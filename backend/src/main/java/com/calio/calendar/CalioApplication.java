@@ -1,0 +1,13 @@
+package com.calio.calendar;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class CalioApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(CalioApplication.class, args);
+    }
+
+}

@@ -2,7 +2,7 @@
 
 ## 기술 맥락
 
-- backend는 Java + Spring boot 기반 서비스다.
+- backend는 Java(21) + Spring boot(4.0.6) 기반 서비스다.
 - Spring MVC / Controller /Service / Repository 경계를 명확히 유지한다.
 - 비즈니스 의미와 상태 판단은 transport layer가 아니라 service layer에서 처리한다.
 - 구조는 전역 `controller`, `service`, `repository`를 두는 단순 layered 구조를 따른다.
