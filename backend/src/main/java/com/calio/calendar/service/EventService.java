@@ -2,7 +2,7 @@ package com.calio.calendar.service;
 
 import com.calio.calendar.controller.dto.CreateEventRequest;
 import com.calio.calendar.controller.dto.EventResponse;
-import com.calio.calendar.exception.CalendarException;
+import com.calio.calendar.exception.CalioException;
 import com.calio.calendar.exception.ErrorCode;
 import com.calio.calendar.repository.EventRepository;
 import com.calio.calendar.repository.entity.Event;
@@ -44,7 +44,7 @@ public class EventService {
 
     private Event findEvent(Long eventId) {
         return eventRepository.findById(eventId)
-                .orElseThrow(() -> new CalendarException(ErrorCode.EVENT_NOT_FOUND));
+                .orElseThrow(() -> new CalioException(ErrorCode.EVENT_NOT_FOUND));
     }
 
     private void validateEventTimeRange(OffsetDateTime startAt, OffsetDateTime endAt) {
@@ -52,7 +52,7 @@ public class EventService {
             return;
         }
 
-        throw new CalendarException(ErrorCode.INVALID_TIME_RANGE);
+        throw new CalioException(ErrorCode.INVALID_TIME_RANGE);
     }
 
     private void validateListTimeRange(OffsetDateTime from, OffsetDateTime to) {
@@ -60,6 +60,6 @@ public class EventService {
             return;
         }
 
-        throw new CalendarException(ErrorCode.INVALID_TIME_RANGE);
+        throw new CalioException(ErrorCode.INVALID_TIME_RANGE);
     }
 }

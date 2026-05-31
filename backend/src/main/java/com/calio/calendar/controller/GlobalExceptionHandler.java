@@ -1,7 +1,7 @@
 package com.calio.calendar.controller;
 
 import com.calio.calendar.controller.dto.ErrorResponse;
-import com.calio.calendar.exception.CalendarException;
+import com.calio.calendar.exception.CalioException;
 import com.calio.calendar.exception.ErrorCode;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.ResponseEntity;
@@ -15,8 +15,8 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler(CalendarException.class)
-    public ResponseEntity<ErrorResponse> handleCalendarException(CalendarException exception) {
+    @ExceptionHandler(CalioException.class)
+    public ResponseEntity<ErrorResponse> handleCalioException(CalioException exception) {
         ErrorCode errorCode = exception.getErrorCode();
         return ResponseEntity
                 .status(errorCode.getStatus())
