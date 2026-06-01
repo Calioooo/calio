@@ -6,7 +6,7 @@ import com.calio.calendar.exception.CalioException;
 import com.calio.calendar.exception.ErrorCode;
 import com.calio.calendar.repository.EventRepository;
 import com.calio.calendar.repository.entity.Event;
-import java.time.OffsetDateTime;
+import java.time.Instant;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,7 +34,7 @@ public class EventService {
     }
 
     @Transactional(readOnly = true)
-    public List<EventResponse> listEvents(OffsetDateTime from, OffsetDateTime to) {
+    public List<EventResponse> listEvents(Instant from, Instant to) {
         validateListTimeRange(from, to);
         return eventRepository.findByStartAtBetweenOrderByStartAtAsc(from, to)
                 .stream()
@@ -47,7 +47,7 @@ public class EventService {
                 .orElseThrow(() -> new CalioException(ErrorCode.EVENT_NOT_FOUND));
     }
 
-    private void validateEventTimeRange(OffsetDateTime startAt, OffsetDateTime endAt) {
+    private void validateEventTimeRange(Instant startAt, Instant endAt) {
         if (startAt.isBefore(endAt)) {
             return;
         }
@@ -55,7 +55,7 @@ public class EventService {
         throw new CalioException(ErrorCode.INVALID_TIME_RANGE);
     }
 
-    private void validateListTimeRange(OffsetDateTime from, OffsetDateTime to) {
+    private void validateListTimeRange(Instant from, Instant to) {
         if (!from.isAfter(to)) {
             return;
         }

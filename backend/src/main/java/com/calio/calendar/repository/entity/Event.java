@@ -6,7 +6,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import java.time.OffsetDateTime;
+import java.time.Instant;
 
 @Entity
 @Table(name = "events")
@@ -23,15 +23,15 @@ public class Event extends BaseEntity {
     private String description;
 
     @Column(nullable = false)
-    private OffsetDateTime startAt;
+    private Instant startAt;
 
     @Column(nullable = false)
-    private OffsetDateTime endAt;
+    private Instant endAt;
 
     protected Event() {
     }
 
-    public Event(String title, String description, OffsetDateTime startAt, OffsetDateTime endAt) {
+    public Event(String title, String description, Instant startAt, Instant endAt) {
         this.title = title;
         this.description = description;
         this.startAt = startAt;
@@ -50,11 +50,11 @@ public class Event extends BaseEntity {
         return description;
     }
 
-    public OffsetDateTime getStartAt() {
+    public Instant getStartAt() {
         return startAt;
     }
 
-    public OffsetDateTime getEndAt() {
+    public Instant getEndAt() {
         return endAt;
     }
 }

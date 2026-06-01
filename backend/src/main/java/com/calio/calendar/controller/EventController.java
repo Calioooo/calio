@@ -4,7 +4,7 @@ import com.calio.calendar.controller.dto.CreateEventRequest;
 import com.calio.calendar.controller.dto.EventResponse;
 import com.calio.calendar.service.EventService;
 import jakarta.validation.Valid;
-import java.time.OffsetDateTime;
+import java.time.Instant;
 import java.util.List;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
@@ -42,8 +42,8 @@ public class EventController {
 
     @GetMapping
     public List<EventResponse> listEvents(
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime from,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime to
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to
     ) {
         return eventService.listEvents(from, to);
     }
