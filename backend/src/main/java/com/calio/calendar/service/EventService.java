@@ -36,8 +36,8 @@ public class EventService {
 
     @Transactional
     public EventResponse updateEvent(Long eventId, UpdateEventRequest request) {
-        Event event = findEvent(eventId);
         validateEventTimeRange(request.startAt(), request.endAt());
+        Event event = findEvent(eventId);
         event.replace(request.title(), request.description(), request.startAt(), request.endAt());
         eventRepository.flush();
         return EventResponse.from(event);
