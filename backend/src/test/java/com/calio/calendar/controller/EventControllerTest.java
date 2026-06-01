@@ -2,13 +2,13 @@ package com.calio.calendar.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -18,6 +18,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 @SpringBootTest(properties = {
         "spring.datasource.url=jdbc:h2:mem:calendar-test;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE",
@@ -130,6 +132,161 @@ class EventControllerTest {
     }
 
     @Test
+    @DisplayName("사용자는 기존 일정을 전체 교체하면 id와 생성 시각은 보존되고 변경 가능한 필드만 바뀐다")
+    void givenExistingEvent_whenUpdateEvent_thenReplacesMutableFieldsAndPreservesServerManagedFields()
+            throws Exception {
+        // given
+        MvcResult createResult = createEventResult(
+                "Original",
+                "2026-06-04T00:00:00Z",
+                "2026-06-04T01:00:00Z"
+        );
+        JsonNode createdEvent = readResponse(createResult);
+        long eventId = createdEvent.get("id").asLong();
+        MvcResult persistedResult = mockMvc.perform(get("/api/events/{eventId}", eventId))
+                .andExpect(status().isOk())
+                .andReturn();
+        String persistedCreatedAt = readResponse(persistedResult).get("createdAt").asText();
+
+        String requestBody = """
+                {
+                  "id": 999999,
+                  "title": "Updated",
+                  "description": null,
+                  "startAt": "2026-06-04T02:00:00Z",
+                  "endAt": "2026-06-04T03:00:00Z",
+                  "createdAt": "2000-01-01T00:00:00Z",
+                  "updatedAt": "2000-01-01T00:00:00Z",
+                  "unknown": "ignored"
+                }
+                """;
+
+        // when
+        MvcResult updateResult = mockMvc.perform(put("/api/events/{eventId}", eventId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                // then
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(eventId))
+                .andExpect(jsonPath("$.title").value("Updated"))
+                .andExpect(jsonPath("$.startAt").value("2026-06-04T02:00:00Z"))
+                .andExpect(jsonPath("$.endAt").value("2026-06-04T03:00:00Z"))
+                .andExpect(jsonPath("$.createdAt").value(persistedCreatedAt))
+                .andExpect(jsonPath("$.updatedAt").isString())
+                .andReturn();
+
+        JsonNode updatedEvent = readResponse(updateResult);
+        assertThat(updatedEvent.get("description").isNull()).isTrue();
+        assertThat(updatedEvent.get("updatedAt").asText()).isNotEqualTo("2000-01-01T00:00:00Z");
+    }
+
+    @Test
+    @DisplayName("사용자는 공백 제목으로 일정을 수정할 수 없다")
+    void givenBlankTitle_whenUpdateEvent_thenReturnsValidationFailed() throws Exception {
+        // given
+        long eventId = createEvent("Editable", "2026-06-05T00:00:00Z", "2026-06-05T01:00:00Z");
+        String requestBody = """
+                {
+                  "title": " ",
+                  "startAt": "2026-06-05T02:00:00Z",
+                  "endAt": "2026-06-05T03:00:00Z"
+                }
+                """;
+
+        // when
+        mockMvc.perform(put("/api/events/{eventId}", eventId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                // then
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.message").isString())
+                .andExpect(jsonPath("$.*", hasSize(2)));
+    }
+
+    @Test
+    @DisplayName("사용자는 필수 시각 없이 일정을 수정할 수 없다")
+    void givenMissingRequiredTimeFields_whenUpdateEvent_thenReturnsValidationFailed() throws Exception {
+        // given
+        long eventId = createEvent("Editable", "2026-06-06T00:00:00Z", "2026-06-06T01:00:00Z");
+
+        // when, then
+        mockMvc.perform(put("/api/events/{eventId}", eventId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Updated",
+                                  "endAt": "2026-06-06T03:00:00Z"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.message").isString())
+                .andExpect(jsonPath("$.*", hasSize(2)));
+
+        mockMvc.perform(put("/api/events/{eventId}", eventId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Updated",
+                                  "startAt": "2026-06-06T02:00:00Z"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.message").isString())
+                .andExpect(jsonPath("$.*", hasSize(2)));
+    }
+
+    @Test
+    @DisplayName("사용자는 시작 시각이 종료 시각보다 빠르지 않게 일정을 수정할 수 없다")
+    void givenStartAtIsNotEarlierThanEndAt_whenUpdateEvent_thenReturnsInvalidTimeRange() throws Exception {
+        // given
+        long eventId = createEvent("Editable", "2026-06-07T00:00:00Z", "2026-06-07T01:00:00Z");
+        String requestBody = """
+                {
+                  "title": "Updated",
+                  "startAt": "2026-06-07T02:00:00Z",
+                  "endAt": "2026-06-07T02:00:00Z"
+                }
+                """;
+
+        // when
+        mockMvc.perform(put("/api/events/{eventId}", eventId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                // then
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("INVALID_TIME_RANGE"))
+                .andExpect(jsonPath("$.message").isString())
+                .andExpect(jsonPath("$.*", hasSize(2)));
+    }
+
+    @Test
+    @DisplayName("사용자는 존재하지 않는 일정 id를 수정하면 EVENT_NOT_FOUND를 받는다")
+    void givenMissingEventId_whenUpdateEvent_thenReturnsEventNotFound() throws Exception {
+        // given
+        long missingEventId = 999999L;
+        String requestBody = """
+                {
+                  "title": "Updated",
+                  "startAt": "2026-06-08T00:00:00Z",
+                  "endAt": "2026-06-08T01:00:00Z"
+                }
+                """;
+
+        // when
+        mockMvc.perform(put("/api/events/{eventId}", missingEventId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                // then
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("EVENT_NOT_FOUND"))
+                .andExpect(jsonPath("$.message").isString())
+                .andExpect(jsonPath("$.*", hasSize(2)));
+    }
+
+    @Test
     @DisplayName("사용자는 존재하지 않는 일정 id를 조회하면 EVENT_NOT_FOUND를 받는다")
     void givenMissingEventId_whenGetEvent_thenReturnsEventNotFound() throws Exception {
         // given
@@ -141,6 +298,58 @@ class EventControllerTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorCode").value("EVENT_NOT_FOUND"))
                 .andExpect(jsonPath("$.message").isString());
+    }
+
+    @Test
+    @DisplayName("사용자는 일정을 삭제하면 본문 없는 204를 받고 기존 조회 API에서 삭제된 일정을 볼 수 없다")
+    void givenExistingEvent_whenDeleteEvent_thenReturnsNoContentAndEventIsHiddenFromReads() throws Exception {
+        // given
+        long deletedEventId = createEvent("Delete me", "2026-06-09T00:00:00Z", "2026-06-09T01:00:00Z");
+        long remainingEventId = createEvent("Keep me", "2026-06-09T02:00:00Z", "2026-06-09T03:00:00Z");
+
+        // when
+        MvcResult deleteResult = mockMvc.perform(delete("/api/events/{eventId}", deletedEventId))
+                // then
+                .andExpect(status().isNoContent())
+                .andReturn();
+        assertThat(deleteResult.getResponse().getContentAsString(StandardCharsets.UTF_8)).isEmpty();
+
+        mockMvc.perform(get("/api/events/{eventId}", deletedEventId))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("EVENT_NOT_FOUND"));
+
+        MvcResult listResult = mockMvc.perform(get("/api/events")
+                        .param("from", "2026-06-09T00:00:00Z")
+                        .param("to", "2026-06-09T02:00:00Z"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].id").value(remainingEventId))
+                .andReturn();
+        JsonNode events = readResponse(listResult);
+        assertThat(containsEventId(events, deletedEventId)).isFalse();
+    }
+
+    @Test
+    @DisplayName("사용자는 존재하지 않거나 이미 삭제된 일정 id를 삭제하면 EVENT_NOT_FOUND를 받는다")
+    void givenMissingOrAlreadyDeletedEventId_whenDeleteEvent_thenReturnsEventNotFound() throws Exception {
+        // given
+        long eventId = createEvent("Delete once", "2026-06-10T00:00:00Z", "2026-06-10T01:00:00Z");
+        long missingEventId = 999999L;
+        mockMvc.perform(delete("/api/events/{eventId}", eventId))
+                .andExpect(status().isNoContent());
+
+        // when, then
+        mockMvc.perform(delete("/api/events/{eventId}", missingEventId))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("EVENT_NOT_FOUND"))
+                .andExpect(jsonPath("$.message").isString())
+                .andExpect(jsonPath("$.*", hasSize(2)));
+
+        mockMvc.perform(delete("/api/events/{eventId}", eventId))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("EVENT_NOT_FOUND"))
+                .andExpect(jsonPath("$.message").isString())
+                .andExpect(jsonPath("$.*", hasSize(2)));
     }
 
     @Test
@@ -167,6 +376,10 @@ class EventControllerTest {
     }
 
     private long createEvent(String title, String startAt, String endAt) throws Exception {
+        return readResponse(createEventResult(title, startAt, endAt)).get("id").asLong();
+    }
+
+    private MvcResult createEventResult(String title, String startAt, String endAt) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/events")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -179,11 +392,21 @@ class EventControllerTest {
                 .andExpect(status().isCreated())
                 .andReturn();
 
-        return readResponse(result).get("id").asLong();
+        return result;
     }
 
     private JsonNode readResponse(MvcResult result) throws Exception {
         String content = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
         return objectMapper.readTree(content);
+    }
+
+    private boolean containsEventId(JsonNode events, long eventId) {
+        for (JsonNode event : events) {
+            if (event.get("id").asLong() == eventId) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

@@ -2,6 +2,7 @@ package com.calio.calendar.service;
 
 import com.calio.calendar.controller.dto.CreateEventRequest;
 import com.calio.calendar.controller.dto.EventResponse;
+import com.calio.calendar.controller.dto.UpdateEventRequest;
 import com.calio.calendar.exception.CalioException;
 import com.calio.calendar.exception.ErrorCode;
 import com.calio.calendar.repository.EventRepository;
@@ -31,6 +32,21 @@ public class EventService {
     public EventResponse getEvent(Long eventId) {
         Event event = findEvent(eventId);
         return EventResponse.from(event);
+    }
+
+    @Transactional
+    public EventResponse updateEvent(Long eventId, UpdateEventRequest request) {
+        Event event = findEvent(eventId);
+        validateEventTimeRange(request.startAt(), request.endAt());
+        event.replace(request.title(), request.description(), request.startAt(), request.endAt());
+        eventRepository.flush();
+        return EventResponse.from(event);
+    }
+
+    @Transactional
+    public void deleteEvent(Long eventId) {
+        Event event = findEvent(eventId);
+        eventRepository.delete(event);
     }
 
     @Transactional(readOnly = true)

@@ -38,6 +38,13 @@ public class Event extends BaseEntity {
         this.endAt = endAt;
     }
 
+    public void replace(String title, String description, Instant startAt, Instant endAt) {
+        this.title = title;
+        this.description = description;
+        this.startAt = startAt;
+        this.endAt = endAt;
+    }
+
     public Long getId() {
         return id;
     }
