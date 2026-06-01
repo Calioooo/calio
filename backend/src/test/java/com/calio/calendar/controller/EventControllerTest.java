@@ -7,13 +7,13 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -44,8 +44,8 @@ class EventControllerTest {
                 {
                   "title": "Planning",
                   "description": "Weekly planning",
-                  "startAt": "2026-06-01T09:00:00+09:00",
-                  "endAt": "2026-06-01T10:00:00+09:00",
+                  "startAt": "2026-06-01T00:00:00Z",
+                  "endAt": "2026-06-01T01:00:00Z",
                   "createdAt": "2000-01-01T00:00:00Z",
                   "updatedAt": "2000-01-01T00:00:00Z"
                 }
@@ -60,8 +60,8 @@ class EventControllerTest {
                 .andExpect(jsonPath("$.id").isNumber())
                 .andExpect(jsonPath("$.title").value("Planning"))
                 .andExpect(jsonPath("$.description").value("Weekly planning"))
-                .andExpect(jsonPath("$.startAt").value("2026-06-01T09:00:00+09:00"))
-                .andExpect(jsonPath("$.endAt").value("2026-06-01T10:00:00+09:00"))
+                .andExpect(jsonPath("$.startAt").value("2026-06-01T00:00:00Z"))
+                .andExpect(jsonPath("$.endAt").value("2026-06-01T01:00:00Z"))
                 .andExpect(jsonPath("$.createdAt").isString())
                 .andExpect(jsonPath("$.updatedAt").isString())
                 .andReturn();
@@ -78,8 +78,8 @@ class EventControllerTest {
         String requestBody = """
                 {
                   "title": " ",
-                  "startAt": "2026-06-01T09:00:00+09:00",
-                  "endAt": "2026-06-01T10:00:00+09:00"
+                  "startAt": "2026-06-01T00:00:00Z",
+                  "endAt": "2026-06-01T01:00:00Z"
                 }
                 """;
 
@@ -100,8 +100,8 @@ class EventControllerTest {
         String requestBody = """
                 {
                   "title": "Planning",
-                  "startAt": "2026-06-01T10:00:00+09:00",
-                  "endAt": "2026-06-01T10:00:00+09:00"
+                  "startAt": "2026-06-01T01:00:00Z",
+                  "endAt": "2026-06-01T01:00:00Z"
                 }
                 """;
 
@@ -119,7 +119,7 @@ class EventControllerTest {
     @DisplayName("사용자는 생성된 일정 id로 단일 일정을 조회할 수 있다")
     void givenExistingEventId_whenGetEvent_thenReturnsEvent() throws Exception {
         // given
-        long eventId = createEvent("Review", "2026-06-02T09:00:00+09:00", "2026-06-02T10:00:00+09:00");
+        long eventId = createEvent("Review", "2026-06-02T00:00:00Z", "2026-06-02T01:00:00Z");
 
         // when
         mockMvc.perform(get("/api/events/{eventId}", eventId))
@@ -148,16 +148,16 @@ class EventControllerTest {
     void givenEventsAcrossRangeBoundaries_whenListEvents_thenReturnsInclusiveRangeSortedByStartAt()
             throws Exception {
         // given
-        createEvent("Before", "2026-06-03T08:59:59+09:00", "2026-06-03T09:30:00+09:00");
-        long lowerBoundaryId = createEvent("Lower", "2026-06-03T09:00:00+09:00", "2026-06-03T10:00:00+09:00");
-        long middleId = createEvent("Middle", "2026-06-03T10:00:00+09:00", "2026-06-03T11:00:00+09:00");
-        long upperBoundaryId = createEvent("Upper", "2026-06-03T11:00:00+09:00", "2026-06-03T12:00:00+09:00");
-        createEvent("After", "2026-06-03T11:00:01+09:00", "2026-06-03T12:30:00+09:00");
+        createEvent("Before", "2026-06-02T23:59:59Z", "2026-06-03T00:30:00Z");
+        long lowerBoundaryId = createEvent("Lower", "2026-06-03T00:00:00Z", "2026-06-03T01:00:00Z");
+        long middleId = createEvent("Middle", "2026-06-03T01:00:00Z", "2026-06-03T02:00:00Z");
+        long upperBoundaryId = createEvent("Upper", "2026-06-03T02:00:00Z", "2026-06-03T03:00:00Z");
+        createEvent("After", "2026-06-03T02:00:01Z", "2026-06-03T03:30:00Z");
 
         // when
         mockMvc.perform(get("/api/events")
-                        .param("from", "2026-06-03T09:00:00+09:00")
-                        .param("to", "2026-06-03T11:00:00+09:00"))
+                        .param("from", "2026-06-03T00:00:00Z")
+                        .param("to", "2026-06-03T02:00:00Z"))
                 // then
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(3)))
