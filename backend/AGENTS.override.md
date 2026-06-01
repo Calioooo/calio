@@ -89,6 +89,17 @@
 - 과도한 mocking으로 구현 세부에 강하게 결합되는 테스트는 피한다
 - not-found, validation failure, conflict, unsupported-state 같은 경계 케이스는 integration test 또는 적절한 테스트로 명시적으로 검증한다.
 - 테스트는 기대 동작과 실패 동작이 읽히는 형태로 작성한다.
+- 테스트는 기능 명세처럼 읽히도록 작성하고, Java/Spring 테스트는 `@DisplayName`으로 기대 동작을 명확히 드러낸다.
+- 테스트 본문은 필요한 경우 `// given`, `// when`, `// then` 주석으로 준비, 실행, 검증 구간을 구분한다.
+- Spring integration test는 운영 DB나 실제 외부 secret에 의존하지 않고, test profile, `src/test/resources`, embedded DB, testcontainer 중 하나로 독립 실행 가능해야 한다.
+
+## 환경 변수 / Verify 규칙
+
+- 실제 secret 값은 git에 커밋하지 않고, repo에는 필요한 환경 변수 목록을 설명하는 `.env.example`만 둔다.
+- unit test와 기본 integration test는 실제 secret 없이 실행 가능해야 한다.
+- 실제 env 값이 필요한 검증은 verify 단계에서만 pipeline/project secret으로 런타임 주입한다.
+- domain별 verify command가 필요한 경우 대상 repo의 `.orchestrator/domain-map.json`에 `workdir`와 `verifyCommand`를 명시한다.
+
 
 ## 코드 구성 원칙
 
