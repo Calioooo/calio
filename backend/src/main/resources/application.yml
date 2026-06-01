@@ -1,17 +1,17 @@
 spring:
-   application:
-     name:calio
-   datasource:
-      url: jdbc:mysql://localhost:3306/calendar
-      username: calendar
-      password: calendar
-     driver-class-name: com.mysql.cj.jdbc.Driver
-   jpa:
-     hibernate:
-       ddl-auto: update
-     properties:
-       hibernate:
-         format_sql: true
-   sql:
-     init:
-       mode: never
+  application:
+    name: calio
+  datasource:
+    url: jdbc:mysql://localhost:3306/calendar
+    username: calendar
+    password: calendar
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+  sql:
+    init:
+      mode: never
