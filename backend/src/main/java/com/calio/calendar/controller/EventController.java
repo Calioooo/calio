@@ -51,6 +51,11 @@ public class EventController {
         return eventService.updateEvent(eventId, request);
     }
 
+    @PutMapping("/{eventId}/important-event")
+    public EventResponse markImportantEvent(@PathVariable Long eventId) {
+        return eventService.markImportantEvent(eventId);
+    }
+
     @DeleteMapping("/{eventId}")
     public ResponseEntity<Void> deleteEvent(@PathVariable Long eventId) {
         eventService.deleteEvent(eventId);

@@ -64,6 +64,7 @@ class EventControllerTest {
                 .andExpect(jsonPath("$.description").value("Weekly planning"))
                 .andExpect(jsonPath("$.startAt").value("2026-06-01T00:00:00Z"))
                 .andExpect(jsonPath("$.endAt").value("2026-06-01T01:00:00Z"))
+                .andExpect(jsonPath("$.importantEvent").value(false))
                 .andExpect(jsonPath("$.createdAt").isString())
                 .andExpect(jsonPath("$.updatedAt").isString())
                 .andReturn();
@@ -128,7 +129,68 @@ class EventControllerTest {
                 // then
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(eventId))
-                .andExpect(jsonPath("$.title").value("Review"));
+                .andExpect(jsonPath("$.title").value("Review"))
+                .andExpect(jsonPath("$.importantEvent").value(false));
+    }
+
+    @Test
+    @DisplayName("사용자는 기존 일정을 중요한 일정으로 등록하면 이후 조회에서 저장된 importantEvent 값을 받는다")
+    void givenExistingEvent_whenMarkImportantEvent_thenReturnsImportantEventAndPersistsIt()
+            throws Exception {
+        // given
+        long eventId = createEvent("Important", "2026-06-11T00:00:00Z", "2026-06-11T01:00:00Z");
+
+        // when
+        mockMvc.perform(put("/api/events/{eventId}/important-event", eventId))
+                // then
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(eventId))
+                .andExpect(jsonPath("$.importantEvent").value(true));
+
+        mockMvc.perform(get("/api/events/{eventId}", eventId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(eventId))
+                .andExpect(jsonPath("$.importantEvent").value(true));
+
+        mockMvc.perform(get("/api/events")
+                        .param("from", "2026-06-11T00:00:00Z")
+                        .param("to", "2026-06-11T01:00:00Z"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].id").value(eventId))
+                .andExpect(jsonPath("$[0].importantEvent").value(true));
+    }
+
+    @Test
+    @DisplayName("사용자는 이미 중요한 일정을 다시 등록해도 성공하고 importantEvent true를 받는다")
+    void givenAlreadyImportantEvent_whenMarkImportantEventAgain_thenReturnsImportantEvent()
+            throws Exception {
+        // given
+        long eventId = createEvent("Important again", "2026-06-12T00:00:00Z", "2026-06-12T01:00:00Z");
+        mockMvc.perform(put("/api/events/{eventId}/important-event", eventId))
+                .andExpect(status().isOk());
+
+        // when
+        mockMvc.perform(put("/api/events/{eventId}/important-event", eventId))
+                // then
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(eventId))
+                .andExpect(jsonPath("$.importantEvent").value(true));
+    }
+
+    @Test
+    @DisplayName("사용자는 존재하지 않는 일정을 중요한 일정으로 등록하면 EVENT_NOT_FOUND를 받는다")
+    void givenMissingEventId_whenMarkImportantEvent_thenReturnsEventNotFound() throws Exception {
+        // given
+        long missingEventId = 999999L;
+
+        // when
+        mockMvc.perform(put("/api/events/{eventId}/important-event", missingEventId))
+                // then
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("EVENT_NOT_FOUND"))
+                .andExpect(jsonPath("$.message").isString())
+                .andExpect(jsonPath("$.*", hasSize(2)));
     }
 
     @Test
@@ -372,7 +434,10 @@ class EventControllerTest {
                 .andExpect(jsonPath("$", hasSize(3)))
                 .andExpect(jsonPath("$[0].id").value(lowerBoundaryId))
                 .andExpect(jsonPath("$[1].id").value(middleId))
-                .andExpect(jsonPath("$[2].id").value(upperBoundaryId));
+                .andExpect(jsonPath("$[2].id").value(upperBoundaryId))
+                .andExpect(jsonPath("$[0].importantEvent").value(false))
+                .andExpect(jsonPath("$[1].importantEvent").value(false))
+                .andExpect(jsonPath("$[2].importantEvent").value(false));
     }
 
     private long createEvent(String title, String startAt, String endAt) throws Exception {
