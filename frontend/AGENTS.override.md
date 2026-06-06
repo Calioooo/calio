@@ -3,14 +3,14 @@
 ## 기술 맥락
 
 - frontend는 Swift 기반 iOS 앱이다.
-- 초기 구조는 전역 `view`, `viewModel`, `service`, `model`를 두는 단순 layered 구조를 따른다.
 - 화면 표현, 사용자 입력, 상태 표시, backend 응답 소비를 명확히 분리한다.
 - backend가 API 계약과 비즈니스 의미의 source of truth다.
 
 ## 구조 원칙
 
 - 패키지는 전역 레이어 기준으로 나눈다.
-- 기본 구조는 `view`, `viewModel`, `service`, `model`을 기준으로 나눈다.
+- 기본 구조는 `view`, `viewModel`, `service`, `repository`, `model`을 기준으로 나눈다.
+- 의존성 방향은 `view -> viewModel -> service -> Repository Protocol -> Repository Implementation -> DataSource / API` 순서로 흐르며, 상위 계층은 하위 계층의 추상화에만 의존하고 하위 계층은 상위 계층을 알지 못하게 설계한다.
 - 화면 UI 코드는 `view` 아래에 둔다.
 - 화면 상태와 사용자 액션 흐름은 `viewModel`에서 처리한다.
 - API 호출, 응답 디코딩, 앱 내부 모델 변환은 `service`에서 처리한다.
