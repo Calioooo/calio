@@ -28,6 +28,9 @@ public class Event extends BaseEntity {
     @Column(nullable = false)
     private Instant endAt;
 
+    @Column(name = "is_important_event", nullable = false, columnDefinition = "boolean default false")
+    private boolean isImportantEvent = false;
+
     protected Event() {
     }
 
@@ -43,6 +46,10 @@ public class Event extends BaseEntity {
         this.description = description;
         this.startAt = startAt;
         this.endAt = endAt;
+    }
+
+    public void changeIsImportantEvent(boolean isImportantEvent) {
+        this.isImportantEvent = isImportantEvent;
     }
 
     public Long getId() {
@@ -63,5 +70,9 @@ public class Event extends BaseEntity {
 
     public Instant getEndAt() {
         return endAt;
+    }
+
+    public boolean isImportantEvent() {
+        return isImportantEvent;
     }
 }

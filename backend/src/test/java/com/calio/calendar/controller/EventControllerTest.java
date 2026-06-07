@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -18,6 +19,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.ResultActions;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -64,6 +66,7 @@ class EventControllerTest {
                 .andExpect(jsonPath("$.description").value("Weekly planning"))
                 .andExpect(jsonPath("$.startAt").value("2026-06-01T00:00:00Z"))
                 .andExpect(jsonPath("$.endAt").value("2026-06-01T01:00:00Z"))
+                .andExpect(jsonPath("$.isImportantEvent").value(false))
                 .andExpect(jsonPath("$.createdAt").isString())
                 .andExpect(jsonPath("$.updatedAt").isString())
                 .andReturn();
@@ -128,7 +131,124 @@ class EventControllerTest {
                 // then
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(eventId))
-                .andExpect(jsonPath("$.title").value("Review"));
+                .andExpect(jsonPath("$.title").value("Review"))
+                .andExpect(jsonPath("$.isImportantEvent").value(false));
+    }
+
+    @Test
+    @DisplayName("사용자는 일정을 중요 일정으로 등록하고 해제할 수 있다")
+    void givenExistingEvent_whenUpdateImportantEvent_thenReturnsUpdatedImportantEventState()
+            throws Exception {
+        // given
+        long eventId = createEvent("Important target", "2026-06-11T00:00:00Z", "2026-06-11T01:00:00Z");
+
+        // when, then
+        updateImportantEventResult(eventId, true)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(eventId))
+                .andExpect(jsonPath("$.isImportantEvent").value(true));
+
+        updateImportantEventResult(eventId, false)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(eventId))
+                .andExpect(jsonPath("$.isImportantEvent").value(false));
+    }
+
+    @Test
+    @DisplayName("사용자는 같은 중요 일정 상태를 반복 요청해도 성공 응답을 받는다")
+    void givenSameImportantEventState_whenUpdateImportantEventTwice_thenReturnsIdempotentSuccess()
+            throws Exception {
+        // given
+        long eventId = createEvent("Idempotent target", "2026-06-12T00:00:00Z", "2026-06-12T01:00:00Z");
+
+        // when, then
+        updateImportantEventResult(eventId, true)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isImportantEvent").value(true));
+
+        updateImportantEventResult(eventId, true)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isImportantEvent").value(true));
+
+        updateImportantEventResult(eventId, false)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isImportantEvent").value(false));
+
+        updateImportantEventResult(eventId, false)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isImportantEvent").value(false));
+    }
+
+    @Test
+    @DisplayName("사용자는 중요 일정 여부 없이 중요 일정 상태를 변경할 수 없다")
+    void givenMissingImportantEventField_whenUpdateImportantEvent_thenReturnsValidationFailed()
+            throws Exception {
+        // given
+        long eventId = createEvent("Missing important field", "2026-06-13T00:00:00Z", "2026-06-13T01:00:00Z");
+
+        // when
+        mockMvc.perform(patch("/api/events/{eventId}/important-event", eventId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                // then
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.message").isString())
+                .andExpect(jsonPath("$.*", hasSize(2)));
+    }
+
+    @Test
+    @DisplayName("사용자는 boolean이 아닌 중요 일정 여부로 중요 일정 상태를 변경할 수 없다")
+    void givenNonBooleanImportantEventField_whenUpdateImportantEvent_thenReturnsValidationFailed()
+            throws Exception {
+        // given
+        long eventId = createEvent("Invalid important field", "2026-06-14T00:00:00Z", "2026-06-14T01:00:00Z");
+
+        // when
+        mockMvc.perform(patch("/api/events/{eventId}/important-event", eventId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "isImportantEvent": "yes"
+                                }
+                                """))
+                // then
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.message").isString())
+                .andExpect(jsonPath("$.*", hasSize(2)));
+    }
+
+    @Test
+    @DisplayName("사용자는 존재하지 않는 일정 id의 중요 일정 상태를 변경하면 EVENT_NOT_FOUND를 받는다")
+    void givenMissingEventId_whenUpdateImportantEvent_thenReturnsEventNotFound() throws Exception {
+        // given
+        long missingEventId = 999999L;
+
+        // when
+        updateImportantEventResult(missingEventId, true)
+                // then
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("EVENT_NOT_FOUND"))
+                .andExpect(jsonPath("$.message").isString())
+                .andExpect(jsonPath("$.*", hasSize(2)));
+    }
+
+    @Test
+    @DisplayName("사용자는 중요 일정 변경 후 단일 조회에서 저장된 중요 일정 상태를 받는다")
+    void givenChangedImportantEvent_whenGetEvent_thenReturnsStoredImportantEventState()
+            throws Exception {
+        // given
+        long eventId = createEvent("Read important", "2026-06-15T00:00:00Z", "2026-06-15T01:00:00Z");
+        updateImportantEventResult(eventId, true)
+                .andExpect(status().isOk());
+
+        // when
+        mockMvc.perform(get("/api/events/{eventId}", eventId))
+                // then
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(eventId))
+                .andExpect(jsonPath("$.isImportantEvent").value(true));
     }
 
     @Test
@@ -375,6 +495,32 @@ class EventControllerTest {
                 .andExpect(jsonPath("$[2].id").value(upperBoundaryId));
     }
 
+    @Test
+    @DisplayName("사용자는 범위 조회에서 저장된 중요 일정 상태를 받으며 기존 시작 시각 정렬은 유지된다")
+    void givenChangedImportantEvent_whenListEvents_thenReturnsStoredImportantEventStateSortedByStartAt()
+            throws Exception {
+        // given
+        long firstId = createEvent("First", "2026-07-01T00:00:00Z", "2026-07-01T01:00:00Z");
+        long importantId = createEvent("Important", "2026-07-01T01:00:00Z", "2026-07-01T02:00:00Z");
+        long lastId = createEvent("Last", "2026-07-01T02:00:00Z", "2026-07-01T03:00:00Z");
+        updateImportantEventResult(importantId, true)
+                .andExpect(status().isOk());
+
+        // when
+        mockMvc.perform(get("/api/events")
+                        .param("from", "2026-07-01T00:00:00Z")
+                        .param("to", "2026-07-01T02:00:00Z"))
+                // then
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(3)))
+                .andExpect(jsonPath("$[0].id").value(firstId))
+                .andExpect(jsonPath("$[0].isImportantEvent").value(false))
+                .andExpect(jsonPath("$[1].id").value(importantId))
+                .andExpect(jsonPath("$[1].isImportantEvent").value(true))
+                .andExpect(jsonPath("$[2].id").value(lastId))
+                .andExpect(jsonPath("$[2].isImportantEvent").value(false));
+    }
+
     private long createEvent(String title, String startAt, String endAt) throws Exception {
         return readResponse(createEventResult(title, startAt, endAt)).get("id").asLong();
     }
@@ -393,6 +539,16 @@ class EventControllerTest {
                 .andReturn();
 
         return result;
+    }
+
+    private ResultActions updateImportantEventResult(long eventId, boolean isImportantEvent) throws Exception {
+        return mockMvc.perform(patch("/api/events/{eventId}/important-event", eventId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {
+                          "isImportantEvent": %s
+                        }
+                        """.formatted(isImportantEvent)));
     }
 
     private JsonNode readResponse(MvcResult result) throws Exception {
