@@ -180,7 +180,7 @@ class EventControllerTest {
     }
 
     @Test
-    @DisplayName("사용자는 중요 일정 여부 없이 중요 일정 상태를 변경할 수 없다")
+    @DisplayName("요청에 중요 일정 여부가 없으면 상태를 변경할 수 없다")
     void givenMissingImportantEventField_whenUpdateImportantEvent_thenReturnsValidationFailed()
             throws Exception {
         // given
