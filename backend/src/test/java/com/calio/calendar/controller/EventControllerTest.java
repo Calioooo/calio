@@ -496,7 +496,7 @@ class EventControllerTest {
     }
 
     @Test
-    @DisplayName("사용자는 범위 조회에서 저장된 중요 일정 상태를 받으며 기존 시작 시각 정렬은 유지된다")
+    @DisplayName("중요 일정 상태 변경 후에도 조회 결과는 startAt 기준으로 정렬된다")
     void givenChangedImportantEvent_whenListEvents_thenReturnsStoredImportantEventStateSortedByStartAt()
             throws Exception {
         // given
