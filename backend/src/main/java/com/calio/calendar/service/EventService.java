@@ -44,6 +44,14 @@ public class EventService {
     }
 
     @Transactional
+    public EventResponse changeImportantEvent(Long eventId, boolean isImportantEvent) {
+        Event event = findEvent(eventId);
+        event.changeIsImportantEvent(isImportantEvent);
+        eventRepository.flush();
+        return EventResponse.from(event);
+    }
+
+    @Transactional
     public void deleteEvent(Long eventId) {
         Event event = findEvent(eventId);
         eventRepository.delete(event);

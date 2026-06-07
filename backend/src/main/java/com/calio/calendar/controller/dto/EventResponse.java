@@ -1,6 +1,7 @@
 package com.calio.calendar.controller.dto;
 
 import com.calio.calendar.repository.entity.Event;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.Instant;
 
 public record EventResponse(
@@ -9,6 +10,7 @@ public record EventResponse(
         String description,
         Instant startAt,
         Instant endAt,
+        @JsonProperty("isImportantEvent") boolean isImportantEvent,
         Instant createdAt,
         Instant updatedAt
 ) {
@@ -20,6 +22,7 @@ public record EventResponse(
                 event.getDescription(),
                 event.getStartAt(),
                 event.getEndAt(),
+                event.isImportantEvent(),
                 event.getCreatedAt(),
                 event.getUpdatedAt()
         );
