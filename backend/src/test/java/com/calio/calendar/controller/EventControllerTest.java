@@ -198,7 +198,7 @@ class EventControllerTest {
     }
 
     @Test
-    @DisplayName("사용자는 boolean이 아닌 중요 일정 여부로 중요 일정 상태를 변경할 수 없다")
+    @DisplayName("요청에 boolean이 아닌 값으로 중요 일정 여부를 전달할 수 없다")
     void givenNonBooleanImportantEventField_whenUpdateImportantEvent_thenReturnsValidationFailed()
             throws Exception {
         // given
