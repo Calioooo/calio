@@ -47,7 +47,7 @@ public class EventService {
     @Transactional
     public EventResponse updateImportantEvent(Long eventId, UpdateImportantEventRequest request) {
         Event event = findEvent(eventId);
-        event.changeIsImportantEvent(request.isImportantEvent());
+        event.changeImportantEvent(request.importantEvent());
         eventRepository.flush();
         return EventResponse.from(event);
     }

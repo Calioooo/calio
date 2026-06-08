@@ -66,7 +66,7 @@ class EventControllerTest {
                 .andExpect(jsonPath("$.description").value("Weekly planning"))
                 .andExpect(jsonPath("$.startAt").value("2026-06-01T00:00:00Z"))
                 .andExpect(jsonPath("$.endAt").value("2026-06-01T01:00:00Z"))
-                .andExpect(jsonPath("$.isImportantEvent").value(false))
+                .andExpect(jsonPath("$.importantEvent").value(false))
                 .andExpect(jsonPath("$.createdAt").isString())
                 .andExpect(jsonPath("$.updatedAt").isString())
                 .andReturn();
@@ -132,7 +132,7 @@ class EventControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(eventId))
                 .andExpect(jsonPath("$.title").value("Review"))
-                .andExpect(jsonPath("$.isImportantEvent").value(false));
+                .andExpect(jsonPath("$.importantEvent").value(false));
     }
 
     @Test
@@ -146,12 +146,12 @@ class EventControllerTest {
         updateImportantEventResult(eventId, true)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(eventId))
-                .andExpect(jsonPath("$.isImportantEvent").value(true));
+                .andExpect(jsonPath("$.importantEvent").value(true));
 
         updateImportantEventResult(eventId, false)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(eventId))
-                .andExpect(jsonPath("$.isImportantEvent").value(false));
+                .andExpect(jsonPath("$.importantEvent").value(false));
     }
 
     @Test
@@ -164,19 +164,19 @@ class EventControllerTest {
         // when, then
         updateImportantEventResult(eventId, true)
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.isImportantEvent").value(true));
+                .andExpect(jsonPath("$.importantEvent").value(true));
 
         updateImportantEventResult(eventId, true)
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.isImportantEvent").value(true));
+                .andExpect(jsonPath("$.importantEvent").value(true));
 
         updateImportantEventResult(eventId, false)
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.isImportantEvent").value(false));
+                .andExpect(jsonPath("$.importantEvent").value(false));
 
         updateImportantEventResult(eventId, false)
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.isImportantEvent").value(false));
+                .andExpect(jsonPath("$.importantEvent").value(false));
     }
 
     @Test
@@ -209,7 +209,7 @@ class EventControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "isImportantEvent": "yes"
+                                  "importantEvent": "yes"
                                 }
                                 """))
                 // then
@@ -248,7 +248,7 @@ class EventControllerTest {
                 // then
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(eventId))
-                .andExpect(jsonPath("$.isImportantEvent").value(true));
+                .andExpect(jsonPath("$.importantEvent").value(true));
     }
 
     @Test
@@ -514,11 +514,11 @@ class EventControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(3)))
                 .andExpect(jsonPath("$[0].id").value(firstId))
-                .andExpect(jsonPath("$[0].isImportantEvent").value(false))
+                .andExpect(jsonPath("$[0].importantEvent").value(false))
                 .andExpect(jsonPath("$[1].id").value(importantId))
-                .andExpect(jsonPath("$[1].isImportantEvent").value(true))
+                .andExpect(jsonPath("$[1].importantEvent").value(true))
                 .andExpect(jsonPath("$[2].id").value(lastId))
-                .andExpect(jsonPath("$[2].isImportantEvent").value(false));
+                .andExpect(jsonPath("$[2].importantEvent").value(false));
     }
 
     private long createEvent(String title, String startAt, String endAt) throws Exception {
@@ -541,14 +541,14 @@ class EventControllerTest {
         return result;
     }
 
-    private ResultActions updateImportantEventResult(long eventId, boolean isImportantEvent) throws Exception {
+    private ResultActions updateImportantEventResult(long eventId, boolean importantEvent) throws Exception {
         return mockMvc.perform(patch("/api/events/{eventId}/important-event", eventId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                         {
-                          "isImportantEvent": %s
+                          "importantEvent": %s
                         }
-                        """.formatted(isImportantEvent)));
+                        """.formatted(importantEvent)));
     }
 
     private JsonNode readResponse(MvcResult result) throws Exception {
