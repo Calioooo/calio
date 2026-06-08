@@ -23,23 +23,24 @@ final class CalendarHomeViewModel: ObservableObject {
     private let dateService: CalendarDateService
     private let eventService: EventService
     private let calendar: Calendar
+    private var loadingEdges: Set<CalendarState.LoadedEdge> = []
     
     init(
         calendar: Calendar = .current,
         dateService: CalendarDateService = CalendarDateService(),
-        eventService: EventService = EventService()
+        eventService: EventService = EventService(),
+        initialState: CalendarState? = nil,
+        initialFocusedDate: Date = Date()
     ) {
         self.dateService = dateService
         self.calendar = calendar
         self.eventService = eventService
         
-        let focusedDate = Date()
-        
-        self.state = CalendarState(
-            startDate: Date(),
-            endDate: Date(),
+        self.state = initialState ?? CalendarState(
+            startDate: initialFocusedDate,
+            endDate: initialFocusedDate,
             daysByKey: [:],
-            focusedDay: DayKey(date: focusedDate, calendar: calendar)
+            focusedDay: DayKey(date: initialFocusedDate, calendar: calendar)
         )
     }
     
@@ -48,6 +49,10 @@ final class CalendarHomeViewModel: ObservableObject {
             count: visibleDateCount,
             calendar: calendar
         )
+    }
+
+    var loadedDateCellItems: [CalendarDateCellItem] {
+        state.loadedDateCellItems(calendar: calendar)
     }
     
     func loadInitialIfNeeded() {
@@ -118,6 +123,11 @@ final class CalendarHomeViewModel: ObservableObject {
             return
         }
         
+        guard !loadingEdges.contains(edge) else {
+            return
+        }
+        
+        loadingEdges.insert(edge)
         
         let loadStartDate: Date
         let loadEndDate: Date
@@ -132,6 +142,10 @@ final class CalendarHomeViewModel: ObservableObject {
             loadEndDate = dateService.dateByAddingDays(days: -1, to: state.startDate)
         }
         Task {
+            defer {
+                self.loadingEdges.remove(edge)
+            }
+            
             do {
                 let events = try await eventService.fetchEvents(from: loadStartDate, to: loadEndDate)
                 let daysByKey = makeDateCellItemsByDay(events: events, from: loadStartDate, to: loadEndDate)

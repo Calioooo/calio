@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct CalendarDateEventCellView: View {
+    private let maxVisibleEventCount = 3
     
     let weekday: CalendarWeekday
     let monthText: String
@@ -17,14 +18,15 @@ struct CalendarDateEventCellView: View {
     let events: [Event]
     
     var body: some View {
-        VStack {
+        VStack(spacing: 8) {
             Text("\(monthText) / \(dayText)")
                 .font(.system(size: 18, weight: .medium))
                 .frame(maxWidth: .infinity, alignment: .leading)
             FlowLayout() {
-                ForEach(events, id: \.id) { event in
+                ForEach(visibleEvents, id: \.id) { event in
                     Text(event.title)
                         .font(.system(size: 13, weight: .medium))
+                        .lineLimit(1)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
                         .background(
@@ -32,10 +34,32 @@ struct CalendarDateEventCellView: View {
                                 .fill(Color(hex: event.colorCode))
                         )
                 }
+                
+                if hiddenEventCount > 0 {
+                    Text("+\(hiddenEventCount) more")
+                        .font(.system(size: 13, weight: .medium))
+                        .lineLimit(1)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(Color.secondary.opacity(0.12))
+                        )
+                }
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .contentShape(Rectangle())
         .onTapGesture(perform: onTap)
+    }
+    
+    private var visibleEvents: [Event] {
+        Array(events.prefix(maxVisibleEventCount))
+    }
+    
+    private var hiddenEventCount: Int {
+        events.count - visibleEvents.count
     }
 }
 
