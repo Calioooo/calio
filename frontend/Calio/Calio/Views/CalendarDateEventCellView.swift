@@ -34,6 +34,8 @@ struct CalendarDateEventCellView: View {
                 }
             }
         }
+        .contentShape(Rectangle())
+        .onTapGesture(perform: onTap)
     }
 }
 

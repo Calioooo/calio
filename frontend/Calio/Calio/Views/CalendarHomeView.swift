@@ -9,26 +9,70 @@ import SwiftUI
 
 struct CalendarHomeView: View {
     @StateObject private var viewModel = CalendarHomeViewModel()
+    @State private var displayMode: CalendarDisplayMode = .week
     
     private let minimumStripViewHeight: CGFloat = 110
     private let stripViewHeightRatio: CGFloat = 0.2
+    private let minimumMonthViewHeight: CGFloat = 260
+    private let monthViewHeightRatio: CGFloat = 0.42
     
 
     var body: some View {
         GeometryReader { geometry in
-            VStack(spacing: 2){
-                CalendarDateStripView(
+            VStack(spacing: 0) {
+                calendarHeader(in: geometry)
+
+                CalendarScheduleDrawerView(
                     items: viewModel.visibleDateCellItems,
-                    onSelectedDay: viewModel.focusDay(_:)
+                    displayMode: displayMode,
+                    onSelectedEvent: { _ in },
+                    onDragEnded: updateDisplayMode(after:)
                 )
-                .frame(height: max(minimumStripViewHeight, geometry.size.height * stripViewHeightRatio))
-                CalendarDateEventView(items: viewModel.visibleDateCellItems, onSelectedEvent: {_ in })
-                
             }
+            .animation(.easeInOut(duration: 0.2), value: displayMode)
             .task {
                 viewModel.loadInitialIfNeeded()
             }
         }
+    }
+
+    @ViewBuilder
+    private func calendarHeader(in geometry: GeometryProxy) -> some View {
+        switch displayMode {
+        case .week:
+            CalendarDateStripView(
+                items: viewModel.visibleDateCellItems,
+                onSelectedDay: viewModel.focusDay(_:)
+            )
+            .frame(height: weekHeaderHeight(in: geometry))
+            .transition(.opacity)
+            .accessibilityIdentifier("calendar_header_week")
+
+        case .month:
+            CalendarMonthView(items: viewModel.visibleDateCellItems)
+                .frame(height: monthHeaderHeight(in: geometry))
+                .transition(.opacity)
+        }
+    }
+
+    private func updateDisplayMode(after translation: CGSize) {
+        let nextDisplayMode = displayMode.resolved(
+            afterDragTranslationHeight: translation.height
+        )
+
+        guard nextDisplayMode != displayMode else {
+            return
+        }
+
+        displayMode = nextDisplayMode
+    }
+
+    private func weekHeaderHeight(in geometry: GeometryProxy) -> CGFloat {
+        max(minimumStripViewHeight, geometry.size.height * stripViewHeightRatio)
+    }
+
+    private func monthHeaderHeight(in geometry: GeometryProxy) -> CGFloat {
+        max(minimumMonthViewHeight, geometry.size.height * monthViewHeightRatio)
     }
 }
 

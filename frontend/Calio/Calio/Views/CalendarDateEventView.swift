@@ -17,7 +17,9 @@ struct CalendarDateEventView: View {
     var body: some View {
         VStack(spacing: 15) {
             ForEach(items) { item in
-                CalendarDateEventCellView(weekday: item.weekday, monthText: item.monthText, dayText: item.dayText, isToday: item.isToday, onTap: { }, events: item.events)
+                CalendarDateEventCellView(weekday: item.weekday, monthText: item.monthText, dayText: item.dayText, isToday: item.isToday, onTap: {
+                    onSelectedEvent(item.id)
+                }, events: item.events)
                     .frame(height: 80)
             }
         }
