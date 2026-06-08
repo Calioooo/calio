@@ -2,6 +2,7 @@ package com.calio.calendar.controller;
 
 import com.calio.calendar.controller.dto.CreateEventRequest;
 import com.calio.calendar.controller.dto.EventResponse;
+import com.calio.calendar.controller.dto.UpdateImportantEventRequest;
 import com.calio.calendar.controller.dto.UpdateEventRequest;
 import com.calio.calendar.service.EventService;
 import jakarta.validation.Valid;
@@ -13,6 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -49,6 +51,14 @@ public class EventController {
             @Valid @RequestBody UpdateEventRequest request
     ) {
         return eventService.updateEvent(eventId, request);
+    }
+
+    @PatchMapping("/{eventId}/important-event")
+    public EventResponse updateImportantEvent(
+            @PathVariable Long eventId,
+            @Valid @RequestBody UpdateImportantEventRequest request
+    ) {
+        return eventService.updateImportantEvent(eventId, request);
     }
 
     @DeleteMapping("/{eventId}")

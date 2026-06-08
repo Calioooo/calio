@@ -9,6 +9,7 @@ public record EventResponse(
         String description,
         Instant startAt,
         Instant endAt,
+        boolean importantEvent,
         Instant createdAt,
         Instant updatedAt
 ) {
@@ -20,6 +21,7 @@ public record EventResponse(
                 event.getDescription(),
                 event.getStartAt(),
                 event.getEndAt(),
+                event.importantEvent(),
                 event.getCreatedAt(),
                 event.getUpdatedAt()
         );
