@@ -1,0 +1,10 @@
+{
+  "backend": {
+    "workdir": "backend",
+    "verifyCommand": "./gradlew test"
+  },
+  "frontend": {
+    "workdir": "frontend/Calio",
+    "verifyCommand": "xcodebuild test -project Calio.xcodeproj -scheme Calio -destination 'platform=iOS Simulator,name=iPhone 16'"
+  }
+}
