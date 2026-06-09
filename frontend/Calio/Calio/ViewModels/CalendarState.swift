@@ -92,8 +92,8 @@ struct CalendarState {
     }
 
     func loadedDateCellItems(calendar: Calendar) -> [CalendarDateCellItem] {
-        daysByKey.values.sorted { lhs, rhs in
-            lhs.id.toDate(calendar: calendar) < rhs.id.toDate(calendar: calendar)
+        daysByKey.values.sorted { earlierCandidate, laterCandidate in
+            earlierCandidate.id.toDate(calendar: calendar) < laterCandidate.id.toDate(calendar: calendar)
         }
     }
 }
