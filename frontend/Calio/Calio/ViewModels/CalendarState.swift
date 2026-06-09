@@ -13,17 +13,17 @@ struct CalendarState {
     let daysByKey: [DayKey: CalendarDateCellItem]
     let focusedDay: DayKey
     
-    enum LoadedEdge {
+    enum LoadedEdge: Hashable {
         case start
         case end
     }
     
-    func focused(on day: DayKey) -> CalendarState{
+    func focused(on day: DayKey) -> CalendarState {
         return CalendarState(startDate: startDate, endDate: endDate, daysByKey: daysByKey, focusedDay: day)
     }
     
     func isNeedInitialize() -> Bool {
-        return daysByKey.isEmpty;
+        return daysByKey.isEmpty
     }
     
     func nearLoadedEdge(
@@ -88,6 +88,12 @@ struct CalendarState {
         .compactMap { date in
             let day = DayKey(date: date, calendar: calendar)
             return daysByKey[day]
+        }
+    }
+
+    func loadedDateCellItems(calendar: Calendar) -> [CalendarDateCellItem] {
+        daysByKey.values.sorted { earlierCandidate, laterCandidate in
+            earlierCandidate.id.toDate(calendar: calendar) < laterCandidate.id.toDate(calendar: calendar)
         }
     }
 }

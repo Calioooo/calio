@@ -8,35 +8,136 @@
 import SwiftUI
 
 struct CalendarDateStripView: View {
-    
     private let dateCellCount = 7
+    private let coordinateSpaceName = "calendar_date_strip_scroll"
+    private let programmaticAlignmentDelay: UInt64 = 300_000_000
     
     let items: [CalendarDateCellItem]
-    let onSelectedDay: (DayKey) -> Void
+    let focusedDay: DayKey
+    let onFocusedDayChanged: (DayKey) -> Void
+    
+    @State private var scrollPosition: DayKey?
+    @State private var isProgrammaticAlignment = false
+    @State private var lastUserRequestedDay: DayKey?
+    @State private var lastReportedDay: DayKey?
+    @State private var resetProgrammaticAlignmentTask: Task<Void, Never>?
     
     var body: some View {
         GeometryReader { geometry in
-            
             let spacing = min(max(geometry.size.width * 0.01, 3), 8)
-             let totalSpacing = spacing * CGFloat(dateCellCount - 1)
-             let availableWidth = geometry.size.width - totalSpacing
-             let cellWidth = availableWidth / CGFloat(dateCellCount)
+            let totalSpacing = spacing * CGFloat(dateCellCount - 1)
+            let availableWidth = geometry.size.width - totalSpacing
+            let cellWidth = availableWidth / CGFloat(dateCellCount)
             
-            HStack(spacing: spacing) {
-                ForEach (items) { item in
-                    CalendarDateCellView(
-                        weekday: item.weekday,
-                        dayText: item.dayText,
-                        isToday: item.isToday,
-                        onTap: {
-                            onSelectedDay(item.id)
-                        },
-                        events: item.events
-                    )
-                    .frame(width: cellWidth)
+            ScrollView(.horizontal) {
+                LazyHStack(spacing: spacing) {
+                    ForEach(items) { item in
+                        CalendarDateCellView(
+                            weekday: item.weekday,
+                            dayText: item.dayText,
+                            isToday: item.isToday,
+                            onTap: {
+                                reportUserFocusedDay(item.id)
+                            },
+                            events: item.events
+                        )
+                        .frame(width: cellWidth)
+                        .id(item.id)
+                        .background(
+                            GeometryReader { proxy in
+                                Color.clear.preference(
+                                    key: CalendarDateStripCellFramePreferenceKey.self,
+                                    value: [item.id: proxy.frame(in: .named(coordinateSpaceName))]
+                                )
+                            }
+                        )
+                    }
                 }
+                .scrollTargetLayout()
             }
+            .coordinateSpace(name: coordinateSpaceName)
+            .scrollIndicators(.hidden)
+            .scrollTargetBehavior(.viewAligned)
+            .scrollPosition(id: $scrollPosition, anchor: .leading)
+            .onPreferenceChange(CalendarDateStripCellFramePreferenceKey.self) { frames in
+                updateFocusedDayFromLeadingCell(frames)
+            }
+            .onChange(of: focusedDay) { _, newDay in
+                alignIfNeeded(to: newDay)
+            }
+            .onChange(of: items.map(\.id)) { _, _ in
+                alignProgrammatically(to: focusedDay)
+            }
+            .onAppear {
+                alignProgrammatically(to: focusedDay)
+            }
+            .onDisappear {
+                resetProgrammaticAlignmentTask?.cancel()
+            }
+        }
+    }
+    
+    private func updateFocusedDayFromLeadingCell(_ frames: [DayKey: CGRect]) {
+        guard !isProgrammaticAlignment else { return }
+        guard let day = leadingVisibleDay(in: frames) else { return }
+        guard day != lastReportedDay else { return }
+        
+        reportUserFocusedDay(day)
+    }
+    
+    private func leadingVisibleDay(in frames: [DayKey: CGRect]) -> DayKey? {
+        let crossingOrVisibleBeforeLeading = frames.filter { _, frame in
+            frame.minX <= 0 && frame.maxX > 0
+        }
+        
+        if let day = crossingOrVisibleBeforeLeading.max(by: { $0.value.minX < $1.value.minX })?.key {
+            return day
+        }
+        
+        return frames
+            .filter { _, frame in frame.minX > 0 }
+            .min(by: { $0.value.minX < $1.value.minX })?
+            .key
+    }
+    
+    private func reportUserFocusedDay(_ day: DayKey) {
+        lastUserRequestedDay = day
+        lastReportedDay = day
+        onFocusedDayChanged(day)
+    }
+    
+    private func alignIfNeeded(to day: DayKey) {
+        if lastUserRequestedDay == day {
+            lastUserRequestedDay = nil
+            return
+        }
+        
+        alignProgrammatically(to: day)
+    }
+    
+    private func alignProgrammatically(to day: DayKey) {
+        guard items.contains(where: { $0.id == day }) else { return }
+        
+        isProgrammaticAlignment = true
+        scrollPosition = day
+        resetProgrammaticAlignmentTask?.cancel()
+        resetProgrammaticAlignmentTask = Task {
+            try? await Task.sleep(nanoseconds: programmaticAlignmentDelay)
+            guard !Task.isCancelled else { return }
             
+            await MainActor.run {
+                isProgrammaticAlignment = false
+            }
+        }
+    }
+}
+
+private struct CalendarDateStripCellFramePreferenceKey: PreferenceKey {
+    static var defaultValue: [DayKey: CGRect] = [:]
+    
+    static func reduce(value: inout [DayKey: CGRect], nextValue: () -> [DayKey: CGRect]) {
+        value.merge(nextValue()) { _, next in
+            next
         }
     }
 }
@@ -126,8 +227,8 @@ struct CalendarDateStripView: View {
     
     CalendarDateStripView(
         items: items,
-        onSelectedDay: { _ in }
+        focusedDay: items[0].id,
+        onFocusedDayChanged: { _ in }
     )
     .frame(height: 110)
 }
-

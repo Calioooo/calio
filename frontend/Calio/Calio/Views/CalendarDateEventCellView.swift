@@ -6,8 +6,13 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct CalendarDateEventCellView: View {
+    private let maxVisibleEventRowCount = 3
+    private let eventChipHorizontalPadding: CGFloat = 20
+    private let eventChipSpacing: CGFloat = 8
+    private let eventChipFont = UIFont.systemFont(ofSize: 13, weight: .medium)
     
     let weekday: CalendarWeekday
     let monthText: String
@@ -17,25 +22,125 @@ struct CalendarDateEventCellView: View {
     let events: [Event]
     
     var body: some View {
-        VStack {
-            Text("\(monthText) / \(dayText)")
-                .font(.system(size: 18, weight: .medium))
-                .frame(maxWidth: .infinity, alignment: .leading)
-            FlowLayout() {
-                ForEach(events, id: \.id) { event in
-                    Text(event.title)
-                        .font(.system(size: 13, weight: .medium))
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(
-                            RoundedRectangle(cornerRadius: 6)
-                                .fill(Color(hex: event.colorCode))
-                        )
+        GeometryReader { geometry in
+            let overflow = eventOverflow(maxWidth: geometry.size.width)
+            
+            VStack(spacing: 8) {
+                Text("\(monthText) / \(dayText)")
+                    .font(.system(size: 18, weight: .medium))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                FlowLayout(spacing: eventChipSpacing) {
+                    ForEach(overflow.visibleEvents, id: \.id) { event in
+                        Text(event.title)
+                            .font(.system(size: 13, weight: .medium))
+                            .lineLimit(1)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(Color(hex: event.colorCode))
+                            )
+                    }
+                    
+                    if overflow.hiddenEventCount > 0 {
+                        Text("+\(overflow.hiddenEventCount) more")
+                            .font(.system(size: 13, weight: .medium))
+                            .lineLimit(1)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(Color.secondary.opacity(0.12))
+                            )
+                    }
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
         .contentShape(Rectangle())
         .onTapGesture(perform: onTap)
+    }
+    
+    private func eventOverflow(maxWidth: CGFloat) -> EventOverflow {
+        guard maxWidth > 0 else {
+            return EventOverflow(visibleEvents: [], hiddenEventCount: events.count)
+        }
+        
+        var visibleEvents: [Event] = []
+        
+        for event in events {
+            let candidateEvents = visibleEvents + [event]
+            let hiddenEventCount = events.count - candidateEvents.count
+            
+            guard eventChipsFit(
+                visibleEvents: candidateEvents,
+                hiddenEventCount: hiddenEventCount,
+                maxWidth: maxWidth
+            ) else {
+                break
+            }
+            
+            visibleEvents = candidateEvents
+        }
+        
+        return EventOverflow(
+            visibleEvents: visibleEvents,
+            hiddenEventCount: events.count - visibleEvents.count
+        )
+    }
+    
+    private func eventChipsFit(
+        visibleEvents: [Event],
+        hiddenEventCount: Int,
+        maxWidth: CGFloat
+    ) -> Bool {
+        let eventWidths = visibleEvents.map { chipWidth(text: $0.title, maxWidth: maxWidth) }
+        let hiddenWidth = hiddenEventCount > 0
+            ? [chipWidth(text: "+\(hiddenEventCount) more", maxWidth: maxWidth)]
+            : []
+        
+        return rowCount(for: eventWidths + hiddenWidth, maxWidth: maxWidth) <= maxVisibleEventRowCount
+    }
+    
+    private func chipWidth(text: String, maxWidth: CGFloat) -> CGFloat {
+        let textWidth = (text as NSString).size(withAttributes: [.font: eventChipFont]).width
+        
+        return min(textWidth + eventChipHorizontalPadding, maxWidth)
+    }
+    
+    private func rowCount(for widths: [CGFloat], maxWidth: CGFloat) -> Int {
+        widths.reduce(into: EventChipRows()) { rows, width in
+            rows.append(width: width, maxWidth: maxWidth, spacing: eventChipSpacing)
+        }
+        .count
+    }
+}
+
+private struct EventOverflow {
+    let visibleEvents: [Event]
+    let hiddenEventCount: Int
+}
+
+private struct EventChipRows {
+    private(set) var count = 0
+    private var currentRowWidth: CGFloat = 0
+    
+    mutating func append(width: CGFloat, maxWidth: CGFloat, spacing: CGFloat) {
+        guard count > 0 else {
+            count = 1
+            currentRowWidth = width
+            return
+        }
+        
+        let nextRowWidth = currentRowWidth + spacing + width
+        guard nextRowWidth <= maxWidth else {
+            count += 1
+            currentRowWidth = width
+            return
+        }
+        
+        currentRowWidth = nextRowWidth
     }
 }
 

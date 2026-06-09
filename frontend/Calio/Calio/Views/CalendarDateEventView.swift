@@ -8,20 +8,134 @@
 import SwiftUI
 
 struct CalendarDateEventView: View {
-    
-    private let dateCellCount = 7
+    private let coordinateSpaceName = "calendar_date_event_scroll"
+    private let dateRowHeight: CGFloat = 96
+    private let rowSpacing: CGFloat = 15
+    private let programmaticAlignmentDelay: UInt64 = 300_000_000
     
     let items: [CalendarDateCellItem]
-    let onSelectedEvent: (DayKey) -> Void
+    let focusedDay: DayKey
+    let onFocusedDayChanged: (DayKey) -> Void
+    
+    @State private var scrollPosition: DayKey?
+    @State private var isProgrammaticAlignment = false
+    @State private var lastUserRequestedDay: DayKey?
+    @State private var lastReportedDay: DayKey?
+    @State private var resetProgrammaticAlignmentTask: Task<Void, Never>?
     
     var body: some View {
-        VStack(spacing: 15) {
-            ForEach(items) { item in
-                CalendarDateEventCellView(weekday: item.weekday, monthText: item.monthText, dayText: item.dayText, isToday: item.isToday, onTap: {
-                    onSelectedEvent(item.id)
-                }, events: item.events)
-                    .frame(height: 80)
+        ScrollView(.vertical) {
+            LazyVStack(spacing: rowSpacing) {
+                ForEach(items) { item in
+                    CalendarDateEventCellView(
+                        weekday: item.weekday,
+                        monthText: item.monthText,
+                        dayText: item.dayText,
+                        isToday: item.isToday,
+                        onTap: {
+                            reportUserFocusedDay(item.id)
+                        },
+                        events: item.events
+                    )
+                    .frame(height: dateRowHeight)
+                    .clipped()
+                    .id(item.id)
+                    .background(
+                        GeometryReader { proxy in
+                            Color.clear.preference(
+                                key: CalendarDateEventRowFramePreferenceKey.self,
+                                value: [item.id: proxy.frame(in: .named(coordinateSpaceName))]
+                            )
+                        }
+                    )
+                }
             }
+            .scrollTargetLayout()
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+            .padding(.bottom, 24)
+        }
+        .coordinateSpace(name: coordinateSpaceName)
+        .scrollTargetBehavior(.viewAligned)
+        .scrollPosition(id: $scrollPosition, anchor: .top)
+        .onPreferenceChange(CalendarDateEventRowFramePreferenceKey.self) { frames in
+            updateFocusedDayFromTopRow(frames)
+        }
+        .onChange(of: focusedDay) { _, newDay in
+            alignIfNeeded(to: newDay)
+        }
+        .onChange(of: items.map(\.id)) { _, _ in
+            alignProgrammatically(to: focusedDay)
+        }
+        .onAppear {
+            alignProgrammatically(to: focusedDay)
+        }
+        .onDisappear {
+            resetProgrammaticAlignmentTask?.cancel()
+        }
+    }
+    
+    private func updateFocusedDayFromTopRow(_ frames: [DayKey: CGRect]) {
+        guard !isProgrammaticAlignment else { return }
+        guard let day = topVisibleDay(in: frames) else { return }
+        guard day != lastReportedDay else { return }
+        
+        reportUserFocusedDay(day)
+    }
+    
+    private func topVisibleDay(in frames: [DayKey: CGRect]) -> DayKey? {
+        let crossingOrVisibleBeforeTop = frames.filter { _, frame in
+            frame.minY <= 0 && frame.maxY > 0
+        }
+        
+        if let day = crossingOrVisibleBeforeTop.max(by: { $0.value.minY < $1.value.minY })?.key {
+            return day
+        }
+        
+        return frames
+            .filter { _, frame in frame.minY > 0 }
+            .min(by: { $0.value.minY < $1.value.minY })?
+            .key
+    }
+    
+    private func reportUserFocusedDay(_ day: DayKey) {
+        lastUserRequestedDay = day
+        lastReportedDay = day
+        onFocusedDayChanged(day)
+    }
+    
+    private func alignIfNeeded(to day: DayKey) {
+        if lastUserRequestedDay == day {
+            lastUserRequestedDay = nil
+            return
+        }
+        
+        alignProgrammatically(to: day)
+    }
+    
+    private func alignProgrammatically(to day: DayKey) {
+        guard items.contains(where: { $0.id == day }) else { return }
+        
+        isProgrammaticAlignment = true
+        scrollPosition = day
+        resetProgrammaticAlignmentTask?.cancel()
+        resetProgrammaticAlignmentTask = Task {
+            try? await Task.sleep(nanoseconds: programmaticAlignmentDelay)
+            guard !Task.isCancelled else { return }
+            
+            await MainActor.run {
+                isProgrammaticAlignment = false
+            }
+        }
+    }
+}
+
+private struct CalendarDateEventRowFramePreferenceKey: PreferenceKey {
+    static var defaultValue: [DayKey: CGRect] = [:]
+    
+    static func reduce(value: inout [DayKey: CGRect], nextValue: () -> [DayKey: CGRect]) {
+        value.merge(nextValue()) { _, next in
+            next
         }
     }
 }
@@ -111,7 +225,8 @@ struct CalendarDateEventView: View {
     
     CalendarDateEventView(
         items: items,
-        onSelectedEvent: { _ in }
+        focusedDay: items[0].id,
+        onFocusedDayChanged: { _ in }
     )
     .frame(height: 110)
 }

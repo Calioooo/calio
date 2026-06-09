@@ -23,9 +23,10 @@ struct CalendarHomeView: View {
                 calendarHeader(in: geometry)
 
                 CalendarScheduleDrawerView(
-                    items: viewModel.visibleDateCellItems,
+                    items: viewModel.loadedDateCellItems,
+                    focusedDay: viewModel.state.focusedDay,
                     displayMode: displayMode,
-                    onSelectedEvent: { _ in },
+                    onFocusedDayChanged: viewModel.focusDay(_:),
                     onDragEnded: updateDisplayMode(after:)
                 )
             }
@@ -41,8 +42,9 @@ struct CalendarHomeView: View {
         switch displayMode {
         case .week:
             CalendarDateStripView(
-                items: viewModel.visibleDateCellItems,
-                onSelectedDay: viewModel.focusDay(_:)
+                items: viewModel.loadedDateCellItems,
+                focusedDay: viewModel.state.focusedDay,
+                onFocusedDayChanged: viewModel.focusDay(_:)
             )
             .frame(height: weekHeaderHeight(in: geometry))
             .transition(.opacity)

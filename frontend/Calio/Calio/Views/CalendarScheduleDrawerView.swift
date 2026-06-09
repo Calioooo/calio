@@ -9,23 +9,20 @@ import SwiftUI
 
 struct CalendarScheduleDrawerView: View {
     let items: [CalendarDateCellItem]
+    let focusedDay: DayKey
     let displayMode: CalendarDisplayMode
-    let onSelectedEvent: (DayKey) -> Void
+    let onFocusedDayChanged: (DayKey) -> Void
     let onDragEnded: (CGSize) -> Void
 
     var body: some View {
         VStack(spacing: 0) {
             dragHandle
 
-            ScrollView {
-                CalendarDateEventView(
-                    items: items,
-                    onSelectedEvent: onSelectedEvent
-                )
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
-                .padding(.bottom, 24)
-            }
+            CalendarDateEventView(
+                items: items,
+                focusedDay: focusedDay,
+                onFocusedDayChanged: onFocusedDayChanged
+            )
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(uiColor: .systemBackground))
@@ -79,8 +76,9 @@ struct CalendarScheduleDrawerView: View {
 #Preview {
     CalendarScheduleDrawerView(
         items: [],
+        focusedDay: DayKey(date: Date()),
         displayMode: .week,
-        onSelectedEvent: { _ in },
+        onFocusedDayChanged: { _ in },
         onDragEnded: { _ in }
     )
 }
