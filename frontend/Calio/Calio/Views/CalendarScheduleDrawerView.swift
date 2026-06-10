@@ -13,6 +13,9 @@ struct CalendarScheduleDrawerView: View {
     let displayMode: CalendarDisplayMode
     let onFocusedDayChanged: (DayKey) -> Void
     let onDragEnded: (CGSize) -> Void
+    var eventTargetOffset: CalendarScrollTarget?
+    var onEventScrollProgressChanged: (CGFloat, CalendarVisibleIndexRange) -> Void = { _, _ in }
+    var onEventScrollEnded: (CGFloat) -> Void = { _ in }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -21,7 +24,10 @@ struct CalendarScheduleDrawerView: View {
             CalendarDateEventView(
                 items: items,
                 focusedDay: focusedDay,
-                onFocusedDayChanged: onFocusedDayChanged
+                onFocusedDayChanged: onFocusedDayChanged,
+                targetOffset: eventTargetOffset,
+                onScrollProgressChanged: onEventScrollProgressChanged,
+                onScrollEnded: onEventScrollEnded
             )
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

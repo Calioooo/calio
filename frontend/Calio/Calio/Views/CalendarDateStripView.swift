@@ -6,31 +6,43 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct CalendarDateStripView: View {
-    private let dateCellCount = 7
-    private let coordinateSpaceName = "calendar_date_strip_scroll"
-    private let programmaticAlignmentDelay: UInt64 = 300_000_000
-    
     let items: [CalendarDateCellItem]
     let focusedDay: DayKey
     let onFocusedDayChanged: (DayKey) -> Void
-    
-    @State private var scrollPosition: DayKey?
-    @State private var isProgrammaticAlignment = false
-    @State private var lastUserRequestedDay: DayKey?
-    @State private var lastReportedDay: DayKey?
-    @State private var resetProgrammaticAlignmentTask: Task<Void, Never>?
+    var targetOffset: CalendarScrollTarget?
+    var onScrollProgressChanged: (CGFloat, CalendarVisibleIndexRange) -> Void = { _, _ in }
+    var onScrollEnded: (CGFloat) -> Void = { _ in }
+    var onCellWidthChanged: (CGFloat) -> Void = { _ in }
     
     var body: some View {
         GeometryReader { geometry in
-            let spacing = min(max(geometry.size.width * 0.01, 3), 8)
-            let totalSpacing = spacing * CGFloat(dateCellCount - 1)
-            let availableWidth = geometry.size.width - totalSpacing
-            let cellWidth = availableWidth / CGFloat(dateCellCount)
+            let cellWidth = CalendarScrollMetrics.stripCellWidth(
+                containerWidth: geometry.size.width
+            )
             
-            ScrollView(.horizontal) {
-                LazyHStack(spacing: spacing) {
+            CalendarOffsetScrollView(
+                axis: .horizontal,
+                showsIndicators: false,
+                targetOffset: targetOffset,
+                onUserOffsetChanged: { contentOffset, viewportLength in
+                    reportScrollProgress(
+                        contentOffset: contentOffset,
+                        viewportLength: viewportLength,
+                        cellWidth: cellWidth
+                    )
+                },
+                onUserScrollEnded: { contentOffset, _ in
+                    let progress = CalendarScrollMetrics.progress(
+                        contentOffset: contentOffset,
+                        itemExtent: cellWidth
+                    )
+                    onScrollEnded(progress)
+                }
+            ) {
+                LazyHStack(spacing: 0) {
                     ForEach(items) { item in
                         CalendarDateCellView(
                             weekday: item.weekday,
@@ -43,101 +55,233 @@ struct CalendarDateStripView: View {
                         )
                         .frame(width: cellWidth)
                         .id(item.id)
-                        .background(
-                            GeometryReader { proxy in
-                                Color.clear.preference(
-                                    key: CalendarDateStripCellFramePreferenceKey.self,
-                                    value: [item.id: proxy.frame(in: .named(coordinateSpaceName))]
-                                )
-                            }
-                        )
                     }
+
+                    Color.clear
+                        .frame(width: cellWidth * CGFloat(CalendarScrollMetrics.stripVisibleCellCount - 1))
                 }
-                .scrollTargetLayout()
-            }
-            .coordinateSpace(name: coordinateSpaceName)
-            .scrollIndicators(.hidden)
-            .scrollTargetBehavior(.viewAligned)
-            .scrollPosition(id: $scrollPosition, anchor: .leading)
-            .onPreferenceChange(CalendarDateStripCellFramePreferenceKey.self) { frames in
-                updateFocusedDayFromLeadingCell(frames)
-            }
-            .onChange(of: focusedDay) { _, newDay in
-                alignIfNeeded(to: newDay)
-            }
-            .onChange(of: items.map(\.id)) { _, _ in
-                alignProgrammatically(to: focusedDay)
             }
             .onAppear {
-                alignProgrammatically(to: focusedDay)
+                onCellWidthChanged(cellWidth)
             }
-            .onDisappear {
-                resetProgrammaticAlignmentTask?.cancel()
+            .onChange(of: cellWidth) { _, newCellWidth in
+                onCellWidthChanged(newCellWidth)
             }
         }
     }
     
-    private func updateFocusedDayFromLeadingCell(_ frames: [DayKey: CGRect]) {
-        guard !isProgrammaticAlignment else { return }
-        guard let day = leadingVisibleDay(in: frames) else { return }
-        guard day != lastReportedDay else { return }
-        
-        reportUserFocusedDay(day)
-    }
-    
-    private func leadingVisibleDay(in frames: [DayKey: CGRect]) -> DayKey? {
-        let crossingOrVisibleBeforeLeading = frames.filter { _, frame in
-            frame.minX <= 0 && frame.maxX > 0
-        }
-        
-        if let day = crossingOrVisibleBeforeLeading.max(by: { $0.value.minX < $1.value.minX })?.key {
-            return day
-        }
-        
-        return frames
-            .filter { _, frame in frame.minX > 0 }
-            .min(by: { $0.value.minX < $1.value.minX })?
-            .key
-    }
-    
-    private func reportUserFocusedDay(_ day: DayKey) {
-        lastUserRequestedDay = day
-        lastReportedDay = day
-        onFocusedDayChanged(day)
-    }
-    
-    private func alignIfNeeded(to day: DayKey) {
-        if lastUserRequestedDay == day {
-            lastUserRequestedDay = nil
+    private func reportScrollProgress(
+        contentOffset: CGFloat,
+        viewportLength: CGFloat,
+        cellWidth: CGFloat
+    ) {
+        let progress = CalendarScrollMetrics.progress(
+            contentOffset: contentOffset,
+            itemExtent: cellWidth
+        )
+
+        guard let visibleRange = CalendarScrollMetrics.visibleIndexRange(
+            contentOffset: contentOffset,
+            viewportLength: viewportLength,
+            itemExtent: cellWidth,
+            itemCount: items.count
+        ) else {
             return
         }
-        
-        alignProgrammatically(to: day)
+
+        onScrollProgressChanged(progress, visibleRange)
     }
-    
-    private func alignProgrammatically(to day: DayKey) {
-        guard items.contains(where: { $0.id == day }) else { return }
-        
-        isProgrammaticAlignment = true
-        scrollPosition = day
-        resetProgrammaticAlignmentTask?.cancel()
-        resetProgrammaticAlignmentTask = Task {
-            try? await Task.sleep(nanoseconds: programmaticAlignmentDelay)
-            guard !Task.isCancelled else { return }
-            
-            await MainActor.run {
-                isProgrammaticAlignment = false
-            }
-        }
+
+    private func reportUserFocusedDay(_ day: DayKey) {
+        onFocusedDayChanged(day)
     }
 }
 
-private struct CalendarDateStripCellFramePreferenceKey: PreferenceKey {
-    static var defaultValue: [DayKey: CGRect] = [:]
-    
-    static func reduce(value: inout [DayKey: CGRect], nextValue: () -> [DayKey: CGRect]) {
-        value.merge(nextValue()) { _, next in
-            next
+enum CalendarOffsetScrollAxis: Equatable {
+    case horizontal
+    case vertical
+}
+
+struct CalendarOffsetScrollView<Content: View>: UIViewRepresentable {
+    let axis: CalendarOffsetScrollAxis
+    let showsIndicators: Bool
+    let targetOffset: CalendarScrollTarget?
+    let onUserOffsetChanged: (CGFloat, CGFloat) -> Void
+    let onUserScrollEnded: (CGFloat, CGFloat) -> Void
+    @ViewBuilder let content: () -> Content
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    func makeUIView(context: Context) -> UIScrollView {
+        let scrollView = UIScrollView()
+        let hostingController = UIHostingController(rootView: content())
+
+        context.coordinator.hostingController = hostingController
+        scrollView.delegate = context.coordinator
+        scrollView.alwaysBounceHorizontal = axis == .horizontal
+        scrollView.alwaysBounceVertical = axis == .vertical
+        scrollView.showsHorizontalScrollIndicator = showsIndicators && axis == .horizontal
+        scrollView.showsVerticalScrollIndicator = showsIndicators && axis == .vertical
+        scrollView.contentInsetAdjustmentBehavior = .never
+        scrollView.backgroundColor = .clear
+
+        hostingController.view.backgroundColor = .clear
+        hostingController.view.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.addSubview(hostingController.view)
+        NSLayoutConstraint.activate(contentConstraints(
+            for: hostingController.view,
+            in: scrollView
+        ))
+
+        return scrollView
+    }
+
+    func updateUIView(_ scrollView: UIScrollView, context: Context) {
+        context.coordinator.axis = axis
+        context.coordinator.onUserOffsetChanged = onUserOffsetChanged
+        context.coordinator.onUserScrollEnded = onUserScrollEnded
+        context.coordinator.hostingController?.rootView = content()
+        context.coordinator.applyTargetOffsetIfNeeded(targetOffset, to: scrollView)
+    }
+
+    private func contentConstraints(
+        for contentView: UIView,
+        in scrollView: UIScrollView
+    ) -> [NSLayoutConstraint] {
+        switch axis {
+        case .horizontal:
+            return [
+                contentView.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
+                contentView.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
+                contentView.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
+                contentView.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
+                contentView.heightAnchor.constraint(equalTo: scrollView.frameLayoutGuide.heightAnchor)
+            ]
+
+        case .vertical:
+            return [
+                contentView.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
+                contentView.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
+                contentView.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
+                contentView.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
+                contentView.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor)
+            ]
+        }
+    }
+
+    final class Coordinator: NSObject, UIScrollViewDelegate {
+        var axis: CalendarOffsetScrollAxis = .vertical
+        var onUserOffsetChanged: (CGFloat, CGFloat) -> Void = { _, _ in }
+        var onUserScrollEnded: (CGFloat, CGFloat) -> Void = { _, _ in }
+        var hostingController: UIHostingController<Content>?
+        private var appliedTargetID: UUID?
+        private var isApplyingProgrammaticOffset = false
+
+        func applyTargetOffsetIfNeeded(
+            _ targetOffset: CalendarScrollTarget?,
+            to scrollView: UIScrollView
+        ) {
+            guard let targetOffset, appliedTargetID != targetOffset.id else {
+                return
+            }
+
+            scrollView.layoutIfNeeded()
+            appliedTargetID = targetOffset.id
+            isApplyingProgrammaticOffset = true
+            scrollView.setContentOffset(
+                point(for: clampedOffset(targetOffset.offset, in: scrollView)),
+                animated: targetOffset.animated
+            )
+
+            guard !targetOffset.animated else {
+                return
+            }
+
+            DispatchQueue.main.async {
+                self.isApplyingProgrammaticOffset = false
+            }
+        }
+
+        func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
+            isApplyingProgrammaticOffset = false
+        }
+
+        func scrollViewDidScroll(_ scrollView: UIScrollView) {
+            guard !isApplyingProgrammaticOffset, scrollView.isTracking || scrollView.isDragging || scrollView.isDecelerating else {
+                return
+            }
+
+            onUserOffsetChanged(offset(from: scrollView), viewportLength(from: scrollView))
+        }
+
+        func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
+            guard !decelerate else {
+                return
+            }
+
+            reportScrollEnded(scrollView)
+        }
+
+        func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
+            reportScrollEnded(scrollView)
+        }
+
+        func scrollViewDidEndScrollingAnimation(_ scrollView: UIScrollView) {
+            isApplyingProgrammaticOffset = false
+        }
+
+        private func reportScrollEnded(_ scrollView: UIScrollView) {
+            guard !isApplyingProgrammaticOffset else {
+                return
+            }
+
+            onUserScrollEnded(offset(from: scrollView), viewportLength(from: scrollView))
+        }
+
+        private func point(for offset: CGFloat) -> CGPoint {
+            switch axis {
+            case .horizontal:
+                return CGPoint(x: offset, y: 0)
+
+            case .vertical:
+                return CGPoint(x: 0, y: offset)
+            }
+        }
+
+        private func offset(from scrollView: UIScrollView) -> CGFloat {
+            switch axis {
+            case .horizontal:
+                return scrollView.contentOffset.x
+
+            case .vertical:
+                return scrollView.contentOffset.y
+            }
+        }
+
+        private func viewportLength(from scrollView: UIScrollView) -> CGFloat {
+            switch axis {
+            case .horizontal:
+                return scrollView.bounds.width
+
+            case .vertical:
+                return scrollView.bounds.height
+            }
+        }
+
+        private func clampedOffset(_ offset: CGFloat, in scrollView: UIScrollView) -> CGFloat {
+            let maximumOffset: CGFloat
+
+            switch axis {
+            case .horizontal:
+                maximumOffset = max(scrollView.contentSize.width - scrollView.bounds.width, 0)
+
+            case .vertical:
+                maximumOffset = max(scrollView.contentSize.height - scrollView.bounds.height, 0)
+            }
+
+            return min(max(offset, 0), maximumOffset)
         }
     }
 }

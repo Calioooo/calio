@@ -152,6 +152,55 @@ struct CalioTests {
         #expect(eventList.focusedDay == items[0].id)
     }
 
+    @Test func calendarScrollMetricsConvertStripOffsetAndProgress() async throws {
+        let cellWidth = CalendarScrollMetrics.stripCellWidth(containerWidth: 350)
+
+        let progress = CalendarScrollMetrics.progress(
+            contentOffset: 125,
+            itemExtent: cellWidth
+        )
+        let targetOffset = CalendarScrollMetrics.targetOffset(
+            progress: 2.5,
+            itemExtent: cellWidth
+        )
+
+        #expect(cellWidth == 50)
+        #expect(progress == 2.5)
+        #expect(targetOffset == 125)
+    }
+
+    @Test func calendarScrollMetricsConvertEventOffsetAndProgress() async throws {
+        let progress = CalendarScrollMetrics.progress(
+            contentOffset: 222,
+            itemExtent: CalendarScrollMetrics.eventRowHeight
+        )
+        let targetOffset = CalendarScrollMetrics.targetOffset(
+            progress: 2,
+            itemExtent: CalendarScrollMetrics.eventRowHeight
+        )
+
+        #expect(progress == 2)
+        #expect(targetOffset == 222)
+    }
+
+    @Test func calendarScrollMetricsCalculatesVisibleIndexRange() async throws {
+        let visibleRange = try #require(CalendarScrollMetrics.visibleIndexRange(
+            contentOffset: 222,
+            viewportLength: 333,
+            itemExtent: CalendarScrollMetrics.eventRowHeight,
+            itemCount: 10
+        ))
+
+        #expect(visibleRange == CalendarVisibleIndexRange(startIndex: 2, endIndex: 4))
+    }
+
+    @Test func calendarScrollMetricsCalculatesSingleNearestFinalIndex() async throws {
+        #expect(CalendarScrollMetrics.nearestIndex(progress: 2.49, itemCount: 10) == 2)
+        #expect(CalendarScrollMetrics.nearestIndex(progress: 2.5, itemCount: 10) == 3)
+        #expect(CalendarScrollMetrics.nearestIndex(progress: -1, itemCount: 10) == 0)
+        #expect(CalendarScrollMetrics.nearestIndex(progress: 20, itemCount: 10) == 9)
+    }
+
     @MainActor
     @Test func calendarHomeViewModelFocusDayUpdatesCanonicalFocusedDay() async throws {
         let calendar = fixedCalendar
@@ -170,7 +219,7 @@ struct CalioTests {
     }
 
     @MainActor
-    @Test func calendarHomeViewModelRequestsPastAndFutureLoadsNearLoadedRangeEdges() async throws {
+    @Test func calendarHomeViewModelRequestsPastAndFutureLoadsFromVisibleIndexEdges() async throws {
         let calendar = fixedCalendar
         let baseDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8)))
         let repository = RecordingEventRepository()
@@ -181,8 +230,12 @@ struct CalioTests {
             initialState: makeLoadedState(dayOffsets: 0...60, focusedOffset: 30, from: baseDate, calendar: calendar)
         )
 
-        viewModel.focusDay(makeDayKey(dayOffset: 1, from: baseDate, calendar: calendar))
-        viewModel.focusDay(makeDayKey(dayOffset: 59, from: baseDate, calendar: calendar))
+        viewModel.loadAdditionalEventsIfNeeded(
+            visibleRange: CalendarVisibleIndexRange(startIndex: 1, endIndex: 7)
+        )
+        viewModel.loadAdditionalEventsIfNeeded(
+            visibleRange: CalendarVisibleIndexRange(startIndex: 53, endIndex: 59)
+        )
         await repository.waitForRequestCount(2)
 
         #expect(repository.requestCount == 2)
@@ -201,9 +254,13 @@ struct CalioTests {
             initialState: makeLoadedState(dayOffsets: 0...60, focusedOffset: 30, from: baseDate, calendar: calendar)
         )
 
-        viewModel.focusDay(makeDayKey(dayOffset: 59, from: baseDate, calendar: calendar))
+        viewModel.loadAdditionalEventsIfNeeded(
+            visibleRange: CalendarVisibleIndexRange(startIndex: 53, endIndex: 59)
+        )
         await repository.waitForRequestCount(1)
-        viewModel.focusDay(makeDayKey(dayOffset: 58, from: baseDate, calendar: calendar))
+        viewModel.loadAdditionalEventsIfNeeded(
+            visibleRange: CalendarVisibleIndexRange(startIndex: 52, endIndex: 58)
+        )
         await Task.yield()
 
         #expect(repository.requestCount == 1)
@@ -216,7 +273,6 @@ struct CalioTests {
         let baseDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8)))
         let repository = RecordingEventRepository(error: TestEventRepositoryError.failed)
         let initialState = makeLoadedState(dayOffsets: 0...60, focusedOffset: 30, from: baseDate, calendar: calendar)
-        let focusedDay = makeDayKey(dayOffset: 59, from: baseDate, calendar: calendar)
         let viewModel = CalendarHomeViewModel(
             calendar: calendar,
             dateService: CalendarDateService(calendar: calendar),
@@ -224,14 +280,56 @@ struct CalioTests {
             initialState: initialState
         )
 
-        viewModel.focusDay(focusedDay)
+        viewModel.loadAdditionalEventsIfNeeded(
+            visibleRange: CalendarVisibleIndexRange(startIndex: 53, endIndex: 59)
+        )
         await repository.waitForRequestCount(1)
         await Task.yield()
 
         #expect(viewModel.state.startDate == initialState.startDate)
         #expect(viewModel.state.endDate == initialState.endDate)
         #expect(viewModel.state.daysByKey.count == initialState.daysByKey.count)
-        #expect(viewModel.state.focusedDay == focusedDay)
+        #expect(viewModel.state.focusedDay == initialState.focusedDay)
+    }
+
+    @MainActor
+    @Test func calendarHomeViewModelCommitsSnappedDayFromFinalIndex() async throws {
+        let calendar = fixedCalendar
+        let baseDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8)))
+        let viewModel = CalendarHomeViewModel(
+            calendar: calendar,
+            dateService: CalendarDateService(calendar: calendar),
+            eventService: EventService(repository: RecordingEventRepository()),
+            initialState: makeLoadedState(dayOffsets: 0...10, focusedOffset: 0, from: baseDate, calendar: calendar)
+        )
+        let finalIndex = try #require(CalendarScrollMetrics.nearestIndex(progress: 4.6, itemCount: viewModel.loadedDateCount))
+        let snappedDay = try #require(viewModel.day(at: finalIndex))
+
+        viewModel.focusDay(snappedDay)
+
+        #expect(finalIndex == 5)
+        #expect(viewModel.state.focusedDay == makeDayKey(dayOffset: 5, from: baseDate, calendar: calendar))
+    }
+
+    @MainActor
+    @Test func calendarHomeViewModelPublishesPastPrependCompensation() async throws {
+        let calendar = fixedCalendar
+        let baseDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8)))
+        let repository = RecordingEventRepository()
+        let viewModel = CalendarHomeViewModel(
+            calendar: calendar,
+            dateService: CalendarDateService(calendar: calendar),
+            eventService: EventService(repository: repository),
+            initialState: makeLoadedState(dayOffsets: 0...60, focusedOffset: 30, from: baseDate, calendar: calendar)
+        )
+
+        viewModel.loadAdditionalEventsIfNeeded(
+            visibleRange: CalendarVisibleIndexRange(startIndex: 1, endIndex: 7)
+        )
+        await repository.waitForRequestCount(1)
+        await Task.yield()
+
+        #expect(viewModel.prependScrollCompensation?.insertedCount == 60)
     }
     
     private var fixedCalendar: Calendar {
