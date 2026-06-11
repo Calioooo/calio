@@ -12,6 +12,7 @@ struct CalendarScheduleDrawerView: View {
     let focusedDay: DayKey
     let displayMode: CalendarDisplayMode
     let onFocusedDayChanged: (DayKey) -> Void
+    let onVisibleRangeChanged: (CalendarVisibleIndexRange) -> Void
     let onDragEnded: (CGSize) -> Void
 
     var body: some View {
@@ -21,7 +22,8 @@ struct CalendarScheduleDrawerView: View {
             CalendarDateEventView(
                 items: items,
                 focusedDay: focusedDay,
-                onFocusedDayChanged: onFocusedDayChanged
+                onFocusedDayChanged: onFocusedDayChanged,
+                onVisibleRangeChanged: onVisibleRangeChanged
             )
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -79,6 +81,7 @@ struct CalendarScheduleDrawerView: View {
         focusedDay: DayKey(date: Date()),
         displayMode: .week,
         onFocusedDayChanged: { _ in },
+        onVisibleRangeChanged: { _ in },
         onDragEnded: { _ in }
     )
 }

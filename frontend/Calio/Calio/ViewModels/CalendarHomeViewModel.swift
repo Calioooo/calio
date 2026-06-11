@@ -7,12 +7,17 @@
 
 import Foundation
 
+struct CalendarVisibleIndexRange: Equatable {
+    let startIndex: Int
+    let endIndex: Int
+}
+
 @MainActor
 final class CalendarHomeViewModel: ObservableObject {
     @Published private(set) var state: CalendarState
     
-    private let initialLoadPastDays = 60
-    private let initialLoadFutureDays = 60
+    private let initialLoadPastDays = 90
+    private let initialLoadFutureDays = 90
     
     private let thresholdDays = 20
     private let loadFutureDays = 60
@@ -55,6 +60,10 @@ final class CalendarHomeViewModel: ObservableObject {
         state.loadedDateCellItems(calendar: calendar)
     }
     
+    var loadedDateCount: Int {
+        state.daysByKey.count
+    }
+    
     func loadInitialIfNeeded() {
         guard state.isNeedInitialize() else { return }
         
@@ -83,8 +92,25 @@ final class CalendarHomeViewModel: ObservableObject {
             return
         }
         
+        guard state.focusedDay != day else {
+            return
+        }
+        
         state = state.focused(on: day)
-        checkAndLoadEvents()
+    }
+    
+    func loadAdditionalEventsIfNeeded(visibleRange: CalendarVisibleIndexRange) {
+        guard !state.isNeedInitialize() else {
+            return
+        }
+        
+        if visibleRange.startIndex < thresholdDays {
+            loadAdditionalEvents(at: .start)
+        }
+        
+        if loadedDateCount - visibleRange.endIndex < thresholdDays {
+            loadAdditionalEvents(at: .end)
+        }
     }
     
     private func makeDateCellItemsByDay(
@@ -114,15 +140,7 @@ final class CalendarHomeViewModel: ObservableObject {
         )
     }
     
-    private func checkAndLoadEvents() {
-        guard let edge = state.nearLoadedEdge(
-            around: state.focusedDay,
-            thresholdDays: thresholdDays,
-            calendar: calendar
-        ) else {
-            return
-        }
-        
+    private func loadAdditionalEvents(at edge: CalendarState.LoadedEdge) {
         guard !loadingEdges.contains(edge) else {
             return
         }

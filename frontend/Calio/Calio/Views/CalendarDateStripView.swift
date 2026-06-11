@@ -9,7 +9,6 @@ import SwiftUI
 
 struct CalendarDateStripView: View {
     private let dateCellCount = 7
-    private let coordinateSpaceName = "calendar_date_strip_scroll"
     private let programmaticAlignmentDelay: UInt64 = 300_000_000
     
     let items: [CalendarDateCellItem]
@@ -37,30 +36,21 @@ struct CalendarDateStripView: View {
                             dayText: item.dayText,
                             isToday: item.isToday,
                             onTap: {
-                                reportUserFocusedDay(item.id)
+                                notifyUserFocusedDayChanged(item.id)
                             },
                             events: item.events
                         )
                         .frame(width: cellWidth)
                         .id(item.id)
-                        .background(
-                            GeometryReader { proxy in
-                                Color.clear.preference(
-                                    key: CalendarDateStripCellFramePreferenceKey.self,
-                                    value: [item.id: proxy.frame(in: .named(coordinateSpaceName))]
-                                )
-                            }
-                        )
                     }
                 }
                 .scrollTargetLayout()
             }
-            .coordinateSpace(name: coordinateSpaceName)
             .scrollIndicators(.hidden)
             .scrollTargetBehavior(.viewAligned)
             .scrollPosition(id: $scrollPosition, anchor: .leading)
-            .onPreferenceChange(CalendarDateStripCellFramePreferenceKey.self) { frames in
-                updateFocusedDayFromLeadingCell(frames)
+            .onChange(of: scrollPosition) { _, newDay in
+                updateFocusedDayFromScrollPosition(newDay)
             }
             .onChange(of: focusedDay) { _, newDay in
                 alignIfNeeded(to: newDay)
@@ -77,30 +67,15 @@ struct CalendarDateStripView: View {
         }
     }
     
-    private func updateFocusedDayFromLeadingCell(_ frames: [DayKey: CGRect]) {
+    private func updateFocusedDayFromScrollPosition(_ day: DayKey?) {
         guard !isProgrammaticAlignment else { return }
-        guard let day = leadingVisibleDay(in: frames) else { return }
+        guard let day else { return }
         guard day != lastReportedDay else { return }
         
-        reportUserFocusedDay(day)
+        notifyUserFocusedDayChanged(day)
     }
     
-    private func leadingVisibleDay(in frames: [DayKey: CGRect]) -> DayKey? {
-        let crossingOrVisibleBeforeLeading = frames.filter { _, frame in
-            frame.minX <= 0 && frame.maxX > 0
-        }
-        
-        if let day = crossingOrVisibleBeforeLeading.max(by: { $0.value.minX < $1.value.minX })?.key {
-            return day
-        }
-        
-        return frames
-            .filter { _, frame in frame.minX > 0 }
-            .min(by: { $0.value.minX < $1.value.minX })?
-            .key
-    }
-    
-    private func reportUserFocusedDay(_ day: DayKey) {
+    private func notifyUserFocusedDayChanged(_ day: DayKey) {
         lastUserRequestedDay = day
         lastReportedDay = day
         onFocusedDayChanged(day)
@@ -128,16 +103,6 @@ struct CalendarDateStripView: View {
             await MainActor.run {
                 isProgrammaticAlignment = false
             }
-        }
-    }
-}
-
-private struct CalendarDateStripCellFramePreferenceKey: PreferenceKey {
-    static var defaultValue: [DayKey: CGRect] = [:]
-    
-    static func reduce(value: inout [DayKey: CGRect], nextValue: () -> [DayKey: CGRect]) {
-        value.merge(nextValue()) { _, next in
-            next
         }
     }
 }

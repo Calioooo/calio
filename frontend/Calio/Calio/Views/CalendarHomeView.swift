@@ -27,6 +27,7 @@ struct CalendarHomeView: View {
                     focusedDay: viewModel.state.focusedDay,
                     displayMode: displayMode,
                     onFocusedDayChanged: viewModel.focusDay(_:),
+                    onVisibleRangeChanged: viewModel.loadAdditionalEventsIfNeeded(visibleRange:),
                     onDragEnded: updateDisplayMode(after:)
                 )
             }
