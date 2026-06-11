@@ -113,6 +113,28 @@ final class CalendarHomeViewModel: ObservableObject {
         }
     }
     
+    func moveMonth(by value: Int) {
+        let currentDate = state.focusedDay.toDate(calendar: calendar)
+
+        guard let movedMonthDate = calendar.date(
+            byAdding: .month,
+            value: value,
+            to: currentDate
+        ) else {
+            return
+        }
+
+        let components = calendar.dateComponents([.year, .month], from: movedMonthDate)
+
+        guard let firstDayOfMonth = calendar.date(from: components) else {
+            return
+        }
+
+        let day = DayKey(date: firstDayOfMonth, calendar: calendar)
+
+        focusDay(day)
+    }
+    
     private func makeDateCellItemsByDay(
         events: [Event],
         from startDate: Date,

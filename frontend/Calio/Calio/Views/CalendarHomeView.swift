@@ -13,7 +13,7 @@ struct CalendarHomeView: View {
     
     private let minimumStripViewHeight: CGFloat = 110
     private let stripViewHeightRatio: CGFloat = 0.2
-    private let minimumMonthViewHeight: CGFloat = 260
+    private let minimumMonthViewHeight: CGFloat = 380
     private let monthViewHeightRatio: CGFloat = 0.42
     
 
@@ -52,9 +52,14 @@ struct CalendarHomeView: View {
             .accessibilityIdentifier("calendar_header_week")
 
         case .month:
-            CalendarMonthView(items: viewModel.visibleDateCellItems)
-                .frame(height: monthHeaderHeight(in: geometry))
-                .transition(.opacity)
+            CalendarMonthView(
+                items: viewModel.loadedDateCellItems,
+                focusedDay: viewModel.state.focusedDay,
+                onSelectedDay: viewModel.focusDay(_:),
+                onMonthChanged: viewModel.moveMonth(by:)
+            )
+            .frame(height: monthHeaderHeight(in: geometry))
+            .transition(.opacity)
         }
     }
 
