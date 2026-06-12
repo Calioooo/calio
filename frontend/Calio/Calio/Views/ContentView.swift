@@ -25,6 +25,13 @@ struct ContentView: View {
                     Text("Week")
                 }
                 .tag(1)
+            
+            CalendarDayTimelineTestView()
+                .tabItem {
+                    Image(systemName: "calendar.day.timeline.leading")
+                    Text("Day")
+                }
+                .tag(2)
         }
     }
 }
@@ -37,6 +44,20 @@ private struct CalendarWeekTimelineTestView: View {
             items: viewModel.loadedDateCellItems,
             focusedDay: viewModel.state.focusedDay,
             onSelectedDay: viewModel.focusDay(_:)
+        )
+        .task {
+            viewModel.loadInitialIfNeeded()
+        }
+    }
+}
+
+private struct CalendarDayTimelineTestView: View {
+    @StateObject private var viewModel = CalendarHomeViewModel()
+    
+    var body: some View {
+        CalendarDayTimelineView(
+            items: viewModel.loadedDateCellItems,
+            focusedDay: viewModel.state.focusedDay
         )
         .task {
             viewModel.loadInitialIfNeeded()
