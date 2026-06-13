@@ -8,13 +8,17 @@
 import SwiftUI
 
 struct CalendarHomeView: View {
-    @StateObject private var viewModel = CalendarHomeViewModel()
+    @StateObject private var viewModel: CalendarHomeViewModel
     @State private var displayMode: CalendarDisplayMode = .week
     
     private let minimumStripViewHeight: CGFloat = 110
     private let stripViewHeightRatio: CGFloat = 0.2
     private let minimumMonthViewHeight: CGFloat = 380
     private let monthViewHeightRatio: CGFloat = 0.42
+    
+    init(viewModel: CalendarHomeViewModel) {
+        _viewModel = StateObject(wrappedValue: viewModel)
+    }
     
 
     var body: some View {
@@ -85,14 +89,14 @@ struct CalendarHomeView: View {
 }
 
 #Preview("iPhone SE") {
-    CalendarHomeView()
+    CalendarHomeView(viewModel: CalendarHomeViewModel())
 }
 
 #Preview("iPhone 15 Pro") {
-    CalendarHomeView()
+    CalendarHomeView(viewModel: CalendarHomeViewModel())
 }
 
 #Preview("Dark Mode") {
-    CalendarHomeView()
+    CalendarHomeView(viewModel: CalendarHomeViewModel())
         .preferredColorScheme(.dark)
 }

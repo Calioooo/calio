@@ -9,24 +9,25 @@ import SwiftUI
 
 struct ContentView: View {
     @State private var selectedTab = 1
+    @StateObject private var viewModel = CalendarHomeViewModel()
     
     var body: some View {
         TabView(selection: $selectedTab) {
-            CalendarHomeView()
+            CalendarHomeView(viewModel: viewModel)
                 .tabItem {
                     Image(systemName: "calendar")
                     Text("Home")
                 }
                 .tag(0)
             
-            CalendarWeekTimelineTestView()
+            CalendarWeekTimelineTestView(viewModel: viewModel)
                 .tabItem {
                     Image(systemName: "calendar.day.timeline.left")
                     Text("Week")
                 }
                 .tag(1)
             
-            CalendarDayTimelineTestView()
+            CalendarDayTimelineTestView(viewModel: viewModel)
                 .tabItem {
                     Image(systemName: "calendar.day.timeline.leading")
                     Text("Day")
@@ -37,7 +38,7 @@ struct ContentView: View {
 }
 
 private struct CalendarWeekTimelineTestView: View {
-    @StateObject private var viewModel = CalendarHomeViewModel()
+    @ObservedObject var viewModel: CalendarHomeViewModel
     
     var body: some View {
         CalendarWeekTimelineView(
@@ -52,7 +53,7 @@ private struct CalendarWeekTimelineTestView: View {
 }
 
 private struct CalendarDayTimelineTestView: View {
-    @StateObject private var viewModel = CalendarHomeViewModel()
+    @ObservedObject var viewModel: CalendarHomeViewModel
     
     var body: some View {
         CalendarDayTimelineView(
