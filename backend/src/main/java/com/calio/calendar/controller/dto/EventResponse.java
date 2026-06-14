@@ -1,7 +1,6 @@
 package com.calio.calendar.controller.dto;
 
 import com.calio.calendar.repository.entity.Event;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.Instant;
 
 public record EventResponse(
@@ -12,7 +11,6 @@ public record EventResponse(
         Instant endAt,
         boolean importantEvent,
         Long recurrenceId,
-        @JsonProperty("isRecurrenceOccurrence")
         boolean isRecurrenceOccurrence,
         Instant createdAt,
         Instant updatedAt
