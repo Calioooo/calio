@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@Transactional(readOnly = true)
 public class RecurrenceEventService {
 
     private final RecurrenceEventRepository recurrenceEventRepository;
@@ -42,7 +43,6 @@ public class RecurrenceEventService {
         return RecurrenceEventResponse.from(recurrenceEvent);
     }
 
-    @Transactional(readOnly = true)
     public RecurrenceEventResponse getRecurrenceEvent(Long recurrenceId) {
         RecurrenceEvent recurrenceEvent = findRecurrenceEvent(recurrenceId);
         return RecurrenceEventResponse.from(recurrenceEvent);
