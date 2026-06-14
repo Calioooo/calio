@@ -7,6 +7,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.util.Optional;
 
 @Entity
 @Table(name = "events")
@@ -31,14 +32,22 @@ public class Event extends BaseEntity {
     @Column(name = "important_event", nullable = false, columnDefinition = "boolean default false")
     private boolean importantEvent = false;
 
+    @Column(name = "recurrence_id")
+    private Long recurrenceId;
+
     protected Event() {
     }
 
     public Event(String title, String description, Instant startAt, Instant endAt) {
+        this(title, description, startAt, endAt, null);
+    }
+
+    public Event(String title, String description, Instant startAt, Instant endAt, Long recurrenceId) {
         this.title = title;
         this.description = description;
         this.startAt = startAt;
         this.endAt = endAt;
+        this.recurrenceId = recurrenceId;
     }
 
     public void replace(String title, String description, Instant startAt, Instant endAt) {
@@ -74,5 +83,13 @@ public class Event extends BaseEntity {
 
     public boolean importantEvent() {
         return importantEvent;
+    }
+
+    public Optional<Long> getRecurrenceId() {
+        return Optional.ofNullable(recurrenceId);
+    }
+
+    public boolean isRecurrenceOccurrence() {
+        return recurrenceId != null;
     }
 }
