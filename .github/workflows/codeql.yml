@@ -74,7 +74,7 @@
             languages: swift
 
         - name: Build iOS for CodeQL
-          working-directory: ios
+          working-directory: frontend/Calio
           run: |
             xcodebuild build \
               -project Calio.xcodeproj \ 

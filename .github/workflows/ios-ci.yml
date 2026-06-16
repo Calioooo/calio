@@ -18,7 +18,7 @@ jobs:
       run: xcodebuild -version
 
     - name: Run iOS tests
-      working-directory: ios
+      working-directory: frontend/Calio
       run: |
         xcodebuild test \
           -project Calio.xcodeproj \ 
