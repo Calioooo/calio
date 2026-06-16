@@ -18,7 +18,7 @@ enum CalendarWeekday: Int, CaseIterable, Identifiable {
 
     var id: Int {
         rawValue
-    }
+    }  
 
     var shortKoreanText: String {
         switch self {
