@@ -10,6 +10,8 @@ public record EventResponse(
         Instant startAt,
         Instant endAt,
         boolean importantEvent,
+        Long recurrenceId,
+        boolean isRecurrenceOccurrence,
         Instant createdAt,
         Instant updatedAt
 ) {
@@ -22,6 +24,8 @@ public record EventResponse(
                 event.getStartAt(),
                 event.getEndAt(),
                 event.importantEvent(),
+                event.getRecurrenceId().orElse(null),
+                event.isRecurrenceOccurrence(),
                 event.getCreatedAt(),
                 event.getUpdatedAt()
         );
