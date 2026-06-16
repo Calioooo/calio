@@ -21,6 +21,6 @@ jobs:
       working-directory: frontend/Calio
       run: |
         xcodebuild test \
-          -project Calio.xcodeproj \ 
+          -project Calio.xcodeproj \
           -scheme Calio \
           -destination 'platform=iOS Simulator,name=iPhone 15'

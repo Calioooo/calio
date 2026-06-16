@@ -12,7 +12,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 })
 class CalioApplicationTests {
 
-    @Test 
+    @Test
     void contextLoads() {
     }
 }
