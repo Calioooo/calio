@@ -35,6 +35,12 @@ public class Event extends BaseEntity {
     @Column(name = "recurrence_id")
     private Long recurrenceId;
 
+    @Column(name = "origin_start_at")
+    private Instant originStartAt;
+
+    @Column(name = "origin_end_at")
+    private Instant originEndAt;
+
     protected Event() {
     }
 
@@ -48,6 +54,8 @@ public class Event extends BaseEntity {
         this.startAt = startAt;
         this.endAt = endAt;
         this.recurrenceId = recurrenceId;
+        this.originStartAt = recurrenceId == null ? null : startAt;
+        this.originEndAt = recurrenceId == null ? null : endAt;
     }
 
     public void replace(String title, String description, Instant startAt, Instant endAt) {
@@ -59,6 +67,27 @@ public class Event extends BaseEntity {
 
     public void changeImportantEvent(boolean importantEvent) {
         this.importantEvent = importantEvent;
+    }
+
+    public void replaceRecurrenceOccurrence(
+            String title,
+            String description,
+            Instant startAt,
+            Instant endAt,
+            Instant originStartAt,
+            Instant originEndAt
+    ) {
+        this.title = title;
+        this.description = description;
+        this.startAt = startAt;
+        this.endAt = endAt;
+        this.originStartAt = originStartAt;
+        this.originEndAt = originEndAt;
+    }
+
+    public void rescheduleRecurrenceOccurrence(Instant startAt, Instant endAt) {
+        this.startAt = startAt;
+        this.endAt = endAt;
     }
 
     public Long getId() {
@@ -87,6 +116,22 @@ public class Event extends BaseEntity {
 
     public Optional<Long> getRecurrenceId() {
         return Optional.ofNullable(recurrenceId);
+    }
+
+    public Instant getOriginStartAt() {
+        if (originStartAt != null) {
+            return originStartAt;
+        }
+
+        return startAt;
+    }
+
+    public Instant getOriginEndAt() {
+        if (originEndAt != null) {
+            return originEndAt;
+        }
+
+        return endAt;
     }
 
     public boolean isRecurrenceOccurrence() {

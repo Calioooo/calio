@@ -3,12 +3,16 @@ package com.calio.calendar.controller;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.calio.calendar.repository.EventRepository;
+import com.calio.calendar.repository.RecurrenceEventOverrideRepository;
+import com.calio.calendar.repository.entity.RecurrenceEventOverride;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,6 +42,9 @@ class RecurrenceEventControllerTest {
 
     @Autowired
     private EventRepository eventRepository;
+
+    @Autowired
+    private RecurrenceEventOverrideRepository recurrenceEventOverrideRepository;
 
     @Test
     @DisplayName("사용자는 반복 일정을 생성하면 rule과 inclusive 범위의 occurrence 일정을 함께 저장한다")
@@ -316,6 +323,412 @@ class RecurrenceEventControllerTest {
                 "2025-02-28T09:00:00Z",
                 "2026-02-28T09:00:00Z"
         );
+    }
+
+    @Test
+    @DisplayName("사용자는 반복 일정 전체를 수정하면 rule과 occurrence 일정들이 변경된 rule로 재구성된다")
+    void givenExistingRecurrenceEvent_whenPatchWholeRecurrenceEvent_thenUpdatesRuleAndReconstructsOccurrences()
+            throws Exception {
+        // given
+        long recurrenceId = createRecurrenceEvent(
+                "Original series",
+                "2026-11-01",
+                "2026-11-03",
+                "DAILY"
+        );
+
+        // when
+        mockMvc.perform(patch("/api/recurrence-events/{recurrenceId}", recurrenceId)
+                        .param("updateScope", "RECURRENCE_EVENT")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "recurrenceTitle": "Updated series",
+                                  "recurrenceDescription": "Changed description",
+                                  "recurrenceEndDate": "2026-11-02",
+                                  "recurrenceStartTime": "11:00:00",
+                                  "recurrenceEndTime": "12:00:00"
+                                }
+                                """))
+                // then
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.recurrenceId").value(recurrenceId))
+                .andExpect(jsonPath("$.recurrenceTitle").value("Updated series"))
+                .andExpect(jsonPath("$.recurrenceDescription").value("Changed description"))
+                .andExpect(jsonPath("$.recurrenceStartDate").value("2026-11-01"))
+                .andExpect(jsonPath("$.recurrenceEndDate").value("2026-11-02"))
+                .andExpect(jsonPath("$.recurrenceStartTime").value("11:00:00"))
+                .andExpect(jsonPath("$.recurrenceEndTime").value("12:00:00"))
+                .andExpect(jsonPath("$.recurrenceFrequency").value("DAILY"));
+
+        mockMvc.perform(get("/api/events")
+                        .param("from", "2026-11-01T00:00:00Z")
+                        .param("to", "2026-11-04T00:00:00Z"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$[0].title").value("Updated series"))
+                .andExpect(jsonPath("$[0].description").value("Changed description"))
+                .andExpect(jsonPath("$[0].startAt").value("2026-11-01T11:00:00Z"))
+                .andExpect(jsonPath("$[0].endAt").value("2026-11-01T12:00:00Z"))
+                .andExpect(jsonPath("$[1].title").value("Updated series"))
+                .andExpect(jsonPath("$[1].startAt").value("2026-11-02T11:00:00Z"))
+                .andExpect(jsonPath("$[1].endAt").value("2026-11-02T12:00:00Z"));
+    }
+
+    @Test
+    @DisplayName("사용자는 반복 일정의 단일 occurrence만 수정하고 rule과 형제 occurrence는 보존한다")
+    void givenExistingOccurrence_whenPatchSingleOccurrence_thenUpdatesOnlyTargetAndRecordsOverride()
+            throws Exception {
+        // given
+        long recurrenceId = createRecurrenceEvent(
+                "Single occurrence target",
+                "2026-12-01",
+                "2026-12-02",
+                "DAILY"
+        );
+
+        // when
+        mockMvc.perform(patch("/api/recurrence-events/{recurrenceId}", recurrenceId)
+                        .param("updateScope", "SINGLE_OCCURRENCE")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "targetOccurrenceStartAt": "2026-12-01T09:00:00Z",
+                                  "modifiedStartAt": "2026-12-01T13:00:00Z",
+                                  "modifiedEndAt": "2026-12-01T14:00:00Z"
+                                }
+                                """))
+                // then
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.recurrenceId").value(recurrenceId))
+                .andExpect(jsonPath("$.startAt").value("2026-12-01T13:00:00Z"))
+                .andExpect(jsonPath("$.endAt").value("2026-12-01T14:00:00Z"))
+                .andExpect(jsonPath("$.isRecurrenceOccurrence").value(true));
+
+        mockMvc.perform(get("/api/recurrence-events/{recurrenceId}", recurrenceId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.recurrenceTitle").value("Single occurrence target"))
+                .andExpect(jsonPath("$.recurrenceStartTime").value("09:00:00"))
+                .andExpect(jsonPath("$.recurrenceEndTime").value("10:00:00"));
+
+        mockMvc.perform(get("/api/events")
+                        .param("from", "2026-12-01T00:00:00Z")
+                        .param("to", "2026-12-03T00:00:00Z"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$[0].startAt").value("2026-12-01T13:00:00Z"))
+                .andExpect(jsonPath("$[0].endAt").value("2026-12-01T14:00:00Z"))
+                .andExpect(jsonPath("$[1].startAt").value("2026-12-02T09:00:00Z"))
+                .andExpect(jsonPath("$[1].endAt").value("2026-12-02T10:00:00Z"));
+
+        assertThat(recurrenceEventOverrideRepository.findByRecurrenceIdAndOriginStartAt(
+                recurrenceId,
+                Instant.parse("2026-12-01T09:00:00Z")
+        )).hasValueSatisfying(override -> {
+            assertThat(override.isDeleted()).isFalse();
+            assertThat(override.getOriginEndAt()).isEqualTo(Instant.parse("2026-12-01T10:00:00Z"));
+            assertThat(override.getOverrideStartAt()).isEqualTo(Instant.parse("2026-12-01T13:00:00Z"));
+            assertThat(override.getOverrideEndAt()).isEqualTo(Instant.parse("2026-12-01T14:00:00Z"));
+        });
+    }
+
+    @Test
+    @DisplayName("사용자는 존재하지 않는 occurrence를 수정하면 RECURRENCE_OCCURRENCE_NOT_FOUND를 받는다")
+    void givenMissingOccurrence_whenPatchSingleOccurrence_thenReturnsOccurrenceNotFound() throws Exception {
+        // given
+        long recurrenceId = createRecurrenceEvent(
+                "Missing occurrence target",
+                "2027-01-01",
+                "2027-01-01",
+                "DAILY"
+        );
+
+        // when
+        mockMvc.perform(patch("/api/recurrence-events/{recurrenceId}", recurrenceId)
+                        .param("updateScope", "SINGLE_OCCURRENCE")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "targetOccurrenceStartAt": "2027-01-02T09:00:00Z",
+                                  "modifiedStartAt": "2027-01-02T13:00:00Z",
+                                  "modifiedEndAt": "2027-01-02T14:00:00Z"
+                                }
+                                """))
+                // then
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("RECURRENCE_OCCURRENCE_NOT_FOUND"))
+                .andExpect(jsonPath("$.message").value("Recurrence occurrence not found."));
+    }
+
+    @Test
+    @DisplayName("사용자는 삭제 override가 있는 occurrence를 수정하면 RECURRENCE_OCCURRENCE_DELETED를 받는다")
+    void givenDeletedOverride_whenPatchSingleOccurrence_thenReturnsOccurrenceDeleted() throws Exception {
+        // given
+        long recurrenceId = createRecurrenceEvent(
+                "Deleted occurrence target",
+                "2027-02-01",
+                "2027-02-01",
+                "DAILY"
+        );
+        recurrenceEventOverrideRepository.save(new RecurrenceEventOverride(
+                recurrenceId,
+                true,
+                Instant.parse("2027-02-01T09:00:00Z"),
+                Instant.parse("2027-02-01T10:00:00Z"),
+                null,
+                null
+        ));
+
+        // when
+        mockMvc.perform(patch("/api/recurrence-events/{recurrenceId}", recurrenceId)
+                        .param("updateScope", "SINGLE_OCCURRENCE")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "targetOccurrenceStartAt": "2027-02-01T09:00:00Z",
+                                  "modifiedStartAt": "2027-02-01T13:00:00Z",
+                                  "modifiedEndAt": "2027-02-01T14:00:00Z"
+                                }
+                                """))
+                // then
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("RECURRENCE_OCCURRENCE_DELETED"))
+                .andExpect(jsonPath("$.message").value("Recurrence occurrence is deleted."));
+    }
+
+    @Test
+    @DisplayName("사용자는 updateScope query parameter 없이 반복 일정 update API를 호출할 수 없다")
+    void givenMissingUpdateScope_whenPatchRecurrenceEvent_thenReturnsValidationFailed() throws Exception {
+        // given
+        long recurrenceId = createRecurrenceEvent(
+                "Missing scope",
+                "2027-03-01",
+                "2027-03-01",
+                "DAILY"
+        );
+
+        // when
+        mockMvc.perform(patch("/api/recurrence-events/{recurrenceId}", recurrenceId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                // then
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.message").value("Validation failed."));
+    }
+
+    @Test
+    @DisplayName("사용자는 body에 updateScope를 담아 반복 일정 update API를 호출할 수 없다")
+    void givenBodyLevelUpdateScope_whenPatchRecurrenceEvent_thenReturnsValidationFailed() throws Exception {
+        // given
+        long recurrenceId = createRecurrenceEvent(
+                "Body scope",
+                "2027-04-01",
+                "2027-04-01",
+                "DAILY"
+        );
+
+        // when
+        mockMvc.perform(patch("/api/recurrence-events/{recurrenceId}", recurrenceId)
+                        .param("updateScope", "RECURRENCE_EVENT")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "updateScope": "RECURRENCE_EVENT",
+                                  "recurrenceTitle": "Rejected"
+                                }
+                                """))
+                // then
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.message").value("Validation failed."));
+    }
+
+    @Test
+    @DisplayName("사용자는 전체 수정 field와 단일 occurrence 수정 field를 한 요청에 섞을 수 없다")
+    void givenMixedUpdateFields_whenPatchRecurrenceEvent_thenReturnsValidationFailed() throws Exception {
+        // given
+        long recurrenceId = createRecurrenceEvent(
+                "Mixed fields",
+                "2027-05-01",
+                "2027-05-01",
+                "DAILY"
+        );
+
+        // when
+        mockMvc.perform(patch("/api/recurrence-events/{recurrenceId}", recurrenceId)
+                        .param("updateScope", "RECURRENCE_EVENT")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "recurrenceTitle": "Rejected",
+                                  "targetOccurrenceStartAt": "2027-05-01T09:00:00Z"
+                                }
+                                """))
+                // then
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.message").value("Validation failed."));
+    }
+
+    @Test
+    @DisplayName("사용자는 지원하지 않는 updateScope로 반복 일정 update API를 호출할 수 없다")
+    void givenUnsupportedUpdateScope_whenPatchRecurrenceEvent_thenReturnsValidationFailed() throws Exception {
+        // given
+        long recurrenceId = createRecurrenceEvent(
+                "Unsupported scope",
+                "2027-06-01",
+                "2027-06-01",
+                "DAILY"
+        );
+
+        // when
+        mockMvc.perform(patch("/api/recurrence-events/{recurrenceId}", recurrenceId)
+                        .param("updateScope", "UNKNOWN")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                // then
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.message").value("Validation failed."));
+    }
+
+    @Test
+    @DisplayName("사용자는 전체 반복 일정 수정에서 최종 시작 날짜가 종료 날짜보다 늦은 rule을 만들 수 없다")
+    void givenInvalidDateRange_whenPatchWholeRecurrenceEvent_thenReturnsInvalidRecurrenceDateRange()
+            throws Exception {
+        // given
+        long recurrenceId = createRecurrenceEvent(
+                "Invalid update date",
+                "2027-07-01",
+                "2027-07-02",
+                "DAILY"
+        );
+
+        // when
+        mockMvc.perform(patch("/api/recurrence-events/{recurrenceId}", recurrenceId)
+                        .param("updateScope", "RECURRENCE_EVENT")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "recurrenceStartDate": "2027-07-03"
+                                }
+                                """))
+                // then
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("INVALID_RECURRENCE_DATE_RANGE"))
+                .andExpect(jsonPath("$.message").value("Invalid recurrence date range."));
+    }
+
+    @Test
+    @DisplayName("사용자는 전체 반복 일정 수정에서 시작 시각이 종료 시각보다 빠르지 않은 rule을 만들 수 없다")
+    void givenInvalidTimeRange_whenPatchWholeRecurrenceEvent_thenReturnsInvalidRecurrenceTimeRange()
+            throws Exception {
+        // given
+        long recurrenceId = createRecurrenceEvent(
+                "Invalid update time",
+                "2027-08-01",
+                "2027-08-02",
+                "DAILY"
+        );
+
+        // when
+        mockMvc.perform(patch("/api/recurrence-events/{recurrenceId}", recurrenceId)
+                        .param("updateScope", "RECURRENCE_EVENT")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "recurrenceEndTime": "09:00:00"
+                                }
+                                """))
+                // then
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("INVALID_RECURRENCE_TIME_RANGE"))
+                .andExpect(jsonPath("$.message").value("Invalid recurrence time range."));
+    }
+
+    @Test
+    @DisplayName("사용자는 전체 반복 일정 수정에서 지원하지 않는 recurrenceFrequency를 사용할 수 없다")
+    void givenUnsupportedFrequency_whenPatchWholeRecurrenceEvent_thenReturnsInvalidRecurrenceFrequency()
+            throws Exception {
+        // given
+        long recurrenceId = createRecurrenceEvent(
+                "Invalid update frequency",
+                "2027-09-01",
+                "2027-09-02",
+                "DAILY"
+        );
+
+        // when
+        mockMvc.perform(patch("/api/recurrence-events/{recurrenceId}", recurrenceId)
+                        .param("updateScope", "RECURRENCE_EVENT")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "recurrenceFrequency": "HOURLY"
+                                }
+                                """))
+                // then
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("INVALID_RECURRENCE_FREQUENCY"))
+                .andExpect(jsonPath("$.message").value("Invalid recurrence frequency."));
+    }
+
+    @Test
+    @DisplayName("사용자는 단일 occurrence 수정에서 필수 field를 생략할 수 없다")
+    void givenMissingRequiredSingleOccurrenceField_whenPatchSingleOccurrence_thenReturnsValidationFailed()
+            throws Exception {
+        // given
+        long recurrenceId = createRecurrenceEvent(
+                "Missing single field",
+                "2027-10-01",
+                "2027-10-01",
+                "DAILY"
+        );
+
+        // when
+        mockMvc.perform(patch("/api/recurrence-events/{recurrenceId}", recurrenceId)
+                        .param("updateScope", "SINGLE_OCCURRENCE")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "targetOccurrenceStartAt": "2027-10-01T09:00:00Z",
+                                  "modifiedStartAt": "2027-10-01T13:00:00Z"
+                                }
+                                """))
+                // then
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.message").value("Validation failed."));
+    }
+
+    @Test
+    @DisplayName("사용자는 단일 occurrence 수정에서 modifiedStartAt이 modifiedEndAt보다 빠르지 않은 시간을 사용할 수 없다")
+    void givenInvalidModifiedTimeRange_whenPatchSingleOccurrence_thenReturnsValidationFailed()
+            throws Exception {
+        // given
+        long recurrenceId = createRecurrenceEvent(
+                "Invalid single time",
+                "2027-11-01",
+                "2027-11-01",
+                "DAILY"
+        );
+
+        // when
+        mockMvc.perform(patch("/api/recurrence-events/{recurrenceId}", recurrenceId)
+                        .param("updateScope", "SINGLE_OCCURRENCE")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "targetOccurrenceStartAt": "2027-11-01T09:00:00Z",
+                                  "modifiedStartAt": "2027-11-01T13:00:00Z",
+                                  "modifiedEndAt": "2027-11-01T13:00:00Z"
+                                }
+                                """))
+                // then
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.message").value("Validation failed."));
     }
 
     @Test
