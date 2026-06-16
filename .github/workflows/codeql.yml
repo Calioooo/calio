@@ -77,7 +77,7 @@
           working-directory: frontend/Calio
           run: |
             xcodebuild build \
-              -project Calio.xcodeproj \ 
+              -project Calio.xcodeproj \
               -scheme Calio \
               -destination 'platform=iOS Simulator,name=iPhone 16'
 
