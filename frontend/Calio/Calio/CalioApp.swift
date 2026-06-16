@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-@main
+@main 
 struct CalioApp: App {
     var body: some Scene {
         WindowGroup {
