@@ -79,6 +79,6 @@
             xcodebuild build \
               -project Calio.xcodeproj \ 
               -scheme Calio \
-              -destination 'platform=iOS Simulator,name=iPhone 15'
+              -destination 'platform=iOS Simulator,name=iPhone 16'
 
         - uses: github/codeql-action/analyze@v3
