@@ -23,14 +23,14 @@ struct CalendarDateEventCellView: View {
     
     var body: some View {
         GeometryReader { geometry in
-            let overflow = eventOverflow(maxWidth: geometry.size.width)
+            let chipLayout = eventChipLayout(maxWidth: geometry.size.width)
             
             VStack(spacing: 8) {
                 Text("\(monthText) / \(dayText)")
                     .font(.system(size: 18, weight: .medium))
                     .frame(maxWidth: .infinity, alignment: .leading)
                 FlowLayout(spacing: eventChipSpacing) {
-                    ForEach(overflow.visibleEvents, id: \.id) { event in
+                    ForEach(chipLayout.visibleEvents, id: \.id) { event in
                         Text(event.title)
                             .font(.system(size: 13, weight: .medium))
                             .lineLimit(1)
@@ -42,8 +42,8 @@ struct CalendarDateEventCellView: View {
                             )
                     }
                     
-                    if overflow.hiddenEventCount > 0 {
-                        Text("+\(overflow.hiddenEventCount) more")
+                    if chipLayout.hiddenEventCount > 0 {
+                        Text("+\(chipLayout.hiddenEventCount) more")
                             .font(.system(size: 13, weight: .medium))
                             .lineLimit(1)
                             .foregroundStyle(.secondary)
@@ -62,9 +62,9 @@ struct CalendarDateEventCellView: View {
         .onTapGesture(perform: onTap)
     }
     
-    private func eventOverflow(maxWidth: CGFloat) -> EventOverflow {
+    private func eventChipLayout(maxWidth: CGFloat) -> EventChipLayout {
         guard maxWidth > 0 else {
-            return EventOverflow(visibleEvents: [], hiddenEventCount: events.count)
+            return EventChipLayout(visibleEvents: [], hiddenEventCount: events.count)
         }
         
         var visibleEvents: [Event] = []
@@ -84,7 +84,7 @@ struct CalendarDateEventCellView: View {
             visibleEvents = candidateEvents
         }
         
-        return EventOverflow(
+        return EventChipLayout(
             visibleEvents: visibleEvents,
             hiddenEventCount: events.count - visibleEvents.count
         )
@@ -117,7 +117,7 @@ struct CalendarDateEventCellView: View {
     }
 }
 
-private struct EventOverflow {
+private struct EventChipLayout {
     let visibleEvents: [Event]
     let hiddenEventCount: Int
 }
