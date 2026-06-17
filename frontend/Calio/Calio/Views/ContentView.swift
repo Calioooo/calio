@@ -44,7 +44,8 @@ private struct CalendarWeekTimelineTestView: View {
         CalendarWeekTimelineView(
             items: viewModel.loadedDateCellItems,
             focusedDay: viewModel.state.focusedDay,
-            onSelectedDay: viewModel.focusDay(_:)
+            onSelectedDay: viewModel.focusDay(_:),
+            onVisibleRangeChanged: viewModel.loadAdditionalEventsIfNeeded(visibleRange:)
         )
         .task {
             viewModel.loadInitialIfNeeded()

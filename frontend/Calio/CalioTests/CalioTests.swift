@@ -9,6 +9,7 @@ import Testing
 import Foundation
 @testable import Calio
 
+@Suite(.serialized)
 struct CalioTests {
 
     @Test func calendarDisplayModeStartsFromWeek() async throws {
@@ -34,12 +35,14 @@ struct CalioTests {
         #expect(CalendarDisplayMode.month.resolved(afterDragTranslationHeight: -40) == .month)
     }
 
+    @MainActor
     @Test func scheduleDrawerUsesItemsAndCallbacksWithoutViewModel() async throws {
         let drawer = CalendarScheduleDrawerView(
             items: [],
             focusedDay: DayKey(date: Date()),
             displayMode: .week,
             onFocusedDayChanged: { _ in },
+            onVisibleRangeChanged: { _ in },
             onDragEnded: { _ in }
         )
 
@@ -127,6 +130,7 @@ struct CalioTests {
         #expect(state.nearLoadedEdge(around: makeDayKey(dayOffset: 5, from: baseDate, calendar: calendar), thresholdDays: 3, calendar: calendar) == nil)
     }
     
+    @MainActor
     @Test func scrollingDateViewsReceiveItemsFocusedDayAndCallbacksWithoutViewModel() async throws {
         let calendar = fixedCalendar
         let baseDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8)))
@@ -143,7 +147,8 @@ struct CalioTests {
         let eventList = CalendarDateEventView(
             items: items,
             focusedDay: items[0].id,
-            onFocusedDayChanged: { _ in }
+            onFocusedDayChanged: { _ in },
+            onVisibleRangeChanged: { _ in }
         )
         
         #expect(strip.items.count == 2)
@@ -173,6 +178,42 @@ struct CalioTests {
     @Test func calendarHomeViewModelRequestsPastAndFutureLoadsNearLoadedRangeEdges() async throws {
         let calendar = fixedCalendar
         let baseDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8)))
+        let pastRepository = RecordingEventRepository()
+        let pastViewModel = CalendarHomeViewModel(
+            calendar: calendar,
+            dateService: CalendarDateService(calendar: calendar),
+            eventService: EventService(repository: pastRepository),
+            initialState: makeLoadedState(dayOffsets: 0...60, focusedOffset: 30, from: baseDate, calendar: calendar)
+        )
+
+        pastViewModel.loadAdditionalEventsIfNeeded(
+            visibleRange: CalendarVisibleIndexRange(startIndex: 1, endIndex: 7)
+        )
+        let didRequestPastLoad = await pastRepository.waitForRequestCount(1)
+        
+        let futureRepository = RecordingEventRepository()
+        let futureViewModel = CalendarHomeViewModel(
+            calendar: calendar,
+            dateService: CalendarDateService(calendar: calendar),
+            eventService: EventService(repository: futureRepository),
+            initialState: makeLoadedState(dayOffsets: 0...60, focusedOffset: 30, from: baseDate, calendar: calendar)
+        )
+        
+        futureViewModel.loadAdditionalEventsIfNeeded(
+            visibleRange: CalendarVisibleIndexRange(startIndex: 53, endIndex: 59)
+        )
+        let didRequestFutureLoad = await futureRepository.waitForRequestCount(1)
+
+        #expect(didRequestPastLoad)
+        #expect(didRequestFutureLoad)
+        #expect(pastRepository.requestDirections(relativeTo: baseDate, calendar: calendar) == [.past])
+        #expect(futureRepository.requestDirections(relativeTo: baseDate, calendar: calendar) == [.future])
+    }
+    
+    @MainActor
+    @Test func calendarHomeViewModelDoesNotLoadWhenVisibleRangeIsAwayFromLoadedEdges() async throws {
+        let calendar = fixedCalendar
+        let baseDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8)))
         let repository = RecordingEventRepository()
         let viewModel = CalendarHomeViewModel(
             calendar: calendar,
@@ -180,13 +221,13 @@ struct CalioTests {
             eventService: EventService(repository: repository),
             initialState: makeLoadedState(dayOffsets: 0...60, focusedOffset: 30, from: baseDate, calendar: calendar)
         )
-
-        viewModel.focusDay(makeDayKey(dayOffset: 1, from: baseDate, calendar: calendar))
-        viewModel.focusDay(makeDayKey(dayOffset: 59, from: baseDate, calendar: calendar))
-        await repository.waitForRequestCount(2)
-
-        #expect(repository.requestCount == 2)
-        #expect(repository.requestDirections(relativeTo: baseDate, calendar: calendar) == [.past, .future])
+        
+        viewModel.loadAdditionalEventsIfNeeded(
+            visibleRange: CalendarVisibleIndexRange(startIndex: 25, endIndex: 35)
+        )
+        await Task.yield()
+        
+        #expect(repository.requestCount == 0)
     }
 
     @MainActor
@@ -201,11 +242,16 @@ struct CalioTests {
             initialState: makeLoadedState(dayOffsets: 0...60, focusedOffset: 30, from: baseDate, calendar: calendar)
         )
 
-        viewModel.focusDay(makeDayKey(dayOffset: 59, from: baseDate, calendar: calendar))
-        await repository.waitForRequestCount(1)
-        viewModel.focusDay(makeDayKey(dayOffset: 58, from: baseDate, calendar: calendar))
+        viewModel.loadAdditionalEventsIfNeeded(
+            visibleRange: CalendarVisibleIndexRange(startIndex: 53, endIndex: 59)
+        )
+        let didRequestInitialLoad = await repository.waitForRequestCount(1)
+        viewModel.loadAdditionalEventsIfNeeded(
+            visibleRange: CalendarVisibleIndexRange(startIndex: 52, endIndex: 58)
+        )
         await Task.yield()
 
+        #expect(didRequestInitialLoad)
         #expect(repository.requestCount == 1)
         repository.finishSuspendedRequests()
     }
@@ -225,9 +271,13 @@ struct CalioTests {
         )
 
         viewModel.focusDay(focusedDay)
-        await repository.waitForRequestCount(1)
+        viewModel.loadAdditionalEventsIfNeeded(
+            visibleRange: CalendarVisibleIndexRange(startIndex: 53, endIndex: 59)
+        )
+        let didRequestFailedLoad = await repository.waitForRequestCount(1)
         await Task.yield()
 
+        #expect(didRequestFailedLoad)
         #expect(viewModel.state.startDate == initialState.startDate)
         #expect(viewModel.state.endDate == initialState.endDate)
         #expect(viewModel.state.daysByKey.count == initialState.daysByKey.count)
@@ -309,7 +359,6 @@ private enum RequestedLoadDirection: Equatable {
 
 private final class RecordingEventRepository: EventRepository {
     private(set) var requests: [(startDate: Date, endDate: Date)] = []
-    private var waiters: [(Int, CheckedContinuation<Void, Never>)] = []
     private var suspendedContinuations: [CheckedContinuation<[EventResponseDTO], Error>] = []
     private let shouldSuspend: Bool
     private let error: Error?
@@ -325,7 +374,6 @@ private final class RecordingEventRepository: EventRepository {
 
     func fetchEvents(from startDate: Date, to endDate: Date) async throws -> [EventResponseDTO] {
         requests.append((startDate, endDate))
-        resumeReadyWaiters()
 
         if let error {
             throw error
@@ -340,14 +388,22 @@ private final class RecordingEventRepository: EventRepository {
         return []
     }
 
-    func waitForRequestCount(_ count: Int) async {
-        guard requests.count < count else {
-            return
+    func waitForRequestCount(
+        _ count: Int,
+        timeoutNanoseconds: UInt64 = 5_000_000_000
+    ) async -> Bool {
+        let retryIntervalNanoseconds: UInt64 = 10_000_000
+        let maxAttemptCount = Int(timeoutNanoseconds / retryIntervalNanoseconds)
+        
+        for _ in 0...maxAttemptCount {
+            if requests.count >= count {
+                return true
+            }
+            
+            try? await Task.sleep(nanoseconds: retryIntervalNanoseconds)
         }
-
-        await withCheckedContinuation { continuation in
-            waiters.append((count, continuation))
-        }
+        
+        return requests.count >= count
     }
 
     func finishSuspendedRequests() {
@@ -361,18 +417,6 @@ private final class RecordingEventRepository: EventRepository {
     func requestDirections(relativeTo baseDate: Date, calendar: Calendar) -> [RequestedLoadDirection] {
         requests.map { request in
             request.startDate < baseDate ? .past : .future
-        }
-    }
-
-    private func resumeReadyWaiters() {
-        let readyWaiters = waiters.filter { count, _ in
-            requests.count >= count
-        }
-        waiters.removeAll { count, _ in
-            requests.count >= count
-        }
-        readyWaiters.forEach { _, continuation in
-            continuation.resume()
         }
     }
 }

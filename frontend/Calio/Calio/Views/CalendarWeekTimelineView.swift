@@ -17,6 +17,10 @@ struct CalendarWeekTimelineView: View {
     let items: [CalendarDateCellItem]
     let focusedDay: DayKey
     let onSelectedDay: (DayKey) -> Void
+    let onVisibleRangeChanged: (CalendarVisibleIndexRange) -> Void
+    
+    @State private var headerScrollPosition: DayKey?
+    @State private var lastVisibleRange: CalendarVisibleIndexRange?
     
     var body: some View {
         GeometryReader { geometry in
@@ -54,26 +58,45 @@ struct CalendarWeekTimelineView: View {
     }
     
     private func timelineHeader(metrics: TimelineMetrics) -> some View {
-        ZStack(alignment: .topLeading) {
-            Path { path in
-                for index in 0...visibleDayCount {
-                    let x = metrics.gridStartX + CGFloat(index) * metrics.dayColumnWidth
-                    path.move(to: CGPoint(x: x, y: metrics.headerGridLineStartY))
-                    path.addLine(to: CGPoint(x: x, y: metrics.headerHeight))
-                }
-            }
-            .stroke(Color.secondary.opacity(0.28), lineWidth: 0.7)
+        HStack(spacing: 0) {
+            Color.clear
+                .frame(width: metrics.gridStartX)
             
-            HStack(spacing: 0) {
-                ForEach(visibleDays, id: \.self) { day in
-                    dayHeader(for: day, metrics: metrics)
-                        .frame(
-                            width: metrics.dayColumnWidth,
-                            height: metrics.headerHeight
-                        )
+            ScrollView(.horizontal) {
+                LazyHStack(spacing: 0) {
+                    ForEach(items) { item in
+                        dayHeader(for: item, metrics: metrics)
+                            .frame(
+                                width: metrics.dayColumnWidth,
+                                height: metrics.headerHeight
+                            )
+                            .id(item.id)
+                            .overlay(alignment: .leading) {
+                                verticalHeaderDivider(metrics: metrics)
+                            }
+                    }
+                    
+                    verticalHeaderDivider(metrics: metrics)
+                        .frame(width: 0, height: metrics.headerHeight)
                 }
+                .scrollTargetLayout()
             }
-            .offset(x: metrics.gridStartX)
+            .scrollIndicators(.hidden)
+            .scrollTargetBehavior(.viewAligned)
+            .scrollPosition(id: $headerScrollPosition, anchor: .leading)
+            .onChange(of: headerScrollPosition) { _, newDay in
+                updateFocusedDayFromHeaderScrollPosition(newDay)
+            }
+            .onChange(of: focusedDay) { _, newDay in
+                alignHeader(to: newDay)
+            }
+            .onChange(of: items.count) { _, _ in
+                alignHeader(to: focusedDay)
+            }
+            .onAppear {
+                alignHeader(to: focusedDay)
+                notifyVisibleRangeChanged(around: focusedDay)
+            }
         }
         .frame(
             width: metrics.totalWidth,
@@ -82,27 +105,34 @@ struct CalendarWeekTimelineView: View {
         )
     }
     
-    private func dayHeader(for day: DayKey, metrics: TimelineMetrics) -> some View {
-        let item = itemsByDay[day]
-        let isFocused = day == focusedDay
+    private func verticalHeaderDivider(metrics: TimelineMetrics) -> some View {
+        Path { path in
+            path.move(to: CGPoint(x: 0, y: metrics.headerGridLineStartY))
+            path.addLine(to: CGPoint(x: 0, y: metrics.headerHeight))
+        }
+        .stroke(Color.secondary.opacity(0.28), lineWidth: 0.7)
+    }
+    
+    private func dayHeader(for item: CalendarDateCellItem, metrics: TimelineMetrics) -> some View {
+        let isFocused = item.id == focusedDay
         
         return Button {
-            onSelectedDay(day)
+            onSelectedDay(item.id)
         } label: {
             VStack(spacing: 8) {
-                Text(item?.weekday.fullKoreanText ?? "")
+                Text(item.weekday.fullKoreanText)
                     .font(.system(size: metrics.weekdayFontSize, weight: .medium))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
-                    .foregroundStyle(dayHeaderColor(for: item))
+                    .foregroundStyle(dayHeaderColor(for: item.weekday))
                     .frame(maxWidth: .infinity, alignment: .center)
                 
-                Text("\(day.day)")
+                Text("\(item.id.day)")
                     .font(.system(size: metrics.dayNumberFontSize, weight: .regular))
-                    .foregroundStyle(item?.isToday == true ? .white : dayHeaderColor(for: item))
+                    .foregroundStyle(item.isToday ? .white : dayHeaderColor(for: item.weekday))
                     .frame(width: metrics.dayCircleSize, height: metrics.dayCircleSize)
                     .background {
-                        if item?.isToday == true {
+                        if item.isToday {
                             Circle()
                                 .fill(Color(red: 0.56, green: 0.61, blue: 0.96))
                         } else if isFocused {
@@ -127,8 +157,8 @@ struct CalendarWeekTimelineView: View {
             fullDayEventRowGrid(metrics: metrics)
             
             HStack(spacing: 0) {
-                ForEach(visibleDays, id: \.self) { day in
-                    fullDayEventCell(for: day, metrics: metrics)
+                ForEach(visibleItems) { item in
+                    fullDayEventCell(for: item, metrics: metrics)
                         .frame(
                             width: metrics.dayColumnWidth,
                             height: metrics.fullDayEventRowHeight
@@ -161,10 +191,10 @@ struct CalendarWeekTimelineView: View {
     }
     
     private func fullDayEventCell(
-        for day: DayKey,
+        for item: CalendarDateCellItem,
         metrics: TimelineMetrics
     ) -> some View {
-        let events = fullDayEvents(for: day)
+        let events = fullDayEvents(in: item)
         
         return VStack(spacing: 3) {
             ForEach(Array(events.prefix(metrics.maxVisibleFullDayEventCount))) { event in
@@ -267,25 +297,13 @@ struct CalendarWeekTimelineView: View {
         }
     }
     
-    private var visibleDays: [DayKey] {
-        let focusedDate = focusedDay.toDate(calendar: calendar)
-        let startDate = calendar.startOfDay(for: focusedDate)
-        
-        return (0..<visibleDayCount).compactMap { offset in
-            guard let date = calendar.date(
-                byAdding: .day,
-                value: offset,
-                to: startDate
-            ) else {
-                return nil
-            }
-            
-            return DayKey(date: date, calendar: calendar)
+    private var visibleItems: [CalendarDateCellItem] {
+        guard let focusedIndex = items.firstIndex(where: { $0.id == focusedDay }) else {
+            return []
         }
-    }
-    
-    private var itemsByDay: [DayKey: CalendarDateCellItem] {
-        Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })
+        
+        let endIndex = min(items.endIndex, focusedIndex + visibleDayCount)
+        return Array(items[focusedIndex..<endIndex])
     }
     
     private var timelineHours: [Int] {
@@ -297,8 +315,8 @@ struct CalendarWeekTimelineView: View {
     }
     
     private func eventLayouts(metrics: TimelineMetrics) -> [TimelineEventLayout] {
-        visibleDays.enumerated().flatMap { dayIndex, day in
-            let events = timedEvents(for: day)
+        visibleItems.enumerated().flatMap { dayIndex, item in
+            let events = timedEvents(in: item)
             
             return events.compactMap { event in
                 makeEventLayout(
@@ -308,6 +326,46 @@ struct CalendarWeekTimelineView: View {
                 )
             }
         }
+    }
+    
+    private func updateFocusedDayFromHeaderScrollPosition(_ day: DayKey?) {
+        guard let day else { return }
+        
+        notifyVisibleRangeChanged(around: day)
+        guard day != focusedDay else { return }
+        
+        onSelectedDay(day)
+    }
+    
+    private func alignHeader(to day: DayKey) {
+        guard items.contains(where: { $0.id == day }) else { return }
+        guard headerScrollPosition != day else { return }
+        
+        headerScrollPosition = day
+        notifyVisibleRangeChanged(around: day)
+    }
+    
+    private func notifyVisibleRangeChanged(around day: DayKey) {
+        guard let focusedIndex = items.firstIndex(where: { $0.id == day }) else {
+            return
+        }
+        
+        let endIndex = min(
+            items.count - 1,
+            focusedIndex + visibleDayCount - 1
+        )
+        
+        let visibleRange = CalendarVisibleIndexRange(
+            startIndex: focusedIndex,
+            endIndex: endIndex
+        )
+        
+        guard visibleRange != lastVisibleRange else {
+            return
+        }
+        
+        lastVisibleRange = visibleRange
+        onVisibleRangeChanged(visibleRange)
     }
     
     private func makeEventLayout(
@@ -355,14 +413,14 @@ struct CalendarWeekTimelineView: View {
         )
     }
     
-    private func timedEvents(for day: DayKey) -> [Event] {
-        (itemsByDay[day]?.events ?? []).filter { event in
+    private func timedEvents(in item: CalendarDateCellItem) -> [Event] {
+        item.events.filter { event in
             !isFullDayEvent(event)
         }
     }
     
-    private func fullDayEvents(for day: DayKey) -> [Event] {
-        (itemsByDay[day]?.events ?? []).filter(isFullDayEvent)
+    private func fullDayEvents(in item: CalendarDateCellItem) -> [Event] {
+        item.events.filter(isFullDayEvent)
     }
     
     private func isFullDayEvent(_ event: Event) -> Bool {
@@ -398,8 +456,8 @@ struct CalendarWeekTimelineView: View {
         return "\(displayHour) \(suffix)"
     }
     
-    private func dayHeaderColor(for item: CalendarDateCellItem?) -> Color {
-        switch item?.weekday {
+    private func dayHeaderColor(for weekday: CalendarWeekday) -> Color {
+        switch weekday {
         case .sunday:
             return .red
         case .saturday:
@@ -658,6 +716,7 @@ private extension UIView {
     CalendarWeekTimelineView(
         items: items,
         focusedDay: items[0].id,
-        onSelectedDay: { _ in }
+        onSelectedDay: { _ in },
+        onVisibleRangeChanged: { _ in }
     )
 }
