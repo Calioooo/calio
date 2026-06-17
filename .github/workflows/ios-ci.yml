@@ -1,0 +1,26 @@
+name: iOS CI
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ios-test:
+    runs-on: macos-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Show Xcode version
+      run: xcodebuild -version
+
+    - name: Run iOS tests
+      working-directory: frontend/Calio
+      run: |
+        xcodebuild test \
+          -project Calio.xcodeproj \
+          -scheme Calio \
+          -destination 'platform=iOS Simulator,name=iPhone 16'

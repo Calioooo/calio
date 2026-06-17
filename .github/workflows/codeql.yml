@@ -1,0 +1,84 @@
+  name: CodeQL
+
+  on:
+    pull_request:
+      branches: [dev, test/workflows]
+    push:
+      branches: [dev, test/workflows]
+
+  permissions:
+    contents: read
+    security-events: write
+
+  jobs:
+    changes:
+      runs-on: ubuntu-latest
+      outputs:
+        backend: ${{ steps.filter.outputs.backend }}
+        ios: ${{ steps.filter.outputs.ios }}
+        shared: ${{ steps.filter.outputs.shared }}
+      steps:
+        - uses: actions/checkout@v4
+
+        - uses: dorny/paths-filter@v3
+          id: filter
+          with:
+            filters: |
+              backend:
+                - 'backend/**'
+              ios:
+                - 'frontend/**'
+                - '*.xcodeproj/**'
+                - '*.xcworkspace/**'
+
+    codeql-backend:
+      needs: changes
+      if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.shared == 'true'
+      runs-on: ubuntu-latest
+
+      defaults:
+        run:
+          working-directory: backend
+
+      steps:
+        - uses: actions/checkout@v4
+
+        - uses: github/codeql-action/init@v3
+          with:
+            languages: java-kotlin
+
+        - uses: actions/setup-java@v4
+          with:
+            distribution: temurin
+            java-version: '21'
+            cache: gradle
+
+        - name: Make Gradle wrapper executable
+          run: chmod +x ./gradlew
+
+        - name: Build backend
+          run: ./gradlew build -x test
+
+        - uses: github/codeql-action/analyze@v3
+
+    codeql-ios:
+      needs: changes
+      if: needs.changes.outputs.ios == 'true' || needs.changes.outputs.shared == 'true'
+      runs-on: macos-latest
+
+      steps:
+        - uses: actions/checkout@v4
+
+        - uses: github/codeql-action/init@v3
+          with:
+            languages: swift
+
+        - name: Build iOS for CodeQL
+          working-directory: frontend/Calio
+          run: |
+            xcodebuild build \
+              -project Calio.xcodeproj \
+              -scheme Calio \
+              -destination 'platform=iOS Simulator,name=iPhone 16'
+
+        - uses: github/codeql-action/analyze@v3

@@ -1,0 +1,43 @@
+name: PR Check
+
+on:
+  pull_request:
+    branches: [dev, test/workflows]
+  push:
+    branches: [dev, test/workflows]
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      ios: ${{ steps.filter.outputs.ios }}
+      shared: ${{ steps.filter.outputs.shared }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+            ios:
+              - 'frontend/**'
+              - '*.xcodeproj/**'
+              - '*.xcworkspace/**'
+
+  backend:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.shared == 'true'
+    uses: ./.github/workflows/backend-ci.yml
+    secrets: inherit
+
+  ios:
+    needs: changes
+    if: needs.changes.outputs.ios == 'true' || needs.changes.outputs.shared == 'true'
+    uses: ./.github/workflows/ios-ci.yml
+    secrets: inherit
