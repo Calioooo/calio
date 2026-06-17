@@ -6,10 +6,10 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeParseException;
-import java.util.Set;
 import tools.jackson.databind.JsonNode;
 
 public record UpdateRecurrenceEventRequest(
+        boolean hasBodyUpdateScope,
         String recurrenceTitle,
         boolean hasRecurrenceTitle,
         String recurrenceDescription,
@@ -32,27 +32,11 @@ public record UpdateRecurrenceEventRequest(
         boolean hasModifiedEndAt
 ) {
 
-    private static final Set<String> WHOLE_UPDATE_FIELDS = Set.of(
-            "recurrenceTitle",
-            "recurrenceDescription",
-            "recurrenceStartDate",
-            "recurrenceEndDate",
-            "recurrenceStartTime",
-            "recurrenceEndTime",
-            "recurrenceFrequency"
-    );
-    private static final Set<String> SINGLE_OCCURRENCE_FIELDS = Set.of(
-            "targetOccurrenceStartAt",
-            "modifiedStartAt",
-            "modifiedEndAt"
-    );
-
     public static UpdateRecurrenceEventRequest from(JsonNode body) {
         validateObjectBody(body);
-        validateNoBodyUpdateScope(body);
-        validateNoMixedFields(body);
 
         return new UpdateRecurrenceEventRequest(
+                body.has("updateScope"),
                 parseText(body, "recurrenceTitle"),
                 body.has("recurrenceTitle"),
                 parseNullableText(body, "recurrenceDescription"),
@@ -76,24 +60,6 @@ public record UpdateRecurrenceEventRequest(
         );
     }
 
-    public void validateWholeUpdateScope() {
-        if (hasAnySingleOccurrenceField()) {
-            throwValidationFailed();
-        }
-    }
-
-    public void validateSingleOccurrenceScope() {
-        if (hasAnyWholeUpdateField() || missesSingleOccurrenceRequiredFields()) {
-            throwValidationFailed();
-        }
-
-        if (modifiedStartAt.isBefore(modifiedEndAt)) {
-            return;
-        }
-
-        throwValidationFailed();
-    }
-
     private static void validateObjectBody(JsonNode body) {
         if (body != null && body.isObject()) {
             return;
@@ -102,42 +68,12 @@ public record UpdateRecurrenceEventRequest(
         throwValidationFailed();
     }
 
-    private static void validateNoBodyUpdateScope(JsonNode body) {
-        if (!body.has("updateScope")) {
-            return;
-        }
-
-        throwValidationFailed();
-    }
-
-    private static void validateNoMixedFields(JsonNode body) {
-        boolean hasWholeUpdateField = containsAny(body, WHOLE_UPDATE_FIELDS);
-        boolean hasSingleOccurrenceField = containsAny(body, SINGLE_OCCURRENCE_FIELDS);
-
-        if (!hasWholeUpdateField || !hasSingleOccurrenceField) {
-            return;
-        }
-
-        throwValidationFailed();
-    }
-
-    private static boolean containsAny(JsonNode body, Set<String> fields) {
-        return fields.stream().anyMatch(body::has);
-    }
-
     private static String parseText(JsonNode body, String fieldName) {
-        if (!body.has(fieldName)) {
+        if (!body.has(fieldName) || body.get(fieldName).isNull()) {
             return null;
         }
 
-        if (!body.get(fieldName).isNull()) {
-            String value = body.get(fieldName).asText();
-            validateNotBlank(fieldName, value);
-            return value;
-        }
-
-        throwValidationFailed();
-        return null;
+        return body.get(fieldName).asText();
     }
 
     private static String parseNullableText(JsonNode body, String fieldName) {
@@ -148,21 +84,9 @@ public record UpdateRecurrenceEventRequest(
         return body.get(fieldName).asText();
     }
 
-    private static void validateNotBlank(String fieldName, String value) {
-        if (!"recurrenceTitle".equals(fieldName) || !value.isBlank()) {
-            return;
-        }
-
-        throwValidationFailed();
-    }
-
     private static LocalDate parseLocalDate(JsonNode body, String fieldName) {
-        if (!body.has(fieldName)) {
+        if (!body.has(fieldName) || body.get(fieldName).isNull()) {
             return null;
-        }
-
-        if (body.get(fieldName).isNull()) {
-            throwValidationFailed();
         }
 
         try {
@@ -174,12 +98,8 @@ public record UpdateRecurrenceEventRequest(
     }
 
     private static LocalTime parseLocalTime(JsonNode body, String fieldName) {
-        if (!body.has(fieldName)) {
+        if (!body.has(fieldName) || body.get(fieldName).isNull()) {
             return null;
-        }
-
-        if (body.get(fieldName).isNull()) {
-            throwValidationFailed();
         }
 
         try {
@@ -191,12 +111,8 @@ public record UpdateRecurrenceEventRequest(
     }
 
     private static Instant parseInstant(JsonNode body, String fieldName) {
-        if (!body.has(fieldName)) {
+        if (!body.has(fieldName) || body.get(fieldName).isNull()) {
             return null;
-        }
-
-        if (body.get(fieldName).isNull()) {
-            throwValidationFailed();
         }
 
         try {
@@ -205,24 +121,6 @@ public record UpdateRecurrenceEventRequest(
             throwValidationFailed();
             return null;
         }
-    }
-
-    private boolean hasAnyWholeUpdateField() {
-        return hasRecurrenceTitle
-                || hasRecurrenceDescription
-                || hasRecurrenceStartDate
-                || hasRecurrenceEndDate
-                || hasRecurrenceStartTime
-                || hasRecurrenceEndTime
-                || hasRecurrenceFrequency;
-    }
-
-    private boolean hasAnySingleOccurrenceField() {
-        return hasTargetOccurrenceStartAt || hasModifiedStartAt || hasModifiedEndAt;
-    }
-
-    private boolean missesSingleOccurrenceRequiredFields() {
-        return !hasTargetOccurrenceStartAt || !hasModifiedStartAt || !hasModifiedEndAt;
     }
 
     private static void throwValidationFailed() {

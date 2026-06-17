@@ -60,7 +60,7 @@ public class RecurrenceEventService {
 
     @Transactional
     public RecurrenceEventResponse updateRecurrenceEvent(Long recurrenceId, UpdateRecurrenceEventRequest request) {
-        request.validateWholeUpdateScope();
+        validateWholeUpdateRequest(request);
         RecurrenceEvent recurrenceEvent = findRecurrenceEvent(recurrenceId);
         String recurrenceTitle = resolveTitle(recurrenceEvent, request);
         String recurrenceDescription = resolveDescription(recurrenceEvent, request);
@@ -90,7 +90,7 @@ public class RecurrenceEventService {
 
     @Transactional
     public EventResponse updateSingleOccurrence(Long recurrenceId, UpdateRecurrenceEventRequest request) {
-        request.validateSingleOccurrenceScope();
+        validateSingleOccurrenceUpdateRequest(request);
         findRecurrenceEvent(recurrenceId);
         Event occurrence = findOccurrenceEvent(recurrenceId, request.targetOccurrenceStartAt());
         Instant originStartAt = occurrence.getOriginStartAt();
@@ -117,6 +117,74 @@ public class RecurrenceEventService {
         return eventRepository.findFirstByRecurrenceIdAndOriginStartAt(recurrenceId, targetOccurrenceStartAt)
                 .or(() -> eventRepository.findFirstByRecurrenceIdAndStartAt(recurrenceId, targetOccurrenceStartAt))
                 .orElseThrow(() -> new CalioException(ErrorCode.RECURRENCE_OCCURRENCE_NOT_FOUND));
+    }
+
+    private void validateWholeUpdateRequest(UpdateRecurrenceEventRequest request) {
+        if (request.hasBodyUpdateScope()
+                || hasAnySingleOccurrenceField(request)
+                || hasInvalidWholeUpdateFieldValue(request)) {
+            throwValidationFailed();
+        }
+    }
+
+    private boolean hasInvalidWholeUpdateFieldValue(UpdateRecurrenceEventRequest request) {
+        return isProvidedBlankTitle(request)
+                || isProvidedNullDateOrTime(request)
+                || isProvidedNullFrequency(request);
+    }
+
+    private boolean isProvidedBlankTitle(UpdateRecurrenceEventRequest request) {
+        return request.hasRecurrenceTitle()
+                && (request.recurrenceTitle() == null || request.recurrenceTitle().isBlank());
+    }
+
+    private boolean isProvidedNullDateOrTime(UpdateRecurrenceEventRequest request) {
+        return request.hasRecurrenceStartDate() && request.recurrenceStartDate() == null
+                || request.hasRecurrenceEndDate() && request.recurrenceEndDate() == null
+                || request.hasRecurrenceStartTime() && request.recurrenceStartTime() == null
+                || request.hasRecurrenceEndTime() && request.recurrenceEndTime() == null;
+    }
+
+    private boolean isProvidedNullFrequency(UpdateRecurrenceEventRequest request) {
+        return request.hasRecurrenceFrequency() && request.recurrenceFrequency() == null;
+    }
+
+    private void validateSingleOccurrenceUpdateRequest(UpdateRecurrenceEventRequest request) {
+        if (request.hasBodyUpdateScope()
+                || hasAnyWholeUpdateField(request)
+                || missesSingleOccurrenceRequiredFields(request)
+                || hasNullSingleOccurrenceField(request)
+                || !request.modifiedStartAt().isBefore(request.modifiedEndAt())) {
+            throwValidationFailed();
+        }
+    }
+
+    private boolean missesSingleOccurrenceRequiredFields(UpdateRecurrenceEventRequest request) {
+        return !request.hasTargetOccurrenceStartAt()
+                || !request.hasModifiedStartAt()
+                || !request.hasModifiedEndAt();
+    }
+
+    private boolean hasAnyWholeUpdateField(UpdateRecurrenceEventRequest request) {
+        return request.hasRecurrenceTitle()
+                || request.hasRecurrenceDescription()
+                || request.hasRecurrenceStartDate()
+                || request.hasRecurrenceEndDate()
+                || request.hasRecurrenceStartTime()
+                || request.hasRecurrenceEndTime()
+                || request.hasRecurrenceFrequency();
+    }
+
+    private boolean hasAnySingleOccurrenceField(UpdateRecurrenceEventRequest request) {
+        return request.hasTargetOccurrenceStartAt()
+                || request.hasModifiedStartAt()
+                || request.hasModifiedEndAt();
+    }
+
+    private boolean hasNullSingleOccurrenceField(UpdateRecurrenceEventRequest request) {
+        return request.targetOccurrenceStartAt() == null
+                || request.modifiedStartAt() == null
+                || request.modifiedEndAt() == null;
     }
 
     private void updateExistingOverride(RecurrenceEventOverride override, UpdateRecurrenceEventRequest request) {
@@ -248,6 +316,10 @@ public class RecurrenceEventService {
         }
 
         throw new CalioException(ErrorCode.INVALID_RECURRENCE_TIME_RANGE);
+    }
+
+    private void throwValidationFailed() {
+        throw new CalioException(ErrorCode.VALIDATION_FAILED);
     }
 
     private String resolveTitle(RecurrenceEvent recurrenceEvent, UpdateRecurrenceEventRequest request) {
