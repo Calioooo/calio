@@ -20,10 +20,6 @@ struct CalendarMonthView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(monthTitle)
-                .font(.system(size: 24, weight: .semibold))
-                .foregroundStyle(.primary)
-
             HStack(spacing: 8) {
                 ForEach(CalendarWeekday.allCases) { weekday in
                     Text(weekday.shortKoreanText)
@@ -36,7 +32,8 @@ struct CalendarMonthView: View {
             monthGrid
         }
         .padding(.horizontal, 20)
-        .padding(.vertical, 18)
+        .padding(.top, 4)
+        .padding(.bottom, 18)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .accessibilityIdentifier("calendar_header_month")
         .gesture(
@@ -56,10 +53,6 @@ struct CalendarMonthView: View {
           )
     }
 
-    private var monthTitle: String {
-        "\(focusedDay.year)년 \(focusedDay.month)월"
-    }
-    
     private var monthGrid: some View {
         GeometryReader { geometry in
             let cellWidth = geometry.size.width / CGFloat(columnCount)

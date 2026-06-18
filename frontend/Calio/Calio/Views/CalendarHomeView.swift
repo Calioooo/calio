@@ -15,6 +15,7 @@ struct CalendarHomeView: View {
     private let stripViewHeightRatio: CGFloat = 0.2
     private let minimumMonthViewHeight: CGFloat = 380
     private let monthViewHeightRatio: CGFloat = 0.42
+    private let topBarHeight: CGFloat = 58
     
     init(viewModel: CalendarHomeViewModel) {
         _viewModel = StateObject(wrappedValue: viewModel)
@@ -24,6 +25,7 @@ struct CalendarHomeView: View {
     var body: some View {
         GeometryReader { geometry in
             VStack(spacing: 0) {
+                calendarTopBar
                 calendarHeader(in: geometry)
 
                 CalendarScheduleDrawerView(
@@ -40,6 +42,25 @@ struct CalendarHomeView: View {
                 viewModel.loadInitialIfNeeded()
             }
         }
+    }
+    
+    private var calendarTopBar: some View {
+        HStack(spacing: 12) {
+            CalendarYearMonthTitleView(focusedDay: viewModel.state.focusedDay)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            
+            Button(action: startCreatingEvent) {
+                Image(systemName: "plus")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .frame(width: 36, height: 36)
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("일정 추가")
+        }
+        .padding(.horizontal, 20)
+        .frame(height: topBarHeight)
     }
 
     @ViewBuilder
@@ -85,6 +106,9 @@ struct CalendarHomeView: View {
 
     private func monthHeaderHeight(in geometry: GeometryProxy) -> CGFloat {
         max(minimumMonthViewHeight, geometry.size.height * monthViewHeightRatio)
+    }
+    
+    private func startCreatingEvent() {
     }
 }
 

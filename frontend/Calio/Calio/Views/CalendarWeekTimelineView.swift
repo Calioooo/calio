@@ -28,9 +28,7 @@ struct CalendarWeekTimelineView: View {
             let metrics = timelineMetrics(for: geometry.size)
             
             VStack(spacing: 0) {
-                Text(monthTitle)
-                    .font(.system(size: 24, weight: .semibold))
-                    .foregroundStyle(.primary)
+                CalendarYearMonthTitleView(focusedDay: focusedDay)
                     .frame(
                         width: metrics.totalWidth,
                         height: metrics.monthTitleHeight,
@@ -333,10 +331,6 @@ struct CalendarWeekTimelineView: View {
     
     private var timelineHours: [Int] {
         Array(timelineStartHour...timelineEndHour)
-    }
-    
-    private var monthTitle: String {
-        "\(focusedDay.year)년 \(focusedDay.month)월"
     }
     
     private func eventLayouts(metrics: TimelineMetrics) -> [TimelineEventLayout] {
