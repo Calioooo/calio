@@ -35,6 +35,12 @@ public class Event extends BaseEntity {
     @Column(name = "recurrence_id")
     private Long recurrenceId;
 
+    @Column(name = "origin_start_at")
+    private Instant originStartAt;
+
+    @Column(name = "origin_end_at")
+    private Instant originEndAt;
+
     protected Event() {
     }
 
@@ -48,11 +54,29 @@ public class Event extends BaseEntity {
         this.startAt = startAt;
         this.endAt = endAt;
         this.recurrenceId = recurrenceId;
+        if (recurrenceId != null) {
+            this.originStartAt = startAt;
+            this.originEndAt = endAt;
+        }
     }
 
     public void replace(String title, String description, Instant startAt, Instant endAt) {
         this.title = title;
         this.description = description;
+        this.startAt = startAt;
+        this.endAt = endAt;
+    }
+
+    public void replaceRecurrenceOccurrence(String title, String description, Instant startAt, Instant endAt) {
+        this.title = title;
+        this.description = description;
+        this.startAt = startAt;
+        this.endAt = endAt;
+        this.originStartAt = startAt;
+        this.originEndAt = endAt;
+    }
+
+    public void moveRecurrenceOccurrence(Instant startAt, Instant endAt) {
         this.startAt = startAt;
         this.endAt = endAt;
     }
@@ -87,6 +111,14 @@ public class Event extends BaseEntity {
 
     public Optional<Long> getRecurrenceId() {
         return Optional.ofNullable(recurrenceId);
+    }
+
+    public Optional<Instant> getOriginStartAt() {
+        return Optional.ofNullable(originStartAt);
+    }
+
+    public Optional<Instant> getOriginEndAt() {
+        return Optional.ofNullable(originEndAt);
     }
 
     public boolean isRecurrenceOccurrence() {
