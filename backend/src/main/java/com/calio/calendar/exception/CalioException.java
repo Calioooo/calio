@@ -9,6 +9,11 @@ public class CalioException extends RuntimeException {
         this.errorCode = errorCode;
     }
 
+    public CalioException(ErrorCode errorCode, String message) {
+        super(message);
+        this.errorCode = errorCode;
+    }
+
     public ErrorCode getErrorCode() {
         return errorCode;
     }

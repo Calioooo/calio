@@ -623,7 +623,7 @@ class RecurrenceEventControllerTest {
 
     @Test
     @DisplayName("사용자는 공백 제목이나 잘못된 날짜 형식으로 반복 일정을 수정할 수 없다")
-    void givenInvalidUpdateFieldValue_whenPatchWholeRecurrenceEvent_thenReturnsValidationFailed()
+    void givenInvalidUpdateFieldValue_whenPatchWholeRecurrenceEvent_thenReturnsValidationOrFieldTypeError()
             throws Exception {
         // given
         long recurrenceId = createRecurrenceEvent(
@@ -654,7 +654,8 @@ class RecurrenceEventControllerTest {
                                 }
                                 """))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"));
+                .andExpect(jsonPath("$.errorCode").value("INVALID_FIELD_TYPE"))
+                .andExpect(jsonPath("$.message").value("recurrenceStartDate"));
     }
 
     @Test
