@@ -20,6 +20,18 @@ struct StubEventRepository: EventRepository {
             event.startAt >= startDate && event.endAt <= endDate
         }
     }
+
+    func createEvent(_ request: CreateEventRequestDTO) async throws -> EventResponseDTO {
+        EventResponseDTO(
+            id: Int64(Date().timeIntervalSince1970),
+            title: request.title,
+            description: request.description,
+            startAt: request.startAt,
+            endAt: request.endAt,
+            createdAt: Date(),
+            updatedAt: Date()
+        )
+    }
     
     private func sampleEvents(around baseDate: Date) -> [EventResponseDTO] {
         [

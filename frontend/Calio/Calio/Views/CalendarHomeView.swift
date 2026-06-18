@@ -44,7 +44,10 @@ struct CalendarHomeView: View {
             }
             .sheet(isPresented: $isShowingEventCreationView) {
                 CalendarEventCreationView(
-                    focusedDay: viewModel.state.focusedDay
+                    focusedDay: viewModel.state.focusedDay,
+                    isSaving: viewModel.createState.isSaving,
+                    failureMessage: viewModel.createState.failureMessage,
+                    onSave: viewModel.createEvent(_:)
                 )
             }
         }
@@ -115,6 +118,7 @@ struct CalendarHomeView: View {
     }
     
     private func startCreatingEvent() {
+        viewModel.resetCreateState()
         isShowingEventCreationView = true
     }
 }
