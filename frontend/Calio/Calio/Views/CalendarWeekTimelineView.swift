@@ -21,6 +21,7 @@ struct CalendarWeekTimelineView: View {
     
     @State private var headerScrollPosition: DayKey?
     @State private var lastVisibleRange: CalendarVisibleIndexRange?
+    @State private var selectedEvent: Event?
     
     var body: some View {
         GeometryReader { geometry in
@@ -208,6 +209,18 @@ struct CalendarWeekTimelineView: View {
                         RoundedRectangle(cornerRadius: 5)
                             .fill(Color(hex: event.colorCode))
                     )
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        selectedEvent = event
+                    }
+                    .popover(
+                        isPresented: isShowingEventPopover(for: event),
+                        attachmentAnchor: .rect(.bounds),
+                        arrowEdge: .top
+                    ) {
+                        CalendarEventSummaryPopoverView(event: event)
+                            .presentationCompactAdaptation(.popover)
+                    }
             }
             
             if events.count > metrics.maxVisibleFullDayEventCount {
@@ -293,6 +306,18 @@ struct CalendarWeekTimelineView: View {
                     RoundedRectangle(cornerRadius: 6)
                         .fill(Color(hex: layout.event.colorCode))
                 )
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    selectedEvent = layout.event
+                }
+                .popover(
+                    isPresented: isShowingEventPopover(for: layout.event),
+                    attachmentAnchor: .rect(.bounds),
+                    arrowEdge: .top
+                ) {
+                    CalendarEventSummaryPopoverView(event: layout.event)
+                        .presentationCompactAdaptation(.popover)
+                }
                 .offset(x: layout.x, y: layout.y)
         }
     }
@@ -326,6 +351,19 @@ struct CalendarWeekTimelineView: View {
                 )
             }
         }
+    }
+    
+    private func isShowingEventPopover(for event: Event) -> Binding<Bool> {
+        Binding(
+            get: {
+                selectedEvent?.id == event.id
+            },
+            set: { isPresented in
+                if !isPresented {
+                    selectedEvent = nil
+                }
+            }
+        )
     }
     
     private func updateFocusedDayFromHeaderScrollPosition(_ day: DayKey?) {
@@ -607,6 +645,52 @@ private struct TimelineEventLayout: Identifiable {
     
     var id: Int64 {
         event.id
+    }
+}
+
+private struct CalendarEventSummaryPopoverView: View {
+    let event: Event
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 8) {
+                RoundedRectangle(cornerRadius: 3)
+                    .fill(Color(hex: event.colorCode))
+                    .frame(width: 6, height: 32)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(event.title)
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(2)
+                    
+                    Text(eventTimeText)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            
+            if hasDescription {
+                Text(event.description)
+                    .font(.system(size: 14, weight: .regular))
+                    .foregroundStyle(.primary)
+                    .lineLimit(4)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(14)
+        .frame(width: 260, alignment: .leading)
+    }
+    
+    private var hasDescription: Bool {
+        !event.description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+    
+    private var eventTimeText: String {
+        let startText = event.startAt.formatted(date: .omitted, time: .shortened)
+        let endText = event.endAt.formatted(date: .omitted, time: .shortened)
+        
+        return "\(startText) - \(endText)"
     }
 }
 
