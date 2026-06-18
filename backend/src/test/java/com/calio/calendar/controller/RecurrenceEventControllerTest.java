@@ -656,6 +656,18 @@ class RecurrenceEventControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode").value("INVALID_DATE_FORMAT"))
                 .andExpect(jsonPath("$.message").value("recurrenceStartDate"));
+
+        mockMvc.perform(patch("/api/recurrence-events/{recurrenceId}", recurrenceId)
+                        .param("updateScope", "RECURRENCE_EVENT")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "recurrenceStartTime": "9 AM"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("INVALID_TIME_FORMAT"))
+                .andExpect(jsonPath("$.message").value("recurrenceStartTime"));
     }
 
     @Test

@@ -47,7 +47,7 @@ public class JsonParser {
         try {
             return LocalTime.parse(text);
         } catch (DateTimeParseException exception) {
-            throw new CalioException(ErrorCode.INVALID_DATE_FORMAT, fieldName);
+            throw new CalioException(ErrorCode.INVALID_TIME_FORMAT, fieldName);
         }
     }
 
