@@ -14,6 +14,7 @@ public enum ErrorCode {
     INVALID_FIELD_TYPE(HttpStatus.BAD_REQUEST, "Invalid field type."),
     INVALID_DATE_FORMAT(HttpStatus.BAD_REQUEST, "Invalid date format."),
     INVALID_TIME_FORMAT(HttpStatus.BAD_REQUEST, "Invalid time format."),
+    INVALID_TIMESTAMP_FORMAT(HttpStatus.BAD_REQUEST, "Invalid timestamp format."),
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "Validation failed."),
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error.");
 

@@ -60,7 +60,7 @@ public class JsonParser {
         try {
             return Instant.parse(text);
         } catch (DateTimeParseException exception) {
-            throw new CalioException(ErrorCode.INVALID_DATE_FORMAT, fieldName);
+            throw new CalioException(ErrorCode.INVALID_TIMESTAMP_FORMAT, fieldName);
         }
     }
 }
