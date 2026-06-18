@@ -10,6 +10,7 @@ import SwiftUI
 struct CalendarHomeView: View {
     @StateObject private var viewModel: CalendarHomeViewModel
     @State private var displayMode: CalendarDisplayMode = .week
+    @State private var isShowingEventCreationView = false
     
     private let minimumStripViewHeight: CGFloat = 110
     private let stripViewHeightRatio: CGFloat = 0.2
@@ -40,6 +41,11 @@ struct CalendarHomeView: View {
             .animation(.easeInOut(duration: 0.2), value: displayMode)
             .task {
                 viewModel.loadInitialIfNeeded()
+            }
+            .sheet(isPresented: $isShowingEventCreationView) {
+                CalendarEventCreationView(
+                    focusedDay: viewModel.state.focusedDay
+                )
             }
         }
     }
@@ -109,6 +115,7 @@ struct CalendarHomeView: View {
     }
     
     private func startCreatingEvent() {
+        isShowingEventCreationView = true
     }
 }
 
