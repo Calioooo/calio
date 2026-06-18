@@ -12,6 +12,7 @@ public enum ErrorCode {
     INVALID_RECURRENCE_TIME_RANGE(HttpStatus.BAD_REQUEST, "Invalid recurrence time range."),
     INVALID_RECURRENCE_FREQUENCY(HttpStatus.BAD_REQUEST, "Invalid recurrence frequency."),
     INVALID_FIELD_TYPE(HttpStatus.BAD_REQUEST, "Invalid field type."),
+    INVALID_DATE_FORMAT(HttpStatus.BAD_REQUEST, "Invalid date format."),
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "Validation failed."),
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error.");
 

@@ -34,7 +34,7 @@ public class JsonParser {
         try {
             return LocalDate.parse(text);
         } catch (DateTimeParseException exception) {
-            throw new CalioException(ErrorCode.INVALID_FIELD_TYPE, fieldName);
+            throw new CalioException(ErrorCode.INVALID_DATE_FORMAT, fieldName);
         }
     }
 
@@ -47,7 +47,7 @@ public class JsonParser {
         try {
             return LocalTime.parse(text);
         } catch (DateTimeParseException exception) {
-            throw new CalioException(ErrorCode.INVALID_FIELD_TYPE, fieldName);
+            throw new CalioException(ErrorCode.INVALID_DATE_FORMAT, fieldName);
         }
     }
 
@@ -60,7 +60,7 @@ public class JsonParser {
         try {
             return Instant.parse(text);
         } catch (DateTimeParseException exception) {
-            throw new CalioException(ErrorCode.INVALID_FIELD_TYPE, fieldName);
+            throw new CalioException(ErrorCode.INVALID_DATE_FORMAT, fieldName);
         }
     }
 }

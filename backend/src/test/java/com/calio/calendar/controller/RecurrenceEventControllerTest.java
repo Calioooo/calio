@@ -654,7 +654,7 @@ class RecurrenceEventControllerTest {
                                 }
                                 """))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("INVALID_FIELD_TYPE"))
+                .andExpect(jsonPath("$.errorCode").value("INVALID_DATE_FORMAT"))
                 .andExpect(jsonPath("$.message").value("recurrenceStartDate"));
     }
 
