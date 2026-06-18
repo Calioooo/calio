@@ -118,7 +118,7 @@ struct CalendarWeekTimelineView: View {
         return Button {
             onSelectedDay(item.id)
         } label: {
-            VStack(spacing: 8) {
+            VStack(spacing: 6) {
                 Text(item.weekday.fullKoreanText)
                     .font(.system(size: metrics.weekdayFontSize, weight: .medium))
                     .lineLimit(1)
@@ -134,11 +134,19 @@ struct CalendarWeekTimelineView: View {
                         if item.isToday {
                             Circle()
                                 .fill(Color(red: 0.56, green: 0.61, blue: 0.96))
-                        } else if isFocused {
-                            Circle()
-                                .stroke(Color(red: 0.56, green: 0.61, blue: 0.96), lineWidth: 2)
                         }
                     }
+                
+                Capsule()
+                    .fill(
+                        isFocused
+                            ? Color(red: 0.56, green: 0.61, blue: 0.96)
+                            : Color.clear
+                    )
+                    .frame(
+                        width: metrics.focusedDayIndicatorWidth,
+                        height: metrics.focusedDayIndicatorHeight
+                    )
             }
             .frame(
                 maxWidth: .infinity,
@@ -611,6 +619,14 @@ private struct TimelineMetrics {
     
     var dayCircleSize: CGFloat {
         min(max(dayColumnWidth * 0.5, 30), 30)
+    }
+    
+    var focusedDayIndicatorWidth: CGFloat {
+        min(max(dayColumnWidth * 0.28, 18), 24)
+    }
+    
+    var focusedDayIndicatorHeight: CGFloat {
+        3
     }
     
     var horizontalLineStartX: CGFloat {
