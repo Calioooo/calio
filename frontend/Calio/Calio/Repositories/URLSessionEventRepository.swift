@@ -26,44 +26,70 @@ struct URLSessionEventRepository: EventRepository {
     }
 
     func fetchEvents(from startDate: Date, to endDate: Date) async throws -> [EventResponseDTO] {
+        let request = makeRequest(
+            method: "GET",
+            url: try eventsURL(
+                queryItems: [
+                    URLQueryItem(name: "from", value: EventJSONCoding.string(from: startDate)),
+                    URLQueryItem(name: "to", value: EventJSONCoding.string(from: endDate))
+                ]
+            )
+        )
+
+        return try await response([EventResponseDTO].self, for: request)
+    }
+
+    func createEvent(_ requestDTO: CreateEventRequestDTO) async throws -> EventResponseDTO {
+        let request = try makeRequest(
+            method: "POST",
+            url: eventsURL(),
+            body: requestDTO
+        )
+
+        return try await response(EventResponseDTO.self, for: request)
+    }
+
+    private func eventsURL(queryItems: [URLQueryItem] = []) throws -> URL {
         var components = URLComponents(
-            url: eventsURL,
+            url: baseURL.appendingPathComponent("api/events"),
             resolvingAgainstBaseURL: false
         )
-        components?.queryItems = [
-            URLQueryItem(name: "from", value: EventJSONCoding.string(from: startDate)),
-            URLQueryItem(name: "to", value: EventJSONCoding.string(from: endDate))
-        ]
+        components?.queryItems = queryItems.isEmpty ? nil : queryItems
 
         guard let url = components?.url else {
             throw EventRepositoryError.invalidURL
         }
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-
-        let data = try await data(for: request)
-        return try decode([EventResponseDTO].self, from: data)
+        return url
     }
 
-    func createEvent(_ requestDTO: CreateEventRequestDTO) async throws -> EventResponseDTO {
-        var request = URLRequest(url: eventsURL)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    private func makeRequest(method: String, url: URL) -> URLRequest {
+        var request = URLRequest(url: url)
+        request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Accept")
+        return request
+    }
+
+    private func makeRequest<Body: Encodable>(
+        method: String,
+        url: URL,
+        body: Body
+    ) throws -> URLRequest {
+        var request = makeRequest(method: method, url: url)
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         do {
-            request.httpBody = try jsonEncoder.encode(requestDTO)
+            request.httpBody = try jsonEncoder.encode(body)
         } catch {
             throw EventRepositoryError.encoding(error)
         }
 
-        let data = try await data(for: request)
-        return try decode(EventResponseDTO.self, from: data)
+        return request
     }
 
-    private var eventsURL: URL {
-        baseURL.appendingPathComponent("api/events")
+    private func response<T: Decodable>(_ type: T.Type, for request: URLRequest) async throws -> T {
+        let data = try await data(for: request)
+        return try decode(type, from: data)
     }
 
     private func data(for request: URLRequest) async throws -> Data {
