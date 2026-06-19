@@ -1,0 +1,112 @@
+language: "ko-KR"
+early_access: false
+focus: "high"
+
+reviews:
+  profile: "assertive"
+  request_changes_workflow: true
+  high_level_summary: true
+  changed_files_summary: true
+  review_status: true
+  collapse_walkthrough: true
+  review_details: true
+  commit_status: true
+  fail_commit_status: true
+  suggested_labels: true
+  auto_apply_labels: false
+  labeling_instructions:
+    - label: "frontend"
+      instructions: "frontend/** 변경이 포함된 PR"
+    - label: "backend"
+      instructions: "backend/** 변경이 포함된 PR"
+    - label: "feature"
+      instructions: "새로운 사용자 기능, API 기능, 화면 기능, 유스케이스가 추가된 PR"
+    - label: "bug"
+      instructions: "기존 동작 오류, 예외, 잘못된 UI 상태, 잘못된 API 응답을 수정하는 PR"
+    - label: "refactor"
+      instructions: "외부 동작이나 API 계약 변경 없이 코드 구조, 네이밍, 책임 분리를 개선하는 PR"
+    - label: "test"
+      instructions: "테스트 코드 추가, 수정, 테스트 fixture 개선이 주된 변경인 PR"
+    - label: "docs"
+      instructions: "문서, spec, README, 주석성 가이드 변경이 주된 PR"
+    - label: "config"
+      instructions: "CodeRabbit, GitHub Actions, Gradle, Xcode project 등 개발 도구 설정 변경 PR"
+    - label: "infra"
+      instructions: "Docker, docker-compose, DB 연결, 배포, 런타임 환경 설정 변경 PR"
+  poem: false
+  pre_merge_checks:
+    title:
+      mode: "warning"
+      requirements: "PR 제목은 변경 도메인과 의도를 드러내야 한다. 예: feat(frontend): add event creation flow"
+    description:
+      mode: "warning"  
+  auto_review:
+    enabled: true
+    auto_incremental_review: true
+    drafts: false
+    base_branches:
+      - "main"
+      - "dev"
+  path_filters:
+    - "!**/.gradle/**"
+    - "!**/build/**"
+    - "!**/DerivedData/**"
+    - "!**/*.xcuserstate"
+    - "!**/*.xcuserdata/**"
+    - "!**/Preview Content/**"
+  path_instructions:
+    - path: "**/*"
+      instructions: |
+        이 repository의 공통 규칙은 AGENTS.md를 기준으로 리뷰한다.
+        이 제품은 AI 일정 관리 캘린더 시스템이며, backend가 비즈니스 상태 의미와 API 계약의 source of truth다.
+        기존 구조를 우선 확장하고 불필요한 새 레이어를 만들지 않는다.
+        계약, enum, shared literal, canonical vocabulary 변경은 contract-sensitive하게 본다.
+        backend와 frontend의 사용자 노출 상태, 메시지, 처리 결과 의미가 어긋나면 지적한다.
+        의미 있는 변경에는 자동 테스트가 추가되었는지 확인한다.
+        테스트는 구현 세부보다 기대 동작, 경계 조건, 실패 동작을 설명해야 한다.
+
+    - path: "frontend/**"
+      instructions: |
+        frontend/AGENTS.override.md를 기준으로 Swift iOS 코드를 리뷰한다.
+        기본 의존성 방향은 view -> viewModel -> service -> Repository Protocol -> Repository Implementation -> DataSource/API다.
+        View는 표시와 사용자 입력 전달에 집중하고, ViewModel은 화면 상태와 사용자 액션 흐름을 관리해야 한다.
+        service는 backend DTO decoding과 앱 내부 model 변환을 담당하며, ViewModel과 View는 backend DTO를 직접 사용하지 않아야 한다.
+        backend가 내려준 상태 값, errorCode, canonical field 의미를 frontend에서 재계산하거나 임의 fallback으로 바꾸지 않아야 한다.
+        loading, empty, error, success 같은 화면 상태는 흩어진 boolean보다 읽기 쉬운 명시 상태 모델을 선호한다.
+        네트워크 실패, decoding 실패, backend business failure가 구분되는지 확인한다.
+        시간 formatting은 표시 목적에 한정하고, 시간/날짜 경계의 비즈니스 의미를 frontend에서 새로 만들지 않는다.
+        async/await 사용, main thread UI 상태 반영, 취소 가능 작업의 생명주기 처리를 확인한다.
+        Swift 함수는 작고 선언적으로 유지하고, 중첩 조건은 guard/early return과 의미 있는 보조 함수로 낮춘다.
+        UI 변경은 기존 SwiftUI 구조와 사용자 흐름을 우선 확장해야 한다.
+        backend 계약 소비 방식, 화면 상태 전이, 사용자 노출 동작이 바뀌면 unit 또는 integration-style 테스트가 필요하다.
+
+    - path: "backend/**"
+      instructions: |
+        backend/AGENTS.override.md를 기준으로 Java 21 + Spring Boot 코드를 리뷰한다.
+        전역 controller/service/repository layered 구조를 유지한다.
+        Controller는 transport boundary로 유지하고 business logic을 넣지 않아야 한다.
+        Service는 유스케이스 흐름, transaction boundary, 비즈니스 규칙 적용의 중심이어야 한다.
+        Repository는 persistence 접근만 담당해야 한다.
+        request/response DTO는 controller/dto 아래 transport boundary model로 유지한다.
+        Entity를 controller로 직접 노출하지 않아야 하며, response DTO 변환은 DTO의 static from(...) 같은 단순 매핑에 한정한다.
+        backend는 API 계약의 source of truth다. enum, 상태 값, errorCode, 응답 필드 의미를 임의 변경하거나 silent fallback으로 넓히지 않는다.
+        예상 가능한 비즈니스 실패는 CalioException과 ErrorCode로 표현하고, 클라이언트 분기 기준은 message가 아니라 stable errorCode여야 한다.
+        request validation은 DTO/controller 경계에서, 정책/비즈니스 판단은 service에서 처리한다.
+        transaction boundary는 service layer에서 관리한다.
+        API 계약 변경에는 controller/service/repository/validation/error 흐름을 포함한 integration test가 필요하다.
+        테스트는 @DisplayName으로 기대 동작을 명확히 드러내고, 필요한 경우 // given, // when, // then 구간을 구분한다.
+        테스트는 운영 DB나 실제 secret에 의존하지 않아야 한다.
+
+chat:
+  auto_reply: false
+
+knowledge_base:
+  opt_out: false
+  web_search:
+    enabled: true
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - "AGENTS.md"
+      - "frontend/AGENTS.override.md"
+      - "backend/AGENTS.override.md"
