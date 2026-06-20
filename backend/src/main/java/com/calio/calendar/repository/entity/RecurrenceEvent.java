@@ -19,7 +19,7 @@ public class RecurrenceEvent extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    @Column
     private String recurrenceTitle;
 
     @Column
@@ -45,6 +45,24 @@ public class RecurrenceEvent extends BaseEntity {
     }
 
     public RecurrenceEvent(
+            String recurrenceTitle,
+            String recurrenceDescription,
+            LocalDate recurrenceStartDate,
+            LocalDate recurrenceEndDate,
+            LocalTime recurrenceStartTime,
+            LocalTime recurrenceEndTime,
+            RecurrenceFrequency recurrenceFrequency
+    ) {
+        this.recurrenceTitle = recurrenceTitle;
+        this.recurrenceDescription = recurrenceDescription;
+        this.recurrenceStartDate = recurrenceStartDate;
+        this.recurrenceEndDate = recurrenceEndDate;
+        this.recurrenceStartTime = recurrenceStartTime;
+        this.recurrenceEndTime = recurrenceEndTime;
+        this.recurrenceFrequency = recurrenceFrequency;
+    }
+
+    public void replace(
             String recurrenceTitle,
             String recurrenceDescription,
             LocalDate recurrenceStartDate,

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -112,6 +113,375 @@ class RecurrenceEventControllerTest {
                 .andExpect(jsonPath("$.recurrenceStartDate").value("2026-08-11"))
                 .andExpect(jsonPath("$.recurrenceEndDate").value("2026-08-25"))
                 .andExpect(jsonPath("$.recurrenceFrequency").value("WEEKLY"));
+    }
+
+    @Test
+    @DisplayName("사용자는 반복 일정 전체를 수정하면 rule과 occurrence 일정 집합을 함께 재구성한다")
+    void givenExistingRecurrenceEvent_whenUpdateWholeRecurrenceEvent_thenUpdatesRuleAndRebuildsOccurrences()
+            throws Exception {
+        // given
+        long recurrenceId = createRecurrenceEvent(
+                "Original daily",
+                "2026-11-01",
+                "2026-11-03",
+                "DAILY"
+        );
+        String requestBody = recurrenceUpdateRequest(
+                "Updated weekly",
+                "Updated series",
+                "2026-11-01T09:00:00Z",
+                "2026-11-15T10:00:00Z",
+                "WEEKLY"
+        );
+
+        // when
+        mockMvc.perform(put("/api/recurrence-events/{recurrenceId}", recurrenceId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                // then
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.recurrenceId").value(recurrenceId))
+                .andExpect(jsonPath("$.recurrenceTitle").value("Updated weekly"))
+                .andExpect(jsonPath("$.recurrenceDescription").value("Updated series"))
+                .andExpect(jsonPath("$.recurrenceStartDate").value("2026-11-01"))
+                .andExpect(jsonPath("$.recurrenceEndDate").value("2026-11-15"))
+                .andExpect(jsonPath("$.recurrenceStartTime").value("09:00:00"))
+                .andExpect(jsonPath("$.recurrenceEndTime").value("10:00:00"))
+                .andExpect(jsonPath("$.recurrenceFrequency").value("WEEKLY"));
+
+        var occurrences = eventRepository.findByRecurrenceIdOrderByStartAtAsc(recurrenceId);
+        assertThat(occurrences)
+                .hasSize(3)
+                .allSatisfy(event -> {
+                    assertThat(event.getTitle()).isEqualTo("Updated weekly");
+                    assertThat(event.getDescription()).isEqualTo("Updated series");
+                    assertThat(event.getRecurrenceId()).contains(recurrenceId);
+                });
+        assertThat(occurrences)
+                .extracting(event -> event.getStartAt().toString())
+                .containsExactly(
+                        "2026-11-01T09:00:00Z",
+                        "2026-11-08T09:00:00Z",
+                        "2026-11-15T09:00:00Z"
+                );
+    }
+
+    @Test
+    @DisplayName("반복 일정 전체 수정에서 omitted title은 유지하고 explicit null description은 null로 갱신한다")
+    void givenOmittedTitleAndNullDescription_whenUpdateWholeRecurrenceEvent_thenRetainsTitleAndClearsDescription()
+            throws Exception {
+        // given
+        long recurrenceId = createRecurrenceEventWithDescription(
+                "Nullable recurrence",
+                "Original description",
+                "2026-11-21",
+                "2026-11-22",
+                "DAILY"
+        );
+        String requestBody = """
+                {
+                  "description": null,
+                  "startAt": "2026-11-21T09:00:00Z",
+                  "endAt": "2026-11-22T10:00:00Z",
+                  "recurrenceFrequency": "DAILY"
+                }
+                """;
+
+        // when
+        MvcResult result = mockMvc.perform(put("/api/recurrence-events/{recurrenceId}", recurrenceId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                // then
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.recurrenceTitle").value("Nullable recurrence"))
+                .andReturn();
+
+        assertThat(readResponse(result).get("recurrenceDescription").isNull()).isTrue();
+        assertThat(eventRepository.findByRecurrenceIdOrderByStartAtAsc(recurrenceId))
+                .allSatisfy(event -> {
+                    assertThat(event.getTitle()).isEqualTo("Nullable recurrence");
+                    assertThat(event.getDescription()).isNull();
+                });
+    }
+
+    @Test
+    @DisplayName("반복 일정 전체 수정 요청 body가 object가 아니면 RECURRENCE_UPDATE_BODY_NOT_OBJECT를 받는다")
+    void givenNonObjectBody_whenUpdateWholeRecurrenceEvent_thenReturnsBodyNotObject() throws Exception {
+        // given
+        long recurrenceId = createRecurrenceEvent(
+                "Body shape",
+                "2026-11-25",
+                "2026-11-26",
+                "DAILY"
+        );
+
+        // when, then
+        assertUpdateError(recurrenceId, "[]", "RECURRENCE_UPDATE_BODY_NOT_OBJECT");
+    }
+
+    @Test
+    @DisplayName("반복 일정 전체 수정 요청 body의 updateScope는 RECURRENCE_UPDATE_SCOPE_UNSUPPORTED를 받는다")
+    void givenUpdateScopeBodyField_whenUpdateWholeRecurrenceEvent_thenReturnsScopeUnsupported() throws Exception {
+        // given
+        long recurrenceId = createRecurrenceEvent(
+                "Body scope",
+                "2026-11-27",
+                "2026-11-28",
+                "DAILY"
+        );
+        String requestBody = """
+                {
+                  "title": "Scope",
+                  "startAt": "2026-11-27T09:00:00Z",
+                  "endAt": "2026-11-28T10:00:00Z",
+                  "recurrenceFrequency": "DAILY",
+                  "updateScope": "ALL"
+                }
+                """;
+
+        // when, then
+        assertUpdateError(recurrenceId, requestBody, "RECURRENCE_UPDATE_SCOPE_UNSUPPORTED");
+    }
+
+    @Test
+    @DisplayName("반복 일정 전체 수정 요청 query의 updateScope는 RECURRENCE_UPDATE_SCOPE_UNSUPPORTED를 받는다")
+    void givenUpdateScopeQueryParameter_whenUpdateWholeRecurrenceEvent_thenReturnsScopeUnsupported()
+            throws Exception {
+        // given
+        long recurrenceId = createRecurrenceEvent(
+                "Query scope",
+                "2026-11-29",
+                "2026-11-30",
+                "DAILY"
+        );
+
+        // when
+        mockMvc.perform(put("/api/recurrence-events/{recurrenceId}", recurrenceId)
+                        .param("updateScope", "ALL")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validRecurrenceUpdateRequest()))
+                // then
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("RECURRENCE_UPDATE_SCOPE_UNSUPPORTED"))
+                .andExpect(jsonPath("$.message").isString())
+                .andExpect(jsonPath("$.*", hasSize(2)));
+    }
+
+    @Test
+    @DisplayName("반복 일정 전체 수정 요청에 지원하지 않는 field가 있으면 RECURRENCE_UPDATE_UNSUPPORTED_FIELD를 받는다")
+    void givenUnsupportedBodyField_whenUpdateWholeRecurrenceEvent_thenReturnsUnsupportedField() throws Exception {
+        // given
+        long recurrenceId = createRecurrenceEvent(
+                "Unsupported field",
+                "2026-12-01",
+                "2026-12-02",
+                "DAILY"
+        );
+        String requestBody = """
+                {
+                  "title": "Unsupported",
+                  "startAt": "2026-12-01T09:00:00Z",
+                  "endAt": "2026-12-02T10:00:00Z",
+                  "recurrenceFrequency": "DAILY",
+                  "unknown": true
+                }
+                """;
+
+        // when, then
+        assertUpdateError(recurrenceId, requestBody, "RECURRENCE_UPDATE_UNSUPPORTED_FIELD");
+    }
+
+    @Test
+    @DisplayName("반복 일정 전체 수정 요청의 title이 공백이면 RECURRENCE_UPDATE_TITLE_BLANK를 받는다")
+    void givenBlankTitle_whenUpdateWholeRecurrenceEvent_thenReturnsTitleBlank() throws Exception {
+        // given
+        long recurrenceId = createRecurrenceEvent(
+                "Blank title",
+                "2026-12-03",
+                "2026-12-04",
+                "DAILY"
+        );
+        String requestBody = recurrenceUpdateRequest(
+                " ",
+                null,
+                "2026-12-03T09:00:00Z",
+                "2026-12-04T10:00:00Z",
+                "DAILY"
+        );
+
+        // when, then
+        assertUpdateError(recurrenceId, requestBody, "RECURRENCE_UPDATE_TITLE_BLANK");
+    }
+
+    @Test
+    @DisplayName("반복 일정 전체 수정 요청의 startAt이 없으면 RECURRENCE_UPDATE_START_AT_REQUIRED를 받는다")
+    void givenMissingStartAt_whenUpdateWholeRecurrenceEvent_thenReturnsStartAtRequired() throws Exception {
+        // given
+        long recurrenceId = createRecurrenceEvent(
+                "Missing start",
+                "2026-12-05",
+                "2026-12-06",
+                "DAILY"
+        );
+        String requestBody = """
+                {
+                  "title": "Missing start",
+                  "endAt": "2026-12-06T10:00:00Z",
+                  "recurrenceFrequency": "DAILY"
+                }
+                """;
+
+        // when, then
+        assertUpdateError(recurrenceId, requestBody, "RECURRENCE_UPDATE_START_AT_REQUIRED");
+    }
+
+    @Test
+    @DisplayName("반복 일정 전체 수정 요청의 startAt 형식이 잘못되면 RECURRENCE_UPDATE_START_AT_INVALID를 받는다")
+    void givenInvalidStartAt_whenUpdateWholeRecurrenceEvent_thenReturnsStartAtInvalid() throws Exception {
+        // given
+        long recurrenceId = createRecurrenceEvent(
+                "Invalid start",
+                "2026-12-07",
+                "2026-12-08",
+                "DAILY"
+        );
+        String requestBody = recurrenceUpdateRequest(
+                "Invalid start",
+                null,
+                "not-an-instant",
+                "2026-12-08T10:00:00Z",
+                "DAILY"
+        );
+
+        // when, then
+        assertUpdateError(recurrenceId, requestBody, "RECURRENCE_UPDATE_START_AT_INVALID");
+    }
+
+    @Test
+    @DisplayName("반복 일정 전체 수정 요청의 endAt이 없으면 RECURRENCE_UPDATE_END_AT_REQUIRED를 받는다")
+    void givenMissingEndAt_whenUpdateWholeRecurrenceEvent_thenReturnsEndAtRequired() throws Exception {
+        // given
+        long recurrenceId = createRecurrenceEvent(
+                "Missing end",
+                "2026-12-09",
+                "2026-12-10",
+                "DAILY"
+        );
+        String requestBody = """
+                {
+                  "title": "Missing end",
+                  "startAt": "2026-12-09T09:00:00Z",
+                  "recurrenceFrequency": "DAILY"
+                }
+                """;
+
+        // when, then
+        assertUpdateError(recurrenceId, requestBody, "RECURRENCE_UPDATE_END_AT_REQUIRED");
+    }
+
+    @Test
+    @DisplayName("반복 일정 전체 수정 요청의 endAt 형식이 잘못되면 RECURRENCE_UPDATE_END_AT_INVALID를 받는다")
+    void givenInvalidEndAt_whenUpdateWholeRecurrenceEvent_thenReturnsEndAtInvalid() throws Exception {
+        // given
+        long recurrenceId = createRecurrenceEvent(
+                "Invalid end",
+                "2026-12-11",
+                "2026-12-12",
+                "DAILY"
+        );
+        String requestBody = recurrenceUpdateRequest(
+                "Invalid end",
+                null,
+                "2026-12-11T09:00:00Z",
+                "not-an-instant",
+                "DAILY"
+        );
+
+        // when, then
+        assertUpdateError(recurrenceId, requestBody, "RECURRENCE_UPDATE_END_AT_INVALID");
+    }
+
+    @Test
+    @DisplayName("반복 일정 전체 수정 요청의 recurrenceFrequency가 없으면 RECURRENCE_UPDATE_FREQUENCY_REQUIRED를 받는다")
+    void givenMissingFrequency_whenUpdateWholeRecurrenceEvent_thenReturnsFrequencyRequired() throws Exception {
+        // given
+        long recurrenceId = createRecurrenceEvent(
+                "Missing frequency",
+                "2026-12-13",
+                "2026-12-14",
+                "DAILY"
+        );
+        String requestBody = """
+                {
+                  "title": "Missing frequency",
+                  "startAt": "2026-12-13T09:00:00Z",
+                  "endAt": "2026-12-14T10:00:00Z"
+                }
+                """;
+
+        // when, then
+        assertUpdateError(recurrenceId, requestBody, "RECURRENCE_UPDATE_FREQUENCY_REQUIRED");
+    }
+
+    @Test
+    @DisplayName("반복 일정 전체 수정 요청의 recurrenceFrequency 값이 잘못되면 RECURRENCE_UPDATE_FREQUENCY_INVALID를 받는다")
+    void givenInvalidFrequency_whenUpdateWholeRecurrenceEvent_thenReturnsFrequencyInvalid() throws Exception {
+        // given
+        long recurrenceId = createRecurrenceEvent(
+                "Invalid frequency",
+                "2026-12-15",
+                "2026-12-16",
+                "DAILY"
+        );
+        String requestBody = recurrenceUpdateRequest(
+                "Invalid frequency",
+                null,
+                "2026-12-15T09:00:00Z",
+                "2026-12-16T10:00:00Z",
+                "HOURLY"
+        );
+
+        // when, then
+        assertUpdateError(recurrenceId, requestBody, "RECURRENCE_UPDATE_FREQUENCY_INVALID");
+    }
+
+    @Test
+    @DisplayName("반복 일정 전체 수정 요청의 startAt이 endAt보다 빠르지 않으면 RECURRENCE_UPDATE_TIME_RANGE_INVALID를 받는다")
+    void givenInvalidTimeRange_whenUpdateWholeRecurrenceEvent_thenReturnsTimeRangeInvalid() throws Exception {
+        // given
+        long recurrenceId = createRecurrenceEvent(
+                "Invalid update range",
+                "2026-12-17",
+                "2026-12-18",
+                "DAILY"
+        );
+        String requestBody = recurrenceUpdateRequest(
+                "Invalid update range",
+                null,
+                "2026-12-17T09:00:00Z",
+                "2026-12-17T09:00:00Z",
+                "DAILY"
+        );
+
+        // when, then
+        assertUpdateError(recurrenceId, requestBody, "RECURRENCE_UPDATE_TIME_RANGE_INVALID");
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 반복 일정 id로 전체 수정하면 RECURRENCE_EVENT_NOT_FOUND를 받는다")
+    void givenMissingRecurrenceId_whenUpdateWholeRecurrenceEvent_thenReturnsRecurrenceEventNotFound()
+            throws Exception {
+        // given
+        long missingRecurrenceId = 999999L;
+
+        // when, then
+        mockMvc.perform(put("/api/recurrence-events/{recurrenceId}", missingRecurrenceId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validRecurrenceUpdateRequest()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("RECURRENCE_EVENT_NOT_FOUND"))
+                .andExpect(jsonPath("$.message").isString())
+                .andExpect(jsonPath("$.*", hasSize(2)));
     }
 
     @Test
@@ -428,6 +798,30 @@ class RecurrenceEventControllerTest {
         return readResponse(result).get("recurrenceId").asLong();
     }
 
+    private long createRecurrenceEventWithDescription(
+            String recurrenceTitle,
+            String recurrenceDescription,
+            String recurrenceStartDate,
+            String recurrenceEndDate,
+            String recurrenceFrequency
+    ) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/recurrence-events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(recurrenceRequest(
+                                recurrenceTitle,
+                                recurrenceDescription,
+                                recurrenceStartDate,
+                                recurrenceEndDate,
+                                "09:00:00",
+                                "10:00:00",
+                                recurrenceFrequency
+                        )))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        return readResponse(result).get("recurrenceId").asLong();
+    }
+
     private JsonNode listEvents(String from, String to) throws Exception {
         MvcResult result = mockMvc.perform(get("/api/events")
                         .param("from", from)
@@ -480,6 +874,50 @@ class RecurrenceEventControllerTest {
                 recurrenceEndTime,
                 recurrenceFrequency
         );
+    }
+
+    private String recurrenceUpdateRequest(
+            String title,
+            String description,
+            String startAt,
+            String endAt,
+            String recurrenceFrequency
+    ) {
+        return """
+                {
+                  "title": %s,
+                  "description": %s,
+                  "startAt": "%s",
+                  "endAt": "%s",
+                  "recurrenceFrequency": "%s"
+                }
+                """.formatted(
+                toJsonString(title),
+                toJsonString(description),
+                startAt,
+                endAt,
+                recurrenceFrequency
+        );
+    }
+
+    private String validRecurrenceUpdateRequest() {
+        return recurrenceUpdateRequest(
+                "Valid update",
+                null,
+                "2026-12-20T09:00:00Z",
+                "2026-12-21T10:00:00Z",
+                "DAILY"
+        );
+    }
+
+    private void assertUpdateError(long recurrenceId, String requestBody, String errorCode) throws Exception {
+        mockMvc.perform(put("/api/recurrence-events/{recurrenceId}", recurrenceId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value(errorCode))
+                .andExpect(jsonPath("$.message").isString())
+                .andExpect(jsonPath("$.*", hasSize(2)));
     }
 
     private String toJsonString(String value) {
