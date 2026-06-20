@@ -93,10 +93,20 @@ public class UpdateRecurrenceEventValidator {
             throw new CalioException(ErrorCode.RECURRENCE_UPDATE_FREQUENCY_REQUIRED);
         }
 
-        try {
-            RecurrenceFrequency.valueOf(requestBody.get("recurrenceFrequency").asString());
-        } catch (IllegalArgumentException exception) {
-            throw new CalioException(ErrorCode.RECURRENCE_UPDATE_FREQUENCY_INVALID);
+        if (isSupportedFrequency(requestBody.get("recurrenceFrequency").asString())) {
+            return;
         }
+
+        throw new CalioException(ErrorCode.RECURRENCE_UPDATE_FREQUENCY_INVALID);
+    }
+
+    private boolean isSupportedFrequency(String rawFrequency) {
+        for (RecurrenceFrequency frequency : RecurrenceFrequency.values()) {
+            if (frequency.name().equals(rawFrequency)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
