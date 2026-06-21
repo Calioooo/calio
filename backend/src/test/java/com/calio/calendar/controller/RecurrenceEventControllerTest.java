@@ -219,6 +219,34 @@ class RecurrenceEventControllerTest {
     }
 
     @Test
+    @DisplayName("반복 일정 전체 수정 요청에 지원하지 않는 필드가 있으면 VALIDATION_FAILED를 받는다")
+    void givenUnknownField_whenPatchRecurrenceEvent_thenReturnsValidationFailed()
+            throws Exception {
+        // given
+        long recurrenceId = createRecurrenceEvent(
+                "Unknown field target",
+                "2026-11-24",
+                "2026-11-25",
+                "DAILY"
+        );
+
+        // when
+        mockMvc.perform(patch("/api/recurrence-events/{recurrenceId}", recurrenceId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Blocked by unknown field",
+                                  "unsupportedField": "fail"
+                                }
+                                """))
+                // then
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.message").isString())
+                .andExpect(jsonPath("$.*", hasSize(2)));
+    }
+
+    @Test
     @DisplayName("반복 일정 전체 수정은 effective instant range가 유효하면 종료 시각이 시작 시각보다 이른 값을 허용한다")
     void givenValidEffectiveInstantRange_whenPatchRecurrenceEvent_thenUpdatesRule()
             throws Exception {
