@@ -27,16 +27,13 @@ public class RecurrenceEventService {
 
     private final RecurrenceEventRepository recurrenceEventRepository;
     private final EventRepository eventRepository;
-    private final RecurrenceEventAuthorizationService authorizationService;
 
     public RecurrenceEventService(
             RecurrenceEventRepository recurrenceEventRepository,
-            EventRepository eventRepository,
-            RecurrenceEventAuthorizationService authorizationService
+            EventRepository eventRepository
     ) {
         this.recurrenceEventRepository = recurrenceEventRepository;
         this.eventRepository = eventRepository;
-        this.authorizationService = authorizationService;
     }
 
     @Transactional
@@ -58,7 +55,6 @@ public class RecurrenceEventService {
     @Transactional
     public RecurrenceEventResponse updateRecurrenceEvent(Long recurrenceId, UpdateRecurrenceEventRequest request) {
         RecurrenceEvent recurrenceEvent = findRecurrenceEvent(recurrenceId);
-        validateCanUpdateRecurrence(recurrenceEvent);
         validateProvidedTitle(request.title());
 
         MergedRecurrenceUpdate update = mergeUpdate(recurrenceEvent, request);
@@ -77,14 +73,6 @@ public class RecurrenceEventService {
         rebuildOccurrenceEvents(recurrenceEvent);
 
         return RecurrenceEventResponse.from(recurrenceEvent);
-    }
-
-    private void validateCanUpdateRecurrence(RecurrenceEvent recurrenceEvent) {
-        if (authorizationService.canUpdate(recurrenceEvent)) {
-            return;
-        }
-
-        throw new CalioException(ErrorCode.RECURRENCE_EVENT_UPDATE_FORBIDDEN);
     }
 
     private RecurrenceEvent findRecurrenceEvent(Long recurrenceId) {

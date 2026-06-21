@@ -3,7 +3,6 @@ package com.calio.calendar.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.calio.calendar.controller.dto.UpdateRecurrenceEventRequest;
@@ -37,9 +36,6 @@ class RecurrenceEventServiceTest {
     @Mock
     private EventRepository eventRepository;
 
-    @Mock
-    private RecurrenceEventAuthorizationService authorizationService;
-
     @InjectMocks
     private RecurrenceEventService recurrenceEventService;
 
@@ -55,7 +51,6 @@ class RecurrenceEventServiceTest {
                 RecurrenceFrequency.DAILY
         );
         when(recurrenceEventRepository.findById(1L)).thenReturn(Optional.of(recurrenceEvent));
-        when(authorizationService.canUpdate(recurrenceEvent)).thenReturn(true);
         when(eventRepository.findByRecurrenceIdOrderByStartAtAsc(1L)).thenReturn(List.of());
 
         UpdateRecurrenceEventRequest request = new UpdateRecurrenceEventRequest(
@@ -89,7 +84,6 @@ class RecurrenceEventServiceTest {
                 RecurrenceFrequency.DAILY
         );
         when(recurrenceEventRepository.findById(1L)).thenReturn(Optional.of(recurrenceEvent));
-        when(authorizationService.canUpdate(recurrenceEvent)).thenReturn(true);
 
         UpdateRecurrenceEventRequest request = new UpdateRecurrenceEventRequest(
                 null,
@@ -118,7 +112,6 @@ class RecurrenceEventServiceTest {
                 RecurrenceFrequency.DAILY
         );
         when(recurrenceEventRepository.findById(1L)).thenReturn(Optional.of(recurrenceEvent));
-        when(authorizationService.canUpdate(recurrenceEvent)).thenReturn(true);
         when(eventRepository.findByRecurrenceIdOrderByStartAtAsc(1L)).thenReturn(List.of());
 
         UpdateRecurrenceEventRequest request = new UpdateRecurrenceEventRequest(
@@ -135,35 +128,6 @@ class RecurrenceEventServiceTest {
         // then
         assertThat(recurrenceEvent.getRecurrenceStartTime()).isEqualTo(LocalTime.parse("23:00:00"));
         assertThat(recurrenceEvent.getRecurrenceEndTime()).isEqualTo(LocalTime.parse("01:00:00"));
-    }
-
-    @Test
-    @DisplayName("반복 일정 전체 수정 권한이 없으면 RECURRENCE_EVENT_UPDATE_FORBIDDEN을 반환하고 occurrence를 변경하지 않는다")
-    void givenForbiddenPermission_whenUpdateRecurrenceEvent_thenThrowsRecurrenceEventUpdateForbidden() {
-        // given
-        RecurrenceEvent recurrenceEvent = recurrenceEvent(
-                "Original",
-                null,
-                "2026-12-11",
-                "2026-12-12",
-                RecurrenceFrequency.DAILY
-        );
-        when(recurrenceEventRepository.findById(1L)).thenReturn(Optional.of(recurrenceEvent));
-        when(authorizationService.canUpdate(recurrenceEvent)).thenReturn(false);
-        UpdateRecurrenceEventRequest request = new UpdateRecurrenceEventRequest(
-                "Blocked",
-                null,
-                null,
-                null,
-                null
-        );
-
-        // when, then
-        assertThatThrownBy(() -> recurrenceEventService.updateRecurrenceEvent(1L, request))
-                .isInstanceOfSatisfying(CalioException.class, exception ->
-                        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.RECURRENCE_EVENT_UPDATE_FORBIDDEN)
-                );
-        verifyNoInteractions(eventRepository);
     }
 
     @Test
@@ -197,7 +161,6 @@ class RecurrenceEventServiceTest {
         Event stale = event("Stale", "2027-01-09T09:00:00Z", "2027-01-09T10:00:00Z", 1L);
 
         when(recurrenceEventRepository.findById(1L)).thenReturn(Optional.of(recurrenceEvent));
-        when(authorizationService.canUpdate(recurrenceEvent)).thenReturn(true);
         when(eventRepository.findByRecurrenceIdOrderByStartAtAsc(1L))
                 .thenReturn(List.of(retainedFirst, retainedSecond, stale));
 
