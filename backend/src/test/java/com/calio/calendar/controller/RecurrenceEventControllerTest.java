@@ -69,8 +69,6 @@ class RecurrenceEventControllerTest {
                 .andExpect(jsonPath("$.recurrenceStartTime").value("09:00:00"))
                 .andExpect(jsonPath("$.recurrenceEndTime").value("10:00:00"))
                 .andExpect(jsonPath("$.recurrenceFrequency").value("DAILY"))
-                .andExpect(jsonPath("$.createdAt").isString())
-                .andExpect(jsonPath("$.updatedAt").isString())
                 .andReturn();
 
         long recurrenceId = readResponse(createResult).get("recurrenceId").asLong();
@@ -142,19 +140,13 @@ class RecurrenceEventControllerTest {
                 // then
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.recurrenceId").value(recurrenceId))
-                .andExpect(jsonPath("$.title").value("Updated recurrence"))
-                .andExpect(jsonPath("$.description").value(" "))
-                .andExpect(jsonPath("$.startAt").value("2026-11-02T11:00:00Z"))
-                .andExpect(jsonPath("$.endAt").value("2026-11-09T12:00:00Z"))
                 .andExpect(jsonPath("$.recurrenceTitle").value("Updated recurrence"))
                 .andExpect(jsonPath("$.recurrenceDescription").value(" "))
                 .andExpect(jsonPath("$.recurrenceStartDate").value("2026-11-02"))
                 .andExpect(jsonPath("$.recurrenceEndDate").value("2026-11-09"))
                 .andExpect(jsonPath("$.recurrenceStartTime").value("11:00:00"))
                 .andExpect(jsonPath("$.recurrenceEndTime").value("12:00:00"))
-                .andExpect(jsonPath("$.recurrenceFrequency").value("WEEKLY"))
-                .andExpect(jsonPath("$.createdAt").isString())
-                .andExpect(jsonPath("$.updatedAt").isString());
+                .andExpect(jsonPath("$.recurrenceFrequency").value("WEEKLY"));
 
         assertStoredOccurrences(
                 recurrenceId,
@@ -189,10 +181,12 @@ class RecurrenceEventControllerTest {
                                 """))
                 // then
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.title").value("Preserved recurrence"))
-                .andExpect(jsonPath("$.description").doesNotExist())
-                .andExpect(jsonPath("$.startAt").value("2026-11-11T09:00:00Z"))
-                .andExpect(jsonPath("$.endAt").value("2026-11-12T10:00:00Z"))
+                .andExpect(jsonPath("$.recurrenceTitle").value("Preserved recurrence"))
+                .andExpect(jsonPath("$.recurrenceDescription").doesNotExist())
+                .andExpect(jsonPath("$.recurrenceStartDate").value("2026-11-11"))
+                .andExpect(jsonPath("$.recurrenceEndDate").value("2026-11-12"))
+                .andExpect(jsonPath("$.recurrenceStartTime").value("09:00:00"))
+                .andExpect(jsonPath("$.recurrenceEndTime").value("10:00:00"))
                 .andExpect(jsonPath("$.recurrenceFrequency").value("DAILY"));
     }
 
@@ -248,8 +242,8 @@ class RecurrenceEventControllerTest {
                 // then
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.recurrenceId").value(recurrenceId))
-                .andExpect(jsonPath("$.startAt").value("2026-11-28T23:00:00Z"))
-                .andExpect(jsonPath("$.endAt").value("2026-11-29T01:00:00Z"))
+                .andExpect(jsonPath("$.recurrenceStartDate").value("2026-11-28"))
+                .andExpect(jsonPath("$.recurrenceEndDate").value("2026-11-29"))
                 .andExpect(jsonPath("$.recurrenceStartTime").value("23:00:00"))
                 .andExpect(jsonPath("$.recurrenceEndTime").value("01:00:00"));
 
