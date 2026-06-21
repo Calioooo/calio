@@ -9,7 +9,6 @@ import com.calio.calendar.repository.EventRepository;
 import com.calio.calendar.repository.RecurrenceEventRepository;
 import com.calio.calendar.repository.entity.Event;
 import com.calio.calendar.repository.entity.RecurrenceEvent;
-import com.calio.calendar.repository.entity.RecurrenceFrequency;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -57,17 +56,32 @@ public class RecurrenceEventService {
         RecurrenceEvent recurrenceEvent = findRecurrenceEvent(recurrenceId);
         validateProvidedTitle(request.title());
 
-        MergedRecurrenceUpdate update = mergeUpdate(recurrenceEvent, request);
-        validateRecurrenceUpdateTimeRange(update);
+        Instant effectiveStartAt = request.startAt() == null
+                ? toInstant(recurrenceEvent.getRecurrenceStartDate(), recurrenceEvent.getRecurrenceStartTime())
+                : request.startAt();
+        Instant effectiveEndAt = request.endAt() == null
+                ? toInstant(recurrenceEvent.getRecurrenceEndDate(), recurrenceEvent.getRecurrenceEndTime())
+                : request.endAt();
+        validateRecurrenceUpdateTimeRange(effectiveStartAt, effectiveEndAt);
 
         recurrenceEvent.update(
-                update.title(),
-                update.description(),
-                update.startDate(),
-                update.endDate(),
-                update.startTime(),
-                update.endTime(),
-                update.recurrenceFrequency()
+                request.title() == null ? recurrenceEvent.getRecurrenceTitle() : request.title(),
+                request.description() == null ? recurrenceEvent.getRecurrenceDescription() : request.description(),
+                request.startAt() == null
+                        ? recurrenceEvent.getRecurrenceStartDate()
+                        : request.startAt().atOffset(ZoneOffset.UTC).toLocalDate(),
+                request.endAt() == null
+                        ? recurrenceEvent.getRecurrenceEndDate()
+                        : request.endAt().atOffset(ZoneOffset.UTC).toLocalDate(),
+                request.startAt() == null
+                        ? recurrenceEvent.getRecurrenceStartTime()
+                        : request.startAt().atOffset(ZoneOffset.UTC).toLocalTime(),
+                request.endAt() == null
+                        ? recurrenceEvent.getRecurrenceEndTime()
+                        : request.endAt().atOffset(ZoneOffset.UTC).toLocalTime(),
+                request.recurrenceFrequency() == null
+                        ? recurrenceEvent.getRecurrenceFrequency()
+                        : request.recurrenceFrequency()
         );
         recurrenceEventRepository.flush();
         rebuildOccurrenceEvents(recurrenceEvent);
@@ -88,82 +102,8 @@ public class RecurrenceEventService {
         throw new CalioException(ErrorCode.VALIDATION_FAILED);
     }
 
-    private MergedRecurrenceUpdate mergeUpdate(
-            RecurrenceEvent recurrenceEvent,
-            UpdateRecurrenceEventRequest request
-    ) {
-        return new MergedRecurrenceUpdate(
-                mergeTitle(recurrenceEvent, request.title()),
-                mergeDescription(recurrenceEvent, request.description()),
-                mergeStartDate(recurrenceEvent, request.startAt()),
-                mergeEndDate(recurrenceEvent, request.endAt()),
-                mergeStartTime(recurrenceEvent, request.startAt()),
-                mergeEndTime(recurrenceEvent, request.endAt()),
-                mergeFrequency(recurrenceEvent, request.recurrenceFrequency())
-        );
-    }
-
-    private String mergeTitle(RecurrenceEvent recurrenceEvent, String title) {
-        if (title == null) {
-            return recurrenceEvent.getRecurrenceTitle();
-        }
-
-        return title;
-    }
-
-    private String mergeDescription(RecurrenceEvent recurrenceEvent, String description) {
-        if (description == null) {
-            return recurrenceEvent.getRecurrenceDescription();
-        }
-
-        return description;
-    }
-
-    private LocalDate mergeStartDate(RecurrenceEvent recurrenceEvent, Instant startAt) {
-        if (startAt == null) {
-            return recurrenceEvent.getRecurrenceStartDate();
-        }
-
-        return startAt.atOffset(ZoneOffset.UTC).toLocalDate();
-    }
-
-    private LocalDate mergeEndDate(RecurrenceEvent recurrenceEvent, Instant endAt) {
-        if (endAt == null) {
-            return recurrenceEvent.getRecurrenceEndDate();
-        }
-
-        return endAt.atOffset(ZoneOffset.UTC).toLocalDate();
-    }
-
-    private LocalTime mergeStartTime(RecurrenceEvent recurrenceEvent, Instant startAt) {
-        if (startAt == null) {
-            return recurrenceEvent.getRecurrenceStartTime();
-        }
-
-        return startAt.atOffset(ZoneOffset.UTC).toLocalTime();
-    }
-
-    private LocalTime mergeEndTime(RecurrenceEvent recurrenceEvent, Instant endAt) {
-        if (endAt == null) {
-            return recurrenceEvent.getRecurrenceEndTime();
-        }
-
-        return endAt.atOffset(ZoneOffset.UTC).toLocalTime();
-    }
-
-    private RecurrenceFrequency mergeFrequency(
-            RecurrenceEvent recurrenceEvent,
-            RecurrenceFrequency recurrenceFrequency
-    ) {
-        if (recurrenceFrequency == null) {
-            return recurrenceEvent.getRecurrenceFrequency();
-        }
-
-        return recurrenceFrequency;
-    }
-
-    private void validateRecurrenceUpdateTimeRange(MergedRecurrenceUpdate update) {
-        if (update.startAt().isBefore(update.endAt())) {
+    private void validateRecurrenceUpdateTimeRange(Instant startAt, Instant endAt) {
+        if (startAt.isBefore(endAt)) {
             return;
         }
 
