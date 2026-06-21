@@ -43,7 +43,7 @@ public class RecurrenceEventController {
     @PatchMapping("/{recurrenceId}")
     public RecurrenceEventResponse updateRecurrenceEvent(
             @PathVariable Long recurrenceId,
-            @RequestBody UpdateRecurrenceEventRequest request
+            @Valid @RequestBody UpdateRecurrenceEventRequest request
     ) {
         return recurrenceEventService.updateRecurrenceEvent(recurrenceId, request);
     }
