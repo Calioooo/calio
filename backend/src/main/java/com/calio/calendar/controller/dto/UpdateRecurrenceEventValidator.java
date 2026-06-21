@@ -36,6 +36,7 @@ public class UpdateRecurrenceEventValidator {
                 ErrorCode.RECURRENCE_UPDATE_END_AT_REQUIRED,
                 ErrorCode.RECURRENCE_UPDATE_END_AT_INVALID
         );
+        validateTimeRange(requestBody);
         validateFrequency(requestBody);
     }
 
@@ -98,6 +99,24 @@ public class UpdateRecurrenceEventValidator {
         }
 
         throw new CalioException(ErrorCode.RECURRENCE_UPDATE_FREQUENCY_INVALID);
+    }
+
+    private void validateTimeRange(JsonNode requestBody) {
+        Instant startAt = parseInstant(requestBody, "startAt", ErrorCode.RECURRENCE_UPDATE_START_AT_INVALID);
+        Instant endAt = parseInstant(requestBody, "endAt", ErrorCode.RECURRENCE_UPDATE_END_AT_INVALID);
+        if (startAt.isBefore(endAt)) {
+            return;
+        }
+
+        throw new CalioException(ErrorCode.RECURRENCE_UPDATE_TIME_RANGE_INVALID);
+    }
+
+    private Instant parseInstant(JsonNode requestBody, String fieldName, ErrorCode invalidErrorCode) {
+        try {
+            return Instant.parse(requestBody.get(fieldName).asString());
+        } catch (DateTimeParseException exception) {
+            throw new CalioException(invalidErrorCode);
+        }
     }
 
     private boolean isSupportedFrequency(String rawFrequency) {

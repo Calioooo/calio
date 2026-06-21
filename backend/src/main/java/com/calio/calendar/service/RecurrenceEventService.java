@@ -53,8 +53,6 @@ public class RecurrenceEventService {
 
     @Transactional
     public RecurrenceEventResponse updateRecurrenceEvent(Long recurrenceId, UpdateRecurrenceEventRequest request) {
-        validateUpdateTimeRange(request.startAt(), request.endAt());
-
         RecurrenceEvent recurrenceEvent = findRecurrenceEvent(recurrenceId);
         recurrenceEvent.replace(
                 request.title().applyTo(recurrenceEvent.getRecurrenceTitle()),
@@ -176,13 +174,5 @@ public class RecurrenceEventService {
         }
 
         throw new CalioException(ErrorCode.INVALID_RECURRENCE_TIME_RANGE);
-    }
-
-    private void validateUpdateTimeRange(Instant startAt, Instant endAt) {
-        if (startAt.isBefore(endAt)) {
-            return;
-        }
-
-        throw new CalioException(ErrorCode.RECURRENCE_UPDATE_TIME_RANGE_INVALID);
     }
 }
