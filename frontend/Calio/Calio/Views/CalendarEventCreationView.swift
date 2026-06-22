@@ -23,31 +23,35 @@ struct CalendarEventCreationView: View {
     @State private var description = ""
     @State private var selectedColorCode = "#4F46E5"
     
-    let onSave: () -> Void
+    let isSaving: Bool
+    let failureMessage: String?
+    let onSave: (EventCreateInput) async -> Bool
     
     init(
         focusedDay: DayKey,
         calendar: Calendar = .current,
-        onSave: @escaping () -> Void = {}
+        isSaving: Bool = false,
+        failureMessage: String? = nil,
+        onSave: @escaping (EventCreateInput) async -> Bool = { _ in true }
     ) {
-        let startAt = CalendarEventCreationView.defaultStartAt(
+        let timeRange = CalendarEventCreationView.defaultTimeRange(
             focusedDay: focusedDay,
             calendar: calendar
         )
-        let endAt = calendar.date(
-            byAdding: .hour,
-            value: 1,
-            to: startAt
-        ) ?? startAt
+        let startAt = timeRange.startAt
+        let endAt = timeRange.endAt
         
         _startAt = State(initialValue: startAt)
         _endAt = State(initialValue: endAt)
+        self.isSaving = isSaving
+        self.failureMessage = failureMessage
         self.onSave = onSave
     }
     
     var body: some View {
         NavigationStack {
             Form {
+                failureSection
                 titleSection
                 timeSection
                 descriptionSection
@@ -66,11 +70,28 @@ struct CalendarEventCreationView: View {
                 
                 ToolbarItem(placement: .confirmationAction) {
                     Button("저장") {
-                        onSave()
-                        dismiss()
+                        save()
                     }
-                    .disabled(!canSave)
+                    .disabled(!canSave || isSaving)
                 }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var failureSection: some View {
+        if let failureMessage {
+            Section {
+                HStack(alignment: .top, spacing: 10) {
+                    Image(systemName: "exclamationmark.circle.fill")
+                        .foregroundStyle(.red)
+                    Text(failureMessage)
+                        .font(.subheadline)
+                        .foregroundStyle(.primary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.vertical, 2)
+                .accessibilityIdentifier("event_creation_failure_message")
             }
         }
     }
@@ -151,21 +172,53 @@ struct CalendarEventCreationView: View {
     }
     
     private var canSave: Bool {
-        !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        endAt > startAt
+        CalendarEventCreationView.canSave(
+            title: title,
+            startAt: startAt,
+            endAt: endAt
+        )
     }
     
-    private static func defaultStartAt(
+    private func save() {
+        let input = EventCreateInput(
+            title: title.trimmingCharacters(in: .whitespacesAndNewlines),
+            description: description,
+            startAt: startAt,
+            endAt: endAt
+        )
+
+        Task {
+            let didSave = await onSave(input)
+
+            if didSave {
+                dismiss()
+            }
+        }
+    }
+
+    static func defaultTimeRange(
         focusedDay: DayKey,
         calendar: Calendar
-    ) -> Date {
+    ) -> (startAt: Date, endAt: Date) {
         let date = focusedDay.toDate(calendar: calendar)
-        return calendar.date(
+        let startAt = calendar.date(
             bySettingHour: 9,
             minute: 0,
             second: 0,
             of: date
         ) ?? date
+        let endAt = calendar.date(
+            byAdding: .hour,
+            value: 1,
+            to: startAt
+        ) ?? startAt
+
+        return (startAt, endAt)
+    }
+
+    static func canSave(title: String, startAt: Date, endAt: Date) -> Bool {
+        !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        endAt > startAt
     }
 }
 
