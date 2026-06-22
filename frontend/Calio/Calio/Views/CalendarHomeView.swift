@@ -11,7 +11,6 @@ struct CalendarHomeView: View {
     @StateObject private var viewModel: CalendarHomeViewModel
     @State private var displayMode: CalendarDisplayMode = .week
     @State private var isShowingEventCreationView = false
-    @State private var isShowingYearMonthPicker = false
     
     private let minimumStripViewHeight: CGFloat = 110
     private let stripViewHeightRatio: CGFloat = 0.2
@@ -60,28 +59,9 @@ struct CalendarHomeView: View {
         HStack(spacing: 12) {
             CalendarYearMonthTitleView(
                 focusedDay: viewModel.state.focusedDay,
-                onTap: {
-                    isShowingYearMonthPicker = true
-                }
+                onSelectedYearMonth: viewModel.selectYearMonth(year:month:)
             )
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .popover(
-                    isPresented: $isShowingYearMonthPicker,
-                    attachmentAnchor: .rect(.bounds),
-                    arrowEdge: .top
-                ) {
-                    CalendarYearMonthPickerView(
-                        focusedDay: viewModel.state.focusedDay,
-                        onCancel: {
-                            isShowingYearMonthPicker = false
-                        },
-                        onConfirm: { year, month in
-                            isShowingYearMonthPicker = false
-                            viewModel.selectYearMonth(year: year, month: month)
-                        }
-                    )
-                    .presentationCompactAdaptation(.popover)
-                }
             
             Button(action: startCreatingEvent) {
                 Image(systemName: "plus")

@@ -25,7 +25,6 @@ struct CalendarWeekTimelineView: View {
     @State private var headerScrollPosition: DayKey?
     @State private var lastVisibleRange: CalendarVisibleIndexRange?
     @State private var selectedEvent: Event?
-    @State private var isShowingYearMonthPicker = false
     
     var body: some View {
         GeometryReader { geometry in
@@ -34,9 +33,7 @@ struct CalendarWeekTimelineView: View {
             VStack(spacing: 0) {
                 CalendarYearMonthTitleView(
                     focusedDay: focusedDay,
-                    onTap: {
-                        isShowingYearMonthPicker = true
-                    }
+                    onSelectedYearMonth: onSelectedYearMonth
                 )
                     .frame(
                         width: metrics.totalWidth,
@@ -44,23 +41,6 @@ struct CalendarWeekTimelineView: View {
                         alignment: .leading
                     )
                     .padding(.leading, metrics.monthTitleLeadingPadding)
-                    .popover(
-                        isPresented: $isShowingYearMonthPicker,
-                        attachmentAnchor: .rect(.bounds),
-                        arrowEdge: .top
-                    ) {
-                        CalendarYearMonthPickerView(
-                            focusedDay: focusedDay,
-                            onCancel: {
-                                isShowingYearMonthPicker = false
-                            },
-                            onConfirm: { year, month in
-                                isShowingYearMonthPicker = false
-                                onSelectedYearMonth(year, month)
-                            }
-                        )
-                        .presentationCompactAdaptation(.popover)
-                    }
 
                 eventStatusBanner
                 

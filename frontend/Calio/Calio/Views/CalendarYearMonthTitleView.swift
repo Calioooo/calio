@@ -9,24 +9,70 @@ import SwiftUI
 
 struct CalendarYearMonthTitleView: View {
     let focusedDay: DayKey
-    let onTap: (() -> Void)?
+    let onSelectedYearMonth: ((Int, Int) -> Void)?
+
+    @State private var isShowingYearPicker = false
+    @State private var isShowingMonthPicker = false
 
     init(
         focusedDay: DayKey,
-        onTap: (() -> Void)? = nil
+        onSelectedYearMonth: ((Int, Int) -> Void)? = nil
     ) {
         self.focusedDay = focusedDay
-        self.onTap = onTap
+        self.onSelectedYearMonth = onSelectedYearMonth
     }
     
     var body: some View {
-        if let onTap {
-            Button(action: onTap) {
-                titleText
-                    .contentShape(Rectangle())
+        if let onSelectedYearMonth {
+            HStack(spacing: 4) {
+                titleButton(text: "\(focusedDay.year)년") {
+                    isShowingYearPicker = true
+                }
+                .popover(
+                    isPresented: $isShowingYearPicker,
+                    attachmentAnchor: .rect(.bounds),
+                    arrowEdge: .top
+                ) {
+                    CalendarYearMonthComponentPickerView(
+                        title: "연도",
+                        values: years,
+                        selectedValue: focusedDay.year,
+                        displayText: { "\($0)년" },
+                        onCancel: {
+                            isShowingYearPicker = false
+                        },
+                        onConfirm: { year in
+                            isShowingYearPicker = false
+                            onSelectedYearMonth(year, focusedDay.month)
+                        }
+                    )
+                    .presentationCompactAdaptation(.popover)
+                }
+
+                titleButton(text: "\(focusedDay.month)월") {
+                    isShowingMonthPicker = true
+                }
+                .popover(
+                    isPresented: $isShowingMonthPicker,
+                    attachmentAnchor: .rect(.bounds),
+                    arrowEdge: .top
+                ) {
+                    CalendarYearMonthComponentPickerView(
+                        title: "월",
+                        values: Array(1...12),
+                        selectedValue: focusedDay.month,
+                        displayText: { "\($0)월" },
+                        onCancel: {
+                            isShowingMonthPicker = false
+                        },
+                        onConfirm: { month in
+                            isShowingMonthPicker = false
+                            onSelectedYearMonth(focusedDay.year, month)
+                        }
+                    )
+                    .presentationCompactAdaptation(.popover)
+                }
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("년월 선택")
         } else {
             titleText
         }
@@ -41,29 +87,52 @@ struct CalendarYearMonthTitleView: View {
             .font(.system(size: 24, weight: .semibold))
             .foregroundStyle(.primary)
     }
+
+    private var years: [Int] {
+        let currentYear = Calendar.current.component(.year, from: Date())
+        return Array((currentYear - 20)...(currentYear + 20))
+    }
+
+    private func titleButton(
+        text: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Text(text)
+                .font(.system(size: 24, weight: .semibold))
+                .foregroundStyle(.primary)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(text) 선택")
+    }
 }
 
-struct CalendarYearMonthPickerView: View {
-    let focusedDay: DayKey
-    let calendar: Calendar
+private struct CalendarYearMonthComponentPickerView: View {
+    let title: String
+    let values: [Int]
+    let selectedValue: Int
+    let displayText: (Int) -> String
     let onCancel: () -> Void
-    let onConfirm: (Int, Int) -> Void
+    let onConfirm: (Int) -> Void
 
-    @State private var selectedYear: Int
-    @State private var selectedMonth: Int
+    @State private var selection: Int
 
     init(
-        focusedDay: DayKey,
-        calendar: Calendar = .current,
+        title: String,
+        values: [Int],
+        selectedValue: Int,
+        displayText: @escaping (Int) -> String,
         onCancel: @escaping () -> Void,
-        onConfirm: @escaping (Int, Int) -> Void
+        onConfirm: @escaping (Int) -> Void
     ) {
-        self.focusedDay = focusedDay
-        self.calendar = calendar
+        self.title = title
+        self.values = values
+        self.selectedValue = selectedValue
+        self.displayText = displayText
         self.onCancel = onCancel
         self.onConfirm = onConfirm
-        _selectedYear = State(initialValue: focusedDay.year)
-        _selectedMonth = State(initialValue: focusedDay.month)
+        _selection = State(initialValue: selectedValue)
     }
 
     var body: some View {
@@ -75,39 +144,28 @@ struct CalendarYearMonthPickerView: View {
                 Spacer()
 
                 Button("이동") {
-                    onConfirm(selectedYear, selectedMonth)
+                    onConfirm(selection)
                 }
                 .fontWeight(.semibold)
             }
             .padding(.horizontal, 18)
             .padding(.top, 16)
 
-            HStack(spacing: 0) {
-                Picker("연도", selection: $selectedYear) {
-                    ForEach(years, id: \.self) { year in
-                        Text("\(year)년").tag(year)
-                    }
+            Picker(title, selection: $selection) {
+                ForEach(values, id: \.self) { value in
+                    Text(displayText(value)).tag(value)
                 }
-                .pickerStyle(.wheel)
-
-                Picker("월", selection: $selectedMonth) {
-                    ForEach(1...12, id: \.self) { month in
-                        Text("\(month)월").tag(month)
-                    }
-                }
-                .pickerStyle(.wheel)
             }
-            .frame(width: 280, height: 190)
+            .pickerStyle(.wheel)
+            .frame(width: 180, height: 190)
             .clipped()
             .padding(.horizontal, 10)
             .padding(.bottom, 12)
         }
-        .frame(width: 320)
-    }
-
-    private var years: [Int] {
-        let currentYear = calendar.component(.year, from: Date())
-        return Array((currentYear - 20)...(currentYear + 20))
+        .frame(width: 220)
+        .onChange(of: selectedValue) { _, newValue in
+            selection = newValue
+        }
     }
 }
 
