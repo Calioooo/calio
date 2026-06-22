@@ -62,6 +62,24 @@ public class RecurrenceEvent extends BaseEntity {
         this.recurrenceFrequency = recurrenceFrequency;
     }
 
+    public void update(
+            String recurrenceTitle,
+            String recurrenceDescription,
+            LocalDate recurrenceStartDate,
+            LocalDate recurrenceEndDate,
+            LocalTime recurrenceStartTime,
+            LocalTime recurrenceEndTime,
+            RecurrenceFrequency recurrenceFrequency
+    ) {
+        this.recurrenceTitle = recurrenceTitle;
+        this.recurrenceDescription = recurrenceDescription;
+        this.recurrenceStartDate = recurrenceStartDate;
+        this.recurrenceEndDate = recurrenceEndDate;
+        this.recurrenceStartTime = recurrenceStartTime;
+        this.recurrenceEndTime = recurrenceEndTime;
+        this.recurrenceFrequency = recurrenceFrequency;
+    }
+
     public Long getId() {
         return id;
     }

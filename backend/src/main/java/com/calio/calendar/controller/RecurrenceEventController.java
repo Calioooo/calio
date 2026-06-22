@@ -2,12 +2,14 @@ package com.calio.calendar.controller;
 
 import com.calio.calendar.controller.dto.CreateRecurrenceEventRequest;
 import com.calio.calendar.controller.dto.RecurrenceEventResponse;
+import com.calio.calendar.controller.dto.UpdateRecurrenceEventRequest;
 import com.calio.calendar.service.RecurrenceEventService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -36,5 +38,13 @@ public class RecurrenceEventController {
     @GetMapping("/{recurrenceId}")
     public RecurrenceEventResponse getRecurrenceEvent(@PathVariable Long recurrenceId) {
         return recurrenceEventService.getRecurrenceEvent(recurrenceId);
+    }
+
+    @PatchMapping("/{recurrenceId}")
+    public RecurrenceEventResponse updateRecurrenceEvent(
+            @PathVariable Long recurrenceId,
+            @Valid @RequestBody UpdateRecurrenceEventRequest request
+    ) {
+        return recurrenceEventService.updateRecurrenceEvent(recurrenceId, request);
     }
 }

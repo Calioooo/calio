@@ -2,7 +2,6 @@ package com.calio.calendar.controller.dto;
 
 import com.calio.calendar.repository.entity.RecurrenceEvent;
 import com.calio.calendar.repository.entity.RecurrenceFrequency;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 
@@ -14,9 +13,7 @@ public record RecurrenceEventResponse(
         LocalDate recurrenceEndDate,
         LocalTime recurrenceStartTime,
         LocalTime recurrenceEndTime,
-        RecurrenceFrequency recurrenceFrequency,
-        Instant createdAt,
-        Instant updatedAt
+        RecurrenceFrequency recurrenceFrequency
 ) {
 
     public static RecurrenceEventResponse from(RecurrenceEvent recurrenceEvent) {
@@ -28,9 +25,7 @@ public record RecurrenceEventResponse(
                 recurrenceEvent.getRecurrenceEndDate(),
                 recurrenceEvent.getRecurrenceStartTime(),
                 recurrenceEvent.getRecurrenceEndTime(),
-                recurrenceEvent.getRecurrenceFrequency(),
-                recurrenceEvent.getCreatedAt(),
-                recurrenceEvent.getUpdatedAt()
+                recurrenceEvent.getRecurrenceFrequency()
         );
     }
 }
