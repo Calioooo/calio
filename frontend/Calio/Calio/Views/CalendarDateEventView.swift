@@ -15,8 +15,10 @@ struct CalendarDateEventView: View {
     
     let items: [CalendarDateCellItem]
     let focusedDay: DayKey
+    let eventAreaState: CalendarEventAreaState
     let onFocusedDayChanged: (DayKey) -> Void
     let onVisibleRangeChanged: (CalendarVisibleIndexRange) -> Void
+    let onRetryEvents: () -> Void
     
     @State private var scrollPosition: DayKey?
     @State private var isProgrammaticAlignment = false
@@ -25,62 +27,102 @@ struct CalendarDateEventView: View {
     @State private var resetProgrammaticAlignmentTask: Task<Void, Never>?
     
     var body: some View {
-        GeometryReader { geometry in
-            ScrollView(.vertical) {
-                LazyVStack(spacing: rowSpacing) {
-                    ForEach(items) { item in
-                        CalendarDateEventCellView(
-                            weekday: item.weekday,
-                            monthText: item.monthText,
-                            dayText: item.dayText,
-                            isToday: item.isToday,
-                            onTap: {
-                                notifyUserFocusedDayChanged(item.id)
-                            },
-                            events: item.events
-                        )
-                        .frame(height: dateRowHeight)
-                        .clipped()
-                        .id(item.id)
-                        .background(
-                            GeometryReader { proxy in
-                                Color.clear.preference(
-                                    key: CalendarDateEventRowFramePreferenceKey.self,
-                                    value: [item.id: proxy.frame(in: .named(coordinateSpaceName))]
-                                )
-                            }
-                        )
+        VStack(spacing: 0) {
+            eventStatusBanner
+
+            GeometryReader { geometry in
+                ScrollView(.vertical) {
+                    LazyVStack(spacing: rowSpacing) {
+                        ForEach(items) { item in
+                            CalendarDateEventCellView(
+                                weekday: item.weekday,
+                                monthText: item.monthText,
+                                dayText: item.dayText,
+                                isToday: item.isToday,
+                                onTap: {
+                                    notifyUserFocusedDayChanged(item.id)
+                                },
+                                events: item.events
+                            )
+                            .frame(height: dateRowHeight)
+                            .clipped()
+                            .id(item.id)
+                            .background(
+                                GeometryReader { proxy in
+                                    Color.clear.preference(
+                                        key: CalendarDateEventRowFramePreferenceKey.self,
+                                        value: [item.id: proxy.frame(in: .named(coordinateSpaceName))]
+                                    )
+                                }
+                            )
+                        }
                     }
+                    .scrollTargetLayout()
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
+                    .padding(.bottom, 24)
                 }
-                .scrollTargetLayout()
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
-                .padding(.bottom, 24)
+                .coordinateSpace(name: coordinateSpaceName)
+                .scrollTargetBehavior(.viewAligned)
+                .scrollPosition(id: $scrollPosition, anchor: .top)
+                .onPreferenceChange(CalendarDateEventRowFramePreferenceKey.self) { frames in
+                    notifyVisibleRangeChangedIfNeeded(
+                        frames,
+                        viewportHeight: geometry.size.height
+                    )
+                }
+                .onChange(of: scrollPosition) { _, newDay in
+                    updateFocusedDayFromScrollPosition(newDay)
+                }
+                .onChange(of: focusedDay) { _, newDay in
+                    alignIfNeeded(to: newDay)
+                }
+                .onChange(of: items.map(\.id)) { _, _ in
+                    alignProgrammatically(to: focusedDay)
+                }
+                .onAppear {
+                    alignProgrammatically(to: focusedDay)
+                }
+                .onDisappear {
+                    resetProgrammaticAlignmentTask?.cancel()
+                }
             }
-            .coordinateSpace(name: coordinateSpaceName)
-            .scrollTargetBehavior(.viewAligned)
-            .scrollPosition(id: $scrollPosition, anchor: .top)
-            .onPreferenceChange(CalendarDateEventRowFramePreferenceKey.self) { frames in
-                notifyVisibleRangeChangedIfNeeded(
-                    frames,
-                    viewportHeight: geometry.size.height
-                )
+        }
+    }
+
+    @ViewBuilder
+    private var eventStatusBanner: some View {
+        switch eventAreaState {
+        case .idle:
+            EmptyView()
+
+        case .loading:
+            HStack(spacing: 8) {
+                ProgressView()
+                    .controlSize(.small)
+
+                Text("일정을 불러오는 중입니다.")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.secondary)
             }
-            .onChange(of: scrollPosition) { _, newDay in
-                updateFocusedDayFromScrollPosition(newDay)
+            .frame(maxWidth: .infinity, minHeight: 36)
+            .background(Color(uiColor: .secondarySystemBackground))
+
+        case .failed(let message):
+            HStack(spacing: 10) {
+                Text(message)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+
+                Spacer(minLength: 8)
+
+                Button("다시 시도", action: onRetryEvents)
+                    .font(.system(size: 13, weight: .semibold))
             }
-            .onChange(of: focusedDay) { _, newDay in
-                alignIfNeeded(to: newDay)
-            }
-            .onChange(of: items.map(\.id)) { _, _ in
-                alignProgrammatically(to: focusedDay)
-            }
-            .onAppear {
-                alignProgrammatically(to: focusedDay)
-            }
-            .onDisappear {
-                resetProgrammaticAlignmentTask?.cancel()
-            }
+            .padding(.horizontal, 16)
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .background(Color(uiColor: .secondarySystemBackground))
         }
     }
     
@@ -247,8 +289,10 @@ private struct CalendarDateEventRowFramePreferenceKey: PreferenceKey {
     CalendarDateEventView(
         items: items,
         focusedDay: items[0].id,
+        eventAreaState: .idle,
         onFocusedDayChanged: { _ in },
-        onVisibleRangeChanged: { _ in }
+        onVisibleRangeChanged: { _ in },
+        onRetryEvents: {}
     )
     .frame(height: 110)
 }

@@ -16,25 +16,53 @@ struct CalendarWeekTimelineView: View {
     
     let items: [CalendarDateCellItem]
     let focusedDay: DayKey
+    let eventAreaState: CalendarEventAreaState
     let onSelectedDay: (DayKey) -> Void
     let onVisibleRangeChanged: (CalendarVisibleIndexRange) -> Void
+    let onSelectedYearMonth: (Int, Int) -> Void
+    let onRetryEvents: () -> Void
     
     @State private var headerScrollPosition: DayKey?
     @State private var lastVisibleRange: CalendarVisibleIndexRange?
     @State private var selectedEvent: Event?
+    @State private var isShowingYearMonthPicker = false
     
     var body: some View {
         GeometryReader { geometry in
             let metrics = timelineMetrics(for: geometry.size)
             
             VStack(spacing: 0) {
-                CalendarYearMonthTitleView(focusedDay: focusedDay)
+                CalendarYearMonthTitleView(
+                    focusedDay: focusedDay,
+                    onTap: {
+                        isShowingYearMonthPicker = true
+                    }
+                )
                     .frame(
                         width: metrics.totalWidth,
                         height: metrics.monthTitleHeight,
                         alignment: .leading
                     )
                     .padding(.leading, metrics.monthTitleLeadingPadding)
+                    .popover(
+                        isPresented: $isShowingYearMonthPicker,
+                        attachmentAnchor: .rect(.bounds),
+                        arrowEdge: .top
+                    ) {
+                        CalendarYearMonthPickerView(
+                            focusedDay: focusedDay,
+                            onCancel: {
+                                isShowingYearMonthPicker = false
+                            },
+                            onConfirm: { year, month in
+                                isShowingYearMonthPicker = false
+                                onSelectedYearMonth(year, month)
+                            }
+                        )
+                        .presentationCompactAdaptation(.popover)
+                    }
+
+                eventStatusBanner
                 
                 timelineHeader(metrics: metrics)
                     .frame(height: metrics.headerHeight, alignment: .top)
@@ -53,6 +81,42 @@ struct CalendarWeekTimelineView: View {
                 alignment: .top
             )
             .background(Color(uiColor: .systemBackground))
+        }
+    }
+
+    @ViewBuilder
+    private var eventStatusBanner: some View {
+        switch eventAreaState {
+        case .idle:
+            EmptyView()
+
+        case .loading:
+            HStack(spacing: 8) {
+                ProgressView()
+                    .controlSize(.small)
+
+                Text("일정을 불러오는 중입니다.")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, minHeight: 34)
+            .background(Color(uiColor: .secondarySystemBackground))
+
+        case .failed(let message):
+            HStack(spacing: 10) {
+                Text(message)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+
+                Spacer(minLength: 8)
+
+                Button("다시 시도", action: onRetryEvents)
+                    .font(.system(size: 13, weight: .semibold))
+            }
+            .padding(.horizontal, 16)
+            .frame(maxWidth: .infinity, minHeight: 42)
+            .background(Color(uiColor: .secondarySystemBackground))
         }
     }
     
@@ -810,7 +874,10 @@ private extension UIView {
     CalendarWeekTimelineView(
         items: items,
         focusedDay: items[0].id,
+        eventAreaState: .idle,
         onSelectedDay: { _ in },
-        onVisibleRangeChanged: { _ in }
+        onVisibleRangeChanged: { _ in },
+        onSelectedYearMonth: { _, _ in },
+        onRetryEvents: {}
     )
 }

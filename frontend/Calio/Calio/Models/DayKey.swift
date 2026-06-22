@@ -11,6 +11,12 @@ struct DayKey: Hashable {
     let year: Int
     let month: Int
     let day: Int
+
+    init(year: Int, month: Int, day: Int) {
+        self.year = year
+        self.month = month
+        self.day = day
+    }
     
     init(date: Date, calendar: Calendar = .current) {
         let components = calendar.dateComponents([.year, .month, .day], from: date)

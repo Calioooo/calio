@@ -17,19 +17,17 @@ final class CalendarHomeViewModel: ObservableObject {
     @Published private(set) var state: CalendarState
     @Published private(set) var createState: CalendarEventCreateState = .idle
     
-    private let initialLoadPastDays = 90
-    private let initialLoadFutureDays = 90
-    
+    private let initialGeneratedPastDays = 90
+    private let initialGeneratedFutureDays = 90
     private let thresholdDays = 20
-    private let loadFutureDays = 60
-    private let loadPastDays = 60
-    
+    private let generateFutureDays = 60
+    private let generatePastDays = 60
     private let visibleDateCount = 7
     
     private let dateService: CalendarDateService
     private let eventService: EventService
     private let calendar: Calendar
-    private var loadingEdges: Set<CalendarState.LoadedEdge> = []
+    private var lastVisibleMonthKeys: Set<YearMonthKey> = []
     
     init(
         calendar: Calendar = .current,
@@ -64,54 +62,51 @@ final class CalendarHomeViewModel: ObservableObject {
     var loadedDateCount: Int {
         state.daysByKey.count
     }
+
+    var focusedEventAreaState: CalendarEventAreaState {
+        let key = YearMonthKey(day: state.focusedDay)
+        let entry = state.monthEventCache[key] ?? .idle
+
+        if entry.isLoading {
+            return .loading
+        }
+
+        if let failure = entry.failure {
+            return .failed(failure.message)
+        }
+
+        return .idle
+    }
     
     func loadInitialIfNeeded() {
         guard state.isNeedInitialize() else { return }
-        
-        Task {
-            let today = Date()
-            let startDate = dateService.dateByAddingDays(days: initialLoadPastDays * -1, to: today)
-            let endDate = dateService.dateByAddingDays(days: initialLoadFutureDays, to: today)
-            
-            do {
-                let events = try await eventService.fetchEvents(from: startDate, to: endDate)
-                let daysBykey = makeDateCellItemsByDay(
-                    events: events,
-                    from: startDate,
-                    to: endDate
-                )
-                
-                state = CalendarState(startDate: startDate, endDate: endDate, daysByKey: daysBykey, focusedDay: DayKey(date: today, calendar: calendar))
-            } catch {
-                print(error)
-            }
-        }
+
+        let focusedDate = state.focusedDay.toDate(calendar: calendar)
+        replaceGeneratedDateCells(
+            from: dateService.dateByAddingDays(days: initialGeneratedPastDays * -1, to: focusedDate),
+            to: dateService.dateByAddingDays(days: initialGeneratedFutureDays, to: focusedDate)
+        )
+        prefetchFocusedMonthAndAdjacent(retryFailed: false)
     }
     
     func focusDay(_ day: DayKey) {
-        guard state.daysByKey[day] != nil else {
-            return
-        }
-        
         guard state.focusedDay != day else {
             return
         }
         
         state = state.focused(on: day)
+        ensureGeneratedDateCells(contain: day)
+        prefetchFocusedMonthAndAdjacent(retryFailed: true)
     }
     
     func loadAdditionalEventsIfNeeded(visibleRange: CalendarVisibleIndexRange) {
-        guard !state.isNeedInitialize() else {
+        guard !state.daysByKey.isEmpty else {
             return
         }
-        
-        if visibleRange.startIndex < thresholdDays {
-            loadAdditionalEvents(at: .start)
-        }
-        
-        if loadedDateCount - visibleRange.endIndex < thresholdDays {
-            loadAdditionalEvents(at: .end)
-        }
+
+        let visibleItems = loadedItems(in: visibleRange)
+        appendGeneratedDateCellsIfNeeded(visibleRange: visibleRange)
+        prefetchMonthsForVisibleItemsIfNeeded(visibleItems)
     }
     
     func moveMonth(by value: Int) {
@@ -127,13 +122,24 @@ final class CalendarHomeViewModel: ObservableObject {
 
         let components = calendar.dateComponents([.year, .month], from: movedMonthDate)
 
-        guard let firstDayOfMonth = calendar.date(from: components) else {
+        guard let year = components.year,
+              let month = components.month
+        else {
             return
         }
 
-        let day = DayKey(date: firstDayOfMonth, calendar: calendar)
+        selectYearMonth(year: year, month: month)
+    }
 
-        focusDay(day)
+    func selectYearMonth(year: Int, month: Int) {
+        let targetDay = makeTargetDayPreservingFocusedDay(year: year, month: month)
+        state = state.focused(on: targetDay)
+        ensureGeneratedDateCells(contain: targetDay)
+        prefetchFocusedMonthAndAdjacent(retryFailed: true)
+    }
+
+    func retryFocusedMonthEvents() {
+        requestMonths([YearMonthKey(day: state.focusedDay)], retryFailed: true)
     }
 
     func resetCreateState() {
@@ -149,7 +155,7 @@ final class CalendarHomeViewModel: ObservableObject {
 
         do {
             let createdEvent = try await eventService.createEvent(input)
-            insertCreatedEventIfLoaded(createdEvent)
+            insertCreatedEventIntoMonthCache(createdEvent)
             createState = .idle
             return true
         } catch let error as EventServiceError {
@@ -162,11 +168,10 @@ final class CalendarHomeViewModel: ObservableObject {
     }
     
     private func makeDateCellItemsByDay(
-        events: [Event],
         from startDate: Date,
         to endDate: Date
     ) -> [DayKey: CalendarDateCellItem] {
-        let eventsByDay = makeEventsByDay(events)
+        let eventsByDay = makeEventsByDay(cachedEvents(in: startDate...endDate))
         
         return Dictionary(
             uniqueKeysWithValues: makeDates(from: startDate, to: endDate).map { date in
@@ -188,36 +193,17 @@ final class CalendarHomeViewModel: ObservableObject {
         )
     }
     
-    private func loadAdditionalEvents(at edge: CalendarState.LoadedEdge) {
-        guard !loadingEdges.contains(edge) else {
-            return
-        }
-        
-        loadingEdges.insert(edge)
-        
-        let loadStartDate: Date
-        let loadEndDate: Date
-        
-        switch edge {
-        case .end:
-            loadStartDate = dateService.dateByAddingDays(days: 1, to: state.endDate)
-            loadEndDate = dateService.dateByAddingDays(days: loadFutureDays, to: state.endDate)
-            
-        case .start:
-            loadStartDate = dateService.dateByAddingDays(days: loadPastDays * -1, to: state.startDate)
-            loadEndDate = dateService.dateByAddingDays(days: -1, to: state.startDate)
-        }
+    private func fetchMonth(_ key: YearMonthKey) {
+        let range = key.dateRange(calendar: calendar)
+
         Task {
-            defer {
-                self.loadingEdges.remove(edge)
-            }
-            
             do {
-                let events = try await eventService.fetchEvents(from: loadStartDate, to: loadEndDate)
-                let daysByKey = makeDateCellItemsByDay(events: events, from: loadStartDate, to: loadEndDate)
-                self.state = self.state.appended(startDate: loadStartDate, endDate: loadEndDate, daysByKey: daysByKey)
+                let events = try await eventService.fetchEvents(from: range.from, to: range.to)
+                self.setMonthCacheEntry(.loaded(sortedEvents(events)), for: key)
+            } catch let error as EventServiceError {
+                self.setFailedMonthCacheEntry(CalendarMonthEventFailure(error: error), for: key)
             } catch {
-                print(error)
+                self.setFailedMonthCacheEntry(.unexpected, for: key)
             }
         }
     }
@@ -226,41 +212,6 @@ final class CalendarHomeViewModel: ObservableObject {
         Dictionary(grouping: events) { event in
             DayKey(date: event.startAt, calendar: calendar)
         }
-    }
-
-    private func insertCreatedEventIfLoaded(_ event: Event) {
-        let eventDay = DayKey(date: event.startAt, calendar: calendar)
-
-        guard isInsideLoadedRange(eventDay) else {
-            return
-        }
-
-        let currentItem = state.daysByKey[eventDay] ?? makeDateCellItem(for: eventDay)
-        var nextDaysByKey = state.daysByKey
-        nextDaysByKey[eventDay] = CalendarDateCellItem(
-            id: currentItem.id,
-            weekday: currentItem.weekday,
-            monthText: currentItem.monthText,
-            dayText: currentItem.dayText,
-            isToday: currentItem.isToday,
-            isSelected: currentItem.isSelected,
-            events: sortedEvents(currentItem.events + [event])
-        )
-        state = CalendarState(
-            startDate: state.startDate,
-            endDate: state.endDate,
-            daysByKey: nextDaysByKey,
-            focusedDay: state.focusedDay
-        )
-    }
-
-    private func isInsideLoadedRange(_ day: DayKey) -> Bool {
-        let date = day.toDate(calendar: calendar)
-        let normalizedDate = calendar.startOfDay(for: date)
-        let normalizedStartDate = calendar.startOfDay(for: state.startDate)
-        let normalizedEndDate = calendar.startOfDay(for: state.endDate)
-
-        return normalizedStartDate <= normalizedDate && normalizedDate <= normalizedEndDate
     }
 
     private func makeDateCellItem(for day: DayKey) -> CalendarDateCellItem {
@@ -275,6 +226,198 @@ final class CalendarHomeViewModel: ObservableObject {
             isSelected: false,
             events: []
         )
+    }
+
+    private func replaceGeneratedDateCells(from startDate: Date, to endDate: Date) {
+        state = state.replacingDateCells(
+            startDate: startDate,
+            endDate: endDate,
+            daysByKey: makeDateCellItemsByDay(from: startDate, to: endDate)
+        )
+    }
+
+    private func refreshGeneratedDateCells() {
+        replaceGeneratedDateCells(from: state.startDate, to: state.endDate)
+    }
+
+    private func ensureGeneratedDateCells(contain day: DayKey) {
+        let date = day.toDate(calendar: calendar)
+        let normalizedDate = calendar.startOfDay(for: date)
+        let normalizedStartDate = calendar.startOfDay(for: state.startDate)
+        let normalizedEndDate = calendar.startOfDay(for: state.endDate)
+
+        guard normalizedDate < normalizedStartDate || normalizedDate > normalizedEndDate else {
+            refreshGeneratedDateCells()
+            return
+        }
+
+        replaceGeneratedDateCells(
+            from: dateService.dateByAddingDays(days: initialGeneratedPastDays * -1, to: date),
+            to: dateService.dateByAddingDays(days: initialGeneratedFutureDays, to: date)
+        )
+    }
+
+    private func appendGeneratedDateCellsIfNeeded(visibleRange: CalendarVisibleIndexRange) {
+        if visibleRange.startIndex < thresholdDays {
+            appendGeneratedDateCells(at: .start)
+        }
+
+        if loadedDateCount - visibleRange.endIndex < thresholdDays {
+            appendGeneratedDateCells(at: .end)
+        }
+    }
+
+    private func appendGeneratedDateCells(at edge: CalendarState.LoadedEdge) {
+        let nextStartDate: Date
+        let nextEndDate: Date
+
+        switch edge {
+        case .start:
+            nextStartDate = dateService.dateByAddingDays(days: generatePastDays * -1, to: state.startDate)
+            nextEndDate = dateService.dateByAddingDays(days: -1, to: state.startDate)
+        case .end:
+            nextStartDate = dateService.dateByAddingDays(days: 1, to: state.endDate)
+            nextEndDate = dateService.dateByAddingDays(days: generateFutureDays, to: state.endDate)
+        }
+
+        let nextDaysByKey = makeDateCellItemsByDay(from: nextStartDate, to: nextEndDate)
+        state = state.appended(
+            startDate: nextStartDate,
+            endDate: nextEndDate,
+            daysByKey: nextDaysByKey
+        )
+    }
+
+    private func prefetchFocusedMonthAndAdjacent(retryFailed: Bool) {
+        requestMonths(
+            adjacentMonthKeys(around: YearMonthKey(day: state.focusedDay)),
+            retryFailed: retryFailed
+        )
+    }
+
+    private func prefetchMonthsForVisibleItemsIfNeeded(_ visibleItems: [CalendarDateCellItem]) {
+        let visibleMonthKeys = Set(visibleItems.map { YearMonthKey(day: $0.id) })
+
+        guard !visibleMonthKeys.isEmpty,
+              visibleMonthKeys != lastVisibleMonthKeys
+        else {
+            return
+        }
+
+        lastVisibleMonthKeys = visibleMonthKeys
+        requestMonths(
+            visibleMonthKeys.flatMap(adjacentMonthKeys(around:)),
+            retryFailed: true
+        )
+    }
+
+    private func requestMonths(_ keys: [YearMonthKey], retryFailed: Bool) {
+        Set(keys).sorted().forEach { key in
+            guard shouldFetchMonth(key, retryFailed: retryFailed) else {
+                return
+            }
+
+            setMonthCacheEntry(.loading, for: key)
+            fetchMonth(key)
+        }
+    }
+
+    private func shouldFetchMonth(_ key: YearMonthKey, retryFailed: Bool) -> Bool {
+        switch state.monthEventCache[key] ?? .idle {
+        case .idle:
+            return true
+        case .failed:
+            return retryFailed
+        case .loading, .loaded:
+            return false
+        }
+    }
+
+    private func adjacentMonthKeys(around key: YearMonthKey) -> [YearMonthKey] {
+        [
+            key.addingMonths(-1, calendar: calendar),
+            key,
+            key.addingMonths(1, calendar: calendar)
+        ]
+    }
+
+    private func setMonthCacheEntry(
+        _ entry: CalendarMonthEventCacheEntry,
+        for key: YearMonthKey
+    ) {
+        var nextCache = state.monthEventCache
+        nextCache[key] = entry
+        state = state.replacingMonthEventCache(nextCache)
+        refreshGeneratedDateCells()
+    }
+
+    private func setFailedMonthCacheEntry(
+        _ failure: CalendarMonthEventFailure,
+        for key: YearMonthKey
+    ) {
+        guard state.monthEventCache[key]?.isLoading == true else {
+            return
+        }
+
+        setMonthCacheEntry(.failed(failure), for: key)
+    }
+
+    private func cachedEvents(in dateRange: ClosedRange<Date>) -> [Event] {
+        state.monthEventCache.values.flatMap(\.loadedEvents).filter { event in
+            dateRange.contains(event.startAt)
+        }
+    }
+
+    private func loadedItems(in visibleRange: CalendarVisibleIndexRange) -> [CalendarDateCellItem] {
+        let items = loadedDateCellItems
+
+        guard !items.isEmpty else {
+            return []
+        }
+
+        let startIndex = max(visibleRange.startIndex, items.startIndex)
+        let endIndex = min(visibleRange.endIndex, items.endIndex - 1)
+
+        guard startIndex <= endIndex else {
+            return []
+        }
+
+        return Array(items[startIndex...endIndex])
+    }
+
+    private func makeTargetDayPreservingFocusedDay(year: Int, month: Int) -> DayKey {
+        let clampedDay = min(state.focusedDay.day, lastDayOfMonth(year: year, month: month))
+        var components = DateComponents()
+        components.year = year
+        components.month = month
+        components.day = clampedDay
+
+        guard let date = calendar.date(from: components) else {
+            preconditionFailure("Failed to create target day for \(year)-\(month)")
+        }
+
+        return DayKey(date: date, calendar: calendar)
+    }
+
+    private func lastDayOfMonth(year: Int, month: Int) -> Int {
+        var components = DateComponents()
+        components.year = year
+        components.month = month
+        components.day = 1
+
+        guard let firstDay = calendar.date(from: components),
+              let dayRange = calendar.range(of: .day, in: .month, for: firstDay)
+        else {
+            preconditionFailure("Failed to find last day for \(year)-\(month)")
+        }
+
+        return dayRange.count
+    }
+
+    private func insertCreatedEventIntoMonthCache(_ event: Event) {
+        let key = YearMonthKey(date: event.startAt, calendar: calendar)
+        let currentEvents = state.monthEventCache[key]?.loadedEvents ?? []
+        setMonthCacheEntry(.loaded(sortedEvents(currentEvents + [event])), for: key)
     }
 
     private func sortedEvents(_ events: [Event]) -> [Event] {

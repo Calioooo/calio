@@ -15,6 +15,8 @@ struct CalendarDayTimelineView: View {
     
     let items: [CalendarDateCellItem]
     let focusedDay: DayKey
+    let eventAreaState: CalendarEventAreaState
+    let onRetryEvents: () -> Void
     
     var body: some View {
         GeometryReader { geometry in
@@ -30,6 +32,8 @@ struct CalendarDayTimelineView: View {
                         alignment: .leading
                     )
                     .padding(.leading, metrics.titleLeadingPadding)
+
+                eventStatusBanner
                 
                 dayHeader(metrics: metrics)
                     .frame(height: metrics.headerHeight, alignment: .top)
@@ -48,6 +52,42 @@ struct CalendarDayTimelineView: View {
                 alignment: .top
             )
             .background(Color(uiColor: .systemBackground))
+        }
+    }
+
+    @ViewBuilder
+    private var eventStatusBanner: some View {
+        switch eventAreaState {
+        case .idle:
+            EmptyView()
+
+        case .loading:
+            HStack(spacing: 8) {
+                ProgressView()
+                    .controlSize(.small)
+
+                Text("일정을 불러오는 중입니다.")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, minHeight: 34)
+            .background(Color(uiColor: .secondarySystemBackground))
+
+        case .failed(let message):
+            HStack(spacing: 10) {
+                Text(message)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+
+                Spacer(minLength: 8)
+
+                Button("다시 시도", action: onRetryEvents)
+                    .font(.system(size: 13, weight: .semibold))
+            }
+            .padding(.horizontal, 16)
+            .frame(maxWidth: .infinity, minHeight: 42)
+            .background(Color(uiColor: .secondarySystemBackground))
         }
     }
     
@@ -544,6 +584,8 @@ private extension UIView {
     
     CalendarDayTimelineView(
         items: [item],
-        focusedDay: day
+        focusedDay: day,
+        eventAreaState: .idle,
+        onRetryEvents: {}
     )
 }
