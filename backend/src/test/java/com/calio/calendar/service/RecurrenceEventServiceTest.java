@@ -269,7 +269,7 @@ class RecurrenceEventServiceTest {
     }
 
     @Test
-    @DisplayName("반복 occurrence 수정은 기존 override가 있으면 새 override를 저장하지 않는다")
+    @DisplayName("override가 이미 생성된 경우 기존 override를 사용해 occurrence를 수정한다")
     void givenExistingOverride_whenUpdateRecurrenceOccurrence_thenReusesOverride() {
         // given
         RecurrenceEvent recurrenceEvent = recurrenceEvent(
