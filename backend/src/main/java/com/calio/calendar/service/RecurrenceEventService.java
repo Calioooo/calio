@@ -1,13 +1,17 @@
 package com.calio.calendar.service;
 
 import com.calio.calendar.controller.dto.CreateRecurrenceEventRequest;
+import com.calio.calendar.controller.dto.EventResponse;
 import com.calio.calendar.controller.dto.RecurrenceEventResponse;
 import com.calio.calendar.controller.dto.UpdateRecurrenceEventRequest;
+import com.calio.calendar.controller.dto.UpdateRecurrenceOccurrenceRequest;
 import com.calio.calendar.exception.CalioException;
 import com.calio.calendar.exception.ErrorCode;
 import com.calio.calendar.repository.EventRepository;
+import com.calio.calendar.repository.RecurrenceEventOverrideRepository;
 import com.calio.calendar.repository.RecurrenceEventRepository;
 import com.calio.calendar.repository.entity.Event;
+import com.calio.calendar.repository.entity.RecurrenceEventOverride;
 import com.calio.calendar.repository.entity.RecurrenceEvent;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -17,6 +21,8 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,13 +32,16 @@ public class RecurrenceEventService {
 
     private final RecurrenceEventRepository recurrenceEventRepository;
     private final EventRepository eventRepository;
+    private final RecurrenceEventOverrideRepository recurrenceEventOverrideRepository;
 
     public RecurrenceEventService(
             RecurrenceEventRepository recurrenceEventRepository,
-            EventRepository eventRepository
+            EventRepository eventRepository,
+            RecurrenceEventOverrideRepository recurrenceEventOverrideRepository
     ) {
         this.recurrenceEventRepository = recurrenceEventRepository;
         this.eventRepository = eventRepository;
+        this.recurrenceEventOverrideRepository = recurrenceEventOverrideRepository;
     }
 
     @Transactional
@@ -89,9 +98,47 @@ public class RecurrenceEventService {
         return RecurrenceEventResponse.from(recurrenceEvent);
     }
 
+    @Transactional
+    public EventResponse updateRecurrenceOccurrence(
+            Long recurrenceId,
+            Long eventId,
+            UpdateRecurrenceOccurrenceRequest request
+    ) {
+        findRecurrenceEvent(recurrenceId);
+
+        Event event = eventRepository.findById(eventId)
+                .orElseThrow(() -> new CalioException(ErrorCode.EVENT_NOT_FOUND));
+        validateOccurrenceOwnership(event, recurrenceId);
+        validateProvidedTitle(request.title());
+
+        Instant effectiveStartAt = request.startAt() == null ? event.getStartAt() : request.startAt();
+        Instant effectiveEndAt = request.endAt() == null ? event.getEndAt() : request.endAt();
+        validateEventTimeRange(effectiveStartAt, effectiveEndAt);
+
+        event.updateOccurrence(
+                request.title() == null ? event.getTitle() : request.title(),
+                request.description() == null ? event.getDescription() : request.description(),
+                effectiveStartAt,
+                effectiveEndAt,
+                request.isImportant() == null ? event.importantEvent() : request.isImportant()
+        );
+        createOverrideIfAbsent(eventId);
+        eventRepository.flush();
+
+        return EventResponse.from(event);
+    }
+
     private RecurrenceEvent findRecurrenceEvent(Long recurrenceId) {
         return recurrenceEventRepository.findById(recurrenceId)
                 .orElseThrow(() -> new CalioException(ErrorCode.RECURRENCE_EVENT_NOT_FOUND));
+    }
+
+    private void validateOccurrenceOwnership(Event event, Long recurrenceId) {
+        if (event.getRecurrenceId().filter(recurrenceId::equals).isPresent()) {
+            return;
+        }
+
+        throw new CalioException(ErrorCode.RECURRENCE_OCCURRENCE_NOT_FOUND);
     }
 
     private void validateProvidedTitle(String title) {
@@ -108,6 +155,38 @@ public class RecurrenceEventService {
         }
 
         throw new CalioException(ErrorCode.RECURRENCE_UPDATE_TIME_RANGE_INVALID);
+    }
+
+    private void validateEventTimeRange(Instant startAt, Instant endAt) {
+        if (startAt.isBefore(endAt)) {
+            return;
+        }
+
+        throw new CalioException(ErrorCode.INVALID_TIME_RANGE);
+    }
+
+    private RecurrenceEventOverride createOverrideIfAbsent(Long eventId) {
+        return recurrenceEventOverrideRepository.findByEventId(eventId)
+                .orElseGet(() -> saveOverride(eventId));
+    }
+
+    private RecurrenceEventOverride saveOverride(Long eventId) {
+        try {
+            RecurrenceEventOverride override = recurrenceEventOverrideRepository.save(
+                    new RecurrenceEventOverride(eventId)
+            );
+            recurrenceEventOverrideRepository.flush();
+            return override;
+        } catch (DuplicateKeyException exception) {
+            return findExistingOverride(eventId);
+        } catch (DataIntegrityViolationException exception) {
+            return findExistingOverride(eventId);
+        }
+    }
+
+    private RecurrenceEventOverride findExistingOverride(Long eventId) {
+        return recurrenceEventOverrideRepository.findByEventId(eventId)
+                .orElseThrow(() -> new CalioException(ErrorCode.INTERNAL_SERVER_ERROR));
     }
 
     private void rebuildOccurrenceEvents(RecurrenceEvent recurrenceEvent) {
