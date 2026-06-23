@@ -81,7 +81,8 @@ final class CalendarHomeViewModel: ObservableObject {
         guard state.isNeedInitialize() else { return }
 
         let focusedDate = state.focusedDay.toDate(calendar: calendar)
-        replaceGeneratedDateCells(in: initialGeneratedDateRange(around: focusedDate))
+        let range = initialGeneratedDateRange(around: focusedDate)
+        replaceGeneratedDateCells(from: range.startDate, to: range.endDate)
         prefetchFocusedMonthAndAdjacent(retryFailed: false)
     }
     
@@ -232,12 +233,6 @@ final class CalendarHomeViewModel: ObservableObject {
         )
     }
 
-    private func replaceGeneratedDateCells(
-        in range: (startDate: Date, endDate: Date)
-    ) {
-        replaceGeneratedDateCells(from: range.startDate, to: range.endDate)
-    }
-
     private func refreshGeneratedDateCells() {
         replaceGeneratedDateCells(from: state.startDate, to: state.endDate)
     }
@@ -277,7 +272,8 @@ final class CalendarHomeViewModel: ObservableObject {
             return
         }
 
-        replaceGeneratedDateCells(in: initialGeneratedDateRange(around: date))
+        let range = initialGeneratedDateRange(around: date)
+        replaceGeneratedDateCells(from: range.startDate, to: range.endDate)
     }
 
     private func appendGeneratedDateCellsIfNeeded(visibleRange: CalendarVisibleIndexRange) {
