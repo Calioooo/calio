@@ -15,6 +15,8 @@ struct CalendarDayTimelineView: View {
     
     let items: [CalendarDateCellItem]
     let focusedDay: DayKey
+    let eventAreaState: CalendarEventAreaState
+    let onRetryEvents: () -> Void
     
     var body: some View {
         GeometryReader { geometry in
@@ -30,6 +32,11 @@ struct CalendarDayTimelineView: View {
                         alignment: .leading
                     )
                     .padding(.leading, metrics.titleLeadingPadding)
+
+                CalendarEventStatusBannerView(
+                    state: eventAreaState,
+                    onRetry: onRetryEvents
+                )
                 
                 dayHeader(metrics: metrics)
                     .frame(height: metrics.headerHeight, alignment: .top)
@@ -526,7 +533,6 @@ private extension UIView {
         monthText: dateService.monthText(from: date),
         dayText: dateService.dayText(from: date),
         isToday: true,
-        isSelected: true,
         events: [
             Event(
                 id: 1,
@@ -544,6 +550,8 @@ private extension UIView {
     
     CalendarDayTimelineView(
         items: [item],
-        focusedDay: day
+        focusedDay: day,
+        eventAreaState: .idle,
+        onRetryEvents: {}
     )
 }

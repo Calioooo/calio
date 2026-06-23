@@ -13,6 +13,5 @@ struct CalendarDateCellItem: Identifiable {
     let monthText: String
     let dayText: String
     let isToday: Bool
-    let isSelected: Bool
     let events: [Event]
 }

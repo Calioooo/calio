@@ -41,8 +41,10 @@ struct CalioTests {
             items: [],
             focusedDay: DayKey(date: Date()),
             displayMode: .week,
+            eventAreaState: .idle,
             onFocusedDayChanged: { _ in },
             onVisibleRangeChanged: { _ in },
+            onRetryEvents: {},
             onDragEnded: { _ in }
         )
 
@@ -114,22 +116,6 @@ struct CalioTests {
         #expect(state.focused(on: secondDay).focusedDay == secondDay)
     }
     
-    @Test func calendarStateDetectsLoadedRangeEdgesByThreshold() async throws {
-        let calendar = fixedCalendar
-        let baseDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8)))
-        let endDate = try #require(calendar.date(byAdding: .day, value: 10, to: baseDate))
-        let state = CalendarState(
-            startDate: baseDate,
-            endDate: endDate,
-            daysByKey: [:],
-            focusedDay: makeDayKey(dayOffset: 5, from: baseDate, calendar: calendar)
-        )
-        
-        #expect(state.nearLoadedEdge(around: makeDayKey(dayOffset: 1, from: baseDate, calendar: calendar), thresholdDays: 3, calendar: calendar) == .start)
-        #expect(state.nearLoadedEdge(around: makeDayKey(dayOffset: 9, from: baseDate, calendar: calendar), thresholdDays: 3, calendar: calendar) == .end)
-        #expect(state.nearLoadedEdge(around: makeDayKey(dayOffset: 5, from: baseDate, calendar: calendar), thresholdDays: 3, calendar: calendar) == nil)
-    }
-    
     @MainActor
     @Test func scrollingDateViewsReceiveItemsFocusedDayAndCallbacksWithoutViewModel() async throws {
         let calendar = fixedCalendar
@@ -147,14 +133,88 @@ struct CalioTests {
         let eventList = CalendarDateEventView(
             items: items,
             focusedDay: items[0].id,
+            eventAreaState: .idle,
             onFocusedDayChanged: { _ in },
-            onVisibleRangeChanged: { _ in }
+            onVisibleRangeChanged: { _ in },
+            onRetryEvents: {}
         )
         
         #expect(strip.items.count == 2)
         #expect(strip.focusedDay == items[0].id)
         #expect(eventList.items.count == 2)
         #expect(eventList.focusedDay == items[0].id)
+    }
+
+    @MainActor
+    @Test func calendarScrollFocusCoordinatorPreparesFocusedDayBeforeRendering() async throws {
+        let focusedDay = DayKey(year: 2026, month: 6, day: 23)
+        let earlierDay = DayKey(year: 2026, month: 4, day: 23)
+        let coordinator = CalendarScrollFocusCoordinator()
+
+        #expect(!coordinator.canRenderContent(focusedDay: focusedDay, itemIDs: [earlierDay, focusedDay]))
+
+        coordinator.prepareContentPosition(focusedDay: focusedDay, itemIDs: [earlierDay, focusedDay])
+
+        #expect(coordinator.scrollPosition == focusedDay)
+        #expect(coordinator.canRenderContent(focusedDay: focusedDay, itemIDs: [earlierDay, focusedDay]))
+    }
+
+    @MainActor
+    @Test func calendarScrollFocusCoordinatorIgnoresInitialNonFocusedPositionThenNotifiesUserScroll() async throws {
+        let focusedDay = DayKey(year: 2026, month: 6, day: 23)
+        let earlierDay = DayKey(year: 2026, month: 4, day: 23)
+        let nextDay = DayKey(year: 2026, month: 6, day: 24)
+        let coordinator = CalendarScrollFocusCoordinator()
+        var notifiedDays: [DayKey] = []
+
+        coordinator.prepareContentPosition(focusedDay: focusedDay, itemIDs: [earlierDay, focusedDay, nextDay])
+        coordinator.notifyScrollFocusedDayIfNeeded(
+            earlierDay,
+            currentFocusedDay: focusedDay,
+            onFocusedDayChanged: { notifiedDays.append($0) }
+        )
+        coordinator.notifyScrollFocusedDayIfNeeded(
+            focusedDay,
+            currentFocusedDay: focusedDay,
+            onFocusedDayChanged: { notifiedDays.append($0) }
+        )
+        coordinator.notifyScrollFocusedDayIfNeeded(
+            nextDay,
+            currentFocusedDay: focusedDay,
+            onFocusedDayChanged: { notifiedDays.append($0) }
+        )
+
+        #expect(notifiedDays == [nextDay])
+    }
+
+    @MainActor
+    @Test func calendarScrollFocusCoordinatorKeepsContinuousUserScrollAfterFocusChange() async throws {
+        let focusedDay = DayKey(year: 2026, month: 6, day: 23)
+        let nextDay = DayKey(year: 2026, month: 6, day: 24)
+        let followingDay = DayKey(year: 2026, month: 6, day: 25)
+        let itemIDs = [focusedDay, nextDay, followingDay]
+        let coordinator = CalendarScrollFocusCoordinator()
+        var notifiedDays: [DayKey] = []
+
+        coordinator.prepareContentPosition(focusedDay: focusedDay, itemIDs: itemIDs)
+        coordinator.notifyScrollFocusedDayIfNeeded(
+            focusedDay,
+            currentFocusedDay: focusedDay,
+            onFocusedDayChanged: { notifiedDays.append($0) }
+        )
+        coordinator.notifyScrollFocusedDayIfNeeded(
+            nextDay,
+            currentFocusedDay: focusedDay,
+            onFocusedDayChanged: { notifiedDays.append($0) }
+        )
+        coordinator.alignAfterFocusedDayChanged(to: nextDay, itemIDs: itemIDs)
+        coordinator.notifyScrollFocusedDayIfNeeded(
+            followingDay,
+            currentFocusedDay: nextDay,
+            onFocusedDayChanged: { notifiedDays.append($0) }
+        )
+
+        #expect(notifiedDays == [nextDay, followingDay])
     }
 
     @MainActor
@@ -175,43 +235,7 @@ struct CalioTests {
     }
 
     @MainActor
-    @Test func calendarHomeViewModelRequestsPastAndFutureLoadsNearLoadedRangeEdges() async throws {
-        let calendar = fixedCalendar
-        let baseDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8)))
-        let pastRepository = RecordingEventRepository()
-        let pastViewModel = CalendarHomeViewModel(
-            calendar: calendar,
-            dateService: CalendarDateService(calendar: calendar),
-            eventService: EventService(repository: pastRepository),
-            initialState: makeLoadedState(dayOffsets: 0...60, focusedOffset: 30, from: baseDate, calendar: calendar)
-        )
-
-        pastViewModel.loadAdditionalEventsIfNeeded(
-            visibleRange: CalendarVisibleIndexRange(startIndex: 1, endIndex: 7)
-        )
-        let didRequestPastLoad = await pastRepository.waitForRequestCount(1)
-        
-        let futureRepository = RecordingEventRepository()
-        let futureViewModel = CalendarHomeViewModel(
-            calendar: calendar,
-            dateService: CalendarDateService(calendar: calendar),
-            eventService: EventService(repository: futureRepository),
-            initialState: makeLoadedState(dayOffsets: 0...60, focusedOffset: 30, from: baseDate, calendar: calendar)
-        )
-        
-        futureViewModel.loadAdditionalEventsIfNeeded(
-            visibleRange: CalendarVisibleIndexRange(startIndex: 53, endIndex: 59)
-        )
-        let didRequestFutureLoad = await futureRepository.waitForRequestCount(1)
-
-        #expect(didRequestPastLoad)
-        #expect(didRequestFutureLoad)
-        #expect(pastRepository.requestDirections(relativeTo: baseDate, calendar: calendar) == [.past])
-        #expect(futureRepository.requestDirections(relativeTo: baseDate, calendar: calendar) == [.future])
-    }
-    
-    @MainActor
-    @Test func calendarHomeViewModelDoesNotLoadWhenVisibleRangeIsAwayFromLoadedEdges() async throws {
+    @Test func calendarHomeViewModelInitialLoadRequestsFocusedAndAdjacentMonthsOnly() async throws {
         let calendar = fixedCalendar
         let baseDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8)))
         let repository = RecordingEventRepository()
@@ -219,19 +243,22 @@ struct CalioTests {
             calendar: calendar,
             dateService: CalendarDateService(calendar: calendar),
             eventService: EventService(repository: repository),
-            initialState: makeLoadedState(dayOffsets: 0...60, focusedOffset: 30, from: baseDate, calendar: calendar)
+            initialFocusedDate: baseDate
         )
-        
-        viewModel.loadAdditionalEventsIfNeeded(
-            visibleRange: CalendarVisibleIndexRange(startIndex: 25, endIndex: 35)
-        )
-        await Task.yield()
-        
-        #expect(repository.requestCount == 0)
+
+        viewModel.loadInitialIfNeeded()
+        let didRequestInitialMonths = await repository.waitForRequestCount(3)
+
+        #expect(didRequestInitialMonths)
+        #expect(repository.requestMonthKeys(calendar: calendar) == [
+            YearMonthKey(year: 2026, month: 5),
+            YearMonthKey(year: 2026, month: 6),
+            YearMonthKey(year: 2026, month: 7)
+        ])
     }
 
     @MainActor
-    @Test func calendarHomeViewModelPreventsDuplicateSameDirectionLoadsWhileLoading() async throws {
+    @Test func calendarHomeViewModelSelectYearMonthJumpsImmediatelyWithoutIntermediateFetches() async throws {
         let calendar = fixedCalendar
         let baseDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8)))
         let repository = RecordingEventRepository(shouldSuspend: true)
@@ -239,30 +266,54 @@ struct CalioTests {
             calendar: calendar,
             dateService: CalendarDateService(calendar: calendar),
             eventService: EventService(repository: repository),
-            initialState: makeLoadedState(dayOffsets: 0...60, focusedOffset: 30, from: baseDate, calendar: calendar)
+            initialState: makeLoadedState(dayOffsets: 0...10, focusedOffset: 0, from: baseDate, calendar: calendar)
         )
 
-        viewModel.loadAdditionalEventsIfNeeded(
-            visibleRange: CalendarVisibleIndexRange(startIndex: 53, endIndex: 59)
-        )
-        let didRequestInitialLoad = await repository.waitForRequestCount(1)
-        viewModel.loadAdditionalEventsIfNeeded(
-            visibleRange: CalendarVisibleIndexRange(startIndex: 52, endIndex: 58)
-        )
-        await Task.yield()
+        viewModel.selectYearMonth(year: 2036, month: 6)
+        let didRequestTargetMonths = await repository.waitForRequestCount(3)
 
-        #expect(didRequestInitialLoad)
-        #expect(repository.requestCount == 1)
+        #expect(viewModel.state.focusedDay == DayKey(year: 2036, month: 6, day: 8))
+        #expect(didRequestTargetMonths)
+        #expect(repository.requestMonthKeys(calendar: calendar) == [
+            YearMonthKey(year: 2036, month: 5),
+            YearMonthKey(year: 2036, month: 6),
+            YearMonthKey(year: 2036, month: 7)
+        ])
         repository.finishSuspendedRequests()
     }
 
     @MainActor
-    @Test func calendarHomeViewModelKeepsRangeAndFocusWhenAdditionalLoadFails() async throws {
+    @Test func calendarHomeViewModelSelectYearMonthClampsMissingDayToLastDay() async throws {
+        let calendar = fixedCalendar
+        let baseDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 1, day: 31)))
+        let repository = RecordingEventRepository()
+        let viewModel = CalendarHomeViewModel(
+            calendar: calendar,
+            dateService: CalendarDateService(calendar: calendar),
+            eventService: EventService(repository: repository),
+            initialState: makeLoadedState(dayOffsets: 0...10, focusedOffset: 0, from: baseDate, calendar: calendar)
+        )
+
+        viewModel.selectYearMonth(year: 2026, month: 2)
+
+        #expect(viewModel.state.focusedDay == DayKey(year: 2026, month: 2, day: 28))
+    }
+
+    @MainActor
+    @Test func calendarHomeViewModelSuppressesDuplicateLoadingAndLoadedMonthRequests() async throws {
         let calendar = fixedCalendar
         let baseDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8)))
-        let repository = RecordingEventRepository(error: TestEventRepositoryError.failed)
-        let initialState = makeLoadedState(dayOffsets: 0...60, focusedOffset: 30, from: baseDate, calendar: calendar)
-        let focusedDay = makeDayKey(dayOffset: 59, from: baseDate, calendar: calendar)
+        let repository = RecordingEventRepository(shouldSuspend: true)
+        let initialState = makeLoadedState(
+            dayOffsets: 0...10,
+            focusedOffset: 0,
+            from: baseDate,
+            calendar: calendar,
+            monthEventCache: [
+                YearMonthKey(year: 2026, month: 6): .loaded([]),
+                YearMonthKey(year: 2026, month: 7): .loading
+            ]
+        )
         let viewModel = CalendarHomeViewModel(
             calendar: calendar,
             dateService: CalendarDateService(calendar: calendar),
@@ -270,18 +321,38 @@ struct CalioTests {
             initialState: initialState
         )
 
-        viewModel.focusDay(focusedDay)
+        viewModel.retryFocusedMonthEvents()
         viewModel.loadAdditionalEventsIfNeeded(
-            visibleRange: CalendarVisibleIndexRange(startIndex: 53, endIndex: 59)
+            visibleRange: CalendarVisibleIndexRange(startIndex: 0, endIndex: 6)
         )
-        let didRequestFailedLoad = await repository.waitForRequestCount(1)
+        let didRequestMissingAdjacentMonth = await repository.waitForRequestCount(1)
+
+        #expect(didRequestMissingAdjacentMonth)
+        #expect(repository.requestMonthKeys(calendar: calendar) == [
+            YearMonthKey(year: 2026, month: 5)
+        ])
+        repository.finishSuspendedRequests()
+    }
+
+    @MainActor
+    @Test func calendarHomeViewModelKeepsFocusAndExposesRetryStateWhenTargetMonthFails() async throws {
+        let calendar = fixedCalendar
+        let baseDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8)))
+        let repository = RecordingEventRepository(error: EventRepositoryError.network(URLError(.notConnectedToInternet)))
+        let viewModel = CalendarHomeViewModel(
+            calendar: calendar,
+            dateService: CalendarDateService(calendar: calendar),
+            eventService: EventService(repository: repository),
+            initialState: makeLoadedState(dayOffsets: 0...10, focusedOffset: 0, from: baseDate, calendar: calendar)
+        )
+
+        viewModel.selectYearMonth(year: 2036, month: 6)
+        let didRequestTargetMonths = await repository.waitForRequestCount(3)
         await Task.yield()
 
-        #expect(didRequestFailedLoad)
-        #expect(viewModel.state.startDate == initialState.startDate)
-        #expect(viewModel.state.endDate == initialState.endDate)
-        #expect(viewModel.state.daysByKey.count == initialState.daysByKey.count)
-        #expect(viewModel.state.focusedDay == focusedDay)
+        #expect(didRequestTargetMonths)
+        #expect(viewModel.state.focusedDay == DayKey(year: 2036, month: 6, day: 8))
+        #expect(viewModel.focusedEventAreaState == .failed("일정을 불러오지 못했습니다. 네트워크 연결을 확인해 주세요."))
     }
 
     @Test func eventCreationDefaultTimesUseFocusedDayMorningRange() async throws {
@@ -424,7 +495,7 @@ struct CalioTests {
     }
 
     @MainActor
-    @Test func calendarHomeViewModelInsertsCreatedEventInsideLoadedRange() async throws {
+    @Test func calendarHomeViewModelInsertsCreatedEventIntoStartAtMonthCache() async throws {
         let calendar = fixedCalendar
         let baseDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8)))
         let startAt = try #require(calendar.date(byAdding: DateComponents(day: 1, hour: 9), to: baseDate))
@@ -453,7 +524,7 @@ struct CalioTests {
     }
 
     @MainActor
-    @Test func calendarHomeViewModelDoesNotExpandLoadedRangeForCreatedEventOutsideRange() async throws {
+    @Test func calendarHomeViewModelDoesNotTreatCreatedEventInIdleMonthAsLoadedCache() async throws {
         let calendar = fixedCalendar
         let baseDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8)))
         let startAt = try #require(calendar.date(byAdding: DateComponents(day: 5, hour: 9), to: baseDate))
@@ -475,11 +546,50 @@ struct CalioTests {
                 endAt: createdEvent.endAt
             )
         )
+        let monthKey = YearMonthKey(date: createdEvent.startAt, calendar: calendar)
 
         #expect(didCreate)
+        #expect(repository.requests.isEmpty)
         #expect(viewModel.state.startDate == initialState.startDate)
         #expect(viewModel.state.endDate == initialState.endDate)
         #expect(viewModel.state.daysByKey.count == initialState.daysByKey.count)
+        #expect(!viewModel.state.monthEventCache.keys.contains(monthKey))
+    }
+
+    @MainActor
+    @Test func calendarHomeViewModelDoesNotReplaceLoadingMonthCacheWhenCreatedEventArrives() async throws {
+        let calendar = fixedCalendar
+        let baseDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8)))
+        let startAt = try #require(calendar.date(byAdding: DateComponents(day: 1, hour: 9), to: baseDate))
+        let createdEvent = makeEvent(id: 101, title: "로딩 중 생성된 일정", on: startAt)
+        let monthKey = YearMonthKey(date: createdEvent.startAt, calendar: calendar)
+        let repository = RecordingEventRepository(createResponse: makeEventResponse(from: createdEvent))
+        let viewModel = CalendarHomeViewModel(
+            calendar: calendar,
+            dateService: CalendarDateService(calendar: calendar),
+            eventService: EventService(repository: repository),
+            initialState: makeLoadedState(
+                dayOffsets: 0...2,
+                focusedOffset: 0,
+                from: baseDate,
+                calendar: calendar,
+                monthEventCache: [monthKey: .loading]
+            )
+        )
+
+        let didCreate = await viewModel.createEvent(
+            EventCreateInput(
+                title: createdEvent.title,
+                description: createdEvent.description,
+                startAt: createdEvent.startAt,
+                endAt: createdEvent.endAt
+            )
+        )
+
+        #expect(didCreate)
+        #expect(viewModel.state.monthEventCache[monthKey]?.isLoading == true)
+        #expect(viewModel.state.monthEventCache[monthKey]?.loadedEvents.isEmpty == true)
+        #expect(viewModel.state.daysByKey[DayKey(date: createdEvent.startAt, calendar: calendar)]?.events.map(\.id) == [101])
     }
 
     @MainActor
@@ -582,7 +692,6 @@ struct CalioTests {
             monthText: dateService.monthText(from: date),
             dayText: dateService.dayText(from: date),
             isToday: false,
-            isSelected: false,
             events: events
         )
     }
@@ -591,7 +700,8 @@ struct CalioTests {
         dayOffsets: ClosedRange<Int>,
         focusedOffset: Int,
         from baseDate: Date,
-        calendar: Calendar
+        calendar: Calendar,
+        monthEventCache: [YearMonthKey: CalendarMonthEventCacheEntry] = [:]
     ) -> CalendarState {
         let items = dayOffsets.map { offset in
             makeDateCellItem(dayOffset: offset, from: baseDate, calendar: calendar)
@@ -603,7 +713,8 @@ struct CalioTests {
             startDate: startDate,
             endDate: endDate,
             daysByKey: Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) }),
-            focusedDay: makeDayKey(dayOffset: focusedOffset, from: baseDate, calendar: calendar)
+            focusedDay: makeDayKey(dayOffset: focusedOffset, from: baseDate, calendar: calendar),
+            monthEventCache: monthEventCache
         )
     }
     
@@ -664,15 +775,6 @@ struct CalioTests {
         return data
     }
 
-}
-
-private enum TestEventRepositoryError: Error {
-    case failed
-}
-
-private enum RequestedLoadDirection: Equatable {
-    case past
-    case future
 }
 
 private final class RecordingEventRepository: EventRepository {
@@ -800,10 +902,10 @@ private final class RecordingEventRepository: EventRepository {
         }
     }
 
-    func requestDirections(relativeTo baseDate: Date, calendar: Calendar) -> [RequestedLoadDirection] {
+    func requestMonthKeys(calendar: Calendar) -> [YearMonthKey] {
         requests.map { request in
-            request.startDate < baseDate ? .past : .future
-        }
+            YearMonthKey(date: request.startDate, calendar: calendar)
+        }.sorted()
     }
 }
 

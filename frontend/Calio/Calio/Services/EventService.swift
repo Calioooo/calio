@@ -16,9 +16,14 @@ struct EventService {
     }
     
     func fetchEvents(from startDate: Date, to endDate: Date) async throws -> [Event] {
-        let response = try await repository.fetchEvents(from: startDate, to: endDate)
-        
-        return response.map(mapToEvent(_:))
+        do {
+            let response = try await repository.fetchEvents(from: startDate, to: endDate)
+            return response.map(mapToEvent(_:))
+        } catch let error as EventRepositoryError {
+            throw mapToServiceError(error)
+        } catch {
+            throw EventServiceError.unexpected
+        }
     }
 
     func createEvent(_ input: EventCreateInput) async throws -> Event {

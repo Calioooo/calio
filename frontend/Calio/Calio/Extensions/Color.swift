@@ -8,10 +8,6 @@
 import SwiftUI
 
 extension Color {
-    init(eventColor: EventColor) {
-        self.init(hex: eventColor.hex)
-    }
-
     init(hex: String) {
         let sanitizedHex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
 

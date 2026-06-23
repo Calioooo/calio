@@ -35,16 +35,4 @@ struct CalendarDateService {
     func isToday(_ date: Date) -> Bool {
         calendar.isDateInToday(date)
     }
-    
-    func dateByAddingDays(days: Int, to date: Date) -> Date {
-        guard let result = calendar.date(
-            byAdding: .day,
-            value: days,
-            to: date
-        ) else {
-            preconditionFailure("Failed to add days to date: \(date)")
-        }
-
-        return result
-    }
 }

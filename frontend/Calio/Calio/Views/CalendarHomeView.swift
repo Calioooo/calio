@@ -33,8 +33,10 @@ struct CalendarHomeView: View {
                     items: viewModel.loadedDateCellItems,
                     focusedDay: viewModel.state.focusedDay,
                     displayMode: displayMode,
+                    eventAreaState: viewModel.focusedEventAreaState,
                     onFocusedDayChanged: viewModel.focusDay(_:),
                     onVisibleRangeChanged: viewModel.loadAdditionalEventsIfNeeded(visibleRange:),
+                    onRetryEvents: viewModel.retryFocusedMonthEvents,
                     onDragEnded: updateDisplayMode(after:)
                 )
             }
@@ -55,7 +57,10 @@ struct CalendarHomeView: View {
     
     private var calendarTopBar: some View {
         HStack(spacing: 12) {
-            CalendarYearMonthTitleView(focusedDay: viewModel.state.focusedDay)
+            CalendarYearMonthTitleView(
+                focusedDay: viewModel.state.focusedDay,
+                onSelectedYearMonth: viewModel.selectYearMonth(year:month:)
+            )
                 .frame(maxWidth: .infinity, alignment: .leading)
             
             Button(action: startCreatingEvent) {

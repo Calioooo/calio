@@ -16,8 +16,11 @@ struct CalendarWeekTimelineView: View {
     
     let items: [CalendarDateCellItem]
     let focusedDay: DayKey
+    let eventAreaState: CalendarEventAreaState
     let onSelectedDay: (DayKey) -> Void
     let onVisibleRangeChanged: (CalendarVisibleIndexRange) -> Void
+    let onSelectedYearMonth: (Int, Int) -> Void
+    let onRetryEvents: () -> Void
     
     @State private var headerScrollPosition: DayKey?
     @State private var lastVisibleRange: CalendarVisibleIndexRange?
@@ -28,13 +31,21 @@ struct CalendarWeekTimelineView: View {
             let metrics = timelineMetrics(for: geometry.size)
             
             VStack(spacing: 0) {
-                CalendarYearMonthTitleView(focusedDay: focusedDay)
+                CalendarYearMonthTitleView(
+                    focusedDay: focusedDay,
+                    onSelectedYearMonth: onSelectedYearMonth
+                )
                     .frame(
                         width: metrics.totalWidth,
                         height: metrics.monthTitleHeight,
                         alignment: .leading
                     )
                     .padding(.leading, metrics.monthTitleLeadingPadding)
+
+                CalendarEventStatusBannerView(
+                    state: eventAreaState,
+                    onRetry: onRetryEvents
+                )
                 
                 timelineHeader(metrics: metrics)
                     .frame(height: metrics.headerHeight, alignment: .top)
@@ -802,7 +813,6 @@ private extension UIView {
             monthText: dateService.monthText(from: date),
             dayText: dateService.dayText(from: date),
             isToday: offset == 0,
-            isSelected: offset == 0,
             events: events
         )
     }
@@ -810,7 +820,10 @@ private extension UIView {
     CalendarWeekTimelineView(
         items: items,
         focusedDay: items[0].id,
+        eventAreaState: .idle,
         onSelectedDay: { _ in },
-        onVisibleRangeChanged: { _ in }
+        onVisibleRangeChanged: { _ in },
+        onSelectedYearMonth: { _, _ in },
+        onRetryEvents: {}
     )
 }
