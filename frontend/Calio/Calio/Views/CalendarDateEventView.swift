@@ -22,8 +22,8 @@ struct CalendarDateEventView: View {
     
     @State private var scrollPosition: DayKey?
     @State private var isProgrammaticAlignment = false
-    @State private var lastUserRequestedDay: DayKey?
-    @State private var lastReportedDay: DayKey?
+    @State private var lastUserSelectedFocusedDay: DayKey?
+    @State private var lastNotifiedFocusedDay: DayKey?
     @State private var resetProgrammaticAlignmentTask: Task<Void, Never>?
     
     var body: some View {
@@ -96,14 +96,15 @@ struct CalendarDateEventView: View {
     private func updateFocusedDayFromScrollPosition(_ day: DayKey?) {
         guard !isProgrammaticAlignment else { return }
         guard let day else { return }
-        guard day != lastReportedDay else { return }
+        guard lastNotifiedFocusedDay != nil || day == focusedDay else { return }
+        guard day != lastNotifiedFocusedDay else { return }
         
         notifyUserFocusedDayChanged(day)
     }
     
     private func notifyUserFocusedDayChanged(_ day: DayKey) {
-        lastUserRequestedDay = day
-        lastReportedDay = day
+        lastUserSelectedFocusedDay = day
+        lastNotifiedFocusedDay = day
         onFocusedDayChanged(day)
     }
     
@@ -135,8 +136,8 @@ struct CalendarDateEventView: View {
     }
     
     private func alignIfNeeded(to day: DayKey) {
-        if lastUserRequestedDay == day {
-            lastUserRequestedDay = nil
+        if lastUserSelectedFocusedDay == day {
+            lastUserSelectedFocusedDay = nil
             return
         }
         
