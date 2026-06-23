@@ -155,7 +155,7 @@ class RecurrenceEventServiceTest {
     }
 
     @Test
-    @DisplayName("반복 occurrence 수정은 non-null 요청 필드만 Event row에 반영하고 recurrenceId를 보존한다")
+    @DisplayName("반복 일정의 단일 occurrence 수정 시 null이 아닌 필드만 업데이트하고 recurrenceId는 변경하지 않는다")
     void givenPartialFields_whenUpdateRecurrenceOccurrence_thenUpdatesEventAndPreservesRecurrenceId() {
         // given
         RecurrenceEvent recurrenceEvent = recurrenceEvent(
