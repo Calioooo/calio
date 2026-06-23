@@ -2,15 +2,21 @@ package com.calio.calendar.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.calio.calendar.controller.dto.EventResponse;
 import com.calio.calendar.controller.dto.UpdateRecurrenceEventRequest;
+import com.calio.calendar.controller.dto.UpdateRecurrenceOccurrenceRequest;
 import com.calio.calendar.exception.CalioException;
 import com.calio.calendar.exception.ErrorCode;
 import com.calio.calendar.repository.EventRepository;
+import com.calio.calendar.repository.RecurrenceEventOverrideRepository;
 import com.calio.calendar.repository.RecurrenceEventRepository;
 import com.calio.calendar.repository.entity.Event;
+import com.calio.calendar.repository.entity.RecurrenceEventOverride;
 import com.calio.calendar.repository.entity.RecurrenceEvent;
 import com.calio.calendar.repository.entity.RecurrenceFrequency;
 import java.time.Instant;
@@ -25,6 +31,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -35,6 +42,9 @@ class RecurrenceEventServiceTest {
 
     @Mock
     private EventRepository eventRepository;
+
+    @Mock
+    private RecurrenceEventOverrideRepository recurrenceEventOverrideRepository;
 
     @InjectMocks
     private RecurrenceEventService recurrenceEventService;
@@ -142,6 +152,179 @@ class RecurrenceEventServiceTest {
                 .isInstanceOfSatisfying(CalioException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.RECURRENCE_EVENT_NOT_FOUND)
                 );
+    }
+
+    @Test
+    @DisplayName("반복 occurrence 수정은 non-null 요청 필드만 Event row에 반영하고 recurrenceId를 보존한다")
+    void givenPartialFields_whenUpdateRecurrenceOccurrence_thenUpdatesEventAndPreservesRecurrenceId() {
+        // given
+        RecurrenceEvent recurrenceEvent = recurrenceEvent(
+                "Rule",
+                "Rule memo",
+                "2027-02-01",
+                "2027-02-03",
+                RecurrenceFrequency.DAILY
+        );
+        Event event = event("Original occurrence", "2027-02-01T09:00:00Z", "2027-02-01T10:00:00Z", 1L);
+        ReflectionTestUtils.setField(event, "id", 10L);
+
+        when(recurrenceEventRepository.findById(1L)).thenReturn(Optional.of(recurrenceEvent));
+        when(eventRepository.findById(10L)).thenReturn(Optional.of(event));
+        when(recurrenceEventOverrideRepository.findByEventId(10L)).thenReturn(Optional.empty());
+        when(recurrenceEventOverrideRepository.save(any(RecurrenceEventOverride.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        UpdateRecurrenceOccurrenceRequest request = new UpdateRecurrenceOccurrenceRequest(
+                "Updated occurrence",
+                null,
+                Instant.parse("2027-02-01T09:30:00Z"),
+                null,
+                true
+        );
+
+        // when
+        EventResponse response = recurrenceEventService.updateRecurrenceOccurrence(1L, 10L, request);
+
+        // then
+        assertThat(response.title()).isEqualTo("Updated occurrence");
+        assertThat(response.description()).isNull();
+        assertThat(response.startAt()).isEqualTo(Instant.parse("2027-02-01T09:30:00Z"));
+        assertThat(response.endAt()).isEqualTo(Instant.parse("2027-02-01T10:00:00Z"));
+        assertThat(response.importantEvent()).isTrue();
+        assertThat(response.recurrenceId()).isEqualTo(1L);
+        assertThat(event.getRecurrenceId()).contains(1L);
+    }
+
+    @Test
+    @DisplayName("반복 occurrence 수정은 eventId가 path recurrenceId에 속하지 않으면 RECURRENCE_OCCURRENCE_NOT_FOUND를 반환한다")
+    void givenMismatchedRecurrenceId_whenUpdateRecurrenceOccurrence_thenThrowsOccurrenceNotFound() {
+        // given
+        RecurrenceEvent recurrenceEvent = recurrenceEvent(
+                "Rule",
+                null,
+                "2027-03-01",
+                "2027-03-02",
+                RecurrenceFrequency.DAILY
+        );
+        Event event = event("Other occurrence", "2027-03-01T09:00:00Z", "2027-03-01T10:00:00Z", 2L);
+
+        when(recurrenceEventRepository.findById(1L)).thenReturn(Optional.of(recurrenceEvent));
+        when(eventRepository.findById(10L)).thenReturn(Optional.of(event));
+
+        UpdateRecurrenceOccurrenceRequest request = new UpdateRecurrenceOccurrenceRequest(null, null, null, null, null);
+
+        // when, then
+        assertThatThrownBy(() -> recurrenceEventService.updateRecurrenceOccurrence(1L, 10L, request))
+                .isInstanceOfSatisfying(CalioException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.RECURRENCE_OCCURRENCE_NOT_FOUND)
+                );
+    }
+
+    @Test
+    @DisplayName("반복 occurrence 수정은 일반 event이면 RECURRENCE_OCCURRENCE_NOT_FOUND를 반환한다")
+    void givenNormalEvent_whenUpdateRecurrenceOccurrence_thenThrowsOccurrenceNotFound() {
+        // given
+        RecurrenceEvent recurrenceEvent = recurrenceEvent(
+                "Rule",
+                null,
+                "2027-03-11",
+                "2027-03-12",
+                RecurrenceFrequency.DAILY
+        );
+        Event event = event("Normal event", "2027-03-11T09:00:00Z", "2027-03-11T10:00:00Z", null);
+
+        when(recurrenceEventRepository.findById(1L)).thenReturn(Optional.of(recurrenceEvent));
+        when(eventRepository.findById(10L)).thenReturn(Optional.of(event));
+
+        UpdateRecurrenceOccurrenceRequest request = new UpdateRecurrenceOccurrenceRequest(null, null, null, null, null);
+
+        // when, then
+        assertThatThrownBy(() -> recurrenceEventService.updateRecurrenceOccurrence(1L, 10L, request))
+                .isInstanceOfSatisfying(CalioException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.RECURRENCE_OCCURRENCE_NOT_FOUND)
+                );
+    }
+
+    @Test
+    @DisplayName("반복 occurrence 수정은 존재하지 않는 eventId면 EVENT_NOT_FOUND를 반환한다")
+    void givenMissingEventId_whenUpdateRecurrenceOccurrence_thenThrowsEventNotFound() {
+        // given
+        RecurrenceEvent recurrenceEvent = recurrenceEvent(
+                "Rule",
+                null,
+                "2027-04-01",
+                "2027-04-02",
+                RecurrenceFrequency.DAILY
+        );
+        when(recurrenceEventRepository.findById(1L)).thenReturn(Optional.of(recurrenceEvent));
+        when(eventRepository.findById(999L)).thenReturn(Optional.empty());
+
+        UpdateRecurrenceOccurrenceRequest request = new UpdateRecurrenceOccurrenceRequest(null, null, null, null, null);
+
+        // when, then
+        assertThatThrownBy(() -> recurrenceEventService.updateRecurrenceOccurrence(1L, 999L, request))
+                .isInstanceOfSatisfying(CalioException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.EVENT_NOT_FOUND)
+                );
+    }
+
+    @Test
+    @DisplayName("반복 occurrence 수정은 기존 override가 있으면 새 override를 저장하지 않는다")
+    void givenExistingOverride_whenUpdateRecurrenceOccurrence_thenReusesOverride() {
+        // given
+        RecurrenceEvent recurrenceEvent = recurrenceEvent(
+                "Rule",
+                null,
+                "2027-05-01",
+                "2027-05-02",
+                RecurrenceFrequency.DAILY
+        );
+        Event event = event("Occurrence", "2027-05-01T09:00:00Z", "2027-05-01T10:00:00Z", 1L);
+        RecurrenceEventOverride override = new RecurrenceEventOverride(10L);
+
+        when(recurrenceEventRepository.findById(1L)).thenReturn(Optional.of(recurrenceEvent));
+        when(eventRepository.findById(10L)).thenReturn(Optional.of(event));
+        when(recurrenceEventOverrideRepository.findByEventId(10L)).thenReturn(Optional.of(override));
+
+        UpdateRecurrenceOccurrenceRequest request = new UpdateRecurrenceOccurrenceRequest("Updated", null, null, null, null);
+
+        // when
+        recurrenceEventService.updateRecurrenceOccurrence(1L, 10L, request);
+
+        // then
+        verify(recurrenceEventOverrideRepository, never()).save(any(RecurrenceEventOverride.class));
+    }
+
+    @Test
+    @DisplayName("반복 occurrence override 생성 경합은 DuplicateKeyException 이후 기존 override 조회로 흡수한다")
+    void givenDuplicateOverrideRace_whenUpdateRecurrenceOccurrence_thenFindsExistingOverride() {
+        // given
+        RecurrenceEvent recurrenceEvent = recurrenceEvent(
+                "Rule",
+                null,
+                "2027-06-01",
+                "2027-06-02",
+                RecurrenceFrequency.DAILY
+        );
+        Event event = event("Occurrence", "2027-06-01T09:00:00Z", "2027-06-01T10:00:00Z", 1L);
+        RecurrenceEventOverride override = new RecurrenceEventOverride(10L);
+
+        when(recurrenceEventRepository.findById(1L)).thenReturn(Optional.of(recurrenceEvent));
+        when(eventRepository.findById(10L)).thenReturn(Optional.of(event));
+        when(recurrenceEventOverrideRepository.findByEventId(10L))
+                .thenReturn(Optional.empty())
+                .thenReturn(Optional.of(override));
+        when(recurrenceEventOverrideRepository.save(any(RecurrenceEventOverride.class)))
+                .thenThrow(new DuplicateKeyException("duplicate event_id"));
+
+        UpdateRecurrenceOccurrenceRequest request = new UpdateRecurrenceOccurrenceRequest("Updated", null, null, null, null);
+
+        // when
+        recurrenceEventService.updateRecurrenceOccurrence(1L, 10L, request);
+
+        // then
+        verify(recurrenceEventOverrideRepository).save(any(RecurrenceEventOverride.class));
+        assertThat(event.getTitle()).isEqualTo("Updated");
     }
 
     @Test

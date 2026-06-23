@@ -9,6 +9,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.calio.calendar.repository.EventRepository;
+import com.calio.calendar.repository.RecurrenceEventOverrideRepository;
+import com.calio.calendar.repository.RecurrenceEventRepository;
+import com.calio.calendar.repository.entity.RecurrenceEvent;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -39,6 +42,12 @@ class RecurrenceEventControllerTest {
 
     @Autowired
     private EventRepository eventRepository;
+
+    @Autowired
+    private RecurrenceEventRepository recurrenceEventRepository;
+
+    @Autowired
+    private RecurrenceEventOverrideRepository recurrenceEventOverrideRepository;
 
     @Test
     @DisplayName("사용자는 반복 일정을 생성하면 rule과 inclusive 범위의 occurrence 일정을 함께 저장한다")
@@ -501,6 +510,310 @@ class RecurrenceEventControllerTest {
     }
 
     @Test
+    @DisplayName("사용자는 저장된 recurrence occurrence 하나만 수정하고 기존 EventResponse 계약을 받는다")
+    void givenExistingOccurrence_whenPatchRecurrenceOccurrence_thenUpdatesOnlyTargetEventAndCreatesOverride()
+            throws Exception {
+        // given
+        long recurrenceId = createRecurrenceEventWithDescription(
+                "Occurrence update target",
+                "Rule memo",
+                "2026-12-01",
+                "2026-12-02",
+                "DAILY"
+        );
+        RecurrenceEvent originalRule = recurrenceEventRepository.findById(recurrenceId).orElseThrow();
+        JsonNode events = listEvents("2026-12-01T00:00:00Z", "2026-12-03T00:00:00Z");
+        long firstOccurrenceId = events.get(0).get("id").asLong();
+        long secondOccurrenceId = events.get(1).get("id").asLong();
+
+        // when
+        mockMvc.perform(patch(
+                        "/api/recurrence-events/{recurrenceId}/occurrences/{eventId}",
+                        recurrenceId,
+                        firstOccurrenceId
+                )
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Updated occurrence only",
+                                  "description": "Changed occurrence memo",
+                                  "startAt": "2026-12-01T09:30:00Z",
+                                  "endAt": "2026-12-01T10:30:00Z",
+                                  "isImportant": true
+                                }
+                                """))
+                // then
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(firstOccurrenceId))
+                .andExpect(jsonPath("$.title").value("Updated occurrence only"))
+                .andExpect(jsonPath("$.description").value("Changed occurrence memo"))
+                .andExpect(jsonPath("$.startAt").value("2026-12-01T09:30:00Z"))
+                .andExpect(jsonPath("$.endAt").value("2026-12-01T10:30:00Z"))
+                .andExpect(jsonPath("$.importantEvent").value(true))
+                .andExpect(jsonPath("$.recurrenceId").value(recurrenceId))
+                .andExpect(jsonPath("$.isRecurrenceOccurrence").value(true));
+
+        assertThat(recurrenceEventOverrideRepository.existsByEventId(firstOccurrenceId)).isTrue();
+        assertThat(recurrenceEventOverrideRepository.existsByEventId(secondOccurrenceId)).isFalse();
+        assertThat(eventRepository.findById(secondOccurrenceId)).hasValueSatisfying(event -> {
+            assertThat(event.getTitle()).isEqualTo("Occurrence update target");
+            assertThat(event.getDescription()).isEqualTo("Rule memo");
+            assertThat(event.importantEvent()).isFalse();
+        });
+        assertRuleUnchanged(originalRule, recurrenceEventRepository.findById(recurrenceId).orElseThrow());
+    }
+
+    @Test
+    @DisplayName("반복 occurrence 수정에서 null과 omitted 필드는 기존 Event 값을 보존하고 override를 중복 생성하지 않는다")
+    void givenNullAndOmittedFields_whenPatchRecurrenceOccurrence_thenPreservesValuesAndReusesOverride()
+            throws Exception {
+        // given
+        long recurrenceId = createRecurrenceEventWithDescription(
+                "Preserve occurrence",
+                "Keep memo",
+                "2027-01-01",
+                "2027-01-01",
+                "DAILY"
+        );
+        long eventId = listEvents("2027-01-01T00:00:00Z", "2027-01-02T00:00:00Z")
+                .get(0)
+                .get("id")
+                .asLong();
+        long overrideCountBefore = recurrenceEventOverrideRepository.count();
+
+        // when
+        mockMvc.perform(patch(
+                        "/api/recurrence-events/{recurrenceId}/occurrences/{eventId}",
+                        recurrenceId,
+                        eventId
+                )
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": null,
+                                  "description": null,
+                                  "startAt": null,
+                                  "endAt": null,
+                                  "isImportant": null
+                                }
+                                """))
+                // then
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("Preserve occurrence"))
+                .andExpect(jsonPath("$.description").value("Keep memo"))
+                .andExpect(jsonPath("$.startAt").value("2027-01-01T09:00:00Z"))
+                .andExpect(jsonPath("$.endAt").value("2027-01-01T10:00:00Z"))
+                .andExpect(jsonPath("$.importantEvent").value(false));
+
+        mockMvc.perform(patch(
+                        "/api/recurrence-events/{recurrenceId}/occurrences/{eventId}",
+                        recurrenceId,
+                        eventId
+                )
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "isImportant": true
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("Preserve occurrence"))
+                .andExpect(jsonPath("$.description").value("Keep memo"))
+                .andExpect(jsonPath("$.importantEvent").value(true));
+
+        assertThat(recurrenceEventOverrideRepository.count()).isEqualTo(overrideCountBefore + 1);
+        assertThat(recurrenceEventOverrideRepository.findByEventId(eventId)).isPresent();
+    }
+
+    @Test
+    @DisplayName("반복 occurrence 수정은 eventId가 path recurrenceId에 속하지 않으면 RECURRENCE_OCCURRENCE_NOT_FOUND를 받는다")
+    void givenMismatchedOccurrence_whenPatchRecurrenceOccurrence_thenReturnsOccurrenceNotFound()
+            throws Exception {
+        // given
+        long pathRecurrenceId = createRecurrenceEvent(
+                "Path recurrence",
+                "2027-02-01",
+                "2027-02-01",
+                "DAILY"
+        );
+        long otherRecurrenceId = createRecurrenceEvent(
+                "Other recurrence",
+                "2027-02-02",
+                "2027-02-02",
+                "DAILY"
+        );
+        long otherEventId = listEvents("2027-02-02T00:00:00Z", "2027-02-03T00:00:00Z")
+                .get(0)
+                .get("id")
+                .asLong();
+
+        // when
+        mockMvc.perform(patch(
+                        "/api/recurrence-events/{recurrenceId}/occurrences/{eventId}",
+                        pathRecurrenceId,
+                        otherEventId
+                )
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "No ownership"
+                                }
+                                """))
+                // then
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("RECURRENCE_OCCURRENCE_NOT_FOUND"))
+                .andExpect(jsonPath("$.message").value("Recurrence occurrence not found."))
+                .andExpect(jsonPath("$.*", hasSize(2)));
+
+        assertThat(recurrenceEventOverrideRepository.existsByEventId(otherEventId)).isFalse();
+        assertThat(pathRecurrenceId).isNotEqualTo(otherRecurrenceId);
+    }
+
+    @Test
+    @DisplayName("반복 occurrence 수정은 존재하지 않는 recurrenceId면 RECURRENCE_EVENT_NOT_FOUND를 받는다")
+    void givenMissingRecurrenceId_whenPatchRecurrenceOccurrence_thenReturnsRecurrenceEventNotFound()
+            throws Exception {
+        // given
+        long recurrenceId = createRecurrenceEvent(
+                "Existing recurrence",
+                "2027-03-01",
+                "2027-03-01",
+                "DAILY"
+        );
+        long eventId = listEvents("2027-03-01T00:00:00Z", "2027-03-02T00:00:00Z")
+                .get(0)
+                .get("id")
+                .asLong();
+
+        // when
+        mockMvc.perform(patch(
+                        "/api/recurrence-events/{recurrenceId}/occurrences/{eventId}",
+                        999999L,
+                        eventId
+                )
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "No recurrence"
+                                }
+                                """))
+                // then
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("RECURRENCE_EVENT_NOT_FOUND"))
+                .andExpect(jsonPath("$.message").value("Recurrence event not found."))
+                .andExpect(jsonPath("$.*", hasSize(2)));
+
+        assertThat(recurrenceEventOverrideRepository.existsByEventId(eventId)).isFalse();
+        assertThat(recurrenceEventRepository.existsById(recurrenceId)).isTrue();
+    }
+
+    @Test
+    @DisplayName("반복 occurrence 수정은 존재하지 않는 eventId면 EVENT_NOT_FOUND를 받는다")
+    void givenMissingEventId_whenPatchRecurrenceOccurrence_thenReturnsEventNotFound()
+            throws Exception {
+        // given
+        long recurrenceId = createRecurrenceEvent(
+                "Missing event recurrence",
+                "2027-04-01",
+                "2027-04-01",
+                "DAILY"
+        );
+
+        // when
+        mockMvc.perform(patch(
+                        "/api/recurrence-events/{recurrenceId}/occurrences/{eventId}",
+                        recurrenceId,
+                        999999L
+                )
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "No event"
+                                }
+                                """))
+                // then
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("EVENT_NOT_FOUND"))
+                .andExpect(jsonPath("$.message").value("Event not found."))
+                .andExpect(jsonPath("$.*", hasSize(2)));
+    }
+
+    @Test
+    @DisplayName("반복 occurrence 수정은 effective startAt이 endAt보다 빠르지 않으면 INVALID_TIME_RANGE를 받는다")
+    void givenInvalidTimeRange_whenPatchRecurrenceOccurrence_thenReturnsInvalidTimeRange()
+            throws Exception {
+        // given
+        long recurrenceId = createRecurrenceEvent(
+                "Invalid occurrence time",
+                "2027-05-01",
+                "2027-05-01",
+                "DAILY"
+        );
+        long eventId = listEvents("2027-05-01T00:00:00Z", "2027-05-02T00:00:00Z")
+                .get(0)
+                .get("id")
+                .asLong();
+
+        // when
+        mockMvc.perform(patch(
+                        "/api/recurrence-events/{recurrenceId}/occurrences/{eventId}",
+                        recurrenceId,
+                        eventId
+                )
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "startAt": "2027-05-01T10:00:00Z",
+                                  "endAt": "2027-05-01T10:00:00Z"
+                                }
+                                """))
+                // then
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("INVALID_TIME_RANGE"))
+                .andExpect(jsonPath("$.message").value("Invalid time range."))
+                .andExpect(jsonPath("$.*", hasSize(2)));
+
+        assertThat(recurrenceEventOverrideRepository.existsByEventId(eventId)).isFalse();
+    }
+
+    @Test
+    @DisplayName("반복 occurrence 수정은 non-null blank title이면 VALIDATION_FAILED를 받는다")
+    void givenBlankTitle_whenPatchRecurrenceOccurrence_thenReturnsValidationFailed()
+            throws Exception {
+        // given
+        long recurrenceId = createRecurrenceEvent(
+                "Blank title target",
+                "2027-06-01",
+                "2027-06-01",
+                "DAILY"
+        );
+        long eventId = listEvents("2027-06-01T00:00:00Z", "2027-06-02T00:00:00Z")
+                .get(0)
+                .get("id")
+                .asLong();
+
+        // when
+        mockMvc.perform(patch(
+                        "/api/recurrence-events/{recurrenceId}/occurrences/{eventId}",
+                        recurrenceId,
+                        eventId
+                )
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": " "
+                                }
+                                """))
+                // then
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.message").value("Validation failed."))
+                .andExpect(jsonPath("$.*", hasSize(2)));
+
+        assertThat(recurrenceEventOverrideRepository.existsByEventId(eventId)).isFalse();
+    }
+
+    @Test
     @DisplayName("사용자는 일정 범위 조회에서 normal event와 recurrence occurrence event를 함께 startAt 순서로 받는다")
     void givenNormalAndRecurrenceEvents_whenListEvents_thenReturnsMergedStoredEventsSortedByStartAt()
             throws Exception {
@@ -570,11 +883,27 @@ class RecurrenceEventControllerTest {
             String recurrenceEndDate,
             String recurrenceFrequency
     ) throws Exception {
+        return createRecurrenceEventWithDescription(
+                recurrenceTitle,
+                null,
+                recurrenceStartDate,
+                recurrenceEndDate,
+                recurrenceFrequency
+        );
+    }
+
+    private long createRecurrenceEventWithDescription(
+            String recurrenceTitle,
+            String recurrenceDescription,
+            String recurrenceStartDate,
+            String recurrenceEndDate,
+            String recurrenceFrequency
+    ) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/recurrence-events")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(recurrenceRequest(
                                 recurrenceTitle,
-                                null,
+                                recurrenceDescription,
                                 recurrenceStartDate,
                                 recurrenceEndDate,
                                 "09:00:00",
@@ -585,6 +914,17 @@ class RecurrenceEventControllerTest {
                 .andReturn();
 
         return readResponse(result).get("recurrenceId").asLong();
+    }
+
+    private void assertRuleUnchanged(RecurrenceEvent expected, RecurrenceEvent actual) {
+        assertThat(actual.getId()).isEqualTo(expected.getId());
+        assertThat(actual.getRecurrenceTitle()).isEqualTo(expected.getRecurrenceTitle());
+        assertThat(actual.getRecurrenceDescription()).isEqualTo(expected.getRecurrenceDescription());
+        assertThat(actual.getRecurrenceStartDate()).isEqualTo(expected.getRecurrenceStartDate());
+        assertThat(actual.getRecurrenceEndDate()).isEqualTo(expected.getRecurrenceEndDate());
+        assertThat(actual.getRecurrenceStartTime()).isEqualTo(expected.getRecurrenceStartTime());
+        assertThat(actual.getRecurrenceEndTime()).isEqualTo(expected.getRecurrenceEndTime());
+        assertThat(actual.getRecurrenceFrequency()).isEqualTo(expected.getRecurrenceFrequency());
     }
 
     private JsonNode listEvents(String from, String to) throws Exception {

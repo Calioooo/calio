@@ -57,6 +57,17 @@ public class Event extends BaseEntity {
         this.endAt = endAt;
     }
 
+    public void updateOccurrence(
+            String title,
+            String description,
+            Instant startAt,
+            Instant endAt,
+            boolean importantEvent
+    ) {
+        replace(title, description, startAt, endAt);
+        changeImportantEvent(importantEvent);
+    }
+
     public void changeImportantEvent(boolean importantEvent) {
         this.importantEvent = importantEvent;
     }
