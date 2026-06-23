@@ -17,11 +17,10 @@ final class CalendarHomeViewModel: ObservableObject {
     @Published private(set) var state: CalendarState
     @Published private(set) var createState: CalendarEventCreateState = .idle
     
-    private let initialGeneratedPastDays = 90
-    private let initialGeneratedFutureDays = 90
-    private let thresholdDays = 20
-    private let generateFutureDays = 60
-    private let generatePastDays = 60
+    private let initialGeneratedPastMonths = 3
+    private let initialGeneratedFutureMonths = 3
+    private let edgeGenerationThresholdDateCount = 20
+    private let generatedMonthBatchCount = 2
     private let visibleDateCount = 7
     
     private let dateService: CalendarDateService
@@ -82,10 +81,7 @@ final class CalendarHomeViewModel: ObservableObject {
         guard state.isNeedInitialize() else { return }
 
         let focusedDate = state.focusedDay.toDate(calendar: calendar)
-        replaceGeneratedDateCells(
-            from: dateService.dateByAddingDays(days: initialGeneratedPastDays * -1, to: focusedDate),
-            to: dateService.dateByAddingDays(days: initialGeneratedFutureDays, to: focusedDate)
-        )
+        replaceGeneratedDateCells(in: initialGeneratedDateRange(around: focusedDate))
         prefetchFocusedMonthAndAdjacent(retryFailed: false)
     }
     
@@ -236,8 +232,38 @@ final class CalendarHomeViewModel: ObservableObject {
         )
     }
 
+    private func replaceGeneratedDateCells(
+        in range: (startDate: Date, endDate: Date)
+    ) {
+        replaceGeneratedDateCells(from: range.startDate, to: range.endDate)
+    }
+
     private func refreshGeneratedDateCells() {
         replaceGeneratedDateCells(from: state.startDate, to: state.endDate)
+    }
+
+    private func initialGeneratedDateRange(around date: Date) -> (startDate: Date, endDate: Date) {
+        let focusedMonthKey = YearMonthKey(date: date, calendar: calendar)
+        let startKey = focusedMonthKey.addingMonths(
+            initialGeneratedPastMonths * -1,
+            calendar: calendar
+        )
+        let endKey = focusedMonthKey.addingMonths(
+            initialGeneratedFutureMonths,
+            calendar: calendar
+        )
+
+        return monthDateRange(from: startKey, to: endKey)
+    }
+
+    private func monthDateRange(
+        from startKey: YearMonthKey,
+        to endKey: YearMonthKey
+    ) -> (startDate: Date, endDate: Date) {
+        let startRange = startKey.dateRange(calendar: calendar)
+        let endRange = endKey.dateRange(calendar: calendar)
+
+        return (startDate: startRange.from, endDate: endRange.to)
     }
 
     private func ensureGeneratedDateCells(contain day: DayKey) {
@@ -251,18 +277,15 @@ final class CalendarHomeViewModel: ObservableObject {
             return
         }
 
-        replaceGeneratedDateCells(
-            from: dateService.dateByAddingDays(days: initialGeneratedPastDays * -1, to: date),
-            to: dateService.dateByAddingDays(days: initialGeneratedFutureDays, to: date)
-        )
+        replaceGeneratedDateCells(in: initialGeneratedDateRange(around: date))
     }
 
     private func appendGeneratedDateCellsIfNeeded(visibleRange: CalendarVisibleIndexRange) {
-        if visibleRange.startIndex < thresholdDays {
+        if visibleRange.startIndex < edgeGenerationThresholdDateCount {
             appendGeneratedDateCells(at: .start)
         }
 
-        if loadedDateCount - visibleRange.endIndex < thresholdDays {
+        if loadedDateCount - visibleRange.endIndex < edgeGenerationThresholdDateCount {
             appendGeneratedDateCells(at: .end)
         }
     }
@@ -273,11 +296,21 @@ final class CalendarHomeViewModel: ObservableObject {
 
         switch edge {
         case .start:
-            nextStartDate = dateService.dateByAddingDays(days: generatePastDays * -1, to: state.startDate)
-            nextEndDate = dateService.dateByAddingDays(days: -1, to: state.startDate)
+            let startKey = YearMonthKey(date: state.startDate, calendar: calendar)
+                .addingMonths(generatedMonthBatchCount * -1, calendar: calendar)
+            let endKey = YearMonthKey(date: state.startDate, calendar: calendar)
+                .addingMonths(-1, calendar: calendar)
+            let range = monthDateRange(from: startKey, to: endKey)
+            nextStartDate = range.startDate
+            nextEndDate = range.endDate
         case .end:
-            nextStartDate = dateService.dateByAddingDays(days: 1, to: state.endDate)
-            nextEndDate = dateService.dateByAddingDays(days: generateFutureDays, to: state.endDate)
+            let startKey = YearMonthKey(date: state.endDate, calendar: calendar)
+                .addingMonths(1, calendar: calendar)
+            let endKey = YearMonthKey(date: state.endDate, calendar: calendar)
+                .addingMonths(generatedMonthBatchCount, calendar: calendar)
+            let range = monthDateRange(from: startKey, to: endKey)
+            nextStartDate = range.startDate
+            nextEndDate = range.endDate
         }
 
         let nextDaysByKey = makeDateCellItemsByDay(from: nextStartDate, to: nextEndDate)
