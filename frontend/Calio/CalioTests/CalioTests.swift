@@ -452,12 +452,12 @@ struct CalioTests {
     }
 
     @MainActor
-    @Test func calendarHomeViewModelKeepsCreatedEventPartialAndFetchesIdleMonthCache() async throws {
+    @Test func calendarHomeViewModelDoesNotTreatCreatedEventInIdleMonthAsLoadedCache() async throws {
         let calendar = fixedCalendar
         let baseDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8)))
         let startAt = try #require(calendar.date(byAdding: DateComponents(day: 5, hour: 9), to: baseDate))
         let createdEvent = makeEvent(id: 100, title: "범위 밖 일정", on: startAt)
-        let repository = RecordingEventRepository(shouldSuspend: true, createResponse: makeEventResponse(from: createdEvent))
+        let repository = RecordingEventRepository(createResponse: makeEventResponse(from: createdEvent))
         let initialState = makeLoadedState(dayOffsets: 0...2, focusedOffset: 0, from: baseDate, calendar: calendar)
         let viewModel = CalendarHomeViewModel(
             calendar: calendar,
@@ -474,19 +474,14 @@ struct CalioTests {
                 endAt: createdEvent.endAt
             )
         )
-        let didRequestCreatedEventMonth = await repository.waitForRequestCount(1)
         let monthKey = YearMonthKey(date: createdEvent.startAt, calendar: calendar)
 
         #expect(didCreate)
-        #expect(didRequestCreatedEventMonth)
-        #expect(repository.requestMonthKeys(calendar: calendar) == [monthKey])
+        #expect(repository.requests.isEmpty)
         #expect(viewModel.state.startDate == initialState.startDate)
         #expect(viewModel.state.endDate == initialState.endDate)
         #expect(viewModel.state.daysByKey.count == initialState.daysByKey.count)
-        #expect(viewModel.state.monthEventCache[monthKey]?.isLoading == true)
-        #expect(viewModel.state.monthEventCache[monthKey]?.loadedEvents.map(\.id) == [100])
-
-        repository.finishSuspendedRequests()
+        #expect(!viewModel.state.monthEventCache.keys.contains(monthKey))
     }
 
     @MainActor
@@ -521,7 +516,8 @@ struct CalioTests {
 
         #expect(didCreate)
         #expect(viewModel.state.monthEventCache[monthKey]?.isLoading == true)
-        #expect(viewModel.state.monthEventCache[monthKey]?.loadedEvents.map(\.id) == [101])
+        #expect(viewModel.state.monthEventCache[monthKey]?.loadedEvents.isEmpty == true)
+        #expect(viewModel.state.daysByKey[DayKey(date: createdEvent.startAt, calendar: calendar)]?.events.map(\.id) == [101])
     }
 
     @MainActor

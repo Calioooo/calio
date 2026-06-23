@@ -26,6 +26,7 @@ final class CalendarHomeViewModel: ObservableObject {
     private let eventService: EventService
     private let calendar: Calendar
     private var lastVisibleMonthKeys: Set<YearMonthKey> = []
+    private var pendingCreatedEventsByMonth: [YearMonthKey: [Event]] = [:]
     
     init(
         calendar: Calendar = .current,
@@ -187,8 +188,9 @@ final class CalendarHomeViewModel: ObservableObject {
         Task {
             do {
                 let events = try await eventService.fetchEvents(from: range.from, to: range.to)
+                let pendingEvents = self.pendingCreatedEventsByMonth.removeValue(forKey: key) ?? []
                 self.setMonthCacheEntry(
-                    .loaded(self.mergedSortedEvents(events, with: self.state.monthEventCache[key]?.loadedEvents ?? [])),
+                    .loaded(self.mergedSortedEvents(events, with: pendingEvents)),
                     for: key
                 )
             } catch let error as EventServiceError {
@@ -326,28 +328,19 @@ final class CalendarHomeViewModel: ObservableObject {
                 return
             }
 
-            setMonthCacheEntry(loadingMonthCacheEntry(for: key), for: key)
+            setMonthCacheEntry(.loading, for: key)
             fetchMonth(key)
         }
     }
 
     private func shouldFetchMonth(_ key: YearMonthKey, retryFailed: Bool) -> Bool {
         switch state.monthEventCache[key] ?? .idle {
-        case .idle, .partial(_):
+        case .idle:
             return true
-        case .failed(_), .failedPartial(_, _):
+        case .failed:
             return retryFailed
-        case .loading, .loadingPartial(_), .loaded(_):
+        case .loading, .loaded:
             return false
-        }
-    }
-
-    private func loadingMonthCacheEntry(for key: YearMonthKey) -> CalendarMonthEventCacheEntry {
-        switch state.monthEventCache[key] ?? .idle {
-        case .partial(let events), .failedPartial(let events, _):
-            return .loadingPartial(events)
-        case .idle, .loading, .loadingPartial(_), .loaded(_), .failed(_):
-            return .loading
         }
     }
 
@@ -373,18 +366,18 @@ final class CalendarHomeViewModel: ObservableObject {
         _ failure: CalendarMonthEventFailure,
         for key: YearMonthKey
     ) {
-        switch state.monthEventCache[key] {
-        case .loading:
-            setMonthCacheEntry(.failed(failure), for: key)
-        case .loadingPartial(let events):
-            setMonthCacheEntry(.failedPartial(events, failure), for: key)
-        case .idle, .partial(_), .loaded(_), .failed(_), .failedPartial(_, _), nil:
+        guard state.monthEventCache[key]?.isLoading == true else {
             return
         }
+
+        setMonthCacheEntry(.failed(failure), for: key)
     }
 
     private func cachedEvents(in dateRange: ClosedRange<Date>) -> [Event] {
-        state.monthEventCache.values.flatMap(\.loadedEvents).filter { event in
+        let cachedEvents = state.monthEventCache.values.flatMap(\.loadedEvents)
+        let pendingEvents = pendingCreatedEventsByMonth.values.flatMap { $0 }
+
+        return mergedSortedEvents(cachedEvents, with: pendingEvents).filter { event in
             dateRange.contains(event.startAt)
         }
     }
@@ -441,19 +434,14 @@ final class CalendarHomeViewModel: ObservableObject {
         switch state.monthEventCache[key] ?? .idle {
         case .loaded(let events):
             setMonthCacheEntry(.loaded(mergedSortedEvents(events, with: [event])), for: key)
-        case .partial(let events):
-            setMonthCacheEntry(.partial(mergedSortedEvents(events, with: [event])), for: key)
-        case .idle:
-            setMonthCacheEntry(.partial([event]), for: key)
-            requestMonths([key], retryFailed: false)
         case .loading:
-            setMonthCacheEntry(.loadingPartial([event]), for: key)
-        case .loadingPartial(let events):
-            setMonthCacheEntry(.loadingPartial(mergedSortedEvents(events, with: [event])), for: key)
-        case .failed(let failure):
-            setMonthCacheEntry(.failedPartial([event], failure), for: key)
-        case .failedPartial(let events, let failure):
-            setMonthCacheEntry(.failedPartial(mergedSortedEvents(events, with: [event]), failure), for: key)
+            pendingCreatedEventsByMonth[key] = mergedSortedEvents(
+                pendingCreatedEventsByMonth[key] ?? [],
+                with: [event]
+            )
+            refreshGeneratedDateCells()
+        case .idle, .failed:
+            refreshGeneratedDateCells()
         }
     }
 
