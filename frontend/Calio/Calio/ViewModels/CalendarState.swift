@@ -78,31 +78,37 @@ struct YearMonthKey: Hashable, Comparable {
 enum CalendarMonthEventCacheEntry {
     case idle
     case loading
+    case loadingPartial([Event])
+    case partial([Event])
     case loaded([Event])
     case failed(CalendarMonthEventFailure)
+    case failedPartial([Event], CalendarMonthEventFailure)
 
     var loadedEvents: [Event] {
-        guard case .loaded(let events) = self else {
+        switch self {
+        case .loadingPartial(let events), .partial(let events), .loaded(let events), .failedPartial(let events, _):
+            return events
+        case .idle, .loading, .failed(_):
             return []
         }
-
-        return events
     }
 
     var isLoading: Bool {
-        guard case .loading = self else {
+        switch self {
+        case .loading, .loadingPartial(_):
+            return true
+        case .idle, .partial(_), .loaded(_), .failed(_), .failedPartial(_, _):
             return false
         }
-
-        return true
     }
 
     var failure: CalendarMonthEventFailure? {
-        guard case .failed(let failure) = self else {
+        switch self {
+        case .failed(let failure), .failedPartial(_, let failure):
+            return failure
+        case .idle, .loading, .loadingPartial(_), .partial(_), .loaded(_):
             return nil
         }
-
-        return failure
     }
 }
 

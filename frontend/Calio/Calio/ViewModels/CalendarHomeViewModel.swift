@@ -187,7 +187,10 @@ final class CalendarHomeViewModel: ObservableObject {
         Task {
             do {
                 let events = try await eventService.fetchEvents(from: range.from, to: range.to)
-                self.setMonthCacheEntry(.loaded(sortedEvents(events)), for: key)
+                self.setMonthCacheEntry(
+                    .loaded(self.mergedSortedEvents(events, with: self.state.monthEventCache[key]?.loadedEvents ?? [])),
+                    for: key
+                )
             } catch let error as EventServiceError {
                 self.setFailedMonthCacheEntry(CalendarMonthEventFailure(error: error), for: key)
             } catch {
@@ -323,19 +326,28 @@ final class CalendarHomeViewModel: ObservableObject {
                 return
             }
 
-            setMonthCacheEntry(.loading, for: key)
+            setMonthCacheEntry(loadingMonthCacheEntry(for: key), for: key)
             fetchMonth(key)
         }
     }
 
     private func shouldFetchMonth(_ key: YearMonthKey, retryFailed: Bool) -> Bool {
         switch state.monthEventCache[key] ?? .idle {
-        case .idle:
+        case .idle, .partial(_):
             return true
-        case .failed:
+        case .failed(_), .failedPartial(_, _):
             return retryFailed
-        case .loading, .loaded:
+        case .loading, .loadingPartial(_), .loaded(_):
             return false
+        }
+    }
+
+    private func loadingMonthCacheEntry(for key: YearMonthKey) -> CalendarMonthEventCacheEntry {
+        switch state.monthEventCache[key] ?? .idle {
+        case .partial(let events), .failedPartial(let events, _):
+            return .loadingPartial(events)
+        case .idle, .loading, .loadingPartial(_), .loaded(_), .failed(_):
+            return .loading
         }
     }
 
@@ -361,11 +373,14 @@ final class CalendarHomeViewModel: ObservableObject {
         _ failure: CalendarMonthEventFailure,
         for key: YearMonthKey
     ) {
-        guard state.monthEventCache[key]?.isLoading == true else {
+        switch state.monthEventCache[key] {
+        case .loading:
+            setMonthCacheEntry(.failed(failure), for: key)
+        case .loadingPartial(let events):
+            setMonthCacheEntry(.failedPartial(events, failure), for: key)
+        case .idle, .partial(_), .loaded(_), .failed(_), .failedPartial(_, _), nil:
             return
         }
-
-        setMonthCacheEntry(.failed(failure), for: key)
     }
 
     private func cachedEvents(in dateRange: ClosedRange<Date>) -> [Event] {
@@ -425,12 +440,35 @@ final class CalendarHomeViewModel: ObservableObject {
 
         switch state.monthEventCache[key] ?? .idle {
         case .loaded(let events):
-            setMonthCacheEntry(.loaded(sortedEvents(events + [event])), for: key)
+            setMonthCacheEntry(.loaded(mergedSortedEvents(events, with: [event])), for: key)
+        case .partial(let events):
+            setMonthCacheEntry(.partial(mergedSortedEvents(events, with: [event])), for: key)
         case .idle:
-            setMonthCacheEntry(.loaded([event]), for: key)
-        case .loading, .failed:
-            refreshGeneratedDateCells()
+            setMonthCacheEntry(.partial([event]), for: key)
+            requestMonths([key], retryFailed: false)
+        case .loading:
+            setMonthCacheEntry(.loadingPartial([event]), for: key)
+        case .loadingPartial(let events):
+            setMonthCacheEntry(.loadingPartial(mergedSortedEvents(events, with: [event])), for: key)
+        case .failed(let failure):
+            setMonthCacheEntry(.failedPartial([event], failure), for: key)
+        case .failedPartial(let events, let failure):
+            setMonthCacheEntry(.failedPartial(mergedSortedEvents(events, with: [event]), failure), for: key)
         }
+    }
+
+    private func mergedSortedEvents(_ events: [Event], with additionalEvents: [Event]) -> [Event] {
+        var eventsByID: [Int64: Event] = [:]
+
+        events.forEach { event in
+            eventsByID[event.id] = event
+        }
+
+        additionalEvents.forEach { event in
+            eventsByID[event.id] = event
+        }
+
+        return sortedEvents(Array(eventsByID.values))
     }
 
     private func sortedEvents(_ events: [Event]) -> [Event] {
