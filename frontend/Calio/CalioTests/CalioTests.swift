@@ -499,6 +499,40 @@ struct CalioTests {
     }
 
     @MainActor
+    @Test func calendarHomeViewModelDoesNotReplaceLoadingMonthCacheWhenCreatedEventArrives() async throws {
+        let calendar = fixedCalendar
+        let baseDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8)))
+        let startAt = try #require(calendar.date(byAdding: DateComponents(day: 1, hour: 9), to: baseDate))
+        let createdEvent = makeEvent(id: 101, title: "로딩 중 생성된 일정", on: startAt)
+        let monthKey = YearMonthKey(date: createdEvent.startAt, calendar: calendar)
+        let repository = RecordingEventRepository(createResponse: makeEventResponse(from: createdEvent))
+        let viewModel = CalendarHomeViewModel(
+            calendar: calendar,
+            dateService: CalendarDateService(calendar: calendar),
+            eventService: EventService(repository: repository),
+            initialState: makeLoadedState(
+                dayOffsets: 0...2,
+                focusedOffset: 0,
+                from: baseDate,
+                calendar: calendar,
+                monthEventCache: [monthKey: .loading]
+            )
+        )
+
+        let didCreate = await viewModel.createEvent(
+            EventCreateInput(
+                title: createdEvent.title,
+                description: createdEvent.description,
+                startAt: createdEvent.startAt,
+                endAt: createdEvent.endAt
+            )
+        )
+
+        #expect(didCreate)
+        #expect(viewModel.state.monthEventCache[monthKey]?.isLoading == true)
+    }
+
+    @MainActor
     @Test func calendarHomeViewModelKeepsFailureStateAndMapsBackendCreateError() async throws {
         let calendar = fixedCalendar
         let baseDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8)))

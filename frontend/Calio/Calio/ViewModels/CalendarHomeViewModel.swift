@@ -445,8 +445,15 @@ final class CalendarHomeViewModel: ObservableObject {
 
     private func insertCreatedEventIntoMonthCache(_ event: Event) {
         let key = YearMonthKey(date: event.startAt, calendar: calendar)
-        let currentEvents = state.monthEventCache[key]?.loadedEvents ?? []
-        setMonthCacheEntry(.loaded(sortedEvents(currentEvents + [event])), for: key)
+
+        switch state.monthEventCache[key] ?? .idle {
+        case .loaded(let events):
+            setMonthCacheEntry(.loaded(sortedEvents(events + [event])), for: key)
+        case .idle:
+            setMonthCacheEntry(.loaded([event]), for: key)
+        case .loading, .failed:
+            refreshGeneratedDateCells()
+        }
     }
 
     private func sortedEvents(_ events: [Event]) -> [Event] {
