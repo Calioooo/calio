@@ -533,7 +533,6 @@ private extension UIView {
         monthText: dateService.monthText(from: date),
         dayText: dateService.dayText(from: date),
         isToday: true,
-        isSelected: true,
         events: [
             Event(
                 id: 1,

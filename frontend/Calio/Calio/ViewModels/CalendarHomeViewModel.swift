@@ -21,7 +21,6 @@ final class CalendarHomeViewModel: ObservableObject {
     private let initialGeneratedFutureMonths = 3
     private let edgeGenerationThresholdDateCount = 20
     private let generatedMonthBatchCount = 2
-    private let visibleDateCount = 7
     
     private let dateService: CalendarDateService
     private let eventService: EventService
@@ -47,13 +46,6 @@ final class CalendarHomeViewModel: ObservableObject {
         )
     }
     
-    var visibleDateCellItems: [CalendarDateCellItem] {
-        state.visibleDateCellItems(
-            count: visibleDateCount,
-            calendar: calendar
-        )
-    }
-
     var loadedDateCellItems: [CalendarDateCellItem] {
         state.loadedDateCellItems(calendar: calendar)
     }
@@ -182,7 +174,6 @@ final class CalendarHomeViewModel: ObservableObject {
                         monthText: dateService.monthText(from: date),
                         dayText: dateService.dayText(from: date),
                         isToday: dateService.isToday(date),
-                        isSelected: false,
                         events: eventsByDay[day] ?? []
                     )
                 )
@@ -209,20 +200,6 @@ final class CalendarHomeViewModel: ObservableObject {
         Dictionary(grouping: events) { event in
             DayKey(date: event.startAt, calendar: calendar)
         }
-    }
-
-    private func makeDateCellItem(for day: DayKey) -> CalendarDateCellItem {
-        let date = day.toDate(calendar: calendar)
-
-        return CalendarDateCellItem(
-            id: day,
-            weekday: dateService.getWeekday(from: date),
-            monthText: dateService.monthText(from: date),
-            dayText: dateService.dayText(from: date),
-            isToday: dateService.isToday(date),
-            isSelected: false,
-            events: []
-        )
     }
 
     private func replaceGeneratedDateCells(from startDate: Date, to endDate: Date) {

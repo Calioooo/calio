@@ -116,22 +116,6 @@ struct CalioTests {
         #expect(state.focused(on: secondDay).focusedDay == secondDay)
     }
     
-    @Test func calendarStateDetectsLoadedRangeEdgesByThreshold() async throws {
-        let calendar = fixedCalendar
-        let baseDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8)))
-        let endDate = try #require(calendar.date(byAdding: .day, value: 10, to: baseDate))
-        let state = CalendarState(
-            startDate: baseDate,
-            endDate: endDate,
-            daysByKey: [:],
-            focusedDay: makeDayKey(dayOffset: 5, from: baseDate, calendar: calendar)
-        )
-        
-        #expect(state.nearLoadedEdge(around: makeDayKey(dayOffset: 1, from: baseDate, calendar: calendar), thresholdDays: 3, calendar: calendar) == .start)
-        #expect(state.nearLoadedEdge(around: makeDayKey(dayOffset: 9, from: baseDate, calendar: calendar), thresholdDays: 3, calendar: calendar) == .end)
-        #expect(state.nearLoadedEdge(around: makeDayKey(dayOffset: 5, from: baseDate, calendar: calendar), thresholdDays: 3, calendar: calendar) == nil)
-    }
-    
     @MainActor
     @Test func scrollingDateViewsReceiveItemsFocusedDayAndCallbacksWithoutViewModel() async throws {
         let calendar = fixedCalendar
@@ -632,7 +616,6 @@ struct CalioTests {
             monthText: dateService.monthText(from: date),
             dayText: dateService.dayText(from: date),
             isToday: false,
-            isSelected: false,
             events: events
         )
     }

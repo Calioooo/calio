@@ -185,7 +185,6 @@ struct CalendarDateStripView: View {
             monthText: dateService.monthText(from: date),
             dayText: dateService.dayText(from: date),
             isToday: calendar.isDateInToday(date),
-            isSelected: offset == 0,
             events: events
         )
     }

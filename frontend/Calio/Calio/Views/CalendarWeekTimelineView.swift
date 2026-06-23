@@ -813,7 +813,6 @@ private extension UIView {
             monthText: dateService.monthText(from: date),
             dayText: dateService.dayText(from: date),
             isToday: offset == 0,
-            isSelected: offset == 0,
             events: events
         )
     }

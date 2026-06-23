@@ -97,14 +97,6 @@ enum CalendarMonthEventCacheEntry {
         return true
     }
 
-    var isLoaded: Bool {
-        guard case .loaded = self else {
-            return false
-        }
-
-        return true
-    }
-
     var failure: CalendarMonthEventFailure? {
         guard case .failed(let failure) = self else {
             return nil
@@ -183,39 +175,6 @@ struct CalendarState {
         return daysByKey.isEmpty && monthEventCache.isEmpty
     }
     
-    func nearLoadedEdge(
-        around day: DayKey,
-        thresholdDays: Int,
-        calendar: Calendar
-    ) -> LoadedEdge? {
-        let date = day.toDate(calendar: calendar)
-        let normalizedStartDate = calendar.startOfDay(for: startDate)
-        let normalizedEndDate = calendar.startOfDay(for: endDate)
-        let normalizedDate = calendar.startOfDay(for: date)
-        
-        let distanceFromStart = calendar.dateComponents(
-            [.day],
-            from: normalizedStartDate,
-            to: normalizedDate
-        ).day ?? 0
-        
-        let distanceToEnd = calendar.dateComponents(
-            [.day],
-            from: normalizedDate,
-            to: normalizedEndDate
-        ).day ?? 0
-        
-        if distanceFromStart < thresholdDays {
-            return .start
-        }
-        
-        if distanceToEnd < thresholdDays {
-            return .end
-        }
-        
-        return nil
-    }
-    
     func appended(
         startDate newStartDate: Date,
         endDate newEndDate: Date,
@@ -258,23 +217,6 @@ struct CalendarState {
         )
     }
     
-    func visibleDateCellItems(
-        count: Int,
-        calendar: Calendar
-    ) -> [CalendarDateCellItem] {
-        let focusedDate = focusedDay.toDate(calendar: calendar)
-        let startDate = calendar.startOfDay(for: focusedDate)
-
-        return sequence(first: startDate) { currentDate in
-            calendar.date(byAdding: .day, value: 1, to: currentDate)
-        }
-        .prefix(count)
-        .compactMap { date in
-            let day = DayKey(date: date, calendar: calendar)
-            return daysByKey[day]
-        }
-    }
-
     func loadedDateCellItems(calendar: Calendar) -> [CalendarDateCellItem] {
         daysByKey.values.sorted { earlierCandidate, laterCandidate in
             earlierCandidate.id.toDate(calendar: calendar) < laterCandidate.id.toDate(calendar: calendar)
