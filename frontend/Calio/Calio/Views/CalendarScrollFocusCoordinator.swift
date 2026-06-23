@@ -15,7 +15,7 @@ final class CalendarScrollFocusCoordinator: ObservableObject {
     private let programmaticAlignmentDelay: UInt64 = 300_000_000
     private var hasPreparedContentPosition = false
     private var programmaticTarget: DayKey?
-    private var lastUserSelectedFocusedDay: DayKey?
+    private var lastLocallyRequestedFocusedDay: DayKey?
     private var lastSyncedFocusedDay: DayKey?
     private var resetProgrammaticAlignmentTask: Task<Void, Never>?
 
@@ -41,8 +41,8 @@ final class CalendarScrollFocusCoordinator: ObservableObject {
         to day: DayKey,
         itemIDs: [DayKey]
     ) {
-        if lastUserSelectedFocusedDay == day {
-            lastUserSelectedFocusedDay = nil
+        if lastLocallyRequestedFocusedDay == day {
+            lastLocallyRequestedFocusedDay = nil
             return
         }
 
@@ -60,7 +60,7 @@ final class CalendarScrollFocusCoordinator: ObservableObject {
         _ day: DayKey,
         onFocusedDayChanged: (DayKey) -> Void
     ) {
-        lastUserSelectedFocusedDay = day
+        lastLocallyRequestedFocusedDay = day
         notifyFocusedDay(day, onFocusedDayChanged: onFocusedDayChanged)
     }
 
@@ -78,6 +78,7 @@ final class CalendarScrollFocusCoordinator: ObservableObject {
         guard lastSyncedFocusedDay != nil || day == currentFocusedDay else { return }
         guard day != lastSyncedFocusedDay else { return }
 
+        lastLocallyRequestedFocusedDay = day
         notifyFocusedDay(day, onFocusedDayChanged: onFocusedDayChanged)
     }
 
@@ -94,6 +95,7 @@ final class CalendarScrollFocusCoordinator: ObservableObject {
         guard itemIDs.contains(day) else { return }
 
         programmaticTarget = day
+        lastSyncedFocusedDay = day
         scrollPosition = day
         scheduleProgrammaticAlignmentReset(for: day)
     }

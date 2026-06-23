@@ -188,6 +188,36 @@ struct CalioTests {
     }
 
     @MainActor
+    @Test func calendarScrollFocusCoordinatorKeepsContinuousUserScrollAfterFocusChange() async throws {
+        let focusedDay = DayKey(year: 2026, month: 6, day: 23)
+        let nextDay = DayKey(year: 2026, month: 6, day: 24)
+        let followingDay = DayKey(year: 2026, month: 6, day: 25)
+        let itemIDs = [focusedDay, nextDay, followingDay]
+        let coordinator = CalendarScrollFocusCoordinator()
+        var notifiedDays: [DayKey] = []
+
+        coordinator.prepareContentPosition(focusedDay: focusedDay, itemIDs: itemIDs)
+        coordinator.notifyScrollFocusedDayIfNeeded(
+            focusedDay,
+            currentFocusedDay: focusedDay,
+            onFocusedDayChanged: { notifiedDays.append($0) }
+        )
+        coordinator.notifyScrollFocusedDayIfNeeded(
+            nextDay,
+            currentFocusedDay: focusedDay,
+            onFocusedDayChanged: { notifiedDays.append($0) }
+        )
+        coordinator.alignAfterFocusedDayChanged(to: nextDay, itemIDs: itemIDs)
+        coordinator.notifyScrollFocusedDayIfNeeded(
+            followingDay,
+            currentFocusedDay: nextDay,
+            onFocusedDayChanged: { notifiedDays.append($0) }
+        )
+
+        #expect(notifiedDays == [nextDay, followingDay])
+    }
+
+    @MainActor
     @Test func calendarHomeViewModelFocusDayUpdatesCanonicalFocusedDay() async throws {
         let calendar = fixedCalendar
         let baseDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8)))
