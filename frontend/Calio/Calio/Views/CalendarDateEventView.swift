@@ -11,7 +11,6 @@ struct CalendarDateEventView: View {
     private let coordinateSpaceName = "calendar_date_event_scroll"
     private let dateRowHeight: CGFloat = 96
     private let rowSpacing: CGFloat = 15
-    private let programmaticAlignmentDelay: UInt64 = 300_000_000
     
     let items: [CalendarDateCellItem]
     let focusedDay: DayKey
@@ -20,11 +19,7 @@ struct CalendarDateEventView: View {
     let onVisibleRangeChanged: (CalendarVisibleIndexRange) -> Void
     let onRetryEvents: () -> Void
     
-    @State private var scrollPosition: DayKey?
-    @State private var isProgrammaticAlignment = false
-    @State private var lastUserSelectedFocusedDay: DayKey?
-    @State private var lastNotifiedFocusedDay: DayKey?
-    @State private var resetProgrammaticAlignmentTask: Task<Void, Never>?
+    @StateObject private var focusCoordinator = CalendarScrollFocusCoordinator()
     
     var body: some View {
         VStack(spacing: 0) {
@@ -34,78 +29,108 @@ struct CalendarDateEventView: View {
             )
 
             GeometryReader { geometry in
-                ScrollView(.vertical) {
-                    LazyVStack(spacing: rowSpacing) {
-                        ForEach(items) { item in
-                            CalendarDateEventCellView(
-                                weekday: item.weekday,
-                                monthText: item.monthText,
-                                dayText: item.dayText,
-                                isToday: item.isToday,
-                                onTap: {
-                                    notifyUserFocusedDayChanged(item.id)
-                                },
-                                events: item.events
-                            )
-                            .frame(height: dateRowHeight)
-                            .clipped()
-                            .id(item.id)
-                            .background(
-                                GeometryReader { proxy in
-                                    Color.clear.preference(
-                                        key: CalendarDateEventRowFramePreferenceKey.self,
-                                        value: [item.id: proxy.frame(in: .named(coordinateSpaceName))]
-                                    )
-                                }
-                            )
-                        }
-                    }
-                    .scrollTargetLayout()
-                    .padding(.horizontal, 16)
-                    .padding(.top, 12)
-                    .padding(.bottom, 24)
-                }
-                .coordinateSpace(name: coordinateSpaceName)
-                .scrollTargetBehavior(.viewAligned)
-                .scrollPosition(id: $scrollPosition, anchor: .top)
-                .onPreferenceChange(CalendarDateEventRowFramePreferenceKey.self) { frames in
-                    notifyVisibleRangeChangedIfNeeded(
-                        frames,
-                        viewportHeight: geometry.size.height
-                    )
-                }
-                .onChange(of: scrollPosition) { _, newDay in
-                    updateFocusedDayFromScrollPosition(newDay)
-                }
-                .onChange(of: focusedDay) { _, newDay in
-                    alignIfNeeded(to: newDay)
-                }
-                .onChange(of: items.map(\.id)) { _, _ in
-                    alignProgrammatically(to: focusedDay)
-                }
-                .onAppear {
-                    alignProgrammatically(to: focusedDay)
-                }
-                .onDisappear {
-                    resetProgrammaticAlignmentTask?.cancel()
+                let itemIDs = items.map(\.id)
+
+                if focusCoordinator.canRenderContent(focusedDay: focusedDay, itemIDs: itemIDs) {
+                    scrollContent(in: geometry, itemIDs: itemIDs)
+                } else {
+                    initialAlignmentPlaceholder(itemIDs: itemIDs)
                 }
             }
         }
     }
-    
-    private func updateFocusedDayFromScrollPosition(_ day: DayKey?) {
-        guard !isProgrammaticAlignment else { return }
-        guard let day else { return }
-        guard lastNotifiedFocusedDay != nil || day == focusedDay else { return }
-        guard day != lastNotifiedFocusedDay else { return }
-        
-        notifyUserFocusedDayChanged(day)
+
+    private func scrollContent(
+        in geometry: GeometryProxy,
+        itemIDs: [DayKey]
+    ) -> some View {
+        ScrollView(.vertical) {
+            LazyVStack(spacing: rowSpacing) {
+                ForEach(items) { item in
+                    CalendarDateEventCellView(
+                        weekday: item.weekday,
+                        monthText: item.monthText,
+                        dayText: item.dayText,
+                        isToday: item.isToday,
+                        onTap: {
+                            focusCoordinator.notifyUserSelectedFocusedDay(
+                                item.id,
+                                onFocusedDayChanged: onFocusedDayChanged
+                            )
+                        },
+                        events: item.events
+                    )
+                    .frame(height: dateRowHeight)
+                    .clipped()
+                    .id(item.id)
+                    .background(
+                        GeometryReader { proxy in
+                            Color.clear.preference(
+                                key: CalendarDateEventRowFramePreferenceKey.self,
+                                value: [item.id: proxy.frame(in: .named(coordinateSpaceName))]
+                            )
+                        }
+                    )
+                }
+            }
+            .scrollTargetLayout()
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+            .padding(.bottom, 24)
+        }
+        .coordinateSpace(name: coordinateSpaceName)
+        .scrollTargetBehavior(.viewAligned)
+        .scrollPosition(id: $focusCoordinator.scrollPosition, anchor: .top)
+        .onPreferenceChange(CalendarDateEventRowFramePreferenceKey.self) { frames in
+            notifyVisibleRangeChangedIfNeeded(
+                frames,
+                viewportHeight: geometry.size.height
+            )
+        }
+        .onChange(of: focusCoordinator.scrollPosition) { _, newDay in
+            focusCoordinator.notifyScrollFocusedDayIfNeeded(
+                newDay,
+                currentFocusedDay: focusedDay,
+                onFocusedDayChanged: onFocusedDayChanged
+            )
+        }
+        .onChange(of: focusedDay) { _, newDay in
+            focusCoordinator.alignAfterFocusedDayChanged(
+                to: newDay,
+                itemIDs: itemIDs
+            )
+        }
+        .onChange(of: itemIDs) { _, newItemIDs in
+            focusCoordinator.alignAfterItemsChanged(
+                focusedDay: focusedDay,
+                itemIDs: newItemIDs
+            )
+        }
+        .onDisappear {
+            focusCoordinator.cancel()
+        }
     }
-    
-    private func notifyUserFocusedDayChanged(_ day: DayKey) {
-        lastUserSelectedFocusedDay = day
-        lastNotifiedFocusedDay = day
-        onFocusedDayChanged(day)
+
+    private func initialAlignmentPlaceholder(itemIDs: [DayKey]) -> some View {
+        Color.clear
+            .onAppear {
+                focusCoordinator.prepareContentPosition(
+                    focusedDay: focusedDay,
+                    itemIDs: itemIDs
+                )
+            }
+            .onChange(of: itemIDs) { _, newItemIDs in
+                focusCoordinator.prepareContentPosition(
+                    focusedDay: focusedDay,
+                    itemIDs: newItemIDs
+                )
+            }
+            .onChange(of: focusedDay) { _, newDay in
+                focusCoordinator.prepareContentPosition(
+                    focusedDay: newDay,
+                    itemIDs: itemIDs
+                )
+            }
     }
     
     private func notifyVisibleRangeChangedIfNeeded(
@@ -135,30 +160,6 @@ struct CalendarDateEventView: View {
         )
     }
     
-    private func alignIfNeeded(to day: DayKey) {
-        if lastUserSelectedFocusedDay == day {
-            lastUserSelectedFocusedDay = nil
-            return
-        }
-        
-        alignProgrammatically(to: day)
-    }
-    
-    private func alignProgrammatically(to day: DayKey) {
-        guard items.contains(where: { $0.id == day }) else { return }
-        
-        isProgrammaticAlignment = true
-        scrollPosition = day
-        resetProgrammaticAlignmentTask?.cancel()
-        resetProgrammaticAlignmentTask = Task {
-            try? await Task.sleep(nanoseconds: programmaticAlignmentDelay)
-            guard !Task.isCancelled else { return }
-            
-            await MainActor.run {
-                isProgrammaticAlignment = false
-            }
-        }
-    }
 }
 
 private struct CalendarDateEventRowFramePreferenceKey: PreferenceKey {

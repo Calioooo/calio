@@ -146,6 +146,48 @@ struct CalioTests {
     }
 
     @MainActor
+    @Test func calendarScrollFocusCoordinatorPreparesFocusedDayBeforeRendering() async throws {
+        let focusedDay = DayKey(year: 2026, month: 6, day: 23)
+        let earlierDay = DayKey(year: 2026, month: 4, day: 23)
+        let coordinator = CalendarScrollFocusCoordinator()
+
+        #expect(!coordinator.canRenderContent(focusedDay: focusedDay, itemIDs: [earlierDay, focusedDay]))
+
+        coordinator.prepareContentPosition(focusedDay: focusedDay, itemIDs: [earlierDay, focusedDay])
+
+        #expect(coordinator.scrollPosition == focusedDay)
+        #expect(coordinator.canRenderContent(focusedDay: focusedDay, itemIDs: [earlierDay, focusedDay]))
+    }
+
+    @MainActor
+    @Test func calendarScrollFocusCoordinatorIgnoresInitialNonFocusedPositionThenNotifiesUserScroll() async throws {
+        let focusedDay = DayKey(year: 2026, month: 6, day: 23)
+        let earlierDay = DayKey(year: 2026, month: 4, day: 23)
+        let nextDay = DayKey(year: 2026, month: 6, day: 24)
+        let coordinator = CalendarScrollFocusCoordinator()
+        var notifiedDays: [DayKey] = []
+
+        coordinator.prepareContentPosition(focusedDay: focusedDay, itemIDs: [earlierDay, focusedDay, nextDay])
+        coordinator.notifyScrollFocusedDayIfNeeded(
+            earlierDay,
+            currentFocusedDay: focusedDay,
+            onFocusedDayChanged: { notifiedDays.append($0) }
+        )
+        coordinator.notifyScrollFocusedDayIfNeeded(
+            focusedDay,
+            currentFocusedDay: focusedDay,
+            onFocusedDayChanged: { notifiedDays.append($0) }
+        )
+        coordinator.notifyScrollFocusedDayIfNeeded(
+            nextDay,
+            currentFocusedDay: focusedDay,
+            onFocusedDayChanged: { notifiedDays.append($0) }
+        )
+
+        #expect(notifiedDays == [nextDay])
+    }
+
+    @MainActor
     @Test func calendarHomeViewModelFocusDayUpdatesCanonicalFocusedDay() async throws {
         let calendar = fixedCalendar
         let baseDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8)))
