@@ -221,7 +221,7 @@ class RecurrenceEventServiceTest {
     }
 
     @Test
-    @DisplayName("반복 occurrence 수정은 일반 event이면 RECURRENCE_OCCURRENCE_NOT_FOUND를 반환한다")
+    @DisplayName("반복 일정의 단일 occurrence 수정에서 occurrence가 아닌 일반 evnet를 수정하려고 하면 RECURRENCE_OCCURRENCE_NOT_FOUND를 반환한다.")
     void givenNormalEvent_whenUpdateRecurrenceOccurrence_thenThrowsOccurrenceNotFound() {
         // given
         RecurrenceEvent recurrenceEvent = recurrenceEvent(
