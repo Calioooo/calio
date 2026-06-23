@@ -22,7 +22,7 @@ public class RecurrenceEventOverride extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long overrideId;
 
-    @Column(name = "event_id", nullable = false, unique = true)
+    @Column(name = "event_id", nullable = false)
     private Long eventId;
 
     protected RecurrenceEventOverride() {
