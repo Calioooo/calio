@@ -270,7 +270,7 @@ class RecurrenceEventServiceTest {
     }
 
     @Test
-    @DisplayName("반복 occurrence 삭제는 대상 Event의 deletedAt만 채우고 override 저장소를 사용하지 않는다")
+    @DisplayName("사용자가 반복 일정의 단일 occurrence를 삭제하면 Event의 deletedAt만 설정되고 Override는 변경되지 않는다")
     void givenExistingOccurrence_whenDeleteRecurrenceOccurrence_thenSoftDeletesEventWithoutOverrideUse() {
         // given
         RecurrenceEvent recurrenceEvent = recurrenceEvent(
