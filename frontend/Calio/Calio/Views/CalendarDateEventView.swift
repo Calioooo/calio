@@ -8,14 +8,15 @@
 import SwiftUI
 
 struct CalendarDateEventView: View {
-    private let coordinateSpaceName = "calendar_date_event_scroll"
     private let dateRowHeight: CGFloat = 96
     private let rowSpacing: CGFloat = 15
+    private let contentTopPadding: CGFloat = 12
+    private let contentBottomPadding: CGFloat = 24
     
     let items: [CalendarDateCellItem]
-    let focusedDay: DayKey
+    let referenceDay: DayKey
     let eventAreaState: CalendarEventAreaState
-    let onFocusedDayChanged: (DayKey) -> Void
+    let onReferenceDayChanged: (DayKey) -> Void
     let onVisibleRangeChanged: (CalendarVisibleIndexRange) -> Void
     let onRetryEvents: () -> Void
     
@@ -28,11 +29,11 @@ struct CalendarDateEventView: View {
                 onRetry: onRetryEvents
             )
 
-            GeometryReader { geometry in
+            GeometryReader { _ in
                 let itemIDs = items.map(\.id)
 
-                if focusCoordinator.canRenderContent(focusedDay: focusedDay, itemIDs: itemIDs) {
-                    scrollContent(in: geometry, itemIDs: itemIDs)
+                if focusCoordinator.canRenderContent(referenceDay: referenceDay, itemIDs: itemIDs) {
+                    scrollContent(itemIDs: itemIDs)
                 } else {
                     initialAlignmentPlaceholder(itemIDs: itemIDs)
                 }
@@ -41,10 +42,9 @@ struct CalendarDateEventView: View {
     }
 
     private func scrollContent(
-        in geometry: GeometryProxy,
         itemIDs: [DayKey]
     ) -> some View {
-        ScrollView(.vertical) {
+        return ScrollView(.vertical) {
             LazyVStack(spacing: rowSpacing) {
                 ForEach(items) { item in
                     CalendarDateEventCellView(
@@ -53,9 +53,9 @@ struct CalendarDateEventView: View {
                         dayText: item.dayText,
                         isToday: item.isToday,
                         onTap: {
-                            focusCoordinator.notifyUserSelectedFocusedDay(
+                            focusCoordinator.notifyUserSelectedReferenceDay(
                                 item.id,
-                                onFocusedDayChanged: onFocusedDayChanged
+                                onReferenceDayChanged: onReferenceDayChanged
                             )
                         },
                         events: item.events
@@ -63,46 +63,31 @@ struct CalendarDateEventView: View {
                     .frame(height: dateRowHeight)
                     .clipped()
                     .id(item.id)
-                    .background(
-                        GeometryReader { proxy in
-                            Color.clear.preference(
-                                key: CalendarDateEventRowFramePreferenceKey.self,
-                                value: [item.id: proxy.frame(in: .named(coordinateSpaceName))]
-                            )
-                        }
-                    )
                 }
             }
             .scrollTargetLayout()
             .padding(.horizontal, 16)
-            .padding(.top, 12)
-            .padding(.bottom, 24)
+            .padding(.top, contentTopPadding)
+            .padding(.bottom, contentBottomPadding)
         }
-        .coordinateSpace(name: coordinateSpaceName)
-        .scrollTargetBehavior(.viewAligned)
         .scrollPosition(id: $focusCoordinator.scrollPosition, anchor: .top)
-        .onPreferenceChange(CalendarDateEventRowFramePreferenceKey.self) { frames in
-            notifyVisibleRangeChangedIfNeeded(
-                frames,
-                viewportHeight: geometry.size.height
-            )
-        }
         .onChange(of: focusCoordinator.scrollPosition) { _, newDay in
-            focusCoordinator.notifyScrollFocusedDayIfNeeded(
+            focusCoordinator.notifyScrollReferenceDayIfNeeded(
                 newDay,
-                currentFocusedDay: focusedDay,
-                onFocusedDayChanged: onFocusedDayChanged
+                currentReferenceDay: referenceDay,
+                onReferenceDayChanged: onReferenceDayChanged
             )
+            notifyVisibleRangeChanged(day: newDay, itemIDs: itemIDs)
         }
-        .onChange(of: focusedDay) { _, newDay in
-            focusCoordinator.alignAfterFocusedDayChanged(
+        .onChange(of: referenceDay) { _, newDay in
+            focusCoordinator.alignAfterReferenceDayChanged(
                 to: newDay,
                 itemIDs: itemIDs
             )
         }
         .onChange(of: itemIDs) { _, newItemIDs in
             focusCoordinator.alignAfterItemsChanged(
-                focusedDay: focusedDay,
+                referenceDay: referenceDay,
                 itemIDs: newItemIDs
             )
         }
@@ -115,60 +100,40 @@ struct CalendarDateEventView: View {
         Color.clear
             .onAppear {
                 focusCoordinator.prepareContentPosition(
-                    focusedDay: focusedDay,
+                    referenceDay: referenceDay,
                     itemIDs: itemIDs
                 )
             }
             .onChange(of: itemIDs) { _, newItemIDs in
                 focusCoordinator.prepareContentPosition(
-                    focusedDay: focusedDay,
+                    referenceDay: referenceDay,
                     itemIDs: newItemIDs
                 )
             }
-            .onChange(of: focusedDay) { _, newDay in
+            .onChange(of: referenceDay) { _, newDay in
                 focusCoordinator.prepareContentPosition(
-                    focusedDay: newDay,
+                    referenceDay: newDay,
                     itemIDs: itemIDs
                 )
             }
     }
     
-    private func notifyVisibleRangeChangedIfNeeded(
-        _ frames: [DayKey: CGRect],
-        viewportHeight: CGFloat
+    private func notifyVisibleRangeChanged(
+        day: DayKey?,
+        itemIDs: [DayKey]
     ) {
-        let visibleIndexes = items.indices.compactMap { index -> Int? in
-            let day = items[index].id
-            guard let frame = frames[day] else { return nil }
-            guard frame.maxY > 0 else { return nil }
-            guard frame.minY < viewportHeight else { return nil }
-            
-            return index
-        }
-        
-        guard let startIndex = visibleIndexes.min(),
-              let endIndex = visibleIndexes.max()
+        guard let day,
+              let index = itemIDs.firstIndex(of: day)
         else {
             return
         }
-        
+
         onVisibleRangeChanged(
             CalendarVisibleIndexRange(
-                startIndex: startIndex,
-                endIndex: endIndex
+                startIndex: index,
+                endIndex: index
             )
         )
-    }
-    
-}
-
-private struct CalendarDateEventRowFramePreferenceKey: PreferenceKey {
-    static var defaultValue: [DayKey: CGRect] = [:]
-    
-    static func reduce(value: inout [DayKey: CGRect], nextValue: () -> [DayKey: CGRect]) {
-        value.merge(nextValue()) { _, next in
-            next
-        }
     }
 }
 
@@ -256,9 +221,9 @@ private struct CalendarDateEventRowFramePreferenceKey: PreferenceKey {
     
     CalendarDateEventView(
         items: items,
-        focusedDay: items[0].id,
+        referenceDay: items[0].id,
         eventAreaState: .idle,
-        onFocusedDayChanged: { _ in },
+        onReferenceDayChanged: { _ in },
         onVisibleRangeChanged: { _ in },
         onRetryEvents: {}
     )

@@ -5,7 +5,6 @@
 //  Created by Codex on 6/23/26.
 //
 
-import Combine
 import Foundation
 
 @MainActor
@@ -15,34 +14,34 @@ final class CalendarScrollFocusCoordinator: ObservableObject {
     private let programmaticAlignmentDelay: UInt64 = 300_000_000
     private var hasPreparedContentPosition = false
     private var programmaticTarget: DayKey?
-    private var lastLocallyRequestedFocusedDay: DayKey?
-    private var lastSyncedFocusedDay: DayKey?
+    private var lastLocallyRequestedReferenceDay: DayKey?
+    private var lastSyncedReferenceDay: DayKey?
     private var resetProgrammaticAlignmentTask: Task<Void, Never>?
 
     func canRenderContent(
-        focusedDay: DayKey,
+        referenceDay: DayKey,
         itemIDs: [DayKey]
     ) -> Bool {
-        hasPreparedContentPosition && itemIDs.contains(focusedDay)
+        hasPreparedContentPosition && itemIDs.contains(referenceDay)
     }
 
     func prepareContentPosition(
-        focusedDay: DayKey,
+        referenceDay: DayKey,
         itemIDs: [DayKey]
     ) {
-        guard itemIDs.contains(focusedDay) else { return }
+        guard itemIDs.contains(referenceDay) else { return }
         guard !hasPreparedContentPosition || scrollPosition.map({ !itemIDs.contains($0) }) == true else { return }
 
         hasPreparedContentPosition = true
-        alignProgrammatically(to: focusedDay, itemIDs: itemIDs)
+        alignProgrammatically(to: referenceDay, itemIDs: itemIDs)
     }
 
-    func alignAfterFocusedDayChanged(
+    func alignAfterReferenceDayChanged(
         to day: DayKey,
         itemIDs: [DayKey]
     ) {
-        if lastLocallyRequestedFocusedDay == day {
-            lastLocallyRequestedFocusedDay = nil
+        if lastLocallyRequestedReferenceDay == day {
+            lastLocallyRequestedReferenceDay = nil
             return
         }
 
@@ -50,24 +49,24 @@ final class CalendarScrollFocusCoordinator: ObservableObject {
     }
 
     func alignAfterItemsChanged(
-        focusedDay: DayKey,
+        referenceDay: DayKey,
         itemIDs: [DayKey]
     ) {
-        alignProgrammatically(to: focusedDay, itemIDs: itemIDs)
+        alignProgrammatically(to: referenceDay, itemIDs: itemIDs)
     }
 
-    func notifyUserSelectedFocusedDay(
+    func notifyUserSelectedReferenceDay(
         _ day: DayKey,
-        onFocusedDayChanged: (DayKey) -> Void
+        onReferenceDayChanged: (DayKey) -> Void
     ) {
-        lastLocallyRequestedFocusedDay = day
-        notifyFocusedDay(day, onFocusedDayChanged: onFocusedDayChanged)
+        lastLocallyRequestedReferenceDay = day
+        notifyReferenceDay(day, onReferenceDayChanged: onReferenceDayChanged)
     }
 
-    func notifyScrollFocusedDayIfNeeded(
+    func notifyScrollReferenceDayIfNeeded(
         _ day: DayKey?,
-        currentFocusedDay: DayKey,
-        onFocusedDayChanged: (DayKey) -> Void
+        currentReferenceDay: DayKey,
+        onReferenceDayChanged: (DayKey) -> Void
     ) {
         if let programmaticTarget {
             clearProgrammaticAlignmentIfReached(programmaticTarget, by: day)
@@ -75,11 +74,11 @@ final class CalendarScrollFocusCoordinator: ObservableObject {
         }
 
         guard let day else { return }
-        guard lastSyncedFocusedDay != nil || day == currentFocusedDay else { return }
-        guard day != lastSyncedFocusedDay else { return }
+        guard lastSyncedReferenceDay != nil || day == currentReferenceDay else { return }
+        guard day != lastSyncedReferenceDay else { return }
 
-        lastLocallyRequestedFocusedDay = day
-        notifyFocusedDay(day, onFocusedDayChanged: onFocusedDayChanged)
+        lastLocallyRequestedReferenceDay = day
+        notifyReferenceDay(day, onReferenceDayChanged: onReferenceDayChanged)
     }
 
     func cancel() {
@@ -95,17 +94,17 @@ final class CalendarScrollFocusCoordinator: ObservableObject {
         guard itemIDs.contains(day) else { return }
 
         programmaticTarget = day
-        lastSyncedFocusedDay = day
+        lastSyncedReferenceDay = day
         scrollPosition = day
         scheduleProgrammaticAlignmentReset(for: day)
     }
 
-    private func notifyFocusedDay(
+    private func notifyReferenceDay(
         _ day: DayKey,
-        onFocusedDayChanged: (DayKey) -> Void
+        onReferenceDayChanged: (DayKey) -> Void
     ) {
-        lastSyncedFocusedDay = day
-        onFocusedDayChanged(day)
+        lastSyncedReferenceDay = day
+        onReferenceDayChanged(day)
     }
 
     private func clearProgrammaticAlignmentIfReached(
@@ -114,7 +113,7 @@ final class CalendarScrollFocusCoordinator: ObservableObject {
     ) {
         guard day == target else { return }
 
-        lastSyncedFocusedDay = target
+        lastSyncedReferenceDay = target
         programmaticTarget = nil
         resetProgrammaticAlignmentTask?.cancel()
         resetProgrammaticAlignmentTask = nil

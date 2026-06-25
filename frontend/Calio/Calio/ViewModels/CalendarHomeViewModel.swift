@@ -15,17 +15,21 @@ struct CalendarVisibleIndexRange: Equatable {
 @MainActor
 final class CalendarHomeViewModel: ObservableObject {
     @Published private(set) var state: CalendarState
+    @Published private(set) var referenceDay: DayKey
     @Published private(set) var createState: CalendarEventCreateState = .idle
     
     private let initialGeneratedPastMonths = 3
     private let initialGeneratedFutureMonths = 3
     private let edgeGenerationThresholdDateCount = 20
     private let generatedMonthBatchCount = 2
+    private let maxGeneratedMonthCount = 18
     
     private let dateService: CalendarDateService
     private let eventService: EventService
     private let calendar: Calendar
     private var lastVisibleMonthKeys: Set<YearMonthKey> = []
+    private var lastHandledVisibleRange: CalendarVisibleIndexRange?
+    private var monthEventCache: [YearMonthKey: CalendarMonthEventCacheEntry]
     private var pendingCreatedEventsByMonth: [YearMonthKey: [Event]] = [:]
     
     init(
@@ -33,31 +37,33 @@ final class CalendarHomeViewModel: ObservableObject {
         dateService: CalendarDateService = CalendarDateService(),
         eventService: EventService = EventService(),
         initialState: CalendarState? = nil,
-        initialFocusedDate: Date = Date()
+        initialReferenceDate: Date = Date()
     ) {
         self.dateService = dateService
         self.calendar = calendar
         self.eventService = eventService
+        self.monthEventCache = initialState?.monthEventCache ?? [:]
+        let referenceDate = initialState?.startDate ?? initialReferenceDate
+        self.referenceDay = DayKey(date: referenceDate, calendar: calendar)
         
         self.state = initialState ?? CalendarState(
-            startDate: initialFocusedDate,
-            endDate: initialFocusedDate,
-            daysByKey: [:],
-            focusedDay: DayKey(date: initialFocusedDate, calendar: calendar)
+            startDate: initialReferenceDate,
+            endDate: initialReferenceDate,
+            daysByKey: [:]
         )
     }
     
     var loadedDateCellItems: [CalendarDateCellItem] {
-        state.loadedDateCellItems(calendar: calendar)
+        return state.loadedDateCellItems(calendar: calendar)
     }
     
     var loadedDateCount: Int {
         state.daysByKey.count
     }
 
-    var focusedEventAreaState: CalendarEventAreaState {
-        let key = YearMonthKey(day: state.focusedDay)
-        let entry = state.monthEventCache[key] ?? .idle
+    var referenceEventAreaState: CalendarEventAreaState {
+        let key = YearMonthKey(day: referenceDay)
+        let entry = monthEventCache[key] ?? .idle
 
         if entry.isLoading {
             return .loading
@@ -71,22 +77,21 @@ final class CalendarHomeViewModel: ObservableObject {
     }
     
     func loadInitialIfNeeded() {
-        guard state.isNeedInitialize() else { return }
+        guard state.daysByKey.isEmpty && monthEventCache.isEmpty else { return }
 
-        let focusedDate = state.focusedDay.toDate(calendar: calendar)
-        let range = initialGeneratedDateRange(around: focusedDate)
+        let referenceDate = referenceDay.toDate(calendar: calendar)
+        let range = initialGeneratedDateRange(around: referenceDate)
         replaceGeneratedDateCells(from: range.startDate, to: range.endDate)
-        prefetchFocusedMonthAndAdjacent(retryFailed: false)
+        prefetchReferenceMonthAndAdjacent(retryFailed: false)
     }
     
-    func focusDay(_ day: DayKey) {
-        guard state.focusedDay != day else {
+    func setReferenceDay(_ day: DayKey) {
+        guard referenceDay != day else {
             return
         }
         
-        state = state.focused(on: day)
+        referenceDay = day
         ensureGeneratedDateCells(contain: day)
-        prefetchFocusedMonthAndAdjacent(retryFailed: true)
     }
     
     func loadAdditionalEventsIfNeeded(visibleRange: CalendarVisibleIndexRange) {
@@ -94,13 +99,19 @@ final class CalendarHomeViewModel: ObservableObject {
             return
         }
 
+        guard lastHandledVisibleRange != visibleRange else {
+            return
+        }
+
+        lastHandledVisibleRange = visibleRange
+
         let visibleItems = loadedItems(in: visibleRange)
         appendGeneratedDateCellsIfNeeded(visibleRange: visibleRange)
         prefetchMonthsForVisibleItemsIfNeeded(visibleItems)
     }
     
     func moveMonth(by value: Int) {
-        let currentDate = state.focusedDay.toDate(calendar: calendar)
+        let currentDate = referenceDay.toDate(calendar: calendar)
 
         guard let movedMonthDate = calendar.date(
             byAdding: .month,
@@ -122,14 +133,14 @@ final class CalendarHomeViewModel: ObservableObject {
     }
 
     func selectYearMonth(year: Int, month: Int) {
-        let targetDay = makeTargetDayPreservingFocusedDay(year: year, month: month)
-        state = state.focused(on: targetDay)
+        let targetDay = makeTargetDayPreservingReferenceDay(year: year, month: month)
+        referenceDay = targetDay
         ensureGeneratedDateCells(contain: targetDay)
-        prefetchFocusedMonthAndAdjacent(retryFailed: true)
+        prefetchReferenceMonthAndAdjacent(retryFailed: true)
     }
 
-    func retryFocusedMonthEvents() {
-        requestMonths([YearMonthKey(day: state.focusedDay)], retryFailed: true)
+    func retryReferenceMonthEvents() {
+        requestMonths([YearMonthKey(day: referenceDay)], retryFailed: true)
     }
 
     func resetCreateState() {
@@ -159,9 +170,15 @@ final class CalendarHomeViewModel: ObservableObject {
     
     private func makeDateCellItemsByDay(
         from startDate: Date,
-        to endDate: Date
+        to endDate: Date,
+        monthEventCache: [YearMonthKey: CalendarMonthEventCacheEntry]? = nil
     ) -> [DayKey: CalendarDateCellItem] {
-        let eventsByDay = makeEventsByDay(cachedEvents(in: startDate...endDate))
+        let eventsByDay = makeEventsByDay(
+            cachedEvents(
+                in: startDate...endDate,
+                monthEventCache: monthEventCache ?? self.monthEventCache
+            )
+        )
         
         return Dictionary(
             uniqueKeysWithValues: makeDates(from: startDate, to: endDate).map { date in
@@ -211,21 +228,34 @@ final class CalendarHomeViewModel: ObservableObject {
         state = state.replacingDateCells(
             startDate: startDate,
             endDate: endDate,
-            daysByKey: makeDateCellItemsByDay(from: startDate, to: endDate)
+            daysByKey: makeDateCellItemsByDay(from: startDate, to: endDate),
+            monthEventCache: monthEventCache
         )
     }
 
-    private func refreshGeneratedDateCells() {
-        replaceGeneratedDateCells(from: state.startDate, to: state.endDate)
+    private func refreshGeneratedDateCells(for key: YearMonthKey) {
+        let daysByKey = makeDateCellItemsForGeneratedMonth(
+            key,
+            monthEventCache: monthEventCache
+        )
+
+        guard !daysByKey.isEmpty else {
+            return
+        }
+
+        state = state.replacingMonthEventCache(
+            monthEventCache,
+            updatingDateCells: daysByKey
+        )
     }
 
     private func initialGeneratedDateRange(around date: Date) -> (startDate: Date, endDate: Date) {
-        let focusedMonthKey = YearMonthKey(date: date, calendar: calendar)
-        let startKey = focusedMonthKey.addingMonths(
+        let referenceMonthKey = YearMonthKey(date: date, calendar: calendar)
+        let startKey = referenceMonthKey.addingMonths(
             initialGeneratedPastMonths * -1,
             calendar: calendar
         )
-        let endKey = focusedMonthKey.addingMonths(
+        let endKey = referenceMonthKey.addingMonths(
             initialGeneratedFutureMonths,
             calendar: calendar
         )
@@ -250,7 +280,6 @@ final class CalendarHomeViewModel: ObservableObject {
         let normalizedEndDate = calendar.startOfDay(for: state.endDate)
 
         guard normalizedDate < normalizedStartDate || normalizedDate > normalizedEndDate else {
-            refreshGeneratedDateCells()
             return
         }
 
@@ -291,17 +320,80 @@ final class CalendarHomeViewModel: ObservableObject {
             nextEndDate = range.endDate
         }
 
+        let finalRange = generatedDateRangeAfterAppending(
+            edge: edge,
+            nextStartDate: nextStartDate,
+            nextEndDate: nextEndDate
+        )
+
+        if finalRange.shouldReplace {
+            replaceGeneratedDateCells(
+                from: finalRange.startDate,
+                to: finalRange.endDate
+            )
+            return
+        }
+
         let nextDaysByKey = makeDateCellItemsByDay(from: nextStartDate, to: nextEndDate)
         state = state.appended(
             startDate: nextStartDate,
             endDate: nextEndDate,
-            daysByKey: nextDaysByKey
+            daysByKey: nextDaysByKey,
+            monthEventCache: monthEventCache
         )
     }
 
-    private func prefetchFocusedMonthAndAdjacent(retryFailed: Bool) {
+    private func generatedDateRangeAfterAppending(
+        edge: CalendarState.LoadedEdge,
+        nextStartDate: Date,
+        nextEndDate: Date
+    ) -> (startDate: Date, endDate: Date, shouldReplace: Bool) {
+        let appendedStartDate = min(state.startDate, nextStartDate)
+        let appendedEndDate = max(state.endDate, nextEndDate)
+
+        guard generatedMonthCount(from: appendedStartDate, to: appendedEndDate) > maxGeneratedMonthCount else {
+            return (
+                startDate: appendedStartDate,
+                endDate: appendedEndDate,
+                shouldReplace: false
+            )
+        }
+
+        switch edge {
+        case .start:
+            let startKey = YearMonthKey(date: appendedStartDate, calendar: calendar)
+            let endKey = startKey.addingMonths(maxGeneratedMonthCount - 1, calendar: calendar)
+            let range = monthDateRange(from: startKey, to: endKey)
+
+            return (
+                startDate: range.startDate,
+                endDate: range.endDate,
+                shouldReplace: true
+            )
+
+        case .end:
+            let endKey = YearMonthKey(date: appendedEndDate, calendar: calendar)
+            let startKey = endKey.addingMonths((maxGeneratedMonthCount - 1) * -1, calendar: calendar)
+            let range = monthDateRange(from: startKey, to: endKey)
+
+            return (
+                startDate: range.startDate,
+                endDate: range.endDate,
+                shouldReplace: true
+            )
+        }
+    }
+
+    private func generatedMonthCount(from startDate: Date, to endDate: Date) -> Int {
+        let startKey = YearMonthKey(date: startDate, calendar: calendar)
+        let endKey = YearMonthKey(date: endDate, calendar: calendar)
+
+        return ((endKey.year - startKey.year) * 12) + endKey.month - startKey.month + 1
+    }
+
+    private func prefetchReferenceMonthAndAdjacent(retryFailed: Bool) {
         requestMonths(
-            adjacentMonthKeys(around: YearMonthKey(day: state.focusedDay)),
+            adjacentMonthKeys(around: YearMonthKey(day: referenceDay)),
             retryFailed: retryFailed
         )
     }
@@ -334,7 +426,7 @@ final class CalendarHomeViewModel: ObservableObject {
     }
 
     private func shouldFetchMonth(_ key: YearMonthKey, retryFailed: Bool) -> Bool {
-        switch state.monthEventCache[key] ?? .idle {
+        switch monthEventCache[key] ?? .idle {
         case .idle:
             return true
         case .failed:
@@ -356,30 +448,85 @@ final class CalendarHomeViewModel: ObservableObject {
         _ entry: CalendarMonthEventCacheEntry,
         for key: YearMonthKey
     ) {
-        var nextCache = state.monthEventCache
-        nextCache[key] = entry
-        state = state.replacingMonthEventCache(nextCache)
-        refreshGeneratedDateCells()
+        monthEventCache[key] = entry
+        let updatedDaysByKey: [DayKey: CalendarDateCellItem]
+
+        if case .loaded = entry {
+            updatedDaysByKey = makeDateCellItemsForGeneratedMonth(
+                key,
+                monthEventCache: monthEventCache
+            )
+        } else {
+            updatedDaysByKey = [:]
+        }
+
+        guard !updatedDaysByKey.isEmpty || shouldPublishCacheOnlyChange(for: key) else {
+            return
+        }
+
+        state = state.replacingMonthEventCache(
+            monthEventCache,
+            updatingDateCells: updatedDaysByKey
+        )
     }
 
     private func setFailedMonthCacheEntry(
         _ failure: CalendarMonthEventFailure,
         for key: YearMonthKey
     ) {
-        guard state.monthEventCache[key]?.isLoading == true else {
+        guard monthEventCache[key]?.isLoading == true else {
             return
         }
 
         setMonthCacheEntry(.failed(failure), for: key)
     }
 
-    private func cachedEvents(in dateRange: ClosedRange<Date>) -> [Event] {
-        let cachedEvents = state.monthEventCache.values.flatMap(\.loadedEvents)
+    private func shouldPublishCacheOnlyChange(for key: YearMonthKey) -> Bool {
+        key == YearMonthKey(day: referenceDay)
+    }
+
+    private func cachedEvents(
+        in dateRange: ClosedRange<Date>,
+        monthEventCache: [YearMonthKey: CalendarMonthEventCacheEntry]
+    ) -> [Event] {
+        let cachedEvents = monthKeys(from: dateRange.lowerBound, to: dateRange.upperBound)
+            .flatMap { key in
+                monthEventCache[key]?.loadedEvents ?? []
+            }
         let pendingEvents = pendingCreatedEventsByMonth.values.flatMap { $0 }
 
         return mergedSortedEvents(cachedEvents, with: pendingEvents).filter { event in
             dateRange.contains(event.startAt)
         }
+    }
+
+    private func makeDateCellItemsForGeneratedMonth(
+        _ key: YearMonthKey,
+        monthEventCache: [YearMonthKey: CalendarMonthEventCacheEntry]
+    ) -> [DayKey: CalendarDateCellItem] {
+        guard let range = generatedDateRange(in: key) else {
+            return [:]
+        }
+
+        return makeDateCellItemsByDay(
+            from: range.startDate,
+            to: range.endDate,
+            monthEventCache: monthEventCache
+        )
+    }
+
+    private func generatedDateRange(
+        in key: YearMonthKey
+    ) -> (startDate: Date, endDate: Date)? {
+        let monthRange = key.dateRange(calendar: calendar)
+        let startDate = max(monthRange.from, state.startDate)
+        let endDate = min(monthRange.to, state.endDate)
+
+        guard startDate <= endDate else {
+            return nil
+        }
+
+        return (startDate: startDate, endDate: endDate)
     }
 
     private func loadedItems(in visibleRange: CalendarVisibleIndexRange) -> [CalendarDateCellItem] {
@@ -396,11 +543,12 @@ final class CalendarHomeViewModel: ObservableObject {
             return []
         }
 
-        return Array(items[startIndex...endIndex])
+        let visibleItems = Array(items[startIndex...endIndex])
+        return visibleItems
     }
 
-    private func makeTargetDayPreservingFocusedDay(year: Int, month: Int) -> DayKey {
-        let clampedDay = min(state.focusedDay.day, lastDayOfMonth(year: year, month: month))
+    private func makeTargetDayPreservingReferenceDay(year: Int, month: Int) -> DayKey {
+        let clampedDay = min(referenceDay.day, lastDayOfMonth(year: year, month: month))
         var components = DateComponents()
         components.year = year
         components.month = month
@@ -431,7 +579,7 @@ final class CalendarHomeViewModel: ObservableObject {
     private func insertCreatedEventIntoMonthCache(_ event: Event) {
         let key = YearMonthKey(date: event.startAt, calendar: calendar)
 
-        switch state.monthEventCache[key] ?? .idle {
+        switch monthEventCache[key] ?? .idle {
         case .loaded(let events):
             setMonthCacheEntry(.loaded(mergedSortedEvents(events, with: [event])), for: key)
         case .loading:
@@ -439,9 +587,13 @@ final class CalendarHomeViewModel: ObservableObject {
                 pendingCreatedEventsByMonth[key] ?? [],
                 with: [event]
             )
-            refreshGeneratedDateCells()
+            refreshGeneratedDateCells(for: key)
         case .idle, .failed:
-            refreshGeneratedDateCells()
+            pendingCreatedEventsByMonth[key] = mergedSortedEvents(
+                pendingCreatedEventsByMonth[key] ?? [],
+                with: [event]
+            )
+            refreshGeneratedDateCells(for: key)
         }
     }
 
@@ -484,6 +636,18 @@ final class CalendarHomeViewModel: ObservableObject {
                 .prefix { currentDate in
                     currentDate <= endOfDay }
         )
+    }
+
+    private func monthKeys(from startDate: Date, to endDate: Date) -> [YearMonthKey] {
+        let startKey = YearMonthKey(date: startDate, calendar: calendar)
+        let endKey = YearMonthKey(date: endDate, calendar: calendar)
+        let count = generatedMonthCount(from: startDate, to: endDate)
+
+        return (0..<count).map { offset in
+            startKey.addingMonths(offset, calendar: calendar)
+        }.filter { key in
+            key <= endKey
+        }
     }
 }
 

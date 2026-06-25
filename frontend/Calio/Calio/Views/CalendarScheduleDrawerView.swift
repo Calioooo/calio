@@ -9,10 +9,10 @@ import SwiftUI
 
 struct CalendarScheduleDrawerView: View {
     let items: [CalendarDateCellItem]
-    let focusedDay: DayKey
+    let referenceDay: DayKey
     let displayMode: CalendarDisplayMode
     let eventAreaState: CalendarEventAreaState
-    let onFocusedDayChanged: (DayKey) -> Void
+    let onReferenceDayChanged: (DayKey) -> Void
     let onVisibleRangeChanged: (CalendarVisibleIndexRange) -> Void
     let onRetryEvents: () -> Void
     let onDragEnded: (CGSize) -> Void
@@ -23,9 +23,9 @@ struct CalendarScheduleDrawerView: View {
 
             CalendarDateEventView(
                 items: items,
-                focusedDay: focusedDay,
+                referenceDay: referenceDay,
                 eventAreaState: eventAreaState,
-                onFocusedDayChanged: onFocusedDayChanged,
+                onReferenceDayChanged: onReferenceDayChanged,
                 onVisibleRangeChanged: onVisibleRangeChanged,
                 onRetryEvents: onRetryEvents
             )
@@ -82,10 +82,10 @@ struct CalendarScheduleDrawerView: View {
 #Preview {
     CalendarScheduleDrawerView(
         items: [],
-        focusedDay: DayKey(date: Date()),
+        referenceDay: DayKey(date: Date()),
         displayMode: .week,
         eventAreaState: .idle,
-        onFocusedDayChanged: { _ in },
+        onReferenceDayChanged: { _ in },
         onVisibleRangeChanged: { _ in },
         onRetryEvents: {},
         onDragEnded: { _ in }

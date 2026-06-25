@@ -15,7 +15,7 @@ struct CalendarWeekTimelineView: View {
     private let timelineEndHour = 23
     
     let items: [CalendarDateCellItem]
-    let focusedDay: DayKey
+    let referenceDay: DayKey
     let eventAreaState: CalendarEventAreaState
     let onSelectedDay: (DayKey) -> Void
     let onVisibleRangeChanged: (CalendarVisibleIndexRange) -> Void
@@ -32,7 +32,7 @@ struct CalendarWeekTimelineView: View {
             
             VStack(spacing: 0) {
                 CalendarYearMonthTitleView(
-                    focusedDay: focusedDay,
+                    referenceDay: referenceDay,
                     onSelectedYearMonth: onSelectedYearMonth
                 )
                     .frame(
@@ -95,17 +95,17 @@ struct CalendarWeekTimelineView: View {
             .scrollTargetBehavior(.viewAligned)
             .scrollPosition(id: $headerScrollPosition, anchor: .leading)
             .onChange(of: headerScrollPosition) { _, newDay in
-                updateFocusedDayFromHeaderScrollPosition(newDay)
+                updateReferenceDayFromHeaderScrollPosition(newDay)
             }
-            .onChange(of: focusedDay) { _, newDay in
+            .onChange(of: referenceDay) { _, newDay in
                 alignHeader(to: newDay)
             }
             .onChange(of: items.count) { _, _ in
-                alignHeader(to: focusedDay)
+                alignHeader(to: referenceDay)
             }
             .onAppear {
-                alignHeader(to: focusedDay)
-                notifyVisibleRangeChanged(around: focusedDay)
+                alignHeader(to: referenceDay)
+                notifyVisibleRangeChanged(around: referenceDay)
             }
         }
         .frame(
@@ -124,7 +124,7 @@ struct CalendarWeekTimelineView: View {
     }
     
     private func dayHeader(for item: CalendarDateCellItem, metrics: TimelineMetrics) -> some View {
-        let isFocused = item.id == focusedDay
+        let isReferenceDay = item.id == referenceDay
         
         return Button {
             onSelectedDay(item.id)
@@ -150,13 +150,13 @@ struct CalendarWeekTimelineView: View {
                 
                 Capsule()
                     .fill(
-                        isFocused
+                        isReferenceDay
                             ? Color(red: 0.56, green: 0.61, blue: 0.96)
                             : Color.clear
                     )
                     .frame(
-                        width: metrics.focusedDayIndicatorWidth,
-                        height: metrics.focusedDayIndicatorHeight
+                        width: metrics.referenceDayIndicatorWidth,
+                        height: metrics.referenceDayIndicatorHeight
                     )
             }
             .frame(
@@ -340,12 +340,12 @@ struct CalendarWeekTimelineView: View {
     }
     
     private var visibleItems: [CalendarDateCellItem] {
-        guard let focusedIndex = items.firstIndex(where: { $0.id == focusedDay }) else {
+        guard let referenceIndex = items.firstIndex(where: { $0.id == referenceDay }) else {
             return []
         }
         
-        let endIndex = min(items.endIndex, focusedIndex + visibleDayCount)
-        return Array(items[focusedIndex..<endIndex])
+        let endIndex = min(items.endIndex, referenceIndex + visibleDayCount)
+        return Array(items[referenceIndex..<endIndex])
     }
     
     private var timelineHours: [Int] {
@@ -379,11 +379,11 @@ struct CalendarWeekTimelineView: View {
         )
     }
     
-    private func updateFocusedDayFromHeaderScrollPosition(_ day: DayKey?) {
+    private func updateReferenceDayFromHeaderScrollPosition(_ day: DayKey?) {
         guard let day else { return }
         
         notifyVisibleRangeChanged(around: day)
-        guard day != focusedDay else { return }
+        guard day != referenceDay else { return }
         
         onSelectedDay(day)
     }
@@ -397,17 +397,17 @@ struct CalendarWeekTimelineView: View {
     }
     
     private func notifyVisibleRangeChanged(around day: DayKey) {
-        guard let focusedIndex = items.firstIndex(where: { $0.id == day }) else {
+        guard let referenceIndex = items.firstIndex(where: { $0.id == day }) else {
             return
         }
         
         let endIndex = min(
             items.count - 1,
-            focusedIndex + visibleDayCount - 1
+            referenceIndex + visibleDayCount - 1
         )
         
         let visibleRange = CalendarVisibleIndexRange(
-            startIndex: focusedIndex,
+            startIndex: referenceIndex,
             endIndex: endIndex
         )
         
@@ -632,11 +632,11 @@ private struct TimelineMetrics {
         min(max(dayColumnWidth * 0.5, 30), 30)
     }
     
-    var focusedDayIndicatorWidth: CGFloat {
+    var referenceDayIndicatorWidth: CGFloat {
         min(max(dayColumnWidth * 0.28, 18), 24)
     }
     
-    var focusedDayIndicatorHeight: CGFloat {
+    var referenceDayIndicatorHeight: CGFloat {
         3
     }
     
@@ -819,7 +819,7 @@ private extension UIView {
     
     CalendarWeekTimelineView(
         items: items,
-        focusedDay: items[0].id,
+        referenceDay: items[0].id,
         eventAreaState: .idle,
         onSelectedDay: { _ in },
         onVisibleRangeChanged: { _ in },

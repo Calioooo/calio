@@ -43,12 +43,12 @@ private struct CalendarWeekTimelineTestView: View {
     var body: some View {
         CalendarWeekTimelineView(
             items: viewModel.loadedDateCellItems,
-            focusedDay: viewModel.state.focusedDay,
-            eventAreaState: viewModel.focusedEventAreaState,
-            onSelectedDay: viewModel.focusDay(_:),
+            referenceDay: viewModel.referenceDay,
+            eventAreaState: viewModel.referenceEventAreaState,
+            onSelectedDay: viewModel.setReferenceDay(_:),
             onVisibleRangeChanged: viewModel.loadAdditionalEventsIfNeeded(visibleRange:),
             onSelectedYearMonth: viewModel.selectYearMonth(year:month:),
-            onRetryEvents: viewModel.retryFocusedMonthEvents
+            onRetryEvents: viewModel.retryReferenceMonthEvents
         )
         .task {
             viewModel.loadInitialIfNeeded()
@@ -62,9 +62,9 @@ private struct CalendarDayTimelineTestView: View {
     var body: some View {
         CalendarDayTimelineView(
             items: viewModel.loadedDateCellItems,
-            focusedDay: viewModel.state.focusedDay,
-            eventAreaState: viewModel.focusedEventAreaState,
-            onRetryEvents: viewModel.retryFocusedMonthEvents
+            referenceDay: viewModel.referenceDay,
+            eventAreaState: viewModel.referenceEventAreaState,
+            onRetryEvents: viewModel.retryReferenceMonthEvents
         )
         .task {
             viewModel.loadInitialIfNeeded()

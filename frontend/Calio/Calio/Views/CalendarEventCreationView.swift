@@ -28,14 +28,14 @@ struct CalendarEventCreationView: View {
     let onSave: (EventCreateInput) async -> Bool
     
     init(
-        focusedDay: DayKey,
+        referenceDay: DayKey,
         calendar: Calendar = .current,
         isSaving: Bool = false,
         failureMessage: String? = nil,
         onSave: @escaping (EventCreateInput) async -> Bool = { _ in true }
     ) {
         let timeRange = CalendarEventCreationView.defaultTimeRange(
-            focusedDay: focusedDay,
+            referenceDay: referenceDay,
             calendar: calendar
         )
         let startAt = timeRange.startAt
@@ -196,11 +196,11 @@ struct CalendarEventCreationView: View {
         }
     }
 
-    static func defaultTimeRange(
-        focusedDay: DayKey,
+    nonisolated static func defaultTimeRange(
+        referenceDay: DayKey,
         calendar: Calendar
     ) -> (startAt: Date, endAt: Date) {
-        let date = focusedDay.toDate(calendar: calendar)
+        let date = referenceDay.toDate(calendar: calendar)
         let startAt = calendar.date(
             bySettingHour: 9,
             minute: 0,
@@ -216,12 +216,12 @@ struct CalendarEventCreationView: View {
         return (startAt, endAt)
     }
 
-    static func canSave(title: String, startAt: Date, endAt: Date) -> Bool {
+    nonisolated static func canSave(title: String, startAt: Date, endAt: Date) -> Bool {
         !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
         endAt > startAt
     }
 }
 
 #Preview {
-    CalendarEventCreationView(focusedDay: DayKey(date: Date()))
+    CalendarEventCreationView(referenceDay: DayKey(date: Date()))
 }

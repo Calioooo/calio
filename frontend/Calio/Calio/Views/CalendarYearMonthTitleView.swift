@@ -8,24 +8,24 @@
 import SwiftUI
 
 struct CalendarYearMonthTitleView: View {
-    let focusedDay: DayKey
+    let referenceDay: DayKey
     let onSelectedYearMonth: ((Int, Int) -> Void)?
 
     @State private var isShowingYearPicker = false
     @State private var isShowingMonthPicker = false
 
     init(
-        focusedDay: DayKey,
+        referenceDay: DayKey,
         onSelectedYearMonth: ((Int, Int) -> Void)? = nil
     ) {
-        self.focusedDay = focusedDay
+        self.referenceDay = referenceDay
         self.onSelectedYearMonth = onSelectedYearMonth
     }
     
     var body: some View {
         if let onSelectedYearMonth {
             HStack(spacing: 4) {
-                titleButton(text: "\(focusedDay.year)년") {
+                titleButton(text: "\(referenceDay.year)년") {
                     isShowingYearPicker = true
                 }
                 .popover(
@@ -36,20 +36,20 @@ struct CalendarYearMonthTitleView: View {
                     CalendarYearMonthComponentPickerView(
                         title: "연도",
                         values: years,
-                        selectedValue: focusedDay.year,
+                        selectedValue: referenceDay.year,
                         displayText: { "\($0)년" },
                         onCancel: {
                             isShowingYearPicker = false
                         },
                         onConfirm: { year in
                             isShowingYearPicker = false
-                            onSelectedYearMonth(year, focusedDay.month)
+                            onSelectedYearMonth(year, referenceDay.month)
                         }
                     )
                     .presentationCompactAdaptation(.popover)
                 }
 
-                titleButton(text: "\(focusedDay.month)월") {
+                titleButton(text: "\(referenceDay.month)월") {
                     isShowingMonthPicker = true
                 }
                 .popover(
@@ -60,14 +60,14 @@ struct CalendarYearMonthTitleView: View {
                     CalendarYearMonthComponentPickerView(
                         title: "월",
                         values: Array(1...12),
-                        selectedValue: focusedDay.month,
+                        selectedValue: referenceDay.month,
                         displayText: { "\($0)월" },
                         onCancel: {
                             isShowingMonthPicker = false
                         },
                         onConfirm: { month in
                             isShowingMonthPicker = false
-                            onSelectedYearMonth(focusedDay.year, month)
+                            onSelectedYearMonth(referenceDay.year, month)
                         }
                     )
                     .presentationCompactAdaptation(.popover)
@@ -79,7 +79,7 @@ struct CalendarYearMonthTitleView: View {
     }
     
     private var title: String {
-        "\(focusedDay.year)년 \(focusedDay.month)월"
+        "\(referenceDay.year)년 \(referenceDay.month)월"
     }
 
     private var titleText: some View {
@@ -170,5 +170,5 @@ private struct CalendarYearMonthComponentPickerView: View {
 }
 
 #Preview {
-    CalendarYearMonthTitleView(focusedDay: DayKey(date: Date()))
+    CalendarYearMonthTitleView(referenceDay: DayKey(date: Date()))
 }
