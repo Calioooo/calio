@@ -817,7 +817,7 @@ class RecurrenceEventControllerTest {
     }
 
     @Test
-    @DisplayName("사용자는 recurrence occurrence 하나를 삭제하면 Event row는 유지되고 기존 조회 API에서는 제외된다")
+    @DisplayName("사용자가 반복 일정의 단일 occurrence를 삭제하면 기존 Event row는 유지하되, 조회 API에서는 제외된다.")
     void givenExistingOccurrence_whenDeleteRecurrenceOccurrence_thenSoftDeletesOnlyTargetEventAndHidesFromReads()
             throws Exception {
         // given
