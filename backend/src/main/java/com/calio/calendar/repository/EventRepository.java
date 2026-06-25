@@ -12,5 +12,5 @@ public interface EventRepository extends JpaRepository<Event, Long> {
 
     List<Event> findByStartAtBetweenAndDeletedAtIsNullOrderByStartAtAsc(Instant from, Instant to);
 
-    List<Event> findByRecurrenceIdOrderByStartAtAsc(Long recurrenceId);
+    List<Event> findByRecurrenceIdAndDeletedAtIsNullOrderByStartAtAsc(Long recurrenceId);
 }

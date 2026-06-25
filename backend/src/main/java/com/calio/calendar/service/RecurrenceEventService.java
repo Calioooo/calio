@@ -203,7 +203,7 @@ public class RecurrenceEventService {
 
     private void rebuildOccurrenceEvents(RecurrenceEvent recurrenceEvent) {
         List<Event> staleEvents = new ArrayList<>(
-                eventRepository.findByRecurrenceIdOrderByStartAtAsc(recurrenceEvent.getId())
+                eventRepository.findByRecurrenceIdAndDeletedAtIsNullOrderByStartAtAsc(recurrenceEvent.getId())
         );
         List<Event> rebuiltEvents = new ArrayList<>();
 

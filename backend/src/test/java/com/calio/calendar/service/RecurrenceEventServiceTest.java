@@ -62,7 +62,7 @@ class RecurrenceEventServiceTest {
                 RecurrenceFrequency.DAILY
         );
         when(recurrenceEventRepository.findById(1L)).thenReturn(Optional.of(recurrenceEvent));
-        when(eventRepository.findByRecurrenceIdOrderByStartAtAsc(1L)).thenReturn(List.of());
+        when(eventRepository.findByRecurrenceIdAndDeletedAtIsNullOrderByStartAtAsc(1L)).thenReturn(List.of());
 
         UpdateRecurrenceEventRequest request = new UpdateRecurrenceEventRequest(
                 "Updated",
@@ -123,7 +123,7 @@ class RecurrenceEventServiceTest {
                 RecurrenceFrequency.DAILY
         );
         when(recurrenceEventRepository.findById(1L)).thenReturn(Optional.of(recurrenceEvent));
-        when(eventRepository.findByRecurrenceIdOrderByStartAtAsc(1L)).thenReturn(List.of());
+        when(eventRepository.findByRecurrenceIdAndDeletedAtIsNullOrderByStartAtAsc(1L)).thenReturn(List.of());
 
         UpdateRecurrenceEventRequest request = new UpdateRecurrenceEventRequest(
                 null,
@@ -491,7 +491,7 @@ class RecurrenceEventServiceTest {
         Event stale = event("Stale", "2027-01-09T09:00:00Z", "2027-01-09T10:00:00Z", 1L);
 
         when(recurrenceEventRepository.findById(1L)).thenReturn(Optional.of(recurrenceEvent));
-        when(eventRepository.findByRecurrenceIdOrderByStartAtAsc(1L))
+        when(eventRepository.findByRecurrenceIdAndDeletedAtIsNullOrderByStartAtAsc(1L))
                 .thenReturn(List.of(retainedFirst, retainedSecond, stale));
 
         UpdateRecurrenceEventRequest request = new UpdateRecurrenceEventRequest(

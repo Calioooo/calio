@@ -1165,7 +1165,7 @@ class RecurrenceEventControllerTest {
     }
 
     private void assertStoredOccurrences(long recurrenceId, String... expectedStartAtValues) {
-        var occurrences = eventRepository.findByRecurrenceIdOrderByStartAtAsc(recurrenceId);
+        var occurrences = eventRepository.findByRecurrenceIdAndDeletedAtIsNullOrderByStartAtAsc(recurrenceId);
 
         assertThat(occurrences)
                 .hasSize(expectedStartAtValues.length)
@@ -1184,7 +1184,7 @@ class RecurrenceEventControllerTest {
             String expectedDescription,
             String expectedEndAtSuffix
     ) {
-        var occurrences = eventRepository.findByRecurrenceIdOrderByStartAtAsc(recurrenceId);
+        var occurrences = eventRepository.findByRecurrenceIdAndDeletedAtIsNullOrderByStartAtAsc(recurrenceId);
 
         assertThat(occurrences)
                 .allSatisfy(event -> {
