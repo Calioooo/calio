@@ -128,6 +128,18 @@ public class RecurrenceEventService {
         return EventResponse.from(event);
     }
 
+    @Transactional
+    public void deleteRecurrenceOccurrence(Long recurrenceId, Long eventId) {
+        findRecurrenceEvent(recurrenceId);
+
+        Event event = eventRepository.findById(eventId)
+                .orElseThrow(() -> new CalioException(ErrorCode.EVENT_NOT_FOUND));
+        validateOccurrenceOwnership(event, recurrenceId);
+
+        event.softDelete(Instant.now());
+        eventRepository.flush();
+    }
+
     private RecurrenceEvent findRecurrenceEvent(Long recurrenceId) {
         return recurrenceEventRepository.findById(recurrenceId)
                 .orElseThrow(() -> new CalioException(ErrorCode.RECURRENCE_EVENT_NOT_FOUND));

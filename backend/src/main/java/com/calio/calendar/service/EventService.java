@@ -61,14 +61,14 @@ public class EventService {
     @Transactional(readOnly = true)
     public List<EventResponse> listEvents(Instant from, Instant to) {
         validateListTimeRange(from, to);
-        return eventRepository.findByStartAtBetweenOrderByStartAtAsc(from, to)
+        return eventRepository.findByStartAtBetweenAndDeletedAtIsNullOrderByStartAtAsc(from, to)
                 .stream()
                 .map(EventResponse::from)
                 .toList();
     }
 
     private Event findEvent(Long eventId) {
-        return eventRepository.findById(eventId)
+        return eventRepository.findByIdAndDeletedAtIsNull(eventId)
                 .orElseThrow(() -> new CalioException(ErrorCode.EVENT_NOT_FOUND));
     }
 
