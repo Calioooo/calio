@@ -2,6 +2,7 @@ package com.calio.calendar.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -11,8 +12,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.calio.calendar.repository.EventRepository;
 import com.calio.calendar.repository.RecurrenceEventOverrideRepository;
 import com.calio.calendar.repository.RecurrenceEventRepository;
+import com.calio.calendar.repository.entity.Event;
 import com.calio.calendar.repository.entity.RecurrenceEvent;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -120,6 +123,78 @@ class RecurrenceEventControllerTest {
                 .andExpect(jsonPath("$.recurrenceStartDate").value("2026-08-11"))
                 .andExpect(jsonPath("$.recurrenceEndDate").value("2026-08-25"))
                 .andExpect(jsonPath("$.recurrenceFrequency").value("WEEKLY"));
+    }
+
+    @Test
+    @DisplayName("반복 일정 전체 삭제 시 Rule, Occurrence, Override가 모두 삭제되고 204 empty body 를 반환한다.")
+    void givenExistingRecurrenceEvent_whenDeleteRecurrenceEvent_thenDeletesRuleOccurrencesAndOverrides()
+            throws Exception {
+        // given
+        long normalEventId = createEvent("Normal kept", "2030-08-01T08:00:00Z", "2030-08-01T08:30:00Z");
+        long recurrenceId = createRecurrenceEventWithDescription(
+                "Delete target",
+                "Delete memo",
+                "2030-08-01",
+                "2030-08-02",
+                "DAILY"
+        );
+        List<Long> occurrenceEventIds = eventRepository.findByRecurrenceIdOrderByStartAtAsc(recurrenceId)
+                .stream()
+                .map(Event::getId)
+                .toList();
+        long overriddenEventId = occurrenceEventIds.get(0);
+        mockMvc.perform(patch(
+                        "/api/recurrence-events/{recurrenceId}/occurrences/{eventId}",
+                        recurrenceId,
+                        overriddenEventId
+                )
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Override before delete"
+                                }
+                                """))
+                .andExpect(status().isOk());
+        assertThat(recurrenceEventOverrideRepository.existsByEventId(overriddenEventId)).isTrue();
+
+        // when
+        MvcResult deleteResult = mockMvc.perform(delete("/api/recurrence-events/{recurrenceId}", recurrenceId))
+                // then
+                .andExpect(status().isNoContent())
+                .andReturn();
+
+        assertThat(deleteResult.getResponse().getContentAsString(StandardCharsets.UTF_8)).isEmpty();
+        assertThat(recurrenceEventRepository.existsById(recurrenceId)).isFalse();
+        assertThat(eventRepository.findByRecurrenceIdOrderByStartAtAsc(recurrenceId)).isEmpty();
+        assertThat(occurrenceEventIds)
+                .allSatisfy(eventId -> {
+                    assertThat(eventRepository.findById(eventId)).isEmpty();
+                    assertThat(recurrenceEventOverrideRepository.existsByEventId(eventId)).isFalse();
+                });
+
+        mockMvc.perform(get("/api/events")
+                        .param("from", "2030-08-01T00:00:00Z")
+                        .param("to", "2030-08-03T00:00:00Z"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].id").value(normalEventId))
+                .andExpect(jsonPath("$[0].isRecurrenceOccurrence").value(false));
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 반복 일정 전체 삭제는 RECURRENCE_EVENT_NOT_FOUND를 받는다")
+    void givenMissingRecurrenceId_whenDeleteRecurrenceEvent_thenReturnsRecurrenceEventNotFound()
+            throws Exception {
+        // given
+        long missingRecurrenceId = 999999L;
+
+        // when
+        mockMvc.perform(delete("/api/recurrence-events/{recurrenceId}", missingRecurrenceId))
+                // then
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("RECURRENCE_EVENT_NOT_FOUND"))
+                .andExpect(jsonPath("$.message").value("Recurrence event not found."))
+                .andExpect(jsonPath("$.*", hasSize(2)));
     }
 
     @Test
