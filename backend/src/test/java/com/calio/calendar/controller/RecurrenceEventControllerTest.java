@@ -126,7 +126,7 @@ class RecurrenceEventControllerTest {
     }
 
     @Test
-    @DisplayName("사용자는 반복 일정 전체 삭제 시 rule과 occurrence와 override를 hard-delete하고 204 empty body를 받는다")
+    @DisplayName("반복 일정 전체 삭제 시 Rule, Occurrence, Override가 모두 삭제되고 204 empty body 를 반환한다.")
     void givenExistingRecurrenceEvent_whenDeleteRecurrenceEvent_thenDeletesRuleOccurrencesAndOverrides()
             throws Exception {
         // given
