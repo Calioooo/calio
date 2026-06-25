@@ -70,6 +70,8 @@ struct CalendarDateEventView: View {
             .padding(.top, contentTopPadding)
             .padding(.bottom, contentBottomPadding)
         }
+        .scrollTargetBehavior(.viewAligned)
+        .scrollIndicators(.hidden)
         .scrollPosition(id: $focusCoordinator.scrollPosition, anchor: .top)
         .onChange(of: focusCoordinator.scrollPosition) { _, newDay in
             focusCoordinator.notifyScrollReferenceDayIfNeeded(
