@@ -186,7 +186,8 @@ final class CalendarHomeViewModel: ObservableObject {
 
         do {
             try await eventService.createRecurrenceEvent(input)
-            invalidateMonthEventCacheAndRefetchDefaultRange()
+            invalidateMonthEventCache()
+            refetchDefaultPrefetchRange()
             createState = .idle
             return true
         } catch let error as EventServiceError {
@@ -428,7 +429,7 @@ final class CalendarHomeViewModel: ObservableObject {
         )
     }
 
-    private func invalidateMonthEventCacheAndRefetchDefaultRange() {
+    private func invalidateMonthEventCache() {
         monthEventCache.removeAll()
         pendingCreatedEventsByMonth.removeAll()
         state = state.replacingMonthEventCache(
@@ -439,6 +440,9 @@ final class CalendarHomeViewModel: ObservableObject {
                 monthEventCache: monthEventCache
             )
         )
+    }
+
+    private func refetchDefaultPrefetchRange() {
         prefetchReferenceMonthAndAdjacent(retryFailed: false)
     }
 
