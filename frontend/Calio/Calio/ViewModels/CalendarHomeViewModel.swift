@@ -147,6 +147,15 @@ final class CalendarHomeViewModel: ObservableObject {
         createState = .idle
     }
 
+    func createEvent(_ input: CalendarEventCreationSubmitInput) async -> Bool {
+        switch input {
+        case .single(let eventInput):
+            return await createEvent(eventInput)
+        case .recurring(let recurrenceInput):
+            return await createRecurrenceEvent(recurrenceInput)
+        }
+    }
+
     func createEvent(_ input: EventCreateInput) async -> Bool {
         guard !createState.isSaving else {
             return false
@@ -157,6 +166,27 @@ final class CalendarHomeViewModel: ObservableObject {
         do {
             let createdEvent = try await eventService.createEvent(input)
             insertCreatedEventIntoMonthCache(createdEvent)
+            createState = .idle
+            return true
+        } catch let error as EventServiceError {
+            createState = .failed(CalendarEventCreateFailure(error: error))
+            return false
+        } catch {
+            createState = .failed(.unexpected)
+            return false
+        }
+    }
+
+    private func createRecurrenceEvent(_ input: RecurrenceEventCreateInput) async -> Bool {
+        guard !createState.isSaving else {
+            return false
+        }
+
+        createState = .saving
+
+        do {
+            try await eventService.createRecurrenceEvent(input)
+            invalidateMonthEventCacheAndRefetchDefaultRange()
             createState = .idle
             return true
         } catch let error as EventServiceError {
@@ -396,6 +426,20 @@ final class CalendarHomeViewModel: ObservableObject {
             adjacentMonthKeys(around: YearMonthKey(day: referenceDay)),
             retryFailed: retryFailed
         )
+    }
+
+    private func invalidateMonthEventCacheAndRefetchDefaultRange() {
+        monthEventCache.removeAll()
+        pendingCreatedEventsByMonth.removeAll()
+        state = state.replacingMonthEventCache(
+            monthEventCache,
+            updatingDateCells: makeDateCellItemsByDay(
+                from: state.startDate,
+                to: state.endDate,
+                monthEventCache: monthEventCache
+            )
+        )
+        prefetchReferenceMonthAndAdjacent(retryFailed: false)
     }
 
     private func prefetchMonthsForVisibleItemsIfNeeded(_ visibleItems: [CalendarDateCellItem]) {

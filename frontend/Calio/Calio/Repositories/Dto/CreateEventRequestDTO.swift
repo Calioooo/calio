@@ -13,3 +13,24 @@ struct CreateEventRequestDTO: Encodable {
     let startAt: Date
     let endAt: Date
 }
+
+struct CreateRecurrenceEventRequestDTO: Encodable, Equatable {
+    let recurrenceTitle: String
+    let recurrenceDescription: String
+    let recurrenceStartDate: String
+    let recurrenceEndDate: String
+    let recurrenceStartTime: String
+    let recurrenceEndTime: String
+    let recurrenceFrequency: RecurrenceFrequency
+}
+
+struct RecurrenceEventResponseDTO: Decodable, Equatable {
+    let recurrenceId: Int64
+    let recurrenceTitle: String
+    let recurrenceDescription: String?
+    let recurrenceStartDate: String
+    let recurrenceEndDate: String
+    let recurrenceStartTime: String
+    let recurrenceEndTime: String
+    let recurrenceFrequency: RecurrenceFrequency
+}

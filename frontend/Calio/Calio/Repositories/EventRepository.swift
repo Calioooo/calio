@@ -10,6 +10,7 @@ import Foundation
 protocol EventRepository {
     func fetchEvents(from startDate: Date, to endDate: Date) async throws -> [EventResponseDTO]
     func createEvent(_ request: CreateEventRequestDTO) async throws -> EventResponseDTO
+    func createRecurrenceEvent(_ request: CreateRecurrenceEventRequestDTO) async throws -> RecurrenceEventResponseDTO
 }
 
 enum EventRepositoryError: Error {

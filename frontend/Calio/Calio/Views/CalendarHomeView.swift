@@ -51,7 +51,9 @@ struct CalendarHomeView: View {
                     referenceDay: viewModel.referenceDay,
                     isSaving: viewModel.createState.isSaving,
                     failureMessage: viewModel.createState.failureMessage,
-                    onSave: viewModel.createEvent(_:)
+                    onSave: { input in
+                        await viewModel.createEvent(input)
+                    }
                 )
             }
         }
