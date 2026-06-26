@@ -14,7 +14,7 @@ struct CalendarDayTimelineView: View {
     private let timelineEndHour = 23
     
     let items: [CalendarDateCellItem]
-    let focusedDay: DayKey
+    let referenceDay: DayKey
     let eventAreaState: CalendarEventAreaState
     let onRetryEvents: () -> Void
     
@@ -73,7 +73,7 @@ struct CalendarDayTimelineView: View {
                     .font(.system(size: metrics.weekdayFontSize, weight: .medium))
                     .foregroundStyle(dayHeaderColor)
                 
-                Text("\(focusedDay.day)")
+                Text("\(referenceDay.day)")
                     .font(.system(size: metrics.dayNumberFontSize, weight: .regular))
                     .foregroundStyle(currentItem?.isToday == true ? .white : dayHeaderColor)
                     .frame(width: metrics.dayCircleSize, height: metrics.dayCircleSize)
@@ -223,7 +223,7 @@ struct CalendarDayTimelineView: View {
     }
     
     private var currentItem: CalendarDateCellItem? {
-        Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })[focusedDay]
+        Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })[referenceDay]
     }
     
     private var timelineHours: [Int] {
@@ -231,7 +231,7 @@ struct CalendarDayTimelineView: View {
     }
     
     private var dayTitle: String {
-        "\(focusedDay.year)년 \(focusedDay.month)월 \(focusedDay.day)일"
+        "\(referenceDay.year)년 \(referenceDay.month)월 \(referenceDay.day)일"
     }
     
     private var timedEvents: [Event] {
@@ -550,7 +550,7 @@ private extension UIView {
     
     CalendarDayTimelineView(
         items: [item],
-        focusedDay: day,
+        referenceDay: day,
         eventAreaState: .idle,
         onRetryEvents: {}
     )

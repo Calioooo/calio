@@ -14,7 +14,7 @@ struct CalendarMonthView: View {
     private let maxVisibleEventDotCount = 3
     
     let items: [CalendarDateCellItem]
-    let focusedDay: DayKey
+    let referenceDay: DayKey
     let onSelectedDay: (DayKey) -> Void
     let onMonthChanged: (Int) -> Void
 
@@ -77,8 +77,8 @@ struct CalendarMonthView: View {
     
     private func monthCell(for day: DayKey) -> some View {
         let item = itemsByDay[day]
-        let isFocused = day == focusedDay
-        let isCurrentMonth = day.month == focusedDay.month && day.year == focusedDay.year
+        let isReferenceDay = day == referenceDay
+        let isCurrentMonth = day.month == referenceDay.month && day.year == referenceDay.year
         let events = item?.events ?? []
         
         return Button {
@@ -86,7 +86,7 @@ struct CalendarMonthView: View {
         } label: {
             VStack(spacing: 0) {
                 Text("\(day.day)")
-                    .font(.system(size: 17, weight: isFocused ? .semibold : .regular))
+                    .font(.system(size: 17, weight: isReferenceDay ? .semibold : .regular))
                     .foregroundStyle(dayTextColor(for: item, isCurrentMonth: isCurrentMonth))
                     .frame(width: 28, height: 28)
                     .background {
@@ -116,7 +116,7 @@ struct CalendarMonthView: View {
         }
         .buttonStyle(.plain)
         .background {
-            if isFocused {
+            if isReferenceDay {
                 Rectangle()
                     .fill(Color(red: 0.56, green: 0.76, blue: 0.96).opacity(0.18))
             }
@@ -128,8 +128,8 @@ struct CalendarMonthView: View {
     }
     
     private var monthGridDays: [DayKey] {
-        let focusedDate = focusedDay.toDate(calendar: calendar)
-        let monthComponents = calendar.dateComponents([.year, .month], from: focusedDate)
+        let referenceDate = referenceDay.toDate(calendar: calendar)
+        let monthComponents = calendar.dateComponents([.year, .month], from: referenceDate)
         
         guard let firstDayOfMonth = calendar.date(from: monthComponents) else {
             return []
@@ -159,7 +159,7 @@ struct CalendarMonthView: View {
     }
     
     private var monthIdentifier: String {
-        "\(focusedDay.year)-\(focusedDay.month)"
+        "\(referenceDay.year)-\(referenceDay.month)"
     }
     
     private func dayTextColor(
@@ -188,7 +188,7 @@ struct CalendarMonthView: View {
 #Preview {
     CalendarMonthView(
         items: [],
-        focusedDay: DayKey(date: Date()),
+        referenceDay: DayKey(date: Date()),
         onSelectedDay: { _ in },
         onMonthChanged: { _ in }
     )

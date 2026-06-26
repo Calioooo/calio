@@ -129,6 +129,16 @@ public class RecurrenceEventService {
     }
 
     @Transactional
+    public void deleteRecurrenceEvent(Long recurrenceId) {
+        RecurrenceEvent recurrenceEvent = findRecurrenceEvent(recurrenceId);
+        List<Event> occurrenceEvents = eventRepository.findByRecurrenceIdOrderByStartAtAsc(recurrenceId);
+
+        deleteOccurrenceOverrides(occurrenceEvents);
+        eventRepository.deleteAll(occurrenceEvents);
+        recurrenceEventRepository.delete(recurrenceEvent);
+    }
+
+    @Transactional
     public void deleteRecurrenceOccurrence(Long recurrenceId, Long eventId) {
         findRecurrenceEvent(recurrenceId);
 
@@ -143,6 +153,17 @@ public class RecurrenceEventService {
     private RecurrenceEvent findRecurrenceEvent(Long recurrenceId) {
         return recurrenceEventRepository.findById(recurrenceId)
                 .orElseThrow(() -> new CalioException(ErrorCode.RECURRENCE_EVENT_NOT_FOUND));
+    }
+
+    private void deleteOccurrenceOverrides(List<Event> occurrenceEvents) {
+        List<Long> eventIds = occurrenceEvents.stream()
+                .map(Event::getId)
+                .toList();
+        if (eventIds.isEmpty()) {
+            return;
+        }
+
+        recurrenceEventOverrideRepository.deleteByEventIdIn(eventIds);
     }
 
     private void validateOccurrenceOwnership(Event event, Long recurrenceId) {

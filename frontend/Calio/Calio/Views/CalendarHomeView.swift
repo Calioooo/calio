@@ -25,18 +25,20 @@ struct CalendarHomeView: View {
 
     var body: some View {
         GeometryReader { geometry in
+            let loadedDateCellItems = viewModel.loadedDateCellItems
+
             VStack(spacing: 0) {
                 calendarTopBar
-                calendarHeader(in: geometry)
+                calendarHeader(in: geometry, items: loadedDateCellItems)
 
                 CalendarScheduleDrawerView(
-                    items: viewModel.loadedDateCellItems,
-                    focusedDay: viewModel.state.focusedDay,
+                    items: loadedDateCellItems,
+                    referenceDay: viewModel.referenceDay,
                     displayMode: displayMode,
-                    eventAreaState: viewModel.focusedEventAreaState,
-                    onFocusedDayChanged: viewModel.focusDay(_:),
+                    eventAreaState: viewModel.referenceEventAreaState,
+                    onReferenceDayChanged: viewModel.setReferenceDay(_:),
                     onVisibleRangeChanged: viewModel.loadAdditionalEventsIfNeeded(visibleRange:),
-                    onRetryEvents: viewModel.retryFocusedMonthEvents,
+                    onRetryEvents: viewModel.retryReferenceMonthEvents,
                     onDragEnded: updateDisplayMode(after:)
                 )
             }
@@ -46,7 +48,7 @@ struct CalendarHomeView: View {
             }
             .sheet(isPresented: $isShowingEventCreationView) {
                 CalendarEventCreationView(
-                    focusedDay: viewModel.state.focusedDay,
+                    referenceDay: viewModel.referenceDay,
                     isSaving: viewModel.createState.isSaving,
                     failureMessage: viewModel.createState.failureMessage,
                     onSave: viewModel.createEvent(_:)
@@ -58,7 +60,7 @@ struct CalendarHomeView: View {
     private var calendarTopBar: some View {
         HStack(spacing: 12) {
             CalendarYearMonthTitleView(
-                focusedDay: viewModel.state.focusedDay,
+                referenceDay: viewModel.referenceDay,
                 onSelectedYearMonth: viewModel.selectYearMonth(year:month:)
             )
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -78,13 +80,16 @@ struct CalendarHomeView: View {
     }
 
     @ViewBuilder
-    private func calendarHeader(in geometry: GeometryProxy) -> some View {
+    private func calendarHeader(
+        in geometry: GeometryProxy,
+        items: [CalendarDateCellItem]
+    ) -> some View {
         switch displayMode {
         case .week:
             CalendarDateStripView(
-                items: viewModel.loadedDateCellItems,
-                focusedDay: viewModel.state.focusedDay,
-                onFocusedDayChanged: viewModel.focusDay(_:)
+                items: items,
+                referenceDay: viewModel.referenceDay,
+                onReferenceDayChanged: viewModel.setReferenceDay(_:)
             )
             .frame(height: weekHeaderHeight(in: geometry))
             .transition(.opacity)
@@ -92,9 +97,9 @@ struct CalendarHomeView: View {
 
         case .month:
             CalendarMonthView(
-                items: viewModel.loadedDateCellItems,
-                focusedDay: viewModel.state.focusedDay,
-                onSelectedDay: viewModel.focusDay(_:),
+                items: items,
+                referenceDay: viewModel.referenceDay,
+                onSelectedDay: viewModel.setReferenceDay(_:),
                 onMonthChanged: viewModel.moveMonth(by:)
             )
             .frame(height: monthHeaderHeight(in: geometry))

@@ -139,7 +139,7 @@ struct CalendarState {
     let startDate: Date
     let endDate: Date
     let daysByKey: [DayKey: CalendarDateCellItem]
-    let focusedDay: DayKey
+    private let orderedDateCellItems: [CalendarDateCellItem]
     let monthEventCache: [YearMonthKey: CalendarMonthEventCacheEntry]
     
     enum LoadedEdge: Hashable {
@@ -151,24 +151,29 @@ struct CalendarState {
         startDate: Date,
         endDate: Date,
         daysByKey: [DayKey: CalendarDateCellItem],
-        focusedDay: DayKey,
         monthEventCache: [YearMonthKey: CalendarMonthEventCacheEntry] = [:]
     ) {
         self.startDate = startDate
         self.endDate = endDate
         self.daysByKey = daysByKey
-        self.focusedDay = focusedDay
+        self.orderedDateCellItems = daysByKey.values.sorted { earlierCandidate, laterCandidate in
+            earlierCandidate.id < laterCandidate.id
+        }
         self.monthEventCache = monthEventCache
     }
-    
-    func focused(on day: DayKey) -> CalendarState {
-        return CalendarState(
-            startDate: startDate,
-            endDate: endDate,
-            daysByKey: daysByKey,
-            focusedDay: day,
-            monthEventCache: monthEventCache
-        )
+
+    private init(
+        startDate: Date,
+        endDate: Date,
+        daysByKey: [DayKey: CalendarDateCellItem],
+        orderedDateCellItems: [CalendarDateCellItem],
+        monthEventCache: [YearMonthKey: CalendarMonthEventCacheEntry]
+    ) {
+        self.startDate = startDate
+        self.endDate = endDate
+        self.daysByKey = daysByKey
+        self.orderedDateCellItems = orderedDateCellItems
+        self.monthEventCache = monthEventCache
     }
     
     func isNeedInitialize() -> Bool {
@@ -178,48 +183,81 @@ struct CalendarState {
     func appended(
         startDate newStartDate: Date,
         endDate newEndDate: Date,
-        daysByKey newDaysByKey: [DayKey: CalendarDateCellItem]
+        daysByKey newDaysByKey: [DayKey: CalendarDateCellItem],
+        monthEventCache newMonthEventCache: [YearMonthKey: CalendarMonthEventCacheEntry]? = nil
     ) -> CalendarState {
-        CalendarState(
+        let mergedDaysByKey = daysByKey.merging(newDaysByKey) { current, _ in
+            current
+        }
+        let newOrderedItems = newDaysByKey.values.sorted { earlierCandidate, laterCandidate in
+            earlierCandidate.id < laterCandidate.id
+        }
+        let updatedOrderedItems: [CalendarDateCellItem]
+
+        if newEndDate < startDate {
+            updatedOrderedItems = newOrderedItems + orderedDateCellItems
+        } else if newStartDate > endDate {
+            updatedOrderedItems = orderedDateCellItems + newOrderedItems
+        } else {
+            updatedOrderedItems = mergedDaysByKey.values.sorted { earlierCandidate, laterCandidate in
+                earlierCandidate.id < laterCandidate.id
+            }
+        }
+
+        return CalendarState(
             startDate: min(startDate, newStartDate),
             endDate: max(endDate, newEndDate),
-            daysByKey: daysByKey.merging(newDaysByKey) { current, _ in
-                current
-            },
-            focusedDay: focusedDay,
-            monthEventCache: monthEventCache
+            daysByKey: mergedDaysByKey,
+            orderedDateCellItems: updatedOrderedItems,
+            monthEventCache: newMonthEventCache ?? monthEventCache
         )
     }
 
     func replacingDateCells(
         startDate newStartDate: Date,
         endDate newEndDate: Date,
-        daysByKey newDaysByKey: [DayKey: CalendarDateCellItem]
+        daysByKey newDaysByKey: [DayKey: CalendarDateCellItem],
+        monthEventCache newMonthEventCache: [YearMonthKey: CalendarMonthEventCacheEntry]? = nil
     ) -> CalendarState {
         CalendarState(
             startDate: newStartDate,
             endDate: newEndDate,
             daysByKey: newDaysByKey,
-            focusedDay: focusedDay,
-            monthEventCache: monthEventCache
+            monthEventCache: newMonthEventCache ?? monthEventCache
         )
     }
 
     func replacingMonthEventCache(
-        _ newMonthEventCache: [YearMonthKey: CalendarMonthEventCacheEntry]
+        _ newMonthEventCache: [YearMonthKey: CalendarMonthEventCacheEntry],
+        updatingDateCells newDaysByKey: [DayKey: CalendarDateCellItem] = [:]
     ) -> CalendarState {
-        CalendarState(
+        guard !newDaysByKey.isEmpty else {
+            return CalendarState(
+                startDate: startDate,
+                endDate: endDate,
+                daysByKey: daysByKey,
+                orderedDateCellItems: orderedDateCellItems,
+                monthEventCache: newMonthEventCache
+            )
+        }
+
+        let mergedDaysByKey = daysByKey.merging(newDaysByKey) { _, new in
+            new
+        }
+        let updatedOrderedItems = orderedDateCellItems.map { item in
+            newDaysByKey[item.id] ?? item
+        }
+
+        return CalendarState(
             startDate: startDate,
             endDate: endDate,
-            daysByKey: daysByKey,
-            focusedDay: focusedDay,
+            daysByKey: mergedDaysByKey,
+            orderedDateCellItems: updatedOrderedItems,
             monthEventCache: newMonthEventCache
         )
     }
     
     func loadedDateCellItems(calendar: Calendar) -> [CalendarDateCellItem] {
-        daysByKey.values.sorted { earlierCandidate, laterCandidate in
-            earlierCandidate.id.toDate(calendar: calendar) < laterCandidate.id.toDate(calendar: calendar)
-        }
+        return orderedDateCellItems
     }
 }

@@ -11,8 +11,8 @@ struct CalendarDateStripView: View {
     private let dateCellCount = 7
     
     let items: [CalendarDateCellItem]
-    let focusedDay: DayKey
-    let onFocusedDayChanged: (DayKey) -> Void
+    let referenceDay: DayKey
+    let onReferenceDayChanged: (DayKey) -> Void
     
     @StateObject private var focusCoordinator = CalendarScrollFocusCoordinator()
     
@@ -25,7 +25,7 @@ struct CalendarDateStripView: View {
 
             let itemIDs = items.map(\.id)
 
-            if focusCoordinator.canRenderContent(focusedDay: focusedDay, itemIDs: itemIDs) {
+            if focusCoordinator.canRenderContent(referenceDay: referenceDay, itemIDs: itemIDs) {
                 scrollContent(cellWidth: cellWidth, spacing: spacing, itemIDs: itemIDs)
             } else {
                 initialAlignmentPlaceholder(itemIDs: itemIDs)
@@ -46,9 +46,9 @@ struct CalendarDateStripView: View {
                         dayText: item.dayText,
                         isToday: item.isToday,
                         onTap: {
-                            focusCoordinator.notifyUserSelectedFocusedDay(
+                            focusCoordinator.notifyUserSelectedReferenceDay(
                                 item.id,
-                                onFocusedDayChanged: onFocusedDayChanged
+                                onReferenceDayChanged: onReferenceDayChanged
                             )
                         },
                         events: item.events
@@ -60,24 +60,23 @@ struct CalendarDateStripView: View {
             .scrollTargetLayout()
         }
         .scrollIndicators(.hidden)
-        .scrollTargetBehavior(.viewAligned)
         .scrollPosition(id: $focusCoordinator.scrollPosition, anchor: .leading)
         .onChange(of: focusCoordinator.scrollPosition) { _, newDay in
-            focusCoordinator.notifyScrollFocusedDayIfNeeded(
+            focusCoordinator.notifyScrollReferenceDayIfNeeded(
                 newDay,
-                currentFocusedDay: focusedDay,
-                onFocusedDayChanged: onFocusedDayChanged
+                currentReferenceDay: referenceDay,
+                onReferenceDayChanged: onReferenceDayChanged
             )
         }
-        .onChange(of: focusedDay) { _, newDay in
-            focusCoordinator.alignAfterFocusedDayChanged(
+        .onChange(of: referenceDay) { _, newDay in
+            focusCoordinator.alignAfterReferenceDayChanged(
                 to: newDay,
                 itemIDs: itemIDs
             )
         }
         .onChange(of: itemIDs) { _, newItemIDs in
             focusCoordinator.alignAfterItemsChanged(
-                focusedDay: focusedDay,
+                referenceDay: referenceDay,
                 itemIDs: newItemIDs
             )
         }
@@ -90,19 +89,19 @@ struct CalendarDateStripView: View {
         Color.clear
             .onAppear {
                 focusCoordinator.prepareContentPosition(
-                    focusedDay: focusedDay,
+                    referenceDay: referenceDay,
                     itemIDs: itemIDs
                 )
             }
             .onChange(of: itemIDs) { _, newItemIDs in
                 focusCoordinator.prepareContentPosition(
-                    focusedDay: focusedDay,
+                    referenceDay: referenceDay,
                     itemIDs: newItemIDs
                 )
             }
-            .onChange(of: focusedDay) { _, newDay in
+            .onChange(of: referenceDay) { _, newDay in
                 focusCoordinator.prepareContentPosition(
-                    focusedDay: newDay,
+                    referenceDay: newDay,
                     itemIDs: itemIDs
                 )
             }
@@ -193,8 +192,8 @@ struct CalendarDateStripView: View {
     
     CalendarDateStripView(
         items: items,
-        focusedDay: items[0].id,
-        onFocusedDayChanged: { _ in }
+        referenceDay: items[0].id,
+        onReferenceDayChanged: { _ in }
     )
     .frame(height: 110)
 }

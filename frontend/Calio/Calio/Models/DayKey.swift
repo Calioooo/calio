@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct DayKey: Hashable {
+struct DayKey: Hashable, Comparable {
     let year: Int
     let month: Int
     let day: Int
@@ -44,7 +44,19 @@ struct DayKey: Hashable {
         guard let date = calendar.date(from: components) else {
             preconditionFailure("Failed to create date from DayKey: \(self)")
         }
-        
+
         return date
+    }
+
+    static func < (lhs: DayKey, rhs: DayKey) -> Bool {
+        if lhs.year != rhs.year {
+            return lhs.year < rhs.year
+        }
+
+        if lhs.month != rhs.month {
+            return lhs.month < rhs.month
+        }
+
+        return lhs.day < rhs.day
     }
 }

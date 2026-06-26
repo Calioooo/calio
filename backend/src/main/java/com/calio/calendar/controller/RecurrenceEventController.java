@@ -43,6 +43,12 @@ public class RecurrenceEventController {
         return recurrenceEventService.getRecurrenceEvent(recurrenceId);
     }
 
+    @DeleteMapping("/{recurrenceId}")
+    public ResponseEntity<Void> deleteRecurrenceEvent(@PathVariable Long recurrenceId) {
+        recurrenceEventService.deleteRecurrenceEvent(recurrenceId);
+        return ResponseEntity.noContent().build();
+    }
+
     @PatchMapping("/{recurrenceId}")
     public RecurrenceEventResponse updateRecurrenceEvent(
             @PathVariable Long recurrenceId,
