@@ -417,14 +417,30 @@ struct CalioTests {
             startAt: startAt,
             endAt: endAt,
             isRecurrenceEnabled: true,
-            recurrenceEndAt: sameUTCDate
+            recurrenceStartDate: startAt,
+            recurrenceEndDate: sameUTCDate,
+            recurrenceStartTime: startAt,
+            recurrenceEndTime: endAt
         ))
         #expect(!CalendarEventCreationView.canSave(
             title: "반복 회의",
             startAt: startAt,
             endAt: endAt,
             isRecurrenceEnabled: true,
-            recurrenceEndAt: previousUTCDate
+            recurrenceStartDate: startAt,
+            recurrenceEndDate: previousUTCDate,
+            recurrenceStartTime: startAt,
+            recurrenceEndTime: endAt
+        ))
+        #expect(!CalendarEventCreationView.canSave(
+            title: "반복 회의",
+            startAt: startAt,
+            endAt: endAt,
+            isRecurrenceEnabled: true,
+            recurrenceStartDate: startAt,
+            recurrenceEndDate: sameUTCDate,
+            recurrenceStartTime: startAt,
+            recurrenceEndTime: startAt
         ))
     }
 
@@ -541,12 +557,13 @@ struct CalioTests {
         #expect(repository.createRequests.count == 1)
     }
 
-    @Test func eventServiceCreateRecurrenceEventMapsUTCDateAndTimeIntoRepositoryRequest() async throws {
+    @Test func eventServiceCreateRecurrenceEventMapsSeparateUTCDateAndTimeIntoRepositoryRequest() async throws {
         var kstCalendar = Calendar(identifier: .gregorian)
         kstCalendar.timeZone = TimeZone(secondsFromGMT: 9 * 3600)!
-        let startAt = try #require(kstCalendar.date(from: DateComponents(year: 2026, month: 8, day: 1, hour: 9)))
-        let endAt = try #require(kstCalendar.date(from: DateComponents(year: 2026, month: 8, day: 1, hour: 10, minute: 30)))
-        let recurrenceEndAt = try #require(kstCalendar.date(from: DateComponents(year: 2026, month: 8, day: 31, hour: 9)))
+        let recurrenceStartDate = try #require(kstCalendar.date(from: DateComponents(year: 2026, month: 8, day: 1, hour: 9)))
+        let recurrenceEndDate = try #require(kstCalendar.date(from: DateComponents(year: 2026, month: 8, day: 31, hour: 9)))
+        let recurrenceStartTime = try #require(kstCalendar.date(from: DateComponents(year: 2026, month: 9, day: 2, hour: 9)))
+        let recurrenceEndTime = try #require(kstCalendar.date(from: DateComponents(year: 2026, month: 9, day: 2, hour: 10, minute: 30)))
         let repository = RecordingEventRepository()
         let service = EventService(repository: repository)
 
@@ -554,9 +571,10 @@ struct CalioTests {
             RecurrenceEventCreateInput(
                 title: "아침 루틴",
                 description: "반복 설명",
-                startAt: startAt,
-                endAt: endAt,
-                recurrenceEndAt: recurrenceEndAt,
+                recurrenceStartDate: recurrenceStartDate,
+                recurrenceEndDate: recurrenceEndDate,
+                recurrenceStartTime: recurrenceStartTime,
+                recurrenceEndTime: recurrenceEndTime,
                 recurrenceFrequency: .weekly
             )
         )
@@ -888,9 +906,10 @@ struct CalioTests {
                 RecurrenceEventCreateInput(
                     title: "반복 회의",
                     description: "설명",
-                    startAt: baseDate,
-                    endAt: baseDate.addingTimeInterval(3600),
-                    recurrenceEndAt: baseDate.addingTimeInterval(86400),
+                    recurrenceStartDate: baseDate,
+                    recurrenceEndDate: baseDate.addingTimeInterval(86400),
+                    recurrenceStartTime: baseDate,
+                    recurrenceEndTime: baseDate.addingTimeInterval(3600),
                     recurrenceFrequency: .daily
                 )
             )

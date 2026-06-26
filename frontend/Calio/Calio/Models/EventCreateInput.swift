@@ -17,9 +17,10 @@ struct EventCreateInput: Equatable {
 struct RecurrenceEventCreateInput: Equatable {
     let title: String
     let description: String
-    let startAt: Date
-    let endAt: Date
-    let recurrenceEndAt: Date
+    let recurrenceStartDate: Date
+    let recurrenceEndDate: Date
+    let recurrenceStartTime: Date
+    let recurrenceEndTime: Date
     let recurrenceFrequency: RecurrenceFrequency
 }
 

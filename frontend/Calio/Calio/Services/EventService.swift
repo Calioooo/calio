@@ -48,10 +48,10 @@ struct EventService {
         let request = CreateRecurrenceEventRequestDTO(
             recurrenceTitle: input.title,
             recurrenceDescription: input.description,
-            recurrenceStartDate: Self.utcDateString(from: input.startAt),
-            recurrenceEndDate: Self.utcDateString(from: input.recurrenceEndAt),
-            recurrenceStartTime: Self.utcTimeString(from: input.startAt),
-            recurrenceEndTime: Self.utcTimeString(from: input.endAt),
+            recurrenceStartDate: Self.utcDateString(from: input.recurrenceStartDate),
+            recurrenceEndDate: Self.utcDateString(from: input.recurrenceEndDate),
+            recurrenceStartTime: Self.utcTimeString(from: input.recurrenceStartTime),
+            recurrenceEndTime: Self.utcTimeString(from: input.recurrenceEndTime),
             recurrenceFrequency: input.recurrenceFrequency
         )
 
