@@ -65,4 +65,13 @@ public class RecurrenceEventController {
     ) {
         return recurrenceEventService.updateRecurrenceOccurrence(recurrenceId, eventId, request);
     }
+
+    @DeleteMapping("/{recurrenceId}/occurrences/{eventId}")
+    public ResponseEntity<Void> deleteRecurrenceOccurrence(
+            @PathVariable Long recurrenceId,
+            @PathVariable Long eventId
+    ) {
+        recurrenceEventService.deleteRecurrenceOccurrence(recurrenceId, eventId);
+        return ResponseEntity.noContent().build();
+    }
 }

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.calio.calendar.controller.dto.EventResponse;
@@ -61,7 +62,7 @@ class RecurrenceEventServiceTest {
                 RecurrenceFrequency.DAILY
         );
         when(recurrenceEventRepository.findById(1L)).thenReturn(Optional.of(recurrenceEvent));
-        when(eventRepository.findByRecurrenceIdOrderByStartAtAsc(1L)).thenReturn(List.of());
+        when(eventRepository.findByRecurrenceIdAndDeletedAtIsNullOrderByStartAtAsc(1L)).thenReturn(List.of());
 
         UpdateRecurrenceEventRequest request = new UpdateRecurrenceEventRequest(
                 "Updated",
@@ -122,7 +123,7 @@ class RecurrenceEventServiceTest {
                 RecurrenceFrequency.DAILY
         );
         when(recurrenceEventRepository.findById(1L)).thenReturn(Optional.of(recurrenceEvent));
-        when(eventRepository.findByRecurrenceIdOrderByStartAtAsc(1L)).thenReturn(List.of());
+        when(eventRepository.findByRecurrenceIdAndDeletedAtIsNullOrderByStartAtAsc(1L)).thenReturn(List.of());
 
         UpdateRecurrenceEventRequest request = new UpdateRecurrenceEventRequest(
                 null,
@@ -269,6 +270,152 @@ class RecurrenceEventServiceTest {
     }
 
     @Test
+    @DisplayName("사용자가 반복 일정의 단일 occurrence를 삭제하면 Event의 deletedAt만 설정되고 Override는 변경되지 않는다")
+    void givenExistingOccurrence_whenDeleteRecurrenceOccurrence_thenSoftDeletesEventWithoutOverrideUse() {
+        // given
+        RecurrenceEvent recurrenceEvent = recurrenceEvent(
+                "Rule",
+                null,
+                "2027-04-11",
+                "2027-04-11",
+                RecurrenceFrequency.DAILY
+        );
+        Event event = event("Occurrence", "2027-04-11T09:00:00Z", "2027-04-11T10:00:00Z", 1L);
+        String originalTitle = event.getTitle();
+        Instant originalStartAt = event.getStartAt();
+        Instant originalEndAt = event.getEndAt();
+
+        when(recurrenceEventRepository.findById(1L)).thenReturn(Optional.of(recurrenceEvent));
+        when(eventRepository.findById(10L)).thenReturn(Optional.of(event));
+
+        // when
+        recurrenceEventService.deleteRecurrenceOccurrence(1L, 10L);
+
+        // then
+        assertThat(event.getDeletedAt()).isNotNull();
+        assertThat(event.getTitle()).isEqualTo(originalTitle);
+        assertThat(event.getStartAt()).isEqualTo(originalStartAt);
+        assertThat(event.getEndAt()).isEqualTo(originalEndAt);
+        assertThat(event.getRecurrenceId()).contains(1L);
+        verify(eventRepository).flush();
+        verifyNoInteractions(recurrenceEventOverrideRepository);
+    }
+
+    @Test
+    @DisplayName("반복 occurrence 삭제는 이미 deletedAt이 있으면 기존 값을 보존한다")
+    void givenAlreadyDeletedOccurrence_whenDeleteRecurrenceOccurrence_thenPreservesDeletedAt() {
+        // given
+        RecurrenceEvent recurrenceEvent = recurrenceEvent(
+                "Rule",
+                null,
+                "2027-04-21",
+                "2027-04-21",
+                RecurrenceFrequency.DAILY
+        );
+        Event event = event("Occurrence", "2027-04-21T09:00:00Z", "2027-04-21T10:00:00Z", 1L);
+        Instant existingDeletedAt = Instant.parse("2027-04-21T12:00:00Z");
+        event.softDelete(existingDeletedAt);
+
+        when(recurrenceEventRepository.findById(1L)).thenReturn(Optional.of(recurrenceEvent));
+        when(eventRepository.findById(10L)).thenReturn(Optional.of(event));
+
+        // when
+        recurrenceEventService.deleteRecurrenceOccurrence(1L, 10L);
+
+        // then
+        assertThat(event.getDeletedAt()).isEqualTo(existingDeletedAt);
+        verify(eventRepository).flush();
+        verifyNoInteractions(recurrenceEventOverrideRepository);
+    }
+
+    @Test
+    @DisplayName("반복 occurrence 삭제는 recurrenceId를 먼저 확인하고 없으면 event를 조회하지 않는다")
+    void givenMissingRecurrenceId_whenDeleteRecurrenceOccurrence_thenThrowsRecurrenceEventNotFound() {
+        // given
+        when(recurrenceEventRepository.findById(999L)).thenReturn(Optional.empty());
+
+        // when, then
+        assertThatThrownBy(() -> recurrenceEventService.deleteRecurrenceOccurrence(999L, 10L))
+                .isInstanceOfSatisfying(CalioException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.RECURRENCE_EVENT_NOT_FOUND)
+                );
+        verify(eventRepository, never()).findById(10L);
+        verifyNoInteractions(recurrenceEventOverrideRepository);
+    }
+
+    @Test
+    @DisplayName("반복 occurrence 삭제는 존재하지 않는 eventId면 EVENT_NOT_FOUND를 반환한다")
+    void givenMissingEventId_whenDeleteRecurrenceOccurrence_thenThrowsEventNotFound() {
+        // given
+        RecurrenceEvent recurrenceEvent = recurrenceEvent(
+                "Rule",
+                null,
+                "2027-04-22",
+                "2027-04-22",
+                RecurrenceFrequency.DAILY
+        );
+        when(recurrenceEventRepository.findById(1L)).thenReturn(Optional.of(recurrenceEvent));
+        when(eventRepository.findById(999L)).thenReturn(Optional.empty());
+
+        // when, then
+        assertThatThrownBy(() -> recurrenceEventService.deleteRecurrenceOccurrence(1L, 999L))
+                .isInstanceOfSatisfying(CalioException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.EVENT_NOT_FOUND)
+                );
+        verifyNoInteractions(recurrenceEventOverrideRepository);
+    }
+
+    @Test
+    @DisplayName("반복 occurrence 삭제는 event가 path recurrenceId에 속하지 않으면 RECURRENCE_OCCURRENCE_NOT_FOUND를 반환한다")
+    void givenMismatchedRecurrenceId_whenDeleteRecurrenceOccurrence_thenThrowsOccurrenceNotFound() {
+        // given
+        RecurrenceEvent recurrenceEvent = recurrenceEvent(
+                "Rule",
+                null,
+                "2027-04-23",
+                "2027-04-23",
+                RecurrenceFrequency.DAILY
+        );
+        Event event = event("Other occurrence", "2027-04-23T09:00:00Z", "2027-04-23T10:00:00Z", 2L);
+
+        when(recurrenceEventRepository.findById(1L)).thenReturn(Optional.of(recurrenceEvent));
+        when(eventRepository.findById(10L)).thenReturn(Optional.of(event));
+
+        // when, then
+        assertThatThrownBy(() -> recurrenceEventService.deleteRecurrenceOccurrence(1L, 10L))
+                .isInstanceOfSatisfying(CalioException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.RECURRENCE_OCCURRENCE_NOT_FOUND)
+                );
+        assertThat(event.getDeletedAt()).isNull();
+        verifyNoInteractions(recurrenceEventOverrideRepository);
+    }
+
+    @Test
+    @DisplayName("반복 occurrence 삭제는 일반 event면 RECURRENCE_OCCURRENCE_NOT_FOUND를 반환한다")
+    void givenNormalEvent_whenDeleteRecurrenceOccurrence_thenThrowsOccurrenceNotFound() {
+        // given
+        RecurrenceEvent recurrenceEvent = recurrenceEvent(
+                "Rule",
+                null,
+                "2027-04-24",
+                "2027-04-24",
+                RecurrenceFrequency.DAILY
+        );
+        Event event = event("Normal event", "2027-04-24T09:00:00Z", "2027-04-24T10:00:00Z", null);
+
+        when(recurrenceEventRepository.findById(1L)).thenReturn(Optional.of(recurrenceEvent));
+        when(eventRepository.findById(10L)).thenReturn(Optional.of(event));
+
+        // when, then
+        assertThatThrownBy(() -> recurrenceEventService.deleteRecurrenceOccurrence(1L, 10L))
+                .isInstanceOfSatisfying(CalioException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.RECURRENCE_OCCURRENCE_NOT_FOUND)
+                );
+        assertThat(event.getDeletedAt()).isNull();
+        verifyNoInteractions(recurrenceEventOverrideRepository);
+    }
+
+    @Test
     @DisplayName("override가 이미 생성된 경우 기존 override를 사용해 occurrence를 수정한다")
     void givenExistingOverride_whenUpdateRecurrenceOccurrence_thenReusesOverride() {
         // given
@@ -344,7 +491,7 @@ class RecurrenceEventServiceTest {
         Event stale = event("Stale", "2027-01-09T09:00:00Z", "2027-01-09T10:00:00Z", 1L);
 
         when(recurrenceEventRepository.findById(1L)).thenReturn(Optional.of(recurrenceEvent));
-        when(eventRepository.findByRecurrenceIdOrderByStartAtAsc(1L))
+        when(eventRepository.findByRecurrenceIdAndDeletedAtIsNullOrderByStartAtAsc(1L))
                 .thenReturn(List.of(retainedFirst, retainedSecond, stale));
 
         UpdateRecurrenceEventRequest request = new UpdateRecurrenceEventRequest(

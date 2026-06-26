@@ -35,6 +35,9 @@ public class Event extends BaseEntity {
     @Column(name = "recurrence_id")
     private Long recurrenceId;
 
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
+
     protected Event() {
     }
 
@@ -72,6 +75,14 @@ public class Event extends BaseEntity {
         this.importantEvent = importantEvent;
     }
 
+    public void softDelete(Instant deletedAt) {
+        if (this.deletedAt != null) {
+            return;
+        }
+
+        this.deletedAt = deletedAt;
+    }
+
     public Long getId() {
         return id;
     }
@@ -94,6 +105,10 @@ public class Event extends BaseEntity {
 
     public boolean importantEvent() {
         return importantEvent;
+    }
+
+    public Instant getDeletedAt() {
+        return deletedAt;
     }
 
     public Optional<Long> getRecurrenceId() {
