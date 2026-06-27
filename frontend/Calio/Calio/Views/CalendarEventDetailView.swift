@@ -16,6 +16,7 @@ struct CalendarEventDetailView: View {
                 titleSection
                 timeSection
                 statusSection
+                recurrenceDetailSection
                 descriptionSection
             }
             .navigationTitle("일정 상세")
@@ -72,6 +73,16 @@ struct CalendarEventDetailView: View {
     }
 
     @ViewBuilder
+    private var recurrenceDetailSection: some View {
+        if isRepeatedEvent {
+            Section("반복 정보") {
+                LabeledContent("반복 기간", value: "제공된 정보 없음")
+                LabeledContent("반복 주기", value: "제공된 정보 없음")
+            }
+        }
+    }
+
+    @ViewBuilder
     private var descriptionSection: some View {
         if hasDescription {
             Section("설명") {
@@ -97,6 +108,10 @@ struct CalendarEventDetailView: View {
         Self.recurrenceStatusText(for: event)
     }
 
+    private var isRepeatedEvent: Bool {
+        Self.isRepeatedEvent(event)
+    }
+
     nonisolated static func importantStatusText(for event: Event) -> String {
         event.importantEvent ? "중요 일정" : "일반 일정"
     }
@@ -105,7 +120,7 @@ struct CalendarEventDetailView: View {
         isRepeatedEvent(event) ? "반복 일정" : "반복 없음"
     }
 
-    private nonisolated static func isRepeatedEvent(_ event: Event) -> Bool {
+    nonisolated static func isRepeatedEvent(_ event: Event) -> Bool {
         event.isRecurrenceOccurrence || event.recurrenceId != nil
     }
 }
