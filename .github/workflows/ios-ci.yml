@@ -23,4 +23,4 @@ jobs:
         xcodebuild test \
           -project Calio.xcodeproj \
           -scheme Calio \
-          -destination 'platform=iOS Simulator, name=iPhone 16 Pro,OS=18.5'
+          -destination 'platform=iOS Simulator,name=iPhone 16 Pro,OS=18.5'
