@@ -1039,11 +1039,14 @@ struct CalioTests {
 }
 
 private final class RecordingEventRepository: EventRepository {
-    private(set) var requests: [(startDate: Date, endDate: Date)] = []
-    private(set) var createRequests: [CreateEventRequestDTO] = []
-    private(set) var recurrenceCreateRequests: [CreateRecurrenceEventRequestDTO] = []
+    private let lock = NSLock()
+    private var storedRequests: [(startDate: Date, endDate: Date)] = []
+    private var storedCreateRequests: [CreateEventRequestDTO] = []
+    private var storedRecurrenceCreateRequests: [CreateRecurrenceEventRequestDTO] = []
     private var suspendedContinuations: [CheckedContinuation<[EventResponseDTO], Error>] = []
     private var suspendedCreateContinuations: [CheckedContinuation<EventResponseDTO, Error>] = []
+    private var requestCountWaiters: [CountWaiter] = []
+    private var createRequestCountWaiters: [CountWaiter] = []
     private let shouldSuspend: Bool
     private let shouldSuspendCreate: Bool
     private let error: Error?
@@ -1090,12 +1093,32 @@ private final class RecordingEventRepository: EventRepository {
         self.recurrenceCreateError = recurrenceCreateError
     }
 
+    var requests: [(startDate: Date, endDate: Date)] {
+        locked {
+            storedRequests
+        }
+    }
+
+    var createRequests: [CreateEventRequestDTO] {
+        locked {
+            storedCreateRequests
+        }
+    }
+
+    var recurrenceCreateRequests: [CreateRecurrenceEventRequestDTO] {
+        locked {
+            storedRecurrenceCreateRequests
+        }
+    }
+
     var requestCount: Int {
-        requests.count
+        locked {
+            storedRequests.count
+        }
     }
 
     func fetchEvents(from startDate: Date, to endDate: Date) async throws -> [EventResponseDTO] {
-        requests.append((startDate, endDate))
+        recordRequest(startDate: startDate, endDate: endDate)
 
         if let error {
             throw error
@@ -1103,7 +1126,9 @@ private final class RecordingEventRepository: EventRepository {
 
         if shouldSuspend {
             return try await withCheckedThrowingContinuation { continuation in
-                suspendedContinuations.append(continuation)
+                locked {
+                    suspendedContinuations.append(continuation)
+                }
             }
         }
 
@@ -1111,15 +1136,17 @@ private final class RecordingEventRepository: EventRepository {
     }
 
     func createEvent(_ request: CreateEventRequestDTO) async throws -> EventResponseDTO {
-        createRequests.append(request)
+        recordCreateRequest(request)
 
-        if let createError {
+        if let createError = locked({ createError }) {
             throw createError
         }
 
         if shouldSuspendCreate {
             return try await withCheckedThrowingContinuation { continuation in
-                suspendedCreateContinuations.append(continuation)
+                locked {
+                    suspendedCreateContinuations.append(continuation)
+                }
             }
         }
 
@@ -1127,7 +1154,9 @@ private final class RecordingEventRepository: EventRepository {
     }
 
     func createRecurrenceEvent(_ request: CreateRecurrenceEventRequestDTO) async throws -> RecurrenceEventResponseDTO {
-        recurrenceCreateRequests.append(request)
+        locked {
+            storedRecurrenceCreateRequests.append(request)
+        }
 
         if let recurrenceCreateError {
             throw recurrenceCreateError
@@ -1137,30 +1166,28 @@ private final class RecordingEventRepository: EventRepository {
     }
 
     func setCreateError(_ error: Error?) {
-        createError = error
+        locked {
+            createError = error
+        }
     }
 
     func waitForRequestCount(
         _ count: Int,
         timeoutNanoseconds: UInt64 = 5_000_000_000
     ) async -> Bool {
-        let retryIntervalNanoseconds: UInt64 = 10_000_000
-        let maxAttemptCount = Int(timeoutNanoseconds / retryIntervalNanoseconds)
-        
-        for _ in 0...maxAttemptCount {
-            if requests.count >= count {
-                return true
-            }
-            
-            try? await Task.sleep(nanoseconds: retryIntervalNanoseconds)
-        }
-        
-        return requests.count >= count
+        await waitForCount(
+            count,
+            timeoutNanoseconds: timeoutNanoseconds,
+            kind: .fetch
+        )
     }
 
     func finishSuspendedRequests() {
-        let continuations = suspendedContinuations
-        suspendedContinuations.removeAll()
+        let continuations = locked {
+            let continuations = suspendedContinuations
+            suspendedContinuations.removeAll()
+            return continuations
+        }
         continuations.forEach { continuation in
             continuation.resume(returning: [])
         }
@@ -1170,23 +1197,19 @@ private final class RecordingEventRepository: EventRepository {
         _ count: Int,
         timeoutNanoseconds: UInt64 = 5_000_000_000
     ) async -> Bool {
-        let retryIntervalNanoseconds: UInt64 = 10_000_000
-        let maxAttemptCount = Int(timeoutNanoseconds / retryIntervalNanoseconds)
-
-        for _ in 0...maxAttemptCount {
-            if createRequests.count >= count {
-                return true
-            }
-
-            try? await Task.sleep(nanoseconds: retryIntervalNanoseconds)
-        }
-
-        return createRequests.count >= count
+        await waitForCount(
+            count,
+            timeoutNanoseconds: timeoutNanoseconds,
+            kind: .create
+        )
     }
 
     func finishSuspendedCreateRequests() {
-        let continuations = suspendedCreateContinuations
-        suspendedCreateContinuations.removeAll()
+        let continuations = locked {
+            let continuations = suspendedCreateContinuations
+            suspendedCreateContinuations.removeAll()
+            return continuations
+        }
         continuations.forEach { continuation in
             continuation.resume(returning: createResponse)
         }
@@ -1196,6 +1219,139 @@ private final class RecordingEventRepository: EventRepository {
         requests.map { request in
             YearMonthKey(date: request.startDate, calendar: calendar)
         }.sorted()
+    }
+
+    private func recordRequest(startDate: Date, endDate: Date) {
+        let continuations = locked {
+            storedRequests.append((startDate, endDate))
+            return readyWaiters(from: &requestCountWaiters, currentCount: storedRequests.count)
+        }
+        continuations.forEach { $0.resume(returning: true) }
+    }
+
+    private func recordCreateRequest(_ request: CreateEventRequestDTO) {
+        let continuations = locked {
+            storedCreateRequests.append(request)
+            return readyWaiters(
+                from: &createRequestCountWaiters,
+                currentCount: storedCreateRequests.count
+            )
+        }
+        continuations.forEach { $0.resume(returning: true) }
+    }
+
+    private func waitForCount(
+        _ count: Int,
+        timeoutNanoseconds: UInt64,
+        kind: CountWaiterKind
+    ) async -> Bool {
+        let waiterID = UUID()
+
+        return await withCheckedContinuation { continuation in
+            let shouldWait = locked {
+                guard currentCount(for: kind) < count else {
+                    return false
+                }
+
+                appendWaiter(
+                    CountWaiter(
+                        id: waiterID,
+                        count: count,
+                        continuation: continuation
+                    ),
+                    for: kind
+                )
+                return true
+            }
+
+            guard shouldWait else {
+                continuation.resume(returning: true)
+                return
+            }
+
+            Task {
+                try? await Task.sleep(nanoseconds: timeoutNanoseconds)
+                completeWaiterIfNeeded(id: waiterID, kind: kind)
+            }
+        }
+    }
+
+    private func completeWaiterIfNeeded(
+        id: UUID,
+        kind: CountWaiterKind
+    ) {
+        let continuation = locked {
+            let waiters = waiters(for: kind)
+            guard let index = waiters.firstIndex(where: { $0.id == id }) else {
+                return nil as CheckedContinuation<Bool, Never>?
+            }
+
+            return removeWaiter(at: index, for: kind).continuation
+        }
+
+        continuation?.resume(returning: false)
+    }
+
+    private func currentCount(for kind: CountWaiterKind) -> Int {
+        switch kind {
+        case .fetch:
+            return storedRequests.count
+        case .create:
+            return storedCreateRequests.count
+        }
+    }
+
+    private func waiters(for kind: CountWaiterKind) -> [CountWaiter] {
+        switch kind {
+        case .fetch:
+            return requestCountWaiters
+        case .create:
+            return createRequestCountWaiters
+        }
+    }
+
+    private func appendWaiter(_ waiter: CountWaiter, for kind: CountWaiterKind) {
+        switch kind {
+        case .fetch:
+            requestCountWaiters.append(waiter)
+        case .create:
+            createRequestCountWaiters.append(waiter)
+        }
+    }
+
+    private func removeWaiter(at index: Int, for kind: CountWaiterKind) -> CountWaiter {
+        switch kind {
+        case .fetch:
+            return requestCountWaiters.remove(at: index)
+        case .create:
+            return createRequestCountWaiters.remove(at: index)
+        }
+    }
+
+    private func readyWaiters(
+        from waiters: inout [CountWaiter],
+        currentCount: Int
+    ) -> [CheckedContinuation<Bool, Never>] {
+        let readyWaiters = waiters.filter { currentCount >= $0.count }
+        waiters.removeAll { currentCount >= $0.count }
+        return readyWaiters.map(\.continuation)
+    }
+
+    private func locked<T>(_ work: () -> T) -> T {
+        lock.lock()
+        defer { lock.unlock() }
+        return work()
+    }
+
+    private struct CountWaiter {
+        let id: UUID
+        let count: Int
+        let continuation: CheckedContinuation<Bool, Never>
+    }
+
+    private enum CountWaiterKind {
+        case fetch
+        case create
     }
 }
 
