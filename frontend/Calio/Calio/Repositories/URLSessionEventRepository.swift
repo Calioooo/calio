@@ -49,12 +49,37 @@ struct URLSessionEventRepository: EventRepository {
         return try await response(EventResponseDTO.self, for: request)
     }
 
+    func createRecurrenceEvent(
+        _ requestDTO: CreateRecurrenceEventRequestDTO
+    ) async throws -> RecurrenceEventResponseDTO {
+        let request = try makeRequest(
+            method: "POST",
+            url: recurrenceEventsURL(),
+            body: requestDTO
+        )
+
+        return try await response(RecurrenceEventResponseDTO.self, for: request)
+    }
+
     private func eventsURL(queryItems: [URLQueryItem] = []) throws -> URL {
         var components = URLComponents(
             url: baseURL.appendingPathComponent("api/events"),
             resolvingAgainstBaseURL: false
         )
         components?.queryItems = queryItems.isEmpty ? nil : queryItems
+
+        guard let url = components?.url else {
+            throw EventRepositoryError.invalidURL
+        }
+
+        return url
+    }
+
+    private func recurrenceEventsURL() throws -> URL {
+        var components = URLComponents(
+            url: baseURL.appendingPathComponent("api/recurrence-events"),
+            resolvingAgainstBaseURL: false
+        )
 
         guard let url = components?.url else {
             throw EventRepositoryError.invalidURL

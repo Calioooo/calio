@@ -14,6 +14,9 @@ struct Event: Identifiable {
     let startAt: Date
     let endAt: Date
     let colorCode: String
+    let importantEvent: Bool
+    let recurrenceId: Int64?
+    let isRecurrenceOccurrence: Bool
     
     init(
         id: Int64 = 0,
@@ -21,7 +24,10 @@ struct Event: Identifiable {
         description: String,
         startAt: Date,
         endAt: Date,
-        colorCode: String
+        colorCode: String,
+        importantEvent: Bool = false,
+        recurrenceId: Int64? = nil,
+        isRecurrenceOccurrence: Bool = false
     ) {
         self.id = id
         self.title = title
@@ -29,5 +35,8 @@ struct Event: Identifiable {
         self.startAt = startAt
         self.endAt = endAt
         self.colorCode = colorCode
+        self.importantEvent = importantEvent
+        self.recurrenceId = recurrenceId
+        self.isRecurrenceOccurrence = isRecurrenceOccurrence
     }
 }

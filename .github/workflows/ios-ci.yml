@@ -17,10 +17,25 @@ jobs:
     - name: Show Xcode version
       run: xcodebuild -version
 
+    - name: Select iOS simulator
+      id: simulator
+      run: |
+        device_id=$(
+          xcrun simctl list devices available --json | ruby -rjson -e '
+            devices = JSON.parse(STDIN.read).fetch("devices").values.flatten
+            iphones = devices.select { |device| device.fetch("name").start_with?("iPhone") }
+            preferred = iphones.find { |device| device.fetch("name") == "iPhone 16 Pro" }
+            selected = preferred || iphones.first
+            abort("No available iPhone simulator found") unless selected
+            puts selected.fetch("udid")
+          '
+        )
+        echo "id=$device_id" >> "$GITHUB_OUTPUT"
+
     - name: Run iOS tests
       working-directory: frontend/Calio
       run: |
         xcodebuild test \
           -project Calio.xcodeproj \
           -scheme Calio \
-          -destination 'platform=iOS Simulator, name=iPhone 16 Pro,OS=18.5'
+          -destination 'platform=iOS Simulator,id=${{ steps.simulator.outputs.id }}'

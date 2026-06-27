@@ -32,6 +32,19 @@ struct StubEventRepository: EventRepository {
             updatedAt: Date()
         )
     }
+
+    func createRecurrenceEvent(_ request: CreateRecurrenceEventRequestDTO) async throws -> RecurrenceEventResponseDTO {
+        RecurrenceEventResponseDTO(
+            recurrenceId: Int64(Date().timeIntervalSince1970),
+            recurrenceTitle: request.recurrenceTitle,
+            recurrenceDescription: request.recurrenceDescription,
+            recurrenceStartDate: request.recurrenceStartDate,
+            recurrenceEndDate: request.recurrenceEndDate,
+            recurrenceStartTime: request.recurrenceStartTime,
+            recurrenceEndTime: request.recurrenceEndTime,
+            recurrenceFrequency: request.recurrenceFrequency
+        )
+    }
     
     private func sampleEvents(around baseDate: Date) -> [EventResponseDTO] {
         [

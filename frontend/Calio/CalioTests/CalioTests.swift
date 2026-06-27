@@ -404,6 +404,46 @@ struct CalioTests {
         #expect(!CalendarEventCreationView.canSave(title: "회의", startAt: startAt, endAt: startAt.addingTimeInterval(-1)))
     }
 
+    @Test func eventCreationSaveValidationChecksRecurrenceEndDateWithUTCDate() async throws {
+        var kstCalendar = Calendar(identifier: .gregorian)
+        kstCalendar.timeZone = TimeZone(secondsFromGMT: 9 * 3600)!
+        let startAt = try #require(kstCalendar.date(from: DateComponents(year: 2026, month: 8, day: 1, hour: 9)))
+        let endAt = try #require(kstCalendar.date(from: DateComponents(year: 2026, month: 8, day: 1, hour: 10)))
+        let sameUTCDate = startAt
+        let previousUTCDate = try #require(kstCalendar.date(from: DateComponents(year: 2026, month: 7, day: 31, hour: 8)))
+
+        #expect(CalendarEventCreationView.canSave(
+            title: "반복 회의",
+            startAt: startAt,
+            endAt: endAt,
+            isRecurrenceEnabled: true,
+            recurrenceStartDate: startAt,
+            recurrenceEndDate: sameUTCDate,
+            recurrenceStartTime: startAt,
+            recurrenceEndTime: endAt
+        ))
+        #expect(!CalendarEventCreationView.canSave(
+            title: "반복 회의",
+            startAt: startAt,
+            endAt: endAt,
+            isRecurrenceEnabled: true,
+            recurrenceStartDate: startAt,
+            recurrenceEndDate: previousUTCDate,
+            recurrenceStartTime: startAt,
+            recurrenceEndTime: endAt
+        ))
+        #expect(!CalendarEventCreationView.canSave(
+            title: "반복 회의",
+            startAt: startAt,
+            endAt: endAt,
+            isRecurrenceEnabled: true,
+            recurrenceStartDate: startAt,
+            recurrenceEndDate: sameUTCDate,
+            recurrenceStartTime: startAt,
+            recurrenceEndTime: startAt
+        ))
+    }
+
     @Test func createEventRequestDTOEncodesOnlyBackendContractFields() async throws {
         let startAt = Date(timeIntervalSince1970: 1_780_000_000)
         let endAt = startAt.addingTimeInterval(3600)
@@ -423,6 +463,63 @@ struct CalioTests {
         #expect(object["selectedColorCode"] == nil)
         #expect(object["colorCode"] == nil)
         #expect((object["startAt"] as? String)?.hasSuffix("Z") == true)
+    }
+
+    @Test func createRecurrenceEventRequestDTOEncodesOnlyBackendContractFields() async throws {
+        let request = CreateRecurrenceEventRequestDTO(
+            recurrenceTitle: "매일 스탠드업",
+            recurrenceDescription: "팀 동기화",
+            recurrenceStartDate: "2026-08-01",
+            recurrenceEndDate: "2026-08-31",
+            recurrenceStartTime: "00:00:00",
+            recurrenceEndTime: "00:30:00",
+            recurrenceFrequency: .daily
+        )
+
+        let data = try EventJSONCoding.makeEncoder().encode(request)
+        let object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+
+        #expect(Set(object.keys) == [
+            "recurrenceTitle",
+            "recurrenceDescription",
+            "recurrenceStartDate",
+            "recurrenceEndDate",
+            "recurrenceStartTime",
+            "recurrenceEndTime",
+            "recurrenceFrequency"
+        ])
+        #expect(object["recurrenceFrequency"] as? String == "DAILY")
+        #expect(object["colorCode"] == nil)
+        #expect(object["selectedColorCode"] == nil)
+    }
+
+    @Test func eventResponseDTODecodingPreservesCanonicalRecurrenceFields() async throws {
+        let responseJSON = """
+        {
+          "id": 12,
+          "title": "반복 occurrence",
+          "description": "backend canonical fields",
+          "startAt": "2026-08-01T00:00:00Z",
+          "endAt": "2026-08-01T01:00:00Z",
+          "importantEvent": true,
+          "recurrenceId": 44,
+          "isRecurrenceOccurrence": true,
+          "createdAt": "2026-08-01T00:00:00Z",
+          "updatedAt": "2026-08-01T00:00:00Z"
+        }
+        """.data(using: .utf8)!
+
+        let dto = try EventJSONCoding.makeDecoder().decode(EventResponseDTO.self, from: responseJSON)
+        let service = EventService(repository: RecordingEventRepository(fetchResponse: [dto]))
+        let events = try await service.fetchEvents(from: dto.startAt, to: dto.endAt)
+        let event = try #require(events.first)
+
+        #expect(dto.importantEvent)
+        #expect(dto.recurrenceId == 44)
+        #expect(dto.isRecurrenceOccurrence)
+        #expect(event.importantEvent)
+        #expect(event.recurrenceId == 44)
+        #expect(event.isRecurrenceOccurrence)
     }
 
     @Test func eventServiceCreateEventMapsRepositoryResponseToAppEvent() async throws {
@@ -458,6 +555,39 @@ struct CalioTests {
         #expect(event.endAt == endAt)
         #expect(event.colorCode == "#4F46E5")
         #expect(repository.createRequests.count == 1)
+    }
+
+    @Test func eventServiceCreateRecurrenceEventMapsSeparateUTCDateAndTimeIntoRepositoryRequest() async throws {
+        var kstCalendar = Calendar(identifier: .gregorian)
+        kstCalendar.timeZone = TimeZone(secondsFromGMT: 9 * 3600)!
+        let recurrenceStartDate = try #require(kstCalendar.date(from: DateComponents(year: 2026, month: 8, day: 1, hour: 9)))
+        let recurrenceEndDate = try #require(kstCalendar.date(from: DateComponents(year: 2026, month: 8, day: 31, hour: 9)))
+        let recurrenceStartTime = try #require(kstCalendar.date(from: DateComponents(year: 2026, month: 9, day: 2, hour: 9)))
+        let recurrenceEndTime = try #require(kstCalendar.date(from: DateComponents(year: 2026, month: 9, day: 2, hour: 10, minute: 30)))
+        let repository = RecordingEventRepository()
+        let service = EventService(repository: repository)
+
+        try await service.createRecurrenceEvent(
+            RecurrenceEventCreateInput(
+                title: "아침 루틴",
+                description: "반복 설명",
+                recurrenceStartDate: recurrenceStartDate,
+                recurrenceEndDate: recurrenceEndDate,
+                recurrenceStartTime: recurrenceStartTime,
+                recurrenceEndTime: recurrenceEndTime,
+                recurrenceFrequency: .weekly
+            )
+        )
+        let request = try #require(repository.recurrenceCreateRequests.first)
+
+        #expect(request.recurrenceTitle == "아침 루틴")
+        #expect(request.recurrenceDescription == "반복 설명")
+        #expect(request.recurrenceStartDate == "2026-08-01")
+        #expect(request.recurrenceEndDate == "2026-08-31")
+        #expect(request.recurrenceStartTime == "00:00:00")
+        #expect(request.recurrenceEndTime == "01:30:00")
+        #expect(request.recurrenceFrequency == .weekly)
+        #expect(repository.createRequests.isEmpty)
     }
 
     @Test func urlSessionEventRepositoryCreatesEventWithInjectedBaseURLAndContractBody() async throws {
@@ -513,6 +643,69 @@ struct CalioTests {
         #expect(Set(object.keys) == ["title", "description", "startAt", "endAt"])
         #expect(object["title"] as? String == "새 일정")
         #expect(object["selectedColorCode"] == nil)
+    }
+
+    @Test func urlSessionEventRepositoryCreatesRecurrenceEventWithInjectedBaseURLAndContractBody() async throws {
+        let responseJSON = """
+        {
+          "recurrenceId": 123,
+          "recurrenceTitle": "반복 일정",
+          "recurrenceDescription": "설명",
+          "recurrenceStartDate": "2026-08-01",
+          "recurrenceEndDate": "2026-08-31",
+          "recurrenceStartTime": "00:00:00",
+          "recurrenceEndTime": "01:00:00",
+          "recurrenceFrequency": "MONTHLY"
+        }
+        """.data(using: .utf8)!
+        var capturedRequest: URLRequest?
+        MockURLProtocol.requestHandler = { request in
+            capturedRequest = request
+            let response = HTTPURLResponse(
+                url: request.url!,
+                statusCode: 201,
+                httpVersion: nil,
+                headerFields: nil
+            )!
+            return (response, responseJSON)
+        }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        let repository = URLSessionEventRepository(
+            baseURL: URL(string: "https://example.test")!,
+            session: session
+        )
+
+        let response = try await repository.createRecurrenceEvent(
+            CreateRecurrenceEventRequestDTO(
+                recurrenceTitle: "반복 일정",
+                recurrenceDescription: "설명",
+                recurrenceStartDate: "2026-08-01",
+                recurrenceEndDate: "2026-08-31",
+                recurrenceStartTime: "00:00:00",
+                recurrenceEndTime: "01:00:00",
+                recurrenceFrequency: .monthly
+            )
+        )
+        let request = try #require(capturedRequest)
+        let body = try #require(requestBodyData(from: request))
+        let object = try #require(JSONSerialization.jsonObject(with: body) as? [String: Any])
+
+        #expect(response.recurrenceId == 123)
+        #expect(request.url?.absoluteString == "https://example.test/api/recurrence-events")
+        #expect(request.httpMethod == "POST")
+        #expect(Set(object.keys) == [
+            "recurrenceTitle",
+            "recurrenceDescription",
+            "recurrenceStartDate",
+            "recurrenceEndDate",
+            "recurrenceStartTime",
+            "recurrenceEndTime",
+            "recurrenceFrequency"
+        ])
+        #expect(object["recurrenceFrequency"] as? String == "MONTHLY")
+        #expect(object["colorCode"] == nil)
     }
 
     @MainActor
@@ -685,6 +878,56 @@ struct CalioTests {
         repository.finishSuspendedCreateRequests()
         _ = await createTask.value
     }
+
+    @MainActor
+    @Test func calendarHomeViewModelRefetchesDefaultRangeAfterRecurrenceCreateWithoutSynthesizingEvents() async throws {
+        let calendar = fixedCalendar
+        let baseDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8)))
+        let cachedEvent = makeEvent(id: 10, title: "기존 일정", on: baseDate)
+        let repository = RecordingEventRepository()
+        let viewModel = CalendarHomeViewModel(
+            calendar: calendar,
+            dateService: CalendarDateService(calendar: calendar),
+            eventService: EventService(repository: repository),
+            initialState: makeLoadedState(
+                dayOffsets: 0...2,
+                from: baseDate,
+                calendar: calendar,
+                monthEventCache: [
+                    YearMonthKey(year: 2026, month: 5): .loaded([]),
+                    YearMonthKey(year: 2026, month: 6): .loaded([cachedEvent]),
+                    YearMonthKey(year: 2026, month: 7): .loaded([])
+                ]
+            )
+        )
+
+        let didCreate = await viewModel.createEvent(
+            .recurring(
+                RecurrenceEventCreateInput(
+                    title: "반복 회의",
+                    description: "설명",
+                    recurrenceStartDate: baseDate,
+                    recurrenceEndDate: baseDate.addingTimeInterval(86400),
+                    recurrenceStartTime: baseDate,
+                    recurrenceEndTime: baseDate.addingTimeInterval(3600),
+                    recurrenceFrequency: .daily
+                )
+            )
+        )
+        let didRequestDefaultRange = await repository.waitForRequestCount(3)
+        await Task.yield()
+
+        #expect(didCreate)
+        #expect(didRequestDefaultRange)
+        #expect(repository.createRequests.isEmpty)
+        #expect(repository.recurrenceCreateRequests.count == 1)
+        #expect(repository.requestMonthKeys(calendar: calendar) == [
+            YearMonthKey(year: 2026, month: 5),
+            YearMonthKey(year: 2026, month: 6),
+            YearMonthKey(year: 2026, month: 7)
+        ])
+        #expect(viewModel.state.daysByKey[DayKey(date: baseDate, calendar: calendar)]?.events.isEmpty == true)
+    }
     
     private var fixedCalendar: Calendar {
         var calendar = Calendar(identifier: .gregorian)
@@ -796,19 +1039,27 @@ struct CalioTests {
 }
 
 private final class RecordingEventRepository: EventRepository {
-    private(set) var requests: [(startDate: Date, endDate: Date)] = []
-    private(set) var createRequests: [CreateEventRequestDTO] = []
+    private let lock = NSLock()
+    private var storedRequests: [(startDate: Date, endDate: Date)] = []
+    private var storedCreateRequests: [CreateEventRequestDTO] = []
+    private var storedRecurrenceCreateRequests: [CreateRecurrenceEventRequestDTO] = []
     private var suspendedContinuations: [CheckedContinuation<[EventResponseDTO], Error>] = []
     private var suspendedCreateContinuations: [CheckedContinuation<EventResponseDTO, Error>] = []
+    private var requestCountWaiters: [CountWaiter] = []
+    private var createRequestCountWaiters: [CountWaiter] = []
     private let shouldSuspend: Bool
     private let shouldSuspendCreate: Bool
     private let error: Error?
     private var createError: Error?
     private let createResponse: EventResponseDTO
+    private let fetchResponse: [EventResponseDTO]
+    private let recurrenceCreateResponse: RecurrenceEventResponseDTO
+    private let recurrenceCreateError: Error?
 
     init(
         shouldSuspend: Bool = false,
         error: Error? = nil,
+        fetchResponse: [EventResponseDTO] = [],
         createResponse: EventResponseDTO = EventResponseDTO(
             id: 1,
             title: "생성된 일정",
@@ -819,21 +1070,55 @@ private final class RecordingEventRepository: EventRepository {
             updatedAt: Date(timeIntervalSince1970: 0)
         ),
         createError: Error? = nil,
-        shouldSuspendCreate: Bool = false
+        shouldSuspendCreate: Bool = false,
+        recurrenceCreateResponse: RecurrenceEventResponseDTO = RecurrenceEventResponseDTO(
+            recurrenceId: 1,
+            recurrenceTitle: "반복 일정",
+            recurrenceDescription: "",
+            recurrenceStartDate: "1970-01-01",
+            recurrenceEndDate: "1970-01-01",
+            recurrenceStartTime: "00:00:00",
+            recurrenceEndTime: "01:00:00",
+            recurrenceFrequency: .daily
+        ),
+        recurrenceCreateError: Error? = nil
     ) {
         self.shouldSuspend = shouldSuspend
         self.shouldSuspendCreate = shouldSuspendCreate
         self.error = error
+        self.fetchResponse = fetchResponse
         self.createError = createError
         self.createResponse = createResponse
+        self.recurrenceCreateResponse = recurrenceCreateResponse
+        self.recurrenceCreateError = recurrenceCreateError
+    }
+
+    var requests: [(startDate: Date, endDate: Date)] {
+        locked {
+            storedRequests
+        }
+    }
+
+    var createRequests: [CreateEventRequestDTO] {
+        locked {
+            storedCreateRequests
+        }
+    }
+
+    var recurrenceCreateRequests: [CreateRecurrenceEventRequestDTO] {
+        locked {
+            storedRecurrenceCreateRequests
+        }
     }
 
     var requestCount: Int {
-        requests.count
+        locked {
+            storedRequests.count
+        }
     }
 
     func fetchEvents(from startDate: Date, to endDate: Date) async throws -> [EventResponseDTO] {
-        requests.append((startDate, endDate))
+        recordRequest(startDate: startDate, endDate: endDate)
 
         if let error {
             throw error
@@ -841,54 +1126,68 @@ private final class RecordingEventRepository: EventRepository {
 
         if shouldSuspend {
             return try await withCheckedThrowingContinuation { continuation in
-                suspendedContinuations.append(continuation)
+                locked {
+                    suspendedContinuations.append(continuation)
+                }
             }
         }
 
-        return []
+        return fetchResponse
     }
 
     func createEvent(_ request: CreateEventRequestDTO) async throws -> EventResponseDTO {
-        createRequests.append(request)
+        recordCreateRequest(request)
 
-        if let createError {
+        if let createError = locked({ createError }) {
             throw createError
         }
 
         if shouldSuspendCreate {
             return try await withCheckedThrowingContinuation { continuation in
-                suspendedCreateContinuations.append(continuation)
+                locked {
+                    suspendedCreateContinuations.append(continuation)
+                }
             }
         }
 
         return createResponse
     }
 
+    func createRecurrenceEvent(_ request: CreateRecurrenceEventRequestDTO) async throws -> RecurrenceEventResponseDTO {
+        locked {
+            storedRecurrenceCreateRequests.append(request)
+        }
+
+        if let recurrenceCreateError {
+            throw recurrenceCreateError
+        }
+
+        return recurrenceCreateResponse
+    }
+
     func setCreateError(_ error: Error?) {
-        createError = error
+        locked {
+            createError = error
+        }
     }
 
     func waitForRequestCount(
         _ count: Int,
         timeoutNanoseconds: UInt64 = 5_000_000_000
     ) async -> Bool {
-        let retryIntervalNanoseconds: UInt64 = 10_000_000
-        let maxAttemptCount = Int(timeoutNanoseconds / retryIntervalNanoseconds)
-        
-        for _ in 0...maxAttemptCount {
-            if requests.count >= count {
-                return true
-            }
-            
-            try? await Task.sleep(nanoseconds: retryIntervalNanoseconds)
-        }
-        
-        return requests.count >= count
+        await waitForCount(
+            count,
+            timeoutNanoseconds: timeoutNanoseconds,
+            kind: .fetch
+        )
     }
 
     func finishSuspendedRequests() {
-        let continuations = suspendedContinuations
-        suspendedContinuations.removeAll()
+        let continuations = locked {
+            let continuations = suspendedContinuations
+            suspendedContinuations.removeAll()
+            return continuations
+        }
         continuations.forEach { continuation in
             continuation.resume(returning: [])
         }
@@ -898,23 +1197,19 @@ private final class RecordingEventRepository: EventRepository {
         _ count: Int,
         timeoutNanoseconds: UInt64 = 5_000_000_000
     ) async -> Bool {
-        let retryIntervalNanoseconds: UInt64 = 10_000_000
-        let maxAttemptCount = Int(timeoutNanoseconds / retryIntervalNanoseconds)
-
-        for _ in 0...maxAttemptCount {
-            if createRequests.count >= count {
-                return true
-            }
-
-            try? await Task.sleep(nanoseconds: retryIntervalNanoseconds)
-        }
-
-        return createRequests.count >= count
+        await waitForCount(
+            count,
+            timeoutNanoseconds: timeoutNanoseconds,
+            kind: .create
+        )
     }
 
     func finishSuspendedCreateRequests() {
-        let continuations = suspendedCreateContinuations
-        suspendedCreateContinuations.removeAll()
+        let continuations = locked {
+            let continuations = suspendedCreateContinuations
+            suspendedCreateContinuations.removeAll()
+            return continuations
+        }
         continuations.forEach { continuation in
             continuation.resume(returning: createResponse)
         }
@@ -924,6 +1219,139 @@ private final class RecordingEventRepository: EventRepository {
         requests.map { request in
             YearMonthKey(date: request.startDate, calendar: calendar)
         }.sorted()
+    }
+
+    private func recordRequest(startDate: Date, endDate: Date) {
+        let continuations = locked {
+            storedRequests.append((startDate, endDate))
+            return readyWaiters(from: &requestCountWaiters, currentCount: storedRequests.count)
+        }
+        continuations.forEach { $0.resume(returning: true) }
+    }
+
+    private func recordCreateRequest(_ request: CreateEventRequestDTO) {
+        let continuations = locked {
+            storedCreateRequests.append(request)
+            return readyWaiters(
+                from: &createRequestCountWaiters,
+                currentCount: storedCreateRequests.count
+            )
+        }
+        continuations.forEach { $0.resume(returning: true) }
+    }
+
+    private func waitForCount(
+        _ count: Int,
+        timeoutNanoseconds: UInt64,
+        kind: CountWaiterKind
+    ) async -> Bool {
+        let waiterID = UUID()
+
+        return await withCheckedContinuation { continuation in
+            let shouldWait = locked {
+                guard currentCount(for: kind) < count else {
+                    return false
+                }
+
+                appendWaiter(
+                    CountWaiter(
+                        id: waiterID,
+                        count: count,
+                        continuation: continuation
+                    ),
+                    for: kind
+                )
+                return true
+            }
+
+            guard shouldWait else {
+                continuation.resume(returning: true)
+                return
+            }
+
+            Task {
+                try? await Task.sleep(nanoseconds: timeoutNanoseconds)
+                completeWaiterIfNeeded(id: waiterID, kind: kind)
+            }
+        }
+    }
+
+    private func completeWaiterIfNeeded(
+        id: UUID,
+        kind: CountWaiterKind
+    ) {
+        let continuation = locked {
+            let waiters = waiters(for: kind)
+            guard let index = waiters.firstIndex(where: { $0.id == id }) else {
+                return nil as CheckedContinuation<Bool, Never>?
+            }
+
+            return removeWaiter(at: index, for: kind).continuation
+        }
+
+        continuation?.resume(returning: false)
+    }
+
+    private func currentCount(for kind: CountWaiterKind) -> Int {
+        switch kind {
+        case .fetch:
+            return storedRequests.count
+        case .create:
+            return storedCreateRequests.count
+        }
+    }
+
+    private func waiters(for kind: CountWaiterKind) -> [CountWaiter] {
+        switch kind {
+        case .fetch:
+            return requestCountWaiters
+        case .create:
+            return createRequestCountWaiters
+        }
+    }
+
+    private func appendWaiter(_ waiter: CountWaiter, for kind: CountWaiterKind) {
+        switch kind {
+        case .fetch:
+            requestCountWaiters.append(waiter)
+        case .create:
+            createRequestCountWaiters.append(waiter)
+        }
+    }
+
+    private func removeWaiter(at index: Int, for kind: CountWaiterKind) -> CountWaiter {
+        switch kind {
+        case .fetch:
+            return requestCountWaiters.remove(at: index)
+        case .create:
+            return createRequestCountWaiters.remove(at: index)
+        }
+    }
+
+    private func readyWaiters(
+        from waiters: inout [CountWaiter],
+        currentCount: Int
+    ) -> [CheckedContinuation<Bool, Never>] {
+        let readyWaiters = waiters.filter { currentCount >= $0.count }
+        waiters.removeAll { currentCount >= $0.count }
+        return readyWaiters.map(\.continuation)
+    }
+
+    private func locked<T>(_ work: () -> T) -> T {
+        lock.lock()
+        defer { lock.unlock() }
+        return work()
+    }
+
+    private struct CountWaiter {
+        let id: UUID
+        let count: Int
+        let continuation: CheckedContinuation<Bool, Never>
+    }
+
+    private enum CountWaiterKind {
+        case fetch
+        case create
     }
 }
 
