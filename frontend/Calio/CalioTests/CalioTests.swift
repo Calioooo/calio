@@ -144,6 +144,7 @@ struct CalioTests {
         let event = makeEvent(on: Date())
         var selectedEventID: Int64?
         var dateSelectionCount = 0
+        var detailEventID: Int64?
         let cell = CalendarDateEventCellView(
             weekday: .monday,
             monthText: "6",
@@ -152,15 +153,21 @@ struct CalioTests {
             onTap: {
                 dateSelectionCount += 1
             },
+            selectedEvent: .constant(nil),
             onEventSelected: { event in
                 selectedEventID = event.id
+            },
+            onShowEventDetail: { event in
+                detailEventID = event.id
             },
             events: [event]
         )
 
         cell.onEventSelected(event)
+        cell.onShowEventDetail(event)
 
         #expect(selectedEventID == event.id)
+        #expect(detailEventID == event.id)
         #expect(dateSelectionCount == 0)
 
         cell.onTap()

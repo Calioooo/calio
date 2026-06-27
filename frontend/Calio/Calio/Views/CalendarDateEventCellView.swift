@@ -19,7 +19,9 @@ struct CalendarDateEventCellView: View {
     let dayText: String
     let isToday: Bool
     let onTap: () -> Void
+    @Binding var selectedEvent: Event?
     let onEventSelected: (Event) -> Void
+    let onShowEventDetail: (Event) -> Void
     let events: [Event]
     
     var body: some View {
@@ -63,6 +65,7 @@ struct CalendarDateEventCellView: View {
 
     private func eventChipButton(_ event: Event) -> some View {
         Button {
+            selectedEvent = event
             onEventSelected(event)
         } label: {
             Text(event.title)
@@ -76,6 +79,30 @@ struct CalendarDateEventCellView: View {
                 )
         }
         .buttonStyle(.plain)
+        .popover(
+            isPresented: isShowingEventPopover(for: event),
+            attachmentAnchor: .rect(.bounds),
+            arrowEdge: .top
+        ) {
+            CalendarEventSummaryPopoverView(
+                event: event,
+                onShowDetail: onShowEventDetail
+            )
+            .presentationCompactAdaptation(.popover)
+        }
+    }
+
+    private func isShowingEventPopover(for event: Event) -> Binding<Bool> {
+        Binding(
+            get: {
+                selectedEvent?.id == event.id
+            },
+            set: { isPresented in
+                if !isPresented {
+                    selectedEvent = nil
+                }
+            }
+        )
     }
     
     private func eventChipLayout(maxWidth: CGFloat) -> EventChipLayout {
@@ -169,7 +196,9 @@ private struct EventChipRows {
         onTap: {
             return
         },
+        selectedEvent: .constant(nil),
         onEventSelected: { _ in },
+        onShowEventDetail: { _ in },
         events: [
             Event(id: 1, title: "제목1212312313212313123123123123", description: "설명", startAt: Date(), endAt: Date().addingTimeInterval(3000), colorCode: "#FDDDDD"),
             Event(id: 2, title: "제목2312", description: "설명", startAt: Date(), endAt: Date().addingTimeInterval(3000), colorCode: "#5DDDDD"),

@@ -63,26 +63,15 @@ struct CalendarDateEventView: View {
                                 onReferenceDayChanged: onReferenceDayChanged
                             )
                         },
+                        selectedEvent: $selectedEvent,
                         onEventSelected: { event in
                             selectedEvent = event
                         },
+                        onShowEventDetail: showEventDetail,
                         events: item.events
                     )
                     .frame(height: dateRowHeight)
                     .clipped()
-                    .popover(
-                        isPresented: isShowingEventPopover(for: item),
-                        attachmentAnchor: .rect(.bounds),
-                        arrowEdge: .top
-                    ) {
-                        if let selectedEvent {
-                            CalendarEventSummaryPopoverView(
-                                event: selectedEvent,
-                                onShowDetail: showEventDetail
-                            )
-                            .presentationCompactAdaptation(.popover)
-                        }
-                    }
                     .id(item.id)
                 }
             }
@@ -156,21 +145,6 @@ struct CalendarDateEventView: View {
                 startIndex: index,
                 endIndex: index
             )
-        )
-    }
-
-    private func isShowingEventPopover(for item: CalendarDateCellItem) -> Binding<Bool> {
-        Binding(
-            get: {
-                guard let selectedEvent else { return false }
-
-                return item.events.contains { $0.id == selectedEvent.id }
-            },
-            set: { isPresented in
-                if !isPresented {
-                    selectedEvent = nil
-                }
-            }
         )
     }
 
