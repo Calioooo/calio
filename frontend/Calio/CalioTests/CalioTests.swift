@@ -7,6 +7,7 @@
 
 import Testing
 import Foundation
+import SwiftUI
 @testable import Calio
 
 @Suite(.serialized)
@@ -136,6 +137,108 @@ struct CalioTests {
         #expect(strip.referenceDay == items[0].id)
         #expect(eventList.items.count == 2)
         #expect(eventList.referenceDay == items[0].id)
+    }
+
+    @MainActor
+    @Test func dateEventCellSeparatesEventSelectionFromDateSelection() async throws {
+        let event = makeEvent(on: Date())
+        var selectedEventID: Int64?
+        var dateSelectionCount = 0
+        let cell = CalendarDateEventCellView(
+            weekday: .monday,
+            monthText: "6",
+            dayText: "28",
+            isToday: false,
+            onTap: {
+                dateSelectionCount += 1
+            },
+            onEventSelected: { event in
+                selectedEventID = event.id
+            },
+            events: [event]
+        )
+
+        cell.onEventSelected(event)
+
+        #expect(selectedEventID == event.id)
+        #expect(dateSelectionCount == 0)
+
+        cell.onTap()
+
+        #expect(dateSelectionCount == 1)
+    }
+
+    @MainActor
+    @Test func sharedEventSummaryPopoverForwardsDetailActionForSelectedEvent() async throws {
+        let event = makeEvent(id: 91, on: Date())
+        var detailEventID: Int64?
+        let popover = CalendarEventSummaryPopoverView(
+            event: event,
+            onShowDetail: { detailEvent in
+                detailEventID = detailEvent.id
+            }
+        )
+
+        popover.onShowDetail?(event)
+
+        #expect(popover.event.id == event.id)
+        #expect(detailEventID == event.id)
+    }
+
+    @Test func eventDetailStatusUsesCanonicalEventFieldsWithoutRawRecurrenceID() async throws {
+        let baseDate = Date()
+        let repeatedEvent = Event(
+            id: 11,
+            title: "반복 회의",
+            description: "",
+            startAt: baseDate,
+            endAt: baseDate.addingTimeInterval(3600),
+            colorCode: "#4F46E5",
+            importantEvent: true,
+            recurrenceId: 12345,
+            isRecurrenceOccurrence: false
+        )
+        let occurrenceEvent = Event(
+            id: 12,
+            title: "반복 발생 일정",
+            description: "",
+            startAt: baseDate,
+            endAt: baseDate.addingTimeInterval(3600),
+            colorCode: "#4F46E5",
+            importantEvent: false,
+            recurrenceId: nil,
+            isRecurrenceOccurrence: true
+        )
+        let singleEvent = makeEvent(id: 13, on: baseDate)
+
+        #expect(CalendarEventDetailView.importantStatusText(for: repeatedEvent) == "중요 일정")
+        #expect(CalendarEventDetailView.recurrenceStatusText(for: repeatedEvent) == "반복 일정")
+        #expect(CalendarEventDetailView.recurrenceStatusText(for: occurrenceEvent) == "반복 일정")
+        #expect(CalendarEventDetailView.recurrenceStatusText(for: singleEvent) == "반복 없음")
+        #expect(!CalendarEventDetailView.recurrenceStatusText(for: repeatedEvent).contains("12345"))
+    }
+
+    @MainActor
+    @Test func eventCreationFormReceivesReusableBindingsWithoutOwningSaveAction() async throws {
+        let startAt = Date()
+        let endAt = startAt.addingTimeInterval(3600)
+        let form = CalendarEventFormView(
+            title: .constant("회의"),
+            startAt: .constant(startAt),
+            endAt: .constant(endAt),
+            description: .constant("설명"),
+            selectedColorCode: .constant("#4F46E5"),
+            isRecurrenceEnabled: .constant(false),
+            recurrenceStartDate: .constant(startAt),
+            recurrenceEndDate: .constant(startAt),
+            recurrenceStartTime: .constant(startAt),
+            recurrenceEndTime: .constant(endAt),
+            selectedRecurrenceFrequency: .constant(.daily),
+            onRecurrenceEnabled: {}
+        )
+
+        #expect(form.title == "회의")
+        #expect(CalendarEventCreationView.canSave(title: "회의", startAt: startAt, endAt: endAt))
     }
 
     @MainActor

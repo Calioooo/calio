@@ -21,6 +21,8 @@ struct CalendarDateEventView: View {
     let onRetryEvents: () -> Void
     
     @StateObject private var focusCoordinator = CalendarScrollFocusCoordinator()
+    @State private var selectedEvent: Event?
+    @State private var detailEvent: Event?
     
     var body: some View {
         VStack(spacing: 0) {
@@ -38,6 +40,9 @@ struct CalendarDateEventView: View {
                     initialAlignmentPlaceholder(itemIDs: itemIDs)
                 }
             }
+        }
+        .sheet(item: $detailEvent) { event in
+            CalendarEventDetailView(event: event)
         }
     }
 
@@ -58,10 +63,26 @@ struct CalendarDateEventView: View {
                                 onReferenceDayChanged: onReferenceDayChanged
                             )
                         },
+                        onEventSelected: { event in
+                            selectedEvent = event
+                        },
                         events: item.events
                     )
                     .frame(height: dateRowHeight)
                     .clipped()
+                    .popover(
+                        isPresented: isShowingEventPopover(for: item),
+                        attachmentAnchor: .rect(.bounds),
+                        arrowEdge: .top
+                    ) {
+                        if let selectedEvent {
+                            CalendarEventSummaryPopoverView(
+                                event: selectedEvent,
+                                onShowDetail: showEventDetail
+                            )
+                            .presentationCompactAdaptation(.popover)
+                        }
+                    }
                     .id(item.id)
                 }
             }
@@ -136,6 +157,26 @@ struct CalendarDateEventView: View {
                 endIndex: index
             )
         )
+    }
+
+    private func isShowingEventPopover(for item: CalendarDateCellItem) -> Binding<Bool> {
+        Binding(
+            get: {
+                guard let selectedEvent else { return false }
+
+                return item.events.contains { $0.id == selectedEvent.id }
+            },
+            set: { isPresented in
+                if !isPresented {
+                    selectedEvent = nil
+                }
+            }
+        )
+    }
+
+    private func showEventDetail(_ event: Event) {
+        selectedEvent = nil
+        detailEvent = event
     }
 }
 
