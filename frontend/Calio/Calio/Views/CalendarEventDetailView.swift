@@ -47,6 +47,14 @@ struct CalendarEventDetailView: View {
     private var timeSection: some View {
         Section("시간") {
             Label(
+                CalendarEventDisplayText.dateRange(
+                    startAt: event.startAt,
+                    endAt: event.endAt
+                ),
+                systemImage: "calendar"
+            )
+
+            Label(
                 CalendarEventDisplayText.timeRange(
                     startAt: event.startAt,
                     endAt: event.endAt
@@ -103,6 +111,17 @@ struct CalendarEventDetailView: View {
 }
 
 enum CalendarEventDisplayText {
+    static func dateRange(startAt: Date, endAt: Date) -> String {
+        let startText = startAt.formatted(date: .abbreviated, time: .omitted)
+        let endText = endAt.formatted(date: .abbreviated, time: .omitted)
+
+        guard !Calendar.current.isDate(startAt, inSameDayAs: endAt) else {
+            return startText
+        }
+
+        return "\(startText) - \(endText)"
+    }
+
     static func timeRange(startAt: Date, endAt: Date) -> String {
         let startText = startAt.formatted(date: .omitted, time: .shortened)
         let endText = endAt.formatted(date: .omitted, time: .shortened)
