@@ -479,11 +479,13 @@ struct CalioTests {
 
         viewModel.selectYearMonth(year: 2036, month: 6)
         let didRequestTargetMonths = await repository.waitForRequestCount(3)
-        await Task.yield()
+        let didExposeFailure = await waitUntil {
+            viewModel.referenceEventAreaState == .failed("일정을 불러오지 못했습니다. 네트워크 연결을 확인해 주세요.")
+        }
 
         #expect(didRequestTargetMonths)
         #expect(viewModel.referenceDay == DayKey(year: 2036, month: 6, day: 8))
-        #expect(viewModel.referenceEventAreaState == .failed("일정을 불러오지 못했습니다. 네트워크 연결을 확인해 주세요."))
+        #expect(didExposeFailure)
     }
 
     @Test func eventCreationDefaultTimesUseReferenceDayMorningRange() async throws {
@@ -1044,7 +1046,26 @@ struct CalioTests {
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!
         return calendar
     }
-    
+
+    @MainActor
+    private func waitUntil(
+        timeoutNanoseconds: UInt64 = 5_000_000_000,
+        condition: @escaping @MainActor () -> Bool
+    ) async -> Bool {
+        let retryIntervalNanoseconds: UInt64 = 10_000_000
+        let maxAttemptCount = Int(timeoutNanoseconds / retryIntervalNanoseconds)
+
+        for _ in 0...maxAttemptCount {
+            if condition() {
+                return true
+            }
+
+            try? await Task.sleep(nanoseconds: retryIntervalNanoseconds)
+        }
+
+        return condition()
+    }
+
     private func makeDayKey(dayOffset: Int, from baseDate: Date, calendar: Calendar) -> DayKey {
         let date = calendar.date(byAdding: .day, value: dayOffset, to: baseDate) ?? baseDate
         return DayKey(date: date, calendar: calendar)
