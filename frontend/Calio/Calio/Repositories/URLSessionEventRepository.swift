@@ -61,6 +61,43 @@ struct URLSessionEventRepository: EventRepository {
         return try await response(RecurrenceEventResponseDTO.self, for: request)
     }
 
+    func updateEvent(eventId: Int64, request requestDTO: UpdateEventRequestDTO) async throws -> EventResponseDTO {
+        let request = try makeRequest(
+            method: "PUT",
+            url: eventURL(eventId: eventId),
+            body: requestDTO
+        )
+
+        return try await response(EventResponseDTO.self, for: request)
+    }
+
+    func deleteEvent(eventId: Int64) async throws {
+        let request = try makeRequest(
+            method: "DELETE",
+            url: eventURL(eventId: eventId)
+        )
+
+        try await emptyResponse(for: request)
+    }
+
+    func deleteRecurrenceEvent(recurrenceId: Int64) async throws {
+        let request = try makeRequest(
+            method: "DELETE",
+            url: recurrenceEventURL(recurrenceId: recurrenceId)
+        )
+
+        try await emptyResponse(for: request)
+    }
+
+    func deleteRecurrenceOccurrence(recurrenceId: Int64, eventId: Int64) async throws {
+        let request = try makeRequest(
+            method: "DELETE",
+            url: recurrenceOccurrenceURL(recurrenceId: recurrenceId, eventId: eventId)
+        )
+
+        try await emptyResponse(for: request)
+    }
+
     private func eventsURL(queryItems: [URLQueryItem] = []) throws -> URL {
         var components = URLComponents(
             url: baseURL.appendingPathComponent("api/events"),
@@ -75,6 +112,10 @@ struct URLSessionEventRepository: EventRepository {
         return url
     }
 
+    private func eventURL(eventId: Int64) throws -> URL {
+        try eventsURL().appendingPathComponent(String(eventId))
+    }
+
     private func recurrenceEventsURL() throws -> URL {
         var components = URLComponents(
             url: baseURL.appendingPathComponent("api/recurrence-events"),
@@ -86,6 +127,16 @@ struct URLSessionEventRepository: EventRepository {
         }
 
         return url
+    }
+
+    private func recurrenceEventURL(recurrenceId: Int64) throws -> URL {
+        try recurrenceEventsURL().appendingPathComponent(String(recurrenceId))
+    }
+
+    private func recurrenceOccurrenceURL(recurrenceId: Int64, eventId: Int64) throws -> URL {
+        try recurrenceEventURL(recurrenceId: recurrenceId)
+            .appendingPathComponent("occurrences")
+            .appendingPathComponent(String(eventId))
     }
 
     private func makeRequest(method: String, url: URL) -> URLRequest {
@@ -115,6 +166,10 @@ struct URLSessionEventRepository: EventRepository {
     private func response<T: Decodable>(_ type: T.Type, for request: URLRequest) async throws -> T {
         let data = try await data(for: request)
         return try decode(type, from: data)
+    }
+
+    private func emptyResponse(for request: URLRequest) async throws {
+        _ = try await data(for: request)
     }
 
     private func data(for request: URLRequest) async throws -> Data {

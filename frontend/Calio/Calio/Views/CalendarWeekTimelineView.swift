@@ -21,6 +21,45 @@ struct CalendarWeekTimelineView: View {
     let onVisibleRangeChanged: (CalendarVisibleIndexRange) -> Void
     let onSelectedYearMonth: (Int, Int) -> Void
     let onRetryEvents: () -> Void
+    let isEventMutating: Bool
+    let eventMutationFailureMessage: String?
+    let onResetEventMutation: () -> Void
+    let onUpdateSingleEvent: (Event, EventUpdateInput) async -> Bool
+    let onDeleteSingleEvent: (Event) async -> Bool
+    let onDeleteRecurrenceOccurrence: (Event) async -> Bool
+    let onDeleteRecurrenceSeries: (Event) async -> Bool
+
+    init(
+        items: [CalendarDateCellItem],
+        referenceDay: DayKey,
+        eventAreaState: CalendarEventAreaState,
+        onSelectedDay: @escaping (DayKey) -> Void,
+        onVisibleRangeChanged: @escaping (CalendarVisibleIndexRange) -> Void,
+        onSelectedYearMonth: @escaping (Int, Int) -> Void,
+        onRetryEvents: @escaping () -> Void,
+        isEventMutating: Bool = false,
+        eventMutationFailureMessage: String? = nil,
+        onResetEventMutation: @escaping () -> Void = {},
+        onUpdateSingleEvent: @escaping (Event, EventUpdateInput) async -> Bool = { _, _ in true },
+        onDeleteSingleEvent: @escaping (Event) async -> Bool = { _ in true },
+        onDeleteRecurrenceOccurrence: @escaping (Event) async -> Bool = { _ in true },
+        onDeleteRecurrenceSeries: @escaping (Event) async -> Bool = { _ in true }
+    ) {
+        self.items = items
+        self.referenceDay = referenceDay
+        self.eventAreaState = eventAreaState
+        self.onSelectedDay = onSelectedDay
+        self.onVisibleRangeChanged = onVisibleRangeChanged
+        self.onSelectedYearMonth = onSelectedYearMonth
+        self.onRetryEvents = onRetryEvents
+        self.isEventMutating = isEventMutating
+        self.eventMutationFailureMessage = eventMutationFailureMessage
+        self.onResetEventMutation = onResetEventMutation
+        self.onUpdateSingleEvent = onUpdateSingleEvent
+        self.onDeleteSingleEvent = onDeleteSingleEvent
+        self.onDeleteRecurrenceOccurrence = onDeleteRecurrenceOccurrence
+        self.onDeleteRecurrenceSeries = onDeleteRecurrenceSeries
+    }
     
     @State private var headerScrollPosition: DayKey?
     @State private var lastVisibleRange: CalendarVisibleIndexRange?
@@ -67,7 +106,15 @@ struct CalendarWeekTimelineView: View {
             .background(Color(uiColor: .systemBackground))
         }
         .sheet(item: $detailEvent) { event in
-            CalendarEventDetailView(event: event)
+            CalendarEventDetailView(
+                event: event,
+                isMutating: isEventMutating,
+                mutationFailureMessage: eventMutationFailureMessage,
+                onUpdateSingleEvent: onUpdateSingleEvent,
+                onDeleteSingleEvent: onDeleteSingleEvent,
+                onDeleteRecurrenceOccurrence: onDeleteRecurrenceOccurrence,
+                onDeleteRecurrenceSeries: onDeleteRecurrenceSeries
+            )
         }
     }
     
@@ -391,6 +438,7 @@ struct CalendarWeekTimelineView: View {
 
     private func showEventDetail(_ event: Event) {
         selectedEvent = nil
+        onResetEventMutation()
         detailEvent = event
     }
     

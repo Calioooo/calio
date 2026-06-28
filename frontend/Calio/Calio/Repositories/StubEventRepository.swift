@@ -45,6 +45,24 @@ struct StubEventRepository: EventRepository {
             recurrenceFrequency: request.recurrenceFrequency
         )
     }
+
+    func updateEvent(eventId: Int64, request: UpdateEventRequestDTO) async throws -> EventResponseDTO {
+        EventResponseDTO(
+            id: eventId,
+            title: request.title,
+            description: request.description,
+            startAt: request.startAt,
+            endAt: request.endAt,
+            createdAt: Date(),
+            updatedAt: Date()
+        )
+    }
+
+    func deleteEvent(eventId: Int64) async throws {}
+
+    func deleteRecurrenceEvent(recurrenceId: Int64) async throws {}
+
+    func deleteRecurrenceOccurrence(recurrenceId: Int64, eventId: Int64) async throws {}
     
     private func sampleEvents(around baseDate: Date) -> [EventResponseDTO] {
         [

@@ -39,7 +39,14 @@ struct CalendarHomeView: View {
                     onReferenceDayChanged: viewModel.setReferenceDay(_:),
                     onVisibleRangeChanged: viewModel.loadAdditionalEventsIfNeeded(visibleRange:),
                     onRetryEvents: viewModel.retryReferenceMonthEvents,
-                    onDragEnded: updateDisplayMode(after:)
+                    onDragEnded: updateDisplayMode(after:),
+                    isEventMutating: viewModel.mutationState.isMutating,
+                    eventMutationFailureMessage: viewModel.mutationState.failureMessage,
+                    onResetEventMutation: viewModel.resetMutationState,
+                    onUpdateSingleEvent: viewModel.updateSingleEvent(_:input:),
+                    onDeleteSingleEvent: viewModel.deleteSingleEvent(_:),
+                    onDeleteRecurrenceOccurrence: viewModel.deleteRecurrenceOccurrence(_:),
+                    onDeleteRecurrenceSeries: viewModel.deleteRecurrenceSeries(_:)
                 )
             }
             .animation(.easeInOut(duration: 0.2), value: displayMode)

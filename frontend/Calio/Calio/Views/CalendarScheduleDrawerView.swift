@@ -16,6 +16,47 @@ struct CalendarScheduleDrawerView: View {
     let onVisibleRangeChanged: (CalendarVisibleIndexRange) -> Void
     let onRetryEvents: () -> Void
     let onDragEnded: (CGSize) -> Void
+    let isEventMutating: Bool
+    let eventMutationFailureMessage: String?
+    let onResetEventMutation: () -> Void
+    let onUpdateSingleEvent: (Event, EventUpdateInput) async -> Bool
+    let onDeleteSingleEvent: (Event) async -> Bool
+    let onDeleteRecurrenceOccurrence: (Event) async -> Bool
+    let onDeleteRecurrenceSeries: (Event) async -> Bool
+
+    init(
+        items: [CalendarDateCellItem],
+        referenceDay: DayKey,
+        displayMode: CalendarDisplayMode,
+        eventAreaState: CalendarEventAreaState,
+        onReferenceDayChanged: @escaping (DayKey) -> Void,
+        onVisibleRangeChanged: @escaping (CalendarVisibleIndexRange) -> Void,
+        onRetryEvents: @escaping () -> Void,
+        onDragEnded: @escaping (CGSize) -> Void,
+        isEventMutating: Bool = false,
+        eventMutationFailureMessage: String? = nil,
+        onResetEventMutation: @escaping () -> Void = {},
+        onUpdateSingleEvent: @escaping (Event, EventUpdateInput) async -> Bool = { _, _ in true },
+        onDeleteSingleEvent: @escaping (Event) async -> Bool = { _ in true },
+        onDeleteRecurrenceOccurrence: @escaping (Event) async -> Bool = { _ in true },
+        onDeleteRecurrenceSeries: @escaping (Event) async -> Bool = { _ in true }
+    ) {
+        self.items = items
+        self.referenceDay = referenceDay
+        self.displayMode = displayMode
+        self.eventAreaState = eventAreaState
+        self.onReferenceDayChanged = onReferenceDayChanged
+        self.onVisibleRangeChanged = onVisibleRangeChanged
+        self.onRetryEvents = onRetryEvents
+        self.onDragEnded = onDragEnded
+        self.isEventMutating = isEventMutating
+        self.eventMutationFailureMessage = eventMutationFailureMessage
+        self.onResetEventMutation = onResetEventMutation
+        self.onUpdateSingleEvent = onUpdateSingleEvent
+        self.onDeleteSingleEvent = onDeleteSingleEvent
+        self.onDeleteRecurrenceOccurrence = onDeleteRecurrenceOccurrence
+        self.onDeleteRecurrenceSeries = onDeleteRecurrenceSeries
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -27,7 +68,14 @@ struct CalendarScheduleDrawerView: View {
                 eventAreaState: eventAreaState,
                 onReferenceDayChanged: onReferenceDayChanged,
                 onVisibleRangeChanged: onVisibleRangeChanged,
-                onRetryEvents: onRetryEvents
+                onRetryEvents: onRetryEvents,
+                isEventMutating: isEventMutating,
+                eventMutationFailureMessage: eventMutationFailureMessage,
+                onResetEventMutation: onResetEventMutation,
+                onUpdateSingleEvent: onUpdateSingleEvent,
+                onDeleteSingleEvent: onDeleteSingleEvent,
+                onDeleteRecurrenceOccurrence: onDeleteRecurrenceOccurrence,
+                onDeleteRecurrenceSeries: onDeleteRecurrenceSeries
             )
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

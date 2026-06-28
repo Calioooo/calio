@@ -14,6 +14,13 @@ struct EventCreateInput: Equatable {
     let endAt: Date
 }
 
+struct EventUpdateInput: Equatable {
+    let title: String
+    let description: String
+    let startAt: Date
+    let endAt: Date
+}
+
 struct RecurrenceEventCreateInput: Equatable {
     let title: String
     let description: String

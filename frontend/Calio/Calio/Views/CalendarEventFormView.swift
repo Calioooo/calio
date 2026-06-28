@@ -28,12 +28,45 @@ struct CalendarEventFormView: View {
     @Binding var recurrenceEndTime: Date
     @Binding var selectedRecurrenceFrequency: RecurrenceFrequency
 
+    let mode: CalendarEventFormMode
     let onRecurrenceEnabled: () -> Void
+
+    init(
+        title: Binding<String>,
+        startAt: Binding<Date>,
+        endAt: Binding<Date>,
+        description: Binding<String>,
+        selectedColorCode: Binding<String>,
+        isRecurrenceEnabled: Binding<Bool>,
+        recurrenceStartDate: Binding<Date>,
+        recurrenceEndDate: Binding<Date>,
+        recurrenceStartTime: Binding<Date>,
+        recurrenceEndTime: Binding<Date>,
+        selectedRecurrenceFrequency: Binding<RecurrenceFrequency>,
+        mode: CalendarEventFormMode = .create,
+        onRecurrenceEnabled: @escaping () -> Void
+    ) {
+        _title = title
+        _startAt = startAt
+        _endAt = endAt
+        _description = description
+        _selectedColorCode = selectedColorCode
+        _isRecurrenceEnabled = isRecurrenceEnabled
+        _recurrenceStartDate = recurrenceStartDate
+        _recurrenceEndDate = recurrenceEndDate
+        _recurrenceStartTime = recurrenceStartTime
+        _recurrenceEndTime = recurrenceEndTime
+        _selectedRecurrenceFrequency = selectedRecurrenceFrequency
+        self.mode = mode
+        self.onRecurrenceEnabled = onRecurrenceEnabled
+    }
 
     var body: some View {
         titleSection
         timeSection
-        recurrenceSection
+        if mode.showsRecurrenceFields {
+            recurrenceSection
+        }
         descriptionSection
         colorSection
     }
@@ -48,7 +81,7 @@ struct CalendarEventFormView: View {
 
     @ViewBuilder
     private var timeSection: some View {
-        if isRecurrenceEnabled {
+        if mode.showsRecurrenceFields && isRecurrenceEnabled {
             recurrenceDateSection
             recurrenceTimeSection
         } else {
@@ -218,5 +251,19 @@ struct CalendarEventFormView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("일정 색상 선택")
+    }
+}
+
+enum CalendarEventFormMode: Equatable {
+    case create
+    case editSingleEvent
+
+    var showsRecurrenceFields: Bool {
+        switch self {
+        case .create:
+            return true
+        case .editSingleEvent:
+            return false
+        }
     }
 }
