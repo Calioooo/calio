@@ -7,6 +7,7 @@
 
 import Testing
 import Foundation
+import SwiftUI
 @testable import Calio
 
 @Suite(.serialized)
@@ -136,6 +137,115 @@ struct CalioTests {
         #expect(strip.referenceDay == items[0].id)
         #expect(eventList.items.count == 2)
         #expect(eventList.referenceDay == items[0].id)
+    }
+
+    @MainActor
+    @Test func dateEventCellSeparatesEventSelectionFromDateSelection() async throws {
+        let event = makeEvent(on: Date())
+        var selectedEventID: Int64?
+        var dateSelectionCount = 0
+        var detailEventID: Int64?
+        let cell = CalendarDateEventCellView(
+            weekday: .monday,
+            monthText: "6",
+            dayText: "28",
+            isToday: false,
+            onTap: {
+                dateSelectionCount += 1
+            },
+            selectedEvent: .constant(nil),
+            onEventSelected: { event in
+                selectedEventID = event.id
+            },
+            onShowEventDetail: { event in
+                detailEventID = event.id
+            },
+            events: [event]
+        )
+
+        cell.onEventSelected(event)
+        cell.onShowEventDetail(event)
+
+        #expect(selectedEventID == event.id)
+        #expect(detailEventID == event.id)
+        #expect(dateSelectionCount == 0)
+
+        cell.onTap()
+
+        #expect(dateSelectionCount == 1)
+    }
+
+    @MainActor
+    @Test func sharedEventSummaryPopoverForwardsDetailActionForSelectedEvent() async throws {
+        let event = makeEvent(id: 91, on: Date())
+        var detailEventID: Int64?
+        let popover = CalendarEventSummaryPopoverView(
+            event: event,
+            onShowDetail: { detailEvent in
+                detailEventID = detailEvent.id
+            }
+        )
+
+        popover.onShowDetail?(event)
+
+        #expect(popover.event.id == event.id)
+        #expect(detailEventID == event.id)
+    }
+
+    @Test func eventDetailStatusUsesCanonicalEventFieldsWithoutRawRecurrenceID() async throws {
+        let baseDate = Date()
+        let repeatedEvent = Event(
+            id: 11,
+            title: "반복 회의",
+            description: "",
+            startAt: baseDate,
+            endAt: baseDate.addingTimeInterval(3600),
+            colorCode: "#4F46E5",
+            importantEvent: true,
+            recurrenceId: 12345,
+            isRecurrenceOccurrence: false
+        )
+        let occurrenceEvent = Event(
+            id: 12,
+            title: "반복 발생 일정",
+            description: "",
+            startAt: baseDate,
+            endAt: baseDate.addingTimeInterval(3600),
+            colorCode: "#4F46E5",
+            importantEvent: false,
+            recurrenceId: nil,
+            isRecurrenceOccurrence: true
+        )
+        let singleEvent = makeEvent(id: 13, on: baseDate)
+
+        #expect(CalendarEventDetailView.importantStatusText(for: repeatedEvent) == "중요 일정")
+        #expect(CalendarEventDetailView.recurrenceStatusText(for: repeatedEvent) == "반복 일정")
+        #expect(CalendarEventDetailView.recurrenceStatusText(for: occurrenceEvent) == "반복 일정")
+        #expect(CalendarEventDetailView.recurrenceStatusText(for: singleEvent) == "반복 없음")
+        #expect(!CalendarEventDetailView.recurrenceStatusText(for: repeatedEvent).contains("12345"))
+    }
+
+    @MainActor
+    @Test func eventCreationFormReceivesReusableBindingsWithoutOwningSaveAction() async throws {
+        let startAt = Date()
+        let endAt = startAt.addingTimeInterval(3600)
+        let form = CalendarEventFormView(
+            title: .constant("회의"),
+            startAt: .constant(startAt),
+            endAt: .constant(endAt),
+            description: .constant("설명"),
+            selectedColorCode: .constant("#4F46E5"),
+            isRecurrenceEnabled: .constant(false),
+            recurrenceStartDate: .constant(startAt),
+            recurrenceEndDate: .constant(startAt),
+            recurrenceStartTime: .constant(startAt),
+            recurrenceEndTime: .constant(endAt),
+            selectedRecurrenceFrequency: .constant(.daily),
+            onRecurrenceEnabled: {}
+        )
+
+        #expect(form.title == "회의")
+        #expect(CalendarEventCreationView.canSave(title: "회의", startAt: startAt, endAt: endAt))
     }
 
     @MainActor
@@ -369,11 +479,13 @@ struct CalioTests {
 
         viewModel.selectYearMonth(year: 2036, month: 6)
         let didRequestTargetMonths = await repository.waitForRequestCount(3)
-        await Task.yield()
+        let didExposeFailure = await waitUntil {
+            viewModel.referenceEventAreaState == .failed("일정을 불러오지 못했습니다. 네트워크 연결을 확인해 주세요.")
+        }
 
         #expect(didRequestTargetMonths)
         #expect(viewModel.referenceDay == DayKey(year: 2036, month: 6, day: 8))
-        #expect(viewModel.referenceEventAreaState == .failed("일정을 불러오지 못했습니다. 네트워크 연결을 확인해 주세요."))
+        #expect(didExposeFailure)
     }
 
     @Test func eventCreationDefaultTimesUseReferenceDayMorningRange() async throws {
@@ -934,7 +1046,26 @@ struct CalioTests {
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!
         return calendar
     }
-    
+
+    @MainActor
+    private func waitUntil(
+        timeoutNanoseconds: UInt64 = 5_000_000_000,
+        condition: @escaping @MainActor () -> Bool
+    ) async -> Bool {
+        let retryIntervalNanoseconds: UInt64 = 10_000_000
+        let maxAttemptCount = Int(timeoutNanoseconds / retryIntervalNanoseconds)
+
+        for _ in 0...maxAttemptCount {
+            if condition() {
+                return true
+            }
+
+            try? await Task.sleep(nanoseconds: retryIntervalNanoseconds)
+        }
+
+        return condition()
+    }
+
     private func makeDayKey(dayOffset: Int, from baseDate: Date, calendar: Calendar) -> DayKey {
         let date = calendar.date(byAdding: .day, value: dayOffset, to: baseDate) ?? baseDate
         return DayKey(date: date, calendar: calendar)

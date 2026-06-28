@@ -19,47 +19,90 @@ struct CalendarDateEventCellView: View {
     let dayText: String
     let isToday: Bool
     let onTap: () -> Void
+    @Binding var selectedEvent: Event?
+    let onEventSelected: (Event) -> Void
+    let onShowEventDetail: (Event) -> Void
     let events: [Event]
     
     var body: some View {
         GeometryReader { geometry in
             let chipLayout = eventChipLayout(maxWidth: geometry.size.width)
-            
-            VStack(spacing: 8) {
-                Text("\(monthText) / \(dayText)")
-                    .font(.system(size: 18, weight: .medium))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                FlowLayout(spacing: eventChipSpacing) {
-                    ForEach(chipLayout.visibleEvents, id: \.id) { event in
-                        Text(event.title)
-                            .font(.system(size: 13, weight: .medium))
-                            .lineLimit(1)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .fill(Color(hex: event.colorCode))
-                            )
-                    }
-                    
-                    if chipLayout.hiddenEventCount > 0 {
-                        Text("+\(chipLayout.hiddenEventCount) more")
-                            .font(.system(size: 13, weight: .medium))
-                            .lineLimit(1)
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .fill(Color.secondary.opacity(0.12))
-                            )
+
+            ZStack(alignment: .topLeading) {
+                Button(action: onTap) {
+                    Color.clear
+                }
+                .buttonStyle(.plain)
+
+                VStack(spacing: 8) {
+                    Text("\(monthText) / \(dayText)")
+                        .font(.system(size: 18, weight: .medium))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    FlowLayout(spacing: eventChipSpacing) {
+                        ForEach(chipLayout.visibleEvents, id: \.id) { event in
+                            eventChipButton(event)
+                        }
+
+                        if chipLayout.hiddenEventCount > 0 {
+                            Text("+\(chipLayout.hiddenEventCount) more")
+                                .font(.system(size: 13, weight: .medium))
+                                .lineLimit(1)
+                                .foregroundStyle(.secondary)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .fill(Color.secondary.opacity(0.12))
+                                )
+                        }
                     }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
-        .contentShape(Rectangle())
-        .onTapGesture(perform: onTap)
+    }
+
+    private func eventChipButton(_ event: Event) -> some View {
+        Button {
+            selectedEvent = event
+            onEventSelected(event)
+        } label: {
+            Text(event.title)
+                .font(.system(size: 13, weight: .medium))
+                .lineLimit(1)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color(hex: event.colorCode))
+                )
+        }
+        .buttonStyle(.plain)
+        .popover(
+            isPresented: isShowingEventPopover(for: event),
+            attachmentAnchor: .rect(.bounds),
+            arrowEdge: .top
+        ) {
+            CalendarEventSummaryPopoverView(
+                event: event,
+                onShowDetail: onShowEventDetail
+            )
+            .presentationCompactAdaptation(.popover)
+        }
+    }
+
+    private func isShowingEventPopover(for event: Event) -> Binding<Bool> {
+        Binding(
+            get: {
+                selectedEvent?.id == event.id
+            },
+            set: { isPresented in
+                if !isPresented {
+                    selectedEvent = nil
+                }
+            }
+        )
     }
     
     private func eventChipLayout(maxWidth: CGFloat) -> EventChipLayout {
@@ -153,6 +196,9 @@ private struct EventChipRows {
         onTap: {
             return
         },
+        selectedEvent: .constant(nil),
+        onEventSelected: { _ in },
+        onShowEventDetail: { _ in },
         events: [
             Event(id: 1, title: "제목1212312313212313123123123123", description: "설명", startAt: Date(), endAt: Date().addingTimeInterval(3000), colorCode: "#FDDDDD"),
             Event(id: 2, title: "제목2312", description: "설명", startAt: Date(), endAt: Date().addingTimeInterval(3000), colorCode: "#5DDDDD"),

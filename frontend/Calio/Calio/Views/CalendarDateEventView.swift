@@ -21,6 +21,8 @@ struct CalendarDateEventView: View {
     let onRetryEvents: () -> Void
     
     @StateObject private var focusCoordinator = CalendarScrollFocusCoordinator()
+    @State private var selectedEvent: Event?
+    @State private var detailEvent: Event?
     
     var body: some View {
         VStack(spacing: 0) {
@@ -38,6 +40,9 @@ struct CalendarDateEventView: View {
                     initialAlignmentPlaceholder(itemIDs: itemIDs)
                 }
             }
+        }
+        .sheet(item: $detailEvent) { event in
+            CalendarEventDetailView(event: event)
         }
     }
 
@@ -58,6 +63,11 @@ struct CalendarDateEventView: View {
                                 onReferenceDayChanged: onReferenceDayChanged
                             )
                         },
+                        selectedEvent: $selectedEvent,
+                        onEventSelected: { event in
+                            selectedEvent = event
+                        },
+                        onShowEventDetail: showEventDetail,
                         events: item.events
                     )
                     .frame(height: dateRowHeight)
@@ -136,6 +146,11 @@ struct CalendarDateEventView: View {
                 endIndex: index
             )
         )
+    }
+
+    private func showEventDetail(_ event: Event) {
+        selectedEvent = nil
+        detailEvent = event
     }
 }
 

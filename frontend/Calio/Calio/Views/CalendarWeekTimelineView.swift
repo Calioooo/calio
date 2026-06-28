@@ -25,6 +25,7 @@ struct CalendarWeekTimelineView: View {
     @State private var headerScrollPosition: DayKey?
     @State private var lastVisibleRange: CalendarVisibleIndexRange?
     @State private var selectedEvent: Event?
+    @State private var detailEvent: Event?
     
     var body: some View {
         GeometryReader { geometry in
@@ -64,6 +65,9 @@ struct CalendarWeekTimelineView: View {
                 alignment: .top
             )
             .background(Color(uiColor: .systemBackground))
+        }
+        .sheet(item: $detailEvent) { event in
+            CalendarEventDetailView(event: event)
         }
     }
     
@@ -235,7 +239,10 @@ struct CalendarWeekTimelineView: View {
                         attachmentAnchor: .rect(.bounds),
                         arrowEdge: .top
                     ) {
-                        CalendarEventSummaryPopoverView(event: event)
+                        CalendarEventSummaryPopoverView(
+                            event: event,
+                            onShowDetail: showEventDetail
+                        )
                             .presentationCompactAdaptation(.popover)
                     }
             }
@@ -332,7 +339,10 @@ struct CalendarWeekTimelineView: View {
                     attachmentAnchor: .rect(.bounds),
                     arrowEdge: .top
                 ) {
-                    CalendarEventSummaryPopoverView(event: layout.event)
+                    CalendarEventSummaryPopoverView(
+                        event: layout.event,
+                        onShowDetail: showEventDetail
+                    )
                         .presentationCompactAdaptation(.popover)
                 }
                 .offset(x: layout.x, y: layout.y)
@@ -377,6 +387,11 @@ struct CalendarWeekTimelineView: View {
                 }
             }
         )
+    }
+
+    private func showEventDetail(_ event: Event) {
+        selectedEvent = nil
+        detailEvent = event
     }
     
     private func updateReferenceDayFromHeaderScrollPosition(_ day: DayKey?) {
@@ -666,52 +681,6 @@ private struct TimelineEventLayout: Identifiable {
     
     var id: Int64 {
         event.id
-    }
-}
-
-private struct CalendarEventSummaryPopoverView: View {
-    let event: Event
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .top, spacing: 8) {
-                RoundedRectangle(cornerRadius: 3)
-                    .fill(Color(hex: event.colorCode))
-                    .frame(width: 6, height: 32)
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(event.title)
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(.primary)
-                        .lineLimit(2)
-                    
-                    Text(eventTimeText)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(.secondary)
-                }
-            }
-            
-            if hasDescription {
-                Text(event.description)
-                    .font(.system(size: 14, weight: .regular))
-                    .foregroundStyle(.primary)
-                    .lineLimit(4)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .padding(14)
-        .frame(width: 260, alignment: .leading)
-    }
-    
-    private var hasDescription: Bool {
-        !event.description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-    
-    private var eventTimeText: String {
-        let startText = event.startAt.formatted(date: .omitted, time: .shortened)
-        let endText = event.endAt.formatted(date: .omitted, time: .shortened)
-        
-        return "\(startText) - \(endText)"
     }
 }
 
