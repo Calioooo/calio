@@ -262,17 +262,25 @@ struct CalioTests {
         let startAt = Date()
         let endAt = startAt.addingTimeInterval(3600)
         let form = CalendarEventFormView(
-            title: .constant("회의"),
-            startAt: .constant(startAt),
-            endAt: .constant(endAt),
-            description: .constant("설명"),
-            selectedColorCode: .constant("#4F46E5"),
-            isRecurrenceEnabled: .constant(false),
-            recurrenceStartDate: .constant(startAt),
-            recurrenceEndDate: .constant(startAt),
-            recurrenceStartTime: .constant(startAt),
-            recurrenceEndTime: .constant(endAt),
-            selectedRecurrenceFrequency: .constant(.daily),
+            eventInput: .constant(
+                EventInput(
+                    title: "회의",
+                    startAt: startAt,
+                    endAt: endAt,
+                    description: "설명",
+                    colorCode: "#4F46E5"
+                )
+            ),
+            recurrenceInput: .constant(
+                RecurrenceInput(
+                    isEnabled: false,
+                    startDate: startAt,
+                    endDate: startAt,
+                    startTime: startAt,
+                    endTime: endAt,
+                    frequency: .daily
+                )
+            ),
             onRecurrenceEnabled: {}
         )
 
@@ -286,17 +294,25 @@ struct CalioTests {
         let startAt = Date()
         let endAt = startAt.addingTimeInterval(3600)
         let form = CalendarEventFormView(
-            title: .constant("수정할 일정"),
-            startAt: .constant(startAt),
-            endAt: .constant(endAt),
-            description: .constant("설명"),
-            selectedColorCode: .constant("#EF4444"),
-            isRecurrenceEnabled: .constant(true),
-            recurrenceStartDate: .constant(startAt),
-            recurrenceEndDate: .constant(startAt),
-            recurrenceStartTime: .constant(startAt),
-            recurrenceEndTime: .constant(endAt),
-            selectedRecurrenceFrequency: .constant(.weekly),
+            eventInput: .constant(
+                EventInput(
+                    title: "수정할 일정",
+                    startAt: startAt,
+                    endAt: endAt,
+                    description: "설명",
+                    colorCode: "#EF4444"
+                )
+            ),
+            recurrenceInput: .constant(
+                RecurrenceInput(
+                    isEnabled: true,
+                    startDate: startAt,
+                    endDate: startAt,
+                    startTime: startAt,
+                    endTime: endAt,
+                    frequency: .weekly
+                )
+            ),
             mode: .editSingleEvent,
             onRecurrenceEnabled: {}
         )

@@ -21,17 +21,8 @@ struct CalendarEventDetailView: View {
     @State private var isEditing = false
     @State private var isShowingSingleDeleteConfirmation = false
     @State private var isShowingRecurrenceDeleteScope = false
-    @State private var editTitle: String
-    @State private var editStartAt: Date
-    @State private var editEndAt: Date
-    @State private var editDescription: String
-    @State private var selectedColorCode: String
-    @State private var isRecurrenceEnabled = false
-    @State private var recurrenceStartDate: Date
-    @State private var recurrenceEndDate: Date
-    @State private var recurrenceStartTime: Date
-    @State private var recurrenceEndTime: Date
-    @State private var selectedRecurrenceFrequency = RecurrenceFrequency.daily
+    @State private var editInput: EventInput
+    @State private var recurrenceInput: RecurrenceInput
 
     init(
         event: Event,
@@ -49,15 +40,25 @@ struct CalendarEventDetailView: View {
         self.onDeleteSingleEvent = onDeleteSingleEvent
         self.onDeleteRecurrenceOccurrence = onDeleteRecurrenceOccurrence
         self.onDeleteRecurrenceSeries = onDeleteRecurrenceSeries
-        _editTitle = State(initialValue: event.title)
-        _editStartAt = State(initialValue: event.startAt)
-        _editEndAt = State(initialValue: event.endAt)
-        _editDescription = State(initialValue: event.description)
-        _selectedColorCode = State(initialValue: event.colorCode)
-        _recurrenceStartDate = State(initialValue: event.startAt)
-        _recurrenceEndDate = State(initialValue: event.startAt)
-        _recurrenceStartTime = State(initialValue: event.startAt)
-        _recurrenceEndTime = State(initialValue: event.endAt)
+        _editInput = State(
+            initialValue: EventInput(
+                title: event.title,
+                startAt: event.startAt,
+                endAt: event.endAt,
+                description: event.description,
+                colorCode: event.colorCode
+            )
+        )
+        _recurrenceInput = State(
+            initialValue: RecurrenceInput(
+                isEnabled: false,
+                startDate: event.startAt,
+                endDate: event.startAt,
+                startTime: event.startAt,
+                endTime: event.endAt,
+                frequency: .daily
+            )
+        )
     }
 
     var body: some View {
@@ -118,17 +119,8 @@ struct CalendarEventDetailView: View {
         Form {
             mutationFailureSection
             CalendarEventFormView(
-                title: $editTitle,
-                startAt: $editStartAt,
-                endAt: $editEndAt,
-                description: $editDescription,
-                selectedColorCode: $selectedColorCode,
-                isRecurrenceEnabled: $isRecurrenceEnabled,
-                recurrenceStartDate: $recurrenceStartDate,
-                recurrenceEndDate: $recurrenceEndDate,
-                recurrenceStartTime: $recurrenceStartTime,
-                recurrenceEndTime: $recurrenceEndTime,
-                selectedRecurrenceFrequency: $selectedRecurrenceFrequency,
+                eventInput: $editInput,
+                recurrenceInput: $recurrenceInput,
                 mode: .editSingleEvent,
                 onRecurrenceEnabled: {}
             )
@@ -294,18 +286,18 @@ struct CalendarEventDetailView: View {
 
     private var canSaveEdit: Bool {
         CalendarEventCreationView.canSave(
-            title: editTitle,
-            startAt: editStartAt,
-            endAt: editEndAt
+            title: editInput.title,
+            startAt: editInput.startAt,
+            endAt: editInput.endAt
         )
     }
 
     private func updateSingleEvent() {
         let input = EventUpdateInput(
-            title: editTitle.trimmingCharacters(in: .whitespacesAndNewlines),
-            description: editDescription,
-            startAt: editStartAt,
-            endAt: editEndAt
+            title: editInput.title.trimmingCharacters(in: .whitespacesAndNewlines),
+            description: editInput.description,
+            startAt: editInput.startAt,
+            endAt: editInput.endAt
         )
 
         Task {

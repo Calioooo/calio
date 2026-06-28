@@ -9,17 +9,8 @@ import SwiftUI
 
 struct CalendarEventCreationView: View {
     @Environment(\.dismiss) private var dismiss
-    @State private var title = ""
-    @State private var startAt: Date
-    @State private var endAt: Date
-    @State private var description = ""
-    @State private var selectedColorCode = "#4F46E5"
-    @State private var isRecurrenceEnabled = false
-    @State private var recurrenceStartDate: Date
-    @State private var recurrenceEndDate: Date
-    @State private var recurrenceStartTime: Date
-    @State private var recurrenceEndTime: Date
-    @State private var selectedRecurrenceFrequency = RecurrenceFrequency.daily
+    @State private var eventInput: EventInput
+    @State private var recurrenceInput: RecurrenceInput
     
     let isSaving: Bool
     let failureMessage: String?
@@ -39,12 +30,25 @@ struct CalendarEventCreationView: View {
         let startAt = timeRange.startAt
         let endAt = timeRange.endAt
         
-        _startAt = State(initialValue: startAt)
-        _endAt = State(initialValue: endAt)
-        _recurrenceStartDate = State(initialValue: startAt)
-        _recurrenceEndDate = State(initialValue: startAt)
-        _recurrenceStartTime = State(initialValue: startAt)
-        _recurrenceEndTime = State(initialValue: endAt)
+        _eventInput = State(
+            initialValue: EventInput(
+                title: "",
+                startAt: startAt,
+                endAt: endAt,
+                description: "",
+                colorCode: "#4F46E5"
+            )
+        )
+        _recurrenceInput = State(
+            initialValue: RecurrenceInput(
+                isEnabled: false,
+                startDate: startAt,
+                endDate: startAt,
+                startTime: startAt,
+                endTime: endAt,
+                frequency: .daily
+            )
+        )
         self.isSaving = isSaving
         self.failureMessage = failureMessage
         self.onSave = onSave
@@ -55,17 +59,8 @@ struct CalendarEventCreationView: View {
             Form {
                 failureSection
                 CalendarEventFormView(
-                    title: $title,
-                    startAt: $startAt,
-                    endAt: $endAt,
-                    description: $description,
-                    selectedColorCode: $selectedColorCode,
-                    isRecurrenceEnabled: $isRecurrenceEnabled,
-                    recurrenceStartDate: $recurrenceStartDate,
-                    recurrenceEndDate: $recurrenceEndDate,
-                    recurrenceStartTime: $recurrenceStartTime,
-                    recurrenceEndTime: $recurrenceEndTime,
-                    selectedRecurrenceFrequency: $selectedRecurrenceFrequency,
+                    eventInput: $eventInput,
+                    recurrenceInput: $recurrenceInput,
                     onRecurrenceEnabled: resetRecurrenceFieldsFromSingleEventTime
                 )
             }
@@ -110,40 +105,40 @@ struct CalendarEventCreationView: View {
     
     private var canSave: Bool {
         CalendarEventCreationView.canSave(
-            title: title,
-            startAt: startAt,
-            endAt: endAt,
-            isRecurrenceEnabled: isRecurrenceEnabled,
-            recurrenceStartDate: recurrenceStartDate,
-            recurrenceEndDate: recurrenceEndDate,
-            recurrenceStartTime: recurrenceStartTime,
-            recurrenceEndTime: recurrenceEndTime
+            title: eventInput.title,
+            startAt: eventInput.startAt,
+            endAt: eventInput.endAt,
+            isRecurrenceEnabled: recurrenceInput.isEnabled,
+            recurrenceStartDate: recurrenceInput.startDate,
+            recurrenceEndDate: recurrenceInput.endDate,
+            recurrenceStartTime: recurrenceInput.startTime,
+            recurrenceEndTime: recurrenceInput.endTime
         )
     }
     
     private func save() {
-        let eventInput = EventCreateInput(
-            title: title.trimmingCharacters(in: .whitespacesAndNewlines),
-            description: description,
-            startAt: startAt,
-            endAt: endAt
+        let eventCreateInput = EventCreateInput(
+            title: eventInput.title.trimmingCharacters(in: .whitespacesAndNewlines),
+            description: eventInput.description,
+            startAt: eventInput.startAt,
+            endAt: eventInput.endAt
         )
         let submitInput: CalendarEventCreationSubmitInput
 
-        if isRecurrenceEnabled {
+        if recurrenceInput.isEnabled {
             submitInput = .recurring(
                 RecurrenceEventCreateInput(
-                    title: eventInput.title,
-                    description: eventInput.description,
-                    recurrenceStartDate: recurrenceStartDate,
-                    recurrenceEndDate: recurrenceEndDate,
-                    recurrenceStartTime: recurrenceStartTime,
-                    recurrenceEndTime: recurrenceEndTime,
-                    recurrenceFrequency: selectedRecurrenceFrequency
+                    title: eventCreateInput.title,
+                    description: eventCreateInput.description,
+                    recurrenceStartDate: recurrenceInput.startDate,
+                    recurrenceEndDate: recurrenceInput.endDate,
+                    recurrenceStartTime: recurrenceInput.startTime,
+                    recurrenceEndTime: recurrenceInput.endTime,
+                    recurrenceFrequency: recurrenceInput.frequency
                 )
             )
         } else {
-            submitInput = .single(eventInput)
+            submitInput = .single(eventCreateInput)
         }
 
         Task {
@@ -231,11 +226,11 @@ struct CalendarEventCreationView: View {
     }
 
     private func resetRecurrenceFieldsFromSingleEventTime() {
-        recurrenceStartDate = startAt
-        recurrenceEndDate = startAt
-        recurrenceStartTime = startAt
-        recurrenceEndTime = endAt
-        selectedRecurrenceFrequency = .daily
+        recurrenceInput.startDate = eventInput.startAt
+        recurrenceInput.endDate = eventInput.startAt
+        recurrenceInput.startTime = eventInput.startAt
+        recurrenceInput.endTime = eventInput.endAt
+        recurrenceInput.frequency = .daily
     }
 
     private nonisolated static var utcCalendar: Calendar {
