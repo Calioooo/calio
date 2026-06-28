@@ -1,5 +1,5 @@
 //
-//  EventCreateInput.swift
+//  EventInput.swift
 //  Calio
 //
 //  Created by Codex on 6/19/26.
@@ -7,7 +7,31 @@
 
 import Foundation
 
+struct EventInput: Equatable {
+    var title: String
+    var startAt: Date
+    var endAt: Date
+    var description: String
+    var colorCode: String
+}
+
+struct RecurrenceInput: Equatable {
+    var isEnabled: Bool
+    var startDate: Date
+    var endDate: Date
+    var startTime: Date
+    var endTime: Date
+    var frequency: RecurrenceFrequency
+}
+
 struct EventCreateInput: Equatable {
+    let title: String
+    let description: String
+    let startAt: Date
+    let endAt: Date
+}
+
+struct EventUpdateInput: Equatable {
     let title: String
     let description: String
     let startAt: Date
@@ -27,24 +51,4 @@ struct RecurrenceEventCreateInput: Equatable {
 enum CalendarEventCreationSubmitInput: Equatable {
     case single(EventCreateInput)
     case recurring(RecurrenceEventCreateInput)
-}
-
-enum RecurrenceFrequency: String, CaseIterable, Codable, Equatable {
-    case daily = "DAILY"
-    case weekly = "WEEKLY"
-    case monthly = "MONTHLY"
-    case yearly = "YEARLY"
-
-    var koreanLabel: String {
-        switch self {
-        case .daily:
-            return "매일"
-        case .weekly:
-            return "매주"
-        case .monthly:
-            return "매월"
-        case .yearly:
-            return "매년"
-        }
-    }
 }

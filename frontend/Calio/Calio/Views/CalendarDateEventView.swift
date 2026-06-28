@@ -19,6 +19,43 @@ struct CalendarDateEventView: View {
     let onReferenceDayChanged: (DayKey) -> Void
     let onVisibleRangeChanged: (CalendarVisibleIndexRange) -> Void
     let onRetryEvents: () -> Void
+    let isEventMutating: Bool
+    let eventMutationFailureMessage: String?
+    let onResetEventMutation: () -> Void
+    let onUpdateSingleEvent: (Event, EventUpdateInput) async -> Bool
+    let onDeleteSingleEvent: (Event) async -> Bool
+    let onDeleteRecurrenceOccurrence: (Event) async -> Bool
+    let onDeleteRecurrenceSeries: (Event) async -> Bool
+
+    init(
+        items: [CalendarDateCellItem],
+        referenceDay: DayKey,
+        eventAreaState: CalendarEventAreaState,
+        onReferenceDayChanged: @escaping (DayKey) -> Void,
+        onVisibleRangeChanged: @escaping (CalendarVisibleIndexRange) -> Void,
+        onRetryEvents: @escaping () -> Void,
+        isEventMutating: Bool = false,
+        eventMutationFailureMessage: String? = nil,
+        onResetEventMutation: @escaping () -> Void = {},
+        onUpdateSingleEvent: @escaping (Event, EventUpdateInput) async -> Bool = { _, _ in true },
+        onDeleteSingleEvent: @escaping (Event) async -> Bool = { _ in true },
+        onDeleteRecurrenceOccurrence: @escaping (Event) async -> Bool = { _ in true },
+        onDeleteRecurrenceSeries: @escaping (Event) async -> Bool = { _ in true }
+    ) {
+        self.items = items
+        self.referenceDay = referenceDay
+        self.eventAreaState = eventAreaState
+        self.onReferenceDayChanged = onReferenceDayChanged
+        self.onVisibleRangeChanged = onVisibleRangeChanged
+        self.onRetryEvents = onRetryEvents
+        self.isEventMutating = isEventMutating
+        self.eventMutationFailureMessage = eventMutationFailureMessage
+        self.onResetEventMutation = onResetEventMutation
+        self.onUpdateSingleEvent = onUpdateSingleEvent
+        self.onDeleteSingleEvent = onDeleteSingleEvent
+        self.onDeleteRecurrenceOccurrence = onDeleteRecurrenceOccurrence
+        self.onDeleteRecurrenceSeries = onDeleteRecurrenceSeries
+    }
     
     @StateObject private var focusCoordinator = CalendarScrollFocusCoordinator()
     @State private var selectedEvent: Event?
@@ -42,7 +79,15 @@ struct CalendarDateEventView: View {
             }
         }
         .sheet(item: $detailEvent) { event in
-            CalendarEventDetailView(event: event)
+            CalendarEventDetailView(
+                event: event,
+                isMutating: isEventMutating,
+                mutationFailureMessage: eventMutationFailureMessage,
+                onUpdateSingleEvent: onUpdateSingleEvent,
+                onDeleteSingleEvent: onDeleteSingleEvent,
+                onDeleteRecurrenceOccurrence: onDeleteRecurrenceOccurrence,
+                onDeleteRecurrenceSeries: onDeleteRecurrenceSeries
+            )
         }
     }
 
@@ -150,6 +195,7 @@ struct CalendarDateEventView: View {
 
     private func showEventDetail(_ event: Event) {
         selectedEvent = nil
+        onResetEventMutation()
         detailEvent = event
     }
 }

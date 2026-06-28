@@ -48,7 +48,14 @@ private struct CalendarWeekTimelineTestView: View {
             onSelectedDay: viewModel.setReferenceDay(_:),
             onVisibleRangeChanged: viewModel.loadAdditionalEventsIfNeeded(visibleRange:),
             onSelectedYearMonth: viewModel.selectYearMonth(year:month:),
-            onRetryEvents: viewModel.retryReferenceMonthEvents
+            onRetryEvents: viewModel.retryReferenceMonthEvents,
+            isEventMutating: viewModel.mutationState.isMutating,
+            eventMutationFailureMessage: viewModel.mutationState.failureMessage,
+            onResetEventMutation: viewModel.resetMutationState,
+            onUpdateSingleEvent: viewModel.updateSingleEvent(_:input:),
+            onDeleteSingleEvent: viewModel.deleteSingleEvent(_:),
+            onDeleteRecurrenceOccurrence: viewModel.deleteRecurrenceOccurrence(_:),
+            onDeleteRecurrenceSeries: viewModel.deleteRecurrenceSeries(_:)
         )
         .task {
             viewModel.loadInitialIfNeeded()

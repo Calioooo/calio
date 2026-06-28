@@ -44,6 +44,57 @@ struct EventService {
         }
     }
 
+    func updateEvent(eventId: Int64, input: EventUpdateInput) async throws -> Event {
+        let request = UpdateEventRequestDTO(
+            title: input.title,
+            description: input.description,
+            startAt: input.startAt,
+            endAt: input.endAt
+        )
+
+        do {
+            let response = try await repository.updateEvent(eventId: eventId, request: request)
+            return mapToEvent(response)
+        } catch let error as EventRepositoryError {
+            throw mapToServiceError(error)
+        } catch {
+            throw EventServiceError.unexpected
+        }
+    }
+
+    func deleteEvent(eventId: Int64) async throws {
+        do {
+            try await repository.deleteEvent(eventId: eventId)
+        } catch let error as EventRepositoryError {
+            throw mapToServiceError(error)
+        } catch {
+            throw EventServiceError.unexpected
+        }
+    }
+
+    func deleteRecurrenceEvent(recurrenceId: Int64) async throws {
+        do {
+            try await repository.deleteRecurrenceEvent(recurrenceId: recurrenceId)
+        } catch let error as EventRepositoryError {
+            throw mapToServiceError(error)
+        } catch {
+            throw EventServiceError.unexpected
+        }
+    }
+
+    func deleteRecurrenceOccurrence(recurrenceId: Int64, eventId: Int64) async throws {
+        do {
+            try await repository.deleteRecurrenceOccurrence(
+                recurrenceId: recurrenceId,
+                eventId: eventId
+            )
+        } catch let error as EventRepositoryError {
+            throw mapToServiceError(error)
+        } catch {
+            throw EventServiceError.unexpected
+        }
+    }
+
     func createRecurrenceEvent(_ input: RecurrenceEventCreateInput) async throws {
         let request = CreateRecurrenceEventRequestDTO(
             recurrenceTitle: input.title,
@@ -110,6 +161,12 @@ struct EventService {
         switch error {
         case .backend(_, let response):
             switch response?.errorCode {
+            case "EVENT_NOT_FOUND":
+                return .eventNotFound
+            case "RECURRENCE_EVENT_NOT_FOUND":
+                return .recurrenceEventNotFound
+            case "RECURRENCE_OCCURRENCE_NOT_FOUND":
+                return .recurrenceOccurrenceNotFound
             case "VALIDATION_FAILED":
                 return .validationFailed
             case "INVALID_TIME_RANGE":
@@ -131,6 +188,9 @@ struct EventService {
 }
 
 enum EventServiceError: Error, Equatable {
+    case eventNotFound
+    case recurrenceEventNotFound
+    case recurrenceOccurrenceNotFound
     case validationFailed
     case invalidTimeRange
     case network

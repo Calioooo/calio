@@ -17,6 +17,7 @@ final class CalendarHomeViewModel: ObservableObject {
     @Published private(set) var state: CalendarState
     @Published private(set) var referenceDay: DayKey
     @Published private(set) var createState: CalendarEventCreateState = .idle
+    @Published private(set) var mutationState: CalendarEventMutationState = .idle
     
     private let initialGeneratedPastMonths = 3
     private let initialGeneratedFutureMonths = 3
@@ -147,6 +148,10 @@ final class CalendarHomeViewModel: ObservableObject {
         createState = .idle
     }
 
+    func resetMutationState() {
+        mutationState = .idle
+    }
+
     func createEvent(_ input: CalendarEventCreationSubmitInput) async -> Bool {
         switch input {
         case .single(let eventInput):
@@ -195,6 +200,106 @@ final class CalendarHomeViewModel: ObservableObject {
             return false
         } catch {
             createState = .failed(.unexpected)
+            return false
+        }
+    }
+
+    func updateSingleEvent(_ event: Event, input: EventUpdateInput) async -> Bool {
+        guard !mutationState.isMutating else {
+            return false
+        }
+
+        mutationState = .saving
+
+        do {
+            let updatedEvent = try await eventService.updateEvent(eventId: event.id, input: input)
+            invalidateAndRefetchMonths([
+                YearMonthKey(date: event.startAt, calendar: calendar),
+                YearMonthKey(date: updatedEvent.startAt, calendar: calendar)
+            ])
+            mutationState = .idle
+            return true
+        } catch let error as EventServiceError {
+            mutationState = .failed(CalendarEventMutationFailure(error: error))
+            return false
+        } catch {
+            mutationState = .failed(.unexpected)
+            return false
+        }
+    }
+
+    func deleteSingleEvent(_ event: Event) async -> Bool {
+        guard !mutationState.isMutating else {
+            return false
+        }
+
+        mutationState = .saving
+
+        do {
+            try await eventService.deleteEvent(eventId: event.id)
+            invalidateAndRefetchMonths([YearMonthKey(date: event.startAt, calendar: calendar)])
+            mutationState = .idle
+            return true
+        } catch let error as EventServiceError {
+            mutationState = .failed(CalendarEventMutationFailure(error: error))
+            return false
+        } catch {
+            mutationState = .failed(.unexpected)
+            return false
+        }
+    }
+
+    func deleteRecurrenceOccurrence(_ event: Event) async -> Bool {
+        guard let recurrenceId = event.recurrenceId else {
+            return false
+        }
+
+        guard !mutationState.isMutating else {
+            return false
+        }
+
+        mutationState = .saving
+
+        do {
+            try await eventService.deleteRecurrenceOccurrence(
+                recurrenceId: recurrenceId,
+                eventId: event.id
+            )
+            invalidateMonthEventCache()
+            refetchDefaultPrefetchRange()
+            mutationState = .idle
+            return true
+        } catch let error as EventServiceError {
+            mutationState = .failed(CalendarEventMutationFailure(error: error))
+            return false
+        } catch {
+            mutationState = .failed(.unexpected)
+            return false
+        }
+    }
+
+    func deleteRecurrenceSeries(_ event: Event) async -> Bool {
+        guard let recurrenceId = event.recurrenceId else {
+            return false
+        }
+
+        guard !mutationState.isMutating else {
+            return false
+        }
+
+        mutationState = .saving
+
+        do {
+            try await eventService.deleteRecurrenceEvent(recurrenceId: recurrenceId)
+            invalidateMonthEventCache()
+            refetchDefaultPrefetchRange()
+            mutationState = .idle
+            return true
+        } catch let error as EventServiceError {
+            mutationState = .failed(CalendarEventMutationFailure(error: error))
+            return false
+        } catch {
+            mutationState = .failed(.unexpected)
             return false
         }
     }
@@ -439,6 +544,31 @@ final class CalendarHomeViewModel: ObservableObject {
                 to: state.endDate,
                 monthEventCache: monthEventCache
             )
+        )
+    }
+
+    private func invalidateAndRefetchMonths(_ keys: Set<YearMonthKey>) {
+        invalidateMonthEventCache(for: keys)
+        requestMonths(Array(keys), retryFailed: false)
+    }
+
+    private func invalidateMonthEventCache(for keys: Set<YearMonthKey>) {
+        keys.forEach { key in
+            monthEventCache.removeValue(forKey: key)
+            pendingCreatedEventsByMonth.removeValue(forKey: key)
+        }
+
+        let updatedDaysByKey = keys.reduce(into: [DayKey: CalendarDateCellItem]()) { result, key in
+            result.merge(
+                makeDateCellItemsForGeneratedMonth(key, monthEventCache: monthEventCache)
+            ) { _, new in
+                new
+            }
+        }
+
+        state = state.replacingMonthEventCache(
+            monthEventCache,
+            updatingDateCells: updatedDaysByKey
         )
     }
 
@@ -725,6 +855,8 @@ enum CalendarEventCreateFailure: Equatable {
 
     init(error: EventServiceError) {
         switch error {
+        case .eventNotFound, .recurrenceEventNotFound, .recurrenceOccurrenceNotFound:
+            self = .unexpected
         case .validationFailed:
             self = .validationFailed
         case .invalidTimeRange:
@@ -746,6 +878,72 @@ enum CalendarEventCreateFailure: Equatable {
             return "서버에 연결할 수 없습니다."
         case .unexpected:
             return "일정을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요."
+        }
+    }
+}
+
+enum CalendarEventMutationState: Equatable {
+    case idle
+    case saving
+    case failed(CalendarEventMutationFailure)
+
+    var isMutating: Bool {
+        self == .saving
+    }
+
+    var failureMessage: String? {
+        guard case .failed(let failure) = self else {
+            return nil
+        }
+
+        return failure.message
+    }
+}
+
+enum CalendarEventMutationFailure: Equatable {
+    case eventNotFound
+    case recurrenceEventNotFound
+    case recurrenceOccurrenceNotFound
+    case validationFailed
+    case invalidTimeRange
+    case network
+    case unexpected
+
+    init(error: EventServiceError) {
+        switch error {
+        case .eventNotFound:
+            self = .eventNotFound
+        case .recurrenceEventNotFound:
+            self = .recurrenceEventNotFound
+        case .recurrenceOccurrenceNotFound:
+            self = .recurrenceOccurrenceNotFound
+        case .validationFailed:
+            self = .validationFailed
+        case .invalidTimeRange:
+            self = .invalidTimeRange
+        case .network:
+            self = .network
+        case .decoding, .unexpected:
+            self = .unexpected
+        }
+    }
+
+    var message: String {
+        switch self {
+        case .eventNotFound:
+            return "일정을 찾을 수 없습니다."
+        case .recurrenceEventNotFound:
+            return "반복 일정을 찾을 수 없습니다."
+        case .recurrenceOccurrenceNotFound:
+            return "반복 일정 항목을 찾을 수 없습니다."
+        case .validationFailed:
+            return "입력값을 확인해 주세요."
+        case .invalidTimeRange:
+            return "종료 시각은 시작 시각보다 늦어야 합니다."
+        case .network:
+            return "서버에 연결할 수 없습니다."
+        case .unexpected:
+            return "요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요."
         }
     }
 }

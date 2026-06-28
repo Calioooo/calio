@@ -114,7 +114,13 @@ enum CalendarMonthEventFailure: Equatable {
         switch error {
         case .network:
             self = .network
-        case .validationFailed, .invalidTimeRange, .decoding, .unexpected:
+        case .eventNotFound,
+             .recurrenceEventNotFound,
+             .recurrenceOccurrenceNotFound,
+             .validationFailed,
+             .invalidTimeRange,
+             .decoding,
+             .unexpected:
             self = .unexpected
         }
     }

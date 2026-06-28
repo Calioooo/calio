@@ -14,6 +14,13 @@ struct CreateEventRequestDTO: Encodable {
     let endAt: Date
 }
 
+struct UpdateEventRequestDTO: Encodable, Equatable {
+    let title: String
+    let description: String
+    let startAt: Date
+    let endAt: Date
+}
+
 struct CreateRecurrenceEventRequestDTO: Encodable, Equatable {
     let recurrenceTitle: String
     let recurrenceDescription: String
