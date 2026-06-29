@@ -48,7 +48,7 @@ enum EventJSONCoding {
     }
 
     static func string(from date: Date) -> String {
-        fractionalFormatter.string(from: date)
+        formatter.string(from: date)
     }
 
     private static func date(from value: String) -> Date? {
