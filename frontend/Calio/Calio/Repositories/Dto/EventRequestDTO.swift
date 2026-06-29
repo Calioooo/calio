@@ -1,5 +1,5 @@
 //
-//  CreateEventRequestDTO.swift
+//  EventRequestDTO.swift
 //  Calio
 //
 //  Created by Codex on 6/19/26.
