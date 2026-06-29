@@ -48,6 +48,43 @@ struct RecurrenceEventCreateInput: Equatable {
     let recurrenceFrequency: RecurrenceFrequency
 }
 
+struct RecurrenceEventDetails: Equatable {
+    let recurrenceId: Int64
+    let title: String
+    let description: String
+    let recurrenceStartDate: Date
+    let recurrenceEndDate: Date
+    let recurrenceStartTime: Date
+    let recurrenceEndTime: Date
+    let recurrenceFrequency: RecurrenceFrequency
+}
+
+struct RecurrenceEventSeriesEditInput: Equatable {
+    let title: String
+    let description: String
+    let recurrenceStartDate: Date
+    let recurrenceEndDate: Date
+    let recurrenceStartTime: Date
+    let recurrenceEndTime: Date
+    let recurrenceFrequency: RecurrenceFrequency
+}
+
+struct RecurrenceEventUpdateInput: Equatable {
+    let title: String
+    let description: String
+    let startAt: Date
+    let endAt: Date
+    let recurrenceFrequency: RecurrenceFrequency
+}
+
+struct RecurrenceOccurrenceUpdateInput: Equatable {
+    let title: String
+    let description: String
+    let startAt: Date
+    let endAt: Date
+    let isImportant: Bool
+}
+
 enum CalendarEventCreationSubmitInput: Equatable {
     case single(EventCreateInput)
     case recurring(RecurrenceEventCreateInput)

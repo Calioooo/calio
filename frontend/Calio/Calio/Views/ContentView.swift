@@ -52,7 +52,10 @@ private struct CalendarWeekTimelineTestView: View {
             isEventMutating: viewModel.mutationState.isMutating,
             eventMutationFailureMessage: viewModel.mutationState.failureMessage,
             onResetEventMutation: viewModel.resetMutationState,
+            onFetchRecurrenceEvent: viewModel.fetchRecurrenceEvent(recurrenceId:),
             onUpdateSingleEvent: viewModel.updateSingleEvent(_:input:),
+            onUpdateRecurrenceOccurrence: viewModel.updateRecurrenceOccurrence(_:input:),
+            onUpdateRecurrenceSeries: viewModel.updateRecurrenceSeries(recurrenceId:input:),
             onDeleteSingleEvent: viewModel.deleteSingleEvent(_:),
             onDeleteRecurrenceOccurrence: viewModel.deleteRecurrenceOccurrence(_:),
             onDeleteRecurrenceSeries: viewModel.deleteRecurrenceSeries(_:)

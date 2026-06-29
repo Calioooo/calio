@@ -45,7 +45,9 @@ struct CalendarEventFormView: View {
             recurrenceSection
         }
         descriptionSection
-        colorSection
+        if mode.showsColorFields {
+            colorSection
+        }
     }
 
     private var titleSection: some View {
@@ -58,7 +60,7 @@ struct CalendarEventFormView: View {
 
     @ViewBuilder
     private var timeSection: some View {
-        if mode.showsRecurrenceFields && recurrenceInput.isEnabled {
+        if mode.usesRecurrenceDateAndTime(isRecurrenceEnabled: recurrenceInput.isEnabled) {
             recurrenceDateSection
             recurrenceTimeSection
         } else {
@@ -68,9 +70,13 @@ struct CalendarEventFormView: View {
 
     private var recurrenceSection: some View {
         Section("반복") {
-            recurrenceEnabledButton
+            if mode.allowsRecurrenceToggle {
+                recurrenceEnabledButton
+            } else {
+                fixedRecurrenceEnabledRow
+            }
 
-            if recurrenceInput.isEnabled {
+            if mode.showsRecurrenceFrequency(isRecurrenceEnabled: recurrenceInput.isEnabled) {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("반복 주기")
                         .font(.subheadline)
@@ -184,6 +190,17 @@ struct CalendarEventFormView: View {
         .buttonStyle(.plain)
     }
 
+    private var fixedRecurrenceEnabledRow: some View {
+        HStack {
+            Text("반복 일정")
+                .foregroundStyle(.primary)
+            Spacer()
+            Text("켜짐")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Color.accentColor)
+        }
+    }
+
     private func recurrenceFrequencyButton(_ frequency: RecurrenceFrequency) -> some View {
         Button {
             recurrenceInput.frequency = frequency
@@ -234,12 +251,49 @@ struct CalendarEventFormView: View {
 enum CalendarEventFormMode: Equatable {
     case create
     case editSingleEvent
+    case editRecurrenceOccurrence
+    case editRecurrenceSeries
 
     var showsRecurrenceFields: Bool {
         switch self {
-        case .create:
+        case .create, .editRecurrenceSeries:
             return true
-        case .editSingleEvent:
+        case .editSingleEvent, .editRecurrenceOccurrence:
+            return false
+        }
+    }
+
+    var allowsRecurrenceToggle: Bool {
+        self == .create
+    }
+
+    var showsColorFields: Bool {
+        switch self {
+        case .create, .editSingleEvent:
+            return true
+        case .editRecurrenceOccurrence, .editRecurrenceSeries:
+            return false
+        }
+    }
+
+    func usesRecurrenceDateAndTime(isRecurrenceEnabled: Bool) -> Bool {
+        switch self {
+        case .create:
+            return isRecurrenceEnabled
+        case .editRecurrenceSeries:
+            return true
+        case .editSingleEvent, .editRecurrenceOccurrence:
+            return false
+        }
+    }
+
+    func showsRecurrenceFrequency(isRecurrenceEnabled: Bool) -> Bool {
+        switch self {
+        case .create:
+            return isRecurrenceEnabled
+        case .editRecurrenceSeries:
+            return true
+        case .editSingleEvent, .editRecurrenceOccurrence:
             return false
         }
     }

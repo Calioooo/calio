@@ -46,6 +46,19 @@ struct StubEventRepository: EventRepository {
         )
     }
 
+    func fetchRecurrenceEvent(recurrenceId: Int64) async throws -> RecurrenceEventResponseDTO {
+        RecurrenceEventResponseDTO(
+            recurrenceId: recurrenceId,
+            recurrenceTitle: "반복 일정",
+            recurrenceDescription: "",
+            recurrenceStartDate: "2026-01-01",
+            recurrenceEndDate: "2026-01-31",
+            recurrenceStartTime: "00:00:00",
+            recurrenceEndTime: "01:00:00",
+            recurrenceFrequency: .daily
+        )
+    }
+
     func updateEvent(eventId: Int64, request: UpdateEventRequestDTO) async throws -> EventResponseDTO {
         EventResponseDTO(
             id: eventId,
@@ -53,6 +66,41 @@ struct StubEventRepository: EventRepository {
             description: request.description,
             startAt: request.startAt,
             endAt: request.endAt,
+            createdAt: Date(),
+            updatedAt: Date()
+        )
+    }
+
+    func updateRecurrenceEvent(
+        recurrenceId: Int64,
+        request: UpdateRecurrenceEventRequestDTO
+    ) async throws -> RecurrenceEventResponseDTO {
+        RecurrenceEventResponseDTO(
+            recurrenceId: recurrenceId,
+            recurrenceTitle: request.title ?? "반복 일정",
+            recurrenceDescription: request.description,
+            recurrenceStartDate: "2026-01-01",
+            recurrenceEndDate: "2026-01-31",
+            recurrenceStartTime: "00:00:00",
+            recurrenceEndTime: "01:00:00",
+            recurrenceFrequency: request.recurrenceFrequency ?? .daily
+        )
+    }
+
+    func updateRecurrenceOccurrence(
+        recurrenceId: Int64,
+        eventId: Int64,
+        request: UpdateRecurrenceOccurrenceRequestDTO
+    ) async throws -> EventResponseDTO {
+        EventResponseDTO(
+            id: eventId,
+            title: request.title ?? "반복 일정",
+            description: request.description,
+            startAt: request.startAt ?? Date(),
+            endAt: request.endAt ?? Date().addingTimeInterval(3600),
+            importantEvent: request.isImportant ?? false,
+            recurrenceId: recurrenceId,
+            isRecurrenceOccurrence: true,
             createdAt: Date(),
             updatedAt: Date()
         )
