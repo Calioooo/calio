@@ -5,6 +5,6 @@
   },
   "frontend": {
     "workdir": "frontend/Calio",
-    "verifyCommand": "xcodebuild test -project Calio.xcodeproj -scheme Calio -destination 'platform=iOS Simulator,name=iPhone 16'"
+    "verifyCommand": "./frontend/scripts/verify-ios-github-actions.sh"
   }
 }
