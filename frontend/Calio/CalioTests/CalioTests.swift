@@ -288,7 +288,7 @@ struct CalioTests {
 
         #expect(form.title == "회의")
         #expect(form.mode == .create)
-        #expect(CalendarEventCreationView.canSave(title: "회의", startAt: startAt, endAt: endAt))
+        #expect(CalendarEventFormView.canSave(title: "회의", startAt: startAt, endAt: endAt))
     }
 
     @MainActor
@@ -622,10 +622,10 @@ struct CalioTests {
         let startAt = Date()
         let endAt = startAt.addingTimeInterval(3600)
 
-        #expect(CalendarEventCreationView.canSave(title: "회의", startAt: startAt, endAt: endAt))
-        #expect(!CalendarEventCreationView.canSave(title: "   ", startAt: startAt, endAt: endAt))
-        #expect(!CalendarEventCreationView.canSave(title: "회의", startAt: startAt, endAt: startAt))
-        #expect(!CalendarEventCreationView.canSave(title: "회의", startAt: startAt, endAt: startAt.addingTimeInterval(-1)))
+        #expect(CalendarEventFormView.canSave(title: "회의", startAt: startAt, endAt: endAt))
+        #expect(!CalendarEventFormView.canSave(title: "   ", startAt: startAt, endAt: endAt))
+        #expect(!CalendarEventFormView.canSave(title: "회의", startAt: startAt, endAt: startAt))
+        #expect(!CalendarEventFormView.canSave(title: "회의", startAt: startAt, endAt: startAt.addingTimeInterval(-1)))
     }
 
     @Test func eventCreationSaveValidationChecksRecurrenceEndDateWithUTCDate() async throws {
@@ -636,7 +636,7 @@ struct CalioTests {
         let sameUTCDate = startAt
         let previousUTCDate = try #require(kstCalendar.date(from: DateComponents(year: 2026, month: 7, day: 31, hour: 8)))
 
-        #expect(CalendarEventCreationView.canSave(
+        #expect(CalendarEventFormView.canSave(
             title: "반복 회의",
             startAt: startAt,
             endAt: endAt,
@@ -646,7 +646,7 @@ struct CalioTests {
             recurrenceStartTime: startAt,
             recurrenceEndTime: endAt
         ))
-        #expect(!CalendarEventCreationView.canSave(
+        #expect(!CalendarEventFormView.canSave(
             title: "반복 회의",
             startAt: startAt,
             endAt: endAt,
@@ -656,7 +656,7 @@ struct CalioTests {
             recurrenceStartTime: startAt,
             recurrenceEndTime: endAt
         ))
-        #expect(!CalendarEventCreationView.canSave(
+        #expect(!CalendarEventFormView.canSave(
             title: "반복 회의",
             startAt: startAt,
             endAt: endAt,

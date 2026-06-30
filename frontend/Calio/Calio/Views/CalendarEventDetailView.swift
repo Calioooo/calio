@@ -336,7 +336,7 @@ struct CalendarEventDetailView: View {
     }
 
     private var canSaveEdit: Bool {
-        CalendarEventCreationView.canSave(
+        CalendarEventFormView.canSave(
             title: editInput.title,
             startAt: editInput.startAt,
             endAt: editInput.endAt,
