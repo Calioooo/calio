@@ -53,7 +53,7 @@ public class NationalHolidaySyncScheduler {
     @Scheduled(cron = "0 0 4 * * *", zone = "Asia/Seoul")
     public void syncDailyNearRange() {
         if (isFirstDayOfMonth()) {
-            log.warn("National holiday daily sync skipped on monthly sync day. date={}", today());
+            log.info("National holiday daily sync skipped on monthly sync day. date={}", today());
             return;
         }
 
@@ -65,12 +65,12 @@ public class NationalHolidaySyncScheduler {
 
     private void runIfAvailable(String jobName, Runnable syncJob) {
         if (!holidayApiProperties.hasServiceKey()) {
-            log.warn("National holiday sync skipped because service key is missing. job={}", jobName);
+            log.info("National holiday sync skipped because service key is missing. job={}", jobName);
             return;
         }
 
         if (!syncRunning.compareAndSet(false, true)) {
-            log.warn("National holiday sync skipped because another sync is running. job={}", jobName);
+            log.info("National holiday sync skipped because another sync is running. job={}", jobName);
             return;
         }
 
