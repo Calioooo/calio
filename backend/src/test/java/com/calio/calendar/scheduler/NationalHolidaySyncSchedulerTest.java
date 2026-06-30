@@ -81,6 +81,21 @@ class NationalHolidaySyncSchedulerTest {
         assertThat(syncService.requests()).isEmpty();
     }
 
+    @Test
+    @DisplayName("sync 실행 중 다른 scheduler job이 시작되면 중복 실행을 skip한다.")
+    void givenSyncAlreadyRunning_whenAnotherSchedulerJobStarts_thenSkipsDuplicateRun() {
+        // given
+        FakeNationalHolidaySyncService syncService = new FakeNationalHolidaySyncService();
+        NationalHolidaySyncScheduler scheduler = scheduler(syncService, true, "2026-06-02T19:00:00Z");
+        syncService.runOnceDuringSync(scheduler::syncDailyNearRange);
+
+        // when
+        scheduler.syncMonthlyFullRange();
+
+        // then
+        assertThat(syncService.requests()).containsExactly(new YearRange(2006, 2046));
+    }
+
     private NationalHolidaySyncScheduler scheduler(
             FakeNationalHolidaySyncService syncService,
             boolean hasServiceKey,
@@ -96,6 +111,7 @@ class NationalHolidaySyncSchedulerTest {
     private static class FakeNationalHolidaySyncService extends NationalHolidaySyncService {
 
         private final List<YearRange> requests = new ArrayList<>();
+        private Runnable onSync;
 
         private FakeNationalHolidaySyncService() {
             super(
@@ -108,10 +124,21 @@ class NationalHolidaySyncSchedulerTest {
         @Override
         public void syncYearRange(int startYear, int endYear) {
             requests.add(new YearRange(startYear, endYear));
+            if (onSync == null) {
+                return;
+            }
+
+            Runnable callback = onSync;
+            onSync = null;
+            callback.run();
         }
 
         private List<YearRange> requests() {
             return requests;
+        }
+
+        private void runOnceDuringSync(Runnable callback) {
+            onSync = callback;
         }
     }
 
