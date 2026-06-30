@@ -54,7 +54,7 @@ public class NationalHolidaySyncScheduler {
     public void syncDailyNearRange() {
         LocalDate today = today();
         if (today.getDayOfMonth() == 1) {
-            log.info("National holiday daily sync skipped on monthly sync day. date={}", today());
+            log.info("National holiday daily sync skipped on monthly sync day. date={}", today);
             return;
         }
 
