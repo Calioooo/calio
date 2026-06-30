@@ -2,6 +2,8 @@ package com.calio.calendar.client;
 
 import com.calio.calendar.client.dto.HolidayApiResponse;
 import com.calio.calendar.config.HolidayApiProperties;
+import java.time.Duration;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import tools.jackson.core.JacksonException;
@@ -12,6 +14,9 @@ public class HolidayApiClient {
 
     private static final String GET_REST_DE_INFO_URL =
             "http://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/getRestDeInfo";
+    private static final int MAX_RETRY_COUNT = 1;
+    private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
+    private static final Duration READ_TIMEOUT = Duration.ofSeconds(15);
 
     private final HolidayApiProperties holidayApiProperties;
     private final ObjectMapper objectMapper;
@@ -25,6 +30,7 @@ public class HolidayApiClient {
         this.objectMapper = objectMapper;
         this.restClient = RestClient.builder()
                 .baseUrl(GET_REST_DE_INFO_URL)
+                .requestFactory(createRequestFactory())
                 .build();
     }
 
@@ -33,6 +39,29 @@ public class HolidayApiClient {
             throw new IllegalStateException("Holiday API service key is missing");
         }
 
+        return fetchHolidaysWithRetry(year);
+    }
+
+    private HolidayApiResponse fetchHolidaysWithRetry(int year) throws JacksonException {
+        int attempt = 0;
+        while (true) {
+            try {
+                return fetchHolidaysOnce(year);
+            } catch (JacksonException exception) {
+                if (attempt >= MAX_RETRY_COUNT) {
+                    throw exception;
+                }
+                attempt++;
+            } catch (RuntimeException exception) {
+                if (attempt >= MAX_RETRY_COUNT) {
+                    throw exception;
+                }
+                attempt++;
+            }
+        }
+    }
+
+    private HolidayApiResponse fetchHolidaysOnce(int year) throws JacksonException {
         String responseBody = restClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .queryParam("solYear", year)
@@ -44,5 +73,12 @@ public class HolidayApiClient {
                 .body(String.class);
 
         return HolidayApiResponse.fromJson(responseBody, objectMapper);
+    }
+
+    private SimpleClientHttpRequestFactory createRequestFactory() {
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(CONNECT_TIMEOUT);
+        requestFactory.setReadTimeout(READ_TIMEOUT);
+        return requestFactory;
     }
 }
