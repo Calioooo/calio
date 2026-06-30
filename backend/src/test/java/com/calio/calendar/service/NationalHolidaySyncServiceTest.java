@@ -104,7 +104,10 @@ class NationalHolidaySyncServiceTest {
     void givenOneYearApiFailure_whenSyncYearRange_thenContinuesNextYear() {
         // given
         holidayApiClient.addFailure(2026, new IllegalStateException("api failure"));
-        holidayApiClient.addResponse(2027, new HolidayApiResponse("00", List.of()));
+        holidayApiClient.addResponse(2027, new HolidayApiResponse(
+                "00",
+                List.of(new HolidayApiItem("20270101", "신정", "Y"))
+        ));
 
         // when
         nationalHolidaySyncService.syncYearRange(2026, 2027);
@@ -112,6 +115,22 @@ class NationalHolidaySyncServiceTest {
         // then
         assertThat(holidayApiClient.requestedYears()).containsExactly(2026, 2027);
         assertThat(nationalHolidayRepository.findRangeCalled()).isTrue();
+    }
+
+    @Test
+    @DisplayName("성공 resultCode라도 provider row가 비어 있으면 기존 DB row를 삭제하지 않는다")
+    void givenEmptyProviderRows_whenSyncYear_thenPreservesExistingRows() {
+        // given
+        nationalHolidayRepository.addExisting(new NationalHoliday(LocalDate.parse("2026-01-01"), "신정"));
+        holidayApiClient.addResponse(2026, new HolidayApiResponse("00", List.of()));
+
+        // when
+        nationalHolidaySyncService.syncYear(2026);
+
+        // then
+        assertThat(nationalHolidayRepository.findRangeCalled()).isFalse();
+        assertThat(nationalHolidayRepository.deletedHolidays()).isEmpty();
+        assertThat(nationalHolidayRepository.savedHolidays()).isEmpty();
     }
 
     @Test

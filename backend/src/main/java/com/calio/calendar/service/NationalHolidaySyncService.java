@@ -55,6 +55,11 @@ public class NationalHolidaySyncService {
             }
 
             Set<HolidayRow> providerRows = toProviderRows(response.items());
+            if (providerRows.isEmpty()) {
+                log.warn("National holiday sync returned empty provider rows. year={}", year);
+                return;
+            }
+
             applySnapshot(year, providerRows);
         } catch (Exception exception) {
             log.warn(
