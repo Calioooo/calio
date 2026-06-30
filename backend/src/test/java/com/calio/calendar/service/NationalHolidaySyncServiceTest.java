@@ -118,7 +118,7 @@ class NationalHolidaySyncServiceTest {
     }
 
     @Test
-    @DisplayName("성공 resultCode라도 provider row가 비어 있으면 기존 DB row를 삭제하지 않는다")
+    @DisplayName("성공 응답이지만 items가 비어 있는 경우, 기존 공휴일을 삭제하지 않는다.")
     void givenEmptyProviderRows_whenSyncYear_thenPreservesExistingRows() {
         // given
         nationalHolidayRepository.addExisting(new NationalHoliday(LocalDate.parse("2026-01-01"), "신정"));
