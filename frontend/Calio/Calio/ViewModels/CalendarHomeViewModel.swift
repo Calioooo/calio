@@ -300,11 +300,11 @@ final class CalendarHomeViewModel: ObservableObject {
                 input: RecurrenceEventUpdateInput(
                     title: input.title,
                     description: input.description,
-                    startAt: try EventService.composeUTCDateTime(
+                    startAt: try CalendarDateService.composeUTCDateTime(
                         date: input.recurrenceStartDate,
                         time: input.recurrenceStartTime
                     ),
-                    endAt: try EventService.composeUTCDateTime(
+                    endAt: try CalendarDateService.composeUTCDateTime(
                         date: input.recurrenceEndDate,
                         time: input.recurrenceEndTime
                     ),

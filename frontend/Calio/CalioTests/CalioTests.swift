@@ -936,8 +936,8 @@ struct CalioTests {
         #expect(repository.fetchRecurrenceEventIDs == [700])
         #expect(details.title == "반복 회의")
         #expect(details.description == "설명")
-        #expect(EventService.utcDateString(from: details.recurrenceStartDate) == "2026-08-01")
-        #expect(EventService.utcTimeString(from: details.recurrenceEndTime) == "01:30:00")
+        #expect(CalendarDateService.utcDateString(from: details.recurrenceStartDate) == "2026-08-01")
+        #expect(CalendarDateService.utcTimeString(from: details.recurrenceEndTime) == "01:30:00")
         #expect(details.recurrenceFrequency == .weekly)
     }
 
