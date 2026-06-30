@@ -7,6 +7,23 @@
 
 import SwiftUI
 
+struct EventInput: Equatable {
+    var title: String
+    var startAt: Date
+    var endAt: Date
+    var description: String
+    var colorCode: String
+}
+
+struct RecurrenceInput: Equatable {
+    var isEnabled: Bool
+    var startDate: Date
+    var endDate: Date
+    var startTime: Date
+    var endTime: Date
+    var frequency: RecurrenceFrequency
+}
+
 struct CalendarEventFormView: View {
     private let eventColors = [
         "#4F46E5",
