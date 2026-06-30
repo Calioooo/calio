@@ -24,7 +24,10 @@ struct CalendarWeekTimelineView: View {
     let isEventMutating: Bool
     let eventMutationFailureMessage: String?
     let onResetEventMutation: () -> Void
+    let onFetchRecurrenceEvent: (Int64) async -> RecurrenceEventDetails?
     let onUpdateSingleEvent: (Event, EventUpdateInput) async -> Bool
+    let onUpdateRecurrenceOccurrence: (Event, EventUpdateInput) async -> Bool
+    let onUpdateRecurrenceSeries: (Int64, RecurrenceEventSeriesEditInput) async -> Bool
     let onDeleteSingleEvent: (Event) async -> Bool
     let onDeleteRecurrenceOccurrence: (Event) async -> Bool
     let onDeleteRecurrenceSeries: (Event) async -> Bool
@@ -40,7 +43,10 @@ struct CalendarWeekTimelineView: View {
         isEventMutating: Bool = false,
         eventMutationFailureMessage: String? = nil,
         onResetEventMutation: @escaping () -> Void = {},
+        onFetchRecurrenceEvent: @escaping (Int64) async -> RecurrenceEventDetails? = { _ in nil },
         onUpdateSingleEvent: @escaping (Event, EventUpdateInput) async -> Bool = { _, _ in true },
+        onUpdateRecurrenceOccurrence: @escaping (Event, EventUpdateInput) async -> Bool = { _, _ in true },
+        onUpdateRecurrenceSeries: @escaping (Int64, RecurrenceEventSeriesEditInput) async -> Bool = { _, _ in true },
         onDeleteSingleEvent: @escaping (Event) async -> Bool = { _ in true },
         onDeleteRecurrenceOccurrence: @escaping (Event) async -> Bool = { _ in true },
         onDeleteRecurrenceSeries: @escaping (Event) async -> Bool = { _ in true }
@@ -55,7 +61,10 @@ struct CalendarWeekTimelineView: View {
         self.isEventMutating = isEventMutating
         self.eventMutationFailureMessage = eventMutationFailureMessage
         self.onResetEventMutation = onResetEventMutation
+        self.onFetchRecurrenceEvent = onFetchRecurrenceEvent
         self.onUpdateSingleEvent = onUpdateSingleEvent
+        self.onUpdateRecurrenceOccurrence = onUpdateRecurrenceOccurrence
+        self.onUpdateRecurrenceSeries = onUpdateRecurrenceSeries
         self.onDeleteSingleEvent = onDeleteSingleEvent
         self.onDeleteRecurrenceOccurrence = onDeleteRecurrenceOccurrence
         self.onDeleteRecurrenceSeries = onDeleteRecurrenceSeries
@@ -110,7 +119,10 @@ struct CalendarWeekTimelineView: View {
                 event: event,
                 isMutating: isEventMutating,
                 mutationFailureMessage: eventMutationFailureMessage,
+                onFetchRecurrenceEvent: onFetchRecurrenceEvent,
                 onUpdateSingleEvent: onUpdateSingleEvent,
+                onUpdateRecurrenceOccurrence: onUpdateRecurrenceOccurrence,
+                onUpdateRecurrenceSeries: onUpdateRecurrenceSeries,
                 onDeleteSingleEvent: onDeleteSingleEvent,
                 onDeleteRecurrenceOccurrence: onDeleteRecurrenceOccurrence,
                 onDeleteRecurrenceSeries: onDeleteRecurrenceSeries

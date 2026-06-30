@@ -228,6 +228,102 @@ final class CalendarHomeViewModel: ObservableObject {
         }
     }
 
+    func fetchRecurrenceEvent(recurrenceId: Int64) async -> RecurrenceEventDetails? {
+        guard !mutationState.isMutating else {
+            return nil
+        }
+
+        mutationState = .saving
+
+        do {
+            let details = try await eventService.fetchRecurrenceEvent(recurrenceId: recurrenceId)
+            mutationState = .idle
+            return details
+        } catch let error as EventServiceError {
+            mutationState = .failed(CalendarEventMutationFailure(error: error))
+            return nil
+        } catch {
+            mutationState = .failed(.unexpected)
+            return nil
+        }
+    }
+
+    func updateRecurrenceOccurrence(_ event: Event, input: EventUpdateInput) async -> Bool {
+        guard let recurrenceId = event.recurrenceId else {
+            return false
+        }
+
+        guard !mutationState.isMutating else {
+            return false
+        }
+
+        mutationState = .saving
+
+        do {
+            _ = try await eventService.updateRecurrenceOccurrence(
+                recurrenceId: recurrenceId,
+                eventId: event.id,
+                input: RecurrenceOccurrenceUpdateInput(
+                    title: input.title,
+                    description: input.description,
+                    startAt: input.startAt,
+                    endAt: input.endAt,
+                    isImportant: event.importantEvent
+                )
+            )
+            invalidateMonthEventCache()
+            refetchDefaultPrefetchRange()
+            mutationState = .idle
+            return true
+        } catch let error as EventServiceError {
+            mutationState = .failed(CalendarEventMutationFailure(error: error))
+            return false
+        } catch {
+            mutationState = .failed(.unexpected)
+            return false
+        }
+    }
+
+    func updateRecurrenceSeries(
+        recurrenceId: Int64,
+        input: RecurrenceEventSeriesEditInput
+    ) async -> Bool {
+        guard !mutationState.isMutating else {
+            return false
+        }
+
+        mutationState = .saving
+
+        do {
+            _ = try await eventService.updateRecurrenceEvent(
+                recurrenceId: recurrenceId,
+                input: RecurrenceEventUpdateInput(
+                    title: input.title,
+                    description: input.description,
+                    startAt: try CalendarDateService.composeUTCDateTime(
+                        date: input.recurrenceStartDate,
+                        time: input.recurrenceStartTime
+                    ),
+                    endAt: try CalendarDateService.composeUTCDateTime(
+                        date: input.recurrenceEndDate,
+                        time: input.recurrenceEndTime
+                    ),
+                    recurrenceFrequency: input.recurrenceFrequency
+                )
+            )
+            invalidateMonthEventCache()
+            refetchDefaultPrefetchRange()
+            mutationState = .idle
+            return true
+        } catch let error as EventServiceError {
+            mutationState = .failed(CalendarEventMutationFailure(error: error))
+            return false
+        } catch {
+            mutationState = .failed(.unexpected)
+            return false
+        }
+    }
+
     func deleteSingleEvent(_ event: Event) async -> Bool {
         guard !mutationState.isMutating else {
             return false

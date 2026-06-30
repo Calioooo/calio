@@ -252,8 +252,10 @@ struct CalioTests {
         #expect(CalendarEventDetailView.canUpdateSingleEvent(singleEvent))
         #expect(CalendarEventDetailView.canDeleteSingleEvent(singleEvent))
         #expect(!CalendarEventDetailView.canUpdateSingleEvent(recurringEvent))
+        #expect(CalendarEventDetailView.canUpdateRecurringEvent(recurringEvent))
         #expect(!CalendarEventDetailView.canDeleteSingleEvent(recurringEvent))
         #expect(CalendarEventDetailView.canDeleteRecurringEvent(recurringEvent))
+        #expect(!CalendarEventDetailView.canUpdateRecurringEvent(recurringEventWithoutRecurrenceID))
         #expect(!CalendarEventDetailView.canDeleteRecurringEvent(recurringEventWithoutRecurrenceID))
     }
 
@@ -286,7 +288,7 @@ struct CalioTests {
 
         #expect(form.title == "회의")
         #expect(form.mode == .create)
-        #expect(CalendarEventCreationView.canSave(title: "회의", startAt: startAt, endAt: endAt))
+        #expect(CalendarEventFormView.canSave(title: "회의", startAt: startAt, endAt: endAt))
     }
 
     @MainActor
@@ -303,23 +305,41 @@ struct CalioTests {
                     colorCode: "#EF4444"
                 )
             ),
-            recurrenceInput: .constant(
-                RecurrenceInput(
-                    isEnabled: true,
-                    startDate: startAt,
-                    endDate: startAt,
-                    startTime: startAt,
-                    endTime: endAt,
-                    frequency: .weekly
-                )
-            ),
             mode: .editSingleEvent,
             onRecurrenceEnabled: {}
         )
 
         #expect(form.mode == .editSingleEvent)
         #expect(!form.mode.showsRecurrenceFields)
+        #expect(form.recurrenceInput == nil)
         #expect(form.title == "수정할 일정")
+    }
+
+    @MainActor
+    @Test func recurrenceEditFormModesSeparateOccurrenceAndSeriesFields() async throws {
+        let startAt = Date()
+        let endAt = startAt.addingTimeInterval(3600)
+        let occurrenceForm = CalendarEventFormView(
+            eventInput: .constant(
+                EventInput(
+                    title: "반복 항목 수정",
+                    startAt: startAt,
+                    endAt: endAt,
+                    description: "설명",
+                    colorCode: "#EF4444"
+                )
+            ),
+            mode: .editRecurrenceOccurrence,
+            onRecurrenceEnabled: {}
+        )
+        let seriesMode = CalendarEventFormMode.editRecurrenceSeries
+
+        #expect(!occurrenceForm.mode.showsRecurrenceFields)
+        #expect(occurrenceForm.recurrenceInput == nil)
+        #expect(seriesMode.showsRecurrenceFields)
+        #expect(!seriesMode.allowsRecurrenceToggle)
+        #expect(seriesMode.usesRecurrenceDateAndTime(isRecurrenceEnabled: false))
+        #expect(seriesMode.showsRecurrenceFrequency(isRecurrenceEnabled: false))
     }
 
     @MainActor
@@ -584,10 +604,10 @@ struct CalioTests {
         let startAt = Date()
         let endAt = startAt.addingTimeInterval(3600)
 
-        #expect(CalendarEventCreationView.canSave(title: "회의", startAt: startAt, endAt: endAt))
-        #expect(!CalendarEventCreationView.canSave(title: "   ", startAt: startAt, endAt: endAt))
-        #expect(!CalendarEventCreationView.canSave(title: "회의", startAt: startAt, endAt: startAt))
-        #expect(!CalendarEventCreationView.canSave(title: "회의", startAt: startAt, endAt: startAt.addingTimeInterval(-1)))
+        #expect(CalendarEventFormView.canSave(title: "회의", startAt: startAt, endAt: endAt))
+        #expect(!CalendarEventFormView.canSave(title: "   ", startAt: startAt, endAt: endAt))
+        #expect(!CalendarEventFormView.canSave(title: "회의", startAt: startAt, endAt: startAt))
+        #expect(!CalendarEventFormView.canSave(title: "회의", startAt: startAt, endAt: startAt.addingTimeInterval(-1)))
     }
 
     @Test func eventCreationSaveValidationChecksRecurrenceEndDateWithUTCDate() async throws {
@@ -598,7 +618,7 @@ struct CalioTests {
         let sameUTCDate = startAt
         let previousUTCDate = try #require(kstCalendar.date(from: DateComponents(year: 2026, month: 7, day: 31, hour: 8)))
 
-        #expect(CalendarEventCreationView.canSave(
+        #expect(CalendarEventFormView.canSave(
             title: "반복 회의",
             startAt: startAt,
             endAt: endAt,
@@ -608,7 +628,7 @@ struct CalioTests {
             recurrenceStartTime: startAt,
             recurrenceEndTime: endAt
         ))
-        #expect(!CalendarEventCreationView.canSave(
+        #expect(!CalendarEventFormView.canSave(
             title: "반복 회의",
             startAt: startAt,
             endAt: endAt,
@@ -618,7 +638,7 @@ struct CalioTests {
             recurrenceStartTime: startAt,
             recurrenceEndTime: endAt
         ))
-        #expect(!CalendarEventCreationView.canSave(
+        #expect(!CalendarEventFormView.canSave(
             title: "반복 회의",
             startAt: startAt,
             endAt: endAt,
@@ -699,6 +719,48 @@ struct CalioTests {
         #expect(object["recurrenceFrequency"] as? String == "DAILY")
         #expect(object["colorCode"] == nil)
         #expect(object["selectedColorCode"] == nil)
+    }
+
+    @Test func updateRecurrenceEventRequestDTOEncodesOnlyBackendContractFields() async throws {
+        let startAt = Date(timeIntervalSince1970: 1_780_000_000)
+        let endAt = startAt.addingTimeInterval(3600)
+        let request = UpdateRecurrenceEventRequestDTO(
+            title: "수정 반복 일정",
+            description: "수정 설명",
+            startAt: startAt,
+            endAt: endAt,
+            recurrenceFrequency: .weekly
+        )
+
+        let data = try EventJSONCoding.makeEncoder().encode(request)
+        let object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+
+        #expect(Set(object.keys) == ["title", "description", "startAt", "endAt", "recurrenceFrequency"])
+        #expect(object["title"] as? String == "수정 반복 일정")
+        #expect(object["recurrenceFrequency"] as? String == "WEEKLY")
+        #expect(object["isImportant"] == nil)
+        #expect(object["colorCode"] == nil)
+    }
+
+    @Test func updateRecurrenceOccurrenceRequestDTOEncodesOnlyBackendContractFields() async throws {
+        let startAt = Date(timeIntervalSince1970: 1_780_000_000)
+        let endAt = startAt.addingTimeInterval(3600)
+        let request = UpdateRecurrenceOccurrenceRequestDTO(
+            title: "수정 반복 항목",
+            description: "수정 설명",
+            startAt: startAt,
+            endAt: endAt,
+            isImportant: true
+        )
+
+        let data = try EventJSONCoding.makeEncoder().encode(request)
+        let object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+
+        #expect(Set(object.keys) == ["title", "description", "startAt", "endAt", "isImportant"])
+        #expect(object["title"] as? String == "수정 반복 항목")
+        #expect(object["isImportant"] as? Bool == true)
+        #expect(object["importantEvent"] == nil)
+        #expect(object["recurrenceFrequency"] == nil)
     }
 
     @Test func eventResponseDTODecodingPreservesCanonicalRecurrenceFields() async throws {
@@ -834,6 +896,90 @@ struct CalioTests {
         #expect(request.recurrenceEndTime == "01:30:00")
         #expect(request.recurrenceFrequency == .weekly)
         #expect(repository.createRequests.isEmpty)
+    }
+
+    @Test func eventServiceFetchesRecurrenceEventFromCanonicalResponse() async throws {
+        let repository = RecordingEventRepository(
+            fetchRecurrenceResponse: RecurrenceEventResponseDTO(
+                recurrenceId: 700,
+                recurrenceTitle: "반복 회의",
+                recurrenceDescription: "설명",
+                recurrenceStartDate: "2026-08-01",
+                recurrenceEndDate: "2026-08-31",
+                recurrenceStartTime: "00:00:00",
+                recurrenceEndTime: "01:30:00",
+                recurrenceFrequency: .weekly
+            )
+        )
+        let service = EventService(repository: repository)
+
+        let details = try await service.fetchRecurrenceEvent(recurrenceId: 700)
+
+        #expect(repository.fetchRecurrenceEventIDs == [700])
+        #expect(details.title == "반복 회의")
+        #expect(details.description == "설명")
+        #expect(CalendarDateService.utcDateString(from: details.recurrenceStartDate) == "2026-08-01")
+        #expect(CalendarDateService.utcTimeString(from: details.recurrenceEndTime) == "01:30:00")
+        #expect(details.recurrenceFrequency == .weekly)
+    }
+
+    @Test func eventServiceUpdatesRecurrenceOccurrenceWithPreservedImportantState() async throws {
+        let calendar = fixedCalendar
+        let startAt = try #require(calendar.date(from: DateComponents(year: 2026, month: 8, day: 1, hour: 9)))
+        let endAt = startAt.addingTimeInterval(3600)
+        let repository = RecordingEventRepository()
+        let service = EventService(repository: repository)
+
+        _ = try await service.updateRecurrenceOccurrence(
+            recurrenceId: 700,
+            eventId: 701,
+            input: RecurrenceOccurrenceUpdateInput(
+                title: "수정 반복 항목",
+                description: "설명",
+                startAt: startAt,
+                endAt: endAt,
+                isImportant: true
+            )
+        )
+        let request = try #require(repository.updateRecurrenceOccurrenceRequests.first)
+
+        #expect(request.recurrenceId == 700)
+        #expect(request.eventId == 701)
+        #expect(request.request.title == "수정 반복 항목")
+        #expect(request.request.isImportant == true)
+    }
+
+    @Test func eventServiceMapsRecurrenceUpdateInvalidTimeRangeLikeExistingInvalidRange() async throws {
+        let repository = RecordingEventRepository(
+            updateRecurrenceError: EventRepositoryError.backend(
+                statusCode: 400,
+                response: ErrorResponseDTO(
+                    errorCode: "RECURRENCE_UPDATE_TIME_RANGE_INVALID",
+                    message: "invalid"
+                )
+            )
+        )
+        let service = EventService(repository: repository)
+        var thrownError: EventServiceError?
+
+        do {
+            _ = try await service.updateRecurrenceEvent(
+                recurrenceId: 700,
+                input: RecurrenceEventUpdateInput(
+                    title: "반복 수정",
+                    description: "",
+                    startAt: Date(timeIntervalSince1970: 0),
+                    endAt: Date(timeIntervalSince1970: 3600),
+                    recurrenceFrequency: .daily
+                )
+            )
+        } catch let error as EventServiceError {
+            thrownError = error
+        } catch {
+            thrownError = .unexpected
+        }
+
+        #expect(thrownError == .invalidTimeRange)
     }
 
     @Test func urlSessionEventRepositoryCreatesEventWithInjectedBaseURLAndContractBody() async throws {
@@ -1006,6 +1152,83 @@ struct CalioTests {
         #expect(request.httpMethod == "PUT")
         #expect(Set(object.keys) == ["title", "description", "startAt", "endAt"])
         #expect(object["colorCode"] == nil)
+    }
+
+    @Test func urlSessionEventRepositoryUpdatesRecurrenceEndpointsWithPatchBodies() async throws {
+        let recurrenceResponseJSON = """
+        {
+          "recurrenceId": 700,
+          "recurrenceTitle": "수정 반복 일정",
+          "recurrenceDescription": "설명",
+          "recurrenceStartDate": "2026-08-01",
+          "recurrenceEndDate": "2026-08-31",
+          "recurrenceStartTime": "09:00:00",
+          "recurrenceEndTime": "10:00:00",
+          "recurrenceFrequency": "WEEKLY"
+        }
+        """.data(using: .utf8)!
+        let occurrenceResponseJSON = """
+        {
+          "id": 701,
+          "title": "수정 반복 항목",
+          "description": "설명",
+          "startAt": "2026-08-01T09:00:00Z",
+          "endAt": "2026-08-01T10:00:00Z",
+          "importantEvent": true,
+          "recurrenceId": 700,
+          "isRecurrenceOccurrence": true,
+          "createdAt": "2026-08-01T09:00:00Z",
+          "updatedAt": "2026-08-01T10:00:00Z"
+        }
+        """.data(using: .utf8)!
+        var capturedRequests: [URLRequest] = []
+        MockURLProtocol.requestHandler = { request in
+            capturedRequests.append(request)
+            let response = HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            )!
+            let isOccurrenceUpdate = request.url?.path.contains("/occurrences/") == true
+            let data = isOccurrenceUpdate ? occurrenceResponseJSON : recurrenceResponseJSON
+            return (response, data)
+        }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        let repository = URLSessionEventRepository(
+            baseURL: URL(string: "https://example.test")!,
+            session: session
+        )
+
+        _ = try await repository.updateRecurrenceEvent(
+            recurrenceId: 700,
+            request: UpdateRecurrenceEventRequestDTO(
+                title: "수정 반복 일정",
+                description: "설명",
+                startAt: Date(timeIntervalSince1970: 0),
+                endAt: Date(timeIntervalSince1970: 3600),
+                recurrenceFrequency: .weekly
+            )
+        )
+        _ = try await repository.updateRecurrenceOccurrence(
+            recurrenceId: 700,
+            eventId: 701,
+            request: UpdateRecurrenceOccurrenceRequestDTO(
+                title: "수정 반복 항목",
+                description: "설명",
+                startAt: Date(timeIntervalSince1970: 0),
+                endAt: Date(timeIntervalSince1970: 3600),
+                isImportant: true
+            )
+        )
+
+        #expect(capturedRequests.map { $0.url?.absoluteString } == [
+            "https://example.test/api/recurrence-events/700",
+            "https://example.test/api/recurrence-events/700/occurrences/701"
+        ])
+        #expect(capturedRequests.allSatisfy { $0.httpMethod == "PATCH" })
     }
 
     @Test func urlSessionEventRepositoryDeletesWithoutRequestBodiesAndAcceptsNoContent() async throws {
@@ -1389,6 +1612,142 @@ struct CalioTests {
         ])
         #expect(viewModel.state.daysByKey[DayKey(date: baseDate, calendar: calendar)]?.events.isEmpty == true)
     }
+
+    @MainActor
+    @Test func calendarHomeViewModelFetchesRecurrenceRuleBeforeSeriesEdit() async throws {
+        let calendar = fixedCalendar
+        let baseDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8)))
+        let repository = RecordingEventRepository(
+            fetchRecurrenceResponse: RecurrenceEventResponseDTO(
+                recurrenceId: 700,
+                recurrenceTitle: "반복 회의",
+                recurrenceDescription: "설명",
+                recurrenceStartDate: "2026-08-01",
+                recurrenceEndDate: "2026-08-31",
+                recurrenceStartTime: "00:00:00",
+                recurrenceEndTime: "01:00:00",
+                recurrenceFrequency: .weekly
+            )
+        )
+        let viewModel = CalendarHomeViewModel(
+            calendar: calendar,
+            dateService: CalendarDateService(calendar: calendar),
+            eventService: EventService(repository: repository),
+            initialState: makeLoadedState(dayOffsets: 0...2, from: baseDate, calendar: calendar)
+        )
+
+        let details = await viewModel.fetchRecurrenceEvent(recurrenceId: 700)
+
+        #expect(repository.fetchRecurrenceEventIDs == [700])
+        #expect(details?.title == "반복 회의")
+        #expect(details?.recurrenceFrequency == .weekly)
+        #expect(viewModel.mutationState == .idle)
+    }
+
+    @MainActor
+    @Test func calendarHomeViewModelRecurrenceOccurrenceUpdatePreservesImportantAndRefetchesDefaultRange() async throws {
+        let calendar = fixedCalendar
+        let baseDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8)))
+        let event = Event(
+            id: 701,
+            title: "반복 항목",
+            description: "",
+            startAt: baseDate,
+            endAt: baseDate.addingTimeInterval(3600),
+            colorCode: "#4F46E5",
+            importantEvent: true,
+            recurrenceId: 700,
+            isRecurrenceOccurrence: true
+        )
+        let repository = RecordingEventRepository()
+        let viewModel = CalendarHomeViewModel(
+            calendar: calendar,
+            dateService: CalendarDateService(calendar: calendar),
+            eventService: EventService(repository: repository),
+            initialState: makeLoadedState(
+                dayOffsets: 0...2,
+                from: baseDate,
+                calendar: calendar,
+                monthEventCache: [
+                    YearMonthKey(year: 2026, month: 5): .loaded([]),
+                    YearMonthKey(year: 2026, month: 6): .loaded([event]),
+                    YearMonthKey(year: 2026, month: 7): .loaded([])
+                ]
+            )
+        )
+
+        let didUpdate = await viewModel.updateRecurrenceOccurrence(
+            event,
+            input: EventUpdateInput(
+                title: "수정 반복 항목",
+                description: "설명",
+                startAt: baseDate,
+                endAt: baseDate.addingTimeInterval(7200)
+            )
+        )
+        let didRequestDefaultRange = await repository.waitForRequestCount(3)
+        let request = try #require(repository.updateRecurrenceOccurrenceRequests.first)
+
+        #expect(didUpdate)
+        #expect(didRequestDefaultRange)
+        #expect(request.recurrenceId == 700)
+        #expect(request.eventId == 701)
+        #expect(request.request.isImportant == true)
+        #expect(repository.requestMonthKeys(calendar: calendar) == [
+            YearMonthKey(year: 2026, month: 5),
+            YearMonthKey(year: 2026, month: 6),
+            YearMonthKey(year: 2026, month: 7)
+        ])
+    }
+
+    @MainActor
+    @Test func calendarHomeViewModelRecurrenceSeriesUpdateComposesUTCDateTimeAndRefetchesDefaultRange() async throws {
+        let calendar = fixedCalendar
+        let baseDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8)))
+        let repository = RecordingEventRepository()
+        let viewModel = CalendarHomeViewModel(
+            calendar: calendar,
+            dateService: CalendarDateService(calendar: calendar),
+            eventService: EventService(repository: repository),
+            initialState: makeLoadedState(
+                dayOffsets: 0...2,
+                from: baseDate,
+                calendar: calendar,
+                monthEventCache: [
+                    YearMonthKey(year: 2026, month: 5): .loaded([]),
+                    YearMonthKey(year: 2026, month: 6): .loaded([]),
+                    YearMonthKey(year: 2026, month: 7): .loaded([])
+                ]
+            )
+        )
+        let startDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 8, day: 1)))
+        let endDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 8, day: 31)))
+        let startTime = try #require(calendar.date(from: DateComponents(year: 1970, month: 1, day: 1, hour: 9)))
+        let endTime = try #require(calendar.date(from: DateComponents(year: 1970, month: 1, day: 1, hour: 10, minute: 30)))
+
+        let didUpdate = await viewModel.updateRecurrenceSeries(
+            recurrenceId: 700,
+            input: RecurrenceEventSeriesEditInput(
+                title: "수정 반복 일정",
+                description: "설명",
+                recurrenceStartDate: startDate,
+                recurrenceEndDate: endDate,
+                recurrenceStartTime: startTime,
+                recurrenceEndTime: endTime,
+                recurrenceFrequency: .monthly
+            )
+        )
+        let didRequestDefaultRange = await repository.waitForRequestCount(3)
+        let request = try #require(repository.updateRecurrenceEventRequests.first)
+
+        #expect(didUpdate)
+        #expect(didRequestDefaultRange)
+        #expect(request.recurrenceId == 700)
+        #expect(request.request.title == "수정 반복 일정")
+        #expect(request.request.recurrenceFrequency == .monthly)
+        #expect(request.request.startAt.map { EventJSONCoding.string(from: $0) } == "2026-08-01T09:00:00Z")
+        #expect(request.request.endAt.map { EventJSONCoding.string(from: $0) } == "2026-08-31T10:30:00Z")
+    }
     
     private var fixedCalendar: Calendar {
         var calendar = Calendar(identifier: .gregorian)
@@ -1523,7 +1882,10 @@ private final class RecordingEventRepository: EventRepository {
     private var storedRequests: [(startDate: Date, endDate: Date)] = []
     private var storedCreateRequests: [CreateEventRequestDTO] = []
     private var storedRecurrenceCreateRequests: [CreateRecurrenceEventRequestDTO] = []
+    private var storedFetchRecurrenceEventIDs: [Int64] = []
     private var storedUpdateRequests: [(eventId: Int64, request: UpdateEventRequestDTO)] = []
+    private var storedUpdateRecurrenceEventRequests: [(recurrenceId: Int64, request: UpdateRecurrenceEventRequestDTO)] = []
+    private var storedUpdateRecurrenceOccurrenceRequests: [(recurrenceId: Int64, eventId: Int64, request: UpdateRecurrenceOccurrenceRequestDTO)] = []
     private var storedDeleteEventIDs: [Int64] = []
     private var storedDeleteRecurrenceEventIDs: [Int64] = []
     private var storedDeleteRecurrenceOccurrenceRequests: [(recurrenceId: Int64, eventId: Int64)] = []
@@ -1544,6 +1906,12 @@ private final class RecordingEventRepository: EventRepository {
     private let fetchResponse: [EventResponseDTO]
     private let recurrenceCreateResponse: RecurrenceEventResponseDTO
     private let recurrenceCreateError: Error?
+    private let fetchRecurrenceResponse: RecurrenceEventResponseDTO
+    private let fetchRecurrenceError: Error?
+    private let updateRecurrenceResponse: RecurrenceEventResponseDTO
+    private let updateRecurrenceError: Error?
+    private let updateRecurrenceOccurrenceResponse: EventResponseDTO
+    private let updateRecurrenceOccurrenceError: Error?
 
     init(
         shouldSuspend: Bool = false,
@@ -1582,6 +1950,38 @@ private final class RecordingEventRepository: EventRepository {
             recurrenceFrequency: .daily
         ),
         recurrenceCreateError: Error? = nil,
+        fetchRecurrenceResponse: RecurrenceEventResponseDTO = RecurrenceEventResponseDTO(
+            recurrenceId: 1,
+            recurrenceTitle: "반복 일정",
+            recurrenceDescription: "",
+            recurrenceStartDate: "1970-01-01",
+            recurrenceEndDate: "1970-01-01",
+            recurrenceStartTime: "00:00:00",
+            recurrenceEndTime: "01:00:00",
+            recurrenceFrequency: .daily
+        ),
+        fetchRecurrenceError: Error? = nil,
+        updateRecurrenceResponse: RecurrenceEventResponseDTO = RecurrenceEventResponseDTO(
+            recurrenceId: 1,
+            recurrenceTitle: "수정된 반복 일정",
+            recurrenceDescription: "",
+            recurrenceStartDate: "1970-01-01",
+            recurrenceEndDate: "1970-01-01",
+            recurrenceStartTime: "00:00:00",
+            recurrenceEndTime: "01:00:00",
+            recurrenceFrequency: .daily
+        ),
+        updateRecurrenceError: Error? = nil,
+        updateRecurrenceOccurrenceResponse: EventResponseDTO = EventResponseDTO(
+            id: 1,
+            title: "수정된 반복 항목",
+            description: "",
+            startAt: Date(timeIntervalSince1970: 0),
+            endAt: Date(timeIntervalSince1970: 3600),
+            createdAt: Date(timeIntervalSince1970: 0),
+            updatedAt: Date(timeIntervalSince1970: 3600)
+        ),
+        updateRecurrenceOccurrenceError: Error? = nil,
         recurrenceDeleteError: Error? = nil,
         recurrenceOccurrenceDeleteError: Error? = nil
     ) {
@@ -1596,6 +1996,12 @@ private final class RecordingEventRepository: EventRepository {
         self.deleteError = deleteError
         self.recurrenceCreateResponse = recurrenceCreateResponse
         self.recurrenceCreateError = recurrenceCreateError
+        self.fetchRecurrenceResponse = fetchRecurrenceResponse
+        self.fetchRecurrenceError = fetchRecurrenceError
+        self.updateRecurrenceResponse = updateRecurrenceResponse
+        self.updateRecurrenceError = updateRecurrenceError
+        self.updateRecurrenceOccurrenceResponse = updateRecurrenceOccurrenceResponse
+        self.updateRecurrenceOccurrenceError = updateRecurrenceOccurrenceError
         self.recurrenceDeleteError = recurrenceDeleteError
         self.recurrenceOccurrenceDeleteError = recurrenceOccurrenceDeleteError
     }
@@ -1618,9 +2024,27 @@ private final class RecordingEventRepository: EventRepository {
         }
     }
 
+    var fetchRecurrenceEventIDs: [Int64] {
+        locked {
+            storedFetchRecurrenceEventIDs
+        }
+    }
+
     var updateRequests: [(eventId: Int64, request: UpdateEventRequestDTO)] {
         locked {
             storedUpdateRequests
+        }
+    }
+
+    var updateRecurrenceEventRequests: [(recurrenceId: Int64, request: UpdateRecurrenceEventRequestDTO)] {
+        locked {
+            storedUpdateRecurrenceEventRequests
+        }
+    }
+
+    var updateRecurrenceOccurrenceRequests: [(recurrenceId: Int64, eventId: Int64, request: UpdateRecurrenceOccurrenceRequestDTO)] {
+        locked {
+            storedUpdateRecurrenceOccurrenceRequests
         }
     }
 
@@ -1696,6 +2120,18 @@ private final class RecordingEventRepository: EventRepository {
         return recurrenceCreateResponse
     }
 
+    func fetchRecurrenceEvent(recurrenceId: Int64) async throws -> RecurrenceEventResponseDTO {
+        locked {
+            storedFetchRecurrenceEventIDs.append(recurrenceId)
+        }
+
+        if let fetchRecurrenceError {
+            throw fetchRecurrenceError
+        }
+
+        return fetchRecurrenceResponse
+    }
+
     func updateEvent(eventId: Int64, request: UpdateEventRequestDTO) async throws -> EventResponseDTO {
         locked {
             storedUpdateRequests.append((eventId, request))
@@ -1706,6 +2142,37 @@ private final class RecordingEventRepository: EventRepository {
         }
 
         return updateResponse
+    }
+
+    func updateRecurrenceEvent(
+        recurrenceId: Int64,
+        request: UpdateRecurrenceEventRequestDTO
+    ) async throws -> RecurrenceEventResponseDTO {
+        locked {
+            storedUpdateRecurrenceEventRequests.append((recurrenceId, request))
+        }
+
+        if let updateRecurrenceError {
+            throw updateRecurrenceError
+        }
+
+        return updateRecurrenceResponse
+    }
+
+    func updateRecurrenceOccurrence(
+        recurrenceId: Int64,
+        eventId: Int64,
+        request: UpdateRecurrenceOccurrenceRequestDTO
+    ) async throws -> EventResponseDTO {
+        locked {
+            storedUpdateRecurrenceOccurrenceRequests.append((recurrenceId, eventId, request))
+        }
+
+        if let updateRecurrenceOccurrenceError {
+            throw updateRecurrenceOccurrenceError
+        }
+
+        return updateRecurrenceOccurrenceResponse
     }
 
     func deleteEvent(eventId: Int64) async throws {

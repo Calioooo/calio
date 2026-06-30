@@ -1,5 +1,5 @@
 //
-//  CreateEventRequestDTO.swift
+//  EventRequestDTO.swift
 //  Calio
 //
 //  Created by Codex on 6/19/26.
@@ -19,6 +19,22 @@ struct UpdateEventRequestDTO: Encodable, Equatable {
     let description: String
     let startAt: Date
     let endAt: Date
+}
+
+struct UpdateRecurrenceEventRequestDTO: Encodable, Equatable {
+    let title: String?
+    let description: String?
+    let startAt: Date?
+    let endAt: Date?
+    let recurrenceFrequency: RecurrenceFrequency?
+}
+
+struct UpdateRecurrenceOccurrenceRequestDTO: Encodable, Equatable {
+    let title: String?
+    let description: String?
+    let startAt: Date?
+    let endAt: Date?
+    let isImportant: Bool?
 }
 
 struct CreateRecurrenceEventRequestDTO: Encodable, Equatable {

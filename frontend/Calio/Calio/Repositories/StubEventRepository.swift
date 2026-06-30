@@ -46,6 +46,19 @@ struct StubEventRepository: EventRepository {
         )
     }
 
+    func fetchRecurrenceEvent(recurrenceId: Int64) async throws -> RecurrenceEventResponseDTO {
+        RecurrenceEventResponseDTO(
+            recurrenceId: recurrenceId,
+            recurrenceTitle: "반복 일정",
+            recurrenceDescription: "",
+            recurrenceStartDate: "2026-01-01",
+            recurrenceEndDate: "2026-01-31",
+            recurrenceStartTime: "00:00:00",
+            recurrenceEndTime: "01:00:00",
+            recurrenceFrequency: .daily
+        )
+    }
+
     func updateEvent(eventId: Int64, request: UpdateEventRequestDTO) async throws -> EventResponseDTO {
         EventResponseDTO(
             id: eventId,
@@ -55,6 +68,57 @@ struct StubEventRepository: EventRepository {
             endAt: request.endAt,
             createdAt: Date(),
             updatedAt: Date()
+        )
+    }
+
+    func updateRecurrenceEvent(
+        recurrenceId: Int64,
+        request: UpdateRecurrenceEventRequestDTO
+    ) async throws -> RecurrenceEventResponseDTO {
+        guard let title = request.title,
+              let startAt = request.startAt,
+              let endAt = request.endAt,
+              let recurrenceFrequency = request.recurrenceFrequency
+        else {
+            throw EventRepositoryError.invalidResponse
+        }
+
+        return RecurrenceEventResponseDTO(
+            recurrenceId: recurrenceId,
+            recurrenceTitle: title,
+            recurrenceDescription: request.description,
+            recurrenceStartDate: CalendarDateService.utcDateString(from: startAt),
+            recurrenceEndDate: CalendarDateService.utcDateString(from: endAt),
+            recurrenceStartTime: CalendarDateService.utcTimeString(from: startAt),
+            recurrenceEndTime: CalendarDateService.utcTimeString(from: endAt),
+            recurrenceFrequency: recurrenceFrequency
+        )
+    }
+
+    func updateRecurrenceOccurrence(
+        recurrenceId: Int64,
+        eventId: Int64,
+        request: UpdateRecurrenceOccurrenceRequestDTO
+    ) async throws -> EventResponseDTO {
+        guard let title = request.title,
+              let startAt = request.startAt,
+              let endAt = request.endAt,
+              let isImportant = request.isImportant
+        else {
+            throw EventRepositoryError.invalidResponse
+        }
+
+        return EventResponseDTO(
+            id: eventId,
+            title: title,
+            description: request.description,
+            startAt: startAt,
+            endAt: endAt,
+            importantEvent: isImportant,
+            recurrenceId: recurrenceId,
+            isRecurrenceOccurrence: true,
+            createdAt: startAt,
+            updatedAt: endAt
         )
     }
 

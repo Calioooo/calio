@@ -13,13 +13,18 @@ struct CalendarEventDetailView: View {
     let event: Event
     let isMutating: Bool
     let mutationFailureMessage: String?
+    let onFetchRecurrenceEvent: (Int64) async -> RecurrenceEventDetails?
     let onUpdateSingleEvent: (Event, EventUpdateInput) async -> Bool
+    let onUpdateRecurrenceOccurrence: (Event, EventUpdateInput) async -> Bool
+    let onUpdateRecurrenceSeries: (Int64, RecurrenceEventSeriesEditInput) async -> Bool
     let onDeleteSingleEvent: (Event) async -> Bool
     let onDeleteRecurrenceOccurrence: (Event) async -> Bool
     let onDeleteRecurrenceSeries: (Event) async -> Bool
 
-    @State private var isEditing = false
+    @State private var formMode: CalendarEventFormMode?
+    @State private var isFetchingRecurrenceEvent = false
     @State private var isShowingSingleDeleteConfirmation = false
+    @State private var isShowingRecurrenceEditScope = false
     @State private var isShowingRecurrenceDeleteScope = false
     @State private var editInput: EventInput
     @State private var recurrenceInput: RecurrenceInput
@@ -28,7 +33,10 @@ struct CalendarEventDetailView: View {
         event: Event,
         isMutating: Bool = false,
         mutationFailureMessage: String? = nil,
+        onFetchRecurrenceEvent: @escaping (Int64) async -> RecurrenceEventDetails? = { _ in nil },
         onUpdateSingleEvent: @escaping (Event, EventUpdateInput) async -> Bool = { _, _ in true },
+        onUpdateRecurrenceOccurrence: @escaping (Event, EventUpdateInput) async -> Bool = { _, _ in true },
+        onUpdateRecurrenceSeries: @escaping (Int64, RecurrenceEventSeriesEditInput) async -> Bool = { _, _ in true },
         onDeleteSingleEvent: @escaping (Event) async -> Bool = { _ in true },
         onDeleteRecurrenceOccurrence: @escaping (Event) async -> Bool = { _ in true },
         onDeleteRecurrenceSeries: @escaping (Event) async -> Bool = { _ in true }
@@ -36,7 +44,10 @@ struct CalendarEventDetailView: View {
         self.event = event
         self.isMutating = isMutating
         self.mutationFailureMessage = mutationFailureMessage
+        self.onFetchRecurrenceEvent = onFetchRecurrenceEvent
         self.onUpdateSingleEvent = onUpdateSingleEvent
+        self.onUpdateRecurrenceOccurrence = onUpdateRecurrenceOccurrence
+        self.onUpdateRecurrenceSeries = onUpdateRecurrenceSeries
         self.onDeleteSingleEvent = onDeleteSingleEvent
         self.onDeleteRecurrenceOccurrence = onDeleteRecurrenceOccurrence
         self.onDeleteRecurrenceSeries = onDeleteRecurrenceSeries
@@ -68,6 +79,19 @@ struct CalendarEventDetailView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 toolbarContent
+            }
+            .confirmationDialog(
+                "반복 일정 수정",
+                isPresented: $isShowingRecurrenceEditScope,
+                titleVisibility: .visible
+            ) {
+                Button("이 일정만 수정") {
+                    startEditingRecurrenceOccurrence()
+                }
+                Button("전체 반복 일정 수정") {
+                    fetchRecurrenceEventForSeriesEdit()
+                }
+                Button("취소", role: .cancel) {}
             }
             .confirmationDialog(
                 "삭제하시겠습니까?",
@@ -107,6 +131,7 @@ struct CalendarEventDetailView: View {
     private var detailList: some View {
         List {
             mutationFailureSection
+            recurrenceFetchSection
             titleSection
             timeSection
             statusSection
@@ -120,8 +145,8 @@ struct CalendarEventDetailView: View {
             mutationFailureSection
             CalendarEventFormView(
                 eventInput: $editInput,
-                recurrenceInput: $recurrenceInput,
-                mode: .editSingleEvent,
+                recurrenceInput: recurrenceInputForEditForm,
+                mode: formMode ?? .editSingleEvent,
                 onRecurrenceEnabled: {}
             )
         }
@@ -134,38 +159,45 @@ struct CalendarEventDetailView: View {
         if isEditing {
             ToolbarItem(placement: .cancellationAction) {
                 Button("취소") {
-                    isEditing = false
+                    formMode = nil
                 }
-                .disabled(isMutating)
+                .disabled(isEventActionInProgress)
             }
 
             ToolbarItem(placement: .confirmationAction) {
                 Button("저장") {
-                    updateSingleEvent()
+                    saveEdit()
                 }
-                .disabled(!canSaveEdit || isMutating)
+                .disabled(!canSaveEdit || isEventActionInProgress)
             }
         } else {
             ToolbarItemGroup(placement: .topBarTrailing) {
+                if canUpdateRecurringEvent {
+                    Button("수정") {
+                        isShowingRecurrenceEditScope = true
+                    }
+                    .disabled(isEventActionInProgress)
+                }
+
                 if canUpdateSingleEvent {
                     Button("수정") {
-                        isEditing = true
+                        startEditingSingleEvent()
                     }
-                    .disabled(isMutating)
+                    .disabled(isEventActionInProgress)
                 }
 
                 if canDeleteSingleEvent {
                     Button("삭제", role: .destructive) {
                         isShowingSingleDeleteConfirmation = true
                     }
-                    .disabled(isMutating)
+                    .disabled(isEventActionInProgress)
                 }
 
                 if canDeleteRecurringEvent {
                     Button("삭제", role: .destructive) {
                         isShowingRecurrenceDeleteScope = true
                     }
-                    .disabled(isMutating)
+                    .disabled(isEventActionInProgress)
                 }
             }
         }
@@ -185,6 +217,21 @@ struct CalendarEventDetailView: View {
                 }
                 .padding(.vertical, 2)
                 .accessibilityIdentifier("event_mutation_failure_message")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var recurrenceFetchSection: some View {
+        if isFetchingRecurrenceEvent {
+            Section {
+                HStack(spacing: 10) {
+                    ProgressView()
+                    Text("반복 일정 정보를 불러오는 중입니다.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 2)
             }
         }
     }
@@ -284,24 +331,161 @@ struct CalendarEventDetailView: View {
         Self.canDeleteRecurringEvent(event)
     }
 
+    private var canUpdateRecurringEvent: Bool {
+        Self.canUpdateRecurringEvent(event)
+    }
+
     private var canSaveEdit: Bool {
-        CalendarEventCreationView.canSave(
+        CalendarEventFormView.canSave(
             title: editInput.title,
+            startAt: editInput.startAt,
+            endAt: editInput.endAt,
+            isRecurrenceEnabled: formMode == .editRecurrenceSeries,
+            recurrenceStartDate: recurrenceInput.startDate,
+            recurrenceEndDate: recurrenceInput.endDate,
+            recurrenceStartTime: recurrenceInput.startTime,
+            recurrenceEndTime: recurrenceInput.endTime
+        )
+    }
+
+    private var isEditing: Bool {
+        formMode != nil
+    }
+
+    private var isEventActionInProgress: Bool {
+        isMutating || isFetchingRecurrenceEvent
+    }
+
+    private var recurrenceInputForEditForm: Binding<RecurrenceInput>? {
+        formMode == .editRecurrenceSeries ? $recurrenceInput : nil
+    }
+
+    private func startEditingSingleEvent() {
+        resetEditInputFromEvent()
+        recurrenceInput.isEnabled = false
+        formMode = .editSingleEvent
+    }
+
+    private func startEditingRecurrenceOccurrence() {
+        guard event.recurrenceId != nil else {
+            return
+        }
+
+        resetEditInputFromEvent()
+        recurrenceInput.isEnabled = false
+        formMode = .editRecurrenceOccurrence
+    }
+
+    private func fetchRecurrenceEventForSeriesEdit() {
+        guard let recurrenceId = event.recurrenceId else {
+            return
+        }
+
+        isFetchingRecurrenceEvent = true
+
+        Task {
+            let details = await onFetchRecurrenceEvent(recurrenceId)
+            isFetchingRecurrenceEvent = false
+
+            guard let details else {
+                return
+            }
+
+            editInput.title = details.title
+            editInput.description = details.description
+            editInput.startAt = details.recurrenceStartDate
+            editInput.endAt = details.recurrenceEndDate
+            recurrenceInput = RecurrenceInput(
+                isEnabled: true,
+                startDate: details.recurrenceStartDate,
+                endDate: details.recurrenceEndDate,
+                startTime: details.recurrenceStartTime,
+                endTime: details.recurrenceEndTime,
+                frequency: details.recurrenceFrequency
+            )
+            formMode = .editRecurrenceSeries
+        }
+    }
+
+    private func resetEditInputFromEvent() {
+        editInput.title = event.title
+        editInput.description = event.description
+        editInput.startAt = event.startAt
+        editInput.endAt = event.endAt
+        editInput.colorCode = event.colorCode
+    }
+
+    private func saveEdit() {
+        switch formMode {
+        case .editSingleEvent:
+            updateSingleEvent()
+        case .editRecurrenceOccurrence:
+            updateRecurrenceOccurrence()
+        case .editRecurrenceSeries:
+            updateRecurrenceSeries()
+        case .create, nil:
+            return
+        }
+    }
+
+    private func makeEventUpdateInput() -> EventUpdateInput {
+        EventUpdateInput(
+            title: editInput.title.trimmingCharacters(in: .whitespacesAndNewlines),
+            description: editInput.description,
             startAt: editInput.startAt,
             endAt: editInput.endAt
         )
     }
 
     private func updateSingleEvent() {
-        let input = EventUpdateInput(
-            title: editInput.title.trimmingCharacters(in: .whitespacesAndNewlines),
-            description: editInput.description,
-            startAt: editInput.startAt,
-            endAt: editInput.endAt
-        )
+        let input = makeEventUpdateInput()
 
         Task {
             let didUpdate = await onUpdateSingleEvent(event, input)
+
+            if didUpdate {
+                dismiss()
+            }
+        }
+    }
+
+    private func updateRecurrenceOccurrence() {
+        let input = makeEventUpdateInput()
+
+        Task {
+            let didUpdate = await onUpdateRecurrenceOccurrence(event, input)
+
+            if didUpdate {
+                dismiss()
+            }
+        }
+    }
+
+    private func updateRecurrenceSeries() {
+        guard let recurrenceId = event.recurrenceId else {
+            return
+        }
+
+        let input = EventUpdateInput(
+            title: editInput.title.trimmingCharacters(in: .whitespacesAndNewlines),
+            description: editInput.description,
+            startAt: recurrenceInput.startDate,
+            endAt: recurrenceInput.endDate
+        )
+
+        Task {
+            let didUpdate = await onUpdateRecurrenceSeries(
+                recurrenceId,
+                RecurrenceEventSeriesEditInput(
+                    title: input.title,
+                    description: input.description,
+                    recurrenceStartDate: recurrenceInput.startDate,
+                    recurrenceEndDate: recurrenceInput.endDate,
+                    recurrenceStartTime: recurrenceInput.startTime,
+                    recurrenceEndTime: recurrenceInput.endTime,
+                    recurrenceFrequency: recurrenceInput.frequency
+                )
+            )
 
             if didUpdate {
                 dismiss()
@@ -360,6 +544,10 @@ struct CalendarEventDetailView: View {
     }
 
     nonisolated static func canDeleteRecurringEvent(_ event: Event) -> Bool {
+        isRepeatedEvent(event) && event.recurrenceId != nil
+    }
+
+    nonisolated static func canUpdateRecurringEvent(_ event: Event) -> Bool {
         isRepeatedEvent(event) && event.recurrenceId != nil
     }
 }

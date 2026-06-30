@@ -61,10 +61,46 @@ struct URLSessionEventRepository: EventRepository {
         return try await response(RecurrenceEventResponseDTO.self, for: request)
     }
 
+    func fetchRecurrenceEvent(recurrenceId: Int64) async throws -> RecurrenceEventResponseDTO {
+        let request = try makeRequest(
+            method: "GET",
+            url: recurrenceEventURL(recurrenceId: recurrenceId)
+        )
+
+        return try await response(RecurrenceEventResponseDTO.self, for: request)
+    }
+
     func updateEvent(eventId: Int64, request requestDTO: UpdateEventRequestDTO) async throws -> EventResponseDTO {
         let request = try makeRequest(
             method: "PUT",
             url: eventURL(eventId: eventId),
+            body: requestDTO
+        )
+
+        return try await response(EventResponseDTO.self, for: request)
+    }
+
+    func updateRecurrenceEvent(
+        recurrenceId: Int64,
+        request requestDTO: UpdateRecurrenceEventRequestDTO
+    ) async throws -> RecurrenceEventResponseDTO {
+        let request = try makeRequest(
+            method: "PATCH",
+            url: recurrenceEventURL(recurrenceId: recurrenceId),
+            body: requestDTO
+        )
+
+        return try await response(RecurrenceEventResponseDTO.self, for: request)
+    }
+
+    func updateRecurrenceOccurrence(
+        recurrenceId: Int64,
+        eventId: Int64,
+        request requestDTO: UpdateRecurrenceOccurrenceRequestDTO
+    ) async throws -> EventResponseDTO {
+        let request = try makeRequest(
+            method: "PATCH",
+            url: recurrenceOccurrenceURL(recurrenceId: recurrenceId, eventId: eventId),
             body: requestDTO
         )
 

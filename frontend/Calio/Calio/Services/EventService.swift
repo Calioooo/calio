@@ -62,6 +62,73 @@ struct EventService {
         }
     }
 
+    func fetchRecurrenceEvent(recurrenceId: Int64) async throws -> RecurrenceEventDetails {
+        do {
+            let response = try await repository.fetchRecurrenceEvent(recurrenceId: recurrenceId)
+            return try mapToRecurrenceEventDetails(response)
+        } catch let error as EventRepositoryError {
+            throw mapToServiceError(error)
+        } catch let error as EventServiceError {
+            throw error
+        } catch {
+            throw EventServiceError.unexpected
+        }
+    }
+
+    func updateRecurrenceEvent(
+        recurrenceId: Int64,
+        input: RecurrenceEventUpdateInput
+    ) async throws -> RecurrenceEventDetails {
+        let request = UpdateRecurrenceEventRequestDTO(
+            title: input.title,
+            description: input.description,
+            startAt: input.startAt,
+            endAt: input.endAt,
+            recurrenceFrequency: input.recurrenceFrequency
+        )
+
+        do {
+            let response = try await repository.updateRecurrenceEvent(
+                recurrenceId: recurrenceId,
+                request: request
+            )
+            return try mapToRecurrenceEventDetails(response)
+        } catch let error as EventRepositoryError {
+            throw mapToServiceError(error)
+        } catch let error as EventServiceError {
+            throw error
+        } catch {
+            throw EventServiceError.unexpected
+        }
+    }
+
+    func updateRecurrenceOccurrence(
+        recurrenceId: Int64,
+        eventId: Int64,
+        input: RecurrenceOccurrenceUpdateInput
+    ) async throws -> Event {
+        let request = UpdateRecurrenceOccurrenceRequestDTO(
+            title: input.title,
+            description: input.description,
+            startAt: input.startAt,
+            endAt: input.endAt,
+            isImportant: input.isImportant
+        )
+
+        do {
+            let response = try await repository.updateRecurrenceOccurrence(
+                recurrenceId: recurrenceId,
+                eventId: eventId,
+                request: request
+            )
+            return mapToEvent(response)
+        } catch let error as EventRepositoryError {
+            throw mapToServiceError(error)
+        } catch {
+            throw EventServiceError.unexpected
+        }
+    }
+
     func deleteEvent(eventId: Int64) async throws {
         do {
             try await repository.deleteEvent(eventId: eventId)
@@ -99,10 +166,10 @@ struct EventService {
         let request = CreateRecurrenceEventRequestDTO(
             recurrenceTitle: input.title,
             recurrenceDescription: input.description,
-            recurrenceStartDate: Self.utcDateString(from: input.recurrenceStartDate),
-            recurrenceEndDate: Self.utcDateString(from: input.recurrenceEndDate),
-            recurrenceStartTime: Self.utcTimeString(from: input.recurrenceStartTime),
-            recurrenceEndTime: Self.utcTimeString(from: input.recurrenceEndTime),
+            recurrenceStartDate: CalendarDateService.utcDateString(from: input.recurrenceStartDate),
+            recurrenceEndDate: CalendarDateService.utcDateString(from: input.recurrenceEndDate),
+            recurrenceStartTime: CalendarDateService.utcTimeString(from: input.recurrenceStartTime),
+            recurrenceEndTime: CalendarDateService.utcTimeString(from: input.recurrenceEndTime),
             recurrenceFrequency: input.recurrenceFrequency
         )
 
@@ -129,32 +196,21 @@ struct EventService {
         )
     }
 
-    nonisolated static func utcDateString(from date: Date) -> String {
-        let utcCalendar = makeUTCCalendar()
-        let components = utcCalendar.dateComponents([.year, .month, .day], from: date)
-        return String(
-            format: "%04d-%02d-%02d",
-            components.year ?? 0,
-            components.month ?? 0,
-            components.day ?? 0
-        )
-    }
-
-    nonisolated static func utcTimeString(from date: Date) -> String {
-        let utcCalendar = makeUTCCalendar()
-        let components = utcCalendar.dateComponents([.hour, .minute, .second], from: date)
-        return String(
-            format: "%02d:%02d:%02d",
-            components.hour ?? 0,
-            components.minute ?? 0,
-            components.second ?? 0
-        )
-    }
-
-    private nonisolated static func makeUTCCalendar() -> Calendar {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
-        return calendar
+    private func mapToRecurrenceEventDetails(_ dto: RecurrenceEventResponseDTO) throws -> RecurrenceEventDetails {
+        do {
+            return RecurrenceEventDetails(
+                recurrenceId: dto.recurrenceId,
+                title: dto.recurrenceTitle,
+                description: dto.recurrenceDescription ?? "",
+                recurrenceStartDate: try CalendarDateService.utcDate(from: dto.recurrenceStartDate),
+                recurrenceEndDate: try CalendarDateService.utcDate(from: dto.recurrenceEndDate),
+                recurrenceStartTime: try CalendarDateService.utcTime(from: dto.recurrenceStartTime),
+                recurrenceEndTime: try CalendarDateService.utcTime(from: dto.recurrenceEndTime),
+                recurrenceFrequency: dto.recurrenceFrequency
+            )
+        } catch {
+            throw EventServiceError.decoding
+        }
     }
 
     private func mapToServiceError(_ error: EventRepositoryError) -> EventServiceError {
@@ -169,7 +225,7 @@ struct EventService {
                 return .recurrenceOccurrenceNotFound
             case "VALIDATION_FAILED":
                 return .validationFailed
-            case "INVALID_TIME_RANGE":
+            case "INVALID_TIME_RANGE", "RECURRENCE_UPDATE_TIME_RANGE_INVALID":
                 return .invalidTimeRange
             default:
                 return .unexpected

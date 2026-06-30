@@ -7,6 +7,23 @@
 
 import SwiftUI
 
+struct EventInput: Equatable {
+    var title: String
+    var startAt: Date
+    var endAt: Date
+    var description: String
+    var colorCode: String
+}
+
+struct RecurrenceInput: Equatable {
+    var isEnabled: Bool
+    var startDate: Date
+    var endDate: Date
+    var startTime: Date
+    var endTime: Date
+    var frequency: RecurrenceFrequency
+}
+
 struct CalendarEventFormView: View {
     private let eventColors = [
         "#4F46E5",
@@ -17,25 +34,60 @@ struct CalendarEventFormView: View {
     ]
 
     @Binding var eventInput: EventInput
-    @Binding var recurrenceInput: RecurrenceInput
+    let recurrenceInput: Binding<RecurrenceInput>?
 
     let mode: CalendarEventFormMode
     let onRecurrenceEnabled: () -> Void
 
     init(
         eventInput: Binding<EventInput>,
-        recurrenceInput: Binding<RecurrenceInput>,
+        recurrenceInput: Binding<RecurrenceInput>? = nil,
         mode: CalendarEventFormMode = .create,
         onRecurrenceEnabled: @escaping () -> Void
     ) {
         _eventInput = eventInput
-        _recurrenceInput = recurrenceInput
+        self.recurrenceInput = recurrenceInput
         self.mode = mode
         self.onRecurrenceEnabled = onRecurrenceEnabled
     }
 
     var title: String {
         eventInput.title
+    }
+
+    nonisolated static func canSave(title: String, startAt: Date, endAt: Date) -> Bool {
+        canSave(
+            title: title,
+            startAt: startAt,
+            endAt: endAt,
+            isRecurrenceEnabled: false,
+            recurrenceStartDate: startAt,
+            recurrenceEndDate: startAt,
+            recurrenceStartTime: startAt,
+            recurrenceEndTime: endAt
+        )
+    }
+
+    nonisolated static func canSave(
+        title: String,
+        startAt: Date,
+        endAt: Date,
+        isRecurrenceEnabled: Bool,
+        recurrenceStartDate: Date,
+        recurrenceEndDate: Date,
+        recurrenceStartTime: Date,
+        recurrenceEndTime: Date
+    ) -> Bool {
+        guard !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return false
+        }
+
+        guard isRecurrenceEnabled else {
+            return endAt > startAt
+        }
+
+        return !isUTCDate(recurrenceEndDate, before: recurrenceStartDate) &&
+        isUTCTime(recurrenceStartTime, before: recurrenceEndTime)
     }
 
     var body: some View {
@@ -45,7 +97,9 @@ struct CalendarEventFormView: View {
             recurrenceSection
         }
         descriptionSection
-        colorSection
+        if mode.showsColorFields {
+            colorSection
+        }
     }
 
     private var titleSection: some View {
@@ -58,31 +112,39 @@ struct CalendarEventFormView: View {
 
     @ViewBuilder
     private var timeSection: some View {
-        if mode.showsRecurrenceFields && recurrenceInput.isEnabled {
-            recurrenceDateSection
-            recurrenceTimeSection
+        if let recurrenceInput,
+           mode.usesRecurrenceDateAndTime(isRecurrenceEnabled: recurrenceInput.wrappedValue.isEnabled) {
+            recurrenceDateSection(recurrenceInput)
+            recurrenceTimeSection(recurrenceInput)
         } else {
             singleEventTimeSection
         }
     }
 
+    @ViewBuilder
     private var recurrenceSection: some View {
-        Section("반복") {
-            recurrenceEnabledButton
+        if let recurrenceInput {
+            Section("반복") {
+                if mode.allowsRecurrenceToggle {
+                    recurrenceEnabledButton(recurrenceInput)
+                } else {
+                    fixedRecurrenceEnabledRow
+                }
 
-            if recurrenceInput.isEnabled {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("반복 주기")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                if mode.showsRecurrenceFrequency(isRecurrenceEnabled: recurrenceInput.wrappedValue.isEnabled) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("반복 주기")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
 
-                    HStack(spacing: 8) {
-                        ForEach(RecurrenceFrequency.allCases, id: \.self) { frequency in
-                            recurrenceFrequencyButton(frequency)
+                        HStack(spacing: 8) {
+                            ForEach(RecurrenceFrequency.allCases, id: \.self) { frequency in
+                                recurrenceFrequencyButton(frequency, recurrenceInput: recurrenceInput)
+                            }
                         }
                     }
+                    .padding(.vertical, 4)
                 }
-                .padding(.vertical, 4)
             }
         }
     }
@@ -104,33 +166,33 @@ struct CalendarEventFormView: View {
         }
     }
 
-    private var recurrenceDateSection: some View {
+    private func recurrenceDateSection(_ recurrenceInput: Binding<RecurrenceInput>) -> some View {
         Section("반복 기간") {
             DatePicker(
                 "반복 시작일",
-                selection: $recurrenceInput.startDate,
+                selection: recurrenceInput.startDate,
                 displayedComponents: [.date]
             )
 
             DatePicker(
                 "반복 종료일",
-                selection: $recurrenceInput.endDate,
+                selection: recurrenceInput.endDate,
                 displayedComponents: [.date]
             )
         }
     }
 
-    private var recurrenceTimeSection: some View {
+    private func recurrenceTimeSection(_ recurrenceInput: Binding<RecurrenceInput>) -> some View {
         Section("반복 시간") {
             DatePicker(
                 "시작 시간",
-                selection: $recurrenceInput.startTime,
+                selection: recurrenceInput.startTime,
                 displayedComponents: [.hourAndMinute]
             )
 
             DatePicker(
                 "종료 시간",
-                selection: $recurrenceInput.endTime,
+                selection: recurrenceInput.endTime,
                 displayedComponents: [.hourAndMinute]
             )
         }
@@ -163,11 +225,11 @@ struct CalendarEventFormView: View {
         }
     }
 
-    private var recurrenceEnabledButton: some View {
+    private func recurrenceEnabledButton(_ recurrenceInput: Binding<RecurrenceInput>) -> some View {
         Button {
-            recurrenceInput.isEnabled.toggle()
+            recurrenceInput.wrappedValue.isEnabled.toggle()
 
-            if recurrenceInput.isEnabled {
+            if recurrenceInput.wrappedValue.isEnabled {
                 onRecurrenceEnabled()
             }
         } label: {
@@ -175,27 +237,41 @@ struct CalendarEventFormView: View {
                 Text("반복 일정")
                     .foregroundStyle(.primary)
                 Spacer()
-                Text(recurrenceInput.isEnabled ? "켜짐" : "꺼짐")
+                Text(recurrenceInput.wrappedValue.isEnabled ? "켜짐" : "꺼짐")
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(recurrenceInput.isEnabled ? Color.accentColor : Color.secondary)
+                    .foregroundStyle(recurrenceInput.wrappedValue.isEnabled ? Color.accentColor : Color.secondary)
             }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
 
-    private func recurrenceFrequencyButton(_ frequency: RecurrenceFrequency) -> some View {
+    private var fixedRecurrenceEnabledRow: some View {
+        HStack {
+            Text("반복 일정")
+                .foregroundStyle(.primary)
+            Spacer()
+            Text("켜짐")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Color.accentColor)
+        }
+    }
+
+    private func recurrenceFrequencyButton(
+        _ frequency: RecurrenceFrequency,
+        recurrenceInput: Binding<RecurrenceInput>
+    ) -> some View {
         Button {
-            recurrenceInput.frequency = frequency
+            recurrenceInput.wrappedValue.frequency = frequency
         } label: {
             Text(frequency.koreanLabel)
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(recurrenceInput.frequency == frequency ? Color.white : Color.primary)
+                .foregroundStyle(recurrenceInput.wrappedValue.frequency == frequency ? Color.white : Color.primary)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 8)
                 .background(
                     RoundedRectangle(cornerRadius: 8)
-                        .fill(recurrenceInput.frequency == frequency ? Color.accentColor : Color(uiColor: .secondarySystemGroupedBackground))
+                        .fill(recurrenceInput.wrappedValue.frequency == frequency ? Color.accentColor : Color(uiColor: .secondarySystemGroupedBackground))
                 )
                 .overlay {
                     RoundedRectangle(cornerRadius: 8)
@@ -229,17 +305,80 @@ struct CalendarEventFormView: View {
         .buttonStyle(.plain)
         .accessibilityLabel("일정 색상 선택")
     }
+
+    private nonisolated static func isUTCDate(_ candidate: Date, before startAt: Date) -> Bool {
+        DayKey(date: candidate, calendar: utcCalendar) < DayKey(date: startAt, calendar: utcCalendar)
+    }
+
+    private nonisolated static func isUTCTime(_ startTime: Date, before endTime: Date) -> Bool {
+        let calendar = utcCalendar
+        let startComponents = calendar.dateComponents([.hour, .minute, .second], from: startTime)
+        let endComponents = calendar.dateComponents([.hour, .minute, .second], from: endTime)
+        let startSecond = totalSeconds(from: startComponents)
+        let endSecond = totalSeconds(from: endComponents)
+
+        return startSecond < endSecond
+    }
+
+    private nonisolated static func totalSeconds(from components: DateComponents) -> Int {
+        ((components.hour ?? 0) * 3600) +
+        ((components.minute ?? 0) * 60) +
+        (components.second ?? 0)
+    }
+
+    private nonisolated static var utcCalendar: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        return calendar
+    }
 }
 
 enum CalendarEventFormMode: Equatable {
     case create
     case editSingleEvent
+    case editRecurrenceOccurrence
+    case editRecurrenceSeries
 
     var showsRecurrenceFields: Bool {
         switch self {
-        case .create:
+        case .create, .editRecurrenceSeries:
             return true
-        case .editSingleEvent:
+        case .editSingleEvent, .editRecurrenceOccurrence:
+            return false
+        }
+    }
+
+    var allowsRecurrenceToggle: Bool {
+        self == .create
+    }
+
+    var showsColorFields: Bool {
+        switch self {
+        case .create, .editSingleEvent:
+            return true
+        case .editRecurrenceOccurrence, .editRecurrenceSeries:
+            return false
+        }
+    }
+
+    func usesRecurrenceDateAndTime(isRecurrenceEnabled: Bool) -> Bool {
+        switch self {
+        case .create:
+            return isRecurrenceEnabled
+        case .editRecurrenceSeries:
+            return true
+        case .editSingleEvent, .editRecurrenceOccurrence:
+            return false
+        }
+    }
+
+    func showsRecurrenceFrequency(isRecurrenceEnabled: Bool) -> Bool {
+        switch self {
+        case .create:
+            return isRecurrenceEnabled
+        case .editRecurrenceSeries:
+            return true
+        case .editSingleEvent, .editRecurrenceOccurrence:
             return false
         }
     }
