@@ -52,13 +52,14 @@ public class NationalHolidaySyncScheduler {
 
     @Scheduled(cron = "0 0 4 * * *", zone = "Asia/Seoul")
     public void syncDailyNearRange() {
-        if (isFirstDayOfMonth()) {
+        LocalDate today = today();
+        if (today.getDayOfMonth() == 1) {
             log.info("National holiday daily sync skipped on monthly sync day. date={}", today());
             return;
         }
 
         runIfAvailable("daily-near", () -> {
-            int currentYear = currentYear();
+            int currentYear = today.getYear();
             nationalHolidaySyncService.syncYearRange(currentYear, currentYear + 2);
         });
     }
@@ -90,10 +91,6 @@ public class NationalHolidaySyncScheduler {
 
     private int currentYear() {
         return today().getYear();
-    }
-
-    private boolean isFirstDayOfMonth() {
-        return today().getDayOfMonth() == 1;
     }
 
     private LocalDate today() {
