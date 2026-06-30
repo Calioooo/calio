@@ -75,15 +75,23 @@ struct StubEventRepository: EventRepository {
         recurrenceId: Int64,
         request: UpdateRecurrenceEventRequestDTO
     ) async throws -> RecurrenceEventResponseDTO {
+        guard let title = request.title,
+              let startAt = request.startAt,
+              let endAt = request.endAt,
+              let recurrenceFrequency = request.recurrenceFrequency
+        else {
+            throw EventRepositoryError.invalidResponse
+        }
+
         RecurrenceEventResponseDTO(
             recurrenceId: recurrenceId,
-            recurrenceTitle: request.title ?? "반복 일정",
+            recurrenceTitle: title,
             recurrenceDescription: request.description,
-            recurrenceStartDate: "2026-01-01",
-            recurrenceEndDate: "2026-01-31",
-            recurrenceStartTime: "00:00:00",
-            recurrenceEndTime: "01:00:00",
-            recurrenceFrequency: request.recurrenceFrequency ?? .daily
+            recurrenceStartDate: CalendarDateService.utcDateString(from: startAt),
+            recurrenceEndDate: CalendarDateService.utcDateString(from: endAt),
+            recurrenceStartTime: CalendarDateService.utcTimeString(from: startAt),
+            recurrenceEndTime: CalendarDateService.utcTimeString(from: endAt),
+            recurrenceFrequency: recurrenceFrequency
         )
     }
 
@@ -92,17 +100,25 @@ struct StubEventRepository: EventRepository {
         eventId: Int64,
         request: UpdateRecurrenceOccurrenceRequestDTO
     ) async throws -> EventResponseDTO {
+        guard let title = request.title,
+              let startAt = request.startAt,
+              let endAt = request.endAt,
+              let isImportant = request.isImportant
+        else {
+            throw EventRepositoryError.invalidResponse
+        }
+
         EventResponseDTO(
             id: eventId,
-            title: request.title ?? "반복 일정",
+            title: title,
             description: request.description,
-            startAt: request.startAt ?? Date(),
-            endAt: request.endAt ?? Date().addingTimeInterval(3600),
-            importantEvent: request.isImportant ?? false,
+            startAt: startAt,
+            endAt: endAt,
+            importantEvent: isImportant,
             recurrenceId: recurrenceId,
             isRecurrenceOccurrence: true,
-            createdAt: Date(),
-            updatedAt: Date()
+            createdAt: startAt,
+            updatedAt: endAt
         )
     }
 
