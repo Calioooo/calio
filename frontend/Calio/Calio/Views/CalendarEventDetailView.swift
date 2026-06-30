@@ -161,14 +161,14 @@ struct CalendarEventDetailView: View {
                 Button("취소") {
                     formMode = nil
                 }
-                .disabled(isBusy)
+                .disabled(isEventActionInProgress)
             }
 
             ToolbarItem(placement: .confirmationAction) {
                 Button("저장") {
                     saveEdit()
                 }
-                .disabled(!canSaveEdit || isBusy)
+                .disabled(!canSaveEdit || isEventActionInProgress)
             }
         } else {
             ToolbarItemGroup(placement: .topBarTrailing) {
@@ -176,28 +176,28 @@ struct CalendarEventDetailView: View {
                     Button("수정") {
                         isShowingRecurrenceEditScope = true
                     }
-                    .disabled(isBusy)
+                    .disabled(isEventActionInProgress)
                 }
 
                 if canUpdateSingleEvent {
                     Button("수정") {
                         startEditingSingleEvent()
                     }
-                    .disabled(isBusy)
+                    .disabled(isEventActionInProgress)
                 }
 
                 if canDeleteSingleEvent {
                     Button("삭제", role: .destructive) {
                         isShowingSingleDeleteConfirmation = true
                     }
-                    .disabled(isBusy)
+                    .disabled(isEventActionInProgress)
                 }
 
                 if canDeleteRecurringEvent {
                     Button("삭제", role: .destructive) {
                         isShowingRecurrenceDeleteScope = true
                     }
-                    .disabled(isBusy)
+                    .disabled(isEventActionInProgress)
                 }
             }
         }
@@ -352,7 +352,7 @@ struct CalendarEventDetailView: View {
         formMode != nil
     }
 
-    private var isBusy: Bool {
+    private var isEventActionInProgress: Bool {
         isMutating || isFetchingRecurrenceEvent
     }
 
