@@ -83,7 +83,7 @@ struct StubEventRepository: EventRepository {
             throw EventRepositoryError.invalidResponse
         }
 
-        RecurrenceEventResponseDTO(
+        return RecurrenceEventResponseDTO(
             recurrenceId: recurrenceId,
             recurrenceTitle: title,
             recurrenceDescription: request.description,
@@ -108,7 +108,7 @@ struct StubEventRepository: EventRepository {
             throw EventRepositoryError.invalidResponse
         }
 
-        EventResponseDTO(
+        return EventResponseDTO(
             id: eventId,
             title: title,
             description: request.description,
