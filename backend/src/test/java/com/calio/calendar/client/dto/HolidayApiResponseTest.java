@@ -11,7 +11,7 @@ class HolidayApiResponseTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
-    @DisplayName("공휴일 API 응답은 배열 형태의 items.item을 provider item 목록으로 읽는다")
+    @DisplayName("배열 형태의 items.item을 HolidayApiItem 목록으로 반환한다")
     void givenArrayItem_whenParseHolidayApiResponse_thenReadsItems() throws Exception {
         // given
         String json = """
