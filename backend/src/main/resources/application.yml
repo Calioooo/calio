@@ -15,3 +15,7 @@ spring:
   sql:
     init:
       mode: never
+
+external:
+  holiday:
+    service-key: ${HOLIDAY_API_SERVICE_KEY:}
