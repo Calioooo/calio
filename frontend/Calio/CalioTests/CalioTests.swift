@@ -305,22 +305,13 @@ struct CalioTests {
                     colorCode: "#EF4444"
                 )
             ),
-            recurrenceInput: .constant(
-                RecurrenceInput(
-                    isEnabled: true,
-                    startDate: startAt,
-                    endDate: startAt,
-                    startTime: startAt,
-                    endTime: endAt,
-                    frequency: .weekly
-                )
-            ),
             mode: .editSingleEvent,
             onRecurrenceEnabled: {}
         )
 
         #expect(form.mode == .editSingleEvent)
         #expect(!form.mode.showsRecurrenceFields)
+        #expect(form.recurrenceInput == nil)
         #expect(form.title == "수정할 일정")
     }
 
@@ -338,22 +329,13 @@ struct CalioTests {
                     colorCode: "#EF4444"
                 )
             ),
-            recurrenceInput: .constant(
-                RecurrenceInput(
-                    isEnabled: true,
-                    startDate: startAt,
-                    endDate: endAt,
-                    startTime: startAt,
-                    endTime: endAt,
-                    frequency: .monthly
-                )
-            ),
             mode: .editRecurrenceOccurrence,
             onRecurrenceEnabled: {}
         )
         let seriesMode = CalendarEventFormMode.editRecurrenceSeries
 
         #expect(!occurrenceForm.mode.showsRecurrenceFields)
+        #expect(occurrenceForm.recurrenceInput == nil)
         #expect(seriesMode.showsRecurrenceFields)
         #expect(!seriesMode.allowsRecurrenceToggle)
         #expect(seriesMode.usesRecurrenceDateAndTime(isRecurrenceEnabled: false))

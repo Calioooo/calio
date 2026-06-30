@@ -145,7 +145,7 @@ struct CalendarEventDetailView: View {
             mutationFailureSection
             CalendarEventFormView(
                 eventInput: $editInput,
-                recurrenceInput: $recurrenceInput,
+                recurrenceInput: recurrenceInputForEditForm,
                 mode: formMode ?? .editSingleEvent,
                 onRecurrenceEnabled: {}
             )
@@ -354,6 +354,10 @@ struct CalendarEventDetailView: View {
 
     private var isEventActionInProgress: Bool {
         isMutating || isFetchingRecurrenceEvent
+    }
+
+    private var recurrenceInputForEditForm: Binding<RecurrenceInput>? {
+        formMode == .editRecurrenceSeries ? $recurrenceInput : nil
     }
 
     private func startEditingSingleEvent() {

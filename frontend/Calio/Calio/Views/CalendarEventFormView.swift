@@ -34,19 +34,19 @@ struct CalendarEventFormView: View {
     ]
 
     @Binding var eventInput: EventInput
-    @Binding var recurrenceInput: RecurrenceInput
+    let recurrenceInput: Binding<RecurrenceInput>?
 
     let mode: CalendarEventFormMode
     let onRecurrenceEnabled: () -> Void
 
     init(
         eventInput: Binding<EventInput>,
-        recurrenceInput: Binding<RecurrenceInput>,
+        recurrenceInput: Binding<RecurrenceInput>? = nil,
         mode: CalendarEventFormMode = .create,
         onRecurrenceEnabled: @escaping () -> Void
     ) {
         _eventInput = eventInput
-        _recurrenceInput = recurrenceInput
+        self.recurrenceInput = recurrenceInput
         self.mode = mode
         self.onRecurrenceEnabled = onRecurrenceEnabled
     }
@@ -112,35 +112,39 @@ struct CalendarEventFormView: View {
 
     @ViewBuilder
     private var timeSection: some View {
-        if mode.usesRecurrenceDateAndTime(isRecurrenceEnabled: recurrenceInput.isEnabled) {
-            recurrenceDateSection
-            recurrenceTimeSection
+        if let recurrenceInput,
+           mode.usesRecurrenceDateAndTime(isRecurrenceEnabled: recurrenceInput.wrappedValue.isEnabled) {
+            recurrenceDateSection(recurrenceInput)
+            recurrenceTimeSection(recurrenceInput)
         } else {
             singleEventTimeSection
         }
     }
 
+    @ViewBuilder
     private var recurrenceSection: some View {
-        Section("반복") {
-            if mode.allowsRecurrenceToggle {
-                recurrenceEnabledButton
-            } else {
-                fixedRecurrenceEnabledRow
-            }
+        if let recurrenceInput {
+            Section("반복") {
+                if mode.allowsRecurrenceToggle {
+                    recurrenceEnabledButton(recurrenceInput)
+                } else {
+                    fixedRecurrenceEnabledRow
+                }
 
-            if mode.showsRecurrenceFrequency(isRecurrenceEnabled: recurrenceInput.isEnabled) {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("반복 주기")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                if mode.showsRecurrenceFrequency(isRecurrenceEnabled: recurrenceInput.wrappedValue.isEnabled) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("반복 주기")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
 
-                    HStack(spacing: 8) {
-                        ForEach(RecurrenceFrequency.allCases, id: \.self) { frequency in
-                            recurrenceFrequencyButton(frequency)
+                        HStack(spacing: 8) {
+                            ForEach(RecurrenceFrequency.allCases, id: \.self) { frequency in
+                                recurrenceFrequencyButton(frequency, recurrenceInput: recurrenceInput)
+                            }
                         }
                     }
+                    .padding(.vertical, 4)
                 }
-                .padding(.vertical, 4)
             }
         }
     }
@@ -162,33 +166,33 @@ struct CalendarEventFormView: View {
         }
     }
 
-    private var recurrenceDateSection: some View {
+    private func recurrenceDateSection(_ recurrenceInput: Binding<RecurrenceInput>) -> some View {
         Section("반복 기간") {
             DatePicker(
                 "반복 시작일",
-                selection: $recurrenceInput.startDate,
+                selection: recurrenceInput.startDate,
                 displayedComponents: [.date]
             )
 
             DatePicker(
                 "반복 종료일",
-                selection: $recurrenceInput.endDate,
+                selection: recurrenceInput.endDate,
                 displayedComponents: [.date]
             )
         }
     }
 
-    private var recurrenceTimeSection: some View {
+    private func recurrenceTimeSection(_ recurrenceInput: Binding<RecurrenceInput>) -> some View {
         Section("반복 시간") {
             DatePicker(
                 "시작 시간",
-                selection: $recurrenceInput.startTime,
+                selection: recurrenceInput.startTime,
                 displayedComponents: [.hourAndMinute]
             )
 
             DatePicker(
                 "종료 시간",
-                selection: $recurrenceInput.endTime,
+                selection: recurrenceInput.endTime,
                 displayedComponents: [.hourAndMinute]
             )
         }
@@ -221,11 +225,11 @@ struct CalendarEventFormView: View {
         }
     }
 
-    private var recurrenceEnabledButton: some View {
+    private func recurrenceEnabledButton(_ recurrenceInput: Binding<RecurrenceInput>) -> some View {
         Button {
-            recurrenceInput.isEnabled.toggle()
+            recurrenceInput.wrappedValue.isEnabled.toggle()
 
-            if recurrenceInput.isEnabled {
+            if recurrenceInput.wrappedValue.isEnabled {
                 onRecurrenceEnabled()
             }
         } label: {
@@ -233,9 +237,9 @@ struct CalendarEventFormView: View {
                 Text("반복 일정")
                     .foregroundStyle(.primary)
                 Spacer()
-                Text(recurrenceInput.isEnabled ? "켜짐" : "꺼짐")
+                Text(recurrenceInput.wrappedValue.isEnabled ? "켜짐" : "꺼짐")
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(recurrenceInput.isEnabled ? Color.accentColor : Color.secondary)
+                    .foregroundStyle(recurrenceInput.wrappedValue.isEnabled ? Color.accentColor : Color.secondary)
             }
             .contentShape(Rectangle())
         }
@@ -253,18 +257,21 @@ struct CalendarEventFormView: View {
         }
     }
 
-    private func recurrenceFrequencyButton(_ frequency: RecurrenceFrequency) -> some View {
+    private func recurrenceFrequencyButton(
+        _ frequency: RecurrenceFrequency,
+        recurrenceInput: Binding<RecurrenceInput>
+    ) -> some View {
         Button {
-            recurrenceInput.frequency = frequency
+            recurrenceInput.wrappedValue.frequency = frequency
         } label: {
             Text(frequency.koreanLabel)
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(recurrenceInput.frequency == frequency ? Color.white : Color.primary)
+                .foregroundStyle(recurrenceInput.wrappedValue.frequency == frequency ? Color.white : Color.primary)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 8)
                 .background(
                     RoundedRectangle(cornerRadius: 8)
-                        .fill(recurrenceInput.frequency == frequency ? Color.accentColor : Color(uiColor: .secondarySystemGroupedBackground))
+                        .fill(recurrenceInput.wrappedValue.frequency == frequency ? Color.accentColor : Color(uiColor: .secondarySystemGroupedBackground))
                 )
                 .overlay {
                     RoundedRectangle(cornerRadius: 8)
