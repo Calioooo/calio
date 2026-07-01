@@ -35,8 +35,10 @@ class NationalHolidaySyncServiceTest {
         nationalHolidayRepository = new FakeNationalHolidayRepository();
         nationalHolidaySyncService = new NationalHolidaySyncService(
                 holidayApiClient,
-                nationalHolidayRepository.proxy(),
-                new NoOpTransactionManager()
+                new NationalHolidayPersistenceService(
+                        nationalHolidayRepository.proxy(),
+                        new NoOpTransactionManager()
+                )
         );
     }
 
