@@ -15,7 +15,7 @@ public record HolidayApiResponse(
         JsonNode root = objectMapper.readTree(json);
         JsonNode response = root.path("response");
         String resultCode = textOrNull(response.path("header").get("resultCode"));
-        List<HolidayApiItem> items = itemsFrom(response.path("body").path("items").path("item"));
+        List<HolidayApiItem> items = itemsFrom(response.path("body").path("items").path("item"), objectMapper);
 
         return new HolidayApiResponse(resultCode, items);
     }
@@ -24,7 +24,8 @@ public record HolidayApiResponse(
         return "00".equals(resultCode);
     }
 
-    private static List<HolidayApiItem> itemsFrom(JsonNode itemNode) {
+    private static List<HolidayApiItem> itemsFrom(JsonNode itemNode, ObjectMapper objectMapper)
+            throws JacksonException {
         if (itemNode.isMissingNode() || itemNode.isNull()) {
             return List.of();
         }
@@ -32,13 +33,13 @@ public record HolidayApiResponse(
         if (itemNode.isArray()) {
             List<HolidayApiItem> items = new ArrayList<>();
             for (JsonNode node : itemNode) {
-                items.add(HolidayApiItem.from(node));
+                items.add(HolidayApiItem.from(node, objectMapper));
             }
             return items;
         }
 
         if (itemNode.isObject()) {
-            return List.of(HolidayApiItem.from(itemNode));
+            return List.of(HolidayApiItem.from(itemNode, objectMapper));
         }
 
         return List.of();
