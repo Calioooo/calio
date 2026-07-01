@@ -10,7 +10,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.calio.calendar.repository.TagRepository;
+import com.calio.calendar.repository.entity.Tag;
+import com.calio.calendar.repository.entity.TagType;
 import java.nio.charset.StandardCharsets;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,6 +42,15 @@ class EventControllerTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private TagRepository tagRepository;
+
+    @BeforeEach
+    void setUpDefaultTag() {
+        tagRepository.findFirstByTagTypeAndTitleOrderByIdAsc(TagType.DEFAULT, "기타")
+                .orElseGet(() -> tagRepository.save(new Tag(TagType.DEFAULT, "기타", "#64748B")));
+    }
 
     @Test
     @DisplayName("사용자는 단일 시간 일정을 생성하면 서버가 생성한 감사 필드가 포함된 일정을 받는다")
@@ -67,6 +80,8 @@ class EventControllerTest {
                 .andExpect(jsonPath("$.startAt").value("2026-06-01T00:00:00Z"))
                 .andExpect(jsonPath("$.endAt").value("2026-06-01T01:00:00Z"))
                 .andExpect(jsonPath("$.importantEvent").value(false))
+                .andExpect(jsonPath("$.tag.title").value("기타"))
+                .andExpect(jsonPath("$.tag.colorCode").value("#64748B"))
                 .andExpect(jsonPath("$.createdAt").isString())
                 .andExpect(jsonPath("$.updatedAt").isString())
                 .andReturn();
@@ -74,6 +89,89 @@ class EventControllerTest {
         JsonNode response = readResponse(result);
         assertThat(response.get("createdAt").asText()).isNotEqualTo("2000-01-01T00:00:00Z");
         assertThat(response.get("updatedAt").asText()).isNotEqualTo("2000-01-01T00:00:00Z");
+    }
+
+    @Test
+    @DisplayName("사용자는 DEFAULT tagId를 지정해 일정을 생성하면 해당 태그가 저장된 응답을 받는다")
+    void givenDefaultTagId_whenCreateEvent_thenStoresSelectedTag() throws Exception {
+        // given
+        Tag workTag = tagRepository.save(new Tag(TagType.DEFAULT, "업무", "#2563eb"));
+
+        // when
+        mockMvc.perform(post("/api/events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Tagged event",
+                                  "startAt": "2026-06-16T00:00:00Z",
+                                  "endAt": "2026-06-16T01:00:00Z",
+                                  "tagId": %d
+                                }
+                                """.formatted(workTag.getId())))
+                // then
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.tag.id").value(workTag.getId()))
+                .andExpect(jsonPath("$.tag.title").value("업무"))
+                .andExpect(jsonPath("$.tag.colorCode").value("#2563EB"));
+    }
+
+    @Test
+    @DisplayName("사용자는 CUSTOM tagId로 일정을 생성할 수 없다")
+    void givenCustomTagId_whenCreateEvent_thenReturnsTagNotFound() throws Exception {
+        // given
+        Tag customTag = tagRepository.save(new Tag(TagType.CUSTOM, "사용자", "#111111"));
+
+        // when
+        mockMvc.perform(post("/api/events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Custom tag rejected",
+                                  "startAt": "2026-06-17T00:00:00Z",
+                                  "endAt": "2026-06-17T01:00:00Z",
+                                  "tagId": %d
+                                }
+                                """.formatted(customTag.getId())))
+                // then
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("TAG_NOT_FOUND"))
+                .andExpect(jsonPath("$.message").value("Tag not found."));
+    }
+
+    @Test
+    @DisplayName("사용자는 tagId 없이 일정을 수정하면 fallback DEFAULT 기타 태그로 변경된다")
+    void givenNullTagId_whenUpdateEvent_thenChangesToFallbackTag() throws Exception {
+        // given
+        Tag workTag = tagRepository.save(new Tag(TagType.DEFAULT, "업무 수정", "#2563EB"));
+        MvcResult createResult = mockMvc.perform(post("/api/events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Change to fallback",
+                                  "startAt": "2026-06-18T00:00:00Z",
+                                  "endAt": "2026-06-18T01:00:00Z",
+                                  "tagId": %d
+                                }
+                                """.formatted(workTag.getId())))
+                .andExpect(status().isCreated())
+                .andReturn();
+        long eventId = readResponse(createResult).get("id").asLong();
+
+        // when
+        mockMvc.perform(put("/api/events/{eventId}", eventId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Fallback tag",
+                                  "startAt": "2026-06-18T02:00:00Z",
+                                  "endAt": "2026-06-18T03:00:00Z",
+                                  "tagId": null
+                                }
+                                """))
+                // then
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tag.title").value("기타"))
+                .andExpect(jsonPath("$.tag.colorCode").value("#64748B"));
     }
 
     @Test

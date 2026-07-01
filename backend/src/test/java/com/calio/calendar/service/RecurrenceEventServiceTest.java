@@ -20,6 +20,8 @@ import com.calio.calendar.repository.entity.Event;
 import com.calio.calendar.repository.entity.RecurrenceEventOverride;
 import com.calio.calendar.repository.entity.RecurrenceEvent;
 import com.calio.calendar.repository.entity.RecurrenceFrequency;
+import com.calio.calendar.repository.entity.Tag;
+import com.calio.calendar.repository.entity.TagType;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -46,6 +48,9 @@ class RecurrenceEventServiceTest {
 
     @Mock
     private RecurrenceEventOverrideRepository recurrenceEventOverrideRepository;
+
+    @Mock
+    private TagService tagService;
 
     @InjectMocks
     private RecurrenceEventService recurrenceEventService;

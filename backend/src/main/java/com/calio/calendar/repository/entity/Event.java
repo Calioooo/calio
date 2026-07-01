@@ -2,9 +2,12 @@ package com.calio.calendar.repository.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.Optional;
@@ -38,6 +41,10 @@ public class Event extends BaseEntity {
     @Column(name = "deleted_at")
     private Instant deletedAt;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "tag_id")
+    private Tag tag;
+
     protected Event() {
     }
 
@@ -46,11 +53,16 @@ public class Event extends BaseEntity {
     }
 
     public Event(String title, String description, Instant startAt, Instant endAt, Long recurrenceId) {
+        this(title, description, startAt, endAt, recurrenceId, null);
+    }
+
+    public Event(String title, String description, Instant startAt, Instant endAt, Long recurrenceId, Tag tag) {
         this.title = title;
         this.description = description;
         this.startAt = startAt;
         this.endAt = endAt;
         this.recurrenceId = recurrenceId;
+        this.tag = tag;
     }
 
     public void replace(String title, String description, Instant startAt, Instant endAt) {
@@ -58,6 +70,11 @@ public class Event extends BaseEntity {
         this.description = description;
         this.startAt = startAt;
         this.endAt = endAt;
+    }
+
+    public void replace(String title, String description, Instant startAt, Instant endAt, Tag tag) {
+        replace(title, description, startAt, endAt);
+        changeTag(tag);
     }
 
     public void updateOccurrence(
@@ -73,6 +90,10 @@ public class Event extends BaseEntity {
 
     public void changeImportantEvent(boolean importantEvent) {
         this.importantEvent = importantEvent;
+    }
+
+    public void changeTag(Tag tag) {
+        this.tag = tag;
     }
 
     public void softDelete(Instant deletedAt) {
@@ -117,5 +138,9 @@ public class Event extends BaseEntity {
 
     public boolean isRecurrenceOccurrence() {
         return recurrenceId != null;
+    }
+
+    public Tag getTag() {
+        return tag;
     }
 }

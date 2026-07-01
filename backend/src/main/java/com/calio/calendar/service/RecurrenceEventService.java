@@ -13,6 +13,7 @@ import com.calio.calendar.repository.RecurrenceEventRepository;
 import com.calio.calendar.repository.entity.Event;
 import com.calio.calendar.repository.entity.RecurrenceEventOverride;
 import com.calio.calendar.repository.entity.RecurrenceEvent;
+import com.calio.calendar.repository.entity.Tag;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -33,15 +34,18 @@ public class RecurrenceEventService {
     private final RecurrenceEventRepository recurrenceEventRepository;
     private final EventRepository eventRepository;
     private final RecurrenceEventOverrideRepository recurrenceEventOverrideRepository;
+    private final TagService tagService;
 
     public RecurrenceEventService(
             RecurrenceEventRepository recurrenceEventRepository,
             EventRepository eventRepository,
-            RecurrenceEventOverrideRepository recurrenceEventOverrideRepository
+            RecurrenceEventOverrideRepository recurrenceEventOverrideRepository,
+            TagService tagService
     ) {
         this.recurrenceEventRepository = recurrenceEventRepository;
         this.eventRepository = eventRepository;
         this.recurrenceEventOverrideRepository = recurrenceEventOverrideRepository;
+        this.tagService = tagService;
     }
 
     @Transactional
@@ -49,7 +53,8 @@ public class RecurrenceEventService {
         validateRecurrenceDateRange(request.recurrenceStartDate(), request.recurrenceEndDate());
         validateRecurrenceTimeRange(request.recurrenceStartTime(), request.recurrenceEndTime());
 
-        RecurrenceEvent recurrenceEvent = recurrenceEventRepository.save(request.toEntity());
+        Tag tag = tagService.resolveDefaultTag(request.tagId());
+        RecurrenceEvent recurrenceEvent = recurrenceEventRepository.save(request.toEntity(tag));
         eventRepository.saveAll(toOccurrenceEvents(recurrenceEvent));
 
         return RecurrenceEventResponse.from(recurrenceEvent);
@@ -73,6 +78,10 @@ public class RecurrenceEventService {
                 : request.endAt();
         validateRecurrenceUpdateTimeRange(effectiveStartAt, effectiveEndAt);
 
+        Tag tag = request.tagId() == null
+                ? recurrenceEvent.getTag()
+                : tagService.resolveExplicitDefaultTag(request.tagId());
+        recurrenceEvent.changeTag(tag);
         recurrenceEvent.update(
                 request.title() == null ? recurrenceEvent.getRecurrenceTitle() : request.title(),
                 request.description() == null ? recurrenceEvent.getRecurrenceDescription() : request.description(),
@@ -237,6 +246,7 @@ public class RecurrenceEventService {
                     toInstant(occurrenceDate, recurrenceEvent.getRecurrenceStartTime()),
                     toOccurrenceEndInstant(recurrenceEvent, occurrenceDate)
             );
+            occurrence.changeTag(recurrenceEvent.getTag());
             rebuiltEvents.add(occurrence);
         }
 
@@ -295,7 +305,8 @@ public class RecurrenceEventService {
                 recurrenceEvent.getRecurrenceDescription(),
                 toInstant(occurrenceDate, recurrenceEvent.getRecurrenceStartTime()),
                 toOccurrenceEndInstant(recurrenceEvent, occurrenceDate),
-                recurrenceEvent.getId()
+                recurrenceEvent.getId(),
+                recurrenceEvent.getTag()
         );
     }
 

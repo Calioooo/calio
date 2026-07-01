@@ -10,6 +10,16 @@ public record UpdateRecurrenceEventRequest(
         String description,
         Instant startAt,
         Instant endAt,
-        RecurrenceFrequency recurrenceFrequency
+        RecurrenceFrequency recurrenceFrequency,
+        Long tagId
 ) {
+    public UpdateRecurrenceEventRequest(
+            String title,
+            String description,
+            Instant startAt,
+            Instant endAt,
+            RecurrenceFrequency recurrenceFrequency
+    ) {
+        this(title, description, startAt, endAt, recurrenceFrequency, null);
+    }
 }

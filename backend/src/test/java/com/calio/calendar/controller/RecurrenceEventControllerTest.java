@@ -12,11 +12,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.calio.calendar.repository.EventRepository;
 import com.calio.calendar.repository.RecurrenceEventOverrideRepository;
 import com.calio.calendar.repository.RecurrenceEventRepository;
+import com.calio.calendar.repository.TagRepository;
 import com.calio.calendar.repository.entity.Event;
 import com.calio.calendar.repository.entity.RecurrenceEvent;
+import com.calio.calendar.repository.entity.Tag;
+import com.calio.calendar.repository.entity.TagType;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -53,6 +57,15 @@ class RecurrenceEventControllerTest {
     @Autowired
     private RecurrenceEventOverrideRepository recurrenceEventOverrideRepository;
 
+    @Autowired
+    private TagRepository tagRepository;
+
+    @BeforeEach
+    void setUpDefaultTag() {
+        tagRepository.findFirstByTagTypeAndTitleOrderByIdAsc(TagType.DEFAULT, "기타")
+                .orElseGet(() -> tagRepository.save(new Tag(TagType.DEFAULT, "기타", "#64748B")));
+    }
+
     @Test
     @DisplayName("사용자는 반복 일정을 생성하면 rule과 inclusive 범위의 occurrence 일정을 함께 저장한다")
     void givenDailyRecurrenceRequest_whenCreateRecurrenceEvent_thenStoresRuleAndOccurrences()
@@ -82,6 +95,7 @@ class RecurrenceEventControllerTest {
                 .andExpect(jsonPath("$.recurrenceStartTime").value("09:00:00"))
                 .andExpect(jsonPath("$.recurrenceEndTime").value("10:00:00"))
                 .andExpect(jsonPath("$.recurrenceFrequency").value("DAILY"))
+                .andExpect(jsonPath("$.tag.title").value("기타"))
                 .andReturn();
 
         long recurrenceId = readResponse(createResult).get("recurrenceId").asLong();
@@ -96,12 +110,45 @@ class RecurrenceEventControllerTest {
                 .andExpect(jsonPath("$[0].endAt").value("2026-08-01T10:00:00Z"))
                 .andExpect(jsonPath("$[0].recurrenceId").value(recurrenceId))
                 .andExpect(jsonPath("$[0].isRecurrenceOccurrence").value(true))
+                .andExpect(jsonPath("$[0].tag.title").value("기타"))
                 .andExpect(jsonPath("$[1].startAt").value("2026-08-02T09:00:00Z"))
                 .andExpect(jsonPath("$[1].recurrenceId").value(recurrenceId))
                 .andExpect(jsonPath("$[1].isRecurrenceOccurrence").value(true))
                 .andExpect(jsonPath("$[2].startAt").value("2026-08-03T09:00:00Z"))
                 .andExpect(jsonPath("$[2].recurrenceId").value(recurrenceId))
                 .andExpect(jsonPath("$[2].isRecurrenceOccurrence").value(true));
+    }
+
+    @Test
+    @DisplayName("사용자는 DEFAULT tagId로 반복 일정을 생성하면 rule과 occurrence에 같은 태그가 저장된다")
+    void givenDefaultTagId_whenCreateRecurrenceEvent_thenStoresTagOnRuleAndOccurrences() throws Exception {
+        // given
+        Tag workTag = tagRepository.save(new Tag(TagType.DEFAULT, "반복 업무", "#2563eb"));
+
+        // when
+        MvcResult createResult = mockMvc.perform(post("/api/recurrence-events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(recurrenceRequest(
+                                "Tagged recurrence",
+                                "Tagged memo",
+                                "2026-08-05",
+                                "2026-08-06",
+                                "09:00:00",
+                                "10:00:00",
+                                "DAILY",
+                                workTag.getId()
+                        )))
+                // then
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.tag.id").value(workTag.getId()))
+                .andExpect(jsonPath("$.tag.colorCode").value("#2563EB"))
+                .andReturn();
+
+        long recurrenceId = readResponse(createResult).get("recurrenceId").asLong();
+        assertThat(recurrenceEventRepository.findById(recurrenceId))
+                .hasValueSatisfying(rule -> assertThat(rule.getTag().getId()).isEqualTo(workTag.getId()));
+        assertThat(eventRepository.findByRecurrenceIdAndDeletedAtIsNullOrderByStartAtAsc(recurrenceId))
+                .allSatisfy(event -> assertThat(event.getTag().getId()).isEqualTo(workTag.getId()));
     }
 
     @Test
@@ -124,6 +171,71 @@ class RecurrenceEventControllerTest {
                 .andExpect(jsonPath("$.recurrenceStartDate").value("2026-08-11"))
                 .andExpect(jsonPath("$.recurrenceEndDate").value("2026-08-25"))
                 .andExpect(jsonPath("$.recurrenceFrequency").value("WEEKLY"));
+    }
+
+    @Test
+    @DisplayName("반복 일정 전체 수정에서 tagId가 null이면 기존 rule 태그를 보존하고 occurrence에 다시 맞춘다")
+    void givenNullTagId_whenPatchRecurrenceEvent_thenPreservesRuleTagAndAppliesToOccurrences()
+            throws Exception {
+        // given
+        Tag workTag = tagRepository.save(new Tag(TagType.DEFAULT, "보존 태그", "#2563EB"));
+        long recurrenceId = createRecurrenceEventWithTag(
+                "Preserve tag recurrence",
+                "2026-11-13",
+                "2026-11-14",
+                "DAILY",
+                workTag.getId()
+        );
+
+        // when
+        mockMvc.perform(patch("/api/recurrence-events/{recurrenceId}", recurrenceId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Preserved tag recurrence",
+                                  "tagId": null
+                                }
+                                """))
+                // then
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tag.id").value(workTag.getId()));
+
+        assertThat(eventRepository.findByRecurrenceIdAndDeletedAtIsNullOrderByStartAtAsc(recurrenceId))
+                .allSatisfy(event -> assertThat(event.getTag().getId()).isEqualTo(workTag.getId()));
+    }
+
+    @Test
+    @DisplayName("반복 일정 전체 수정에서 explicit DEFAULT tagId는 rule과 유지 occurrence에 적용된다")
+    void givenExplicitTagId_whenPatchRecurrenceEvent_thenAppliesTagToRuleAndOccurrences()
+            throws Exception {
+        // given
+        Tag originalTag = tagRepository.save(new Tag(TagType.DEFAULT, "원래 태그", "#10B981"));
+        Tag updatedTag = tagRepository.save(new Tag(TagType.DEFAULT, "변경 태그", "#F59E0B"));
+        long recurrenceId = createRecurrenceEventWithTag(
+                "Change tag recurrence",
+                "2026-11-15",
+                "2026-11-16",
+                "DAILY",
+                originalTag.getId()
+        );
+
+        // when
+        mockMvc.perform(patch("/api/recurrence-events/{recurrenceId}", recurrenceId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Changed tag recurrence",
+                                  "tagId": %d
+                                }
+                                """.formatted(updatedTag.getId())))
+                // then
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tag.id").value(updatedTag.getId()));
+
+        assertThat(recurrenceEventRepository.findById(recurrenceId))
+                .hasValueSatisfying(rule -> assertThat(rule.getTag().getId()).isEqualTo(updatedTag.getId()));
+        assertThat(eventRepository.findByRecurrenceIdAndDeletedAtIsNullOrderByStartAtAsc(recurrenceId))
+                .allSatisfy(event -> assertThat(event.getTag().getId()).isEqualTo(updatedTag.getId()));
     }
 
     @Test
@@ -627,7 +739,8 @@ class RecurrenceEventControllerTest {
                 .andExpect(jsonPath("$.endAt").value("2026-12-01T10:30:00Z"))
                 .andExpect(jsonPath("$.importantEvent").value(true))
                 .andExpect(jsonPath("$.recurrenceId").value(recurrenceId))
-                .andExpect(jsonPath("$.isRecurrenceOccurrence").value(true));
+                .andExpect(jsonPath("$.isRecurrenceOccurrence").value(true))
+                .andExpect(jsonPath("$.tag.title").value("기타"));
 
         assertThat(recurrenceEventOverrideRepository.existsByEventId(firstOccurrenceId)).isTrue();
         assertThat(recurrenceEventOverrideRepository.existsByEventId(secondOccurrenceId)).isFalse();
@@ -637,6 +750,44 @@ class RecurrenceEventControllerTest {
             assertThat(event.importantEvent()).isFalse();
         });
         assertRuleUnchanged(originalRule, recurrenceEventRepository.findById(recurrenceId).orElseThrow());
+    }
+
+    @Test
+    @DisplayName("반복 occurrence 단독 수정은 occurrence Event의 기존 태그를 변경하지 않는다")
+    void givenTaggedOccurrence_whenPatchRecurrenceOccurrence_thenPreservesEventTag() throws Exception {
+        // given
+        Tag workTag = tagRepository.save(new Tag(TagType.DEFAULT, "occurrence 보존", "#2563EB"));
+        long recurrenceId = createRecurrenceEventWithTag(
+                "Tagged occurrence preserve",
+                "2026-12-11",
+                "2026-12-11",
+                "DAILY",
+                workTag.getId()
+        );
+        long eventId = listEvents("2026-12-11T00:00:00Z", "2026-12-12T00:00:00Z")
+                .get(0)
+                .get("id")
+                .asLong();
+
+        // when
+        mockMvc.perform(patch(
+                        "/api/recurrence-events/{recurrenceId}/occurrences/{eventId}",
+                        recurrenceId,
+                        eventId
+                )
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Tag preserved occurrence"
+                                }
+                                """))
+                // then
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tag.id").value(workTag.getId()))
+                .andExpect(jsonPath("$.tag.title").value("occurrence 보존"));
+
+        assertThat(eventRepository.findById(eventId))
+                .hasValueSatisfying(event -> assertThat(event.getTag().getId()).isEqualTo(workTag.getId()));
     }
 
     @Test
@@ -1216,6 +1367,31 @@ class RecurrenceEventControllerTest {
         return readResponse(result).get("recurrenceId").asLong();
     }
 
+    private long createRecurrenceEventWithTag(
+            String recurrenceTitle,
+            String recurrenceStartDate,
+            String recurrenceEndDate,
+            String recurrenceFrequency,
+            Long tagId
+    ) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/recurrence-events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(recurrenceRequest(
+                                recurrenceTitle,
+                                null,
+                                recurrenceStartDate,
+                                recurrenceEndDate,
+                                "09:00:00",
+                                "10:00:00",
+                                recurrenceFrequency,
+                                tagId
+                        )))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        return readResponse(result).get("recurrenceId").asLong();
+    }
+
     private void assertRuleUnchanged(RecurrenceEvent expected, RecurrenceEvent actual) {
         assertThat(actual.getId()).isEqualTo(expected.getId());
         assertThat(actual.getRecurrenceTitle()).isEqualTo(expected.getRecurrenceTitle());
@@ -1276,6 +1452,28 @@ class RecurrenceEventControllerTest {
             String recurrenceEndTime,
             String recurrenceFrequency
     ) {
+        return recurrenceRequest(
+                recurrenceTitle,
+                recurrenceDescription,
+                recurrenceStartDate,
+                recurrenceEndDate,
+                recurrenceStartTime,
+                recurrenceEndTime,
+                recurrenceFrequency,
+                null
+        );
+    }
+
+    private String recurrenceRequest(
+            String recurrenceTitle,
+            String recurrenceDescription,
+            String recurrenceStartDate,
+            String recurrenceEndDate,
+            String recurrenceStartTime,
+            String recurrenceEndTime,
+            String recurrenceFrequency,
+            Long tagId
+    ) {
         return """
                 {
                   "recurrenceTitle": "%s",
@@ -1284,7 +1482,8 @@ class RecurrenceEventControllerTest {
                   "recurrenceEndDate": "%s",
                   "recurrenceStartTime": "%s",
                   "recurrenceEndTime": "%s",
-                  "recurrenceFrequency": "%s"
+                  "recurrenceFrequency": "%s",
+                  "tagId": %s
                 }
                 """.formatted(
                 recurrenceTitle,
@@ -1293,7 +1492,8 @@ class RecurrenceEventControllerTest {
                 recurrenceEndDate,
                 recurrenceStartTime,
                 recurrenceEndTime,
-                recurrenceFrequency
+                recurrenceFrequency,
+                tagId == null ? "null" : tagId.toString()
         );
     }
 
