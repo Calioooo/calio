@@ -15,3 +15,8 @@ spring:
   sql:
     init:
       mode: never
+
+external:
+  holiday:
+    base-url: http://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/getRestDeInfo
+    service-key: ${HOLIDAY_API_SERVICE_KEY:}
