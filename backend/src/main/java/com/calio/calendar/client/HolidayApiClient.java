@@ -13,8 +13,6 @@ import tools.jackson.databind.ObjectMapper;
 @Component
 public class HolidayApiClient {
 
-    private static final String GET_REST_DE_INFO_URL =
-            "http://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/getRestDeInfo";
     private static final int MAX_RETRY_COUNT = 1;
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
     private static final Duration READ_TIMEOUT = Duration.ofSeconds(15);
@@ -30,7 +28,7 @@ public class HolidayApiClient {
         this.holidayApiProperties = holidayApiProperties;
         this.objectMapper = objectMapper;
         this.restClient = RestClient.builder()
-                .baseUrl(GET_REST_DE_INFO_URL)
+                .baseUrl(holidayApiProperties.getBaseUrl())
                 .requestFactory(createRequestFactory())
                 .build();
     }
