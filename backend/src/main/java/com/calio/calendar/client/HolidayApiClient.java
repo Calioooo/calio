@@ -6,6 +6,7 @@ import java.time.Duration;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.ResourceAccessException;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
@@ -39,20 +40,16 @@ public class HolidayApiClient {
             throw new IllegalStateException("Holiday API service key is missing");
         }
 
-        return fetchHolidaysWithRetry(year);
+        String responseBody = fetchResponseBodyWithRetry(year);
+        return HolidayApiResponse.fromJson(responseBody, objectMapper);
     }
 
-    private HolidayApiResponse fetchHolidaysWithRetry(int year) throws JacksonException {
+    private String fetchResponseBodyWithRetry(int year) {
         int attempt = 0;
         while (true) {
             try {
-                return fetchHolidaysOnce(year);
-            } catch (JacksonException exception) {
-                if (attempt >= MAX_RETRY_COUNT) {
-                    throw exception;
-                }
-                attempt++;
-            } catch (RuntimeException exception) {
+                return fetchResponseBody(year);
+            } catch (ResourceAccessException exception) {
                 if (attempt >= MAX_RETRY_COUNT) {
                     throw exception;
                 }
@@ -61,8 +58,8 @@ public class HolidayApiClient {
         }
     }
 
-    private HolidayApiResponse fetchHolidaysOnce(int year) throws JacksonException {
-        String responseBody = restClient.get()
+    private String fetchResponseBody(int year) {
+        return restClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .queryParam("solYear", year)
                         .queryParam("ServiceKey", holidayApiProperties.getServiceKey())
@@ -71,8 +68,6 @@ public class HolidayApiClient {
                         .build())
                 .retrieve()
                 .body(String.class);
-
-        return HolidayApiResponse.fromJson(responseBody, objectMapper);
     }
 
     private SimpleClientHttpRequestFactory createRequestFactory() {
