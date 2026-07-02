@@ -38,11 +38,6 @@ public class TagService {
                 .orElseThrow(() -> new CalioException(ErrorCode.TAG_NOT_FOUND));
     }
 
-    public Tag resolveExplicitDefaultTag(Long tagId) {
-        return tagRepository.findByIdAndTagType(tagId, TagType.DEFAULT)
-                .orElseThrow(() -> new CalioException(ErrorCode.TAG_NOT_FOUND));
-    }
-
     private Tag resolveFallbackTag() {
         return tagRepository.findFirstByTagTypeAndTitleOrderByIdAsc(TagType.DEFAULT, FALLBACK_TAG_TITLE)
                 .orElseThrow(() -> new CalioException(ErrorCode.DEFAULT_TAG_NOT_FOUND));

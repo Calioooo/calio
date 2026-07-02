@@ -80,7 +80,7 @@ public class RecurrenceEventService {
 
         Tag tag = request.tagId() == null
                 ? recurrenceEvent.getTag()
-                : tagService.resolveExplicitDefaultTag(request.tagId());
+                : tagService.resolveDefaultTag(request.tagId());
         recurrenceEvent.changeTag(tag);
         recurrenceEvent.update(
                 request.title() == null ? recurrenceEvent.getRecurrenceTitle() : request.title(),

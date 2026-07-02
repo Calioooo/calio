@@ -187,7 +187,7 @@ class RecurrenceEventServiceTest {
         );
         Event retained = event("Old", "2027-01-01T09:00:00Z", "2027-01-01T10:00:00Z", 1L, originalTag);
         when(recurrenceEventRepository.findById(1L)).thenReturn(Optional.of(recurrenceEvent));
-        when(tagService.resolveExplicitDefaultTag(7L)).thenReturn(updatedTag);
+        when(tagService.resolveDefaultTag(7L)).thenReturn(updatedTag);
         when(eventRepository.findByRecurrenceIdAndDeletedAtIsNullOrderByStartAtAsc(1L)).thenReturn(List.of(retained));
 
         UpdateRecurrenceEventRequest request = new UpdateRecurrenceEventRequest(
