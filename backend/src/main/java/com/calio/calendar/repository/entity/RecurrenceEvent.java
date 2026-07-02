@@ -45,7 +45,7 @@ public class RecurrenceEvent extends BaseEntity {
     private RecurrenceFrequency recurrenceFrequency;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "tag_id")
+    @JoinColumn(name = "tag_id", nullable = false)
     private Tag tag;
 
     protected RecurrenceEvent() {
