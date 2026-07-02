@@ -19,8 +19,6 @@ import java.util.regex.Pattern;
 @Table(name = "tags")
 public class Tag extends BaseEntity {
 
-    private static final Pattern COLOR_CODE_PATTERN = Pattern.compile("^#[0-9A-Fa-f]{6}$");
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -41,21 +39,13 @@ public class Tag extends BaseEntity {
     public Tag(TagType tagType, String title, String colorCode) {
         this.tagType = tagType;
         this.title = title;
-        this.colorCode = normalizeColorCode(colorCode);
+        this.colorCode = ColorCode.from(colorCode).value();
     }
 
     @PrePersist
     @PreUpdate
     private void normalizeBeforeSave() {
-        colorCode = normalizeColorCode(colorCode);
-    }
-
-    private String normalizeColorCode(String colorCode) {
-        if (colorCode == null || !COLOR_CODE_PATTERN.matcher(colorCode).matches()) {
-            throw new CalioException(ErrorCode.INVALID_TAG_COLOR_CODE);
-        }
-
-        return colorCode.toUpperCase(Locale.ROOT);
+        colorCode = ColorCode.from(colorCode).value();
     }
 
     public Long getId() {
@@ -72,5 +62,28 @@ public class Tag extends BaseEntity {
 
     public String getColorCode() {
         return colorCode;
+    }
+
+    private static final class ColorCode {
+
+        private static final Pattern COLOR_CODE_PATTERN = Pattern.compile("^#[0-9A-Fa-f]{6}$");
+
+        private final String value;
+
+        private ColorCode(String value) {
+            this.value = value;
+        }
+
+        private static ColorCode from(String colorCode) {
+            if (colorCode == null || !COLOR_CODE_PATTERN.matcher(colorCode).matches()) {
+                throw new CalioException(ErrorCode.INVALID_TAG_COLOR_CODE);
+            }
+
+            return new ColorCode(colorCode.toUpperCase(Locale.ROOT));
+        }
+
+        private String value() {
+            return value;
+        }
     }
 }
