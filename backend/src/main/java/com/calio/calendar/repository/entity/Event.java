@@ -42,7 +42,7 @@ public class Event extends BaseEntity {
     private Instant deletedAt;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "tag_id")
+    @JoinColumn(name = "tag_id", nullable = false)
     private Tag tag;
 
     protected Event() {
