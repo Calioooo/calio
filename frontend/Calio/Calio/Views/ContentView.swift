@@ -89,6 +89,7 @@ private struct CalendarMonthScheduleTestView: View {
     @ObservedObject var viewModel: CalendarHomeViewModel
     @State private var isShowingEventCreationView = false
     @State private var creationDateRange: CalendarDateRange?
+    @State private var creationDay: DayKey?
     
     var body: some View {
         CalendarMonthScheduleView(
@@ -100,14 +101,15 @@ private struct CalendarMonthScheduleTestView: View {
             showsTodayButton: !viewModel.isReferenceDayToday,
             onTodayTapped: viewModel.moveToToday,
             onCreateTapped: startCreatingEvent,
-            onCreateInRangeTapped: startCreatingEvent(in:)
+            onCreateInRangeTapped: startCreatingEvent(in:),
+            onCreateInDayTapped: startCreatingEvent(on:)
         )
         .task {
             viewModel.loadInitialIfNeeded()
         }
         .sheet(isPresented: $isShowingEventCreationView) {
             CalendarEventCreationView(
-                referenceDay: creationDateRange?.startDay ?? viewModel.referenceDay,
+                referenceDay: creationDateRange?.startDay ?? creationDay ?? viewModel.referenceDay,
                 initialDateRange: creationDateRange,
                 isSaving: viewModel.createState.isSaving,
                 failureMessage: viewModel.createState.failureMessage,
@@ -120,12 +122,21 @@ private struct CalendarMonthScheduleTestView: View {
 
     private func startCreatingEvent() {
         creationDateRange = nil
+        creationDay = nil
         viewModel.resetCreateState()
         isShowingEventCreationView = true
     }
 
     private func startCreatingEvent(in dateRange: CalendarDateRange) {
         creationDateRange = dateRange
+        creationDay = nil
+        viewModel.resetCreateState()
+        isShowingEventCreationView = true
+    }
+
+    private func startCreatingEvent(on day: DayKey) {
+        creationDateRange = nil
+        creationDay = day
         viewModel.resetCreateState()
         isShowingEventCreationView = true
     }

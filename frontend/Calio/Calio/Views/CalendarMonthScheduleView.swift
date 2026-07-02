@@ -29,9 +29,11 @@ struct CalendarMonthScheduleView: View {
     let onTodayTapped: () -> Void
     let onCreateTapped: () -> Void
     let onCreateInRangeTapped: (CalendarDateRange) -> Void
+    let onCreateInDayTapped: (DayKey) -> Void
 
     @State private var activeDateRange: CalendarDateRange?
     @State private var confirmedDateRange: CalendarDateRange?
+    @State private var detailPanelDay: DayKey?
     @State private var rangeDragStartTime: Date?
     @State private var rangeDragStartLocation: CGPoint?
     @State private var rangeDragCurrentLocation: CGPoint?
@@ -39,15 +41,21 @@ struct CalendarMonthScheduleView: View {
     @State private var rangeSelectionTask: Task<Void, Never>?
 
     var body: some View {
-        VStack(spacing: 0) {
-            topBar
-            weekdayHeader
-            monthGrid
-        }
-        .background(Color(uiColor: .systemBackground))
-        .gesture(monthSwipeGesture)
-        .onDisappear {
-            cancelRangeSelection()
+        GeometryReader { geometry in
+            ZStack {
+                VStack(spacing: 0) {
+                    topBar
+                    weekdayHeader
+                    monthGrid
+                }
+                .background(Color(uiColor: .systemBackground))
+                .gesture(monthSwipeGesture)
+                .onDisappear {
+                    cancelRangeSelection()
+                }
+
+                dayDetailPanel(in: geometry)
+            }
         }
         .accessibilityIdentifier("calendar_month_schedule")
     }
@@ -183,6 +191,7 @@ struct CalendarMonthScheduleView: View {
     private func selectDay(_ day: DayKey) {
         clearDateRangeSelection()
         onSelectedDay(day)
+        detailPanelDay = day
     }
 
     private func visibleEventRowCount(for cellHeight: CGFloat) -> Int {
@@ -353,6 +362,7 @@ struct CalendarMonthScheduleView: View {
             return
         }
 
+        detailPanelDay = nil
         isRangeDragActive = true
         activeDateRange = dateRange
         confirmedDateRange = nil
@@ -376,6 +386,40 @@ struct CalendarMonthScheduleView: View {
 
     private func cancelRangeSelection() {
         resetRangeDragState()
+    }
+
+    @ViewBuilder
+    private func dayDetailPanel(in geometry: GeometryProxy) -> some View {
+        if let detailPanelDay {
+            let itemsByDay = Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })
+
+            ZStack {
+                Color.black.opacity(0.32)
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        self.detailPanelDay = nil
+                    }
+
+                CalendarDayDetailFloatingPanelView(
+                    day: detailPanelDay,
+                    item: itemsByDay[detailPanelDay],
+                    onCreateTapped: {
+                        self.detailPanelDay = nil
+                        onCreateInDayTapped(detailPanelDay)
+                    },
+                    onCloseTapped: {
+                        self.detailPanelDay = nil
+                    }
+                )
+                .frame(
+                    width: geometry.size.width * 0.9,
+                    height: geometry.size.height * 0.8
+                )
+                .transition(.scale(scale: 0.96).combined(with: .opacity))
+            }
+            .animation(.spring(response: 0.26, dampingFraction: 0.84), value: detailPanelDay)
+            .zIndex(2)
+        }
     }
 
     private func dateRange(
@@ -693,6 +737,159 @@ private struct CalendarMonthRangeActionPopover: View {
     }
 }
 
+private struct CalendarDayDetailFloatingPanelView: View {
+    let day: DayKey
+    let item: CalendarDateCellItem?
+    let onCreateTapped: () -> Void
+    let onCloseTapped: () -> Void
+
+    private var events: [Event] {
+        item?.events ?? []
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            panelHeader
+
+            Divider()
+
+            if events.isEmpty {
+                emptyState
+            } else {
+                eventList
+            }
+        }
+        .background(Color(uiColor: .systemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 22))
+        .shadow(color: .black.opacity(0.22), radius: 24, x: 0, y: 14)
+    }
+
+    private var panelHeader: some View {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 5) {
+                Text(dayTitle)
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundStyle(.primary)
+
+                Text(eventCountText)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            Button(action: onCreateTapped) {
+                Image(systemName: "plus")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(Color.accentColor)
+                    .frame(width: 34, height: 34)
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("일정 추가")
+
+            Button(action: onCloseTapped) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 34, height: 34)
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("닫기")
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 20)
+        .padding(.bottom, 16)
+    }
+
+    private var eventList: some View {
+        ScrollView {
+            LazyVStack(spacing: 0) {
+                ForEach(events) { event in
+                    CalendarDayDetailEventRow(event: event)
+
+                    if event.id != events.last?.id {
+                        Divider()
+                            .padding(.leading, 44)
+                    }
+                }
+            }
+            .padding(.vertical, 4)
+        }
+    }
+
+    private var emptyState: some View {
+        VStack(spacing: 10) {
+            Spacer()
+
+            Text("일정이 없습니다")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(.secondary)
+
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var dayTitle: String {
+        guard let weekday = item?.weekday else {
+            return "\(day.month)월 \(day.day)일"
+        }
+
+        return "\(day.month)월 \(day.day)일 \(weekday.fullKoreanText)"
+    }
+
+    private var eventCountText: String {
+        "\(events.count)개의 일정"
+    }
+}
+
+private struct CalendarDayDetailEventRow: View {
+    let event: Event
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            RoundedRectangle(cornerRadius: 3)
+                .fill(Color(hex: event.colorCode))
+                .frame(width: 5, height: 42)
+
+            VStack(alignment: .leading, spacing: 5) {
+                Text(eventTimeText)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.secondary)
+
+                Text(event.title)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
+
+                if hasDescription {
+                    Text(event.description)
+                        .font(.system(size: 13, weight: .regular))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
+    }
+
+    private var hasDescription: Bool {
+        !event.description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var eventTimeText: String {
+        CalendarEventDisplayText.timeRange(
+            startAt: event.startAt,
+            endAt: event.endAt
+        )
+    }
+}
+
 private struct Triangle: Shape {
     func path(in rect: CGRect) -> Path {
         var path = Path()
@@ -714,6 +911,7 @@ private struct Triangle: Shape {
         showsTodayButton: true,
         onTodayTapped: {},
         onCreateTapped: {},
-        onCreateInRangeTapped: { _ in }
+        onCreateInRangeTapped: { _ in },
+        onCreateInDayTapped: { _ in }
     )
 }
