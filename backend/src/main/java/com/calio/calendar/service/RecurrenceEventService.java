@@ -53,7 +53,7 @@ public class RecurrenceEventService {
         validateRecurrenceDateRange(request.recurrenceStartDate(), request.recurrenceEndDate());
         validateRecurrenceTimeRange(request.recurrenceStartTime(), request.recurrenceEndTime());
 
-        Tag tag = tagService.resolveDefaultTag(request.tagId());
+        Tag tag = tagService.getTagOrDefault(request.tagId());
         RecurrenceEvent recurrenceEvent = recurrenceEventRepository.save(request.toEntity(tag));
         eventRepository.saveAll(toOccurrenceEvents(recurrenceEvent));
 
@@ -80,7 +80,7 @@ public class RecurrenceEventService {
 
         Tag tag = request.tagId() == null
                 ? recurrenceEvent.getTag()
-                : tagService.resolveDefaultTag(request.tagId());
+                : tagService.getTag(request.tagId());
         recurrenceEvent.changeTag(tag);
         recurrenceEvent.update(
                 request.title() == null ? recurrenceEvent.getRecurrenceTitle() : request.title(),

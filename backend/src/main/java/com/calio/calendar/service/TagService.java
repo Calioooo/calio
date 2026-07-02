@@ -29,11 +29,15 @@ public class TagService {
                 .toList();
     }
 
-    public Tag resolveDefaultTag(Long tagId) {
+    public Tag getTagOrDefault(Long tagId) {
         if (tagId == null) {
             return resolveFallbackTag();
         }
 
+        return getTag(tagId);
+    }
+
+    public Tag getTag(Long tagId) {
         return tagRepository.findByIdAndTagType(tagId, TagType.DEFAULT)
                 .orElseThrow(() -> new CalioException(ErrorCode.TAG_NOT_FOUND));
     }

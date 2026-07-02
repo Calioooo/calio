@@ -34,7 +34,7 @@ class TagServiceTest {
         when(tagRepository.findByIdAndTagType(1L, TagType.DEFAULT)).thenReturn(Optional.of(tag));
 
         // when
-        Tag resolvedTag = tagService.resolveDefaultTag(1L);
+        Tag resolvedTag = tagService.getTagOrDefault(1L);
 
         // then
         assertThat(resolvedTag).isSameAs(tag);
@@ -48,7 +48,7 @@ class TagServiceTest {
         when(tagRepository.findByIdAndTagType(1L, TagType.DEFAULT)).thenReturn(Optional.empty());
 
         // when, then
-        assertThatThrownBy(() -> tagService.resolveDefaultTag(1L))
+        assertThatThrownBy(() -> tagService.getTagOrDefault(1L))
                 .isInstanceOfSatisfying(CalioException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.TAG_NOT_FOUND)
                 );
@@ -63,7 +63,7 @@ class TagServiceTest {
                 .thenReturn(Optional.of(fallbackTag));
 
         // when
-        Tag resolvedTag = tagService.resolveDefaultTag(null);
+        Tag resolvedTag = tagService.getTagOrDefault(null);
 
         // then
         assertThat(resolvedTag).isSameAs(fallbackTag);
@@ -77,7 +77,7 @@ class TagServiceTest {
                 .thenReturn(Optional.empty());
 
         // when, then
-        assertThatThrownBy(() -> tagService.resolveDefaultTag(null))
+        assertThatThrownBy(() -> tagService.getTagOrDefault(null))
                 .isInstanceOfSatisfying(CalioException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.DEFAULT_TAG_NOT_FOUND)
                 );

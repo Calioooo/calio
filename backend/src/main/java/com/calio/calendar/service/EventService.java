@@ -28,7 +28,7 @@ public class EventService {
     @Transactional
     public EventResponse createEvent(CreateEventRequest request) {
         validateEventTimeRange(request.startAt(), request.endAt());
-        Tag tag = tagService.resolveDefaultTag(request.tagId());
+        Tag tag = tagService.getTagOrDefault(request.tagId());
         Event event = eventRepository.save(request.toEntity(tag));
         return EventResponse.from(event);
     }
@@ -43,7 +43,7 @@ public class EventService {
     public EventResponse updateEvent(Long eventId, UpdateEventRequest request) {
         validateEventTimeRange(request.startAt(), request.endAt());
         Event event = findEvent(eventId);
-        Tag tag = tagService.resolveDefaultTag(request.tagId());
+        Tag tag = tagService.getTagOrDefault(request.tagId());
         event.replace(request.title(), request.description(), request.startAt(), request.endAt(), tag);
         eventRepository.flush();
         return EventResponse.from(event);

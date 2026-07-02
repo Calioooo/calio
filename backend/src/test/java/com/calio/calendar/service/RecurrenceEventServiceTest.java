@@ -62,7 +62,7 @@ class RecurrenceEventServiceTest {
     void givenResolvedTag_whenCreateRecurrenceEvent_thenStoresTagOnRuleAndOccurrences() {
         // given
         Tag tag = tag("업무", "#2563EB");
-        when(tagService.resolveDefaultTag(5L)).thenReturn(tag);
+        when(tagService.getTagOrDefault(5L)).thenReturn(tag);
         when(recurrenceEventRepository.save(any(RecurrenceEvent.class)))
                 .thenAnswer(invocation -> {
                     RecurrenceEvent recurrenceEvent = invocation.getArgument(0);
@@ -187,7 +187,7 @@ class RecurrenceEventServiceTest {
         );
         Event retained = event("Old", "2027-01-01T09:00:00Z", "2027-01-01T10:00:00Z", 1L, originalTag);
         when(recurrenceEventRepository.findById(1L)).thenReturn(Optional.of(recurrenceEvent));
-        when(tagService.resolveDefaultTag(7L)).thenReturn(updatedTag);
+        when(tagService.getTag(7L)).thenReturn(updatedTag);
         when(eventRepository.findByRecurrenceIdAndDeletedAtIsNullOrderByStartAtAsc(1L)).thenReturn(List.of(retained));
 
         UpdateRecurrenceEventRequest request = new UpdateRecurrenceEventRequest(
