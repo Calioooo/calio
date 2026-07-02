@@ -69,6 +69,7 @@ private struct CalendarWeekTimelineTestView: View {
 private struct CalendarMonthScheduleTestView: View {
     @ObservedObject var viewModel: CalendarHomeViewModel
     @State private var isShowingEventCreationView = false
+    @State private var creationDateRange: CalendarDateRange?
     
     var body: some View {
         CalendarMonthScheduleView(
@@ -77,14 +78,16 @@ private struct CalendarMonthScheduleTestView: View {
             onSelectedDay: viewModel.setReferenceDay(_:),
             onMonthChanged: viewModel.moveMonthToFirstDay(by:),
             onSelectedYearMonth: viewModel.selectMonthFirstDay(year:month:),
-            onCreateTapped: startCreatingEvent
+            onCreateTapped: startCreatingEvent,
+            onCreateInRangeTapped: startCreatingEvent(in:)
         )
         .task {
             viewModel.loadInitialIfNeeded()
         }
         .sheet(isPresented: $isShowingEventCreationView) {
             CalendarEventCreationView(
-                referenceDay: viewModel.referenceDay,
+                referenceDay: creationDateRange?.startDay ?? viewModel.referenceDay,
+                initialDateRange: creationDateRange,
                 isSaving: viewModel.createState.isSaving,
                 failureMessage: viewModel.createState.failureMessage,
                 onSave: { input in
@@ -95,6 +98,13 @@ private struct CalendarMonthScheduleTestView: View {
     }
 
     private func startCreatingEvent() {
+        creationDateRange = nil
+        viewModel.resetCreateState()
+        isShowingEventCreationView = true
+    }
+
+    private func startCreatingEvent(in dateRange: CalendarDateRange) {
+        creationDateRange = dateRange
         viewModel.resetCreateState()
         isShowingEventCreationView = true
     }

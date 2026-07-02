@@ -18,6 +18,7 @@ struct CalendarEventCreationView: View {
     
     init(
         referenceDay: DayKey,
+        initialDateRange: CalendarDateRange? = nil,
         calendar: Calendar = .current,
         isSaving: Bool = false,
         failureMessage: String? = nil,
@@ -27,8 +28,13 @@ struct CalendarEventCreationView: View {
             referenceDay: referenceDay,
             calendar: calendar
         )
-        let startAt = timeRange.startAt
-        let endAt = timeRange.endAt
+        let initialTimeRange = CalendarEventCreationView.timeRange(
+            from: initialDateRange,
+            defaultTimeRange: timeRange,
+            calendar: calendar
+        )
+        let startAt = initialTimeRange.startAt
+        let endAt = initialTimeRange.endAt
         
         _eventInput = State(
             initialValue: EventInput(
@@ -168,6 +174,45 @@ struct CalendarEventCreationView: View {
         ) ?? startAt
 
         return (startAt, endAt)
+    }
+
+    nonisolated private static func timeRange(
+        from dateRange: CalendarDateRange?,
+        defaultTimeRange: (startAt: Date, endAt: Date),
+        calendar: Calendar
+    ) -> (startAt: Date, endAt: Date) {
+        guard let dateRange else {
+            return defaultTimeRange
+        }
+
+        return (
+            startAt: date(
+                for: dateRange.startDay,
+                usingTimeFrom: defaultTimeRange.startAt,
+                calendar: calendar
+            ),
+            endAt: date(
+                for: dateRange.endDay,
+                usingTimeFrom: defaultTimeRange.endAt,
+                calendar: calendar
+            )
+        )
+    }
+
+    nonisolated private static func date(
+        for day: DayKey,
+        usingTimeFrom timeSource: Date,
+        calendar: Calendar
+    ) -> Date {
+        let date = day.toDate(calendar: calendar)
+        let timeComponents = calendar.dateComponents([.hour, .minute, .second], from: timeSource)
+
+        return calendar.date(
+            bySettingHour: timeComponents.hour ?? 0,
+            minute: timeComponents.minute ?? 0,
+            second: timeComponents.second ?? 0,
+            of: date
+        ) ?? date
     }
 
     private func resetRecurrenceFieldsFromSingleEventTime() {
