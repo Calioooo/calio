@@ -60,6 +60,7 @@ struct CalendarDateStripView: View {
             .scrollTargetLayout()
         }
         .scrollIndicators(.hidden)
+        .scrollTargetBehavior(.viewAligned)
         .scrollPosition(id: $focusCoordinator.scrollPosition, anchor: .leading)
         .onChange(of: focusCoordinator.scrollPosition) { _, newDay in
             focusCoordinator.notifyScrollReferenceDayIfNeeded(
