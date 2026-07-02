@@ -62,6 +62,10 @@ final class CalendarHomeViewModel: ObservableObject {
         state.daysByKey.count
     }
 
+    var isReferenceDayToday: Bool {
+        dateService.isToday(referenceDay.toDate(calendar: calendar))
+    }
+
     var referenceEventAreaState: CalendarEventAreaState {
         let key = YearMonthKey(day: referenceDay)
         let entry = monthEventCache[key] ?? .idle
@@ -166,6 +170,13 @@ final class CalendarHomeViewModel: ObservableObject {
         let targetDay = DayKey(year: year, month: month, day: 1)
         referenceDay = targetDay
         ensureGeneratedDateCells(contain: targetDay)
+        prefetchReferenceMonthAndAdjacent(retryFailed: true)
+    }
+
+    func moveToToday() {
+        let today = DayKey(date: Date(), calendar: calendar)
+        referenceDay = today
+        ensureGeneratedDateCells(contain: today)
         prefetchReferenceMonthAndAdjacent(retryFailed: true)
     }
 

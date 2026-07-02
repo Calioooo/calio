@@ -39,6 +39,7 @@ struct ContentView: View {
 
 private struct CalendarWeekTimelineTestView: View {
     @ObservedObject var viewModel: CalendarHomeViewModel
+    @State private var isShowingEventCreationView = false
     
     var body: some View {
         CalendarWeekTimelineView(
@@ -48,6 +49,9 @@ private struct CalendarWeekTimelineTestView: View {
             onSelectedDay: viewModel.setReferenceDay(_:),
             onVisibleRangeChanged: viewModel.loadAdditionalEventsIfNeeded(visibleRange:),
             onSelectedYearMonth: viewModel.selectYearMonth(year:month:),
+            showsTodayButton: !viewModel.isReferenceDayToday,
+            onTodayTapped: viewModel.moveToToday,
+            onCreateTapped: startCreatingEvent,
             onRetryEvents: viewModel.retryReferenceMonthEvents,
             isEventMutating: viewModel.mutationState.isMutating,
             eventMutationFailureMessage: viewModel.mutationState.failureMessage,
@@ -63,6 +67,21 @@ private struct CalendarWeekTimelineTestView: View {
         .task {
             viewModel.loadInitialIfNeeded()
         }
+        .sheet(isPresented: $isShowingEventCreationView) {
+            CalendarEventCreationView(
+                referenceDay: viewModel.referenceDay,
+                isSaving: viewModel.createState.isSaving,
+                failureMessage: viewModel.createState.failureMessage,
+                onSave: { input in
+                    await viewModel.createEvent(input)
+                }
+            )
+        }
+    }
+
+    private func startCreatingEvent() {
+        viewModel.resetCreateState()
+        isShowingEventCreationView = true
     }
 }
 
@@ -78,6 +97,8 @@ private struct CalendarMonthScheduleTestView: View {
             onSelectedDay: viewModel.setReferenceDay(_:),
             onMonthChanged: viewModel.moveMonthToFirstDay(by:),
             onSelectedYearMonth: viewModel.selectMonthFirstDay(year:month:),
+            showsTodayButton: !viewModel.isReferenceDayToday,
+            onTodayTapped: viewModel.moveToToday,
             onCreateTapped: startCreatingEvent,
             onCreateInRangeTapped: startCreatingEvent(in:)
         )

@@ -20,6 +20,9 @@ struct CalendarWeekTimelineView: View {
     let onSelectedDay: (DayKey) -> Void
     let onVisibleRangeChanged: (CalendarVisibleIndexRange) -> Void
     let onSelectedYearMonth: (Int, Int) -> Void
+    let showsTodayButton: Bool
+    let onTodayTapped: () -> Void
+    let onCreateTapped: () -> Void
     let onRetryEvents: () -> Void
     let isEventMutating: Bool
     let eventMutationFailureMessage: String?
@@ -39,6 +42,9 @@ struct CalendarWeekTimelineView: View {
         onSelectedDay: @escaping (DayKey) -> Void,
         onVisibleRangeChanged: @escaping (CalendarVisibleIndexRange) -> Void,
         onSelectedYearMonth: @escaping (Int, Int) -> Void,
+        showsTodayButton: Bool = false,
+        onTodayTapped: @escaping () -> Void = {},
+        onCreateTapped: @escaping () -> Void = {},
         onRetryEvents: @escaping () -> Void,
         isEventMutating: Bool = false,
         eventMutationFailureMessage: String? = nil,
@@ -57,6 +63,9 @@ struct CalendarWeekTimelineView: View {
         self.onSelectedDay = onSelectedDay
         self.onVisibleRangeChanged = onVisibleRangeChanged
         self.onSelectedYearMonth = onSelectedYearMonth
+        self.showsTodayButton = showsTodayButton
+        self.onTodayTapped = onTodayTapped
+        self.onCreateTapped = onCreateTapped
         self.onRetryEvents = onRetryEvents
         self.isEventMutating = isEventMutating
         self.eventMutationFailureMessage = eventMutationFailureMessage
@@ -80,16 +89,18 @@ struct CalendarWeekTimelineView: View {
             let metrics = timelineMetrics(for: geometry.size)
             
             VStack(spacing: 0) {
-                CalendarYearMonthTitleView(
+                CalendarTopBarView(
                     referenceDay: referenceDay,
-                    onSelectedYearMonth: onSelectedYearMonth
+                    showsTodayButton: showsTodayButton,
+                    onSelectedYearMonth: onSelectedYearMonth,
+                    onTodayTapped: onTodayTapped,
+                    onCreateTapped: onCreateTapped
                 )
                     .frame(
                         width: metrics.totalWidth,
-                        height: metrics.monthTitleHeight,
+                        height: metrics.topBarHeight,
                         alignment: .leading
                     )
-                    .padding(.leading, metrics.monthTitleLeadingPadding)
 
                 CalendarEventStatusBannerView(
                     state: eventAreaState,
@@ -599,11 +610,11 @@ struct CalendarWeekTimelineView: View {
             (size.width - timeColumnWidth) / CGFloat(visibleDayCount),
             1
         )
-        let monthTitleHeight = min(max(size.height * 0.07, 44), 58)
+        let topBarHeight = min(max(size.height * 0.07, 44), 58)
         let headerHeight = min(max(size.height * 0.11, 78), 110)
         let fullDayEventRowHeight = min(max(size.height * 0.07, 46), 58)
         let availableTimelineHeight = max(
-            size.height - monthTitleHeight - headerHeight - fullDayEventRowHeight,
+            size.height - topBarHeight - headerHeight - fullDayEventRowHeight,
             1
         )
         let hourHeight = max(56, availableTimelineHeight / 12)
@@ -611,7 +622,7 @@ struct CalendarWeekTimelineView: View {
         return TimelineMetrics(
             timeColumnWidth: timeColumnWidth,
             dayColumnWidth: dayColumnWidth,
-            monthTitleHeight: monthTitleHeight,
+            topBarHeight: topBarHeight,
             headerHeight: headerHeight,
             fullDayEventRowHeight: fullDayEventRowHeight,
             hourHeight: hourHeight,
@@ -624,7 +635,7 @@ struct CalendarWeekTimelineView: View {
 private struct TimelineMetrics {
     let timeColumnWidth: CGFloat
     let dayColumnWidth: CGFloat
-    let monthTitleHeight: CGFloat
+    let topBarHeight: CGFloat
     let headerHeight: CGFloat
     let fullDayEventRowHeight: CGFloat
     let hourHeight: CGFloat
@@ -661,10 +672,6 @@ private struct TimelineMetrics {
     
     var headerGridLineStartY: CGFloat {
         max(12, headerHeight * 0.18)
-    }
-    
-    var monthTitleLeadingPadding: CGFloat {
-        20
     }
     
     var fullDayEventFontSize: CGFloat {

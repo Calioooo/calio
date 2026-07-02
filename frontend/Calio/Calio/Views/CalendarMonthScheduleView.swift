@@ -12,7 +12,6 @@ struct CalendarMonthScheduleView: View {
     private let calendar = Calendar.current
     private let columnCount = 7
     private let rowCount = 6
-    private let topBarHeight: CGFloat = 58
     private let weekdayHeaderHeight: CGFloat = 28
     private let monthSwipeMinimumDistance: CGFloat = 10
     private let monthSwipeThreshold: CGFloat = 22
@@ -26,6 +25,8 @@ struct CalendarMonthScheduleView: View {
     let onSelectedDay: (DayKey) -> Void
     let onMonthChanged: (Int) -> Void
     let onSelectedYearMonth: (Int, Int) -> Void
+    let showsTodayButton: Bool
+    let onTodayTapped: () -> Void
     let onCreateTapped: () -> Void
     let onCreateInRangeTapped: (CalendarDateRange) -> Void
 
@@ -52,25 +53,13 @@ struct CalendarMonthScheduleView: View {
     }
 
     private var topBar: some View {
-        HStack(spacing: 12) {
-            CalendarYearMonthTitleView(
-                referenceDay: referenceDay,
-                onSelectedYearMonth: onSelectedYearMonth
-            )
-            .frame(maxWidth: .infinity, alignment: .leading)
-
-            Button(action: onCreateTapped) {
-                Image(systemName: "plus")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(.primary)
-                    .frame(width: 36, height: 36)
-                    .contentShape(Circle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("일정 추가")
-        }
-        .padding(.horizontal, 20)
-        .frame(height: topBarHeight)
+        CalendarTopBarView(
+            referenceDay: referenceDay,
+            showsTodayButton: showsTodayButton,
+            onSelectedYearMonth: onSelectedYearMonth,
+            onTodayTapped: onTodayTapped,
+            onCreateTapped: onCreateTapped
+        )
     }
 
     private var weekdayHeader: some View {
@@ -722,6 +711,8 @@ private struct Triangle: Shape {
         onSelectedDay: { _ in },
         onMonthChanged: { _ in },
         onSelectedYearMonth: { _, _ in },
+        showsTodayButton: true,
+        onTodayTapped: {},
         onCreateTapped: {},
         onCreateInRangeTapped: { _ in }
     )
