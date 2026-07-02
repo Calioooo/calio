@@ -133,8 +133,37 @@ final class CalendarHomeViewModel: ObservableObject {
         selectYearMonth(year: year, month: month)
     }
 
+    func moveMonthToFirstDay(by value: Int) {
+        let currentDate = referenceDay.toDate(calendar: calendar)
+
+        guard let movedMonthDate = calendar.date(
+            byAdding: .month,
+            value: value,
+            to: currentDate
+        ) else {
+            return
+        }
+
+        let components = calendar.dateComponents([.year, .month], from: movedMonthDate)
+
+        guard let year = components.year,
+              let month = components.month
+        else {
+            return
+        }
+
+        selectMonthFirstDay(year: year, month: month)
+    }
+
     func selectYearMonth(year: Int, month: Int) {
         let targetDay = makeTargetDayPreservingReferenceDay(year: year, month: month)
+        referenceDay = targetDay
+        ensureGeneratedDateCells(contain: targetDay)
+        prefetchReferenceMonthAndAdjacent(retryFailed: true)
+    }
+
+    func selectMonthFirstDay(year: Int, month: Int) {
+        let targetDay = DayKey(year: year, month: month, day: 1)
         referenceDay = targetDay
         ensureGeneratedDateCells(contain: targetDay)
         prefetchReferenceMonthAndAdjacent(retryFailed: true)

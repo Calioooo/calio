@@ -27,10 +27,10 @@ struct ContentView: View {
                 }
                 .tag(1)
             
-            CalendarDayTimelineTestView(viewModel: viewModel)
+            CalendarMonthScheduleTestView(viewModel: viewModel)
                 .tabItem {
-                    Image(systemName: "calendar.day.timeline.leading")
-                    Text("Day")
+                    Image(systemName: "calendar")
+                    Text("Month")
                 }
                 .tag(2)
         }
@@ -66,19 +66,37 @@ private struct CalendarWeekTimelineTestView: View {
     }
 }
 
-private struct CalendarDayTimelineTestView: View {
+private struct CalendarMonthScheduleTestView: View {
     @ObservedObject var viewModel: CalendarHomeViewModel
+    @State private var isShowingEventCreationView = false
     
     var body: some View {
-        CalendarDayTimelineView(
+        CalendarMonthScheduleView(
             items: viewModel.loadedDateCellItems,
             referenceDay: viewModel.referenceDay,
-            eventAreaState: viewModel.referenceEventAreaState,
-            onRetryEvents: viewModel.retryReferenceMonthEvents
+            onSelectedDay: viewModel.setReferenceDay(_:),
+            onMonthChanged: viewModel.moveMonthToFirstDay(by:),
+            onSelectedYearMonth: viewModel.selectMonthFirstDay(year:month:),
+            onCreateTapped: startCreatingEvent
         )
         .task {
             viewModel.loadInitialIfNeeded()
         }
+        .sheet(isPresented: $isShowingEventCreationView) {
+            CalendarEventCreationView(
+                referenceDay: viewModel.referenceDay,
+                isSaving: viewModel.createState.isSaving,
+                failureMessage: viewModel.createState.failureMessage,
+                onSave: { input in
+                    await viewModel.createEvent(input)
+                }
+            )
+        }
+    }
+
+    private func startCreatingEvent() {
+        viewModel.resetCreateState()
+        isShowingEventCreationView = true
     }
 }
 
