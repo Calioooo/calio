@@ -104,7 +104,7 @@ public class CalendarItemService {
                     CalendarItemType.EVENT,
                     null,
                     event.getId(),
-                    CalendarItemResponse.event(event)
+                    CalendarItemResponse.from(event)
             );
         }
 

@@ -9,7 +9,7 @@ public record CalendarItemResponse(
         NationalHolidayResponse nationalHoliday
 ) {
 
-    public static CalendarItemResponse event(Event event) {
+    public static CalendarItemResponse from(Event event) {
         return new CalendarItemResponse(
                 CalendarItemType.EVENT,
                 EventResponse.from(event),
