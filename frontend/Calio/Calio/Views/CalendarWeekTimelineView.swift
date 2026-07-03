@@ -82,6 +82,7 @@ struct CalendarWeekTimelineView: View {
     @State private var headerScrollPosition: DayKey?
     @State private var lastVisibleRange: CalendarVisibleIndexRange?
     @State private var selectedEvent: Event?
+    @State private var selectedOverlapGroup: TimelineOverlapSelection?
     @State private var detailEvent: Event?
     
     var body: some View {
@@ -385,10 +386,10 @@ struct CalendarWeekTimelineView: View {
     
     private func eventBlocks(metrics: TimelineMetrics) -> some View {
         ForEach(eventLayouts(metrics: metrics)) { layout in
-            Text(layout.event.title)
+            Text(layout.title)
                 .font(.system(size: metrics.eventFontSize, weight: .semibold))
                 .lineLimit(1)
-                .foregroundStyle(.white)
+                .foregroundStyle(layout.foregroundColor)
                 .padding(.horizontal, metrics.eventHorizontalPadding)
                 .padding(.vertical, metrics.eventVerticalPadding)
                 .frame(
@@ -398,22 +399,33 @@ struct CalendarWeekTimelineView: View {
                 )
                 .background(
                     RoundedRectangle(cornerRadius: 6)
-                        .fill(Color(hex: layout.event.colorCode))
+                        .fill(layout.backgroundColor)
                 )
                 .contentShape(Rectangle())
                 .onTapGesture {
-                    selectedEvent = layout.event
+                    selectTimelineLayout(layout)
                 }
                 .popover(
-                    isPresented: isShowingEventPopover(for: layout.event),
+                    isPresented: isShowingTimelinePopover(for: layout),
                     attachmentAnchor: .rect(.bounds),
                     arrowEdge: .top
                 ) {
-                    CalendarEventSummaryPopoverView(
-                        event: layout.event,
-                        onShowDetail: showEventDetail
-                    )
-                        .presentationCompactAdaptation(.popover)
+                    switch layout.tapAction {
+                    case .showEvent(let event):
+                        CalendarEventSummaryPopoverView(
+                            event: event,
+                            onShowDetail: showEventDetail
+                        )
+                            .presentationCompactAdaptation(.popover)
+                    case .showOverlapGroup:
+                        if let selection = selectedOverlapGroup {
+                            CalendarTimelineOverlapPopoverView(
+                                events: selection.events,
+                                onShowDetail: showOverlapEventDetail
+                            )
+                                .presentationCompactAdaptation(.popover)
+                        }
+                    }
                 }
                 .offset(x: layout.x, y: layout.y)
         }
@@ -434,16 +446,39 @@ struct CalendarWeekTimelineView: View {
     
     private func eventLayouts(metrics: TimelineMetrics) -> [TimelineEventLayout] {
         visibleItems.enumerated().flatMap { dayIndex, item in
-            let events = timedEvents(in: item)
+            let groups = overlapGroups(in: timedEvents(in: item))
             
-            return events.compactMap { event in
-                makeEventLayout(
-                    event: event,
+            return groups.flatMap { group in
+                makeEventLayouts(
+                    group: group,
                     dayIndex: dayIndex,
                     metrics: metrics
                 )
             }
         }
+    }
+    
+    private func isShowingTimelinePopover(for layout: TimelineEventLayout) -> Binding<Bool> {
+        Binding(
+            get: {
+                switch layout.tapAction {
+                case .showEvent(let event):
+                    return selectedEvent?.id == event.id
+                case .showOverlapGroup:
+                    return selectedOverlapGroup?.id == layout.id
+                }
+            },
+            set: { isPresented in
+                if !isPresented {
+                    switch layout.tapAction {
+                    case .showEvent:
+                        selectedEvent = nil
+                    case .showOverlapGroup:
+                        selectedOverlapGroup = nil
+                    }
+                }
+            }
+        )
     }
     
     private func isShowingEventPopover(for event: Event) -> Binding<Bool> {
@@ -458,11 +493,30 @@ struct CalendarWeekTimelineView: View {
             }
         )
     }
+    
+    private func selectTimelineLayout(_ layout: TimelineEventLayout) {
+        switch layout.tapAction {
+        case .showEvent(let event):
+            selectedOverlapGroup = nil
+            selectedEvent = event
+        case .showOverlapGroup(let events):
+            selectedEvent = nil
+            selectedOverlapGroup = TimelineOverlapSelection(
+                id: layout.id,
+                events: events
+            )
+        }
+    }
 
     private func showEventDetail(_ event: Event) {
         selectedEvent = nil
         onResetEventMutation()
         detailEvent = event
+    }
+    
+    private func showOverlapEventDetail(_ event: Event) {
+        selectedOverlapGroup = nil
+        showEventDetail(event)
     }
     
     private func updateReferenceDayFromHeaderScrollPosition(_ day: DayKey?) {
@@ -505,13 +559,195 @@ struct CalendarWeekTimelineView: View {
         onVisibleRangeChanged(visibleRange)
     }
     
-    private func makeEventLayout(
+    private func overlapGroups(in events: [Event]) -> [TimelineOverlapGroup] {
+        let sortedEvents = events.sorted(by: shouldPlaceEarlier)
+        guard let firstEvent = sortedEvents.first else { return [] }
+        
+        var groups: [TimelineOverlapGroup] = []
+        var currentEvents: [Event] = [firstEvent]
+        var currentEndAt = firstEvent.endAt
+        
+        for event in sortedEvents.dropFirst() {
+            if event.startAt < currentEndAt {
+                currentEvents.append(event)
+                currentEndAt = max(currentEndAt, event.endAt)
+            } else {
+                groups.append(TimelineOverlapGroup(events: currentEvents))
+                currentEvents = [event]
+                currentEndAt = event.endAt
+            }
+        }
+        
+        groups.append(TimelineOverlapGroup(events: currentEvents))
+        return groups
+    }
+    
+    private func shouldPlaceEarlier(_ earlierCandidate: Event, _ laterCandidate: Event) -> Bool {
+        if earlierCandidate.startAt != laterCandidate.startAt {
+            return earlierCandidate.startAt < laterCandidate.startAt
+        }
+        
+        let earlierDuration = earlierCandidate.endAt.timeIntervalSince(earlierCandidate.startAt)
+        let laterDuration = laterCandidate.endAt.timeIntervalSince(laterCandidate.startAt)
+        if earlierDuration != laterDuration {
+            return earlierDuration > laterDuration
+        }
+        
+        return earlierCandidate.id < laterCandidate.id
+    }
+    
+    private func makeEventLayouts(
+        group: TimelineOverlapGroup,
+        dayIndex: Int,
+        metrics: TimelineMetrics
+    ) -> [TimelineEventLayout] {
+        switch group.events.count {
+        case 0:
+            return []
+        case 1:
+            guard let event = group.events.first,
+                  let frame = makeEventFrame(
+                    event: event,
+                    dayIndex: dayIndex,
+                    metrics: metrics
+                  )
+            else {
+                return []
+            }
+            
+            return [
+                TimelineEventLayout(
+                    id: "event-\(event.id)",
+                    event: event,
+                    title: event.title,
+                    x: frame.x,
+                    y: frame.y,
+                    width: frame.width,
+                    height: frame.height,
+                    style: .event,
+                    tapAction: .showEvent(event)
+                )
+            ]
+        case 2:
+            let gap = metrics.overlapEventGap
+            let blockWidth = max((metrics.eventContentWidth - gap) / 2, 1)
+            
+            return group.events.enumerated().compactMap { index, event in
+                guard let frame = makeEventFrame(
+                    event: event,
+                    dayIndex: dayIndex,
+                    metrics: metrics
+                ) else {
+                    return nil
+                }
+                
+                return TimelineEventLayout(
+                    id: "event-\(event.id)-split",
+                    event: event,
+                    title: event.title,
+                    x: frame.x + CGFloat(index) * (blockWidth + gap),
+                    y: frame.y,
+                    width: blockWidth,
+                    height: frame.height,
+                    style: .event,
+                    tapAction: .showEvent(event)
+                )
+            }
+        default:
+            return makeOverflowLayouts(
+                group: group,
+                dayIndex: dayIndex,
+                metrics: metrics
+            )
+        }
+    }
+    
+    private func makeOverflowLayouts(
+        group: TimelineOverlapGroup,
+        dayIndex: Int,
+        metrics: TimelineMetrics
+    ) -> [TimelineEventLayout] {
+        guard let representativeEvent = group.events.first,
+              let frame = makeGroupFrame(
+                events: group.events,
+                dayIndex: dayIndex,
+                metrics: metrics
+              )
+        else {
+            return []
+        }
+        
+        let groupID = group.events.map(\.id).map(String.init).joined(separator: "-")
+        let gap = metrics.overlapEventGap
+        let blockWidth = max((metrics.eventContentWidth - gap) / 2, 1)
+        let hiddenEventCount = group.events.count - 1
+        
+        return [
+            TimelineEventLayout(
+                id: "group-\(groupID)-representative",
+                event: representativeEvent,
+                title: representativeEvent.title,
+                x: frame.x,
+                y: frame.y,
+                width: blockWidth,
+                height: frame.height,
+                style: .event,
+                tapAction: .showOverlapGroup(group.events)
+            ),
+            TimelineEventLayout(
+                id: "group-\(groupID)-overflow",
+                event: representativeEvent,
+                title: "+\(hiddenEventCount)",
+                x: frame.x + blockWidth + gap,
+                y: frame.y,
+                width: blockWidth,
+                height: frame.height,
+                style: .overflow,
+                tapAction: .showOverlapGroup(group.events)
+            )
+        ]
+    }
+    
+    private func makeGroupFrame(
+        events: [Event],
+        dayIndex: Int,
+        metrics: TimelineMetrics
+    ) -> TimelineEventFrame? {
+        guard let startAt = events.map(\.startAt).min(),
+              let endAt = events.map(\.endAt).max()
+        else {
+            return nil
+        }
+        
+        return makeFrame(
+            startAt: startAt,
+            endAt: endAt,
+            dayIndex: dayIndex,
+            metrics: metrics
+        )
+    }
+    
+    private func makeEventFrame(
         event: Event,
         dayIndex: Int,
         metrics: TimelineMetrics
-    ) -> TimelineEventLayout? {
-        let startComponents = calendar.dateComponents([.hour, .minute], from: event.startAt)
-        let endComponents = calendar.dateComponents([.hour, .minute], from: event.endAt)
+    ) -> TimelineEventFrame? {
+        makeFrame(
+            startAt: event.startAt,
+            endAt: event.endAt,
+            dayIndex: dayIndex,
+            metrics: metrics
+        )
+    }
+    
+    private func makeFrame(
+        startAt: Date,
+        endAt: Date,
+        dayIndex: Int,
+        metrics: TimelineMetrics
+    ) -> TimelineEventFrame? {
+        let startComponents = calendar.dateComponents([.hour, .minute], from: startAt)
+        let endComponents = calendar.dateComponents([.hour, .minute], from: endAt)
         
         guard let startHour = startComponents.hour,
               let startMinute = startComponents.minute,
@@ -535,14 +771,12 @@ struct CalendarWeekTimelineView: View {
             return nil
         }
         
-        let horizontalPadding: CGFloat = 6
-        let x = metrics.gridStartX + CGFloat(dayIndex) * metrics.dayColumnWidth + horizontalPadding
+        let x = metrics.gridStartX + CGFloat(dayIndex) * metrics.dayColumnWidth + metrics.eventHorizontalMargin
         let y = metrics.timelineTopInset + clampedStartOffset * metrics.hourHeight
-        let width = metrics.dayColumnWidth - (horizontalPadding * 2)
+        let width = metrics.eventContentWidth
         let height = (clampedEndOffset - clampedStartOffset) * metrics.hourHeight
         
-        return TimelineEventLayout(
-            event: event,
+        return TimelineEventFrame(
             x: x,
             y: y,
             width: width,
@@ -702,6 +936,18 @@ private struct TimelineMetrics {
         dayColumnWidth < 44 ? 20 : 24
     }
     
+    var eventHorizontalMargin: CGFloat {
+        6
+    }
+    
+    var eventContentWidth: CGFloat {
+        max(dayColumnWidth - (eventHorizontalMargin * 2), 1)
+    }
+    
+    var overlapEventGap: CGFloat {
+        dayColumnWidth < 44 ? 1 : 2
+    }
+    
     var weekdayFontSize: CGFloat {
         dayColumnWidth < 44 ? 9 : 12
     }
@@ -739,15 +985,113 @@ private struct TimelineMetrics {
     }
 }
 
-private struct TimelineEventLayout: Identifiable {
-    let event: Event
+private struct TimelineOverlapGroup {
+    let events: [Event]
+}
+
+private struct TimelineEventFrame {
     let x: CGFloat
     let y: CGFloat
     let width: CGFloat
     let height: CGFloat
+}
+
+private struct TimelineOverlapSelection: Identifiable {
+    let id: String
+    let events: [Event]
+}
+
+private enum TimelineEventLayoutStyle {
+    case event
+    case overflow
+}
+
+private enum TimelineEventLayoutAction {
+    case showEvent(Event)
+    case showOverlapGroup([Event])
+}
+
+private struct TimelineEventLayout: Identifiable {
+    let id: String
+    let event: Event
+    let title: String
+    let x: CGFloat
+    let y: CGFloat
+    let width: CGFloat
+    let height: CGFloat
+    let style: TimelineEventLayoutStyle
+    let tapAction: TimelineEventLayoutAction
     
-    var id: Int64 {
-        event.id
+    var backgroundColor: Color {
+        switch style {
+        case .event:
+            return Color(hex: event.colorCode)
+        case .overflow:
+            return Color(uiColor: .secondarySystemBackground)
+        }
+    }
+    
+    var foregroundColor: Color {
+        switch style {
+        case .event:
+            return .white
+        case .overflow:
+            return Color.accentColor
+        }
+    }
+}
+
+private struct CalendarTimelineOverlapPopoverView: View {
+    let events: [Event]
+    let onShowDetail: (Event) -> Void
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("일정 \(events.count)개")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(.primary)
+            
+            VStack(spacing: 0) {
+                ForEach(events) { event in
+                    Button {
+                        onShowDetail(event)
+                    } label: {
+                        HStack(alignment: .top, spacing: 8) {
+                            RoundedRectangle(cornerRadius: 3)
+                                .fill(Color(hex: event.colorCode))
+                                .frame(width: 5, height: 34)
+                            
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(event.title)
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(.primary)
+                                    .lineLimit(1)
+                                
+                                Text(
+                                    CalendarEventDisplayText.timeRange(
+                                        startAt: event.startAt,
+                                        endAt: event.endAt
+                                    )
+                                )
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(.secondary)
+                            }
+                            
+                            Spacer(minLength: 0)
+                        }
+                        .contentShape(Rectangle())
+                        .padding(.vertical, 8)
+                    }
+                    .buttonStyle(.plain)
+                    
+                    if event.id != events.last?.id {
+                        Divider()
+                    }
+                }
+            }
+        }
+        .padding(14)
+        .frame(width: 260, alignment: .leading)
     }
 }
 
