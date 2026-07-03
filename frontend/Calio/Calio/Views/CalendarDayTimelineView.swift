@@ -269,19 +269,12 @@ struct CalendarDayTimelineView: View {
             return nil
         }
         
-        let startComponents = calendar.dateComponents([.hour, .minute], from: displayRange.startAt)
-        let endComponents = calendar.dateComponents([.hour, .minute], from: displayRange.endAt)
-        
-        guard let startHour = startComponents.hour,
-              let startMinute = startComponents.minute,
-              let endHour = endComponents.hour,
-              let endMinute = endComponents.minute
+        guard let startOffset = hourOffset(from: displayRange.startAt),
+              let endOffset = hourOffset(from: displayRange.endAt)
         else {
             return nil
         }
         
-        let startOffset = hourOffset(hour: startHour, minute: startMinute)
-        let endOffset = hourOffset(hour: endHour, minute: endMinute)
         let clampedStartOffset = max(0, startOffset)
         let clampedEndOffset = min(
             CGFloat(timelineHours.count),
@@ -342,6 +335,32 @@ struct CalendarDayTimelineView: View {
     
     private func hourOffset(hour: Int, minute: Int) -> CGFloat {
         CGFloat(hour - timelineStartHour) + CGFloat(minute) / 60
+    }
+    
+    private func hourOffset(from date: Date) -> CGFloat? {
+        let dayStart = referenceDay.toDate(calendar: calendar)
+        
+        guard let nextDayStart = calendar.date(
+            byAdding: .day,
+            value: 1,
+            to: dayStart
+        ) else {
+            return nil
+        }
+        
+        if date == nextDayStart {
+            return CGFloat(timelineHours.count)
+        }
+        
+        let components = calendar.dateComponents([.hour, .minute], from: date)
+        
+        guard let hour = components.hour,
+              let minute = components.minute
+        else {
+            return nil
+        }
+        
+        return hourOffset(hour: hour, minute: minute)
     }
     
     private func timeText(for hour: Int) -> String {

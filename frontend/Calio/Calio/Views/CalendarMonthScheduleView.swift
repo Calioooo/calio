@@ -891,11 +891,11 @@ private struct MonthEventLayoutBuilder {
         days.count / columnCount
     }
 
-    private func daysInWeekRow(_ weekRowIndex: Int) -> ArraySlice<DayKey> {
+    private func daysInWeekRow(_ weekRowIndex: Int) -> [DayKey] {
         let startIndex = weekRowIndex * columnCount
         let endIndex = min(startIndex + columnCount, days.count)
 
-        return days[startIndex..<endIndex]
+        return Array(days[startIndex..<endIndex])
     }
 
     private func eventOverlaps(_ event: Event, day: DayKey) -> Bool {
