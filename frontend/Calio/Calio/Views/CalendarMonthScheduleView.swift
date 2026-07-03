@@ -19,6 +19,12 @@ struct CalendarMonthScheduleView: View {
     private let rangeSelectionActivationDelay: UInt64 = 300_000_000
     private let dayTapMaximumDistance: CGFloat = 10
     private let monthGridCoordinateSpace = "calendarMonthScheduleGrid"
+    private let monthCellHorizontalPadding: CGFloat = 4
+    private let monthCellTopPadding: CGFloat = 5
+    private let monthCellDayHeaderHeight: CGFloat = 22
+    private let monthCellDayHeaderBottomSpacing: CGFloat = 3
+    private let monthEventRowHeight: CGFloat = 16
+    private let monthEventChipHeight: CGFloat = 14
 
     let items: [CalendarDateCellItem]
     let referenceDay: DayKey
@@ -89,6 +95,12 @@ struct CalendarMonthScheduleView: View {
             let cellHeight = geometry.size.height / CGFloat(rowCount)
             let itemsByDay = Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })
             let maxEventRowCount = visibleEventRowCount(for: cellHeight)
+            let eventLayout = MonthEventLayoutBuilder.make(
+                items: items,
+                days: monthGridDays,
+                maxVisibleRowCount: maxEventRowCount,
+                calendar: calendar
+            )
 
             ZStack(alignment: .topLeading) {
                 LazyVGrid(
@@ -103,8 +115,7 @@ struct CalendarMonthScheduleView: View {
                             day: day,
                             item: itemsByDay[day],
                             referenceDay: referenceDay,
-                            selectedDateRange: visibleDateRange,
-                            maxVisibleEventRowCount: maxEventRowCount
+                            selectedDateRange: visibleDateRange
                         )
                         .frame(width: cellWidth, height: cellHeight)
                     }
@@ -115,6 +126,21 @@ struct CalendarMonthScheduleView: View {
                 .simultaneousGesture(
                     rangeSelectionGesture(cellWidth: cellWidth, cellHeight: cellHeight)
                 )
+
+                monthEventSpans(
+                    eventLayout.spans,
+                    cellWidth: cellWidth,
+                    cellHeight: cellHeight
+                )
+                .allowsHitTesting(false)
+
+                monthEventOverflowLabels(
+                    eventLayout.hiddenCountByDay,
+                    cellWidth: cellWidth,
+                    cellHeight: cellHeight,
+                    overflowRowIndex: max(maxEventRowCount - 1, 0)
+                )
+                .allowsHitTesting(false)
 
                 rangeActionPopover(
                     gridSize: geometry.size,
@@ -195,13 +221,72 @@ struct CalendarMonthScheduleView: View {
     }
 
     private func visibleEventRowCount(for cellHeight: CGFloat) -> Int {
-        let verticalPadding: CGFloat = 9
-        let dayHeaderHeight: CGFloat = 22
-        let dayHeaderBottomSpacing: CGFloat = 3
-        let eventRowHeight: CGFloat = 16
-        let availableHeight = cellHeight - verticalPadding - dayHeaderHeight - dayHeaderBottomSpacing
+        let verticalPadding = monthCellTopPadding + 4
+        let availableHeight = cellHeight
+            - verticalPadding
+            - monthCellDayHeaderHeight
+            - monthCellDayHeaderBottomSpacing
 
-        return max(1, Int(availableHeight / eventRowHeight))
+        return max(1, Int(availableHeight / monthEventRowHeight))
+    }
+
+    private func monthEventSpans(
+        _ spans: [MonthEventSpanItem],
+        cellWidth: CGFloat,
+        cellHeight: CGFloat
+    ) -> some View {
+        ForEach(spans) { span in
+            Text(span.event.title)
+                .font(.system(size: 10, weight: .medium))
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .foregroundStyle(.black.opacity(0.85))
+                .padding(.horizontal, 4)
+                .frame(
+                    width: max(CGFloat(span.columnSpan) * cellWidth - (monthCellHorizontalPadding * 2), 1),
+                    height: monthEventChipHeight,
+                    alignment: .leading
+                )
+                .background(Color(hex: span.event.colorCode))
+                .clipShape(RoundedRectangle(cornerRadius: 3))
+                .offset(
+                    x: CGFloat(span.startColumn) * cellWidth + monthCellHorizontalPadding,
+                    y: CGFloat(span.weekRowIndex) * cellHeight
+                        + eventAreaTopOffset
+                        + CGFloat(span.eventRowIndex) * monthEventRowHeight
+                )
+        }
+    }
+
+    private func monthEventOverflowLabels(
+        _ hiddenCountByDay: [DayKey: Int],
+        cellWidth: CGFloat,
+        cellHeight: CGFloat,
+        overflowRowIndex: Int
+    ) -> some View {
+        ForEach(monthGridDays, id: \.self) { day in
+            if let hiddenCount = hiddenCountByDay[day], hiddenCount > 0,
+               let index = monthGridDays.firstIndex(of: day) {
+                Text("+\(hiddenCount)")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .frame(
+                        width: max(cellWidth - (monthCellHorizontalPadding * 2), 1),
+                        height: monthEventChipHeight,
+                        alignment: .leading
+                    )
+                    .offset(
+                        x: CGFloat(index % columnCount) * cellWidth + monthCellHorizontalPadding,
+                        y: CGFloat(index / columnCount) * cellHeight
+                            + eventAreaTopOffset
+                            + CGFloat(overflowRowIndex) * monthEventRowHeight
+                    )
+            }
+        }
+    }
+
+    private var eventAreaTopOffset: CGFloat {
+        monthCellTopPadding + monthCellDayHeaderHeight + monthCellDayHeaderBottomSpacing
     }
 
     private func rangeSelectionGesture(
@@ -553,11 +638,6 @@ private struct CalendarMonthScheduleDayCellView: View {
     let item: CalendarDateCellItem?
     let referenceDay: DayKey
     let selectedDateRange: CalendarDateRange?
-    let maxVisibleEventRowCount: Int
-
-    private var events: [Event] {
-        item?.events ?? []
-    }
 
     private var isReferenceDay: Bool {
         day == referenceDay
@@ -571,22 +651,9 @@ private struct CalendarMonthScheduleDayCellView: View {
         selectedDateRange?.contains(day) == true
     }
 
-    private var visibleTitleCount: Int {
-        guard events.count > maxVisibleEventRowCount else {
-            return min(events.count, maxVisibleEventRowCount)
-        }
-
-        return max(maxVisibleEventRowCount - 1, 0)
-    }
-
-    private var hiddenEventCount: Int {
-        max(events.count - visibleTitleCount, 0)
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             dayHeader
-            eventTitles
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 4)
@@ -609,29 +676,6 @@ private struct CalendarMonthScheduleDayCellView: View {
                         .fill(Color(red: 0.56, green: 0.60, blue: 0.96))
                 }
             }
-    }
-
-    private var eventTitles: some View {
-        VStack(spacing: 2) {
-            ForEach(Array(events.prefix(visibleTitleCount).enumerated()), id: \.offset) { _, event in
-                Text(event.title)
-                    .font(.system(size: 10, weight: .medium))
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                    .foregroundStyle(.black.opacity(0.85))
-                    .padding(.horizontal, 4)
-                    .frame(maxWidth: .infinity, minHeight: 14, maxHeight: 14, alignment: .leading)
-                    .background(Color(hex: event.colorCode))
-                    .clipShape(RoundedRectangle(cornerRadius: 3))
-            }
-
-            if hiddenEventCount > 0 {
-                Text("+\(hiddenEventCount)")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, minHeight: 14, maxHeight: 14, alignment: .leading)
-            }
-        }
     }
 
     private var cellBackground: some View {
@@ -670,6 +714,202 @@ private struct CalendarMonthScheduleDayCellView: View {
         default:
             return .primary
         }
+    }
+}
+
+private struct MonthEventLayout {
+    let spans: [MonthEventSpanItem]
+    let hiddenCountByDay: [DayKey: Int]
+}
+
+private struct MonthEventSpanItem: Identifiable {
+    let event: Event
+    let weekRowIndex: Int
+    let startColumn: Int
+    let columnSpan: Int
+    let eventRowIndex: Int
+    let days: [DayKey]
+
+    var id: String {
+        "\(event.id)-\(weekRowIndex)-\(startColumn)-\(columnSpan)-\(eventRowIndex)"
+    }
+}
+
+private struct MonthEventLayoutBuilder {
+    private let items: [CalendarDateCellItem]
+    private let days: [DayKey]
+    private let maxVisibleRowCount: Int
+    private let calendar: Calendar
+    private let columnCount = 7
+
+    static func make(
+        items: [CalendarDateCellItem],
+        days: [DayKey],
+        maxVisibleRowCount: Int,
+        calendar: Calendar
+    ) -> MonthEventLayout {
+        MonthEventLayoutBuilder(
+            items: items,
+            days: days,
+            maxVisibleRowCount: maxVisibleRowCount,
+            calendar: calendar
+        )
+        .make()
+    }
+
+    private func make() -> MonthEventLayout {
+        let rawSpans = makeRawSpans()
+        let overflowDays = Set(
+            rawSpans
+                .filter { $0.eventRowIndex >= maxVisibleRowCount }
+                .flatMap(\.days)
+        )
+        let visibleSpans = rawSpans.filter { span in
+            guard span.eventRowIndex < maxVisibleRowCount else {
+                return false
+            }
+
+            guard span.eventRowIndex == maxVisibleRowCount - 1 else {
+                return true
+            }
+
+            return overflowDays.isDisjoint(with: span.days)
+        }
+        let visibleSpanIDs = Set(visibleSpans.map(\.id))
+        let hiddenCountByDay = makeHiddenCountByDay(
+            rawSpans: rawSpans,
+            visibleSpanIDs: visibleSpanIDs
+        )
+
+        return MonthEventLayout(
+            spans: visibleSpans,
+            hiddenCountByDay: hiddenCountByDay
+        )
+    }
+
+    private func makeRawSpans() -> [MonthEventSpanItem] {
+        let events = uniqueEvents()
+        var spans: [MonthEventSpanItem] = []
+        var occupiedColumnsByWeekAndRow: [Int: [Int: Set<Int>]] = [:]
+
+        for event in events {
+            for weekRowIndex in 0..<weekRowCount {
+                let weekDays = daysInWeekRow(weekRowIndex)
+                let overlappingColumns = weekDays.enumerated().compactMap { column, day -> Int? in
+                    eventOverlaps(event, day: day) ? column : nil
+                }
+
+                guard let startColumn = overlappingColumns.min(),
+                      let endColumn = overlappingColumns.max()
+                else {
+                    continue
+                }
+
+                let eventRowIndex = firstAvailableEventRowIndex(
+                    from: startColumn,
+                    to: endColumn,
+                    weekRowIndex: weekRowIndex,
+                    occupiedColumnsByWeekAndRow: occupiedColumnsByWeekAndRow
+                )
+                let coveredColumns = Set(startColumn...endColumn)
+                occupiedColumnsByWeekAndRow[weekRowIndex, default: [:]][eventRowIndex] = (
+                    occupiedColumnsByWeekAndRow[weekRowIndex]?[eventRowIndex] ?? []
+                ).union(coveredColumns)
+
+                spans.append(
+                    MonthEventSpanItem(
+                        event: event,
+                        weekRowIndex: weekRowIndex,
+                        startColumn: startColumn,
+                        columnSpan: endColumn - startColumn + 1,
+                        eventRowIndex: eventRowIndex,
+                        days: Array(weekDays[startColumn...endColumn])
+                    )
+                )
+            }
+        }
+
+        return spans
+    }
+
+    private func uniqueEvents() -> [Event] {
+        var eventsByID: [Int64: Event] = [:]
+
+        for event in items.flatMap(\.events) {
+            eventsByID[event.id] = event
+        }
+
+        return eventsByID.values.sorted { lhs, rhs in
+            if lhs.startAt != rhs.startAt {
+                return lhs.startAt < rhs.startAt
+            }
+
+            if lhs.endAt != rhs.endAt {
+                return lhs.endAt < rhs.endAt
+            }
+
+            return lhs.id < rhs.id
+        }
+    }
+
+    private func firstAvailableEventRowIndex(
+        from startColumn: Int,
+        to endColumn: Int,
+        weekRowIndex: Int,
+        occupiedColumnsByWeekAndRow: [Int: [Int: Set<Int>]]
+    ) -> Int {
+        let targetColumns = Set(startColumn...endColumn)
+        var rowIndex = 0
+
+        while true {
+            let occupiedColumns = occupiedColumnsByWeekAndRow[weekRowIndex]?[rowIndex] ?? []
+
+            if occupiedColumns.isDisjoint(with: targetColumns) {
+                return rowIndex
+            }
+
+            rowIndex += 1
+        }
+    }
+
+    private func makeHiddenCountByDay(
+        rawSpans: [MonthEventSpanItem],
+        visibleSpanIDs: Set<String>
+    ) -> [DayKey: Int] {
+        rawSpans.reduce(into: [DayKey: Int]()) { result, span in
+            guard !visibleSpanIDs.contains(span.id) else {
+                return
+            }
+
+            for day in span.days {
+                result[day, default: 0] += 1
+            }
+        }
+    }
+
+    private var weekRowCount: Int {
+        days.count / columnCount
+    }
+
+    private func daysInWeekRow(_ weekRowIndex: Int) -> ArraySlice<DayKey> {
+        let startIndex = weekRowIndex * columnCount
+        let endIndex = min(startIndex + columnCount, days.count)
+
+        return days[startIndex..<endIndex]
+    }
+
+    private func eventOverlaps(_ event: Event, day: DayKey) -> Bool {
+        let dayStart = day.toDate(calendar: calendar)
+
+        guard let nextDayStart = calendar.date(
+            byAdding: .day,
+            value: 1,
+            to: dayStart
+        ) else {
+            return false
+        }
+
+        return event.startAt < nextDayStart && event.endAt > dayStart
     }
 }
 
