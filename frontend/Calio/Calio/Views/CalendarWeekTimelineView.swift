@@ -446,7 +446,7 @@ struct CalendarWeekTimelineView: View {
     
     private func eventLayouts(metrics: TimelineMetrics) -> [TimelineEventLayout] {
         visibleItems.enumerated().flatMap { dayIndex, item in
-            let groups = overlapGroups(in: timedEvents(in: item))
+            let groups = overlapGroups(in: timedEvents(in: item), on: item.id)
             
             return groups.flatMap { group in
                 makeEventLayouts(
@@ -560,22 +560,35 @@ struct CalendarWeekTimelineView: View {
         onVisibleRangeChanged(visibleRange)
     }
     
-    private func overlapGroups(in events: [Event]) -> [TimelineOverlapGroup] {
-        let sortedEvents = events.sorted(by: shouldPlaceEarlier)
-        guard let firstEvent = sortedEvents.first else { return [] }
+    private func overlapGroups(in events: [Event], on day: DayKey) -> [TimelineOverlapGroup] {
+        let sortedIntervals = events
+            .compactMap { event -> TimelineEventInterval? in
+                guard let displayRange = displayRange(for: event, on: day) else {
+                    return nil
+                }
+                
+                return TimelineEventInterval(
+                    event: event,
+                    startAt: displayRange.startAt,
+                    endAt: displayRange.endAt
+                )
+            }
+            .sorted(by: shouldPlaceEarlier)
+        
+        guard let firstInterval = sortedIntervals.first else { return [] }
         
         var groups: [TimelineOverlapGroup] = []
-        var currentEvents: [Event] = [firstEvent]
-        var currentEndAt = firstEvent.endAt
+        var currentEvents: [Event] = [firstInterval.event]
+        var currentEndAt = firstInterval.endAt
         
-        for event in sortedEvents.dropFirst() {
-            if event.startAt < currentEndAt {
-                currentEvents.append(event)
-                currentEndAt = max(currentEndAt, event.endAt)
+        for interval in sortedIntervals.dropFirst() {
+            if interval.startAt < currentEndAt {
+                currentEvents.append(interval.event)
+                currentEndAt = max(currentEndAt, interval.endAt)
             } else {
                 groups.append(TimelineOverlapGroup(events: currentEvents))
-                currentEvents = [event]
-                currentEndAt = event.endAt
+                currentEvents = [interval.event]
+                currentEndAt = interval.endAt
             }
         }
         
@@ -583,7 +596,7 @@ struct CalendarWeekTimelineView: View {
         return groups
     }
     
-    private func shouldPlaceEarlier(_ earlierCandidate: Event, _ laterCandidate: Event) -> Bool {
+    private func shouldPlaceEarlier(_ earlierCandidate: TimelineEventInterval, _ laterCandidate: TimelineEventInterval) -> Bool {
         if earlierCandidate.startAt != laterCandidate.startAt {
             return earlierCandidate.startAt < laterCandidate.startAt
         }
@@ -594,7 +607,7 @@ struct CalendarWeekTimelineView: View {
             return earlierDuration > laterDuration
         }
         
-        return earlierCandidate.id < laterCandidate.id
+        return earlierCandidate.event.id < laterCandidate.event.id
     }
     
     private func makeEventLayouts(
@@ -632,32 +645,22 @@ struct CalendarWeekTimelineView: View {
                 )
             ]
         case 2:
-            let gap = metrics.overlapEventGap
-            let blockWidth = max((metrics.eventContentWidth - gap) / 2, 1)
-            
-            return group.events.enumerated().compactMap { index, event in
-                guard let frame = makeEventFrame(
-                    event: event,
+            return makeColumnLayouts(
+                group: group,
+                day: day,
+                dayIndex: dayIndex,
+                metrics: metrics
+            )
+        default:
+            if maxSimultaneousOverlap(in: group.events, on: day) <= 2 {
+                return makeColumnLayouts(
+                    group: group,
                     day: day,
                     dayIndex: dayIndex,
                     metrics: metrics
-                ) else {
-                    return nil
-                }
-                
-                return TimelineEventLayout(
-                    id: "event-\(event.id)-split",
-                    event: event,
-                    title: event.title,
-                    x: frame.x + CGFloat(index) * (blockWidth + gap),
-                    y: frame.y,
-                    width: blockWidth,
-                    height: frame.height,
-                    style: .event,
-                    tapAction: .showEvent(event)
                 )
             }
-        default:
+            
             return makeOverflowLayouts(
                 group: group,
                 day: day,
@@ -665,6 +668,87 @@ struct CalendarWeekTimelineView: View {
                 metrics: metrics
             )
         }
+    }
+    
+    private func makeColumnLayouts(
+        group: TimelineOverlapGroup,
+        day: DayKey,
+        dayIndex: Int,
+        metrics: TimelineMetrics
+    ) -> [TimelineEventLayout] {
+        let intervals = group.events
+            .compactMap { event -> TimelineEventInterval? in
+                guard let displayRange = displayRange(for: event, on: day) else {
+                    return nil
+                }
+                
+                return TimelineEventInterval(
+                    event: event,
+                    startAt: displayRange.startAt,
+                    endAt: displayRange.endAt
+                )
+            }
+            .sorted(by: shouldPlaceEarlier)
+        let gap = metrics.overlapEventGap
+        let blockWidth = max((metrics.eventContentWidth - gap) / 2, 1)
+        var columnEndDates = Array(repeating: Date.distantPast, count: 2)
+        
+        return intervals.compactMap { interval in
+            guard let columnIndex = columnEndDates.firstIndex(where: { $0 <= interval.startAt }),
+                  let frame = makeEventFrame(
+                    event: interval.event,
+                    day: day,
+                    dayIndex: dayIndex,
+                    metrics: metrics
+                  )
+            else {
+                return nil
+            }
+            
+            columnEndDates[columnIndex] = interval.endAt
+            
+            return TimelineEventLayout(
+                id: "event-\(interval.event.id)-column-\(columnIndex)",
+                event: interval.event,
+                title: interval.event.title,
+                x: frame.x + CGFloat(columnIndex) * (blockWidth + gap),
+                y: frame.y,
+                width: blockWidth,
+                height: frame.height,
+                style: .event,
+                tapAction: .showEvent(interval.event)
+            )
+        }
+    }
+    
+    private func maxSimultaneousOverlap(in events: [Event], on day: DayKey) -> Int {
+        let points = events
+            .compactMap { event -> (startAt: Date, endAt: Date)? in
+                displayRange(for: event, on: day)
+            }
+            .flatMap { range in
+                [
+                    TimelineOverlapPoint(date: range.startAt, change: 1),
+                    TimelineOverlapPoint(date: range.endAt, change: -1)
+                ]
+            }
+            .sorted { lhs, rhs in
+                if lhs.date != rhs.date {
+                    return lhs.date < rhs.date
+                }
+                
+                return lhs.change < rhs.change
+            }
+        
+        var activeCount = 0
+        var maxActiveCount = 0
+        
+        for point in points {
+            activeCount += point.change
+            maxActiveCount = max(maxActiveCount, activeCount)
+        }
+        
+        return maxActiveCount
     }
     
     private func makeOverflowLayouts(
@@ -1058,6 +1142,17 @@ private struct TimelineMetrics {
 
 private struct TimelineOverlapGroup {
     let events: [Event]
+}
+
+private struct TimelineEventInterval {
+    let event: Event
+    let startAt: Date
+    let endAt: Date
+}
+
+private struct TimelineOverlapPoint {
+    let date: Date
+    let change: Int
 }
 
 private struct TimelineEventFrame {
