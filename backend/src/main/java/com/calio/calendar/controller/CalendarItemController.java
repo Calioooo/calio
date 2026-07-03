@@ -4,7 +4,6 @@ import com.calio.calendar.controller.dto.CalendarItemResponse;
 import com.calio.calendar.service.CalendarItemService;
 import java.time.Instant;
 import java.util.List;
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -24,8 +23,8 @@ public class CalendarItemController {
 
     @GetMapping
     public List<CalendarItemResponse> listCalendarItems(
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to
+            @RequestParam Instant from,
+            @RequestParam Instant to
     ) {
         return calendarItemService.listCalendarItems(from, to);
     }
