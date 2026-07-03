@@ -4,9 +4,12 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -41,6 +44,10 @@ public class RecurrenceEvent extends BaseEntity {
     @Column(nullable = false)
     private RecurrenceFrequency recurrenceFrequency;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "tag_id", nullable = false)
+    private Tag tag;
+
     protected RecurrenceEvent() {
     }
 
@@ -53,6 +60,28 @@ public class RecurrenceEvent extends BaseEntity {
             LocalTime recurrenceEndTime,
             RecurrenceFrequency recurrenceFrequency
     ) {
+        this(
+                recurrenceTitle,
+                recurrenceDescription,
+                recurrenceStartDate,
+                recurrenceEndDate,
+                recurrenceStartTime,
+                recurrenceEndTime,
+                recurrenceFrequency,
+                null
+        );
+    }
+
+    public RecurrenceEvent(
+            String recurrenceTitle,
+            String recurrenceDescription,
+            LocalDate recurrenceStartDate,
+            LocalDate recurrenceEndDate,
+            LocalTime recurrenceStartTime,
+            LocalTime recurrenceEndTime,
+            RecurrenceFrequency recurrenceFrequency,
+            Tag tag
+    ) {
         this.recurrenceTitle = recurrenceTitle;
         this.recurrenceDescription = recurrenceDescription;
         this.recurrenceStartDate = recurrenceStartDate;
@@ -60,6 +89,7 @@ public class RecurrenceEvent extends BaseEntity {
         this.recurrenceStartTime = recurrenceStartTime;
         this.recurrenceEndTime = recurrenceEndTime;
         this.recurrenceFrequency = recurrenceFrequency;
+        this.tag = tag;
     }
 
     public void update(
@@ -78,6 +108,10 @@ public class RecurrenceEvent extends BaseEntity {
         this.recurrenceStartTime = recurrenceStartTime;
         this.recurrenceEndTime = recurrenceEndTime;
         this.recurrenceFrequency = recurrenceFrequency;
+    }
+
+    public void changeTag(Tag tag) {
+        this.tag = tag;
     }
 
     public Long getId() {
@@ -110,5 +144,9 @@ public class RecurrenceEvent extends BaseEntity {
 
     public RecurrenceFrequency getRecurrenceFrequency() {
         return recurrenceFrequency;
+    }
+
+    public Tag getTag() {
+        return tag;
     }
 }

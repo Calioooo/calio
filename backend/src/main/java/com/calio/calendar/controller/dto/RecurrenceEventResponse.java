@@ -13,7 +13,8 @@ public record RecurrenceEventResponse(
         LocalDate recurrenceEndDate,
         LocalTime recurrenceStartTime,
         LocalTime recurrenceEndTime,
-        RecurrenceFrequency recurrenceFrequency
+        RecurrenceFrequency recurrenceFrequency,
+        TagResponse tag
 ) {
 
     public static RecurrenceEventResponse from(RecurrenceEvent recurrenceEvent) {
@@ -25,7 +26,8 @@ public record RecurrenceEventResponse(
                 recurrenceEvent.getRecurrenceEndDate(),
                 recurrenceEvent.getRecurrenceStartTime(),
                 recurrenceEvent.getRecurrenceEndTime(),
-                recurrenceEvent.getRecurrenceFrequency()
+                recurrenceEvent.getRecurrenceFrequency(),
+                TagResponse.from(recurrenceEvent.getTag())
         );
     }
 }

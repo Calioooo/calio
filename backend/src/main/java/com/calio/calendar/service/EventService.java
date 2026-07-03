@@ -8,6 +8,7 @@ import com.calio.calendar.exception.CalioException;
 import com.calio.calendar.exception.ErrorCode;
 import com.calio.calendar.repository.EventRepository;
 import com.calio.calendar.repository.entity.Event;
+import com.calio.calendar.repository.entity.Tag;
 import java.time.Instant;
 import java.util.List;
 import org.springframework.stereotype.Service;
@@ -17,15 +18,18 @@ import org.springframework.transaction.annotation.Transactional;
 public class EventService {
 
     private final EventRepository eventRepository;
+    private final TagService tagService;
 
-    public EventService(EventRepository eventRepository) {
+    public EventService(EventRepository eventRepository, TagService tagService) {
         this.eventRepository = eventRepository;
+        this.tagService = tagService;
     }
 
     @Transactional
     public EventResponse createEvent(CreateEventRequest request) {
         validateEventTimeRange(request.startAt(), request.endAt());
-        Event event = eventRepository.save(request.toEntity());
+        Tag tag = tagService.getTagOrDefault(request.tagId());
+        Event event = eventRepository.save(request.toEntity(tag));
         return EventResponse.from(event);
     }
 
@@ -39,7 +43,8 @@ public class EventService {
     public EventResponse updateEvent(Long eventId, UpdateEventRequest request) {
         validateEventTimeRange(request.startAt(), request.endAt());
         Event event = findEvent(eventId);
-        event.replace(request.title(), request.description(), request.startAt(), request.endAt());
+        Tag tag = tagService.getTagOrDefault(request.tagId());
+        event.replace(request.title(), request.description(), request.startAt(), request.endAt(), tag);
         eventRepository.flush();
         return EventResponse.from(event);
     }

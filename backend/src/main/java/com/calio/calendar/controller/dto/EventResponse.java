@@ -12,6 +12,7 @@ public record EventResponse(
         boolean importantEvent,
         Long recurrenceId,
         boolean isRecurrenceOccurrence,
+        TagResponse tag,
         Instant createdAt,
         Instant updatedAt
 ) {
@@ -26,6 +27,7 @@ public record EventResponse(
                 event.importantEvent(),
                 event.getRecurrenceId().orElse(null),
                 event.isRecurrenceOccurrence(),
+                TagResponse.from(event.getTag()),
                 event.getCreatedAt(),
                 event.getUpdatedAt()
         );

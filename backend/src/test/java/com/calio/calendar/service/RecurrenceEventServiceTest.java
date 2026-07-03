@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.calio.calendar.controller.dto.CreateRecurrenceEventRequest;
 import com.calio.calendar.controller.dto.EventResponse;
 import com.calio.calendar.controller.dto.UpdateRecurrenceEventRequest;
 import com.calio.calendar.controller.dto.UpdateRecurrenceOccurrenceRequest;
@@ -20,6 +21,8 @@ import com.calio.calendar.repository.entity.Event;
 import com.calio.calendar.repository.entity.RecurrenceEventOverride;
 import com.calio.calendar.repository.entity.RecurrenceEvent;
 import com.calio.calendar.repository.entity.RecurrenceFrequency;
+import com.calio.calendar.repository.entity.Tag;
+import com.calio.calendar.repository.entity.TagType;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -47,8 +50,51 @@ class RecurrenceEventServiceTest {
     @Mock
     private RecurrenceEventOverrideRepository recurrenceEventOverrideRepository;
 
+    @Mock
+    private TagService tagService;
+
     @InjectMocks
     private RecurrenceEventService recurrenceEventService;
+
+    @Test
+    @DisplayName("반복 일정 생성은 resolve된 태그를 rule과 생성 occurrence에 함께 저장한다")
+    @SuppressWarnings("unchecked")
+    void givenResolvedTag_whenCreateRecurrenceEvent_thenStoresTagOnRuleAndOccurrences() {
+        // given
+        Tag tag = tag("업무", "#2563EB");
+        when(tagService.getTagOrDefault(5L)).thenReturn(tag);
+        when(recurrenceEventRepository.save(any(RecurrenceEvent.class)))
+                .thenAnswer(invocation -> {
+                    RecurrenceEvent recurrenceEvent = invocation.getArgument(0);
+                    ReflectionTestUtils.setField(recurrenceEvent, "id", 1L);
+                    return recurrenceEvent;
+                });
+
+        CreateRecurrenceEventRequest request = new CreateRecurrenceEventRequest(
+                "Tagged rule",
+                "Tagged memo",
+                LocalDate.parse("2027-01-01"),
+                LocalDate.parse("2027-01-02"),
+                LocalTime.parse("09:00:00"),
+                LocalTime.parse("10:00:00"),
+                RecurrenceFrequency.DAILY,
+                5L
+        );
+
+        // when
+        recurrenceEventService.createRecurrenceEvent(request);
+
+        // then
+        ArgumentCaptor<RecurrenceEvent> recurrenceCaptor = ArgumentCaptor.forClass(RecurrenceEvent.class);
+        ArgumentCaptor<Iterable<Event>> occurrenceCaptor = ArgumentCaptor.forClass(Iterable.class);
+        verify(recurrenceEventRepository).save(recurrenceCaptor.capture());
+        verify(eventRepository).saveAll(occurrenceCaptor.capture());
+
+        assertThat(recurrenceCaptor.getValue().getTag()).isSameAs(tag);
+        assertThat(occurrenceCaptor.getValue())
+                .hasSize(2)
+                .allSatisfy(event -> assertThat(event.getTag()).isSameAs(tag));
+    }
 
     @Test
     @DisplayName("반복 일정 전체 수정은 non-null 요청 필드만 병합하고 null 필드는 기존 값을 보존한다")
@@ -81,6 +127,89 @@ class RecurrenceEventServiceTest {
         assertThat(recurrenceEvent.getRecurrenceStartDate()).isEqualTo(LocalDate.parse("2026-11-01"));
         assertThat(recurrenceEvent.getRecurrenceEndDate()).isEqualTo(LocalDate.parse("2026-11-02"));
         assertThat(recurrenceEvent.getRecurrenceFrequency()).isEqualTo(RecurrenceFrequency.WEEKLY);
+    }
+
+    @Test
+    @DisplayName("반복 일정 전체 수정에서 tagId가 null이면 기존 rule 태그를 보존해 occurrence에 적용한다")
+    @SuppressWarnings("unchecked")
+    void givenNullTagId_whenUpdateRecurrenceEvent_thenPreservesRuleTagAndAppliesToOccurrences() {
+        // given
+        Tag preservedTag = tag("보존 태그", "#10B981");
+        RecurrenceEvent recurrenceEvent = recurrenceEvent(
+                "Original",
+                null,
+                "2027-01-01",
+                "2027-01-02",
+                RecurrenceFrequency.DAILY,
+                preservedTag
+        );
+        Event retained = event("Old", "2027-01-01T09:00:00Z", "2027-01-01T10:00:00Z", 1L);
+        when(recurrenceEventRepository.findById(1L)).thenReturn(Optional.of(recurrenceEvent));
+        when(eventRepository.findByRecurrenceIdAndDeletedAtIsNullOrderByStartAtAsc(1L)).thenReturn(List.of(retained));
+
+        UpdateRecurrenceEventRequest request = new UpdateRecurrenceEventRequest(
+                "Updated",
+                null,
+                null,
+                null,
+                null,
+                null
+        );
+
+        // when
+        recurrenceEventService.updateRecurrenceEvent(1L, request);
+
+        // then
+        ArgumentCaptor<Iterable<Event>> saveCaptor = ArgumentCaptor.forClass(Iterable.class);
+        verify(eventRepository).saveAll(saveCaptor.capture());
+        verifyNoInteractions(tagService);
+
+        assertThat(recurrenceEvent.getTag()).isSameAs(preservedTag);
+        assertThat(saveCaptor.getValue())
+                .hasSize(2)
+                .allSatisfy(event -> assertThat(event.getTag()).isSameAs(preservedTag));
+    }
+
+    @Test
+    @DisplayName("반복 일정 전체 수정에서 explicit tagId는 rule과 rebuilt occurrence에 적용된다")
+    @SuppressWarnings("unchecked")
+    void givenExplicitTagId_whenUpdateRecurrenceEvent_thenAppliesTagToRuleAndOccurrences() {
+        // given
+        Tag originalTag = tag("기존 태그", "#64748B");
+        Tag updatedTag = tag("변경 태그", "#F59E0B");
+        RecurrenceEvent recurrenceEvent = recurrenceEvent(
+                "Original",
+                null,
+                "2027-01-01",
+                "2027-01-02",
+                RecurrenceFrequency.DAILY,
+                originalTag
+        );
+        Event retained = event("Old", "2027-01-01T09:00:00Z", "2027-01-01T10:00:00Z", 1L, originalTag);
+        when(recurrenceEventRepository.findById(1L)).thenReturn(Optional.of(recurrenceEvent));
+        when(tagService.getTag(7L)).thenReturn(updatedTag);
+        when(eventRepository.findByRecurrenceIdAndDeletedAtIsNullOrderByStartAtAsc(1L)).thenReturn(List.of(retained));
+
+        UpdateRecurrenceEventRequest request = new UpdateRecurrenceEventRequest(
+                null,
+                null,
+                null,
+                null,
+                null,
+                7L
+        );
+
+        // when
+        recurrenceEventService.updateRecurrenceEvent(1L, request);
+
+        // then
+        ArgumentCaptor<Iterable<Event>> saveCaptor = ArgumentCaptor.forClass(Iterable.class);
+        verify(eventRepository).saveAll(saveCaptor.capture());
+
+        assertThat(recurrenceEvent.getTag()).isSameAs(updatedTag);
+        assertThat(saveCaptor.getValue())
+                .hasSize(2)
+                .allSatisfy(event -> assertThat(event.getTag()).isSameAs(updatedTag));
     }
 
     @Test
@@ -194,6 +323,44 @@ class RecurrenceEventServiceTest {
         assertThat(response.importantEvent()).isTrue();
         assertThat(response.recurrenceId()).isEqualTo(1L);
         assertThat(event.getRecurrenceId()).contains(1L);
+    }
+
+    @Test
+    @DisplayName("반복 occurrence 단독 수정은 occurrence Event의 기존 태그를 변경하지 않는다")
+    void givenTaggedOccurrence_whenUpdateRecurrenceOccurrence_thenPreservesEventTag() {
+        // given
+        Tag tag = tag("occurrence 태그", "#8B5CF6");
+        RecurrenceEvent recurrenceEvent = recurrenceEvent(
+                "Rule",
+                null,
+                "2027-02-11",
+                "2027-02-11",
+                RecurrenceFrequency.DAILY,
+                tag
+        );
+        Event event = event("Occurrence", "2027-02-11T09:00:00Z", "2027-02-11T10:00:00Z", 1L, tag);
+
+        when(recurrenceEventRepository.findById(1L)).thenReturn(Optional.of(recurrenceEvent));
+        when(eventRepository.findById(10L)).thenReturn(Optional.of(event));
+        when(recurrenceEventOverrideRepository.findByEventId(10L)).thenReturn(Optional.empty());
+        when(recurrenceEventOverrideRepository.save(any(RecurrenceEventOverride.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        UpdateRecurrenceOccurrenceRequest request = new UpdateRecurrenceOccurrenceRequest(
+                "Updated occurrence",
+                null,
+                null,
+                null,
+                null
+        );
+
+        // when
+        EventResponse response = recurrenceEventService.updateRecurrenceOccurrence(1L, 10L, request);
+
+        // then
+        assertThat(event.getTag()).isSameAs(tag);
+        assertThat(response.tag().title()).isEqualTo("occurrence 태그");
+        verifyNoInteractions(tagService);
     }
 
     @Test
@@ -533,6 +700,17 @@ class RecurrenceEventServiceTest {
             String endDate,
             RecurrenceFrequency recurrenceFrequency
     ) {
+        return recurrenceEvent(title, description, startDate, endDate, recurrenceFrequency, null);
+    }
+
+    private RecurrenceEvent recurrenceEvent(
+            String title,
+            String description,
+            String startDate,
+            String endDate,
+            RecurrenceFrequency recurrenceFrequency,
+            Tag tag
+    ) {
         RecurrenceEvent recurrenceEvent = new RecurrenceEvent(
                 title,
                 description,
@@ -540,13 +718,22 @@ class RecurrenceEventServiceTest {
                 LocalDate.parse(endDate),
                 LocalTime.parse("09:00:00"),
                 LocalTime.parse("10:00:00"),
-                recurrenceFrequency
+                recurrenceFrequency,
+                tag
         );
         ReflectionTestUtils.setField(recurrenceEvent, "id", 1L);
         return recurrenceEvent;
     }
 
     private Event event(String title, String startAt, String endAt, Long recurrenceId) {
-        return new Event(title, null, Instant.parse(startAt), Instant.parse(endAt), recurrenceId);
+        return event(title, startAt, endAt, recurrenceId, null);
+    }
+
+    private Event event(String title, String startAt, String endAt, Long recurrenceId, Tag tag) {
+        return new Event(title, null, Instant.parse(startAt), Instant.parse(endAt), recurrenceId, tag);
+    }
+
+    private Tag tag(String title, String colorCode) {
+        return new Tag(TagType.DEFAULT, title, colorCode);
     }
 }
