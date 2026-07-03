@@ -451,6 +451,7 @@ struct CalendarWeekTimelineView: View {
             return groups.flatMap { group in
                 makeEventLayouts(
                     group: group,
+                    day: item.id,
                     dayIndex: dayIndex,
                     metrics: metrics
                 )
@@ -598,6 +599,7 @@ struct CalendarWeekTimelineView: View {
     
     private func makeEventLayouts(
         group: TimelineOverlapGroup,
+        day: DayKey,
         dayIndex: Int,
         metrics: TimelineMetrics
     ) -> [TimelineEventLayout] {
@@ -608,6 +610,7 @@ struct CalendarWeekTimelineView: View {
             guard let event = group.events.first,
                   let frame = makeEventFrame(
                     event: event,
+                    day: day,
                     dayIndex: dayIndex,
                     metrics: metrics
                   )
@@ -635,6 +638,7 @@ struct CalendarWeekTimelineView: View {
             return group.events.enumerated().compactMap { index, event in
                 guard let frame = makeEventFrame(
                     event: event,
+                    day: day,
                     dayIndex: dayIndex,
                     metrics: metrics
                 ) else {
@@ -656,6 +660,7 @@ struct CalendarWeekTimelineView: View {
         default:
             return makeOverflowLayouts(
                 group: group,
+                day: day,
                 dayIndex: dayIndex,
                 metrics: metrics
             )
@@ -664,12 +669,14 @@ struct CalendarWeekTimelineView: View {
     
     private func makeOverflowLayouts(
         group: TimelineOverlapGroup,
+        day: DayKey,
         dayIndex: Int,
         metrics: TimelineMetrics
     ) -> [TimelineEventLayout] {
         guard let representativeEvent = group.events.first,
               let frame = makeGroupFrame(
                 events: group.events,
+                day: day,
                 dayIndex: dayIndex,
                 metrics: metrics
               )
@@ -710,34 +717,75 @@ struct CalendarWeekTimelineView: View {
     
     private func makeGroupFrame(
         events: [Event],
+        day: DayKey,
         dayIndex: Int,
         metrics: TimelineMetrics
     ) -> TimelineEventFrame? {
-        guard let startAt = events.map(\.startAt).min(),
-              let endAt = events.map(\.endAt).max()
+        let frames = events.compactMap { event in
+            makeEventFrame(
+                event: event,
+                day: day,
+                dayIndex: dayIndex,
+                metrics: metrics
+            )
+        }
+        
+        guard let firstFrame = frames.first
         else {
             return nil
         }
         
-        return makeFrame(
-            startAt: startAt,
-            endAt: endAt,
-            dayIndex: dayIndex,
-            metrics: metrics
+        let minY = frames.map(\.y).min() ?? firstFrame.y
+        let maxY = frames.map { $0.y + $0.height }.max() ?? (firstFrame.y + firstFrame.height)
+        
+        return TimelineEventFrame(
+            x: firstFrame.x,
+            y: minY,
+            width: firstFrame.width,
+            height: maxY - minY
         )
     }
     
     private func makeEventFrame(
         event: Event,
+        day: DayKey,
         dayIndex: Int,
         metrics: TimelineMetrics
     ) -> TimelineEventFrame? {
-        makeFrame(
-            startAt: event.startAt,
-            endAt: event.endAt,
+        guard let displayRange = displayRange(for: event, on: day) else {
+            return nil
+        }
+        
+        return makeFrame(
+            startAt: displayRange.startAt,
+            endAt: displayRange.endAt,
             dayIndex: dayIndex,
             metrics: metrics
         )
+    }
+    
+    private func displayRange(
+        for event: Event,
+        on day: DayKey
+    ) -> (startAt: Date, endAt: Date)? {
+        let dayStart = day.toDate(calendar: calendar)
+        
+        guard let nextDayStart = calendar.date(
+            byAdding: .day,
+            value: 1,
+            to: dayStart
+        ) else {
+            return nil
+        }
+        
+        let displayStartAt = max(event.startAt, dayStart)
+        let displayEndAt = min(event.endAt, nextDayStart)
+        
+        guard displayStartAt < displayEndAt else {
+            return nil
+        }
+        
+        return (startAt: displayStartAt, endAt: displayEndAt)
     }
     
     private func makeFrame(
@@ -786,26 +834,28 @@ struct CalendarWeekTimelineView: View {
     
     private func timedEvents(in item: CalendarDateCellItem) -> [Event] {
         item.events.filter { event in
-            !isFullDayEvent(event)
+            !shouldShowInFullDayArea(event, on: item.id)
         }
     }
     
     private func fullDayEvents(in item: CalendarDateCellItem) -> [Event] {
-        item.events.filter(isFullDayEvent)
+        item.events.filter { event in
+            shouldShowInFullDayArea(event, on: item.id)
+        }
     }
     
-    private func isFullDayEvent(_ event: Event) -> Bool {
-        let startOfStartDay = calendar.startOfDay(for: event.startAt)
+    private func shouldShowInFullDayArea(_ event: Event, on day: DayKey) -> Bool {
+        let dayStart = day.toDate(calendar: calendar)
         
-        guard let startOfNextDay = calendar.date(
+        guard let nextDayStart = calendar.date(
             byAdding: .day,
             value: 1,
-            to: startOfStartDay
+            to: dayStart
         ) else {
             return false
         }
         
-        return event.startAt <= startOfStartDay && event.endAt >= startOfNextDay
+        return event.startAt <= dayStart && event.endAt >= nextDayStart
     }
     
     private func hourOffset(hour: Int, minute: Int) -> CGFloat {

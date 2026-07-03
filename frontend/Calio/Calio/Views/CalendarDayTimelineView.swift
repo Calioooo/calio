@@ -236,12 +236,12 @@ struct CalendarDayTimelineView: View {
     
     private var timedEvents: [Event] {
         (currentItem?.events ?? []).filter { event in
-            !isFullDayEvent(event)
+            !shouldShowInFullDayArea(event)
         }
     }
     
     private var fullDayEvents: [Event] {
-        (currentItem?.events ?? []).filter(isFullDayEvent)
+        (currentItem?.events ?? []).filter(shouldShowInFullDayArea)
     }
     
     private var dayHeaderColor: Color {
@@ -265,8 +265,12 @@ struct CalendarDayTimelineView: View {
         event: Event,
         metrics: DayTimelineMetrics
     ) -> DayTimelineEventLayout? {
-        let startComponents = calendar.dateComponents([.hour, .minute], from: event.startAt)
-        let endComponents = calendar.dateComponents([.hour, .minute], from: event.endAt)
+        guard let displayRange = displayRange(for: event) else {
+            return nil
+        }
+        
+        let startComponents = calendar.dateComponents([.hour, .minute], from: displayRange.startAt)
+        let endComponents = calendar.dateComponents([.hour, .minute], from: displayRange.endAt)
         
         guard let startHour = startComponents.hour,
               let startMinute = startComponents.minute,
@@ -301,18 +305,39 @@ struct CalendarDayTimelineView: View {
         )
     }
     
-    private func isFullDayEvent(_ event: Event) -> Bool {
-        let startOfStartDay = calendar.startOfDay(for: event.startAt)
+    private func displayRange(for event: Event) -> (startAt: Date, endAt: Date)? {
+        let dayStart = referenceDay.toDate(calendar: calendar)
         
-        guard let startOfNextDay = calendar.date(
+        guard let nextDayStart = calendar.date(
             byAdding: .day,
             value: 1,
-            to: startOfStartDay
+            to: dayStart
+        ) else {
+            return nil
+        }
+        
+        let displayStartAt = max(event.startAt, dayStart)
+        let displayEndAt = min(event.endAt, nextDayStart)
+        
+        guard displayStartAt < displayEndAt else {
+            return nil
+        }
+        
+        return (startAt: displayStartAt, endAt: displayEndAt)
+    }
+    
+    private func shouldShowInFullDayArea(_ event: Event) -> Bool {
+        let dayStart = referenceDay.toDate(calendar: calendar)
+        
+        guard let nextDayStart = calendar.date(
+            byAdding: .day,
+            value: 1,
+            to: dayStart
         ) else {
             return false
         }
         
-        return event.startAt <= startOfStartDay && event.endAt >= startOfNextDay
+        return event.startAt <= dayStart && event.endAt >= nextDayStart
     }
     
     private func hourOffset(hour: Int, minute: Int) -> CGFloat {
