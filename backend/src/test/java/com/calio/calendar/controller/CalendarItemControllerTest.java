@@ -53,7 +53,7 @@ class CalendarItemControllerTest {
     }
 
     @Test
-    @DisplayName("사용자는 일정과 공휴일을 하나의 calendar item 목록에서 결정적 순서로 조회한다")
+    @DisplayName("사용자는 일정과 공휴일을 날짜순으로 조회하고 같은 날짜에서는 공휴일을 먼저 조회한다.")
     void givenEventsAndNationalHolidays_whenListCalendarItems_thenReturnsUnifiedItemsInDeterministicOrder()
             throws Exception {
         // given
