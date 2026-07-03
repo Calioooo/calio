@@ -491,9 +491,41 @@ final class CalendarHomeViewModel: ObservableObject {
     }
     
     private func makeEventsByDay(_ events: [Event]) -> [DayKey: [Event]] {
-        Dictionary(grouping: events) { event in
-            DayKey(date: event.startAt, calendar: calendar)
+        events.reduce(into: [DayKey: [Event]]()) { eventsByDay, event in
+            for day in daysOverlapping(event) {
+                eventsByDay[day, default: []].append(event)
+            }
         }
+    }
+    
+    private func daysOverlapping(_ event: Event) -> [DayKey] {
+        let firstDayDate = calendar.startOfDay(for: event.startAt)
+        let lastIncludedDate = lastIncludedDate(for: event)
+        
+        guard firstDayDate <= lastIncludedDate else {
+            return []
+        }
+        
+        return sequence(first: firstDayDate) { currentDate in
+            self.calendar.date(byAdding: .day, value: 1, to: currentDate)
+        }
+        .prefix { date in
+            date <= lastIncludedDate
+        }
+        .map { date in
+            DayKey(date: date, calendar: calendar)
+        }
+    }
+    
+    private func lastIncludedDate(for event: Event) -> Date {
+        let endDayStart = calendar.startOfDay(for: event.endAt)
+        
+        if event.endAt == endDayStart,
+           let previousDay = calendar.date(byAdding: .day, value: -1, to: endDayStart) {
+            return previousDay
+        }
+        
+        return endDayStart
     }
 
     private func replaceGeneratedDateCells(from startDate: Date, to endDate: Date) {
@@ -803,14 +835,11 @@ final class CalendarHomeViewModel: ObservableObject {
         in dateRange: ClosedRange<Date>,
         monthEventCache: [YearMonthKey: CalendarMonthEventCacheEntry]
     ) -> [Event] {
-        let cachedEvents = monthKeys(from: dateRange.lowerBound, to: dateRange.upperBound)
-            .flatMap { key in
-                monthEventCache[key]?.loadedEvents ?? []
-            }
+        let cachedEvents = monthEventCache.values.flatMap(\.loadedEvents)
         let pendingEvents = pendingCreatedEventsByMonth.values.flatMap { $0 }
 
         return mergedSortedEvents(cachedEvents, with: pendingEvents).filter { event in
-            dateRange.contains(event.startAt)
+            event.startAt <= dateRange.upperBound && event.endAt > dateRange.lowerBound
         }
     }
 
