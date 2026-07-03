@@ -17,7 +17,7 @@ public record CalendarItemResponse(
         );
     }
 
-    public static CalendarItemResponse nationalHoliday(NationalHoliday nationalHoliday) {
+    public static CalendarItemResponse from(NationalHoliday nationalHoliday) {
         return new CalendarItemResponse(
                 CalendarItemType.NATIONAL_HOLIDAY,
                 null,

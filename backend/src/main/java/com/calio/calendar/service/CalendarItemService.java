@@ -114,7 +114,7 @@ public class CalendarItemService {
                     CalendarItemType.NATIONAL_HOLIDAY,
                     nationalHoliday.getHolidayTitle(),
                     null,
-                    CalendarItemResponse.nationalHoliday(nationalHoliday)
+                    CalendarItemResponse.from(nationalHoliday)
             );
         }
 
