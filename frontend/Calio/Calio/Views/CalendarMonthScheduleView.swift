@@ -56,6 +56,7 @@ struct CalendarMonthScheduleView: View {
                 }
                 .background(Color(uiColor: .systemBackground))
                 .gesture(monthSwipeGesture)
+                .allowsHitTesting(detailPanelDay == nil)
                 .onDisappear {
                     cancelRangeSelection()
                 }
@@ -141,6 +142,8 @@ struct CalendarMonthScheduleView: View {
                     overflowRowIndex: max(maxEventRowCount - 1, 0)
                 )
                 .allowsHitTesting(false)
+
+                rangeActionDismissLayer(gridSize: geometry.size)
 
                 rangeActionPopover(
                     gridSize: geometry.size,
@@ -481,6 +484,7 @@ struct CalendarMonthScheduleView: View {
             ZStack {
                 Color.black.opacity(0.32)
                     .ignoresSafeArea()
+                    .contentShape(Rectangle())
                     .onTapGesture {
                         self.detailPanelDay = nil
                     }
@@ -502,6 +506,10 @@ struct CalendarMonthScheduleView: View {
                 )
                 .transition(.scale(scale: 0.96).combined(with: .opacity))
             }
+            .frame(
+                width: geometry.size.width,
+                height: geometry.size.height
+            )
             .animation(.spring(response: 0.26, dampingFraction: 0.84), value: detailPanelDay)
             .zIndex(2)
         }
@@ -544,6 +552,20 @@ struct CalendarMonthScheduleView: View {
         }
 
         return monthGridDays[index]
+    }
+
+    @ViewBuilder
+    private func rangeActionDismissLayer(gridSize: CGSize) -> some View {
+        if confirmedDateRange != nil {
+            Color.black.opacity(0.001)
+                .frame(width: gridSize.width, height: gridSize.height)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    confirmedDateRange = nil
+                }
+                .accessibilityHidden(true)
+                .zIndex(0.5)
+        }
     }
 
     @ViewBuilder
