@@ -89,6 +89,28 @@ class NationalHolidayControllerTest {
     }
 
     @Test
+    @DisplayName("사용자는 from과 to가 같은 날짜이면 해당 날짜의 공휴일만 조회한다")
+    void givenSameFromAndTo_whenListNationalHolidays_thenReturnsOnlyThatDateHolidays() throws Exception {
+        // given
+        nationalHolidayRepository.save(new NationalHoliday(LocalDate.of(2026, 5, 4), "Before"));
+        NationalHoliday childrensDay = nationalHolidayRepository.save(
+                new NationalHoliday(LocalDate.of(2026, 5, 5), "Children's Day")
+        );
+        nationalHolidayRepository.save(new NationalHoliday(LocalDate.of(2026, 5, 6), "After"));
+
+        // when
+        mockMvc.perform(get("/api/national-holidays")
+                        .param("from", "2026-05-05")
+                        .param("to", "2026-05-05"))
+                // then
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].nationalHolidayId").value(childrensDay.getNationalHolidayId()))
+                .andExpect(jsonPath("$[0].holidayDate").value("2026-05-05"))
+                .andExpect(jsonPath("$[0].holidayTitle").value("Children's Day"));
+    }
+
+    @Test
     @DisplayName("사용자는 from이 to보다 늦은 공휴일 조회를 요청할 수 없다")
     void givenFromAfterTo_whenListNationalHolidays_thenReturnsInvalidTimeRange() throws Exception {
         // when
