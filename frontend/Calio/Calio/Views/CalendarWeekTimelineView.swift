@@ -13,6 +13,7 @@ struct CalendarWeekTimelineView: View {
     private let visibleDayCount = 5
     private let timelineStartHour = 0
     private let timelineEndHour = 23
+    private let timelineCoordinateSpace = "calendarWeekTimeline"
     
     let items: [CalendarDateCellItem]
     let referenceDay: DayKey
@@ -82,41 +83,54 @@ struct CalendarWeekTimelineView: View {
     @State private var headerScrollPosition: DayKey?
     @State private var lastVisibleRange: CalendarVisibleIndexRange?
     @State private var selectedEvent: Event?
-    @State private var selectedOverlapGroup: TimelineOverlapSelection?
+    @State private var selectedTimelinePopover: TimelinePopoverSelection?
     @State private var detailEvent: Event?
+    @State private var timelineLayoutFrames: [String: CGRect] = [:]
     
     var body: some View {
         GeometryReader { geometry in
             let metrics = timelineMetrics(for: geometry.size)
             
-            VStack(spacing: 0) {
-                CalendarTopBarView(
-                    referenceDay: referenceDay,
-                    showsTodayButton: showsTodayButton,
-                    onSelectedYearMonth: onSelectedYearMonth,
-                    onTodayTapped: onTodayTapped,
-                    onCreateTapped: onCreateTapped
-                )
-                    .frame(
-                        width: metrics.totalWidth,
-                        height: metrics.topBarHeight,
-                        alignment: .leading
+            ZStack(alignment: .topLeading) {
+                VStack(spacing: 0) {
+                    CalendarTopBarView(
+                        referenceDay: referenceDay,
+                        showsTodayButton: showsTodayButton,
+                        onSelectedYearMonth: onSelectedYearMonth,
+                        onTodayTapped: onTodayTapped,
+                        onCreateTapped: onCreateTapped
                     )
+                        .frame(
+                            width: metrics.totalWidth,
+                            height: metrics.topBarHeight,
+                            alignment: .leading
+                        )
 
-                CalendarEventStatusBannerView(
-                    state: eventAreaState,
-                    onRetry: onRetryEvents
-                )
+                    CalendarEventStatusBannerView(
+                        state: eventAreaState,
+                        onRetry: onRetryEvents
+                    )
+                    
+                    timelineHeader(metrics: metrics)
+                        .frame(height: metrics.headerHeight, alignment: .top)
+                    
+                    fullDayEventRow(metrics: metrics)
+                        .frame(height: metrics.fullDayEventRowHeight, alignment: .top)
+                    
+                    ScrollView(.vertical) {
+                        timelineBody(
+                            metrics: metrics,
+                            containerSize: geometry.size
+                        )
+                            .background(TimelineScrollBounceDisabler())
+                    }
+                }
                 
-                timelineHeader(metrics: metrics)
-                    .frame(height: metrics.headerHeight, alignment: .top)
-                
-                fullDayEventRow(metrics: metrics)
-                    .frame(height: metrics.fullDayEventRowHeight, alignment: .top)
-                
-                ScrollView(.vertical) {
-                    timelineBody(metrics: metrics)
-                        .background(TimelineScrollBounceDisabler())
+                if let selectedTimelinePopover {
+                    timelinePopoverOverlay(
+                        selection: selectedTimelinePopover,
+                        containerSize: geometry.size
+                    )
                 }
             }
             .frame(
@@ -125,6 +139,11 @@ struct CalendarWeekTimelineView: View {
                 alignment: .top
             )
             .background(Color(uiColor: .systemBackground))
+            .coordinateSpace(name: timelineCoordinateSpace)
+            .onPreferenceChange(TimelineLayoutFramePreferenceKey.self) { frames in
+                timelineLayoutFrames = frames
+            }
+            .animation(.easeOut(duration: 0.16), value: selectedTimelinePopover?.id)
         }
         .sheet(item: $detailEvent) { event in
             CalendarEventDetailView(
@@ -330,11 +349,11 @@ struct CalendarWeekTimelineView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
     
-    private func timelineBody(metrics: TimelineMetrics) -> some View {
+    private func timelineBody(metrics: TimelineMetrics, containerSize: CGSize) -> some View {
         ZStack(alignment: .topLeading) {
             gridLines(metrics: metrics)
             timeLabels(metrics: metrics)
-            eventBlocks(metrics: metrics)
+            eventBlocks(metrics: metrics, containerSize: containerSize)
         }
         .frame(
             width: metrics.totalWidth,
@@ -384,7 +403,7 @@ struct CalendarWeekTimelineView: View {
         )
     } 
     
-    private func eventBlocks(metrics: TimelineMetrics) -> some View {
+    private func eventBlocks(metrics: TimelineMetrics, containerSize: CGSize) -> some View {
         ForEach(eventLayouts(metrics: metrics)) { layout in
             Text(layout.title)
                 .font(.system(size: metrics.eventFontSize, weight: .semibold))
@@ -401,33 +420,116 @@ struct CalendarWeekTimelineView: View {
                     RoundedRectangle(cornerRadius: 6)
                         .fill(layout.backgroundColor)
                 )
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    selectTimelineLayout(layout)
-                }
-                .popover(
-                    isPresented: isShowingTimelinePopover(for: layout),
-                    attachmentAnchor: .rect(.bounds),
-                    arrowEdge: .top
-                ) {
-                    switch layout.tapAction {
-                    case .showEvent(let event):
-                        CalendarEventSummaryPopoverView(
-                            event: event,
-                            onShowDetail: showEventDetail
+                .background {
+                    GeometryReader { proxy in
+                        Color.clear.preference(
+                            key: TimelineLayoutFramePreferenceKey.self,
+                            value: [
+                                layout.id: proxy.frame(in: .named(timelineCoordinateSpace))
+                            ]
                         )
-                            .presentationCompactAdaptation(.popover)
-                    case .showOverlapGroup:
-                        if let selection = selectedOverlapGroup {
-                            CalendarTimelineOverlapPopoverView(
-                                events: selection.events,
-                                onShowDetail: showOverlapEventDetail
-                            )
-                                .presentationCompactAdaptation(.popover)
-                        }
                     }
                 }
+                .contentShape(Rectangle())
+                .gesture(
+                    SpatialTapGesture()
+                        .onEnded { value in
+                            selectTimelineLayout(
+                                layout,
+                                tapX: value.location.x,
+                                tapY: value.location.y,
+                                metrics: metrics,
+                                containerSize: containerSize
+                            )
+                        }
+                )
                 .offset(x: layout.x, y: layout.y)
+        }
+    }
+    
+    @ViewBuilder
+    private func timelinePopoverOverlay(
+        selection: TimelinePopoverSelection,
+        containerSize: CGSize
+    ) -> some View {
+        ZStack(alignment: .topLeading) {
+            Color.clear
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    selectedTimelinePopover = nil
+                }
+            
+            timelinePopoverContent(selection: selection)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color(uiColor: .secondarySystemBackground))
+                        .shadow(color: .black.opacity(0.16), radius: 16, x: 0, y: 8)
+                )
+                .overlay(alignment: selection.arrowAlignment) {
+                    TimelinePopoverArrow(direction: selection.arrowDirection)
+                        .fill(Color(uiColor: .secondarySystemBackground))
+                        .frame(
+                            width: selection.arrowSize.width,
+                            height: selection.arrowSize.height
+                        )
+                        .offset(selection.arrowOffset)
+                }
+                .position(popoverCenter(for: selection, in: containerSize))
+                .transition(.scale(scale: 0.96).combined(with: .opacity))
+        }
+        .frame(width: containerSize.width, height: containerSize.height)
+        .zIndex(20)
+    }
+    
+    @ViewBuilder
+    private func timelinePopoverContent(selection: TimelinePopoverSelection) -> some View {
+        switch selection.content {
+        case .event(let event):
+            CalendarEventSummaryPopoverView(
+                event: event,
+                onShowDetail: showEventDetail
+            )
+        case .overlapGroup(let events):
+            CalendarTimelineOverlapPopoverView(
+                events: events,
+                onShowDetail: showOverlapEventDetail
+            )
+        }
+    }
+    
+    private func popoverCenter(
+        for selection: TimelinePopoverSelection,
+        in containerSize: CGSize
+    ) -> CGPoint {
+        let size = selection.estimatedSize
+        let edgePadding = TimelinePopoverSelection.edgePadding
+        let arrowGap = TimelinePopoverSelection.arrowGap
+        let minX = edgePadding + size.width / 2
+        let maxX = max(minX, containerSize.width - edgePadding - size.width / 2)
+        let minY = edgePadding + size.height / 2
+        let maxY = max(minY, containerSize.height - edgePadding - size.height / 2)
+        
+        switch selection.placement {
+        case .above:
+            return CGPoint(
+                x: min(max(selection.anchor.x, minX), maxX),
+                y: max(minY, selection.anchor.y - arrowGap - size.height / 2)
+            )
+        case .below:
+            return CGPoint(
+                x: min(max(selection.anchor.x, minX), maxX),
+                y: min(maxY, selection.anchor.y + arrowGap + size.height / 2)
+            )
+        case .left:
+            return CGPoint(
+                x: max(minX, selection.anchor.x - arrowGap - size.width / 2),
+                y: min(max(selection.anchor.y, minY), maxY)
+            )
+        case .right:
+            return CGPoint(
+                x: min(maxX, selection.anchor.x + arrowGap + size.width / 2),
+                y: min(max(selection.anchor.y, minY), maxY)
+            )
         }
     }
     
@@ -459,29 +561,6 @@ struct CalendarWeekTimelineView: View {
         }
     }
     
-    private func isShowingTimelinePopover(for layout: TimelineEventLayout) -> Binding<Bool> {
-        Binding(
-            get: {
-                switch layout.tapAction {
-                case .showEvent(let event):
-                    return selectedEvent?.id == event.id
-                case .showOverlapGroup:
-                    return selectedOverlapGroup?.id == layout.id
-                }
-            },
-            set: { isPresented in
-                if !isPresented {
-                    switch layout.tapAction {
-                    case .showEvent:
-                        selectedEvent = nil
-                    case .showOverlapGroup:
-                        selectedOverlapGroup = nil
-                    }
-                }
-            }
-        )
-    }
-    
     private func isShowingEventPopover(for event: Event) -> Binding<Bool> {
         Binding(
             get: {
@@ -495,28 +574,116 @@ struct CalendarWeekTimelineView: View {
         )
     }
     
-    private func selectTimelineLayout(_ layout: TimelineEventLayout) {
+    private func selectTimelineLayout(
+        _ layout: TimelineEventLayout,
+        tapX: CGFloat,
+        tapY: CGFloat,
+        metrics: TimelineMetrics,
+        containerSize: CGSize
+    ) {
+        let clampedTapX = max(0, min(tapX, max(layout.width, 1)))
+        let clampedTapY = max(0, min(tapY, max(layout.height, 1)))
+        let anchor = timelinePopoverAnchor(
+            for: layout,
+            tapX: clampedTapX,
+            tapY: clampedTapY
+        )
+        
         switch layout.tapAction {
         case .showEvent(let event):
-            selectedOverlapGroup = nil
-            selectedEvent = event
-        case .showOverlapGroup(let events):
-            selectedEvent = nil
-            selectedOverlapGroup = TimelineOverlapSelection(
+            let content = TimelinePopoverContent.event(event)
+            
+            selectedTimelinePopover = TimelinePopoverSelection(
                 id: layout.id,
-                events: events
+                anchor: anchor,
+                placement: timelinePopoverPlacement(
+                    anchor: anchor,
+                    content: content,
+                    metrics: metrics,
+                    containerSize: containerSize
+                ),
+                content: content
+            )
+        case .showOverlapGroup(let events):
+            let content = TimelinePopoverContent.overlapGroup(events)
+            
+            selectedTimelinePopover = TimelinePopoverSelection(
+                id: layout.id,
+                anchor: anchor,
+                placement: timelinePopoverPlacement(
+                    anchor: anchor,
+                    content: content,
+                    metrics: metrics,
+                    containerSize: containerSize
+                ),
+                content: content
             )
         }
+    }
+    
+    private func timelinePopoverAnchor(
+        for layout: TimelineEventLayout,
+        tapX: CGFloat,
+        tapY: CGFloat
+    ) -> CGPoint {
+        guard let frame = timelineLayoutFrames[layout.id] else {
+            return CGPoint(x: layout.x + tapX, y: layout.y + tapY)
+        }
+        
+        return CGPoint(
+            x: frame.minX + tapX,
+            y: frame.minY + tapY
+        )
+    }
+    
+    private func timelinePopoverPlacement(
+        anchor: CGPoint,
+        content: TimelinePopoverContent,
+        metrics: TimelineMetrics,
+        containerSize: CGSize
+    ) -> TimelinePopoverPlacement {
+        let size = TimelinePopoverSelection.estimatedSize(for: content)
+        let edgePadding = TimelinePopoverSelection.edgePadding
+        let arrowGap = TimelinePopoverSelection.arrowGap
+        let topEdge = anchor.y - arrowGap - size.height
+        let bottomEdge = anchor.y + arrowGap + size.height
+        let leftEdge = anchor.x - arrowGap - size.width
+        let rightEdge = anchor.x + arrowGap + size.width
+        let canCenterHorizontally = anchor.x - size.width / 2 >= edgePadding
+            && anchor.x + size.width / 2 <= containerSize.width - edgePadding
+        let canShowAbove = topEdge >= metrics.timelineScrollTopY
+        let canShowBelow = bottomEdge <= containerSize.height - edgePadding
+        let canShowLeft = leftEdge >= edgePadding
+        let canShowRight = rightEdge <= containerSize.width - edgePadding
+        
+        if canCenterHorizontally {
+            return canShowAbove || !canShowBelow ? .above : .below
+        }
+        
+        if anchor.x < containerSize.width / 2 {
+            if canShowRight {
+                return .right
+            }
+            
+            return canShowAbove || !canShowBelow ? .above : .below
+        }
+        
+        if canShowLeft {
+            return .left
+        }
+        
+        return canShowAbove || !canShowBelow ? .above : .below
     }
 
     private func showEventDetail(_ event: Event) {
         selectedEvent = nil
+        selectedTimelinePopover = nil
         onResetEventMutation()
         detailEvent = event
     }
     
     private func showOverlapEventDetail(_ event: Event) {
-        selectedOverlapGroup = nil
+        selectedTimelinePopover = nil
         showEventDetail(event)
     }
     
@@ -633,7 +800,7 @@ struct CalendarWeekTimelineView: View {
             
             return [
                 TimelineEventLayout(
-                    id: "event-\(event.id)",
+                    id: "event-\(day.idValue)-\(event.id)",
                     event: event,
                     title: event.title,
                     x: frame.x,
@@ -708,7 +875,7 @@ struct CalendarWeekTimelineView: View {
             columnEndDates[columnIndex] = interval.endAt
             
             return TimelineEventLayout(
-                id: "event-\(interval.event.id)-column-\(columnIndex)",
+                id: "event-\(day.idValue)-\(interval.event.id)-column-\(columnIndex)",
                 event: interval.event,
                 title: interval.event.title,
                 x: frame.x + CGFloat(columnIndex) * (blockWidth + gap),
@@ -775,7 +942,7 @@ struct CalendarWeekTimelineView: View {
         
         return [
             TimelineEventLayout(
-                id: "group-\(groupID)-representative",
+                id: "group-\(day.idValue)-\(groupID)-representative",
                 event: representativeEvent,
                 title: representativeEvent.title,
                 x: frame.x,
@@ -786,7 +953,7 @@ struct CalendarWeekTimelineView: View {
                 tapAction: .showOverlapGroup(group.events)
             ),
             TimelineEventLayout(
-                id: "group-\(groupID)-overflow",
+                id: "group-\(day.idValue)-\(groupID)-overflow",
                 event: representativeEvent,
                 title: "+\(hiddenEventCount)",
                 x: frame.x + blockWidth + gap,
@@ -1138,6 +1305,10 @@ private struct TimelineMetrics {
     var totalGridHeight: CGFloat {
         timelineTopInset + hourHeight * CGFloat(hourCount)
     }
+    
+    var timelineScrollTopY: CGFloat {
+        topBarHeight + headerHeight + fullDayEventRowHeight
+    }
 }
 
 private struct TimelineOverlapGroup {
@@ -1155,6 +1326,19 @@ private struct TimelineOverlapPoint {
     let change: Int
 }
 
+private struct TimelineLayoutFramePreferenceKey: PreferenceKey {
+    static var defaultValue: [String: CGRect] = [:]
+    
+    static func reduce(
+        value: inout [String: CGRect],
+        nextValue: () -> [String: CGRect]
+    ) {
+        value.merge(nextValue()) { _, newValue in
+            newValue
+        }
+    }
+}
+
 private struct TimelineEventFrame {
     let x: CGFloat
     let y: CGFloat
@@ -1162,9 +1346,126 @@ private struct TimelineEventFrame {
     let height: CGFloat
 }
 
-private struct TimelineOverlapSelection: Identifiable {
+private struct TimelinePopoverSelection: Identifiable {
+    static let edgePadding: CGFloat = 12
+    static let arrowGap: CGFloat = 12
+    static let eventEstimatedHeight: CGFloat = 180
+    
     let id: String
-    let events: [Event]
+    let anchor: CGPoint
+    let placement: TimelinePopoverPlacement
+    let content: TimelinePopoverContent
+    
+    var estimatedSize: CGSize {
+        Self.estimatedSize(for: content)
+    }
+    
+    static func estimatedSize(for content: TimelinePopoverContent) -> CGSize {
+        switch content {
+        case .event:
+            return CGSize(width: 260, height: Self.eventEstimatedHeight)
+        case .overlapGroup(let events):
+            let rowHeight = CGFloat(events.count) * 52
+            let height = min(max(rowHeight + 54, 130), 320)
+            return CGSize(width: 260, height: height)
+        }
+    }
+    
+    var arrowDirection: TimelinePopoverArrowDirection {
+        switch placement {
+        case .above:
+            return .down
+        case .below:
+            return .up
+        case .left:
+            return .right
+        case .right:
+            return .left
+        }
+    }
+    
+    var arrowAlignment: Alignment {
+        switch placement {
+        case .above:
+            return .bottom
+        case .below:
+            return .top
+        case .left:
+            return .trailing
+        case .right:
+            return .leading
+        }
+    }
+    
+    var arrowOffset: CGSize {
+        switch placement {
+        case .above:
+            return CGSize(width: 0, height: 8)
+        case .below:
+            return CGSize(width: 0, height: -8)
+        case .left:
+            return CGSize(width: 8, height: 0)
+        case .right:
+            return CGSize(width: -8, height: 0)
+        }
+    }
+    
+    var arrowSize: CGSize {
+        switch placement {
+        case .above, .below:
+            return CGSize(width: 18, height: 10)
+        case .left, .right:
+            return CGSize(width: 10, height: 18)
+        }
+    }
+}
+
+private enum TimelinePopoverPlacement {
+    case above
+    case below
+    case left
+    case right
+}
+
+private enum TimelinePopoverContent {
+    case event(Event)
+    case overlapGroup([Event])
+}
+
+private enum TimelinePopoverArrowDirection {
+    case up
+    case down
+    case left
+    case right
+}
+
+private struct TimelinePopoverArrow: Shape {
+    let direction: TimelinePopoverArrowDirection
+    
+    func path(in rect: CGRect) -> Path {
+        Path { path in
+            switch direction {
+            case .up:
+                path.move(to: CGPoint(x: rect.midX, y: rect.minY))
+                path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+                path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+            case .down:
+                path.move(to: CGPoint(x: rect.minX, y: rect.minY))
+                path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+                path.addLine(to: CGPoint(x: rect.midX, y: rect.maxY))
+            case .left:
+                path.move(to: CGPoint(x: rect.minX, y: rect.midY))
+                path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+                path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+            case .right:
+                path.move(to: CGPoint(x: rect.minX, y: rect.minY))
+                path.addLine(to: CGPoint(x: rect.maxX, y: rect.midY))
+                path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+            }
+            
+            path.closeSubpath()
+        }
+    }
 }
 
 private enum TimelineEventLayoutStyle {
@@ -1258,6 +1559,12 @@ private struct CalendarTimelineOverlapPopoverView: View {
         }
         .padding(14)
         .frame(width: 260, alignment: .leading)
+    }
+}
+
+private extension DayKey {
+    var idValue: String {
+        "\(year)-\(month)-\(day)"
     }
 }
 
