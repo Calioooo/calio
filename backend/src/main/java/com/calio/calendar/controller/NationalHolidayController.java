@@ -25,6 +25,6 @@ public class NationalHolidayController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
     ) {
-        return nationalHolidayService.listNationalHolidays(from, to);
+        return nationalHolidayService.getNationalHolidays(from, to);
     }
 }

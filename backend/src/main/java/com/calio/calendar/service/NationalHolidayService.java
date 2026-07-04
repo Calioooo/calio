@@ -19,7 +19,7 @@ public class NationalHolidayService {
     }
 
     @Transactional(readOnly = true)
-    public List<NationalHolidayResponse> listNationalHolidays(LocalDate from, LocalDate to) {
+    public List<NationalHolidayResponse> getNationalHolidays(LocalDate from, LocalDate to) {
         validateDateRange(from, to);
         return nationalHolidayRepository.findByHolidayDateBetweenOrderByHolidayDateAscHolidayTitleAsc(from, to)
                 .stream()
