@@ -1,5 +1,7 @@
 package com.calio.calendar.repository.entity;
 
+import com.calio.calendar.exception.CalioException;
+import com.calio.calendar.exception.ErrorCode;
 import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
@@ -40,8 +42,17 @@ public class Tag extends BaseEntity {
     }
 
     public void update(String title, String colorCode) {
+        validateCustomTag();
         this.title = title;
         this.colorCode = new ColorCode(colorCode);
+    }
+
+    private void validateCustomTag() {
+        if (tagType == TagType.CUSTOM) {
+            return;
+        }
+
+        throw new CalioException(ErrorCode.VALIDATION_FAILED);
     }
 
     public Long getId() {
