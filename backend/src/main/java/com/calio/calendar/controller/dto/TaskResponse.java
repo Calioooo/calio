@@ -1,0 +1,23 @@
+package com.calio.calendar.controller.dto;
+
+import com.calio.calendar.repository.entity.Task;
+import java.time.Instant;
+
+public record TaskResponse(
+        Long taskId,
+        String taskTitle,
+        boolean isCompleted,
+        Instant createdAt,
+        Instant updatedAt
+) {
+
+    public static TaskResponse from(Task task) {
+        return new TaskResponse(
+                task.getTaskId(),
+                task.getTaskTitle(),
+                task.isCompleted(),
+                task.getCreatedAt(),
+                task.getUpdatedAt()
+        );
+    }
+}
