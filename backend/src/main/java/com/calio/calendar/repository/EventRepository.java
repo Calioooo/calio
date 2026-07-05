@@ -1,6 +1,7 @@
 package com.calio.calendar.repository;
 
 import com.calio.calendar.repository.entity.Event;
+import com.calio.calendar.repository.entity.Tag;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -15,4 +16,6 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     List<Event> findByRecurrenceIdAndDeletedAtIsNullOrderByStartAtAsc(Long recurrenceId);
 
     List<Event> findByRecurrenceIdOrderByStartAtAsc(Long recurrenceId);
+
+    List<Event> findByTag(Tag tag);
 }

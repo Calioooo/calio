@@ -19,6 +19,6 @@ public class TagController {
 
     @GetMapping
     public List<TagResponse> listTags() {
-        return tagService.listDefaultTags();
+        return tagService.listTags();
     }
 }

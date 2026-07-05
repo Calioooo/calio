@@ -1,9 +1,14 @@
 package com.calio.calendar.service;
 
+import com.calio.calendar.controller.dto.CustomTagRequest;
 import com.calio.calendar.controller.dto.TagResponse;
 import com.calio.calendar.exception.CalioException;
 import com.calio.calendar.exception.ErrorCode;
+import com.calio.calendar.repository.EventRepository;
+import com.calio.calendar.repository.RecurrenceEventRepository;
 import com.calio.calendar.repository.TagRepository;
+import com.calio.calendar.repository.entity.Event;
+import com.calio.calendar.repository.entity.RecurrenceEvent;
 import com.calio.calendar.repository.entity.Tag;
 import com.calio.calendar.repository.entity.TagType;
 import java.util.List;
@@ -17,13 +22,21 @@ public class TagService {
     private static final String FALLBACK_TAG_TITLE = "기타";
 
     private final TagRepository tagRepository;
+    private final EventRepository eventRepository;
+    private final RecurrenceEventRepository recurrenceEventRepository;
 
-    public TagService(TagRepository tagRepository) {
+    public TagService(
+            TagRepository tagRepository,
+            EventRepository eventRepository,
+            RecurrenceEventRepository recurrenceEventRepository
+    ) {
         this.tagRepository = tagRepository;
+        this.eventRepository = eventRepository;
+        this.recurrenceEventRepository = recurrenceEventRepository;
     }
 
-    public List<TagResponse> listDefaultTags() {
-        return tagRepository.findByTagTypeOrderByIdAsc(TagType.DEFAULT)
+    public List<TagResponse> listTags() {
+        return tagRepository.findAllByOrderByIdAsc()
                 .stream()
                 .map(TagResponse::from)
                 .toList();
@@ -38,8 +51,49 @@ public class TagService {
     }
 
     public Tag getTag(Long tagId) {
-        return tagRepository.findByIdAndTagType(tagId, TagType.DEFAULT)
+        return tagRepository.findById(tagId)
                 .orElseThrow(() -> new CalioException(ErrorCode.TAG_NOT_FOUND));
+    }
+
+    @Transactional
+    public TagResponse createCustomTag(CustomTagRequest request) {
+        Tag tag = tagRepository.save(new Tag(TagType.CUSTOM, request.title(), request.colorCode()));
+        return TagResponse.from(tag);
+    }
+
+    @Transactional
+    public TagResponse updateCustomTag(Long tagId, CustomTagRequest request) {
+        Tag tag = getCustomTag(tagId);
+        tag.update(request.title(), request.colorCode());
+        tagRepository.flush();
+        return TagResponse.from(tag);
+    }
+
+    @Transactional
+    public void deleteCustomTag(Long tagId) {
+        Tag tag = getCustomTag(tagId);
+        Tag fallbackTag = resolveFallbackTag();
+
+        reassignEvents(tag, fallbackTag);
+        reassignRecurrenceEvents(tag, fallbackTag);
+        eventRepository.flush();
+        recurrenceEventRepository.flush();
+        tagRepository.delete(tag);
+    }
+
+    private Tag getCustomTag(Long tagId) {
+        return tagRepository.findByIdAndTagType(tagId, TagType.CUSTOM)
+                .orElseThrow(() -> new CalioException(ErrorCode.TAG_NOT_FOUND));
+    }
+
+    private void reassignEvents(Tag sourceTag, Tag fallbackTag) {
+        List<Event> events = eventRepository.findByTag(sourceTag);
+        events.forEach(event -> event.changeTag(fallbackTag));
+    }
+
+    private void reassignRecurrenceEvents(Tag sourceTag, Tag fallbackTag) {
+        List<RecurrenceEvent> recurrenceEvents = recurrenceEventRepository.findByTag(sourceTag);
+        recurrenceEvents.forEach(recurrenceEvent -> recurrenceEvent.changeTag(fallbackTag));
     }
 
     private Tag resolveFallbackTag() {

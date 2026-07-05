@@ -39,6 +39,11 @@ public class Tag extends BaseEntity {
         this.colorCode = new ColorCode(colorCode);
     }
 
+    public void update(String title, String colorCode) {
+        this.title = title;
+        this.colorCode = new ColorCode(colorCode);
+    }
+
     public Long getId() {
         return id;
     }

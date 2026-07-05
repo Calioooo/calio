@@ -8,6 +8,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface TagRepository extends JpaRepository<Tag, Long> {
 
+    List<Tag> findAllByOrderByIdAsc();
+
     List<Tag> findByTagTypeOrderByIdAsc(TagType tagType);
 
     Optional<Tag> findByIdAndTagType(Long id, TagType tagType);
