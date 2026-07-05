@@ -374,6 +374,11 @@ struct CalendarMonthScheduleView: View {
         }
 
         guard didReachRangeSelectionDelay() else {
+            if handleMonthSwipeIfNeeded(value) {
+                activeDateRange = nil
+                return
+            }
+            
             selectDayIfTap(
                 value,
                 cellWidth: cellWidth,
@@ -416,6 +421,31 @@ struct CalendarMonthScheduleView: View {
         }
 
         selectDay(day)
+    }
+    
+    private func handleMonthSwipeIfNeeded(_ value: DragGesture.Value) -> Bool {
+        guard confirmedDateRange == nil && !isRangeDragActive else {
+            return false
+        }
+        
+        let horizontal = value.translation.width
+        let vertical = value.translation.height
+        
+        guard abs(horizontal) > abs(vertical) else {
+            return false
+        }
+        
+        if horizontal < -monthSwipeThreshold {
+            onMonthChanged(1)
+            return true
+        }
+        
+        if horizontal > monthSwipeThreshold {
+            onMonthChanged(-1)
+            return true
+        }
+        
+        return false
     }
 
     private func didReachRangeSelectionDelay() -> Bool {
