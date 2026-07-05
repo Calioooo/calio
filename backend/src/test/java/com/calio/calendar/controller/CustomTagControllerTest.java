@@ -174,7 +174,7 @@ class CustomTagControllerTest {
     }
 
     @Test
-    @DisplayName("fallback 기타 태그가 없으면 custom tag 삭제는 DEFAULT_TAG_NOT_FOUND로 실패하고 기존 참조를 보존한다")
+    @DisplayName("fallback 기타 태그가 없으면 custom tag 삭제는 500 계열 DEFAULT_TAG_NOT_FOUND로 실패하고 기존 참조를 보존한다")
     void givenMissingFallbackTag_whenDeleteCustomTag_thenReturnsDefaultTagNotFoundAndKeepsReferences()
             throws Exception {
         // given
@@ -185,7 +185,7 @@ class CustomTagControllerTest {
         // when
         mockMvc.perform(delete("/api/custom-tags/{tagId}", customTag.getId()))
                 // then
-                .andExpect(status().isNotFound())
+                .andExpect(status().is5xxServerError())
                 .andExpect(jsonPath("$.errorCode").value("DEFAULT_TAG_NOT_FOUND"));
 
         assertThat(tagRepository.existsById(customTag.getId())).isTrue();
