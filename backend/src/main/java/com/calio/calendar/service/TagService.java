@@ -7,8 +7,6 @@ import com.calio.calendar.exception.ErrorCode;
 import com.calio.calendar.repository.EventRepository;
 import com.calio.calendar.repository.RecurrenceEventRepository;
 import com.calio.calendar.repository.TagRepository;
-import com.calio.calendar.repository.entity.Event;
-import com.calio.calendar.repository.entity.RecurrenceEvent;
 import com.calio.calendar.repository.entity.Tag;
 import com.calio.calendar.repository.entity.TagType;
 import java.util.List;
@@ -76,8 +74,6 @@ public class TagService {
 
         reassignEvents(tag, fallbackTag);
         reassignRecurrenceEvents(tag, fallbackTag);
-        eventRepository.flush();
-        recurrenceEventRepository.flush();
         tagRepository.delete(tag);
     }
 
@@ -87,13 +83,11 @@ public class TagService {
     }
 
     private void reassignEvents(Tag sourceTag, Tag fallbackTag) {
-        List<Event> events = eventRepository.findByTag(sourceTag);
-        events.forEach(event -> event.changeTag(fallbackTag));
+        eventRepository.updateTag(sourceTag, fallbackTag);
     }
 
     private void reassignRecurrenceEvents(Tag sourceTag, Tag fallbackTag) {
-        List<RecurrenceEvent> recurrenceEvents = recurrenceEventRepository.findByTag(sourceTag);
-        recurrenceEvents.forEach(recurrenceEvent -> recurrenceEvent.changeTag(fallbackTag));
+        recurrenceEventRepository.updateTag(sourceTag, fallbackTag);
     }
 
     private Tag resolveFallbackTag() {
