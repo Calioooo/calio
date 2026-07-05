@@ -46,7 +46,7 @@ class TaskControllerTest {
     }
 
     @Test
-    @DisplayName("사용자는 taskTitle로 작업을 생성하면 서버 기본 완료 상태와 감사 필드가 포함된 작업을 받는다")
+    @DisplayName("새로 생성한 할 일의 완료 상태는 기본적으로 미완료이다")
     void givenValidTaskTitle_whenCreateTask_thenReturnsPersistedTaskWithServerManagedDefaults()
             throws Exception {
         // given
