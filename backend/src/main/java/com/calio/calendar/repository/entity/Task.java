@@ -19,14 +19,14 @@ public class Task extends BaseEntity {
     private String taskTitle;
 
     @Column(nullable = false)
-    private boolean isCompleted = false;
+    private boolean completed = false;
 
     protected Task() {
     }
 
     public Task(String taskTitle) {
         this.taskTitle = taskTitle;
-        this.isCompleted = false;
+        this.completed = false;
     }
 
     public Long getTaskId() {
@@ -38,6 +38,6 @@ public class Task extends BaseEntity {
     }
 
     public boolean isCompleted() {
-        return isCompleted;
+        return completed;
     }
 }
