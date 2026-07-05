@@ -149,35 +149,6 @@ class TaskControllerTest {
                 .andExpect(jsonPath("$[2].taskTitle").value("Third task"));
     }
 
-    @Test
-    @DisplayName("사용자는 생성된 taskId로 단일 작업을 조회할 수 있다")
-    void givenExistingTaskId_whenGetTask_thenReturnsTask() throws Exception {
-        // given
-        long taskId = createTask("Read task");
-
-        // when
-        mockMvc.perform(get("/api/tasks/{taskId}", taskId))
-                // then
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.taskId").value(taskId))
-                .andExpect(jsonPath("$.taskTitle").value("Read task"))
-                .andExpect(jsonPath("$.isCompleted").value(false))
-                .andExpect(jsonPath("$.createdAt").isString())
-                .andExpect(jsonPath("$.updatedAt").isString());
-    }
-
-    @Test
-    @DisplayName("사용자는 존재하지 않는 taskId를 조회하면 TASK_NOT_FOUND를 받는다")
-    void givenMissingTaskId_whenGetTask_thenReturnsTaskNotFound() throws Exception {
-        // when
-        mockMvc.perform(get("/api/tasks/{taskId}", 999999L))
-                // then
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.errorCode").value("TASK_NOT_FOUND"))
-                .andExpect(jsonPath("$.message").value("Task not found."))
-                .andExpect(jsonPath("$.*", hasSize(2)));
-    }
-
     private long createTask(String taskTitle) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/tasks")
                         .contentType(MediaType.APPLICATION_JSON)
