@@ -92,54 +92,30 @@ struct CalendarMonthScheduleView: View {
 
     private var monthGrid: some View {
         GeometryReader { geometry in
-            let cellWidth = geometry.size.width / CGFloat(columnCount)
-            let cellHeight = geometry.size.height / CGFloat(rowCount)
+            let metrics = monthGridMetrics(for: geometry.size)
             let itemsByDay = Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })
-            let maxEventRowCount = visibleEventRowCount(for: cellHeight)
             let eventLayout = MonthEventLayoutBuilder.make(
                 items: items,
                 days: monthGridDays,
-                maxVisibleRowCount: maxEventRowCount,
+                maxVisibleRowCount: metrics.maxEventRowCount,
                 calendar: calendar
             )
 
             ZStack(alignment: .topLeading) {
-                LazyVGrid(
-                    columns: Array(
-                        repeating: GridItem(.flexible(), spacing: 0),
-                        count: columnCount
-                    ),
-                    spacing: 0
-                ) {
-                    ForEach(monthGridDays, id: \.self) { day in
-                        CalendarMonthScheduleDayCellView(
-                            day: day,
-                            item: itemsByDay[day],
-                            referenceDay: referenceDay,
-                            selectedDateRange: visibleDateRange
-                        )
-                        .frame(width: cellWidth, height: cellHeight)
-                    }
-                }
-                .id(monthIdentifier)
-                .coordinateSpace(name: monthGridCoordinateSpace)
-                .contentShape(Rectangle())
-                .simultaneousGesture(
-                    rangeSelectionGesture(cellWidth: cellWidth, cellHeight: cellHeight)
+                monthDayGrid(
+                    metrics: metrics,
+                    itemsByDay: itemsByDay
                 )
 
                 monthEventSpans(
                     eventLayout.spans,
-                    cellWidth: cellWidth,
-                    cellHeight: cellHeight
+                    metrics: metrics
                 )
                 .allowsHitTesting(false)
 
                 monthEventOverflowLabels(
                     eventLayout.hiddenCountByDay,
-                    cellWidth: cellWidth,
-                    cellHeight: cellHeight,
-                    overflowRowIndex: max(maxEventRowCount - 1, 0)
+                    metrics: metrics
                 )
                 .allowsHitTesting(false)
 
@@ -147,13 +123,57 @@ struct CalendarMonthScheduleView: View {
 
                 rangeActionPopover(
                     gridSize: geometry.size,
-                    cellWidth: cellWidth,
-                    cellHeight: cellHeight
+                    cellWidth: metrics.cellWidth,
+                    cellHeight: metrics.cellHeight
                 )
             }
         }
         .padding(.horizontal, 8)
         .padding(.bottom, 8)
+    }
+    
+    private func monthGridMetrics(for size: CGSize) -> MonthGridMetrics {
+        let cellWidth = size.width / CGFloat(columnCount)
+        let cellHeight = size.height / CGFloat(rowCount)
+        let maxEventRowCount = visibleEventRowCount(for: cellHeight)
+        
+        return MonthGridMetrics(
+            cellWidth: cellWidth,
+            cellHeight: cellHeight,
+            maxEventRowCount: maxEventRowCount
+        )
+    }
+    
+    private func monthDayGrid(
+        metrics: MonthGridMetrics,
+        itemsByDay: [DayKey: CalendarDateCellItem]
+    ) -> some View {
+        LazyVGrid(
+            columns: Array(
+                repeating: GridItem(.flexible(), spacing: 0),
+                count: columnCount
+            ),
+            spacing: 0
+        ) {
+            ForEach(monthGridDays, id: \.self) { day in
+                CalendarMonthScheduleDayCellView(
+                    day: day,
+                    item: itemsByDay[day],
+                    referenceDay: referenceDay,
+                    selectedDateRange: visibleDateRange
+                )
+                .frame(width: metrics.cellWidth, height: metrics.cellHeight)
+            }
+        }
+        .id(monthIdentifier)
+        .coordinateSpace(name: monthGridCoordinateSpace)
+        .contentShape(Rectangle())
+        .simultaneousGesture(
+            rangeSelectionGesture(
+                cellWidth: metrics.cellWidth,
+                cellHeight: metrics.cellHeight
+            )
+        )
     }
 
     private var monthSwipeGesture: some Gesture {
@@ -235,56 +255,50 @@ struct CalendarMonthScheduleView: View {
 
     private func monthEventSpans(
         _ spans: [MonthEventSpanItem],
-        cellWidth: CGFloat,
-        cellHeight: CGFloat
+        metrics: MonthGridMetrics
     ) -> some View {
         ForEach(spans) { span in
-            Text(span.event.title)
-                .font(.system(size: 10, weight: .medium))
-                .lineLimit(1)
-                .truncationMode(.tail)
-                .foregroundStyle(.black.opacity(0.85))
-                .padding(.horizontal, 4)
-                .frame(
-                    width: max(CGFloat(span.columnSpan) * cellWidth - (monthCellHorizontalPadding * 2), 1),
-                    height: monthEventChipHeight,
-                    alignment: .leading
-                )
-                .background(Color(hex: span.event.colorCode))
-                .clipShape(RoundedRectangle(cornerRadius: 3))
-                .offset(
-                    x: CGFloat(span.startColumn) * cellWidth + monthCellHorizontalPadding,
-                    y: CGFloat(span.weekRowIndex) * cellHeight
-                        + eventAreaTopOffset
-                        + CGFloat(span.eventRowIndex) * monthEventRowHeight
-                )
+            MonthEventSpanView(
+                span: span,
+                metrics: metrics,
+                horizontalPadding: monthCellHorizontalPadding,
+                topOffset: eventAreaTopOffset,
+                rowHeight: monthEventRowHeight,
+                chipHeight: monthEventChipHeight
+            )
         }
     }
 
     private func monthEventOverflowLabels(
         _ hiddenCountByDay: [DayKey: Int],
-        cellWidth: CGFloat,
-        cellHeight: CGFloat,
-        overflowRowIndex: Int
+        metrics: MonthGridMetrics
     ) -> some View {
-        ForEach(monthGridDays, id: \.self) { day in
-            if let hiddenCount = hiddenCountByDay[day], hiddenCount > 0,
-               let index = monthGridDays.firstIndex(of: day) {
-                Text("+\(hiddenCount)")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(.secondary)
-                    .frame(
-                        width: max(cellWidth - (monthCellHorizontalPadding * 2), 1),
-                        height: monthEventChipHeight,
-                        alignment: .leading
-                    )
-                    .offset(
-                        x: CGFloat(index % columnCount) * cellWidth + monthCellHorizontalPadding,
-                        y: CGFloat(index / columnCount) * cellHeight
-                            + eventAreaTopOffset
-                            + CGFloat(overflowRowIndex) * monthEventRowHeight
-                    )
+        ForEach(monthEventOverflowLabelItems(hiddenCountByDay)) { label in
+            MonthEventOverflowLabelView(
+                label: label,
+                metrics: metrics,
+                columnCount: columnCount,
+                horizontalPadding: monthCellHorizontalPadding,
+                topOffset: eventAreaTopOffset,
+                rowHeight: monthEventRowHeight,
+                chipHeight: monthEventChipHeight
+            )
+        }
+    }
+    
+    private func monthEventOverflowLabelItems(
+        _ hiddenCountByDay: [DayKey: Int]
+    ) -> [MonthEventOverflowLabelItem] {
+        monthGridDays.enumerated().compactMap { index, day in
+            guard let hiddenCount = hiddenCountByDay[day], hiddenCount > 0 else {
+                return nil
             }
+            
+            return MonthEventOverflowLabelItem(
+                day: day,
+                dayIndex: index,
+                hiddenCount: hiddenCount
+            )
         }
     }
 
@@ -744,6 +758,16 @@ private struct MonthEventLayout {
     let hiddenCountByDay: [DayKey: Int]
 }
 
+private struct MonthGridMetrics {
+    let cellWidth: CGFloat
+    let cellHeight: CGFloat
+    let maxEventRowCount: Int
+    
+    var overflowRowIndex: Int {
+        max(maxEventRowCount - 1, 0)
+    }
+}
+
 private struct MonthEventSpanItem: Identifiable {
     let event: Event
     let weekRowIndex: Int
@@ -754,6 +778,92 @@ private struct MonthEventSpanItem: Identifiable {
 
     var id: String {
         "\(event.id)-\(weekRowIndex)-\(startColumn)-\(columnSpan)-\(eventRowIndex)"
+    }
+}
+
+private struct MonthEventSpanView: View {
+    let span: MonthEventSpanItem
+    let metrics: MonthGridMetrics
+    let horizontalPadding: CGFloat
+    let topOffset: CGFloat
+    let rowHeight: CGFloat
+    let chipHeight: CGFloat
+    
+    var body: some View {
+        Text(span.event.title)
+            .font(.system(size: 10, weight: .medium))
+            .lineLimit(1)
+            .truncationMode(.tail)
+            .foregroundStyle(.black.opacity(0.85))
+            .padding(.horizontal, 4)
+            .frame(
+                width: chipWidth,
+                height: chipHeight,
+                alignment: .leading
+            )
+            .background(Color(hex: span.event.colorCode))
+            .clipShape(RoundedRectangle(cornerRadius: 3))
+            .offset(x: xOffset, y: yOffset)
+    }
+    
+    private var chipWidth: CGFloat {
+        max(CGFloat(span.columnSpan) * metrics.cellWidth - (horizontalPadding * 2), 1)
+    }
+    
+    private var xOffset: CGFloat {
+        CGFloat(span.startColumn) * metrics.cellWidth + horizontalPadding
+    }
+    
+    private var yOffset: CGFloat {
+        CGFloat(span.weekRowIndex) * metrics.cellHeight
+            + topOffset
+            + CGFloat(span.eventRowIndex) * rowHeight
+    }
+}
+
+private struct MonthEventOverflowLabelItem: Identifiable {
+    let day: DayKey
+    let dayIndex: Int
+    let hiddenCount: Int
+
+    var id: DayKey {
+        day
+    }
+}
+
+private struct MonthEventOverflowLabelView: View {
+    let label: MonthEventOverflowLabelItem
+    let metrics: MonthGridMetrics
+    let columnCount: Int
+    let horizontalPadding: CGFloat
+    let topOffset: CGFloat
+    let rowHeight: CGFloat
+    let chipHeight: CGFloat
+    
+    var body: some View {
+        Text("+\(label.hiddenCount)")
+            .font(.system(size: 10, weight: .medium))
+            .foregroundStyle(.secondary)
+            .frame(
+                width: labelWidth,
+                height: chipHeight,
+                alignment: .leading
+            )
+            .offset(x: xOffset, y: yOffset)
+    }
+    
+    private var labelWidth: CGFloat {
+        max(metrics.cellWidth - (horizontalPadding * 2), 1)
+    }
+    
+    private var xOffset: CGFloat {
+        CGFloat(label.dayIndex % columnCount) * metrics.cellWidth + horizontalPadding
+    }
+    
+    private var yOffset: CGFloat {
+        CGFloat(label.dayIndex / columnCount) * metrics.cellHeight
+            + topOffset
+            + CGFloat(metrics.overflowRowIndex) * rowHeight
     }
 }
 

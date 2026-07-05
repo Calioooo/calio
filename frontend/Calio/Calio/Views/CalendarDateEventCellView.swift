@@ -14,12 +14,13 @@ struct CalendarDateEventCellView: View {
     private let eventChipSpacing: CGFloat = 8
     private let eventChipFont = UIFont.systemFont(ofSize: 13, weight: .medium)
     
+    let day: DayKey
     let weekday: CalendarWeekday
     let monthText: String
     let dayText: String
     let isToday: Bool
     let onTap: () -> Void
-    @Binding var selectedEvent: Event?
+    @Binding var selectedEvent: CalendarDateEventSelection?
     let onEventSelected: (Event) -> Void
     let onShowEventDetail: (Event) -> Void
     let events: [Event]
@@ -29,10 +30,9 @@ struct CalendarDateEventCellView: View {
             let chipLayout = eventChipLayout(maxWidth: geometry.size.width)
 
             ZStack(alignment: .topLeading) {
-                Button(action: onTap) {
-                    Color.clear
-                }
-                .buttonStyle(.plain)
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture(perform: onTap)
 
                 VStack(spacing: 8) {
                     Text("\(monthText) / \(dayText)")
@@ -65,7 +65,7 @@ struct CalendarDateEventCellView: View {
 
     private func eventChipButton(_ event: Event) -> some View {
         Button {
-            selectedEvent = event
+            selectedEvent = CalendarDateEventSelection(day: day, event: event)
             onEventSelected(event)
         } label: {
             Text(event.title)
@@ -95,7 +95,7 @@ struct CalendarDateEventCellView: View {
     private func isShowingEventPopover(for event: Event) -> Binding<Bool> {
         Binding(
             get: {
-                selectedEvent?.id == event.id
+                selectedEvent?.day == day && selectedEvent?.event.id == event.id
             },
             set: { isPresented in
                 if !isPresented {
@@ -165,6 +165,18 @@ private struct EventChipLayout {
     let hiddenEventCount: Int
 }
 
+struct CalendarDateEventSelection: Equatable {
+    let day: DayKey
+    let event: Event
+    
+    static func == (
+        lhs: CalendarDateEventSelection,
+        rhs: CalendarDateEventSelection
+    ) -> Bool {
+        lhs.day == rhs.day && lhs.event.id == rhs.event.id
+    }
+}
+
 private struct EventChipRows {
     private(set) var count = 0
     private var currentRowWidth: CGFloat = 0
@@ -189,6 +201,7 @@ private struct EventChipRows {
 
 #Preview {
     CalendarDateEventCellView(
+        day: DayKey(date: Date()),
         weekday: .monday,
         monthText: "6",
         dayText: "27",

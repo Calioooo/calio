@@ -67,7 +67,7 @@ struct CalendarDateEventView: View {
     }
     
     @StateObject private var focusCoordinator = CalendarScrollFocusCoordinator()
-    @State private var selectedEvent: Event?
+    @State private var selectedEvent: CalendarDateEventSelection?
     @State private var detailEvent: Event?
     
     var body: some View {
@@ -110,6 +110,7 @@ struct CalendarDateEventView: View {
             LazyVStack(spacing: rowSpacing) {
                 ForEach(items) { item in
                     CalendarDateEventCellView(
+                        day: item.id,
                         weekday: item.weekday,
                         monthText: item.monthText,
                         dayText: item.dayText,
@@ -121,9 +122,7 @@ struct CalendarDateEventView: View {
                             )
                         },
                         selectedEvent: $selectedEvent,
-                        onEventSelected: { event in
-                            selectedEvent = event
-                        },
+                        onEventSelected: { _ in },
                         onShowEventDetail: showEventDetail,
                         events: item.events
                     )

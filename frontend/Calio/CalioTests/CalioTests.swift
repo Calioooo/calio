@@ -146,6 +146,7 @@ struct CalioTests {
         var dateSelectionCount = 0
         var detailEventID: Int64?
         let cell = CalendarDateEventCellView(
+            day: DayKey(year: 2026, month: 6, day: 28),
             weekday: .monday,
             monthText: "6",
             dayText: "28",
