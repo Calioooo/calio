@@ -42,17 +42,12 @@ public class Tag extends BaseEntity {
     }
 
     public void update(String title, String colorCode) {
-        validateCustomTag();
-        this.title = title;
-        this.colorCode = new ColorCode(colorCode);
-    }
-
-    private void validateCustomTag() {
-        if (tagType == TagType.CUSTOM) {
-            return;
+        if (tagType != TagType.CUSTOM) {
+            throw new CalioException(ErrorCode.VALIDATION_FAILED);
         }
 
-        throw new CalioException(ErrorCode.VALIDATION_FAILED);
+        this.title = title;
+        this.colorCode = new ColorCode(colorCode);
     }
 
     public Long getId() {
