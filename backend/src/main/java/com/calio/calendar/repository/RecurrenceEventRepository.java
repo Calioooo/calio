@@ -11,5 +11,5 @@ public interface RecurrenceEventRepository extends JpaRepository<RecurrenceEvent
 
     @Modifying(flushAutomatically = true)
     @Query("update RecurrenceEvent recurrenceEvent set recurrenceEvent.tag = :fallbackTag where recurrenceEvent.tag = :sourceTag")
-    int updateTag(@Param("sourceTag") Tag sourceTag, @Param("fallbackTag") Tag fallbackTag);
+    int reassignAllByTag(@Param("sourceTag") Tag sourceTag, @Param("fallbackTag") Tag fallbackTag);
 }

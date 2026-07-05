@@ -83,11 +83,11 @@ public class TagService {
     }
 
     private void reassignEvents(Tag sourceTag, Tag fallbackTag) {
-        eventRepository.updateTag(sourceTag, fallbackTag);
+        eventRepository.reassignAllByTag(sourceTag, fallbackTag);
     }
 
     private void reassignRecurrenceEvents(Tag sourceTag, Tag fallbackTag) {
-        recurrenceEventRepository.updateTag(sourceTag, fallbackTag);
+        recurrenceEventRepository.reassignAllByTag(sourceTag, fallbackTag);
     }
 
     private Tag resolveFallbackTag() {

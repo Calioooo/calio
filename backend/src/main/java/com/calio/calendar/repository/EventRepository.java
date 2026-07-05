@@ -22,5 +22,5 @@ public interface EventRepository extends JpaRepository<Event, Long> {
 
     @Modifying(flushAutomatically = true)
     @Query("update Event event set event.tag = :fallbackTag where event.tag = :sourceTag")
-    int updateTag(@Param("sourceTag") Tag sourceTag, @Param("fallbackTag") Tag fallbackTag);
+    int reassignAllByTag(@Param("sourceTag") Tag sourceTag, @Param("fallbackTag") Tag fallbackTag);
 }
