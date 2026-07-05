@@ -112,12 +112,13 @@ class EventControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.tag.id").value(workTag.getId()))
                 .andExpect(jsonPath("$.tag.title").value("업무"))
-                .andExpect(jsonPath("$.tag.colorCode").value("#2563EB"));
+                .andExpect(jsonPath("$.tag.colorCode").value("#2563EB"))
+                .andExpect(jsonPath("$.tag.tagType").value("DEFAULT"));
     }
 
     @Test
-    @DisplayName("사용자는 CUSTOM tagId로 일정을 생성할 수 없다")
-    void givenCustomTagId_whenCreateEvent_thenReturnsTagNotFound() throws Exception {
+    @DisplayName("사용자는 CUSTOM tagId를 지정해 일정을 생성하면 해당 태그가 저장된 응답을 받는다")
+    void givenCustomTagId_whenCreateEvent_thenStoresSelectedTag() throws Exception {
         // given
         Tag customTag = tagRepository.save(new Tag(TagType.CUSTOM, "사용자", "#111111"));
 
@@ -133,9 +134,11 @@ class EventControllerTest {
                                 }
                                 """.formatted(customTag.getId())))
                 // then
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.errorCode").value("TAG_NOT_FOUND"))
-                .andExpect(jsonPath("$.message").value("Tag not found."));
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.tag.id").value(customTag.getId()))
+                .andExpect(jsonPath("$.tag.title").value("사용자"))
+                .andExpect(jsonPath("$.tag.colorCode").value("#111111"))
+                .andExpect(jsonPath("$.tag.tagType").value("CUSTOM"));
     }
 
     @Test
@@ -172,6 +175,51 @@ class EventControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.tag.title").value("기타"))
                 .andExpect(jsonPath("$.tag.colorCode").value("#64748B"));
+    }
+
+    @Test
+    @DisplayName("사용자는 CUSTOM tagId를 지정해 일정을 수정하면 해당 태그가 저장된 응답을 받는다")
+    void givenCustomTagId_whenUpdateEvent_thenStoresSelectedTag() throws Exception {
+        // given
+        Tag customTag = tagRepository.save(new Tag(TagType.CUSTOM, "수정 사용자", "#8b5cf6"));
+        long eventId = createEvent("Custom update target", "2026-06-19T00:00:00Z", "2026-06-19T01:00:00Z");
+
+        // when
+        mockMvc.perform(put("/api/events/{eventId}", eventId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Custom updated",
+                                  "startAt": "2026-06-19T02:00:00Z",
+                                  "endAt": "2026-06-19T03:00:00Z",
+                                  "tagId": %d
+                                }
+                                """.formatted(customTag.getId())))
+                // then
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tag.id").value(customTag.getId()))
+                .andExpect(jsonPath("$.tag.title").value("수정 사용자"))
+                .andExpect(jsonPath("$.tag.colorCode").value("#8B5CF6"))
+                .andExpect(jsonPath("$.tag.tagType").value("CUSTOM"));
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 tagId로 일정을 생성하면 TAG_NOT_FOUND를 받는다")
+    void givenMissingTagId_whenCreateEvent_thenReturnsTagNotFound() throws Exception {
+        // when
+        mockMvc.perform(post("/api/events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Missing tag",
+                                  "startAt": "2026-06-20T00:00:00Z",
+                                  "endAt": "2026-06-20T01:00:00Z",
+                                  "tagId": 999999
+                                }
+                                """))
+                // then
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("TAG_NOT_FOUND"));
     }
 
     @Test

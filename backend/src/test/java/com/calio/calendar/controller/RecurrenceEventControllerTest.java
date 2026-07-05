@@ -152,6 +152,39 @@ class RecurrenceEventControllerTest {
     }
 
     @Test
+    @DisplayName("사용자는 CUSTOM tagId로 반복 일정을 생성하면 rule과 occurrence에 같은 태그가 저장된다")
+    void givenCustomTagId_whenCreateRecurrenceEvent_thenStoresTagOnRuleAndOccurrences() throws Exception {
+        // given
+        Tag customTag = tagRepository.save(new Tag(TagType.CUSTOM, "반복 사용자", "#8b5cf6"));
+
+        // when
+        MvcResult createResult = mockMvc.perform(post("/api/recurrence-events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(recurrenceRequest(
+                                "Custom tagged recurrence",
+                                "Tagged memo",
+                                "2026-08-07",
+                                "2026-08-08",
+                                "09:00:00",
+                                "10:00:00",
+                                "DAILY",
+                                customTag.getId()
+                        )))
+                // then
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.tag.id").value(customTag.getId()))
+                .andExpect(jsonPath("$.tag.colorCode").value("#8B5CF6"))
+                .andExpect(jsonPath("$.tag.tagType").value("CUSTOM"))
+                .andReturn();
+
+        long recurrenceId = readResponse(createResult).get("recurrenceId").asLong();
+        assertThat(recurrenceEventRepository.findById(recurrenceId))
+                .hasValueSatisfying(rule -> assertThat(rule.getTag().getId()).isEqualTo(customTag.getId()));
+        assertThat(eventRepository.findByRecurrenceIdAndDeletedAtIsNullOrderByStartAtAsc(recurrenceId))
+                .allSatisfy(event -> assertThat(event.getTag().getId()).isEqualTo(customTag.getId()));
+    }
+
+    @Test
     @DisplayName("사용자는 생성된 반복 일정 id로 저장된 rule을 조회할 수 있다")
     void givenExistingRecurrenceId_whenGetRecurrenceEvent_thenReturnsStoredRule() throws Exception {
         // given
@@ -205,12 +238,12 @@ class RecurrenceEventControllerTest {
     }
 
     @Test
-    @DisplayName("반복 일정 전체 수정에서 explicit DEFAULT tagId는 rule과 유지 occurrence에 적용된다")
+    @DisplayName("반복 일정 전체 수정에서 explicit CUSTOM tagId는 rule과 유지 occurrence에 적용된다")
     void givenExplicitTagId_whenPatchRecurrenceEvent_thenAppliesTagToRuleAndOccurrences()
             throws Exception {
         // given
         Tag originalTag = tagRepository.save(new Tag(TagType.DEFAULT, "원래 태그", "#10B981"));
-        Tag updatedTag = tagRepository.save(new Tag(TagType.DEFAULT, "변경 태그", "#F59E0B"));
+        Tag updatedTag = tagRepository.save(new Tag(TagType.CUSTOM, "변경 태그", "#F59E0B"));
         long recurrenceId = createRecurrenceEventWithTag(
                 "Change tag recurrence",
                 "2026-11-15",
@@ -230,7 +263,8 @@ class RecurrenceEventControllerTest {
                                 """.formatted(updatedTag.getId())))
                 // then
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.tag.id").value(updatedTag.getId()));
+                .andExpect(jsonPath("$.tag.id").value(updatedTag.getId()))
+                .andExpect(jsonPath("$.tag.tagType").value("CUSTOM"));
 
         assertThat(recurrenceEventRepository.findById(recurrenceId))
                 .hasValueSatisfying(rule -> assertThat(rule.getTag().getId()).isEqualTo(updatedTag.getId()));
@@ -756,7 +790,7 @@ class RecurrenceEventControllerTest {
     @DisplayName("반복 occurrence 단독 수정은 occurrence Event의 기존 태그를 변경하지 않는다")
     void givenTaggedOccurrence_whenPatchRecurrenceOccurrence_thenPreservesEventTag() throws Exception {
         // given
-        Tag workTag = tagRepository.save(new Tag(TagType.DEFAULT, "occurrence 보존", "#2563EB"));
+        Tag workTag = tagRepository.save(new Tag(TagType.CUSTOM, "occurrence 보존", "#2563EB"));
         long recurrenceId = createRecurrenceEventWithTag(
                 "Tagged occurrence preserve",
                 "2026-12-11",
@@ -784,7 +818,8 @@ class RecurrenceEventControllerTest {
                 // then
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.tag.id").value(workTag.getId()))
-                .andExpect(jsonPath("$.tag.title").value("occurrence 보존"));
+                .andExpect(jsonPath("$.tag.title").value("occurrence 보존"))
+                .andExpect(jsonPath("$.tag.tagType").value("CUSTOM"));
 
         assertThat(eventRepository.findById(eventId))
                 .hasValueSatisfying(event -> assertThat(event.getTag().getId()).isEqualTo(workTag.getId()));

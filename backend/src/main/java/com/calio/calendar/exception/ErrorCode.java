@@ -7,7 +7,7 @@ public enum ErrorCode {
     RECURRENCE_EVENT_NOT_FOUND(HttpStatus.NOT_FOUND, "Recurrence event not found."),
     RECURRENCE_OCCURRENCE_NOT_FOUND(HttpStatus.NOT_FOUND, "Recurrence occurrence not found."),
     TAG_NOT_FOUND(HttpStatus.NOT_FOUND, "Tag not found."),
-    DEFAULT_TAG_NOT_FOUND(HttpStatus.NOT_FOUND, "Default tag not found."),
+    DEFAULT_TAG_NOT_FOUND(HttpStatus.INTERNAL_SERVER_ERROR, "Default tag not found."),
     INVALID_TAG_COLOR_CODE(HttpStatus.BAD_REQUEST, "Invalid tag color code."),
     RECURRENCE_UPDATE_TIME_RANGE_INVALID(HttpStatus.BAD_REQUEST, "Recurrence update time range invalid."),
     INVALID_TIME_RANGE(HttpStatus.BAD_REQUEST, "Invalid time range."),

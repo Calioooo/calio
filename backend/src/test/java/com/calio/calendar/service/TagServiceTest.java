@@ -6,6 +6,8 @@ import static org.mockito.Mockito.when;
 
 import com.calio.calendar.exception.CalioException;
 import com.calio.calendar.exception.ErrorCode;
+import com.calio.calendar.repository.EventRepository;
+import com.calio.calendar.repository.RecurrenceEventRepository;
 import com.calio.calendar.repository.TagRepository;
 import com.calio.calendar.repository.entity.Tag;
 import com.calio.calendar.repository.entity.TagType;
@@ -23,29 +25,40 @@ class TagServiceTest {
     @Mock
     private TagRepository tagRepository;
 
+    @Mock
+    private EventRepository eventRepository;
+
+    @Mock
+    private RecurrenceEventRepository recurrenceEventRepository;
+
     @InjectMocks
     private TagService tagService;
 
     @Test
-    @DisplayName("explicit tagId는 DEFAULT 태그만 resolve한다")
-    void givenDefaultTagId_whenResolveDefaultTag_thenReturnsTag() {
+    @DisplayName("explicit tagId는 DEFAULT 또는 CUSTOM 태그를 resolve한다")
+    void givenExistingTagId_whenResolveTag_thenReturnsTag() {
         // given
-        Tag tag = new Tag(TagType.DEFAULT, "업무", "#2563eb");
-        when(tagRepository.findByIdAndTagType(1L, TagType.DEFAULT)).thenReturn(Optional.of(tag));
+        Tag defaultTag = new Tag(TagType.DEFAULT, "업무", "#2563eb");
+        Tag customTag = new Tag(TagType.CUSTOM, "사용자", "#8b5cf6");
+        when(tagRepository.findById(1L)).thenReturn(Optional.of(defaultTag));
+        when(tagRepository.findById(2L)).thenReturn(Optional.of(customTag));
 
         // when
-        Tag resolvedTag = tagService.getTagOrDefault(1L);
+        Tag resolvedDefaultTag = tagService.getTagOrDefault(1L);
+        Tag resolvedCustomTag = tagService.getTagOrDefault(2L);
 
         // then
-        assertThat(resolvedTag).isSameAs(tag);
-        assertThat(resolvedTag.getColorCode()).isEqualTo("#2563EB");
+        assertThat(resolvedDefaultTag).isSameAs(defaultTag);
+        assertThat(resolvedDefaultTag.getColorCode()).isEqualTo("#2563EB");
+        assertThat(resolvedCustomTag).isSameAs(customTag);
+        assertThat(resolvedCustomTag.getColorCode()).isEqualTo("#8B5CF6");
     }
 
     @Test
-    @DisplayName("missing 또는 CUSTOM tagId는 TAG_NOT_FOUND로 실패한다")
-    void givenUnsupportedTagId_whenResolveDefaultTag_thenThrowsTagNotFound() {
+    @DisplayName("missing tagId는 TAG_NOT_FOUND로 실패한다")
+    void givenMissingTagId_whenResolveTag_thenThrowsTagNotFound() {
         // given
-        when(tagRepository.findByIdAndTagType(1L, TagType.DEFAULT)).thenReturn(Optional.empty());
+        when(tagRepository.findById(1L)).thenReturn(Optional.empty());
 
         // when, then
         assertThatThrownBy(() -> tagService.getTagOrDefault(1L))
