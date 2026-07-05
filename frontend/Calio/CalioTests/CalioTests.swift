@@ -225,6 +225,26 @@ struct CalioTests {
         #expect(CalendarEventDetailView.recurrenceStatusText(for: singleEvent) == "반복 없음")
         #expect(!CalendarEventDetailView.recurrenceStatusText(for: repeatedEvent).contains("12345"))
     }
+    
+    @Test func eventDisplayTextIncludesDatesOnlyForMultiDayRanges() async throws {
+        let calendar = Calendar(identifier: .gregorian)
+        let startAt = calendar.date(from: DateComponents(year: 2026, month: 7, day: 5, hour: 9))!
+        let sameDayEndAt = calendar.date(from: DateComponents(year: 2026, month: 7, day: 5, hour: 11))!
+        let nextDayEndAt = calendar.date(from: DateComponents(year: 2026, month: 7, day: 6, hour: 11))!
+        let sameDayText = CalendarEventDisplayText.compactDateTimeRange(
+            startAt: startAt,
+            endAt: sameDayEndAt
+        )
+        let multiDayText = CalendarEventDisplayText.compactDateTimeRange(
+            startAt: startAt,
+            endAt: nextDayEndAt
+        )
+        
+        #expect(sameDayText == CalendarEventDisplayText.timeRange(startAt: startAt, endAt: sameDayEndAt))
+        #expect(multiDayText != CalendarEventDisplayText.timeRange(startAt: startAt, endAt: nextDayEndAt))
+        #expect(multiDayText.contains("7월 5일"))
+        #expect(multiDayText.contains("7월 6일"))
+    }
 
     @Test func eventDetailActionsSeparateSingleAndRecurringEvents() async throws {
         let baseDate = Date()

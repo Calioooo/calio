@@ -1285,7 +1285,7 @@ private struct CalendarDayDetailEventRow: View {
     }
 
     private var eventTimeText: String {
-        CalendarEventDisplayText.timeRange(
+        CalendarEventDisplayText.compactDateTimeRange(
             startAt: event.startAt,
             endAt: event.endAt
         )

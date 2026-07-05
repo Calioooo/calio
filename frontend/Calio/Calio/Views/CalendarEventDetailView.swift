@@ -570,4 +570,25 @@ enum CalendarEventDisplayText {
 
         return "\(startText) - \(endText)"
     }
+    
+    static func compactDateTimeRange(startAt: Date, endAt: Date) -> String {
+        guard !Calendar.current.isDate(startAt, inSameDayAs: endAt) else {
+            return timeRange(startAt: startAt, endAt: endAt)
+        }
+        
+        let includesYear = !Calendar.current.isDate(startAt, equalTo: endAt, toGranularity: .year)
+        let startText = dateTimeText(for: startAt, includesYear: includesYear)
+        let endText = dateTimeText(for: endAt, includesYear: includesYear)
+        
+        return "\(startText) - \(endText)"
+    }
+    
+    private static func dateTimeText(for date: Date, includesYear: Bool) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ko_KR")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.dateFormat = includesYear ? "yyyy년 M월 d일 a h:mm" : "M월 d일 a h:mm"
+        
+        return formatter.string(from: date)
+    }
 }

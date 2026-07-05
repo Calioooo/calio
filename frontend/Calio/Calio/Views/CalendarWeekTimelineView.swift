@@ -1535,7 +1535,7 @@ private struct CalendarTimelineOverlapPopoverView: View {
                                     .lineLimit(1)
                                 
                                 Text(
-                                    CalendarEventDisplayText.timeRange(
+                                    CalendarEventDisplayText.compactDateTimeRange(
                                         startAt: event.startAt,
                                         endAt: event.endAt
                                     )
