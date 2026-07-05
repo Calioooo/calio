@@ -111,6 +111,18 @@ class CustomTagControllerTest {
     }
 
     @Test
+    @DisplayName("custom tag 생성은 공백 colorCode를 VALIDATION_FAILED로 거부한다")
+    void givenBlankColorCode_whenCreateCustomTag_thenReturnsValidationFailed() throws Exception {
+        // when
+        mockMvc.perform(post("/api/custom-tags")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(customTagRequest("색상 공백", " ")))
+                // then
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"));
+    }
+
+    @Test
     @DisplayName("custom tag 생성은 잘못된 colorCode를 INVALID_TAG_COLOR_CODE로 거부한다")
     void givenInvalidColorCode_whenCreateCustomTag_thenReturnsInvalidTagColorCode() throws Exception {
         // when
