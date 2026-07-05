@@ -38,15 +38,20 @@ class TagServiceTest {
     @DisplayName("explicit tagId는 DEFAULT 또는 CUSTOM 태그를 resolve한다")
     void givenExistingTagId_whenResolveTag_thenReturnsTag() {
         // given
-        Tag tag = new Tag(TagType.CUSTOM, "사용자", "#2563eb");
-        when(tagRepository.findById(1L)).thenReturn(Optional.of(tag));
+        Tag defaultTag = new Tag(TagType.DEFAULT, "업무", "#2563eb");
+        Tag customTag = new Tag(TagType.CUSTOM, "사용자", "#8b5cf6");
+        when(tagRepository.findById(1L)).thenReturn(Optional.of(defaultTag));
+        when(tagRepository.findById(2L)).thenReturn(Optional.of(customTag));
 
         // when
-        Tag resolvedTag = tagService.getTagOrDefault(1L);
+        Tag resolvedDefaultTag = tagService.getTagOrDefault(1L);
+        Tag resolvedCustomTag = tagService.getTagOrDefault(2L);
 
         // then
-        assertThat(resolvedTag).isSameAs(tag);
-        assertThat(resolvedTag.getColorCode()).isEqualTo("#2563EB");
+        assertThat(resolvedDefaultTag).isSameAs(defaultTag);
+        assertThat(resolvedDefaultTag.getColorCode()).isEqualTo("#2563EB");
+        assertThat(resolvedCustomTag).isSameAs(customTag);
+        assertThat(resolvedCustomTag.getColorCode()).isEqualTo("#8B5CF6");
     }
 
     @Test
