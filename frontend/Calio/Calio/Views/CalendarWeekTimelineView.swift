@@ -342,7 +342,7 @@ struct CalendarWeekTimelineView: View {
             .frame(maxWidth: .infinity, minHeight: metrics.fullDayEventHeight)
             .background(
                 RoundedRectangle(cornerRadius: 5)
-                    .fill(Color.red)
+                    .fill(Color.calendarHoliday)
             )
             .accessibilityLabel("\(holiday.title) 공휴일")
     }

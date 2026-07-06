@@ -8,6 +8,10 @@
 import SwiftUI
 
 extension Color {
+    static var calendarHoliday: Color {
+        Color(hex: "#E76F73")
+    }
+    
     init(hex: String) {
         let sanitizedHex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
 

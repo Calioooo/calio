@@ -129,7 +129,7 @@ struct CalendarMonthView: View {
             return []
         }
 
-        return Array(repeating: Color.red, count: item.holidays.count)
+        return Array(repeating: Color.calendarHoliday, count: item.holidays.count)
             + item.events.map { Color(hex: $0.colorCode) }
     }
     
@@ -185,7 +185,7 @@ struct CalendarMonthView: View {
         }
 
         if item?.hasHoliday == true {
-            return .red
+            return Color.calendarHoliday
         }
         
         switch item?.weekday {

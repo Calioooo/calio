@@ -104,7 +104,7 @@ struct CalendarDateEventCellView: View {
             .padding(.vertical, 6)
             .background(
                 RoundedRectangle(cornerRadius: 6)
-                    .fill(Color.red)
+                    .fill(Color.calendarHoliday)
             )
             .accessibilityLabel("\(holiday.title) 공휴일")
     }

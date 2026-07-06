@@ -772,6 +772,10 @@ private struct CalendarMonthScheduleDayCellView: View {
             return .secondary.opacity(0.6)
         }
 
+        if item?.hasHoliday == true {
+            return Color.calendarHoliday
+        }
+        
         switch item?.weekday {
         case .sunday:
             return .red
@@ -799,7 +803,7 @@ private struct MonthGridMetrics {
 }
 
 private struct MonthEventSpanItem: Identifiable {
-    let event: Event
+    let chip: MonthScheduleChip
     let weekRowIndex: Int
     let startColumn: Int
     let columnSpan: Int
@@ -807,7 +811,7 @@ private struct MonthEventSpanItem: Identifiable {
     let days: [DayKey]
 
     var id: String {
-        "\(event.id)-\(weekRowIndex)-\(startColumn)-\(columnSpan)-\(eventRowIndex)"
+        "\(chip.id)-\(weekRowIndex)-\(startColumn)-\(columnSpan)-\(eventRowIndex)"
     }
 }
 
@@ -820,7 +824,7 @@ private struct MonthEventSpanView: View {
     let chipHeight: CGFloat
     
     var body: some View {
-        Text(span.event.title)
+        Text(span.chip.title)
             .font(.system(size: 10, weight: .medium))
             .lineLimit(1)
             .truncationMode(.tail)
@@ -831,7 +835,7 @@ private struct MonthEventSpanView: View {
                 height: chipHeight,
                 alignment: .leading
             )
-            .background(Color(hex: span.event.colorCode))
+            .background(span.chip.color)
             .clipShape(RoundedRectangle(cornerRadius: 3))
             .offset(x: xOffset, y: yOffset)
     }
@@ -848,6 +852,56 @@ private struct MonthEventSpanView: View {
         CGFloat(span.weekRowIndex) * metrics.cellHeight
             + topOffset
             + CGFloat(span.eventRowIndex) * rowHeight
+    }
+}
+
+private enum MonthScheduleChip {
+    case event(Event)
+    case holiday(NationalHoliday)
+    
+    var id: String {
+        switch self {
+        case .event(let event):
+            return "event-\(event.id)"
+        case .holiday(let holiday):
+            return "holiday-\(holiday.id)"
+        }
+    }
+    
+    var title: String {
+        switch self {
+        case .event(let event):
+            return event.title
+        case .holiday(let holiday):
+            return holiday.title
+        }
+    }
+    
+    var color: Color {
+        switch self {
+        case .event(let event):
+            return Color(hex: event.colorCode)
+        case .holiday:
+            return Color.calendarHoliday
+        }
+    }
+    
+    var sortStartAt: Date {
+        switch self {
+        case .event(let event):
+            return event.startAt
+        case .holiday(let holiday):
+            return holiday.displayStartAt(calendar: Calendar.current)
+        }
+    }
+    
+    var sortEndAt: Date {
+        switch self {
+        case .event(let event):
+            return event.endAt
+        case .holiday(let holiday):
+            return holiday.displayEndAt(calendar: Calendar.current)
+        }
     }
 }
 
@@ -950,15 +1004,15 @@ private struct MonthEventLayoutBuilder {
     }
 
     private func makeRawSpans() -> [MonthEventSpanItem] {
-        let events = uniqueEvents()
+        let chips = uniqueChips()
         var spans: [MonthEventSpanItem] = []
         var occupiedColumnsByWeekAndRow: [Int: [Int: Set<Int>]] = [:]
 
-        for event in events {
+        for chip in chips {
             for weekRowIndex in 0..<weekRowCount {
                 let weekDays = daysInWeekRow(weekRowIndex)
                 let overlappingColumns = weekDays.enumerated().compactMap { column, day -> Int? in
-                    eventOverlaps(event, day: day) ? column : nil
+                    chipOverlaps(chip, day: day) ? column : nil
                 }
 
                 guard let startColumn = overlappingColumns.min(),
@@ -980,7 +1034,7 @@ private struct MonthEventLayoutBuilder {
 
                 spans.append(
                     MonthEventSpanItem(
-                        event: event,
+                        chip: chip,
                         weekRowIndex: weekRowIndex,
                         startColumn: startColumn,
                         columnSpan: endColumn - startColumn + 1,
@@ -994,20 +1048,29 @@ private struct MonthEventLayoutBuilder {
         return spans
     }
 
-    private func uniqueEvents() -> [Event] {
+    private func uniqueChips() -> [MonthScheduleChip] {
         var eventsByID: [Int64: Event] = [:]
+        var holidaysByID: [Int64: NationalHoliday] = [:]
 
         for event in items.flatMap(\.events) {
             eventsByID[event.id] = event
         }
 
-        return eventsByID.values.sorted { lhs, rhs in
-            if lhs.startAt != rhs.startAt {
-                return lhs.startAt < rhs.startAt
+        for holiday in items.flatMap(\.holidays) {
+            holidaysByID[holiday.id] = holiday
+        }
+
+        return (
+            holidaysByID.values.map(MonthScheduleChip.holiday)
+                + eventsByID.values.map(MonthScheduleChip.event)
+        )
+        .sorted { lhs, rhs in
+            if lhs.sortStartAt != rhs.sortStartAt {
+                return lhs.sortStartAt < rhs.sortStartAt
             }
 
-            if lhs.endAt != rhs.endAt {
-                return lhs.endAt < rhs.endAt
+            if lhs.sortEndAt != rhs.sortEndAt {
+                return lhs.sortEndAt < rhs.sortEndAt
             }
 
             return lhs.id < rhs.id
@@ -1058,6 +1121,15 @@ private struct MonthEventLayoutBuilder {
         let endIndex = min(startIndex + columnCount, days.count)
 
         return Array(days[startIndex..<endIndex])
+    }
+
+    private func chipOverlaps(_ chip: MonthScheduleChip, day: DayKey) -> Bool {
+        switch chip {
+        case .event(let event):
+            return eventOverlaps(event, day: day)
+        case .holiday(let holiday):
+            return holiday.day == day
+        }
     }
 
     private func eventOverlaps(_ event: Event, day: DayKey) -> Bool {
