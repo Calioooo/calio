@@ -124,7 +124,8 @@ struct CalendarDateEventView: View {
                         selectedEvent: $selectedEvent,
                         onEventSelected: { _ in },
                         onShowEventDetail: showEventDetail,
-                        events: item.events
+                        events: item.events,
+                        holidays: item.holidays
                     )
                     .frame(height: dateRowHeight)
                     .clipped()

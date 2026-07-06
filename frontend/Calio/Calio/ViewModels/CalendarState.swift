@@ -106,6 +106,29 @@ enum CalendarMonthEventCacheEntry {
     }
 }
 
+enum CalendarMonthHolidayCacheEntry {
+    case idle
+    case loading
+    case loaded([NationalHoliday])
+    case failed(CalendarMonthHolidayFailure)
+
+    var loadedHolidays: [NationalHoliday] {
+        guard case .loaded(let holidays) = self else {
+            return []
+        }
+
+        return holidays
+    }
+
+    var isLoading: Bool {
+        guard case .loading = self else {
+            return false
+        }
+
+        return true
+    }
+}
+
 enum CalendarMonthEventFailure: Equatable {
     case network
     case unexpected
@@ -135,6 +158,23 @@ enum CalendarMonthEventFailure: Equatable {
     }
 }
 
+enum CalendarMonthHolidayFailure: Equatable {
+    case network
+    case invalidHolidayDate
+    case unexpected
+
+    init(error: NationalHolidayServiceError) {
+        switch error {
+        case .network:
+            self = .network
+        case .invalidHolidayDate:
+            self = .invalidHolidayDate
+        case .decoding, .unexpected:
+            self = .unexpected
+        }
+    }
+}
+
 enum CalendarEventAreaState: Equatable {
     case idle
     case loading
@@ -147,6 +187,7 @@ struct CalendarState {
     let daysByKey: [DayKey: CalendarDateCellItem]
     private let orderedDateCellItems: [CalendarDateCellItem]
     let monthEventCache: [YearMonthKey: CalendarMonthEventCacheEntry]
+    let monthHolidayCache: [YearMonthKey: CalendarMonthHolidayCacheEntry]
     
     enum LoadedEdge: Hashable {
         case start
@@ -157,7 +198,8 @@ struct CalendarState {
         startDate: Date,
         endDate: Date,
         daysByKey: [DayKey: CalendarDateCellItem],
-        monthEventCache: [YearMonthKey: CalendarMonthEventCacheEntry] = [:]
+        monthEventCache: [YearMonthKey: CalendarMonthEventCacheEntry] = [:],
+        monthHolidayCache: [YearMonthKey: CalendarMonthHolidayCacheEntry] = [:]
     ) {
         self.startDate = startDate
         self.endDate = endDate
@@ -166,6 +208,7 @@ struct CalendarState {
             earlierCandidate.id < laterCandidate.id
         }
         self.monthEventCache = monthEventCache
+        self.monthHolidayCache = monthHolidayCache
     }
 
     private init(
@@ -173,24 +216,27 @@ struct CalendarState {
         endDate: Date,
         daysByKey: [DayKey: CalendarDateCellItem],
         orderedDateCellItems: [CalendarDateCellItem],
-        monthEventCache: [YearMonthKey: CalendarMonthEventCacheEntry]
+        monthEventCache: [YearMonthKey: CalendarMonthEventCacheEntry],
+        monthHolidayCache: [YearMonthKey: CalendarMonthHolidayCacheEntry]
     ) {
         self.startDate = startDate
         self.endDate = endDate
         self.daysByKey = daysByKey
         self.orderedDateCellItems = orderedDateCellItems
         self.monthEventCache = monthEventCache
+        self.monthHolidayCache = monthHolidayCache
     }
     
     func isNeedInitialize() -> Bool {
-        return daysByKey.isEmpty && monthEventCache.isEmpty
+        return daysByKey.isEmpty && monthEventCache.isEmpty && monthHolidayCache.isEmpty
     }
     
     func appended(
         startDate newStartDate: Date,
         endDate newEndDate: Date,
         daysByKey newDaysByKey: [DayKey: CalendarDateCellItem],
-        monthEventCache newMonthEventCache: [YearMonthKey: CalendarMonthEventCacheEntry]? = nil
+        monthEventCache newMonthEventCache: [YearMonthKey: CalendarMonthEventCacheEntry]? = nil,
+        monthHolidayCache newMonthHolidayCache: [YearMonthKey: CalendarMonthHolidayCacheEntry]? = nil
     ) -> CalendarState {
         let mergedDaysByKey = daysByKey.merging(newDaysByKey) { current, _ in
             current
@@ -215,7 +261,8 @@ struct CalendarState {
             endDate: max(endDate, newEndDate),
             daysByKey: mergedDaysByKey,
             orderedDateCellItems: updatedOrderedItems,
-            monthEventCache: newMonthEventCache ?? monthEventCache
+            monthEventCache: newMonthEventCache ?? monthEventCache,
+            monthHolidayCache: newMonthHolidayCache ?? monthHolidayCache
         )
     }
 
@@ -223,13 +270,15 @@ struct CalendarState {
         startDate newStartDate: Date,
         endDate newEndDate: Date,
         daysByKey newDaysByKey: [DayKey: CalendarDateCellItem],
-        monthEventCache newMonthEventCache: [YearMonthKey: CalendarMonthEventCacheEntry]? = nil
+        monthEventCache newMonthEventCache: [YearMonthKey: CalendarMonthEventCacheEntry]? = nil,
+        monthHolidayCache newMonthHolidayCache: [YearMonthKey: CalendarMonthHolidayCacheEntry]? = nil
     ) -> CalendarState {
         CalendarState(
             startDate: newStartDate,
             endDate: newEndDate,
             daysByKey: newDaysByKey,
-            monthEventCache: newMonthEventCache ?? monthEventCache
+            monthEventCache: newMonthEventCache ?? monthEventCache,
+            monthHolidayCache: newMonthHolidayCache ?? monthHolidayCache
         )
     }
 
@@ -243,7 +292,8 @@ struct CalendarState {
                 endDate: endDate,
                 daysByKey: daysByKey,
                 orderedDateCellItems: orderedDateCellItems,
-                monthEventCache: newMonthEventCache
+                monthEventCache: newMonthEventCache,
+                monthHolidayCache: monthHolidayCache
             )
         }
 
@@ -259,7 +309,40 @@ struct CalendarState {
             endDate: endDate,
             daysByKey: mergedDaysByKey,
             orderedDateCellItems: updatedOrderedItems,
-            monthEventCache: newMonthEventCache
+            monthEventCache: newMonthEventCache,
+            monthHolidayCache: monthHolidayCache
+        )
+    }
+
+    func replacingMonthHolidayCache(
+        _ newMonthHolidayCache: [YearMonthKey: CalendarMonthHolidayCacheEntry],
+        updatingDateCells newDaysByKey: [DayKey: CalendarDateCellItem] = [:]
+    ) -> CalendarState {
+        guard !newDaysByKey.isEmpty else {
+            return CalendarState(
+                startDate: startDate,
+                endDate: endDate,
+                daysByKey: daysByKey,
+                orderedDateCellItems: orderedDateCellItems,
+                monthEventCache: monthEventCache,
+                monthHolidayCache: newMonthHolidayCache
+            )
+        }
+
+        let mergedDaysByKey = daysByKey.merging(newDaysByKey) { _, new in
+            new
+        }
+        let updatedOrderedItems = orderedDateCellItems.map { item in
+            newDaysByKey[item.id] ?? item
+        }
+
+        return CalendarState(
+            startDate: startDate,
+            endDate: endDate,
+            daysByKey: mergedDaysByKey,
+            orderedDateCellItems: updatedOrderedItems,
+            monthEventCache: monthEventCache,
+            monthHolidayCache: newMonthHolidayCache
         )
     }
     

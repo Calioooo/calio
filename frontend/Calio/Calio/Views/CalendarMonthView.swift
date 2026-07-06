@@ -79,7 +79,8 @@ struct CalendarMonthView: View {
         let item = itemsByDay[day]
         let isReferenceDay = day == referenceDay
         let isCurrentMonth = day.month == referenceDay.month && day.year == referenceDay.year
-        let events = item?.events ?? []
+        let aggregateDotColors = aggregateDotColors(for: item)
+        let hiddenItemCount = max((item?.calendarItemCount ?? 0) - maxVisibleEventDotCount, 0)
         
         return Button {
             onSelectedDay(day)
@@ -97,14 +98,14 @@ struct CalendarMonthView: View {
                     }
                 
                 HStack(spacing: 2) {
-                    ForEach(Array(events.prefix(maxVisibleEventDotCount).enumerated()), id: \.offset) { _, event in
+                    ForEach(Array(aggregateDotColors.prefix(maxVisibleEventDotCount).enumerated()), id: \.offset) { _, color in
                         Circle()
-                            .fill(Color(hex: event.colorCode))
+                            .fill(color)
                             .frame(width: 7, height: 7)
                     }
                     
-                    if events.count > maxVisibleEventDotCount {
-                        Text("+\(events.count - maxVisibleEventDotCount)")
+                    if hiddenItemCount > 0 {
+                        Text("+\(hiddenItemCount)")
                             .font(.system(size: 10, weight: .medium))
                             .foregroundStyle(.secondary)
                     }
@@ -121,6 +122,15 @@ struct CalendarMonthView: View {
                     .fill(Color(red: 0.56, green: 0.76, blue: 0.96).opacity(0.18))
             }
         }
+    }
+
+    private func aggregateDotColors(for item: CalendarDateCellItem?) -> [Color] {
+        guard let item else {
+            return []
+        }
+
+        return Array(repeating: Color.red, count: item.holidays.count)
+            + item.events.map { Color(hex: $0.colorCode) }
     }
     
     private var itemsByDay: [DayKey: CalendarDateCellItem] {
@@ -172,6 +182,10 @@ struct CalendarMonthView: View {
         
         guard isCurrentMonth else {
             return .secondary.opacity(0.55)
+        }
+
+        if item?.hasHoliday == true {
+            return .red
         }
         
         switch item?.weekday {

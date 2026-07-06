@@ -27,23 +27,28 @@ final class CalendarHomeViewModel: ObservableObject {
     
     private let dateService: CalendarDateService
     private let eventService: EventService
+    private let nationalHolidayService: NationalHolidayService
     private let calendar: Calendar
     private var lastVisibleMonthKeys: Set<YearMonthKey> = []
     private var lastHandledVisibleRange: CalendarVisibleIndexRange?
     private var monthEventCache: [YearMonthKey: CalendarMonthEventCacheEntry]
+    private var monthHolidayCache: [YearMonthKey: CalendarMonthHolidayCacheEntry]
     private var pendingCreatedEventsByMonth: [YearMonthKey: [Event]] = [:]
     
     init(
         calendar: Calendar = .current,
         dateService: CalendarDateService = CalendarDateService(),
         eventService: EventService = EventService(),
+        nationalHolidayService: NationalHolidayService = NationalHolidayService(),
         initialState: CalendarState? = nil,
         initialReferenceDate: Date = Date()
     ) {
         self.dateService = dateService
         self.calendar = calendar
         self.eventService = eventService
+        self.nationalHolidayService = nationalHolidayService
         self.monthEventCache = initialState?.monthEventCache ?? [:]
+        self.monthHolidayCache = initialState?.monthHolidayCache ?? [:]
         let referenceDate = initialState?.startDate ?? initialReferenceDate
         self.referenceDay = DayKey(date: referenceDate, calendar: calendar)
         
@@ -82,7 +87,7 @@ final class CalendarHomeViewModel: ObservableObject {
     }
     
     func loadInitialIfNeeded() {
-        guard state.daysByKey.isEmpty && monthEventCache.isEmpty else { return }
+        guard state.daysByKey.isEmpty && monthEventCache.isEmpty && monthHolidayCache.isEmpty else { return }
 
         let referenceDate = referenceDay.toDate(calendar: calendar)
         let range = initialGeneratedDateRange(around: referenceDate)
@@ -97,6 +102,7 @@ final class CalendarHomeViewModel: ObservableObject {
         
         referenceDay = day
         ensureGeneratedDateCells(contain: day)
+        requestHolidayMonth(YearMonthKey(day: day))
     }
     
     func loadAdditionalEventsIfNeeded(visibleRange: CalendarVisibleIndexRange) {
@@ -443,12 +449,18 @@ final class CalendarHomeViewModel: ObservableObject {
     private func makeDateCellItemsByDay(
         from startDate: Date,
         to endDate: Date,
-        monthEventCache: [YearMonthKey: CalendarMonthEventCacheEntry]? = nil
+        monthEventCache: [YearMonthKey: CalendarMonthEventCacheEntry]? = nil,
+        monthHolidayCache: [YearMonthKey: CalendarMonthHolidayCacheEntry]? = nil
     ) -> [DayKey: CalendarDateCellItem] {
         let eventsByDay = makeEventsByDay(
             cachedEvents(
                 in: startDate...endDate,
                 monthEventCache: monthEventCache ?? self.monthEventCache
+            )
+        )
+        let holidaysByDay = makeHolidaysByDay(
+            cachedHolidays(
+                monthHolidayCache: monthHolidayCache ?? self.monthHolidayCache
             )
         )
         
@@ -464,7 +476,8 @@ final class CalendarHomeViewModel: ObservableObject {
                         monthText: dateService.monthText(from: date),
                         dayText: dateService.dayText(from: date),
                         isToday: dateService.isToday(date),
-                        events: eventsByDay[day] ?? []
+                        events: eventsByDay[day] ?? [],
+                        holidays: holidaysByDay[day] ?? []
                     )
                 )
             }
@@ -489,12 +502,31 @@ final class CalendarHomeViewModel: ObservableObject {
             }
         }
     }
+
+    private func fetchHolidayMonth(_ key: YearMonthKey) {
+        Task {
+            do {
+                let holidays = try await nationalHolidayService.fetchNationalHolidays(for: key)
+                self.setMonthHolidayCacheEntry(.loaded(holidays), for: key)
+            } catch let error as NationalHolidayServiceError {
+                self.setFailedMonthHolidayCacheEntry(CalendarMonthHolidayFailure(error: error), for: key)
+            } catch {
+                self.setFailedMonthHolidayCacheEntry(.unexpected, for: key)
+            }
+        }
+    }
     
     private func makeEventsByDay(_ events: [Event]) -> [DayKey: [Event]] {
         events.reduce(into: [DayKey: [Event]]()) { eventsByDay, event in
             for day in daysOverlapping(event) {
                 eventsByDay[day, default: []].append(event)
             }
+        }
+    }
+
+    private func makeHolidaysByDay(_ holidays: [NationalHoliday]) -> [DayKey: [NationalHoliday]] {
+        holidays.reduce(into: [DayKey: [NationalHoliday]]()) { holidaysByDay, holiday in
+            holidaysByDay[holiday.day, default: []].append(holiday)
         }
     }
     
@@ -533,14 +565,16 @@ final class CalendarHomeViewModel: ObservableObject {
             startDate: startDate,
             endDate: endDate,
             daysByKey: makeDateCellItemsByDay(from: startDate, to: endDate),
-            monthEventCache: monthEventCache
+            monthEventCache: monthEventCache,
+            monthHolidayCache: monthHolidayCache
         )
     }
 
     private func refreshGeneratedDateCells(for key: YearMonthKey) {
         let daysByKey = makeDateCellItemsForGeneratedMonth(
             key,
-            monthEventCache: monthEventCache
+            monthEventCache: monthEventCache,
+            monthHolidayCache: monthHolidayCache
         )
 
         guard !daysByKey.isEmpty else {
@@ -635,6 +669,7 @@ final class CalendarHomeViewModel: ObservableObject {
                 from: finalRange.startDate,
                 to: finalRange.endDate
             )
+            requestHolidayMonths(monthKeys(from: finalRange.startDate, to: finalRange.endDate))
             return
         }
 
@@ -643,8 +678,10 @@ final class CalendarHomeViewModel: ObservableObject {
             startDate: nextStartDate,
             endDate: nextEndDate,
             daysByKey: nextDaysByKey,
-            monthEventCache: monthEventCache
+            monthEventCache: monthEventCache,
+            monthHolidayCache: monthHolidayCache
         )
+        requestHolidayMonths(monthKeys(from: nextStartDate, to: nextEndDate))
     }
 
     private func generatedDateRangeAfterAppending(
@@ -710,7 +747,8 @@ final class CalendarHomeViewModel: ObservableObject {
             updatingDateCells: makeDateCellItemsByDay(
                 from: state.startDate,
                 to: state.endDate,
-                monthEventCache: monthEventCache
+                monthEventCache: monthEventCache,
+                monthHolidayCache: monthHolidayCache
             )
         )
     }
@@ -728,7 +766,11 @@ final class CalendarHomeViewModel: ObservableObject {
 
         let updatedDaysByKey = keys.reduce(into: [DayKey: CalendarDateCellItem]()) { result, key in
             result.merge(
-                makeDateCellItemsForGeneratedMonth(key, monthEventCache: monthEventCache)
+                makeDateCellItemsForGeneratedMonth(
+                    key,
+                    monthEventCache: monthEventCache,
+                    monthHolidayCache: monthHolidayCache
+                )
             ) { _, new in
                 new
             }
@@ -762,12 +804,39 @@ final class CalendarHomeViewModel: ObservableObject {
 
     private func requestMonths(_ keys: [YearMonthKey], retryFailed: Bool) {
         Set(keys).sorted().forEach { key in
-            guard shouldFetchMonth(key, retryFailed: retryFailed) else {
-                return
-            }
+            requestEventMonth(key, retryFailed: retryFailed)
+            requestHolidayMonth(key)
+        }
+    }
 
-            setMonthCacheEntry(.loading, for: key)
-            fetchMonth(key)
+    private func requestEventMonth(_ key: YearMonthKey, retryFailed: Bool) {
+        guard shouldFetchMonth(key, retryFailed: retryFailed) else {
+            return
+        }
+
+        setMonthCacheEntry(.loading, for: key)
+        fetchMonth(key)
+    }
+
+    private func requestHolidayMonth(_ key: YearMonthKey) {
+        guard shouldFetchHolidayMonth(key) else {
+            return
+        }
+
+        setMonthHolidayCacheEntry(.loading, for: key)
+        fetchHolidayMonth(key)
+    }
+
+    private func requestHolidayMonths(_ keys: [YearMonthKey]) {
+        Set(keys).sorted().forEach(requestHolidayMonth(_:))
+    }
+
+    private func shouldFetchHolidayMonth(_ key: YearMonthKey) -> Bool {
+        switch monthHolidayCache[key] ?? .idle {
+        case .idle, .failed:
+            return true
+        case .loading, .loaded:
+            return false
         }
     }
 
@@ -800,7 +869,8 @@ final class CalendarHomeViewModel: ObservableObject {
         if case .loaded = entry {
             updatedDaysByKey = makeDateCellItemsForGeneratedMonth(
                 key,
-                monthEventCache: monthEventCache
+                monthEventCache: monthEventCache,
+                monthHolidayCache: monthHolidayCache
             )
         } else {
             updatedDaysByKey = [:]
@@ -827,6 +897,45 @@ final class CalendarHomeViewModel: ObservableObject {
         setMonthCacheEntry(.failed(failure), for: key)
     }
 
+    private func setMonthHolidayCacheEntry(
+        _ entry: CalendarMonthHolidayCacheEntry,
+        for key: YearMonthKey
+    ) {
+        monthHolidayCache[key] = entry
+        let updatedDaysByKey: [DayKey: CalendarDateCellItem]
+
+        switch entry {
+        case .loaded, .failed:
+            updatedDaysByKey = makeDateCellItemsForGeneratedMonth(
+                key,
+                monthEventCache: monthEventCache,
+                monthHolidayCache: monthHolidayCache
+            )
+        case .idle, .loading:
+            updatedDaysByKey = [:]
+        }
+
+        guard !updatedDaysByKey.isEmpty || shouldPublishCacheOnlyChange(for: key) else {
+            return
+        }
+
+        state = state.replacingMonthHolidayCache(
+            monthHolidayCache,
+            updatingDateCells: updatedDaysByKey
+        )
+    }
+
+    private func setFailedMonthHolidayCacheEntry(
+        _ failure: CalendarMonthHolidayFailure,
+        for key: YearMonthKey
+    ) {
+        guard monthHolidayCache[key]?.isLoading == true else {
+            return
+        }
+
+        setMonthHolidayCacheEntry(.failed(failure), for: key)
+    }
+
     private func shouldPublishCacheOnlyChange(for key: YearMonthKey) -> Bool {
         key == YearMonthKey(day: referenceDay)
     }
@@ -843,9 +952,16 @@ final class CalendarHomeViewModel: ObservableObject {
         }
     }
 
+    private func cachedHolidays(
+        monthHolidayCache: [YearMonthKey: CalendarMonthHolidayCacheEntry]
+    ) -> [NationalHoliday] {
+        monthHolidayCache.values.flatMap(\.loadedHolidays)
+    }
+
     private func makeDateCellItemsForGeneratedMonth(
         _ key: YearMonthKey,
-        monthEventCache: [YearMonthKey: CalendarMonthEventCacheEntry]
+        monthEventCache: [YearMonthKey: CalendarMonthEventCacheEntry],
+        monthHolidayCache: [YearMonthKey: CalendarMonthHolidayCacheEntry]
     ) -> [DayKey: CalendarDateCellItem] {
         guard let range = generatedDateRange(in: key) else {
             return [:]
@@ -854,7 +970,8 @@ final class CalendarHomeViewModel: ObservableObject {
         return makeDateCellItemsByDay(
             from: range.startDate,
             to: range.endDate,
-            monthEventCache: monthEventCache
+            monthEventCache: monthEventCache,
+            monthHolidayCache: monthHolidayCache
         )
     }
 

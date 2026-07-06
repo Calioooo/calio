@@ -177,6 +177,118 @@ struct CalioTests {
     }
 
     @MainActor
+    @Test func dateEventCellPlacesHolidayChipsBeforeEventChipsWithoutEventSelection() async throws {
+        let event = makeEvent(on: Date())
+        let holiday = NationalHoliday(
+            id: 10,
+            day: DayKey(year: 2026, month: 6, day: 6),
+            title: "현충일"
+        )
+        var selectedEventID: Int64?
+        let cell = CalendarDateEventCellView(
+            day: holiday.day,
+            weekday: .saturday,
+            monthText: "6",
+            dayText: "6",
+            isToday: false,
+            onTap: {},
+            selectedEvent: .constant(nil),
+            onEventSelected: { event in
+                selectedEventID = event.id
+            },
+            onShowEventDetail: { _ in },
+            events: [event],
+            holidays: [holiday]
+        )
+
+        #expect(cell.calendarChips.map(\.title) == ["현충일", event.title])
+        if case .holiday(let firstHoliday) = cell.calendarChips.first?.kind {
+            #expect(firstHoliday.id == holiday.id)
+        } else {
+            Issue.record("holiday chip이 event chip보다 앞에 있어야 합니다.")
+        }
+        #expect(selectedEventID == nil)
+    }
+
+    @Test func nationalHolidayResponseDTOKeepsHolidayDateStringAndMapsToDayKey() async throws {
+        let calendar = fixedCalendar
+        let responseJSON = """
+        {
+          "nationalHolidayId": 1,
+          "holidayDate": "2026-06-06",
+          "holidayTitle": "현충일"
+        }
+        """.data(using: .utf8)!
+        let dto = try JSONDecoder().decode(NationalHolidayResponseDTO.self, from: responseJSON)
+        let service = NationalHolidayService(
+            repository: RecordingNationalHolidayRepository(fetchResponse: [dto]),
+            calendar: calendar
+        )
+
+        let holidays = try await service.fetchNationalHolidays(for: YearMonthKey(year: 2026, month: 6))
+        let holiday = try #require(holidays.first)
+
+        #expect(dto.holidayDate == "2026-06-06")
+        #expect(holiday.id == 1)
+        #expect(holiday.day == DayKey(year: 2026, month: 6, day: 6))
+        #expect(holiday.title == "현충일")
+    }
+
+    @Test func nationalHolidayServiceRejectsInvalidHolidayDate() async throws {
+        let service = NationalHolidayService(
+            repository: RecordingNationalHolidayRepository(
+                fetchResponse: [
+                    NationalHolidayResponseDTO(
+                        nationalHolidayId: 1,
+                        holidayDate: "2026-02-30",
+                        holidayTitle: "잘못된 날짜"
+                    )
+                ]
+            ),
+            calendar: fixedCalendar
+        )
+        var thrownError: NationalHolidayServiceError?
+
+        do {
+            _ = try await service.fetchNationalHolidays(for: YearMonthKey(year: 2026, month: 2))
+        } catch let error as NationalHolidayServiceError {
+            thrownError = error
+        }
+
+        #expect(thrownError == .invalidHolidayDate)
+    }
+
+    @Test func nationalHolidayDisplayRangeUsesLocalCalendarStartOfDay() async throws {
+        var kstCalendar = Calendar(identifier: .gregorian)
+        kstCalendar.timeZone = TimeZone(secondsFromGMT: 9 * 3600)!
+        let holiday = NationalHoliday(
+            id: 1,
+            day: DayKey(year: 2026, month: 6, day: 6),
+            title: "현충일"
+        )
+
+        let startComponents = kstCalendar.dateComponents(
+            [.year, .month, .day, .hour, .minute],
+            from: holiday.displayStartAt(calendar: kstCalendar)
+        )
+        let endComponents = kstCalendar.dateComponents(
+            [.year, .month, .day, .hour, .minute],
+            from: holiday.displayEndAt(calendar: kstCalendar)
+        )
+
+        #expect(startComponents.year == 2026)
+        #expect(startComponents.month == 6)
+        #expect(startComponents.day == 6)
+        #expect(startComponents.hour == 0)
+        #expect(startComponents.minute == 0)
+        #expect(endComponents.year == 2026)
+        #expect(endComponents.month == 6)
+        #expect(endComponents.day == 7)
+        #expect(endComponents.hour == 0)
+        #expect(endComponents.minute == 0)
+    }
+
+    @MainActor
     @Test func sharedEventSummaryPopoverForwardsDetailActionForSelectedEvent() async throws {
         let event = makeEvent(id: 91, on: Date())
         var detailEventID: Int64?
@@ -444,6 +556,7 @@ struct CalioTests {
             calendar: calendar,
             dateService: CalendarDateService(calendar: calendar),
             eventService: EventService(repository: RecordingEventRepository()),
+            nationalHolidayService: makeNationalHolidayService(calendar: calendar),
             initialState: makeLoadedState(dayOffsets: 0...10, from: baseDate, calendar: calendar)
         )
 
@@ -469,6 +582,7 @@ struct CalioTests {
             calendar: calendar,
             dateService: CalendarDateService(calendar: calendar),
             eventService: EventService(repository: RecordingEventRepository()),
+            nationalHolidayService: makeNationalHolidayService(calendar: calendar),
             initialState: CalendarState(
                 startDate: baseDate,
                 endDate: try #require(calendar.date(byAdding: .day, value: 10, to: baseDate)),
@@ -490,6 +604,7 @@ struct CalioTests {
             calendar: calendar,
             dateService: CalendarDateService(calendar: calendar),
             eventService: EventService(repository: repository),
+            nationalHolidayService: makeNationalHolidayService(calendar: calendar),
             initialReferenceDate: baseDate
         )
 
@@ -513,6 +628,7 @@ struct CalioTests {
             calendar: calendar,
             dateService: CalendarDateService(calendar: calendar),
             eventService: EventService(repository: repository),
+            nationalHolidayService: makeNationalHolidayService(calendar: calendar),
             initialState: makeLoadedState(dayOffsets: 0...10, from: baseDate, calendar: calendar)
         )
 
@@ -538,6 +654,7 @@ struct CalioTests {
             calendar: calendar,
             dateService: CalendarDateService(calendar: calendar),
             eventService: EventService(repository: repository),
+            nationalHolidayService: makeNationalHolidayService(calendar: calendar),
             initialState: makeLoadedState(dayOffsets: 0...10, from: baseDate, calendar: calendar)
         )
 
@@ -564,6 +681,7 @@ struct CalioTests {
             calendar: calendar,
             dateService: CalendarDateService(calendar: calendar),
             eventService: EventService(repository: repository),
+            nationalHolidayService: makeNationalHolidayService(calendar: calendar),
             initialState: initialState
         )
 
@@ -589,6 +707,7 @@ struct CalioTests {
             calendar: calendar,
             dateService: CalendarDateService(calendar: calendar),
             eventService: EventService(repository: repository),
+            nationalHolidayService: makeNationalHolidayService(calendar: calendar),
             initialState: makeLoadedState(dayOffsets: 0...10, from: baseDate, calendar: calendar)
         )
 
@@ -1285,6 +1404,134 @@ struct CalioTests {
         #expect(capturedRequests.allSatisfy { requestBodyData(from: $0) == nil })
     }
 
+    @Test func urlSessionNationalHolidayRepositoryFetchesWithLocalDateQuery() async throws {
+        let responseJSON = """
+        [
+          {
+            "nationalHolidayId": 1,
+            "holidayDate": "2026-06-06",
+            "holidayTitle": "현충일"
+          }
+        ]
+        """.data(using: .utf8)!
+        var capturedRequest: URLRequest?
+        MockURLProtocol.requestHandler = { request in
+            capturedRequest = request
+            let response = HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            )!
+            return (response, responseJSON)
+        }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        let repository = URLSessionNationalHolidayRepository(
+            baseURL: URL(string: "https://example.test")!,
+            session: session
+        )
+
+        let response = try await repository.fetchNationalHolidays(
+            from: DayKey(year: 2026, month: 6, day: 1),
+            to: DayKey(year: 2026, month: 6, day: 30)
+        )
+        let request = try #require(capturedRequest)
+
+        #expect(response.map(\.holidayTitle) == ["현충일"])
+        #expect(request.url?.absoluteString == "https://example.test/api/national-holidays?from=2026-06-01&to=2026-06-30")
+        #expect(request.httpMethod == "GET")
+        #expect(request.value(forHTTPHeaderField: "Accept") == "application/json")
+    }
+
+    @MainActor
+    @Test func calendarHomeViewModelLoadsHolidaysIntoSeparateDateCellItems() async throws {
+        let calendar = fixedCalendar
+        let baseDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8)))
+        let holidayRepository = RecordingNationalHolidayRepository(
+            responsesByMonth: [
+                YearMonthKey(year: 2026, month: 6): [
+                    NationalHolidayResponseDTO(
+                        nationalHolidayId: 1,
+                        holidayDate: "2026-06-06",
+                        holidayTitle: "현충일"
+                    ),
+                    NationalHolidayResponseDTO(
+                        nationalHolidayId: 2,
+                        holidayDate: "2026-06-06",
+                        holidayTitle: "대체 공휴일"
+                    )
+                ]
+            ]
+        )
+        let viewModel = CalendarHomeViewModel(
+            calendar: calendar,
+            dateService: CalendarDateService(calendar: calendar),
+            eventService: EventService(repository: RecordingEventRepository()),
+            nationalHolidayService: NationalHolidayService(
+                repository: holidayRepository,
+                calendar: calendar
+            ),
+            initialReferenceDate: baseDate
+        )
+
+        viewModel.loadInitialIfNeeded()
+        let didRequestHolidayMonths = await holidayRepository.waitForRequestCount(3)
+        let didLoadHolidays = await waitUntil {
+            viewModel.state.daysByKey[DayKey(year: 2026, month: 6, day: 6)]?.holidays.count == 2
+        }
+        let holidayDayItem = viewModel.state.daysByKey[DayKey(year: 2026, month: 6, day: 6)]
+
+        #expect(didRequestHolidayMonths)
+        #expect(holidayRepository.requestMonthKeys == [
+            YearMonthKey(year: 2026, month: 5),
+            YearMonthKey(year: 2026, month: 6),
+            YearMonthKey(year: 2026, month: 7)
+        ])
+        #expect(didLoadHolidays)
+        #expect(holidayDayItem?.events.isEmpty == true)
+        #expect(holidayDayItem?.holidays.map(\.title) == ["현충일", "대체 공휴일"])
+    }
+
+    @MainActor
+    @Test func calendarHomeViewModelHolidayFailureKeepsEventAreaUsable() async throws {
+        let calendar = fixedCalendar
+        let baseDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8)))
+        let event = makeEvent(id: 44, on: baseDate)
+        let eventRepository = RecordingEventRepository(fetchResponse: [makeEventResponse(from: event)])
+        let holidayRepository = RecordingNationalHolidayRepository(
+            error: NationalHolidayRepositoryError.network(URLError(.notConnectedToInternet))
+        )
+        let viewModel = CalendarHomeViewModel(
+            calendar: calendar,
+            dateService: CalendarDateService(calendar: calendar),
+            eventService: EventService(repository: eventRepository),
+            nationalHolidayService: NationalHolidayService(
+                repository: holidayRepository,
+                calendar: calendar
+            ),
+            initialReferenceDate: baseDate
+        )
+
+        viewModel.loadInitialIfNeeded()
+        let didLoadEvents = await waitUntil {
+            viewModel.state.daysByKey[DayKey(date: baseDate, calendar: calendar)]?.events.map(\.id) == [44]
+        }
+        let didStoreHolidayFailure = await waitUntil {
+            if case .failed = viewModel.state.monthHolidayCache[YearMonthKey(year: 2026, month: 6)] {
+                return true
+            }
+
+            return false
+        }
+
+        #expect(didLoadEvents)
+        #expect(didStoreHolidayFailure)
+        #expect(viewModel.referenceEventAreaState == .idle)
+        #expect(viewModel.state.daysByKey[DayKey(date: baseDate, calendar: calendar)]?.holidays.isEmpty == true)
+    }
+
     @MainActor
     @Test func calendarHomeViewModelInsertsCreatedEventIntoStartAtMonthCache() async throws {
         let calendar = fixedCalendar
@@ -1296,6 +1543,7 @@ struct CalioTests {
             calendar: calendar,
             dateService: CalendarDateService(calendar: calendar),
             eventService: EventService(repository: repository),
+            nationalHolidayService: makeNationalHolidayService(calendar: calendar),
             initialState: makeLoadedState(dayOffsets: 0...2, from: baseDate, calendar: calendar)
         )
 
@@ -1326,6 +1574,7 @@ struct CalioTests {
             calendar: calendar,
             dateService: CalendarDateService(calendar: calendar),
             eventService: EventService(repository: repository),
+            nationalHolidayService: makeNationalHolidayService(calendar: calendar),
             initialState: initialState
         )
 
@@ -1359,6 +1608,7 @@ struct CalioTests {
             calendar: calendar,
             dateService: CalendarDateService(calendar: calendar),
             eventService: EventService(repository: repository),
+            nationalHolidayService: makeNationalHolidayService(calendar: calendar),
             initialState: makeLoadedState(
                 dayOffsets: 0...2,
                 from: baseDate,
@@ -1399,6 +1649,7 @@ struct CalioTests {
             calendar: calendar,
             dateService: CalendarDateService(calendar: calendar),
             eventService: EventService(repository: repository),
+            nationalHolidayService: makeNationalHolidayService(calendar: calendar),
             initialState: makeLoadedState(dayOffsets: 0...2, from: baseDate, calendar: calendar)
         )
 
@@ -1428,6 +1679,7 @@ struct CalioTests {
             calendar: calendar,
             dateService: CalendarDateService(calendar: calendar),
             eventService: EventService(repository: repository),
+            nationalHolidayService: makeNationalHolidayService(calendar: calendar),
             initialState: makeLoadedState(dayOffsets: 0...2, from: baseDate, calendar: calendar)
         )
         let input = EventCreateInput(
@@ -1466,6 +1718,7 @@ struct CalioTests {
             calendar: calendar,
             dateService: CalendarDateService(calendar: calendar),
             eventService: EventService(repository: repository),
+            nationalHolidayService: makeNationalHolidayService(calendar: calendar),
             initialState: makeLoadedState(
                 dayOffsets: 0...2,
                 from: baseDate,
@@ -1536,6 +1789,7 @@ struct CalioTests {
             calendar: calendar,
             dateService: CalendarDateService(calendar: calendar),
             eventService: EventService(repository: repository),
+            nationalHolidayService: makeNationalHolidayService(calendar: calendar),
             initialState: initialState
         )
 
@@ -1561,6 +1815,55 @@ struct CalioTests {
     }
 
     @MainActor
+    @Test func calendarHomeViewModelEventMutationDoesNotInvalidateLoadedHolidayCache() async throws {
+        let calendar = fixedCalendar
+        let baseDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8)))
+        let event = makeEvent(id: 601, title: "수정 대상", on: baseDate)
+        let holiday = NationalHoliday(
+            id: 1,
+            day: DayKey(date: baseDate, calendar: calendar),
+            title: "공휴일"
+        )
+        let eventRepository = RecordingEventRepository(
+            updateResponse: makeEventResponse(from: event)
+        )
+        let holidayRepository = RecordingNationalHolidayRepository()
+        let viewModel = CalendarHomeViewModel(
+            calendar: calendar,
+            dateService: CalendarDateService(calendar: calendar),
+            eventService: EventService(repository: eventRepository),
+            nationalHolidayService: NationalHolidayService(
+                repository: holidayRepository,
+                calendar: calendar
+            ),
+            initialState: makeLoadedState(
+                dayOffsets: 0...2,
+                from: baseDate,
+                calendar: calendar,
+                monthEventCache: [YearMonthKey(year: 2026, month: 6): .loaded([event])],
+                monthHolidayCache: [YearMonthKey(year: 2026, month: 6): .loaded([holiday])]
+            )
+        )
+
+        let didUpdate = await viewModel.updateSingleEvent(
+            event,
+            input: EventUpdateInput(
+                title: "수정 대상",
+                description: "",
+                startAt: event.startAt,
+                endAt: event.endAt
+            )
+        )
+        let didRequestEventMonth = await eventRepository.waitForRequestCount(1)
+
+        #expect(didUpdate)
+        #expect(didRequestEventMonth)
+        #expect(holidayRepository.requestCount == 0)
+        #expect(viewModel.state.monthHolidayCache[YearMonthKey(year: 2026, month: 6)]?.loadedHolidays.map(\.id) == [1])
+        #expect(viewModel.state.daysByKey[holiday.day]?.holidays.map(\.id) == [1])
+    }
+
+    @MainActor
     @Test func calendarHomeViewModelRefetchesOriginalMonthAfterSingleEventDelete() async throws {
         let calendar = fixedCalendar
         let baseDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8)))
@@ -1570,6 +1873,7 @@ struct CalioTests {
             calendar: calendar,
             dateService: CalendarDateService(calendar: calendar),
             eventService: EventService(repository: repository),
+            nationalHolidayService: makeNationalHolidayService(calendar: calendar),
             initialState: makeLoadedState(
                 dayOffsets: 0...2,
                 from: baseDate,
@@ -1608,6 +1912,7 @@ struct CalioTests {
             calendar: calendar,
             dateService: CalendarDateService(calendar: calendar),
             eventService: EventService(repository: repository),
+            nationalHolidayService: makeNationalHolidayService(calendar: calendar),
             initialState: makeLoadedState(
                 dayOffsets: 0...2,
                 from: baseDate,
@@ -1654,6 +1959,7 @@ struct CalioTests {
             calendar: calendar,
             dateService: CalendarDateService(calendar: calendar),
             eventService: EventService(repository: repository),
+            nationalHolidayService: makeNationalHolidayService(calendar: calendar),
             initialState: makeLoadedState(dayOffsets: 0...2, from: baseDate, calendar: calendar)
         )
 
@@ -1685,6 +1991,7 @@ struct CalioTests {
             calendar: calendar,
             dateService: CalendarDateService(calendar: calendar),
             eventService: EventService(repository: repository),
+            nationalHolidayService: makeNationalHolidayService(calendar: calendar),
             initialState: makeLoadedState(
                 dayOffsets: 0...2,
                 from: baseDate,
@@ -1730,6 +2037,7 @@ struct CalioTests {
             calendar: calendar,
             dateService: CalendarDateService(calendar: calendar),
             eventService: EventService(repository: repository),
+            nationalHolidayService: makeNationalHolidayService(calendar: calendar),
             initialState: makeLoadedState(
                 dayOffsets: 0...2,
                 from: baseDate,
@@ -1804,7 +2112,8 @@ struct CalioTests {
         dayOffset: Int,
         from baseDate: Date,
         calendar: Calendar,
-        events: [Event] = []
+        events: [Event] = [],
+        holidays: [NationalHoliday] = []
     ) -> CalendarDateCellItem {
         let date = calendar.date(byAdding: .day, value: dayOffset, to: baseDate) ?? baseDate
         let dateService = CalendarDateService(calendar: calendar)
@@ -1815,7 +2124,8 @@ struct CalioTests {
             monthText: dateService.monthText(from: date),
             dayText: dateService.dayText(from: date),
             isToday: false,
-            events: events
+            events: events,
+            holidays: holidays
         )
     }
 
@@ -1823,10 +2133,22 @@ struct CalioTests {
         dayOffsets: ClosedRange<Int>,
         from baseDate: Date,
         calendar: Calendar,
-        monthEventCache: [YearMonthKey: CalendarMonthEventCacheEntry] = [:]
+        monthEventCache: [YearMonthKey: CalendarMonthEventCacheEntry] = [:],
+        monthHolidayCache: [YearMonthKey: CalendarMonthHolidayCacheEntry] = [:]
     ) -> CalendarState {
+        let holidaysByDay = monthHolidayCache.values
+            .flatMap(\.loadedHolidays)
+            .reduce(into: [DayKey: [NationalHoliday]]()) { result, holiday in
+                result[holiday.day, default: []].append(holiday)
+            }
         let items = dayOffsets.map { offset in
-            makeDateCellItem(dayOffset: offset, from: baseDate, calendar: calendar)
+            let day = makeDayKey(dayOffset: offset, from: baseDate, calendar: calendar)
+            return makeDateCellItem(
+                dayOffset: offset,
+                from: baseDate,
+                calendar: calendar,
+                holidays: holidaysByDay[day] ?? []
+            )
         }
         let startDate = calendar.date(byAdding: .day, value: dayOffsets.lowerBound, to: baseDate) ?? baseDate
         let endDate = calendar.date(byAdding: .day, value: dayOffsets.upperBound, to: baseDate) ?? baseDate
@@ -1835,7 +2157,8 @@ struct CalioTests {
             startDate: startDate,
             endDate: endDate,
             daysByKey: Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) }),
-            monthEventCache: monthEventCache
+            monthEventCache: monthEventCache,
+            monthHolidayCache: monthHolidayCache
         )
     }
     
@@ -1896,6 +2219,129 @@ struct CalioTests {
         return data
     }
 
+    private func makeNationalHolidayService(calendar: Calendar) -> NationalHolidayService {
+        NationalHolidayService(
+            repository: RecordingNationalHolidayRepository(),
+            calendar: calendar
+        )
+    }
+
+}
+
+private final class RecordingNationalHolidayRepository: NationalHolidayRepository {
+    private let lock = NSLock()
+    private var storedRequests: [(startDay: DayKey, endDay: DayKey)] = []
+    private var requestCountWaiters: [CountWaiter] = []
+    private let fetchResponse: [NationalHolidayResponseDTO]
+    private let responsesByMonth: [YearMonthKey: [NationalHolidayResponseDTO]]
+    private let error: Error?
+
+    init(
+        fetchResponse: [NationalHolidayResponseDTO] = [],
+        responsesByMonth: [YearMonthKey: [NationalHolidayResponseDTO]] = [:],
+        error: Error? = nil
+    ) {
+        self.fetchResponse = fetchResponse
+        self.responsesByMonth = responsesByMonth
+        self.error = error
+    }
+
+    var requestCount: Int {
+        locked {
+            storedRequests.count
+        }
+    }
+
+    var requestMonthKeys: [YearMonthKey] {
+        locked {
+            storedRequests.map { YearMonthKey(day: $0.startDay) }.sorted()
+        }
+    }
+
+    func fetchNationalHolidays(
+        from startDay: DayKey,
+        to endDay: DayKey
+    ) async throws -> [NationalHolidayResponseDTO] {
+        recordRequest(startDay: startDay, endDay: endDay)
+
+        if let error {
+            throw error
+        }
+
+        return responsesByMonth[YearMonthKey(day: startDay)] ?? fetchResponse
+    }
+
+    func waitForRequestCount(
+        _ count: Int,
+        timeoutNanoseconds: UInt64 = 5_000_000_000
+    ) async -> Bool {
+        let waiterID = UUID()
+
+        return await withCheckedContinuation { continuation in
+            let shouldWait = locked {
+                guard storedRequests.count < count else {
+                    return false
+                }
+
+                requestCountWaiters.append(
+                    CountWaiter(
+                        id: waiterID,
+                        count: count,
+                        continuation: continuation
+                    )
+                )
+                return true
+            }
+
+            guard shouldWait else {
+                continuation.resume(returning: true)
+                return
+            }
+
+            Task {
+                try? await Task.sleep(nanoseconds: timeoutNanoseconds)
+                completeWaiterIfNeeded(id: waiterID)
+            }
+        }
+    }
+
+    private func recordRequest(startDay: DayKey, endDay: DayKey) {
+        let continuations = locked {
+            storedRequests.append((startDay, endDay))
+            return readyWaiters(currentCount: storedRequests.count)
+        }
+        continuations.forEach { $0.resume(returning: true) }
+    }
+
+    private func completeWaiterIfNeeded(id: UUID) {
+        let continuation = locked {
+            guard let index = requestCountWaiters.firstIndex(where: { $0.id == id }) else {
+                return nil as CheckedContinuation<Bool, Never>?
+            }
+
+            return requestCountWaiters.remove(at: index).continuation
+        }
+
+        continuation?.resume(returning: false)
+    }
+
+    private func readyWaiters(currentCount: Int) -> [CheckedContinuation<Bool, Never>] {
+        let readyWaiters = requestCountWaiters.filter { currentCount >= $0.count }
+        requestCountWaiters.removeAll { currentCount >= $0.count }
+        return readyWaiters.map(\.continuation)
+    }
+
+    private func locked<T>(_ work: () -> T) -> T {
+        lock.lock()
+        defer { lock.unlock() }
+        return work()
+    }
+
+    private struct CountWaiter {
+        let id: UUID
+        let count: Int
+        let continuation: CheckedContinuation<Bool, Never>
+    }
 }
 
 private final class RecordingEventRepository: EventRepository {
