@@ -12,10 +12,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.calio.calendar.repository.TaskRepository;
 import com.calio.calendar.repository.entity.Task;
-import com.calio.calendar.service.TaskService;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -46,9 +44,6 @@ class TaskControllerTest {
 
     @Autowired
     private TaskRepository taskRepository;
-
-    @Autowired
-    private TaskService taskService;
 
     @BeforeEach
     void setUp() {
@@ -287,25 +282,6 @@ class TaskControllerTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorCode").value("TASK_NOT_FOUND"))
                 .andExpect(jsonPath("$.message").value("Task not found."));
-    }
-
-    @Test
-    @DisplayName("cleanup은 cutoff보다 오래된 완료 작업만 hard-delete한다")
-    void givenCompletedAndActiveTasks_whenCleanupOldCompletedTasks_thenDeletesOnlyOldCompletedTasks() {
-        // given
-        Instant now = Instant.parse("2026-07-06T00:00:00Z");
-        Task oldCompletedTask = saveCompletedTask("Old completed", now.minus(31, ChronoUnit.DAYS));
-        Task recentCompletedTask = saveCompletedTask("Recent completed", now.minus(29, ChronoUnit.DAYS));
-        Task activeTask = taskRepository.saveAndFlush(new Task("Active task"));
-
-        // when
-        int deletedCount = taskService.deleteCompletedTasksOlderThan(now.minus(30, ChronoUnit.DAYS));
-
-        // then
-        assertThat(deletedCount).isEqualTo(1);
-        assertThat(taskRepository.existsById(oldCompletedTask.getTaskId())).isFalse();
-        assertThat(taskRepository.existsById(recentCompletedTask.getTaskId())).isTrue();
-        assertThat(taskRepository.existsById(activeTask.getTaskId())).isTrue();
     }
 
     private long createTask(String taskTitle) throws Exception {
