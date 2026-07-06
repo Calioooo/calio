@@ -7,6 +7,7 @@ public record TaskResponse(
         Long taskId,
         String taskTitle,
         boolean isCompleted,
+        Instant completedAt,
         Instant createdAt,
         Instant updatedAt
 ) {
@@ -16,6 +17,7 @@ public record TaskResponse(
                 task.getTaskId(),
                 task.getTaskTitle(),
                 task.isCompleted(),
+                task.getCompletedAt(),
                 task.getCreatedAt(),
                 task.getUpdatedAt()
         );

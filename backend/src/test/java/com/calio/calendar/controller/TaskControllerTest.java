@@ -2,13 +2,20 @@ package com.calio.calendar.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.nullValue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.calio.calendar.repository.TaskRepository;
+import com.calio.calendar.repository.entity.Task;
+import com.calio.calendar.service.TaskService;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -40,6 +47,9 @@ class TaskControllerTest {
     @Autowired
     private TaskRepository taskRepository;
 
+    @Autowired
+    private TaskService taskService;
+
     @BeforeEach
     void setUp() {
         taskRepository.deleteAll();
@@ -68,6 +78,7 @@ class TaskControllerTest {
                 .andExpect(jsonPath("$.taskId").isNumber())
                 .andExpect(jsonPath("$.taskTitle").value("Inbox review"))
                 .andExpect(jsonPath("$.isCompleted").value(false))
+                .andExpect(jsonPath("$.completedAt").value(nullValue()))
                 .andExpect(jsonPath("$.createdAt").isString())
                 .andExpect(jsonPath("$.updatedAt").isString())
                 .andReturn();
@@ -128,8 +139,8 @@ class TaskControllerTest {
     }
 
     @Test
-    @DisplayName("사용자는 전체 작업 목록을 taskId 오름차순으로 조회한다")
-    void givenCreatedTasks_whenListTasks_thenReturnsTasksSortedByTaskIdAscending() throws Exception {
+    @DisplayName("사용자는 활성 작업 목록을 taskId 오름차순으로 조회한다")
+    void givenCreatedTasks_whenListTasks_thenReturnsActiveTasksSortedByTaskIdAscending() throws Exception {
         // given
         long firstTaskId = createTask("First task");
         long secondTaskId = createTask("Second task");
@@ -143,10 +154,158 @@ class TaskControllerTest {
                 .andExpect(jsonPath("$[0].taskId").value(firstTaskId))
                 .andExpect(jsonPath("$[0].taskTitle").value("First task"))
                 .andExpect(jsonPath("$[0].isCompleted").value(false))
+                .andExpect(jsonPath("$[0].completedAt").value(nullValue()))
                 .andExpect(jsonPath("$[1].taskId").value(secondTaskId))
                 .andExpect(jsonPath("$[1].taskTitle").value("Second task"))
                 .andExpect(jsonPath("$[2].taskId").value(thirdTaskId))
                 .andExpect(jsonPath("$[2].taskTitle").value("Third task"));
+    }
+
+    @Test
+    @DisplayName("DELETE /api/tasks/{taskId}는 request body 없이 작업을 완료하고 completedAt을 기록한다")
+    void givenActiveTask_whenCompleteTask_thenReturnsCompletedTaskAndPersistsCompletedAt() throws Exception {
+        // given
+        long taskId = createTask("Complete me");
+
+        // when
+        MvcResult result = mockMvc.perform(delete("/api/tasks/{taskId}", taskId))
+                // then
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.taskId").value(taskId))
+                .andExpect(jsonPath("$.taskTitle").value("Complete me"))
+                .andExpect(jsonPath("$.isCompleted").value(true))
+                .andExpect(jsonPath("$.completedAt").isString())
+                .andReturn();
+
+        JsonNode response = readResponse(result);
+        Task task = taskRepository.findById(taskId).orElseThrow();
+        assertThat(task.isCompleted()).isTrue();
+        assertThat(task.getCompletedAt()).isEqualTo(Instant.parse(response.get("completedAt").asText()));
+    }
+
+    @Test
+    @DisplayName("이미 완료된 작업을 다시 완료하면 기존 completedAt을 보존한다")
+    void givenCompletedTask_whenCompleteTaskAgain_thenPreservesCompletedAt() throws Exception {
+        // given
+        Instant originalCompletedAt = Instant.parse("2026-01-01T00:00:00Z");
+        Task task = saveCompletedTask("Already completed", originalCompletedAt);
+
+        // when
+        mockMvc.perform(delete("/api/tasks/{taskId}", task.getTaskId()))
+                // then
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isCompleted").value(true))
+                .andExpect(jsonPath("$.completedAt").value("2026-01-01T00:00:00Z"));
+
+        Task persistedTask = taskRepository.findById(task.getTaskId()).orElseThrow();
+        assertThat(persistedTask.getCompletedAt()).isEqualTo(originalCompletedAt);
+    }
+
+    @Test
+    @DisplayName("PATCH /api/tasks/{taskId}/uncomplete는 request body 없이 작업을 활성 상태로 되돌린다")
+    void givenCompletedTask_whenUncompleteTask_thenReturnsActiveTaskAndClearsCompletedAt() throws Exception {
+        // given
+        Task task = saveCompletedTask("Uncomplete me", Instant.parse("2026-01-01T00:00:00Z"));
+
+        // when
+        mockMvc.perform(patch("/api/tasks/{taskId}/uncomplete", task.getTaskId()))
+                // then
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.taskId").value(task.getTaskId()))
+                .andExpect(jsonPath("$.taskTitle").value("Uncomplete me"))
+                .andExpect(jsonPath("$.isCompleted").value(false))
+                .andExpect(jsonPath("$.completedAt").value(nullValue()));
+
+        Task persistedTask = taskRepository.findById(task.getTaskId()).orElseThrow();
+        assertThat(persistedTask.isCompleted()).isFalse();
+        assertThat(persistedTask.getCompletedAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("이미 활성 상태인 작업을 uncomplete해도 미완료 상태와 null completedAt을 유지한다")
+    void givenActiveTask_whenUncompleteTask_thenKeepsActiveState() throws Exception {
+        // given
+        long taskId = createTask("Already active");
+
+        // when
+        mockMvc.perform(patch("/api/tasks/{taskId}/uncomplete", taskId))
+                // then
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.taskId").value(taskId))
+                .andExpect(jsonPath("$.isCompleted").value(false))
+                .andExpect(jsonPath("$.completedAt").value(nullValue()));
+
+        Task task = taskRepository.findById(taskId).orElseThrow();
+        assertThat(task.isCompleted()).isFalse();
+        assertThat(task.getCompletedAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("완료된 작업은 활성 목록에서 제외되고 uncomplete 후 다시 포함된다")
+    void givenCompletedTask_whenListTasks_thenExcludesUntilUncompleted() throws Exception {
+        // given
+        long firstTaskId = createTask("First task");
+        long secondTaskId = createTask("Second task");
+        mockMvc.perform(delete("/api/tasks/{taskId}", firstTaskId))
+                .andExpect(status().isOk());
+
+        // when, then
+        mockMvc.perform(get("/api/tasks"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].taskId").value(secondTaskId));
+
+        // when
+        mockMvc.perform(patch("/api/tasks/{taskId}/uncomplete", firstTaskId))
+                .andExpect(status().isOk());
+
+        // then
+        mockMvc.perform(get("/api/tasks"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$[0].taskId").value(firstTaskId))
+                .andExpect(jsonPath("$[1].taskId").value(secondTaskId));
+    }
+
+    @Test
+    @DisplayName("없는 작업을 완료하면 TASK_NOT_FOUND를 반환한다")
+    void givenMissingTaskId_whenCompleteTask_thenReturnsTaskNotFound() throws Exception {
+        // when
+        mockMvc.perform(delete("/api/tasks/{taskId}", 999999L))
+                // then
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("TASK_NOT_FOUND"))
+                .andExpect(jsonPath("$.message").value("Task not found."));
+    }
+
+    @Test
+    @DisplayName("없는 작업을 uncomplete하면 TASK_NOT_FOUND를 반환한다")
+    void givenMissingTaskId_whenUncompleteTask_thenReturnsTaskNotFound() throws Exception {
+        // when
+        mockMvc.perform(patch("/api/tasks/{taskId}/uncomplete", 999999L))
+                // then
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("TASK_NOT_FOUND"))
+                .andExpect(jsonPath("$.message").value("Task not found."));
+    }
+
+    @Test
+    @DisplayName("cleanup은 cutoff보다 오래된 완료 작업만 hard-delete한다")
+    void givenCompletedAndActiveTasks_whenCleanupOldCompletedTasks_thenDeletesOnlyOldCompletedTasks() {
+        // given
+        Instant now = Instant.parse("2026-07-06T00:00:00Z");
+        Task oldCompletedTask = saveCompletedTask("Old completed", now.minus(31, ChronoUnit.DAYS));
+        Task recentCompletedTask = saveCompletedTask("Recent completed", now.minus(29, ChronoUnit.DAYS));
+        Task activeTask = taskRepository.saveAndFlush(new Task("Active task"));
+
+        // when
+        int deletedCount = taskService.deleteCompletedTasksOlderThan(now.minus(30, ChronoUnit.DAYS));
+
+        // then
+        assertThat(deletedCount).isEqualTo(1);
+        assertThat(taskRepository.existsById(oldCompletedTask.getTaskId())).isFalse();
+        assertThat(taskRepository.existsById(recentCompletedTask.getTaskId())).isTrue();
+        assertThat(taskRepository.existsById(activeTask.getTaskId())).isTrue();
     }
 
     private long createTask(String taskTitle) throws Exception {
@@ -161,6 +320,12 @@ class TaskControllerTest {
                 .andReturn();
 
         return readResponse(result).get("taskId").asLong();
+    }
+
+    private Task saveCompletedTask(String taskTitle, Instant completedAt) {
+        Task task = new Task(taskTitle);
+        task.complete(completedAt);
+        return taskRepository.saveAndFlush(task);
     }
 
     private JsonNode readResponse(MvcResult result) throws Exception {

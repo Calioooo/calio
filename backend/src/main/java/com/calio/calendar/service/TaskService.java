@@ -2,8 +2,12 @@ package com.calio.calendar.service;
 
 import com.calio.calendar.controller.dto.CreateTaskRequest;
 import com.calio.calendar.controller.dto.TaskResponse;
+import com.calio.calendar.exception.CalioException;
+import com.calio.calendar.exception.ErrorCode;
 import com.calio.calendar.repository.TaskRepository;
 import com.calio.calendar.repository.entity.Task;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -36,10 +40,40 @@ public class TaskService {
                 Sort.by(Sort.Direction.ASC, "taskId")
         );
 
-        return taskRepository.findAll(pageRequest)
+        return taskRepository.findByCompletedFalse(pageRequest)
                 .getContent()
                 .stream()
                 .map(TaskResponse::from)
                 .toList();
+    }
+
+    @Transactional
+    public TaskResponse completeTask(Long taskId) {
+        Task task = getTask(taskId);
+        task.complete(currentPersistenceTime());
+        taskRepository.flush();
+        return TaskResponse.from(task);
+    }
+
+    @Transactional
+    public TaskResponse uncompleteTask(Long taskId) {
+        Task task = getTask(taskId);
+        task.uncomplete();
+        taskRepository.flush();
+        return TaskResponse.from(task);
+    }
+
+    @Transactional
+    public int deleteCompletedTasksOlderThan(Instant cutoff) {
+        return taskRepository.deleteCompletedTasksOlderThan(cutoff);
+    }
+
+    private Task getTask(Long taskId) {
+        return taskRepository.findById(taskId)
+                .orElseThrow(() -> new CalioException(ErrorCode.TASK_NOT_FOUND));
+    }
+
+    private Instant currentPersistenceTime() {
+        return Instant.now().truncatedTo(ChronoUnit.MICROS);
     }
 }
