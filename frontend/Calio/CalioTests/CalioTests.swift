@@ -313,7 +313,7 @@ struct CalioTests {
             description: "",
             startAt: baseDate,
             endAt: baseDate.addingTimeInterval(3600),
-            colorCode: "#4F46E5",
+            tag: .sample(colorCode: "#4F46E5"),
             importantEvent: true,
             recurrenceId: 12345,
             isRecurrenceOccurrence: false
@@ -324,7 +324,7 @@ struct CalioTests {
             description: "",
             startAt: baseDate,
             endAt: baseDate.addingTimeInterval(3600),
-            colorCode: "#4F46E5",
+            tag: .sample(colorCode: "#4F46E5"),
             importantEvent: false,
             recurrenceId: nil,
             isRecurrenceOccurrence: true
@@ -367,7 +367,7 @@ struct CalioTests {
             description: "",
             startAt: baseDate,
             endAt: baseDate.addingTimeInterval(3600),
-            colorCode: "#4F46E5",
+            tag: .sample(colorCode: "#4F46E5"),
             recurrenceId: 100,
             isRecurrenceOccurrence: true
         )
@@ -377,7 +377,7 @@ struct CalioTests {
             description: "",
             startAt: baseDate,
             endAt: baseDate.addingTimeInterval(3600),
-            colorCode: "#4F46E5",
+            tag: .sample(colorCode: "#4F46E5"),
             recurrenceId: nil,
             isRecurrenceOccurrence: true
         )
@@ -403,7 +403,7 @@ struct CalioTests {
                     startAt: startAt,
                     endAt: endAt,
                     description: "설명",
-                    colorCode: "#4F46E5"
+                    tag: .sample(colorCode: "#4F46E5")
                 )
             ),
             recurrenceInput: .constant(
@@ -435,7 +435,7 @@ struct CalioTests {
                     startAt: startAt,
                     endAt: endAt,
                     description: "설명",
-                    colorCode: "#EF4444"
+                    tag: .sample(colorCode: "#EF4444")
                 )
             ),
             mode: .editSingleEvent,
@@ -459,7 +459,7 @@ struct CalioTests {
                     startAt: startAt,
                     endAt: endAt,
                     description: "설명",
-                    colorCode: "#EF4444"
+                    tag: .sample(colorCode: "#EF4444")
                 )
             ),
             mode: .editRecurrenceOccurrence,
@@ -914,6 +914,12 @@ struct CalioTests {
           "importantEvent": true,
           "recurrenceId": 44,
           "isRecurrenceOccurrence": true,
+          "tag": {
+            "id": 1,
+            "title": "업무",
+            "colorCode": "#4F46E5",
+            "tagType": "DEFAULT"
+          },
           "createdAt": "2026-08-01T00:00:00Z",
           "updatedAt": "2026-08-01T00:00:00Z"
         }
@@ -943,6 +949,12 @@ struct CalioTests {
                 description: nil,
                 startAt: startAt,
                 endAt: endAt,
+                tag: TagResponseDTO(
+                    id: 1,
+                    title: "업무",
+                    colorCode: "#4F46E5",
+                    tagType: .defaultTag
+                ),
                 createdAt: startAt,
                 updatedAt: startAt
             )
@@ -963,7 +975,7 @@ struct CalioTests {
         #expect(event.description == "")
         #expect(event.startAt == startAt)
         #expect(event.endAt == endAt)
-        #expect(event.colorCode == "#4F46E5")
+        #expect(event.tag.colorCode == "#4F46E5")
         #expect(repository.createRequests.count == 1)
     }
 
@@ -1133,6 +1145,12 @@ struct CalioTests {
           "description": "메모",
           "startAt": "2026-06-10T09:00:00Z",
           "endAt": "2026-06-10T10:00:00Z",
+          "tag": {
+            "id": 1,
+            "title": "업무",
+            "colorCode": "#3B82F6",
+            "tagType": "DEFAULT"
+          },
           "createdAt": "2026-06-10T09:00:00Z",
           "updatedAt": "2026-06-10T09:00:00Z"
         }
@@ -1187,7 +1205,13 @@ struct CalioTests {
           "recurrenceEndDate": "2026-08-31",
           "recurrenceStartTime": "00:00:00",
           "recurrenceEndTime": "01:00:00",
-          "recurrenceFrequency": "MONTHLY"
+          "recurrenceFrequency": "MONTHLY",
+          "tag": {
+            "id": 1,
+            "title": "업무",
+            "colorCode": "#3B82F6",
+            "tagType": "DEFAULT"
+          }
         }
         """.data(using: .utf8)!
         var capturedRequest: URLRequest?
@@ -1251,6 +1275,12 @@ struct CalioTests {
           "description": "수정 메모",
           "startAt": "2026-06-10T09:00:00Z",
           "endAt": "2026-06-10T10:00:00Z",
+          "tag": {
+            "id": 1,
+            "title": "업무",
+            "colorCode": "#3B82F6",
+            "tagType": "DEFAULT"
+          },
           "createdAt": "2026-06-10T09:00:00Z",
           "updatedAt": "2026-06-10T10:00:00Z"
         }
@@ -1304,7 +1334,13 @@ struct CalioTests {
           "recurrenceEndDate": "2026-08-31",
           "recurrenceStartTime": "09:00:00",
           "recurrenceEndTime": "10:00:00",
-          "recurrenceFrequency": "WEEKLY"
+          "recurrenceFrequency": "WEEKLY",
+          "tag": {
+            "id": 1,
+            "title": "업무",
+            "colorCode": "#3B82F6",
+            "tagType": "DEFAULT"
+          }
         }
         """.data(using: .utf8)!
         let occurrenceResponseJSON = """
@@ -1317,6 +1353,12 @@ struct CalioTests {
           "importantEvent": true,
           "recurrenceId": 700,
           "isRecurrenceOccurrence": true,
+          "tag": {
+            "id": 1,
+            "title": "업무",
+            "colorCode": "#3B82F6",
+            "tagType": "DEFAULT"
+          },
           "createdAt": "2026-08-01T09:00:00Z",
           "updatedAt": "2026-08-01T10:00:00Z"
         }
@@ -1771,7 +1813,7 @@ struct CalioTests {
             description: "수정",
             startAt: updatedStartAt,
             endAt: updatedStartAt.addingTimeInterval(3600),
-            colorCode: "#4F46E5"
+            tag: .sample(colorCode: "#4F46E5")
         )
         let repository = RecordingEventRepository(
             updateResponse: makeEventResponse(from: updatedEvent)
@@ -1903,7 +1945,7 @@ struct CalioTests {
             description: "",
             startAt: baseDate,
             endAt: baseDate.addingTimeInterval(3600),
-            colorCode: "#4F46E5",
+            tag: .sample(colorCode: "#4F46E5"),
             recurrenceId: 700,
             isRecurrenceOccurrence: true
         )
@@ -1981,7 +2023,7 @@ struct CalioTests {
             description: "",
             startAt: baseDate,
             endAt: baseDate.addingTimeInterval(3600),
-            colorCode: "#4F46E5",
+            tag: .sample(colorCode: "#4F46E5"),
             importantEvent: true,
             recurrenceId: 700,
             isRecurrenceOccurrence: true
@@ -2173,7 +2215,7 @@ struct CalioTests {
             description: "",
             startAt: date,
             endAt: date.addingTimeInterval(3600),
-            colorCode: "#4F46E5"
+            tag: .sample(colorCode: "#4F46E5")
         )
     }
 
@@ -2184,6 +2226,12 @@ struct CalioTests {
             description: event.description,
             startAt: event.startAt,
             endAt: event.endAt,
+            tag: TagResponseDTO(
+                id: event.tag.id,
+                title: event.tag.title,
+                colorCode: event.tag.colorCode,
+                tagType: event.tag.tagType
+            ),
             createdAt: event.startAt,
             updatedAt: event.startAt
         )

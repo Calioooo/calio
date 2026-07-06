@@ -9,7 +9,6 @@ import Foundation
 
 struct EventService {
     private let repository: EventRepository
-    private let defaultColorCode = "#4F46E5"
     
     init(repository: EventRepository = URLSessionEventRepository()) {
         self.repository = repository
@@ -31,7 +30,8 @@ struct EventService {
             title: input.title,
             description: input.description,
             startAt: input.startAt,
-            endAt: input.endAt
+            endAt: input.endAt,
+            tagId: input.tagId
         )
 
         do {
@@ -49,7 +49,8 @@ struct EventService {
             title: input.title,
             description: input.description,
             startAt: input.startAt,
-            endAt: input.endAt
+            endAt: input.endAt,
+            tagId: input.tagId
         )
 
         do {
@@ -84,7 +85,8 @@ struct EventService {
             description: input.description,
             startAt: input.startAt,
             endAt: input.endAt,
-            recurrenceFrequency: input.recurrenceFrequency
+            recurrenceFrequency: input.recurrenceFrequency,
+            tagId: input.tagId
         )
 
         do {
@@ -170,7 +172,8 @@ struct EventService {
             recurrenceEndDate: CalendarDateService.utcDateString(from: input.recurrenceEndDate),
             recurrenceStartTime: CalendarDateService.utcTimeString(from: input.recurrenceStartTime),
             recurrenceEndTime: CalendarDateService.utcTimeString(from: input.recurrenceEndTime),
-            recurrenceFrequency: input.recurrenceFrequency
+            recurrenceFrequency: input.recurrenceFrequency,
+            tagId: input.tagId
         )
 
         do {
@@ -189,7 +192,7 @@ struct EventService {
             description: dto.description ?? "",
             startAt: dto.startAt,
             endAt: dto.endAt,
-            colorCode: defaultColorCode,
+            tag: mapToCalendarTag(dto.tag),
             importantEvent: dto.importantEvent,
             recurrenceId: dto.recurrenceId,
             isRecurrenceOccurrence: dto.isRecurrenceOccurrence
@@ -206,11 +209,21 @@ struct EventService {
                 recurrenceEndDate: try CalendarDateService.utcDate(from: dto.recurrenceEndDate),
                 recurrenceStartTime: try CalendarDateService.utcTime(from: dto.recurrenceStartTime),
                 recurrenceEndTime: try CalendarDateService.utcTime(from: dto.recurrenceEndTime),
-                recurrenceFrequency: dto.recurrenceFrequency
+                recurrenceFrequency: dto.recurrenceFrequency,
+                tagId: dto.tag.id
             )
         } catch {
             throw EventServiceError.decoding
         }
+    }
+
+    private func mapToCalendarTag(_ dto: TagResponseDTO) -> CalendarTag {
+        CalendarTag(
+            id: dto.id,
+            title: dto.title,
+            colorCode: dto.colorCode,
+            tagType: dto.tagType
+        )
     }
 
     private func mapToServiceError(_ error: EventRepositoryError) -> EventServiceError {
@@ -252,4 +265,42 @@ enum EventServiceError: Error, Equatable {
     case network
     case decoding
     case unexpected
+}
+
+struct TagService {
+    private let repository: TagRepository
+
+    init(repository: TagRepository = URLSessionTagRepository()) {
+        self.repository = repository
+    }
+
+    func fetchTags() async throws -> [CalendarTag] {
+        do {
+            return try await repository.fetchTags().map { dto in
+                CalendarTag(
+                    id: dto.id,
+                    title: dto.title,
+                    colorCode: dto.colorCode,
+                    tagType: dto.tagType
+                )
+            }
+        } catch let error as EventRepositoryError {
+            throw mapToServiceError(error)
+        } catch {
+            throw EventServiceError.unexpected
+        }
+    }
+
+    private func mapToServiceError(_ error: EventRepositoryError) -> EventServiceError {
+        switch error {
+        case .network:
+            return .network
+        case .decoding:
+            return .decoding
+        case .backend(_, let response) where response?.errorCode == "VALIDATION_FAILED":
+            return .validationFailed
+        case .invalidURL, .invalidResponse, .backend, .encoding, .unexpected:
+            return .unexpected
+        }
+    }
 }

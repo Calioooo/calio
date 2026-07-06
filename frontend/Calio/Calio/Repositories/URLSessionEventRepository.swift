@@ -244,3 +244,67 @@ struct URLSessionEventRepository: EventRepository {
         }
     }
 }
+
+struct URLSessionTagRepository: TagRepository {
+    private let baseURL: URL
+    private let session: URLSession
+    private let jsonDecoder: JSONDecoder
+
+    init(
+        baseURL: URL = CalioAPIConfig.baseURL,
+        session: URLSession = .shared,
+        jsonDecoder: JSONDecoder = EventJSONCoding.makeDecoder()
+    ) {
+        self.baseURL = baseURL
+        self.session = session
+        self.jsonDecoder = jsonDecoder
+    }
+
+    func fetchTags() async throws -> [TagResponseDTO] {
+        let request = makeRequest(
+            method: "GET",
+            url: baseURL.appendingPathComponent("api/tags")
+        )
+
+        return try await response([TagResponseDTO].self, for: request)
+    }
+
+    private func makeRequest(method: String, url: URL) -> URLRequest {
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        return request
+    }
+
+    private func response<T: Decodable>(_ type: T.Type, for request: URLRequest) async throws -> T {
+        let data: Data
+        let response: URLResponse
+
+        do {
+            (data, response) = try await session.data(for: request)
+        } catch let error as URLError {
+            throw EventRepositoryError.network(error)
+        } catch {
+            throw EventRepositoryError.unexpected(error)
+        }
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw EventRepositoryError.invalidResponse
+        }
+
+        guard (200..<300).contains(httpResponse.statusCode) else {
+            throw EventRepositoryError.backend(
+                statusCode: httpResponse.statusCode,
+                response: try? jsonDecoder.decode(ErrorResponseDTO.self, from: data)
+            )
+        }
+
+        do {
+            return try jsonDecoder.decode(type, from: data)
+        } catch let error as DecodingError {
+            throw EventRepositoryError.decoding(error)
+        } catch {
+            throw EventRepositoryError.unexpected(error)
+        }
+    }
+}

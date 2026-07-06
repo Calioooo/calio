@@ -53,7 +53,7 @@ struct CalendarEventSummaryPopoverView: View {
     private var summaryHeader: some View {
         HStack(alignment: .top, spacing: 8) {
             RoundedRectangle(cornerRadius: 3)
-                .fill(Color(hex: event.colorCode))
+                .fill(Color(hex: event.tag.colorCode))
                 .frame(width: 6, height: 32)
 
             VStack(alignment: .leading, spacing: 4) {

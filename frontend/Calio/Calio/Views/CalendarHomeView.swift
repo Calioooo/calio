@@ -32,6 +32,7 @@ struct CalendarHomeView: View {
 
                 CalendarScheduleDrawerView(
                     items: loadedDateCellItems,
+                    tags: viewModel.tags,
                     referenceDay: viewModel.referenceDay,
                     displayMode: displayMode,
                     eventAreaState: viewModel.referenceEventAreaState,
@@ -53,11 +54,13 @@ struct CalendarHomeView: View {
             }
             .animation(.easeInOut(duration: 0.2), value: displayMode)
             .task {
+                viewModel.loadTagsIfNeeded()
                 viewModel.loadInitialIfNeeded()
             }
             .sheet(isPresented: $isShowingEventCreationView) {
                 CalendarEventCreationView(
                     referenceDay: viewModel.referenceDay,
+                    tags: viewModel.tags,
                     isSaving: viewModel.createState.isSaving,
                     failureMessage: viewModel.createState.failureMessage,
                     onSave: { input in

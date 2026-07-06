@@ -12,6 +12,15 @@ struct CreateEventRequestDTO: Encodable {
     let description: String
     let startAt: Date
     let endAt: Date
+    let tagId: Int64?
+
+    init(title: String, description: String, startAt: Date, endAt: Date, tagId: Int64? = nil) {
+        self.title = title
+        self.description = description
+        self.startAt = startAt
+        self.endAt = endAt
+        self.tagId = tagId
+    }
 }
 
 struct UpdateEventRequestDTO: Encodable, Equatable {
@@ -19,6 +28,15 @@ struct UpdateEventRequestDTO: Encodable, Equatable {
     let description: String
     let startAt: Date
     let endAt: Date
+    let tagId: Int64?
+
+    init(title: String, description: String, startAt: Date, endAt: Date, tagId: Int64? = nil) {
+        self.title = title
+        self.description = description
+        self.startAt = startAt
+        self.endAt = endAt
+        self.tagId = tagId
+    }
 }
 
 struct UpdateRecurrenceEventRequestDTO: Encodable, Equatable {
@@ -27,6 +45,23 @@ struct UpdateRecurrenceEventRequestDTO: Encodable, Equatable {
     let startAt: Date?
     let endAt: Date?
     let recurrenceFrequency: RecurrenceFrequency?
+    let tagId: Int64?
+
+    init(
+        title: String?,
+        description: String?,
+        startAt: Date?,
+        endAt: Date?,
+        recurrenceFrequency: RecurrenceFrequency?,
+        tagId: Int64? = nil
+    ) {
+        self.title = title
+        self.description = description
+        self.startAt = startAt
+        self.endAt = endAt
+        self.recurrenceFrequency = recurrenceFrequency
+        self.tagId = tagId
+    }
 }
 
 struct UpdateRecurrenceOccurrenceRequestDTO: Encodable, Equatable {
@@ -45,6 +80,27 @@ struct CreateRecurrenceEventRequestDTO: Encodable, Equatable {
     let recurrenceStartTime: String
     let recurrenceEndTime: String
     let recurrenceFrequency: RecurrenceFrequency
+    let tagId: Int64?
+
+    init(
+        recurrenceTitle: String,
+        recurrenceDescription: String,
+        recurrenceStartDate: String,
+        recurrenceEndDate: String,
+        recurrenceStartTime: String,
+        recurrenceEndTime: String,
+        recurrenceFrequency: RecurrenceFrequency,
+        tagId: Int64? = nil
+    ) {
+        self.recurrenceTitle = recurrenceTitle
+        self.recurrenceDescription = recurrenceDescription
+        self.recurrenceStartDate = recurrenceStartDate
+        self.recurrenceEndDate = recurrenceEndDate
+        self.recurrenceStartTime = recurrenceStartTime
+        self.recurrenceEndTime = recurrenceEndTime
+        self.recurrenceFrequency = recurrenceFrequency
+        self.tagId = tagId
+    }
 }
 
 struct RecurrenceEventResponseDTO: Decodable, Equatable {
@@ -56,4 +112,32 @@ struct RecurrenceEventResponseDTO: Decodable, Equatable {
     let recurrenceStartTime: String
     let recurrenceEndTime: String
     let recurrenceFrequency: RecurrenceFrequency
+    let tag: TagResponseDTO
+
+    init(
+        recurrenceId: Int64,
+        recurrenceTitle: String,
+        recurrenceDescription: String?,
+        recurrenceStartDate: String,
+        recurrenceEndDate: String,
+        recurrenceStartTime: String,
+        recurrenceEndTime: String,
+        recurrenceFrequency: RecurrenceFrequency,
+        tag: TagResponseDTO = TagResponseDTO(
+            id: CalendarTag.fallback.id,
+            title: CalendarTag.fallback.title,
+            colorCode: CalendarTag.fallback.colorCode,
+            tagType: CalendarTag.fallback.tagType
+        )
+    ) {
+        self.recurrenceId = recurrenceId
+        self.recurrenceTitle = recurrenceTitle
+        self.recurrenceDescription = recurrenceDescription
+        self.recurrenceStartDate = recurrenceStartDate
+        self.recurrenceEndDate = recurrenceEndDate
+        self.recurrenceStartTime = recurrenceStartTime
+        self.recurrenceEndTime = recurrenceEndTime
+        self.recurrenceFrequency = recurrenceFrequency
+        self.tag = tag
+    }
 }

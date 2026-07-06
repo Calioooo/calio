@@ -12,6 +12,15 @@ struct EventCreateInput: Equatable {
     let description: String
     let startAt: Date
     let endAt: Date
+    let tagId: Int64?
+
+    init(title: String, description: String, startAt: Date, endAt: Date, tagId: Int64? = nil) {
+        self.title = title
+        self.description = description
+        self.startAt = startAt
+        self.endAt = endAt
+        self.tagId = tagId
+    }
 }
 
 struct EventUpdateInput: Equatable {
@@ -19,6 +28,15 @@ struct EventUpdateInput: Equatable {
     let description: String
     let startAt: Date
     let endAt: Date
+    let tagId: Int64?
+
+    init(title: String, description: String, startAt: Date, endAt: Date, tagId: Int64? = nil) {
+        self.title = title
+        self.description = description
+        self.startAt = startAt
+        self.endAt = endAt
+        self.tagId = tagId
+    }
 }
 
 struct RecurrenceEventCreateInput: Equatable {
@@ -29,6 +47,27 @@ struct RecurrenceEventCreateInput: Equatable {
     let recurrenceStartTime: Date
     let recurrenceEndTime: Date
     let recurrenceFrequency: RecurrenceFrequency
+    let tagId: Int64?
+
+    init(
+        title: String,
+        description: String,
+        recurrenceStartDate: Date,
+        recurrenceEndDate: Date,
+        recurrenceStartTime: Date,
+        recurrenceEndTime: Date,
+        recurrenceFrequency: RecurrenceFrequency,
+        tagId: Int64? = nil
+    ) {
+        self.title = title
+        self.description = description
+        self.recurrenceStartDate = recurrenceStartDate
+        self.recurrenceEndDate = recurrenceEndDate
+        self.recurrenceStartTime = recurrenceStartTime
+        self.recurrenceEndTime = recurrenceEndTime
+        self.recurrenceFrequency = recurrenceFrequency
+        self.tagId = tagId
+    }
 }
 
 struct RecurrenceEventDetails: Equatable {
@@ -40,6 +79,29 @@ struct RecurrenceEventDetails: Equatable {
     let recurrenceStartTime: Date
     let recurrenceEndTime: Date
     let recurrenceFrequency: RecurrenceFrequency
+    let tagId: Int64?
+
+    init(
+        recurrenceId: Int64,
+        title: String,
+        description: String,
+        recurrenceStartDate: Date,
+        recurrenceEndDate: Date,
+        recurrenceStartTime: Date,
+        recurrenceEndTime: Date,
+        recurrenceFrequency: RecurrenceFrequency,
+        tagId: Int64? = nil
+    ) {
+        self.recurrenceId = recurrenceId
+        self.title = title
+        self.description = description
+        self.recurrenceStartDate = recurrenceStartDate
+        self.recurrenceEndDate = recurrenceEndDate
+        self.recurrenceStartTime = recurrenceStartTime
+        self.recurrenceEndTime = recurrenceEndTime
+        self.recurrenceFrequency = recurrenceFrequency
+        self.tagId = tagId
+    }
 }
 
 struct RecurrenceEventSeriesEditInput: Equatable {
@@ -50,6 +112,27 @@ struct RecurrenceEventSeriesEditInput: Equatable {
     let recurrenceStartTime: Date
     let recurrenceEndTime: Date
     let recurrenceFrequency: RecurrenceFrequency
+    let tagId: Int64?
+
+    init(
+        title: String,
+        description: String,
+        recurrenceStartDate: Date,
+        recurrenceEndDate: Date,
+        recurrenceStartTime: Date,
+        recurrenceEndTime: Date,
+        recurrenceFrequency: RecurrenceFrequency,
+        tagId: Int64? = nil
+    ) {
+        self.title = title
+        self.description = description
+        self.recurrenceStartDate = recurrenceStartDate
+        self.recurrenceEndDate = recurrenceEndDate
+        self.recurrenceStartTime = recurrenceStartTime
+        self.recurrenceEndTime = recurrenceEndTime
+        self.recurrenceFrequency = recurrenceFrequency
+        self.tagId = tagId
+    }
 }
 
 struct RecurrenceEventUpdateInput: Equatable {
@@ -58,6 +141,23 @@ struct RecurrenceEventUpdateInput: Equatable {
     let startAt: Date
     let endAt: Date
     let recurrenceFrequency: RecurrenceFrequency
+    let tagId: Int64?
+
+    init(
+        title: String,
+        description: String,
+        startAt: Date,
+        endAt: Date,
+        recurrenceFrequency: RecurrenceFrequency,
+        tagId: Int64? = nil
+    ) {
+        self.title = title
+        self.description = description
+        self.startAt = startAt
+        self.endAt = endAt
+        self.recurrenceFrequency = recurrenceFrequency
+        self.tagId = tagId
+    }
 }
 
 struct RecurrenceOccurrenceUpdateInput: Equatable {

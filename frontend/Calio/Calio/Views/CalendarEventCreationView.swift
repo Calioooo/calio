@@ -12,6 +12,7 @@ struct CalendarEventCreationView: View {
     @State private var eventInput: EventInput
     @State private var recurrenceInput: RecurrenceInput
     
+    let tags: [CalendarTag]
     let isSaving: Bool
     let failureMessage: String?
     let onSave: (CalendarEventCreationSubmitInput) async -> Bool
@@ -19,6 +20,7 @@ struct CalendarEventCreationView: View {
     init(
         referenceDay: DayKey,
         initialDateRange: CalendarDateRange? = nil,
+        tags: [CalendarTag] = [],
         calendar: Calendar = .current,
         isSaving: Bool = false,
         failureMessage: String? = nil,
@@ -42,7 +44,7 @@ struct CalendarEventCreationView: View {
                 startAt: startAt,
                 endAt: endAt,
                 description: "",
-                colorCode: "#4F46E5"
+                tag: CalendarEventCreationView.defaultTag(from: tags)
             )
         )
         _recurrenceInput = State(
@@ -55,6 +57,7 @@ struct CalendarEventCreationView: View {
                 frequency: .daily
             )
         )
+        self.tags = tags
         self.isSaving = isSaving
         self.failureMessage = failureMessage
         self.onSave = onSave
@@ -67,6 +70,7 @@ struct CalendarEventCreationView: View {
                 CalendarEventFormView(
                     eventInput: $eventInput,
                     recurrenceInput: $recurrenceInput,
+                    tags: tags,
                     onRecurrenceEnabled: resetRecurrenceFieldsFromSingleEventTime
                 )
             }
@@ -127,7 +131,8 @@ struct CalendarEventCreationView: View {
             title: eventInput.title.trimmingCharacters(in: .whitespacesAndNewlines),
             description: eventInput.description,
             startAt: eventInput.startAt,
-            endAt: eventInput.endAt
+            endAt: eventInput.endAt,
+            tagId: eventInput.tag?.id
         )
         let submitInput: CalendarEventCreationSubmitInput
 
@@ -140,7 +145,8 @@ struct CalendarEventCreationView: View {
                     recurrenceEndDate: recurrenceInput.endDate,
                     recurrenceStartTime: recurrenceInput.startTime,
                     recurrenceEndTime: recurrenceInput.endTime,
-                    recurrenceFrequency: recurrenceInput.frequency
+                    recurrenceFrequency: recurrenceInput.frequency,
+                    tagId: eventInput.tag?.id
                 )
             )
         } else {
@@ -221,6 +227,10 @@ struct CalendarEventCreationView: View {
         recurrenceInput.startTime = eventInput.startAt
         recurrenceInput.endTime = eventInput.endAt
         recurrenceInput.frequency = .daily
+    }
+
+    private static func defaultTag(from tags: [CalendarTag]) -> CalendarTag {
+        tags.first { $0.title == "기타" } ?? tags.first ?? .fallback
     }
 }
 

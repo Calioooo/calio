@@ -14,6 +14,7 @@ struct CalendarDateEventView: View {
     private let contentBottomPadding: CGFloat = 24
     
     let items: [CalendarDateCellItem]
+    let tags: [CalendarTag]
     let referenceDay: DayKey
     let eventAreaState: CalendarEventAreaState
     let onReferenceDayChanged: (DayKey) -> Void
@@ -32,6 +33,7 @@ struct CalendarDateEventView: View {
 
     init(
         items: [CalendarDateCellItem],
+        tags: [CalendarTag] = [],
         referenceDay: DayKey,
         eventAreaState: CalendarEventAreaState,
         onReferenceDayChanged: @escaping (DayKey) -> Void,
@@ -49,6 +51,7 @@ struct CalendarDateEventView: View {
         onDeleteRecurrenceSeries: @escaping (Event) async -> Bool = { _ in true }
     ) {
         self.items = items
+        self.tags = tags
         self.referenceDay = referenceDay
         self.eventAreaState = eventAreaState
         self.onReferenceDayChanged = onReferenceDayChanged
@@ -90,6 +93,7 @@ struct CalendarDateEventView: View {
         .sheet(item: $detailEvent) { event in
             CalendarEventDetailView(
                 event: event,
+                tags: tags,
                 isMutating: isEventMutating,
                 mutationFailureMessage: eventMutationFailureMessage,
                 onFetchRecurrenceEvent: onFetchRecurrenceEvent,
@@ -239,7 +243,7 @@ struct CalendarDateEventView: View {
             description: "",
             startAt: startAt,
             endAt: endAt,
-            colorCode: colorCode
+            tag: .sample(colorCode: colorCode)
         )
     }
     

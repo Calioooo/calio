@@ -113,7 +113,7 @@ struct CalendarDayTimelineView: View {
                         .frame(maxWidth: .infinity, minHeight: metrics.fullDayEventHeight)
                         .background(
                             RoundedRectangle(cornerRadius: 5)
-                                .fill(Color(hex: event.colorCode))
+                                .fill(Color(hex: event.tag.colorCode))
                         )
                 }
                 
@@ -216,7 +216,7 @@ struct CalendarDayTimelineView: View {
                 )
                 .background(
                     RoundedRectangle(cornerRadius: 6)
-                        .fill(Color(hex: layout.event.colorCode))
+                        .fill(Color(hex: layout.event.tag.colorCode))
                 )
                 .offset(x: layout.x, y: layout.y)
         }
@@ -563,7 +563,7 @@ private extension UIView {
             description: "",
             startAt: startAt,
             endAt: endAt,
-            colorCode: colorCode
+            tag: .sample(colorCode: colorCode)
         )
     }
     let fullDayEndAt = calendar.date(
@@ -584,7 +584,7 @@ private extension UIView {
                 description: "",
                 startAt: startOfDay,
                 endAt: fullDayEndAt,
-                colorCode: "#4F46E5"
+                tag: .sample(colorCode: "#4F46E5")
             ),
             makeEvent(2, "팀 주간 회의", 10, 30, 90, "#EF4444"),
             makeEvent(3, "제품 리뷰", 14, 0, 120, "#22C55E"),

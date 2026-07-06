@@ -62,7 +62,7 @@ struct CalendarDateCellView: View {
         VStack(spacing: 5) {
             ForEach(Array(visibleEvents.enumerated()), id: \.offset) { _, event in
                 RoundedRectangle(cornerRadius: 4)
-                    .fill(Color(hex: event.colorCode))
+                    .fill(Color(hex: event.tag.colorCode))
                     .frame(height: 8)
             }
         }
@@ -109,10 +109,10 @@ struct CalendarDateCellView: View {
             return
         },
         events: [
-            Event(title: "제목", description: "설명", startAt: Date(), endAt: Date().addingTimeInterval(3000), colorCode: "#FDDDDD"),
-            Event(title: "제목", description: "설명", startAt: Date(), endAt: Date().addingTimeInterval(3000), colorCode: "#RDDDDD"),
-            Event(title: "제목", description: "설명", startAt: Date(), endAt: Date().addingTimeInterval(3000), colorCode: "#BDDDDD"),
-            Event(title: "제목", description: "설명", startAt: Date(), endAt: Date().addingTimeInterval(3000), colorCode: "#ADDDDD")
+            Event(title: "제목", description: "설명", startAt: Date(), endAt: Date().addingTimeInterval(3000), tag: .sample(colorCode: "#FDDDDD")),
+            Event(title: "제목", description: "설명", startAt: Date(), endAt: Date().addingTimeInterval(3000), tag: .sample(colorCode: "#RDDDDD")),
+            Event(title: "제목", description: "설명", startAt: Date(), endAt: Date().addingTimeInterval(3000), tag: .sample(colorCode: "#BDDDDD")),
+            Event(title: "제목", description: "설명", startAt: Date(), endAt: Date().addingTimeInterval(3000), tag: .sample(colorCode: "#ADDDDD"))
         ]
     )
 }
@@ -126,14 +126,14 @@ struct CalendarDateCellView: View {
             return
         },
         events: [
-            Event(title: "제목", description: "설명", startAt: Date(), endAt: Date().addingTimeInterval(3000), colorCode: "#FDDDDD"),
-            Event(title: "제목", description: "설명", startAt: Date(), endAt: Date().addingTimeInterval(3000), colorCode: "#RDDDDD"),
-            Event(title: "제목", description: "설명", startAt: Date(), endAt: Date().addingTimeInterval(3000), colorCode: "#BDDDDD"),
-            Event(title: "제목", description: "설명", startAt: Date(), endAt: Date().addingTimeInterval(3000), colorCode: "#ADDDDD"),
-            Event(title: "제목", description: "설명", startAt: Date(), endAt: Date().addingTimeInterval(3000), colorCode: "#FDDDDD"),
-            Event(title: "제목", description: "설명", startAt: Date(), endAt: Date().addingTimeInterval(3000), colorCode: "#RDDDDD"),
-            Event(title: "제목", description: "설명", startAt: Date(), endAt: Date().addingTimeInterval(3000), colorCode: "#BDDDDD"),
-            Event(title: "제목", description: "설명", startAt: Date(), endAt: Date().addingTimeInterval(3000), colorCode: "#ADDDDD")
+            Event(title: "제목", description: "설명", startAt: Date(), endAt: Date().addingTimeInterval(3000), tag: .sample(colorCode: "#FDDDDD")),
+            Event(title: "제목", description: "설명", startAt: Date(), endAt: Date().addingTimeInterval(3000), tag: .sample(colorCode: "#RDDDDD")),
+            Event(title: "제목", description: "설명", startAt: Date(), endAt: Date().addingTimeInterval(3000), tag: .sample(colorCode: "#BDDDDD")),
+            Event(title: "제목", description: "설명", startAt: Date(), endAt: Date().addingTimeInterval(3000), tag: .sample(colorCode: "#ADDDDD")),
+            Event(title: "제목", description: "설명", startAt: Date(), endAt: Date().addingTimeInterval(3000), tag: .sample(colorCode: "#FDDDDD")),
+            Event(title: "제목", description: "설명", startAt: Date(), endAt: Date().addingTimeInterval(3000), tag: .sample(colorCode: "#RDDDDD")),
+            Event(title: "제목", description: "설명", startAt: Date(), endAt: Date().addingTimeInterval(3000), tag: .sample(colorCode: "#BDDDDD")),
+            Event(title: "제목", description: "설명", startAt: Date(), endAt: Date().addingTimeInterval(3000), tag: .sample(colorCode: "#ADDDDD"))
         ]
     )
 }

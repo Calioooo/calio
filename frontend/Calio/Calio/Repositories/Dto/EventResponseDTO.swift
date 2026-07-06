@@ -7,6 +7,13 @@
 
 import Foundation
 
+struct TagResponseDTO: Decodable, Equatable {
+    let id: Int64
+    let title: String
+    let colorCode: String
+    let tagType: CalendarTagType
+}
+
 struct EventResponseDTO: Decodable {
     let id: Int64
     let title: String
@@ -16,6 +23,7 @@ struct EventResponseDTO: Decodable {
     let importantEvent: Bool
     let recurrenceId: Int64?
     let isRecurrenceOccurrence: Bool
+    let tag: TagResponseDTO
     let createdAt: Date
     let updatedAt: Date
 
@@ -28,6 +36,12 @@ struct EventResponseDTO: Decodable {
         importantEvent: Bool = false,
         recurrenceId: Int64? = nil,
         isRecurrenceOccurrence: Bool = false,
+        tag: TagResponseDTO = TagResponseDTO(
+            id: CalendarTag.fallback.id,
+            title: CalendarTag.fallback.title,
+            colorCode: CalendarTag.fallback.colorCode,
+            tagType: CalendarTag.fallback.tagType
+        ),
         createdAt: Date,
         updatedAt: Date
     ) {
@@ -39,6 +53,7 @@ struct EventResponseDTO: Decodable {
         self.importantEvent = importantEvent
         self.recurrenceId = recurrenceId
         self.isRecurrenceOccurrence = isRecurrenceOccurrence
+        self.tag = tag
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
@@ -52,6 +67,7 @@ struct EventResponseDTO: Decodable {
         case importantEvent
         case recurrenceId
         case isRecurrenceOccurrence
+        case tag
         case createdAt
         case updatedAt
     }
@@ -67,6 +83,7 @@ struct EventResponseDTO: Decodable {
         importantEvent = try container.decodeIfPresent(Bool.self, forKey: .importantEvent) ?? false
         recurrenceId = try container.decodeIfPresent(Int64.self, forKey: .recurrenceId)
         isRecurrenceOccurrence = try container.decodeIfPresent(Bool.self, forKey: .isRecurrenceOccurrence) ?? false
+        tag = try container.decode(TagResponseDTO.self, forKey: .tag)
         createdAt = try container.decode(Date.self, forKey: .createdAt)
         updatedAt = try container.decode(Date.self, forKey: .updatedAt)
     }

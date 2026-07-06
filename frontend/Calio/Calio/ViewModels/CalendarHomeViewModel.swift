@@ -18,6 +18,7 @@ final class CalendarHomeViewModel: ObservableObject {
     @Published private(set) var referenceDay: DayKey
     @Published private(set) var createState: CalendarEventCreateState = .idle
     @Published private(set) var mutationState: CalendarEventMutationState = .idle
+    @Published private(set) var tags: [CalendarTag] = []
     
     private let initialGeneratedPastMonths = 3
     private let initialGeneratedFutureMonths = 3
@@ -27,6 +28,7 @@ final class CalendarHomeViewModel: ObservableObject {
     
     private let dateService: CalendarDateService
     private let eventService: EventService
+    private let tagService: TagService
     private let nationalHolidayService: NationalHolidayService
     private let calendar: Calendar
     private var lastVisibleMonthKeys: Set<YearMonthKey> = []
@@ -34,11 +36,13 @@ final class CalendarHomeViewModel: ObservableObject {
     private var monthEventCache: [YearMonthKey: CalendarMonthEventCacheEntry]
     private var monthHolidayCache: [YearMonthKey: CalendarMonthHolidayCacheEntry]
     private var pendingCreatedEventsByMonth: [YearMonthKey: [Event]] = [:]
+    private var isLoadingTags = false
     
     init(
         calendar: Calendar = .current,
         dateService: CalendarDateService = CalendarDateService(),
         eventService: EventService = EventService(),
+        tagService: TagService = TagService(),
         nationalHolidayService: NationalHolidayService = NationalHolidayService(),
         initialState: CalendarState? = nil,
         initialReferenceDate: Date = Date()
@@ -46,6 +50,7 @@ final class CalendarHomeViewModel: ObservableObject {
         self.dateService = dateService
         self.calendar = calendar
         self.eventService = eventService
+        self.tagService = tagService
         self.nationalHolidayService = nationalHolidayService
         self.monthEventCache = initialState?.monthEventCache ?? [:]
         self.monthHolidayCache = initialState?.monthHolidayCache ?? [:]
@@ -93,6 +98,26 @@ final class CalendarHomeViewModel: ObservableObject {
         let range = initialGeneratedDateRange(around: referenceDate)
         replaceGeneratedDateCells(from: range.startDate, to: range.endDate)
         prefetchReferenceMonthAndAdjacent(retryFailed: false)
+    }
+
+    func loadTagsIfNeeded() {
+        guard tags.isEmpty && !isLoadingTags else {
+            return
+        }
+
+        isLoadingTags = true
+
+        Task {
+            defer {
+                isLoadingTags = false
+            }
+
+            do {
+                tags = try await tagService.fetchTags()
+            } catch {
+                tags = [CalendarTag.fallback]
+            }
+        }
     }
     
     func setReferenceDay(_ day: DayKey) {
@@ -354,7 +379,8 @@ final class CalendarHomeViewModel: ObservableObject {
                         date: input.recurrenceEndDate,
                         time: input.recurrenceEndTime
                     ),
-                    recurrenceFrequency: input.recurrenceFrequency
+                    recurrenceFrequency: input.recurrenceFrequency,
+                    tagId: input.tagId
                 )
             )
             invalidateMonthEventCache()

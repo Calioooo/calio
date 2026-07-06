@@ -12,7 +12,7 @@ struct EventInput: Equatable {
     var startAt: Date
     var endAt: Date
     var description: String
-    var colorCode: String
+    var tag: CalendarTag?
 }
 
 struct RecurrenceInput: Equatable {
@@ -25,16 +25,9 @@ struct RecurrenceInput: Equatable {
 }
 
 struct CalendarEventFormView: View {
-    private let eventColors = [
-        "#4F46E5",
-        "#EF4444",
-        "#F59E0B",
-        "#22C55E",
-        "#0EA5E9"
-    ]
-
     @Binding var eventInput: EventInput
     let recurrenceInput: Binding<RecurrenceInput>?
+    let tags: [CalendarTag]
 
     let mode: CalendarEventFormMode
     let onRecurrenceEnabled: () -> Void
@@ -42,11 +35,13 @@ struct CalendarEventFormView: View {
     init(
         eventInput: Binding<EventInput>,
         recurrenceInput: Binding<RecurrenceInput>? = nil,
+        tags: [CalendarTag] = [],
         mode: CalendarEventFormMode = .create,
         onRecurrenceEnabled: @escaping () -> Void
     ) {
         _eventInput = eventInput
         self.recurrenceInput = recurrenceInput
+        self.tags = tags
         self.mode = mode
         self.onRecurrenceEnabled = onRecurrenceEnabled
     }
@@ -97,8 +92,8 @@ struct CalendarEventFormView: View {
             recurrenceSection
         }
         descriptionSection
-        if mode.showsColorFields {
-            colorSection
+        if mode.showsTagField {
+            tagSection
         }
     }
 
@@ -214,14 +209,21 @@ struct CalendarEventFormView: View {
         }
     }
 
-    private var colorSection: some View {
-        Section("색상") {
-            HStack(spacing: 14) {
-                ForEach(eventColors, id: \.self) { colorCode in
-                    colorButton(colorCode)
+    @ViewBuilder
+    private var tagSection: some View {
+        Section("태그") {
+            if availableTags.isEmpty {
+                Text("사용 가능한 태그가 없습니다.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            } else {
+                FlowLayout(spacing: 8) {
+                    ForEach(availableTags) { tag in
+                        tagButton(tag)
+                    }
                 }
+                .padding(.vertical, 4)
             }
-            .padding(.vertical, 4)
         }
     }
 
@@ -283,27 +285,42 @@ struct CalendarEventFormView: View {
         .accessibilityIdentifier("recurrence_frequency_\(frequency.rawValue)")
     }
 
-    private func colorButton(_ colorCode: String) -> some View {
+    private func tagButton(_ tag: CalendarTag) -> some View {
         Button {
-            eventInput.colorCode = colorCode
+            eventInput.tag = tag
         } label: {
-            Circle()
-                .fill(Color(hex: colorCode))
-                .frame(width: 28, height: 28)
-                .overlay {
-                    if eventInput.colorCode == colorCode {
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundStyle(.white)
-                    }
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(Color(hex: tag.colorCode))
+                    .frame(width: 10, height: 10)
+
+                Text(tag.title)
+                    .font(.subheadline.weight(.semibold))
+
+                if eventInput.tag?.id == tag.id {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 11, weight: .bold))
                 }
-                .overlay {
-                    Circle()
-                        .stroke(Color.secondary.opacity(0.25), lineWidth: 1)
-                }
+            }
+            .foregroundStyle(eventInput.tag?.id == tag.id ? Color.white : Color.primary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(eventInput.tag?.id == tag.id ? Color(hex: tag.colorCode) : Color(uiColor: .secondarySystemGroupedBackground))
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 8))
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("일정 색상 선택")
+        .accessibilityLabel("\(tag.title) 태그 선택")
+    }
+
+    private var availableTags: [CalendarTag] {
+        tags.isEmpty ? eventInput.tag.map { [$0] } ?? [] : tags
     }
 
     private nonisolated static func isUTCDate(_ candidate: Date, before startAt: Date) -> Bool {
@@ -352,7 +369,7 @@ enum CalendarEventFormMode: Equatable {
         self == .create
     }
 
-    var showsColorFields: Bool {
+    var showsTagField: Bool {
         switch self {
         case .create, .editSingleEvent:
             return true

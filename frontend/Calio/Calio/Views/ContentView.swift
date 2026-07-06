@@ -44,6 +44,7 @@ private struct CalendarWeekTimelineTestView: View {
     var body: some View {
         CalendarWeekTimelineView(
             items: viewModel.loadedDateCellItems,
+            tags: viewModel.tags,
             referenceDay: viewModel.referenceDay,
             eventAreaState: viewModel.referenceEventAreaState,
             onSelectedDay: viewModel.setReferenceDay(_:),
@@ -65,11 +66,13 @@ private struct CalendarWeekTimelineTestView: View {
             onDeleteRecurrenceSeries: viewModel.deleteRecurrenceSeries(_:)
         )
         .task {
+            viewModel.loadTagsIfNeeded()
             viewModel.loadInitialIfNeeded()
         }
         .sheet(isPresented: $isShowingEventCreationView) {
             CalendarEventCreationView(
                 referenceDay: viewModel.referenceDay,
+                tags: viewModel.tags,
                 isSaving: viewModel.createState.isSaving,
                 failureMessage: viewModel.createState.failureMessage,
                 onSave: { input in
@@ -105,12 +108,14 @@ private struct CalendarMonthScheduleTestView: View {
             onCreateInDayTapped: startCreatingEvent(on:)
         )
         .task {
+            viewModel.loadTagsIfNeeded()
             viewModel.loadInitialIfNeeded()
         }
         .sheet(isPresented: $isShowingEventCreationView) {
             CalendarEventCreationView(
                 referenceDay: creationDateRange?.startDay ?? creationDay ?? viewModel.referenceDay,
                 initialDateRange: creationDateRange,
+                tags: viewModel.tags,
                 isSaving: viewModel.createState.isSaving,
                 failureMessage: viewModel.createState.failureMessage,
                 onSave: { input in

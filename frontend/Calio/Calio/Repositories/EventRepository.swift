@@ -27,6 +27,10 @@ protocol EventRepository {
     func deleteRecurrenceOccurrence(recurrenceId: Int64, eventId: Int64) async throws
 }
 
+protocol TagRepository {
+    func fetchTags() async throws -> [TagResponseDTO]
+}
+
 enum EventRepositoryError: Error {
     case invalidURL
     case invalidResponse

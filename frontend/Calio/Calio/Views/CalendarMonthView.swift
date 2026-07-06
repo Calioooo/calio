@@ -130,7 +130,7 @@ struct CalendarMonthView: View {
         }
 
         return Array(repeating: Color.calendarHoliday, count: item.holidays.count)
-            + item.events.map { Color(hex: $0.colorCode) }
+            + item.events.map { Color(hex: $0.tag.colorCode) }
     }
     
     private var itemsByDay: [DayKey: CalendarDateCellItem] {

@@ -136,7 +136,7 @@ struct CalendarDateStripView: View {
             description: "",
             startAt: startAt,
             endAt: endAt,
-            colorCode: colorCode
+            tag: .sample(colorCode: colorCode)
         )
     }
     

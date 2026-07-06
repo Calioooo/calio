@@ -16,6 +16,7 @@ struct CalendarWeekTimelineView: View {
     private let timelineCoordinateSpace = "calendarWeekTimeline"
     
     let items: [CalendarDateCellItem]
+    let tags: [CalendarTag]
     let referenceDay: DayKey
     let eventAreaState: CalendarEventAreaState
     let onSelectedDay: (DayKey) -> Void
@@ -38,6 +39,7 @@ struct CalendarWeekTimelineView: View {
 
     init(
         items: [CalendarDateCellItem],
+        tags: [CalendarTag] = [],
         referenceDay: DayKey,
         eventAreaState: CalendarEventAreaState,
         onSelectedDay: @escaping (DayKey) -> Void,
@@ -59,6 +61,7 @@ struct CalendarWeekTimelineView: View {
         onDeleteRecurrenceSeries: @escaping (Event) async -> Bool = { _ in true }
     ) {
         self.items = items
+        self.tags = tags
         self.referenceDay = referenceDay
         self.eventAreaState = eventAreaState
         self.onSelectedDay = onSelectedDay
@@ -148,6 +151,7 @@ struct CalendarWeekTimelineView: View {
         .sheet(item: $detailEvent) { event in
             CalendarEventDetailView(
                 event: event,
+                tags: tags,
                 isMutating: isEventMutating,
                 mutationFailureMessage: eventMutationFailureMessage,
                 onFetchRecurrenceEvent: onFetchRecurrenceEvent,
@@ -359,7 +363,7 @@ struct CalendarWeekTimelineView: View {
             .frame(maxWidth: .infinity, minHeight: metrics.fullDayEventHeight)
             .background(
                 RoundedRectangle(cornerRadius: 5)
-                    .fill(Color(hex: event.colorCode))
+                    .fill(Color(hex: event.tag.colorCode))
             )
             .contentShape(Rectangle())
             .onTapGesture {
@@ -1544,7 +1548,7 @@ private struct TimelineEventLayout: Identifiable {
     var backgroundColor: Color {
         switch style {
         case .event:
-            return Color(hex: event.colorCode)
+            return Color(hex: event.tag.colorCode)
         case .overflow:
             return Color(uiColor: .secondarySystemBackground)
         }
@@ -1577,7 +1581,7 @@ private struct CalendarTimelineOverlapPopoverView: View {
                     } label: {
                         HStack(alignment: .top, spacing: 8) {
                             RoundedRectangle(cornerRadius: 3)
-                                .fill(Color(hex: event.colorCode))
+                                .fill(Color(hex: event.tag.colorCode))
                                 .frame(width: 5, height: 34)
                             
                             VStack(alignment: .leading, spacing: 3) {
@@ -1671,7 +1675,7 @@ private extension UIView {
             description: "",
             startAt: startAt,
             endAt: endAt,
-            colorCode: colorCode
+            tag: .sample(colorCode: colorCode)
         )
     }
     

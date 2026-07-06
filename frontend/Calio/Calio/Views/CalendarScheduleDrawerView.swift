@@ -9,6 +9,7 @@ import SwiftUI
 
 struct CalendarScheduleDrawerView: View {
     let items: [CalendarDateCellItem]
+    let tags: [CalendarTag]
     let referenceDay: DayKey
     let displayMode: CalendarDisplayMode
     let eventAreaState: CalendarEventAreaState
@@ -29,6 +30,7 @@ struct CalendarScheduleDrawerView: View {
 
     init(
         items: [CalendarDateCellItem],
+        tags: [CalendarTag] = [],
         referenceDay: DayKey,
         displayMode: CalendarDisplayMode,
         eventAreaState: CalendarEventAreaState,
@@ -48,6 +50,7 @@ struct CalendarScheduleDrawerView: View {
         onDeleteRecurrenceSeries: @escaping (Event) async -> Bool = { _ in true }
     ) {
         self.items = items
+        self.tags = tags
         self.referenceDay = referenceDay
         self.displayMode = displayMode
         self.eventAreaState = eventAreaState
@@ -73,6 +76,7 @@ struct CalendarScheduleDrawerView: View {
 
             CalendarDateEventView(
                 items: items,
+                tags: tags,
                 referenceDay: referenceDay,
                 eventAreaState: eventAreaState,
                 onReferenceDayChanged: onReferenceDayChanged,

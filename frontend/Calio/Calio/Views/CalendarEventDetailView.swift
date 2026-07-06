@@ -11,6 +11,7 @@ struct CalendarEventDetailView: View {
     @Environment(\.dismiss) private var dismiss
 
     let event: Event
+    let tags: [CalendarTag]
     let isMutating: Bool
     let mutationFailureMessage: String?
     let onFetchRecurrenceEvent: (Int64) async -> RecurrenceEventDetails?
@@ -31,6 +32,7 @@ struct CalendarEventDetailView: View {
 
     init(
         event: Event,
+        tags: [CalendarTag] = [],
         isMutating: Bool = false,
         mutationFailureMessage: String? = nil,
         onFetchRecurrenceEvent: @escaping (Int64) async -> RecurrenceEventDetails? = { _ in nil },
@@ -42,6 +44,7 @@ struct CalendarEventDetailView: View {
         onDeleteRecurrenceSeries: @escaping (Event) async -> Bool = { _ in true }
     ) {
         self.event = event
+        self.tags = tags
         self.isMutating = isMutating
         self.mutationFailureMessage = mutationFailureMessage
         self.onFetchRecurrenceEvent = onFetchRecurrenceEvent
@@ -57,7 +60,7 @@ struct CalendarEventDetailView: View {
                 startAt: event.startAt,
                 endAt: event.endAt,
                 description: event.description,
-                colorCode: event.colorCode
+                tag: event.tag
             )
         )
         _recurrenceInput = State(
@@ -146,6 +149,7 @@ struct CalendarEventDetailView: View {
             CalendarEventFormView(
                 eventInput: $editInput,
                 recurrenceInput: recurrenceInputForEditForm,
+                tags: tags,
                 mode: formMode ?? .editSingleEvent,
                 onRecurrenceEnabled: {}
             )
@@ -240,7 +244,7 @@ struct CalendarEventDetailView: View {
         Section {
             HStack(alignment: .top, spacing: 10) {
                 RoundedRectangle(cornerRadius: 3)
-                    .fill(Color(hex: event.colorCode))
+                    .fill(Color(hex: event.tag.colorCode))
                     .frame(width: 6, height: 34)
 
                 Text(event.title)
@@ -412,7 +416,7 @@ struct CalendarEventDetailView: View {
         editInput.description = event.description
         editInput.startAt = event.startAt
         editInput.endAt = event.endAt
-        editInput.colorCode = event.colorCode
+        editInput.tag = event.tag
     }
 
     private func saveEdit() {
@@ -433,7 +437,8 @@ struct CalendarEventDetailView: View {
             title: editInput.title.trimmingCharacters(in: .whitespacesAndNewlines),
             description: editInput.description,
             startAt: editInput.startAt,
-            endAt: editInput.endAt
+            endAt: editInput.endAt,
+            tagId: editInput.tag?.id
         )
     }
 
@@ -470,7 +475,8 @@ struct CalendarEventDetailView: View {
             title: editInput.title.trimmingCharacters(in: .whitespacesAndNewlines),
             description: editInput.description,
             startAt: recurrenceInput.startDate,
-            endAt: recurrenceInput.endDate
+            endAt: recurrenceInput.endDate,
+            tagId: editInput.tag?.id
         )
 
         Task {
@@ -483,7 +489,8 @@ struct CalendarEventDetailView: View {
                     recurrenceEndDate: recurrenceInput.endDate,
                     recurrenceStartTime: recurrenceInput.startTime,
                     recurrenceEndTime: recurrenceInput.endTime,
-                    recurrenceFrequency: recurrenceInput.frequency
+                    recurrenceFrequency: recurrenceInput.frequency,
+                    tagId: input.tagId
                 )
             )
 

@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct StubEventRepository: EventRepository {
+struct StubEventRepository: EventRepository, TagRepository {
     
     private let calendar: Calendar
     
@@ -21,6 +21,10 @@ struct StubEventRepository: EventRepository {
         }
     }
 
+    func fetchTags() async throws -> [TagResponseDTO] {
+        Self.defaultTags
+    }
+
     func createEvent(_ request: CreateEventRequestDTO) async throws -> EventResponseDTO {
         EventResponseDTO(
             id: Int64(Date().timeIntervalSince1970),
@@ -28,6 +32,7 @@ struct StubEventRepository: EventRepository {
             description: request.description,
             startAt: request.startAt,
             endAt: request.endAt,
+            tag: tag(for: request.tagId),
             createdAt: Date(),
             updatedAt: Date()
         )
@@ -42,7 +47,8 @@ struct StubEventRepository: EventRepository {
             recurrenceEndDate: request.recurrenceEndDate,
             recurrenceStartTime: request.recurrenceStartTime,
             recurrenceEndTime: request.recurrenceEndTime,
-            recurrenceFrequency: request.recurrenceFrequency
+            recurrenceFrequency: request.recurrenceFrequency,
+            tag: tag(for: request.tagId)
         )
     }
 
@@ -55,7 +61,8 @@ struct StubEventRepository: EventRepository {
             recurrenceEndDate: "2026-01-31",
             recurrenceStartTime: "00:00:00",
             recurrenceEndTime: "01:00:00",
-            recurrenceFrequency: .daily
+            recurrenceFrequency: .daily,
+            tag: Self.defaultTags[0]
         )
     }
 
@@ -66,6 +73,7 @@ struct StubEventRepository: EventRepository {
             description: request.description,
             startAt: request.startAt,
             endAt: request.endAt,
+            tag: tag(for: request.tagId),
             createdAt: Date(),
             updatedAt: Date()
         )
@@ -91,7 +99,8 @@ struct StubEventRepository: EventRepository {
             recurrenceEndDate: CalendarDateService.utcDateString(from: endAt),
             recurrenceStartTime: CalendarDateService.utcTimeString(from: startAt),
             recurrenceEndTime: CalendarDateService.utcTimeString(from: endAt),
-            recurrenceFrequency: recurrenceFrequency
+            recurrenceFrequency: recurrenceFrequency,
+            tag: tag(for: request.tagId)
         )
     }
 
@@ -117,6 +126,7 @@ struct StubEventRepository: EventRepository {
             importantEvent: isImportant,
             recurrenceId: recurrenceId,
             isRecurrenceOccurrence: true,
+            tag: Self.defaultTags[0],
             createdAt: startAt,
             updatedAt: endAt
         )
@@ -178,8 +188,25 @@ struct StubEventRepository: EventRepository {
             description: description,
             startAt: startAt,
             endAt: endAt,
+            tag: Self.defaultTags[Int(id - 1) % Self.defaultTags.count],
             createdAt: startAt,
             updatedAt: startAt
         )
     }
+
+    private func tag(for tagId: Int64?) -> TagResponseDTO {
+        guard let tagId else {
+            return Self.defaultTags.last ?? Self.defaultTags[0]
+        }
+
+        return Self.defaultTags.first { $0.id == tagId } ?? Self.defaultTags.last ?? Self.defaultTags[0]
+    }
+
+    private static let defaultTags = [
+        TagResponseDTO(id: 1, title: "업무", colorCode: "#3B82F6", tagType: .defaultTag),
+        TagResponseDTO(id: 2, title: "개인", colorCode: "#A855F7", tagType: .defaultTag),
+        TagResponseDTO(id: 3, title: "약속", colorCode: "#F97316", tagType: .defaultTag),
+        TagResponseDTO(id: 4, title: "공부", colorCode: "#10B981", tagType: .defaultTag),
+        TagResponseDTO(id: 5, title: "기타", colorCode: "#64748B", tagType: .defaultTag)
+    ]
 }

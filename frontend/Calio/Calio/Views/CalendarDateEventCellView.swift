@@ -121,7 +121,7 @@ struct CalendarDateEventCellView: View {
                 .padding(.vertical, 6)
                 .background(
                     RoundedRectangle(cornerRadius: 6)
-                        .fill(Color(hex: event.colorCode))
+                        .fill(Color(hex: event.tag.colorCode))
                 )
         }
         .buttonStyle(.plain)
@@ -293,14 +293,14 @@ private struct EventChipRows {
         onEventSelected: { _ in },
         onShowEventDetail: { _ in },
         events: [
-            Event(id: 1, title: "제목1212312313212313123123123123", description: "설명", startAt: Date(), endAt: Date().addingTimeInterval(3000), colorCode: "#FDDDDD"),
-            Event(id: 2, title: "제목2312", description: "설명", startAt: Date(), endAt: Date().addingTimeInterval(3000), colorCode: "#5DDDDD"),
-            Event(id: 3, title: "제목341231231231231321312312321356", description: "설명", startAt: Date(), endAt: Date().addingTimeInterval(3000), colorCode: "#BDDDDD"),
-            Event(id: 4, title: "제목457", description: "설명", startAt: Date(), endAt: Date().addingTimeInterval(3000), colorCode: "#ADDDDD"),
-            Event(id: 5, title: "제목82352323522352352538", description: "설명", startAt: Date(), endAt: Date().addingTimeInterval(3000), colorCode: "#AD9DDD"),
-            Event(id: 6, title: "제목22", description: "설명", startAt: Date(), endAt: Date().addingTimeInterval(3000), colorCode: "#B3DD6D"),
-            Event(id: 7, title: "제목asd", description: "설명", startAt: Date(), endAt: Date().addingTimeInterval(3000), colorCode: "#BDDDDD"),
-            Event(id: 8, title: "제목313", description: "설명", startAt: Date(), endAt: Date().addingTimeInterval(3000), colorCode: "#ADDDDD")
+            Event(id: 1, title: "제목1212312313212313123123123123", description: "설명", startAt: Date(), endAt: Date().addingTimeInterval(3000), tag: .sample(colorCode: "#FDDDDD")),
+            Event(id: 2, title: "제목2312", description: "설명", startAt: Date(), endAt: Date().addingTimeInterval(3000), tag: .sample(colorCode: "#5DDDDD")),
+            Event(id: 3, title: "제목341231231231231321312312321356", description: "설명", startAt: Date(), endAt: Date().addingTimeInterval(3000), tag: .sample(colorCode: "#BDDDDD")),
+            Event(id: 4, title: "제목457", description: "설명", startAt: Date(), endAt: Date().addingTimeInterval(3000), tag: .sample(colorCode: "#ADDDDD")),
+            Event(id: 5, title: "제목82352323522352352538", description: "설명", startAt: Date(), endAt: Date().addingTimeInterval(3000), tag: .sample(colorCode: "#AD9DDD")),
+            Event(id: 6, title: "제목22", description: "설명", startAt: Date(), endAt: Date().addingTimeInterval(3000), tag: .sample(colorCode: "#B3DD6D")),
+            Event(id: 7, title: "제목asd", description: "설명", startAt: Date(), endAt: Date().addingTimeInterval(3000), tag: .sample(colorCode: "#BDDDDD")),
+            Event(id: 8, title: "제목313", description: "설명", startAt: Date(), endAt: Date().addingTimeInterval(3000), tag: .sample(colorCode: "#ADDDDD"))
         ]
     )
 }

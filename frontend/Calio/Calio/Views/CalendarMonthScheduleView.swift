@@ -880,7 +880,7 @@ private enum MonthScheduleChip {
     var color: Color {
         switch self {
         case .event(let event):
-            return Color(hex: event.colorCode)
+            return Color(hex: event.tag.colorCode)
         case .holiday:
             return Color.calendarHoliday
         }
@@ -1325,7 +1325,7 @@ private struct CalendarDayDetailEventRow: View {
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             RoundedRectangle(cornerRadius: 3)
-                .fill(Color(hex: event.colorCode))
+                .fill(Color(hex: event.tag.colorCode))
                 .frame(width: 5, height: 42)
 
             VStack(alignment: .leading, spacing: 5) {
