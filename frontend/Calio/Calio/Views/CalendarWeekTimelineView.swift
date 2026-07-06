@@ -306,39 +306,20 @@ struct CalendarWeekTimelineView: View {
         for item: CalendarDateCellItem,
         metrics: TimelineMetrics
     ) -> some View {
-        let events = fullDayEvents(in: item)
+        let chips = fullDayChips(in: item)
         
         return VStack(spacing: 3) {
-            ForEach(Array(events.prefix(metrics.maxVisibleFullDayEventCount))) { event in
-                Text(event.title)
-                    .font(.system(size: metrics.fullDayEventFontSize, weight: .semibold))
-                    .lineLimit(1)
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, metrics.eventHorizontalPadding)
-                    .frame(maxWidth: .infinity, minHeight: metrics.fullDayEventHeight)
-                    .background(
-                        RoundedRectangle(cornerRadius: 5)
-                            .fill(Color(hex: event.colorCode))
-                    )
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        selectedEvent = event
-                    }
-                    .popover(
-                        isPresented: isShowingEventPopover(for: event),
-                        attachmentAnchor: .rect(.bounds),
-                        arrowEdge: .top
-                    ) {
-                        CalendarEventSummaryPopoverView(
-                            event: event,
-                            onShowDetail: showEventDetail
-                        )
-                            .presentationCompactAdaptation(.popover)
-                    }
+            ForEach(Array(chips.prefix(metrics.maxVisibleFullDayEventCount))) { chip in
+                switch chip.kind {
+                case .holiday(let holiday):
+                    fullDayHolidayChip(holiday, metrics: metrics)
+                case .event(let event):
+                    fullDayEventChip(event, metrics: metrics)
+                }
             }
             
-            if events.count > metrics.maxVisibleFullDayEventCount {
-                Text("+\(events.count - metrics.maxVisibleFullDayEventCount)")
+            if chips.count > metrics.maxVisibleFullDayEventCount {
+                Text("+\(chips.count - metrics.maxVisibleFullDayEventCount)")
                     .font(.system(size: metrics.fullDayEventFontSize, weight: .medium))
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -347,6 +328,54 @@ struct CalendarWeekTimelineView: View {
         .padding(.horizontal, 4)
         .padding(.vertical, 5)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+
+    private func fullDayHolidayChip(
+        _ holiday: NationalHoliday,
+        metrics: TimelineMetrics
+    ) -> some View {
+        Text(holiday.title)
+            .font(.system(size: metrics.fullDayEventFontSize, weight: .semibold))
+            .lineLimit(1)
+            .foregroundStyle(.white)
+            .padding(.horizontal, metrics.eventHorizontalPadding)
+            .frame(maxWidth: .infinity, minHeight: metrics.fullDayEventHeight)
+            .background(
+                RoundedRectangle(cornerRadius: 5)
+                    .fill(Color.red)
+            )
+            .accessibilityLabel("\(holiday.title) 공휴일")
+    }
+
+    private func fullDayEventChip(
+        _ event: Event,
+        metrics: TimelineMetrics
+    ) -> some View {
+        Text(event.title)
+            .font(.system(size: metrics.fullDayEventFontSize, weight: .semibold))
+            .lineLimit(1)
+            .foregroundStyle(.white)
+            .padding(.horizontal, metrics.eventHorizontalPadding)
+            .frame(maxWidth: .infinity, minHeight: metrics.fullDayEventHeight)
+            .background(
+                RoundedRectangle(cornerRadius: 5)
+                    .fill(Color(hex: event.colorCode))
+            )
+            .contentShape(Rectangle())
+            .onTapGesture {
+                selectedEvent = event
+            }
+            .popover(
+                isPresented: isShowingEventPopover(for: event),
+                attachmentAnchor: .rect(.bounds),
+                arrowEdge: .top
+            ) {
+                CalendarEventSummaryPopoverView(
+                    event: event,
+                    onShowDetail: showEventDetail
+                )
+                .presentationCompactAdaptation(.popover)
+            }
     }
     
     private func timelineBody(metrics: TimelineMetrics, containerSize: CGSize) -> some View {
@@ -1089,6 +1118,11 @@ struct CalendarWeekTimelineView: View {
             shouldShowInFullDayArea(event, on: item.id)
         }
     }
+
+    private func fullDayChips(in item: CalendarDateCellItem) -> [WeekFullDayChip] {
+        item.holidays.map { WeekFullDayChip(kind: .holiday($0)) }
+            + fullDayEvents(in: item).map { WeekFullDayChip(kind: .event($0)) }
+    }
     
     private func shouldShowInFullDayArea(_ event: Event, on day: DayKey) -> Bool {
         let dayStart = day.toDate(calendar: calendar)
@@ -1324,6 +1358,24 @@ private struct TimelineEventInterval {
 private struct TimelineOverlapPoint {
     let date: Date
     let change: Int
+}
+
+private struct WeekFullDayChip: Identifiable {
+    let kind: WeekFullDayChipKind
+
+    var id: String {
+        switch kind {
+        case .holiday(let holiday):
+            return "holiday-\(holiday.id)"
+        case .event(let event):
+            return "event-\(event.id)"
+        }
+    }
+}
+
+private enum WeekFullDayChipKind {
+    case holiday(NationalHoliday)
+    case event(Event)
 }
 
 private struct TimelineLayoutFramePreferenceKey: PreferenceKey {

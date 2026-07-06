@@ -24,6 +24,33 @@ struct CalendarDateEventCellView: View {
     let onEventSelected: (Event) -> Void
     let onShowEventDetail: (Event) -> Void
     let events: [Event]
+    let holidays: [NationalHoliday]
+
+    init(
+        day: DayKey,
+        weekday: CalendarWeekday,
+        monthText: String,
+        dayText: String,
+        isToday: Bool,
+        onTap: @escaping () -> Void,
+        selectedEvent: Binding<CalendarDateEventSelection?>,
+        onEventSelected: @escaping (Event) -> Void,
+        onShowEventDetail: @escaping (Event) -> Void,
+        events: [Event],
+        holidays: [NationalHoliday] = []
+    ) {
+        self.day = day
+        self.weekday = weekday
+        self.monthText = monthText
+        self.dayText = dayText
+        self.isToday = isToday
+        self.onTap = onTap
+        self._selectedEvent = selectedEvent
+        self.onEventSelected = onEventSelected
+        self.onShowEventDetail = onShowEventDetail
+        self.events = events
+        self.holidays = holidays
+    }
     
     var body: some View {
         GeometryReader { geometry in
@@ -40,12 +67,17 @@ struct CalendarDateEventCellView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
 
                     FlowLayout(spacing: eventChipSpacing) {
-                        ForEach(chipLayout.visibleEvents, id: \.id) { event in
-                            eventChipButton(event)
+                        ForEach(chipLayout.visibleChips) { chip in
+                            switch chip.kind {
+                            case .holiday(let holiday):
+                                holidayChip(holiday)
+                            case .event(let event):
+                                eventChipButton(event)
+                            }
                         }
 
-                        if chipLayout.hiddenEventCount > 0 {
-                            Text("+\(chipLayout.hiddenEventCount) more")
+                        if chipLayout.hiddenChipCount > 0 {
+                            Text("+\(chipLayout.hiddenChipCount) more")
                                 .font(.system(size: 13, weight: .medium))
                                 .lineLimit(1)
                                 .foregroundStyle(.secondary)
@@ -61,6 +93,20 @@ struct CalendarDateEventCellView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
         }
+    }
+
+    private func holidayChip(_ holiday: NationalHoliday) -> some View {
+        Text(holiday.title)
+            .font(.system(size: 13, weight: .medium))
+            .lineLimit(1)
+            .foregroundStyle(.white)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(Color.red)
+            )
+            .accessibilityLabel("\(holiday.title) 공휴일")
     }
 
     private func eventChipButton(_ event: Event) -> some View {
@@ -106,44 +152,51 @@ struct CalendarDateEventCellView: View {
     }
     
     private func eventChipLayout(maxWidth: CGFloat) -> EventChipLayout {
+        let chips = calendarChips
+
         guard maxWidth > 0 else {
-            return EventChipLayout(visibleEvents: [], hiddenEventCount: events.count)
+            return EventChipLayout(visibleChips: [], hiddenChipCount: chips.count)
         }
         
-        var visibleEvents: [Event] = []
+        var visibleChips: [CalendarDateEventChip] = []
         
-        for event in events {
-            let candidateEvents = visibleEvents + [event]
-            let hiddenEventCount = events.count - candidateEvents.count
+        for chip in chips {
+            let candidateChips = visibleChips + [chip]
+            let hiddenChipCount = chips.count - candidateChips.count
             
-            guard eventChipsFit(
-                visibleEvents: candidateEvents,
-                hiddenEventCount: hiddenEventCount,
+            guard calendarChipsFit(
+                visibleChips: candidateChips,
+                hiddenChipCount: hiddenChipCount,
                 maxWidth: maxWidth
             ) else {
                 break
             }
             
-            visibleEvents = candidateEvents
+            visibleChips = candidateChips
         }
         
         return EventChipLayout(
-            visibleEvents: visibleEvents,
-            hiddenEventCount: events.count - visibleEvents.count
+            visibleChips: visibleChips,
+            hiddenChipCount: chips.count - visibleChips.count
         )
     }
     
-    private func eventChipsFit(
-        visibleEvents: [Event],
-        hiddenEventCount: Int,
+    private func calendarChipsFit(
+        visibleChips: [CalendarDateEventChip],
+        hiddenChipCount: Int,
         maxWidth: CGFloat
     ) -> Bool {
-        let eventWidths = visibleEvents.map { chipWidth(text: $0.title, maxWidth: maxWidth) }
-        let hiddenWidth = hiddenEventCount > 0
-            ? [chipWidth(text: "+\(hiddenEventCount) more", maxWidth: maxWidth)]
+        let chipWidths = visibleChips.map { chipWidth(text: $0.title, maxWidth: maxWidth) }
+        let hiddenWidth = hiddenChipCount > 0
+            ? [chipWidth(text: "+\(hiddenChipCount) more", maxWidth: maxWidth)]
             : []
         
-        return rowCount(for: eventWidths + hiddenWidth, maxWidth: maxWidth) <= maxVisibleEventRowCount
+        return rowCount(for: chipWidths + hiddenWidth, maxWidth: maxWidth) <= maxVisibleEventRowCount
+    }
+
+    var calendarChips: [CalendarDateEventChip] {
+        holidays.map { CalendarDateEventChip(kind: .holiday($0)) }
+            + events.map { CalendarDateEventChip(kind: .event($0)) }
     }
     
     private func chipWidth(text: String, maxWidth: CGFloat) -> CGFloat {
@@ -161,8 +214,35 @@ struct CalendarDateEventCellView: View {
 }
 
 private struct EventChipLayout {
-    let visibleEvents: [Event]
-    let hiddenEventCount: Int
+    let visibleChips: [CalendarDateEventChip]
+    let hiddenChipCount: Int
+}
+
+struct CalendarDateEventChip: Identifiable {
+    let kind: CalendarDateEventChipKind
+
+    var id: String {
+        switch kind {
+        case .holiday(let holiday):
+            return "holiday-\(holiday.id)"
+        case .event(let event):
+            return "event-\(event.id)"
+        }
+    }
+
+    var title: String {
+        switch kind {
+        case .holiday(let holiday):
+            return holiday.title
+        case .event(let event):
+            return event.title
+        }
+    }
+}
+
+enum CalendarDateEventChipKind {
+    case holiday(NationalHoliday)
+    case event(Event)
 }
 
 struct CalendarDateEventSelection: Equatable {
