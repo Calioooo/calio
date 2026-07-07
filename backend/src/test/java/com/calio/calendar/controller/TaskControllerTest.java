@@ -305,7 +305,7 @@ class TaskControllerTest {
     }
 
     @Test
-    @DisplayName("사용자는 malformed JSON으로 작업 제목을 수정할 수 없다")
+    @DisplayName("사용자는 형식이 잘못된 JSON으로 작업 제목을 수정할 수 없다")
     void givenMalformedJson_whenUpdateTaskTitle_thenReturnsValidationFailed() throws Exception {
         // given
         long taskId = createTask("Original task");
