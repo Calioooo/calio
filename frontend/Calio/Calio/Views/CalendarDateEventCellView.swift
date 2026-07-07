@@ -13,6 +13,7 @@ struct CalendarDateEventCellView: View {
     private let eventChipHorizontalPadding: CGFloat = 20
     private let eventChipSpacing: CGFloat = 8
     private let eventChipFont = UIFont.systemFont(ofSize: 13, weight: .medium)
+    private let lowerScreenPopoverThreshold: CGFloat = 0.62
     
     let day: DayKey
     let weekday: CalendarWeekday
@@ -25,6 +26,8 @@ struct CalendarDateEventCellView: View {
     let onShowEventDetail: (Event) -> Void
     let events: [Event]
     let holidays: [NationalHoliday]
+
+    @State private var eventChipFrames: [Int64: CGRect] = [:]
 
     init(
         day: DayKey,
@@ -125,10 +128,21 @@ struct CalendarDateEventCellView: View {
                 )
         }
         .buttonStyle(.plain)
+        .background {
+            GeometryReader { geometry in
+                Color.clear
+                    .onAppear {
+                        updateChipFrame(for: event, frame: geometry.frame(in: .global))
+                    }
+                    .onChange(of: geometry.frame(in: .global)) { _, newFrame in
+                        updateChipFrame(for: event, frame: newFrame)
+                    }
+            }
+        }
         .popover(
             isPresented: isShowingEventPopover(for: event),
             attachmentAnchor: .rect(.bounds),
-            arrowEdge: .top
+            arrowEdge: popoverArrowEdge(for: event)
         ) {
             CalendarEventSummaryPopoverView(
                 event: event,
@@ -149,6 +163,25 @@ struct CalendarDateEventCellView: View {
                 }
             }
         )
+    }
+
+    private func updateChipFrame(for event: Event, frame: CGRect) {
+        guard eventChipFrames[event.id] != frame else {
+            return
+        }
+
+        eventChipFrames[event.id] = frame
+    }
+
+    private func popoverArrowEdge(for event: Event) -> Edge {
+        guard let frame = eventChipFrames[event.id] else {
+            return .top
+        }
+
+        let screenHeight = UIScreen.main.bounds.height
+        let isLowerScreenChip = frame.midY > screenHeight * lowerScreenPopoverThreshold
+
+        return isLowerScreenChip ? .bottom : .top
     }
     
     private func eventChipLayout(maxWidth: CGFloat) -> EventChipLayout {
