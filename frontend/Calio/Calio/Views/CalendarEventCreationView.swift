@@ -14,8 +14,14 @@ struct CalendarEventCreationView: View {
     
     let tags: [CalendarTag]
     let isSaving: Bool
+    let isTagMutating: Bool
     let failureMessage: String?
+    let tagMutationFailureMessage: String?
     let onSave: (CalendarEventCreationSubmitInput) async -> Bool
+    let onResetTagMutation: () -> Void
+    let onCreateCustomTag: (CustomTagInput) async -> Bool
+    let onUpdateCustomTag: (CalendarTag, CustomTagInput) async -> Bool
+    let onDeleteCustomTag: (CalendarTag) async -> Bool
     
     init(
         referenceDay: DayKey,
@@ -23,8 +29,14 @@ struct CalendarEventCreationView: View {
         tags: [CalendarTag] = [],
         calendar: Calendar = .current,
         isSaving: Bool = false,
+        isTagMutating: Bool = false,
         failureMessage: String? = nil,
-        onSave: @escaping (CalendarEventCreationSubmitInput) async -> Bool = { _ in true }
+        tagMutationFailureMessage: String? = nil,
+        onSave: @escaping (CalendarEventCreationSubmitInput) async -> Bool = { _ in true },
+        onResetTagMutation: @escaping () -> Void = {},
+        onCreateCustomTag: @escaping (CustomTagInput) async -> Bool = { _ in false },
+        onUpdateCustomTag: @escaping (CalendarTag, CustomTagInput) async -> Bool = { _, _ in false },
+        onDeleteCustomTag: @escaping (CalendarTag) async -> Bool = { _ in false }
     ) {
         let timeRange = CalendarEventCreationView.defaultTimeRange(
             referenceDay: referenceDay,
@@ -59,8 +71,14 @@ struct CalendarEventCreationView: View {
         )
         self.tags = tags
         self.isSaving = isSaving
+        self.isTagMutating = isTagMutating
         self.failureMessage = failureMessage
+        self.tagMutationFailureMessage = tagMutationFailureMessage
         self.onSave = onSave
+        self.onResetTagMutation = onResetTagMutation
+        self.onCreateCustomTag = onCreateCustomTag
+        self.onUpdateCustomTag = onUpdateCustomTag
+        self.onDeleteCustomTag = onDeleteCustomTag
     }
     
     var body: some View {
@@ -71,7 +89,13 @@ struct CalendarEventCreationView: View {
                     eventInput: $eventInput,
                     recurrenceInput: $recurrenceInput,
                     tags: tags,
-                    onRecurrenceEnabled: resetRecurrenceFieldsFromSingleEventTime
+                    isTagMutating: isTagMutating,
+                    tagMutationFailureMessage: tagMutationFailureMessage,
+                    onRecurrenceEnabled: resetRecurrenceFieldsFromSingleEventTime,
+                    onResetTagMutation: onResetTagMutation,
+                    onCreateCustomTag: onCreateCustomTag,
+                    onUpdateCustomTag: onUpdateCustomTag,
+                    onDeleteCustomTag: onDeleteCustomTag
                 )
             }
             .scrollContentBackground(.hidden)

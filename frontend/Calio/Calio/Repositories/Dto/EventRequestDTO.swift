@@ -103,6 +103,11 @@ struct CreateRecurrenceEventRequestDTO: Encodable, Equatable {
     }
 }
 
+struct CustomTagRequestDTO: Encodable, Equatable {
+    let title: String
+    let colorCode: String
+}
+
 struct RecurrenceEventResponseDTO: Decodable, Equatable {
     let recurrenceId: Int64
     let recurrenceTitle: String

@@ -1446,6 +1446,67 @@ struct CalioTests {
         #expect(capturedRequests.allSatisfy { requestBodyData(from: $0) == nil })
     }
 
+    @Test func urlSessionTagRepositoryManagesCustomTagsWithInjectedBaseURLAndContractBody() async throws {
+        let tagResponseJSON = """
+        {
+          "id": 9,
+          "title": "운동",
+          "colorCode": "#10B981",
+          "tagType": "CUSTOM"
+        }
+        """.data(using: .utf8)!
+        var capturedRequests: [URLRequest] = []
+        MockURLProtocol.requestHandler = { request in
+            capturedRequests.append(request)
+            let statusCode = request.httpMethod == "POST" ? 201 : 200
+            let data = request.httpMethod == "DELETE" ? Data() : tagResponseJSON
+            let response = HTTPURLResponse(
+                url: request.url!,
+                statusCode: request.httpMethod == "DELETE" ? 204 : statusCode,
+                httpVersion: nil,
+                headerFields: nil
+            )!
+            return (response, data)
+        }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        let repository = URLSessionTagRepository(
+            baseURL: URL(string: "https://example.test")!,
+            session: session
+        )
+
+        let createdTag = try await repository.createCustomTag(
+            CustomTagRequestDTO(title: "운동", colorCode: "#10B981")
+        )
+        let updatedTag = try await repository.updateCustomTag(
+            tagId: 9,
+            request: CustomTagRequestDTO(title: "운동", colorCode: "#10B981")
+        )
+        try await repository.deleteCustomTag(tagId: 9)
+
+        #expect(createdTag.tagType == .custom)
+        #expect(updatedTag.id == 9)
+        #expect(capturedRequests.map { $0.url?.absoluteString } == [
+            "https://example.test/api/custom-tags",
+            "https://example.test/api/custom-tags/9",
+            "https://example.test/api/custom-tags/9"
+        ])
+        #expect(capturedRequests.map { $0.httpMethod ?? "" } == ["POST", "PUT", "DELETE"])
+
+        let createBody = try #require(requestBodyData(from: capturedRequests[0]))
+        let updateBody = try #require(requestBodyData(from: capturedRequests[1]))
+        let createObject = try #require(JSONSerialization.jsonObject(with: createBody) as? [String: Any])
+        let updateObject = try #require(JSONSerialization.jsonObject(with: updateBody) as? [String: Any])
+
+        #expect(createObject["title"] as? String == "운동")
+        #expect(createObject["colorCode"] as? String == "#10B981")
+        #expect(Set(createObject.keys) == ["title", "colorCode"])
+        #expect(updateObject["title"] as? String == "운동")
+        #expect(updateObject["colorCode"] as? String == "#10B981")
+        #expect(requestBodyData(from: capturedRequests[2]) == nil)
+    }
+
     @Test func urlSessionNationalHolidayRepositoryFetchesWithLocalDateQuery() async throws {
         let responseJSON = """
         [

@@ -19,6 +19,7 @@ final class CalendarHomeViewModel: ObservableObject {
     @Published private(set) var createState: CalendarEventCreateState = .idle
     @Published private(set) var mutationState: CalendarEventMutationState = .idle
     @Published private(set) var tags: [CalendarTag] = []
+    @Published private(set) var tagMutationState: CalendarTagMutationState = .idle
     
     private let initialGeneratedPastMonths = 3
     private let initialGeneratedFutureMonths = 3
@@ -117,6 +118,14 @@ final class CalendarHomeViewModel: ObservableObject {
             } catch {
                 tags = [CalendarTag.fallback]
             }
+        }
+    }
+
+    private func reloadTags() async {
+        do {
+            tags = try await tagService.fetchTags()
+        } catch {
+            tags = tags.isEmpty ? [CalendarTag.fallback] : tags
         }
     }
     
@@ -221,6 +230,85 @@ final class CalendarHomeViewModel: ObservableObject {
 
     func resetMutationState() {
         mutationState = .idle
+    }
+
+    func resetTagMutationState() {
+        guard tagMutationState != .idle else {
+            return
+        }
+
+        tagMutationState = .idle
+    }
+
+    func createCustomTag(_ input: CustomTagInput) async -> Bool {
+        guard !tagMutationState.isMutating else {
+            return false
+        }
+
+        tagMutationState = .saving
+
+        do {
+            _ = try await tagService.createCustomTag(input)
+            await reloadTags()
+            tagMutationState = .idle
+            return true
+        } catch let error as EventServiceError {
+            tagMutationState = .failed(CalendarTagMutationFailure(error: error))
+            return false
+        } catch {
+            tagMutationState = .failed(.unexpected)
+            return false
+        }
+    }
+
+    func updateCustomTag(_ tag: CalendarTag, input: CustomTagInput) async -> Bool {
+        guard !tagMutationState.isMutating,
+              tag.tagType == .custom
+        else {
+            return false
+        }
+
+        tagMutationState = .saving
+
+        do {
+            _ = try await tagService.updateCustomTag(tagId: tag.id, input: input)
+            await reloadTags()
+            invalidateMonthEventCache()
+            refetchDefaultPrefetchRange()
+            tagMutationState = .idle
+            return true
+        } catch let error as EventServiceError {
+            tagMutationState = .failed(CalendarTagMutationFailure(error: error))
+            return false
+        } catch {
+            tagMutationState = .failed(.unexpected)
+            return false
+        }
+    }
+
+    func deleteCustomTag(_ tag: CalendarTag) async -> Bool {
+        guard !tagMutationState.isMutating,
+              tag.tagType == .custom
+        else {
+            return false
+        }
+
+        tagMutationState = .saving
+
+        do {
+            try await tagService.deleteCustomTag(tagId: tag.id)
+            await reloadTags()
+            invalidateMonthEventCache()
+            refetchDefaultPrefetchRange()
+            tagMutationState = .idle
+            return true
+        } catch let error as EventServiceError {
+            tagMutationState = .failed(CalendarTagMutationFailure(error: error))
+            return false
+        } catch {
+            tagMutationState = .failed(.unexpected)
+            return false
+        }
     }
 
     func createEvent(_ input: CalendarEventCreationSubmitInput) async -> Bool {
@@ -1252,6 +1340,52 @@ enum CalendarEventMutationFailure: Equatable {
             return "서버에 연결할 수 없습니다."
         case .unexpected:
             return "요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요."
+        }
+    }
+}
+
+enum CalendarTagMutationState: Equatable {
+    case idle
+    case saving
+    case failed(CalendarTagMutationFailure)
+
+    var isMutating: Bool {
+        self == .saving
+    }
+
+    var failureMessage: String? {
+        guard case .failed(let failure) = self else {
+            return nil
+        }
+
+        return failure.message
+    }
+}
+
+enum CalendarTagMutationFailure: Equatable {
+    case validationFailed
+    case network
+    case unexpected
+
+    init(error: EventServiceError) {
+        switch error {
+        case .validationFailed, .invalidTimeRange:
+            self = .validationFailed
+        case .network:
+            self = .network
+        case .eventNotFound, .recurrenceEventNotFound, .recurrenceOccurrenceNotFound, .decoding, .unexpected:
+            self = .unexpected
+        }
+    }
+
+    var message: String {
+        switch self {
+        case .validationFailed:
+            return "태그 이름과 색상을 확인해 주세요."
+        case .network:
+            return "서버에 연결할 수 없습니다."
+        case .unexpected:
+            return "태그를 저장하지 못했습니다. 잠시 후 다시 시도해 주세요."
         }
     }
 }

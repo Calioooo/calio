@@ -153,7 +153,7 @@ struct URLSessionEventRepository: EventRepository {
     }
 
     private func recurrenceEventsURL() throws -> URL {
-        var components = URLComponents(
+        let components = URLComponents(
             url: baseURL.appendingPathComponent("api/recurrence-events"),
             resolvingAgainstBaseURL: false
         )
@@ -249,15 +249,18 @@ struct URLSessionTagRepository: TagRepository {
     private let baseURL: URL
     private let session: URLSession
     private let jsonDecoder: JSONDecoder
+    private let jsonEncoder: JSONEncoder
 
     init(
         baseURL: URL = CalioAPIConfig.baseURL,
         session: URLSession = .shared,
-        jsonDecoder: JSONDecoder = EventJSONCoding.makeDecoder()
+        jsonDecoder: JSONDecoder = EventJSONCoding.makeDecoder(),
+        jsonEncoder: JSONEncoder = EventJSONCoding.makeEncoder()
     ) {
         self.baseURL = baseURL
         self.session = session
         self.jsonDecoder = jsonDecoder
+        self.jsonEncoder = jsonEncoder
     }
 
     func fetchTags() async throws -> [TagResponseDTO] {
@@ -269,6 +272,35 @@ struct URLSessionTagRepository: TagRepository {
         return try await response([TagResponseDTO].self, for: request)
     }
 
+    func createCustomTag(_ requestDTO: CustomTagRequestDTO) async throws -> TagResponseDTO {
+        let request = try makeRequest(
+            method: "POST",
+            url: customTagsURL(),
+            body: requestDTO
+        )
+
+        return try await response(TagResponseDTO.self, for: request)
+    }
+
+    func updateCustomTag(tagId: Int64, request requestDTO: CustomTagRequestDTO) async throws -> TagResponseDTO {
+        let request = try makeRequest(
+            method: "PUT",
+            url: customTagURL(tagId: tagId),
+            body: requestDTO
+        )
+
+        return try await response(TagResponseDTO.self, for: request)
+    }
+
+    func deleteCustomTag(tagId: Int64) async throws {
+        let request = makeRequest(
+            method: "DELETE",
+            url: customTagURL(tagId: tagId)
+        )
+
+        try await emptyResponse(for: request)
+    }
+
     private func makeRequest(method: String, url: URL) -> URLRequest {
         var request = URLRequest(url: url)
         request.httpMethod = method
@@ -276,7 +308,40 @@ struct URLSessionTagRepository: TagRepository {
         return request
     }
 
+    private func makeRequest<Body: Encodable>(
+        method: String,
+        url: URL,
+        body: Body
+    ) throws -> URLRequest {
+        var request = makeRequest(method: method, url: url)
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        do {
+            request.httpBody = try jsonEncoder.encode(body)
+        } catch {
+            throw EventRepositoryError.encoding(error)
+        }
+
+        return request
+    }
+
     private func response<T: Decodable>(_ type: T.Type, for request: URLRequest) async throws -> T {
+        let data = try await data(for: request)
+
+        do {
+            return try jsonDecoder.decode(type, from: data)
+        } catch let error as DecodingError {
+            throw EventRepositoryError.decoding(error)
+        } catch {
+            throw EventRepositoryError.unexpected(error)
+        }
+    }
+
+    private func emptyResponse(for request: URLRequest) async throws {
+        _ = try await data(for: request)
+    }
+
+    private func data(for request: URLRequest) async throws -> Data {
         let data: Data
         let response: URLResponse
 
@@ -299,12 +364,14 @@ struct URLSessionTagRepository: TagRepository {
             )
         }
 
-        do {
-            return try jsonDecoder.decode(type, from: data)
-        } catch let error as DecodingError {
-            throw EventRepositoryError.decoding(error)
-        } catch {
-            throw EventRepositoryError.unexpected(error)
-        }
+        return data
+    }
+
+    private func customTagsURL() -> URL {
+        baseURL.appendingPathComponent("api/custom-tags")
+    }
+
+    private func customTagURL(tagId: Int64) -> URL {
+        customTagsURL().appendingPathComponent(String(tagId))
     }
 }

@@ -41,15 +41,21 @@ struct CalendarHomeView: View {
                     onRetryEvents: viewModel.retryReferenceMonthEvents,
                     onDragEnded: updateDisplayMode(after:),
                     isEventMutating: viewModel.mutationState.isMutating,
+                    isTagMutating: viewModel.tagMutationState.isMutating,
                     eventMutationFailureMessage: viewModel.mutationState.failureMessage,
+                    tagMutationFailureMessage: viewModel.tagMutationState.failureMessage,
                     onResetEventMutation: viewModel.resetMutationState,
+                    onResetTagMutation: viewModel.resetTagMutationState,
                     onFetchRecurrenceEvent: viewModel.fetchRecurrenceEvent(recurrenceId:),
                     onUpdateSingleEvent: viewModel.updateSingleEvent(_:input:),
                     onUpdateRecurrenceOccurrence: viewModel.updateRecurrenceOccurrence(_:input:),
                     onUpdateRecurrenceSeries: viewModel.updateRecurrenceSeries(recurrenceId:input:),
                     onDeleteSingleEvent: viewModel.deleteSingleEvent(_:),
                     onDeleteRecurrenceOccurrence: viewModel.deleteRecurrenceOccurrence(_:),
-                    onDeleteRecurrenceSeries: viewModel.deleteRecurrenceSeries(_:)
+                    onDeleteRecurrenceSeries: viewModel.deleteRecurrenceSeries(_:),
+                    onCreateCustomTag: viewModel.createCustomTag(_:),
+                    onUpdateCustomTag: viewModel.updateCustomTag(_:input:),
+                    onDeleteCustomTag: viewModel.deleteCustomTag(_:)
                 )
             }
             .animation(.easeInOut(duration: 0.2), value: displayMode)
@@ -62,10 +68,16 @@ struct CalendarHomeView: View {
                     referenceDay: viewModel.referenceDay,
                     tags: viewModel.tags,
                     isSaving: viewModel.createState.isSaving,
+                    isTagMutating: viewModel.tagMutationState.isMutating,
                     failureMessage: viewModel.createState.failureMessage,
+                    tagMutationFailureMessage: viewModel.tagMutationState.failureMessage,
                     onSave: { input in
                         await viewModel.createEvent(input)
-                    }
+                    },
+                    onResetTagMutation: viewModel.resetTagMutationState,
+                    onCreateCustomTag: viewModel.createCustomTag(_:),
+                    onUpdateCustomTag: viewModel.updateCustomTag(_:input:),
+                    onDeleteCustomTag: viewModel.deleteCustomTag(_:)
                 )
             }
         }

@@ -13,7 +13,9 @@ struct CalendarEventDetailView: View {
     let event: Event
     let tags: [CalendarTag]
     let isMutating: Bool
+    let isTagMutating: Bool
     let mutationFailureMessage: String?
+    let tagMutationFailureMessage: String?
     let onFetchRecurrenceEvent: (Int64) async -> RecurrenceEventDetails?
     let onUpdateSingleEvent: (Event, EventUpdateInput) async -> Bool
     let onUpdateRecurrenceOccurrence: (Event, EventUpdateInput) async -> Bool
@@ -21,6 +23,10 @@ struct CalendarEventDetailView: View {
     let onDeleteSingleEvent: (Event) async -> Bool
     let onDeleteRecurrenceOccurrence: (Event) async -> Bool
     let onDeleteRecurrenceSeries: (Event) async -> Bool
+    let onResetTagMutation: () -> Void
+    let onCreateCustomTag: (CustomTagInput) async -> Bool
+    let onUpdateCustomTag: (CalendarTag, CustomTagInput) async -> Bool
+    let onDeleteCustomTag: (CalendarTag) async -> Bool
 
     @State private var formMode: CalendarEventFormMode?
     @State private var isFetchingRecurrenceEvent = false
@@ -34,19 +40,27 @@ struct CalendarEventDetailView: View {
         event: Event,
         tags: [CalendarTag] = [],
         isMutating: Bool = false,
+        isTagMutating: Bool = false,
         mutationFailureMessage: String? = nil,
+        tagMutationFailureMessage: String? = nil,
         onFetchRecurrenceEvent: @escaping (Int64) async -> RecurrenceEventDetails? = { _ in nil },
         onUpdateSingleEvent: @escaping (Event, EventUpdateInput) async -> Bool = { _, _ in true },
         onUpdateRecurrenceOccurrence: @escaping (Event, EventUpdateInput) async -> Bool = { _, _ in true },
         onUpdateRecurrenceSeries: @escaping (Int64, RecurrenceEventSeriesEditInput) async -> Bool = { _, _ in true },
         onDeleteSingleEvent: @escaping (Event) async -> Bool = { _ in true },
         onDeleteRecurrenceOccurrence: @escaping (Event) async -> Bool = { _ in true },
-        onDeleteRecurrenceSeries: @escaping (Event) async -> Bool = { _ in true }
+        onDeleteRecurrenceSeries: @escaping (Event) async -> Bool = { _ in true },
+        onResetTagMutation: @escaping () -> Void = {},
+        onCreateCustomTag: @escaping (CustomTagInput) async -> Bool = { _ in false },
+        onUpdateCustomTag: @escaping (CalendarTag, CustomTagInput) async -> Bool = { _, _ in false },
+        onDeleteCustomTag: @escaping (CalendarTag) async -> Bool = { _ in false }
     ) {
         self.event = event
         self.tags = tags
         self.isMutating = isMutating
+        self.isTagMutating = isTagMutating
         self.mutationFailureMessage = mutationFailureMessage
+        self.tagMutationFailureMessage = tagMutationFailureMessage
         self.onFetchRecurrenceEvent = onFetchRecurrenceEvent
         self.onUpdateSingleEvent = onUpdateSingleEvent
         self.onUpdateRecurrenceOccurrence = onUpdateRecurrenceOccurrence
@@ -54,6 +68,10 @@ struct CalendarEventDetailView: View {
         self.onDeleteSingleEvent = onDeleteSingleEvent
         self.onDeleteRecurrenceOccurrence = onDeleteRecurrenceOccurrence
         self.onDeleteRecurrenceSeries = onDeleteRecurrenceSeries
+        self.onResetTagMutation = onResetTagMutation
+        self.onCreateCustomTag = onCreateCustomTag
+        self.onUpdateCustomTag = onUpdateCustomTag
+        self.onDeleteCustomTag = onDeleteCustomTag
         _editInput = State(
             initialValue: EventInput(
                 title: event.title,
@@ -150,8 +168,14 @@ struct CalendarEventDetailView: View {
                 eventInput: $editInput,
                 recurrenceInput: recurrenceInputForEditForm,
                 tags: tags,
+                isTagMutating: isTagMutating,
+                tagMutationFailureMessage: tagMutationFailureMessage,
                 mode: formMode ?? .editSingleEvent,
-                onRecurrenceEnabled: {}
+                onRecurrenceEnabled: {},
+                onResetTagMutation: onResetTagMutation,
+                onCreateCustomTag: onCreateCustomTag,
+                onUpdateCustomTag: onUpdateCustomTag,
+                onDeleteCustomTag: onDeleteCustomTag
             )
         }
         .scrollContentBackground(.hidden)

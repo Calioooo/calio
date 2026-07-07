@@ -27,8 +27,11 @@ struct CalendarWeekTimelineView: View {
     let onCreateTapped: () -> Void
     let onRetryEvents: () -> Void
     let isEventMutating: Bool
+    let isTagMutating: Bool
     let eventMutationFailureMessage: String?
+    let tagMutationFailureMessage: String?
     let onResetEventMutation: () -> Void
+    let onResetTagMutation: () -> Void
     let onFetchRecurrenceEvent: (Int64) async -> RecurrenceEventDetails?
     let onUpdateSingleEvent: (Event, EventUpdateInput) async -> Bool
     let onUpdateRecurrenceOccurrence: (Event, EventUpdateInput) async -> Bool
@@ -36,6 +39,9 @@ struct CalendarWeekTimelineView: View {
     let onDeleteSingleEvent: (Event) async -> Bool
     let onDeleteRecurrenceOccurrence: (Event) async -> Bool
     let onDeleteRecurrenceSeries: (Event) async -> Bool
+    let onCreateCustomTag: (CustomTagInput) async -> Bool
+    let onUpdateCustomTag: (CalendarTag, CustomTagInput) async -> Bool
+    let onDeleteCustomTag: (CalendarTag) async -> Bool
 
     init(
         items: [CalendarDateCellItem],
@@ -50,15 +56,21 @@ struct CalendarWeekTimelineView: View {
         onCreateTapped: @escaping () -> Void = {},
         onRetryEvents: @escaping () -> Void,
         isEventMutating: Bool = false,
+        isTagMutating: Bool = false,
         eventMutationFailureMessage: String? = nil,
+        tagMutationFailureMessage: String? = nil,
         onResetEventMutation: @escaping () -> Void = {},
+        onResetTagMutation: @escaping () -> Void = {},
         onFetchRecurrenceEvent: @escaping (Int64) async -> RecurrenceEventDetails? = { _ in nil },
         onUpdateSingleEvent: @escaping (Event, EventUpdateInput) async -> Bool = { _, _ in true },
         onUpdateRecurrenceOccurrence: @escaping (Event, EventUpdateInput) async -> Bool = { _, _ in true },
         onUpdateRecurrenceSeries: @escaping (Int64, RecurrenceEventSeriesEditInput) async -> Bool = { _, _ in true },
         onDeleteSingleEvent: @escaping (Event) async -> Bool = { _ in true },
         onDeleteRecurrenceOccurrence: @escaping (Event) async -> Bool = { _ in true },
-        onDeleteRecurrenceSeries: @escaping (Event) async -> Bool = { _ in true }
+        onDeleteRecurrenceSeries: @escaping (Event) async -> Bool = { _ in true },
+        onCreateCustomTag: @escaping (CustomTagInput) async -> Bool = { _ in false },
+        onUpdateCustomTag: @escaping (CalendarTag, CustomTagInput) async -> Bool = { _, _ in false },
+        onDeleteCustomTag: @escaping (CalendarTag) async -> Bool = { _ in false }
     ) {
         self.items = items
         self.tags = tags
@@ -72,8 +84,11 @@ struct CalendarWeekTimelineView: View {
         self.onCreateTapped = onCreateTapped
         self.onRetryEvents = onRetryEvents
         self.isEventMutating = isEventMutating
+        self.isTagMutating = isTagMutating
         self.eventMutationFailureMessage = eventMutationFailureMessage
+        self.tagMutationFailureMessage = tagMutationFailureMessage
         self.onResetEventMutation = onResetEventMutation
+        self.onResetTagMutation = onResetTagMutation
         self.onFetchRecurrenceEvent = onFetchRecurrenceEvent
         self.onUpdateSingleEvent = onUpdateSingleEvent
         self.onUpdateRecurrenceOccurrence = onUpdateRecurrenceOccurrence
@@ -81,6 +96,9 @@ struct CalendarWeekTimelineView: View {
         self.onDeleteSingleEvent = onDeleteSingleEvent
         self.onDeleteRecurrenceOccurrence = onDeleteRecurrenceOccurrence
         self.onDeleteRecurrenceSeries = onDeleteRecurrenceSeries
+        self.onCreateCustomTag = onCreateCustomTag
+        self.onUpdateCustomTag = onUpdateCustomTag
+        self.onDeleteCustomTag = onDeleteCustomTag
     }
     
     @State private var headerScrollPosition: DayKey?
@@ -153,14 +171,20 @@ struct CalendarWeekTimelineView: View {
                 event: event,
                 tags: tags,
                 isMutating: isEventMutating,
+                isTagMutating: isTagMutating,
                 mutationFailureMessage: eventMutationFailureMessage,
+                tagMutationFailureMessage: tagMutationFailureMessage,
                 onFetchRecurrenceEvent: onFetchRecurrenceEvent,
                 onUpdateSingleEvent: onUpdateSingleEvent,
                 onUpdateRecurrenceOccurrence: onUpdateRecurrenceOccurrence,
                 onUpdateRecurrenceSeries: onUpdateRecurrenceSeries,
                 onDeleteSingleEvent: onDeleteSingleEvent,
                 onDeleteRecurrenceOccurrence: onDeleteRecurrenceOccurrence,
-                onDeleteRecurrenceSeries: onDeleteRecurrenceSeries
+                onDeleteRecurrenceSeries: onDeleteRecurrenceSeries,
+                onResetTagMutation: onResetTagMutation,
+                onCreateCustomTag: onCreateCustomTag,
+                onUpdateCustomTag: onUpdateCustomTag,
+                onDeleteCustomTag: onDeleteCustomTag
             )
         }
     }

@@ -25,6 +25,26 @@ struct StubEventRepository: EventRepository, TagRepository {
         Self.defaultTags
     }
 
+    func createCustomTag(_ request: CustomTagRequestDTO) async throws -> TagResponseDTO {
+        TagResponseDTO(
+            id: Int64(Date().timeIntervalSince1970),
+            title: request.title,
+            colorCode: request.colorCode,
+            tagType: .custom
+        )
+    }
+
+    func updateCustomTag(tagId: Int64, request: CustomTagRequestDTO) async throws -> TagResponseDTO {
+        TagResponseDTO(
+            id: tagId,
+            title: request.title,
+            colorCode: request.colorCode,
+            tagType: .custom
+        )
+    }
+
+    func deleteCustomTag(tagId: Int64) async throws {}
+
     func createEvent(_ request: CreateEventRequestDTO) async throws -> EventResponseDTO {
         EventResponseDTO(
             id: Int64(Date().timeIntervalSince1970),
