@@ -157,6 +157,189 @@ class TaskControllerTest {
     }
 
     @Test
+    @DisplayName("PATCH /api/tasks/{taskId}는 미완료 작업의 제목만 수정한다")
+    void givenActiveTask_whenUpdateTaskTitle_thenReturnsUpdatedTaskAndPersistsOnlyTitle() throws Exception {
+        // given
+        long taskId = createTask("Original task");
+        Task originalTask = taskRepository.findById(taskId).orElseThrow();
+
+        // when
+        mockMvc.perform(patch("/api/tasks/{taskId}", taskId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "taskTitle": "Updated task"
+                                }
+                                """))
+                // then
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.taskId").value(taskId))
+                .andExpect(jsonPath("$.taskTitle").value("Updated task"))
+                .andExpect(jsonPath("$.isCompleted").value(false))
+                .andExpect(jsonPath("$.completedAt").value(nullValue()));
+
+        Task updatedTask = taskRepository.findById(taskId).orElseThrow();
+        assertThat(updatedTask.getTaskTitle()).isEqualTo("Updated task");
+        assertThat(updatedTask.isCompleted()).isEqualTo(originalTask.isCompleted());
+        assertThat(updatedTask.getCompletedAt()).isEqualTo(originalTask.getCompletedAt());
+        assertThat(updatedTask.getCreatedAt()).isEqualTo(originalTask.getCreatedAt());
+    }
+
+    @Test
+    @DisplayName("완료된 작업의 제목을 수정하면 COMPLETED_TASK_TITLE_UPDATE_NOT_ALLOWED를 반환한다")
+    void givenCompletedTask_whenUpdateTaskTitle_thenReturnsCompletedTaskTitleUpdateNotAllowed() throws Exception {
+        // given
+        Instant completedAt = Instant.parse("2026-01-01T00:00:00Z");
+        Task task = saveCompletedTask("Completed task", completedAt);
+
+        // when
+        mockMvc.perform(patch("/api/tasks/{taskId}", task.getTaskId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "taskTitle": "Updated task"
+                                }
+                                """))
+                // then
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("COMPLETED_TASK_TITLE_UPDATE_NOT_ALLOWED"))
+                .andExpect(jsonPath("$.message").value("Completed task title update is not allowed."))
+                .andExpect(jsonPath("$.*", hasSize(2)));
+
+        Task persistedTask = taskRepository.findById(task.getTaskId()).orElseThrow();
+        assertThat(persistedTask.getTaskTitle()).isEqualTo("Completed task");
+        assertThat(persistedTask.isCompleted()).isTrue();
+        assertThat(persistedTask.getCompletedAt()).isEqualTo(completedAt);
+    }
+
+    @Test
+    @DisplayName("없는 작업의 제목을 수정하면 TASK_NOT_FOUND를 반환한다")
+    void givenMissingTaskId_whenUpdateTaskTitle_thenReturnsTaskNotFound() throws Exception {
+        // when
+        mockMvc.perform(patch("/api/tasks/{taskId}", 999999L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "taskTitle": "Updated task"
+                                }
+                                """))
+                // then
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("TASK_NOT_FOUND"))
+                .andExpect(jsonPath("$.message").value("Task not found."));
+    }
+
+    @Test
+    @DisplayName("사용자는 taskTitle 없이 작업 제목을 수정할 수 없다")
+    void givenMissingTaskTitle_whenUpdateTaskTitle_thenReturnsValidationFailed() throws Exception {
+        // given
+        long taskId = createTask("Original task");
+
+        // when
+        mockMvc.perform(patch("/api/tasks/{taskId}", taskId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                // then
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.message").value("Validation failed."))
+                .andExpect(jsonPath("$.*", hasSize(2)));
+    }
+
+    @Test
+    @DisplayName("사용자는 null taskTitle로 작업 제목을 수정할 수 없다")
+    void givenNullTaskTitle_whenUpdateTaskTitle_thenReturnsValidationFailed() throws Exception {
+        // given
+        long taskId = createTask("Original task");
+
+        // when
+        mockMvc.perform(patch("/api/tasks/{taskId}", taskId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "taskTitle": null
+                                }
+                                """))
+                // then
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.message").value("Validation failed."))
+                .andExpect(jsonPath("$.*", hasSize(2)));
+    }
+
+    @Test
+    @DisplayName("사용자는 공백 taskTitle로 작업 제목을 수정할 수 없다")
+    void givenBlankTaskTitle_whenUpdateTaskTitle_thenReturnsValidationFailed() throws Exception {
+        // given
+        long taskId = createTask("Original task");
+
+        // when
+        mockMvc.perform(patch("/api/tasks/{taskId}", taskId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "taskTitle": " "
+                                }
+                                """))
+                // then
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.message").value("Validation failed."))
+                .andExpect(jsonPath("$.*", hasSize(2)));
+    }
+
+    @Test
+    @DisplayName("사용자는 request body 없이 작업 제목을 수정할 수 없다")
+    void givenMissingBody_whenUpdateTaskTitle_thenReturnsValidationFailed() throws Exception {
+        // given
+        long taskId = createTask("Original task");
+
+        // when
+        mockMvc.perform(patch("/api/tasks/{taskId}", taskId)
+                        .contentType(MediaType.APPLICATION_JSON))
+                // then
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.message").value("Validation failed."))
+                .andExpect(jsonPath("$.*", hasSize(2)));
+    }
+
+    @Test
+    @DisplayName("사용자는 malformed JSON으로 작업 제목을 수정할 수 없다")
+    void givenMalformedJson_whenUpdateTaskTitle_thenReturnsValidationFailed() throws Exception {
+        // given
+        long taskId = createTask("Original task");
+
+        // when
+        mockMvc.perform(patch("/api/tasks/{taskId}", taskId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"taskTitle\":"))
+                // then
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.message").value("Validation failed."))
+                .andExpect(jsonPath("$.*", hasSize(2)));
+    }
+
+    @Test
+    @DisplayName("숫자가 아닌 taskId로 작업 제목을 수정하면 VALIDATION_FAILED를 반환한다")
+    void givenInvalidTaskIdPathVariable_whenUpdateTaskTitle_thenReturnsValidationFailed() throws Exception {
+        // when
+        mockMvc.perform(patch("/api/tasks/not-a-number")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "taskTitle": "Updated task"
+                                }
+                                """))
+                // then
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.message").value("Validation failed."))
+                .andExpect(jsonPath("$.*", hasSize(2)));
+    }
+
+    @Test
     @DisplayName("DELETE /api/tasks/{taskId}는 request body 없이 작업을 완료하고 completedAt을 기록한다")
     void givenActiveTask_whenCompleteTask_thenReturnsCompletedTaskAndPersistsCompletedAt() throws Exception {
         // given
