@@ -2,6 +2,7 @@ package com.calio.calendar.controller;
 
 import com.calio.calendar.controller.dto.CreateTaskRequest;
 import com.calio.calendar.controller.dto.TaskResponse;
+import com.calio.calendar.controller.dto.UpdateTaskTitleRequest;
 import com.calio.calendar.service.TaskService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -47,5 +48,13 @@ public class TaskController {
     @PatchMapping("/{taskId}/uncomplete")
     public TaskResponse uncompleteTask(@PathVariable Long taskId) {
         return taskService.uncompleteTask(taskId);
+    }
+
+    @PatchMapping("/{taskId}")
+    public TaskResponse updateTaskTitle(
+            @PathVariable Long taskId,
+            @Valid @RequestBody UpdateTaskTitleRequest request
+    ) {
+        return taskService.updateTaskTitle(taskId, request);
     }
 }

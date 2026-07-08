@@ -49,6 +49,10 @@ public class Task extends BaseEntity {
         return completedAt;
     }
 
+    public void updateTitle(String taskTitle) {
+        this.taskTitle = taskTitle;
+    }
+
     public void complete(Instant completedAt) {
         if (completed) {
             return;

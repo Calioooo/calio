@@ -2,6 +2,7 @@ package com.calio.calendar.service;
 
 import com.calio.calendar.controller.dto.CreateTaskRequest;
 import com.calio.calendar.controller.dto.TaskResponse;
+import com.calio.calendar.controller.dto.UpdateTaskTitleRequest;
 import com.calio.calendar.exception.CalioException;
 import com.calio.calendar.exception.ErrorCode;
 import com.calio.calendar.repository.TaskRepository;
@@ -59,6 +60,18 @@ public class TaskService {
     public TaskResponse uncompleteTask(Long taskId) {
         Task task = getTask(taskId);
         task.uncomplete();
+        taskRepository.flush();
+        return TaskResponse.from(task);
+    }
+
+    @Transactional
+    public TaskResponse updateTaskTitle(Long taskId, UpdateTaskTitleRequest request) {
+        Task task = getTask(taskId);
+        if (task.isCompleted()) {
+            throw new CalioException(ErrorCode.COMPLETED_TASK_TITLE_UPDATE_NOT_ALLOWED);
+        }
+
+        task.updateTitle(request.taskTitle());
         taskRepository.flush();
         return TaskResponse.from(task);
     }
