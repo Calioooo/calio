@@ -22,8 +22,8 @@ public class NationalHolidayController {
 
     @GetMapping
     public List<NationalHolidayResponse> getNationalHolidays(
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
+            @RequestParam("from") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam("to") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
     ) {
         return nationalHolidayService.getNationalHolidays(from, to);
     }

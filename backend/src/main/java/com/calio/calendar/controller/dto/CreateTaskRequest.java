@@ -1,5 +1,6 @@
 package com.calio.calendar.controller.dto;
 
+import com.calio.calendar.repository.entity.Account;
 import com.calio.calendar.repository.entity.Task;
 import jakarta.validation.constraints.NotBlank;
 
@@ -9,5 +10,9 @@ public record CreateTaskRequest(
 
     public Task toEntity() {
         return new Task(taskTitle);
+    }
+
+    public Task toEntity(Account account) {
+        return new Task(taskTitle, account);
     }
 }

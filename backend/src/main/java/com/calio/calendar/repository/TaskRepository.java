@@ -3,6 +3,7 @@ package com.calio.calendar.repository;
 import com.calio.calendar.repository.entity.Task;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -14,7 +15,9 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
 
     List<Task> findAllByOrderByTaskIdAsc();
 
-    Page<Task> findByCompletedFalse(Pageable pageable);
+    Page<Task> findByCompletedFalseAndAccount_Id(Long accountId, Pageable pageable);
+
+    Optional<Task> findByTaskIdAndAccount_Id(Long taskId, Long accountId);
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("delete from Task task where task.completed = true and task.completedAt < :cutoff")

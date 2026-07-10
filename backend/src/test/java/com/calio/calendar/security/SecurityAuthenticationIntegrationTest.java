@@ -113,13 +113,22 @@ class SecurityAuthenticationIntegrationTest {
     }
 
     @Test
-    @DisplayName("기존 public API는 Authorization header 없이도 인증 요구 응답으로 바뀌지 않는다")
-    void givenNoAuthorizationHeader_whenRequestExistingPublicApis_thenDoesNotRequireAuthentication()
+    @DisplayName("보호 대상 domain API는 Authorization header가 없으면 AUTH_TOKEN_REQUIRED를 반환한다")
+    void givenNoAuthorizationHeader_whenRequestProtectedDomainApi_thenReturnsRequiredTokenError()
             throws Exception {
         // when, then
         mockMvc.perform(get("/api/tasks"))
-                .andExpect(status().isOk());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value("AUTH_TOKEN_REQUIRED"))
+                .andExpect(jsonPath("$.message").value("Authentication token is required."))
+                .andExpect(jsonPath("$.*", hasSize(2)));
+    }
 
+    @Test
+    @DisplayName("명시된 public API는 Authorization header 없이도 인증 요구 응답으로 바뀌지 않는다")
+    void givenNoAuthorizationHeader_whenRequestPublicApis_thenDoesNotRequireAuthentication()
+            throws Exception {
+        // when, then
         mockMvc.perform(get("/api/national-holidays"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"));

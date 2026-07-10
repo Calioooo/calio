@@ -9,10 +9,15 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static com.calio.calendar.security.TestAccountSupport.currentAccountReference;
 
+import com.calio.calendar.repository.AccountRepository;
 import com.calio.calendar.repository.TagRepository;
+import com.calio.calendar.repository.entity.Account;
 import com.calio.calendar.repository.entity.Tag;
 import com.calio.calendar.repository.entity.TagType;
+import com.calio.calendar.security.AuthenticatedAccountMockMvcTestConfig;
+import com.calio.calendar.security.WithAuthenticatedAccount;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -20,6 +25,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -35,6 +41,8 @@ import tools.jackson.databind.ObjectMapper;
         "spring.jpa.hibernate.ddl-auto=create-drop"
 })
 @AutoConfigureMockMvc
+@WithAuthenticatedAccount
+@Import(AuthenticatedAccountMockMvcTestConfig.class)
 class EventControllerTest {
 
     @Autowired
@@ -45,6 +53,9 @@ class EventControllerTest {
 
     @Autowired
     private TagRepository tagRepository;
+
+    @Autowired
+    private AccountRepository accountRepository;
 
     @BeforeEach
     void setUpDefaultTag() {
@@ -120,7 +131,7 @@ class EventControllerTest {
     @DisplayName("사용자는 CUSTOM tagId를 지정해 일정을 생성하면 해당 태그가 저장된 응답을 받는다")
     void givenCustomTagId_whenCreateEvent_thenStoresSelectedTag() throws Exception {
         // given
-        Tag customTag = tagRepository.save(new Tag(TagType.CUSTOM, "사용자", "#111111"));
+        Tag customTag = tagRepository.save(new Tag(TagType.CUSTOM, "사용자", "#111111", currentAccountReference()));
 
         // when
         mockMvc.perform(post("/api/events")
@@ -181,7 +192,7 @@ class EventControllerTest {
     @DisplayName("사용자는 CUSTOM tagId를 지정해 일정을 수정하면 해당 태그가 저장된 응답을 받는다")
     void givenCustomTagId_whenUpdateEvent_thenStoresSelectedTag() throws Exception {
         // given
-        Tag customTag = tagRepository.save(new Tag(TagType.CUSTOM, "수정 사용자", "#8b5cf6"));
+        Tag customTag = tagRepository.save(new Tag(TagType.CUSTOM, "수정 사용자", "#8b5cf6", currentAccountReference()));
         long eventId = createEvent("Custom update target", "2026-06-19T00:00:00Z", "2026-06-19T01:00:00Z");
 
         // when
@@ -217,6 +228,31 @@ class EventControllerTest {
                                   "tagId": 999999
                                 }
                                 """))
+                // then
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("TAG_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("다른 Account의 CUSTOM tagId로 일정을 생성하면 TAG_NOT_FOUND를 받는다")
+    void givenOtherAccountCustomTagId_whenCreateEvent_thenReturnsTagNotFound() throws Exception {
+        // given
+        Account otherAccount = accountRepository.saveAndFlush(new Account());
+        Tag otherAccountTag = tagRepository.save(
+                new Tag(TagType.CUSTOM, "다른 계정", "#111111", otherAccount)
+        );
+
+        // when
+        mockMvc.perform(post("/api/events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Other account tag",
+                                  "startAt": "2026-06-20T00:00:00Z",
+                                  "endAt": "2026-06-20T01:00:00Z",
+                                  "tagId": %d
+                                }
+                                """.formatted(otherAccountTag.getId())))
                 // then
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorCode").value("TAG_NOT_FOUND"));

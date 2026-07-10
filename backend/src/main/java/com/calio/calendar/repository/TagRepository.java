@@ -14,5 +14,15 @@ public interface TagRepository extends JpaRepository<Tag, Long> {
 
     Optional<Tag> findByIdAndTagType(Long id, TagType tagType);
 
+    List<Tag> findByTagTypeAndAccountIsNullOrderByIdAsc(TagType tagType);
+
+    List<Tag> findByTagTypeAndAccount_IdOrderByIdAsc(TagType tagType, Long accountId);
+
+    Optional<Tag> findByIdAndTagTypeAndAccountIsNull(Long id, TagType tagType);
+
+    Optional<Tag> findByIdAndTagTypeAndAccount_Id(Long id, TagType tagType, Long accountId);
+
     Optional<Tag> findFirstByTagTypeAndTitleOrderByIdAsc(TagType tagType, String title);
+
+    Optional<Tag> findFirstByTagTypeAndTitleAndAccountIsNullOrderByIdAsc(TagType tagType, String title);
 }

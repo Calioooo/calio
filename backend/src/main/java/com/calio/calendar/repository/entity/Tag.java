@@ -8,9 +8,12 @@ import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
 @Entity
@@ -32,13 +35,22 @@ public class Tag extends BaseEntity {
     @AttributeOverride(name = "value", column = @Column(name = "color_code", nullable = false, length = 7))
     private ColorCode colorCode;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "account_id")
+    private Account account;
+
     protected Tag() {
     }
 
     public Tag(TagType tagType, String title, String colorCode) {
+        this(tagType, title, colorCode, null);
+    }
+
+    public Tag(TagType tagType, String title, String colorCode, Account account) {
         this.tagType = tagType;
         this.title = title;
         this.colorCode = new ColorCode(colorCode);
+        this.account = account;
     }
 
     public void update(String title, String colorCode) {
@@ -64,5 +76,9 @@ public class Tag extends BaseEntity {
 
     public String getColorCode() {
         return colorCode.getValue();
+    }
+
+    public Account getAccount() {
+        return account;
     }
 }

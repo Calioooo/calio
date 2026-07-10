@@ -1,6 +1,7 @@
 package com.calio.calendar.controller.dto;
 
 import com.calio.calendar.repository.entity.Event;
+import com.calio.calendar.repository.entity.Account;
 import com.calio.calendar.repository.entity.Tag;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.validation.constraints.NotBlank;
@@ -18,5 +19,9 @@ public record CreateEventRequest(
 
     public Event toEntity(Tag tag) {
         return new Event(title, description, startAt, endAt, null, tag);
+    }
+
+    public Event toEntity(Tag tag, Account account) {
+        return new Event(title, description, startAt, endAt, null, tag, account);
     }
 }

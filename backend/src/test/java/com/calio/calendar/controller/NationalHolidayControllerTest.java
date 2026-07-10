@@ -8,6 +8,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.calio.calendar.repository.EventRepository;
 import com.calio.calendar.repository.NationalHolidayRepository;
+import com.calio.calendar.security.AuthenticatedAccountMockMvcTestConfig;
+import com.calio.calendar.security.WithAuthenticatedAccount;
 import com.calio.calendar.repository.TagRepository;
 import com.calio.calendar.repository.entity.NationalHoliday;
 import com.calio.calendar.repository.entity.Tag;
@@ -19,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -30,6 +33,8 @@ import org.springframework.test.web.servlet.MockMvc;
         "spring.jpa.hibernate.ddl-auto=create-drop"
 })
 @AutoConfigureMockMvc
+@WithAuthenticatedAccount
+@Import(AuthenticatedAccountMockMvcTestConfig.class)
 class NationalHolidayControllerTest {
 
     @Autowired

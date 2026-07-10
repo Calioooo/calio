@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static com.calio.calendar.security.TestAccountSupport.currentAccountReference;
 
 import com.calio.calendar.repository.EventRepository;
 import com.calio.calendar.repository.RecurrenceEventOverrideRepository;
@@ -17,6 +18,8 @@ import com.calio.calendar.repository.entity.Event;
 import com.calio.calendar.repository.entity.RecurrenceEvent;
 import com.calio.calendar.repository.entity.Tag;
 import com.calio.calendar.repository.entity.TagType;
+import com.calio.calendar.security.AuthenticatedAccountMockMvcTestConfig;
+import com.calio.calendar.security.WithAuthenticatedAccount;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
@@ -26,6 +29,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -40,6 +44,8 @@ import tools.jackson.databind.ObjectMapper;
         "spring.jpa.hibernate.ddl-auto=create-drop"
 })
 @AutoConfigureMockMvc
+@WithAuthenticatedAccount
+@Import(AuthenticatedAccountMockMvcTestConfig.class)
 class RecurrenceEventControllerTest {
 
     @Autowired
@@ -155,7 +161,7 @@ class RecurrenceEventControllerTest {
     @DisplayName("사용자는 CUSTOM tagId로 반복 일정을 생성하면 rule과 occurrence에 같은 태그가 저장된다")
     void givenCustomTagId_whenCreateRecurrenceEvent_thenStoresTagOnRuleAndOccurrences() throws Exception {
         // given
-        Tag customTag = tagRepository.save(new Tag(TagType.CUSTOM, "반복 사용자", "#8b5cf6"));
+        Tag customTag = tagRepository.save(new Tag(TagType.CUSTOM, "반복 사용자", "#8b5cf6", currentAccountReference()));
 
         // when
         MvcResult createResult = mockMvc.perform(post("/api/recurrence-events")
@@ -243,7 +249,7 @@ class RecurrenceEventControllerTest {
             throws Exception {
         // given
         Tag originalTag = tagRepository.save(new Tag(TagType.DEFAULT, "원래 태그", "#10B981"));
-        Tag updatedTag = tagRepository.save(new Tag(TagType.CUSTOM, "변경 태그", "#F59E0B"));
+        Tag updatedTag = tagRepository.save(new Tag(TagType.CUSTOM, "변경 태그", "#F59E0B", currentAccountReference()));
         long recurrenceId = createRecurrenceEventWithTag(
                 "Change tag recurrence",
                 "2026-11-15",
@@ -790,7 +796,7 @@ class RecurrenceEventControllerTest {
     @DisplayName("반복 occurrence 단독 수정은 occurrence Event의 기존 태그를 변경하지 않는다")
     void givenTaggedOccurrence_whenPatchRecurrenceOccurrence_thenPreservesEventTag() throws Exception {
         // given
-        Tag workTag = tagRepository.save(new Tag(TagType.CUSTOM, "occurrence 보존", "#2563EB"));
+        Tag workTag = tagRepository.save(new Tag(TagType.CUSTOM, "occurrence 보존", "#2563EB", currentAccountReference()));
         long recurrenceId = createRecurrenceEventWithTag(
                 "Tagged occurrence preserve",
                 "2026-12-11",

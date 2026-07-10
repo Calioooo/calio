@@ -1,5 +1,6 @@
 package com.calio.calendar.controller.dto;
 
+import com.calio.calendar.repository.entity.Account;
 import com.calio.calendar.repository.entity.RecurrenceEvent;
 import com.calio.calendar.repository.entity.RecurrenceFrequency;
 import com.calio.calendar.repository.entity.Tag;
@@ -31,6 +32,20 @@ public record CreateRecurrenceEventRequest(
                 recurrenceEndTime,
                 recurrenceFrequency,
                 tag
+        );
+    }
+
+    public RecurrenceEvent toEntity(Tag tag, Account account) {
+        return new RecurrenceEvent(
+                recurrenceTitle,
+                recurrenceDescription,
+                recurrenceStartDate,
+                recurrenceEndDate,
+                recurrenceStartTime,
+                recurrenceEndTime,
+                recurrenceFrequency,
+                tag,
+                account
         );
     }
 }
