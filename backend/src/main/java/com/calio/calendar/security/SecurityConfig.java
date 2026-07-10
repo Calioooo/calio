@@ -1,5 +1,6 @@
 package com.calio.calendar.security;
 
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -44,5 +45,13 @@ public class SecurityConfig {
                 )
                 .addFilterBefore(bearerTokenAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
+    }
+
+    @Bean
+    public FilterRegistrationBean<BearerTokenAuthenticationFilter> bearerTokenFilterRegistration() {
+        FilterRegistrationBean<BearerTokenAuthenticationFilter> registration = new FilterRegistrationBean<>();
+        registration.setFilter(bearerTokenAuthenticationFilter);
+        registration.setEnabled(false);
+        return registration;
     }
 }
