@@ -15,14 +15,9 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final BearerTokenAuthenticationFilter bearerTokenAuthenticationFilter;
-    private final CalioAuthenticationEntryPoint authenticationEntryPoint;
 
-    public SecurityConfig(
-            BearerTokenAuthenticationFilter bearerTokenAuthenticationFilter,
-            CalioAuthenticationEntryPoint authenticationEntryPoint
-    ) {
+    public SecurityConfig(BearerTokenAuthenticationFilter bearerTokenAuthenticationFilter) {
         this.bearerTokenAuthenticationFilter = bearerTokenAuthenticationFilter;
-        this.authenticationEntryPoint = authenticationEntryPoint;
     }
 
     @Bean
@@ -33,7 +28,6 @@ public class SecurityConfig {
                 .formLogin(AbstractHttpConfigurer::disable)
                 .logout(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .exceptionHandling(exception -> exception.authenticationEntryPoint(authenticationEntryPoint))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST, "/api/auth/anonymous").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/national-holidays").permitAll()
