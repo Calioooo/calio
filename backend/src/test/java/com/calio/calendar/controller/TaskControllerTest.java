@@ -3,6 +3,7 @@ package com.calio.calendar.controller;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.nullValue;
+import static com.calio.calendar.security.TestAccountSupport.currentAccountReference;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -12,6 +13,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.calio.calendar.repository.TaskRepository;
 import com.calio.calendar.repository.entity.Task;
+import com.calio.calendar.security.AuthenticatedAccountMockMvcTestConfig;
+import com.calio.calendar.security.WithAuthenticatedAccount;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,6 +23,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -34,6 +38,8 @@ import tools.jackson.databind.ObjectMapper;
         "spring.jpa.hibernate.ddl-auto=create-drop"
 })
 @AutoConfigureMockMvc
+@WithAuthenticatedAccount
+@Import(AuthenticatedAccountMockMvcTestConfig.class)
 class TaskControllerTest {
 
     @Autowired
@@ -482,7 +488,7 @@ class TaskControllerTest {
     }
 
     private Task saveCompletedTask(String taskTitle, Instant completedAt) {
-        Task task = new Task(taskTitle);
+        Task task = new Task(taskTitle, currentAccountReference());
         task.complete(completedAt);
         return taskRepository.saveAndFlush(task);
     }

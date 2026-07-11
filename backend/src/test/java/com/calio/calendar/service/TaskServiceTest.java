@@ -2,7 +2,9 @@ package com.calio.calendar.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.calio.calendar.repository.AccountRepository;
 import com.calio.calendar.repository.TaskRepository;
+import com.calio.calendar.repository.entity.Account;
 import com.calio.calendar.repository.entity.Task;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -27,9 +29,16 @@ class TaskServiceTest {
     @Autowired
     private TaskRepository taskRepository;
 
+    @Autowired
+    private AccountRepository accountRepository;
+
+    private Account account;
+
     @BeforeEach
     void setUp() {
         taskRepository.deleteAll();
+        accountRepository.deleteAll();
+        account = accountRepository.saveAndFlush(new Account());
     }
 
     @Test
@@ -39,7 +48,7 @@ class TaskServiceTest {
         Instant now = Instant.parse("2026-07-06T00:00:00Z");
         Task oldCompletedTask = saveCompletedTask("Old completed", now.minus(31, ChronoUnit.DAYS));
         Task recentCompletedTask = saveCompletedTask("Recent completed", now.minus(29, ChronoUnit.DAYS));
-        Task activeTask = taskRepository.saveAndFlush(new Task("Active task"));
+        Task activeTask = taskRepository.saveAndFlush(new Task("Active task", account));
 
         // when
         int deletedCount = taskService.deleteCompletedTasksOlderThan(now.minus(30, ChronoUnit.DAYS));
@@ -52,7 +61,7 @@ class TaskServiceTest {
     }
 
     private Task saveCompletedTask(String taskTitle, Instant completedAt) {
-        Task task = new Task(taskTitle);
+        Task task = new Task(taskTitle, account);
         task.complete(completedAt);
         return taskRepository.saveAndFlush(task);
     }

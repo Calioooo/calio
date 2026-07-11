@@ -14,9 +14,11 @@ import com.calio.calendar.controller.dto.UpdateRecurrenceEventRequest;
 import com.calio.calendar.controller.dto.UpdateRecurrenceOccurrenceRequest;
 import com.calio.calendar.exception.CalioException;
 import com.calio.calendar.exception.ErrorCode;
+import com.calio.calendar.repository.AccountRepository;
 import com.calio.calendar.repository.EventRepository;
 import com.calio.calendar.repository.RecurrenceEventOverrideRepository;
 import com.calio.calendar.repository.RecurrenceEventRepository;
+import com.calio.calendar.repository.entity.Account;
 import com.calio.calendar.repository.entity.Event;
 import com.calio.calendar.repository.entity.RecurrenceEventOverride;
 import com.calio.calendar.repository.entity.RecurrenceEvent;
@@ -51,6 +53,9 @@ class RecurrenceEventServiceTest {
     private RecurrenceEventOverrideRepository recurrenceEventOverrideRepository;
 
     @Mock
+    private AccountRepository accountRepository;
+
+    @Mock
     private TagService tagService;
 
     @InjectMocks
@@ -62,7 +67,7 @@ class RecurrenceEventServiceTest {
     void givenResolvedTag_whenCreateRecurrenceEvent_thenStoresTagOnRuleAndOccurrences() {
         // given
         Tag tag = tag("업무", "#2563EB");
-        when(tagService.getTagOrDefault(5L)).thenReturn(tag);
+        when(tagService.getTagOrDefault(1L, 5L)).thenReturn(tag);
         when(recurrenceEventRepository.save(any(RecurrenceEvent.class)))
                 .thenAnswer(invocation -> {
                     RecurrenceEvent recurrenceEvent = invocation.getArgument(0);
@@ -82,7 +87,7 @@ class RecurrenceEventServiceTest {
         );
 
         // when
-        recurrenceEventService.createRecurrenceEvent(request);
+        recurrenceEventService.createRecurrenceEvent(1L, request);
 
         // then
         ArgumentCaptor<RecurrenceEvent> recurrenceCaptor = ArgumentCaptor.forClass(RecurrenceEvent.class);
@@ -107,8 +112,8 @@ class RecurrenceEventServiceTest {
                 "2026-11-02",
                 RecurrenceFrequency.DAILY
         );
-        when(recurrenceEventRepository.findById(1L)).thenReturn(Optional.of(recurrenceEvent));
-        when(eventRepository.findByRecurrenceIdAndDeletedAtIsNullOrderByStartAtAsc(1L)).thenReturn(List.of());
+        when(recurrenceEventRepository.findByIdAndAccount_Id(1L, 1L)).thenReturn(Optional.of(recurrenceEvent));
+        when(eventRepository.findByRecurrenceIdAndAccount_IdAndDeletedAtIsNullOrderByStartAtAsc(1L, 1L)).thenReturn(List.of());
 
         UpdateRecurrenceEventRequest request = new UpdateRecurrenceEventRequest(
                 "Updated",
@@ -119,7 +124,7 @@ class RecurrenceEventServiceTest {
         );
 
         // when
-        recurrenceEventService.updateRecurrenceEvent(1L, request);
+        recurrenceEventService.updateRecurrenceEvent(1L, 1L, request);
 
         // then
         assertThat(recurrenceEvent.getRecurrenceTitle()).isEqualTo("Updated");
@@ -144,8 +149,8 @@ class RecurrenceEventServiceTest {
                 preservedTag
         );
         Event retained = event("Old", "2027-01-01T09:00:00Z", "2027-01-01T10:00:00Z", 1L);
-        when(recurrenceEventRepository.findById(1L)).thenReturn(Optional.of(recurrenceEvent));
-        when(eventRepository.findByRecurrenceIdAndDeletedAtIsNullOrderByStartAtAsc(1L)).thenReturn(List.of(retained));
+        when(recurrenceEventRepository.findByIdAndAccount_Id(1L, 1L)).thenReturn(Optional.of(recurrenceEvent));
+        when(eventRepository.findByRecurrenceIdAndAccount_IdAndDeletedAtIsNullOrderByStartAtAsc(1L, 1L)).thenReturn(List.of(retained));
 
         UpdateRecurrenceEventRequest request = new UpdateRecurrenceEventRequest(
                 "Updated",
@@ -157,7 +162,7 @@ class RecurrenceEventServiceTest {
         );
 
         // when
-        recurrenceEventService.updateRecurrenceEvent(1L, request);
+        recurrenceEventService.updateRecurrenceEvent(1L, 1L, request);
 
         // then
         ArgumentCaptor<Iterable<Event>> saveCaptor = ArgumentCaptor.forClass(Iterable.class);
@@ -186,9 +191,9 @@ class RecurrenceEventServiceTest {
                 originalTag
         );
         Event retained = event("Old", "2027-01-01T09:00:00Z", "2027-01-01T10:00:00Z", 1L, originalTag);
-        when(recurrenceEventRepository.findById(1L)).thenReturn(Optional.of(recurrenceEvent));
-        when(tagService.getTag(7L)).thenReturn(updatedTag);
-        when(eventRepository.findByRecurrenceIdAndDeletedAtIsNullOrderByStartAtAsc(1L)).thenReturn(List.of(retained));
+        when(recurrenceEventRepository.findByIdAndAccount_Id(1L, 1L)).thenReturn(Optional.of(recurrenceEvent));
+        when(tagService.getTag(1L, 7L)).thenReturn(updatedTag);
+        when(eventRepository.findByRecurrenceIdAndAccount_IdAndDeletedAtIsNullOrderByStartAtAsc(1L, 1L)).thenReturn(List.of(retained));
 
         UpdateRecurrenceEventRequest request = new UpdateRecurrenceEventRequest(
                 null,
@@ -200,7 +205,7 @@ class RecurrenceEventServiceTest {
         );
 
         // when
-        recurrenceEventService.updateRecurrenceEvent(1L, request);
+        recurrenceEventService.updateRecurrenceEvent(1L, 1L, request);
 
         // then
         ArgumentCaptor<Iterable<Event>> saveCaptor = ArgumentCaptor.forClass(Iterable.class);
@@ -223,7 +228,7 @@ class RecurrenceEventServiceTest {
                 "2026-12-01",
                 RecurrenceFrequency.DAILY
         );
-        when(recurrenceEventRepository.findById(1L)).thenReturn(Optional.of(recurrenceEvent));
+        when(recurrenceEventRepository.findByIdAndAccount_Id(1L, 1L)).thenReturn(Optional.of(recurrenceEvent));
 
         UpdateRecurrenceEventRequest request = new UpdateRecurrenceEventRequest(
                 null,
@@ -234,7 +239,7 @@ class RecurrenceEventServiceTest {
         );
 
         // when, then
-        assertThatThrownBy(() -> recurrenceEventService.updateRecurrenceEvent(1L, request))
+        assertThatThrownBy(() -> recurrenceEventService.updateRecurrenceEvent(1L, 1L, request))
                 .isInstanceOfSatisfying(CalioException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.RECURRENCE_UPDATE_TIME_RANGE_INVALID)
                 );
@@ -251,8 +256,8 @@ class RecurrenceEventServiceTest {
                 "2026-12-02",
                 RecurrenceFrequency.DAILY
         );
-        when(recurrenceEventRepository.findById(1L)).thenReturn(Optional.of(recurrenceEvent));
-        when(eventRepository.findByRecurrenceIdAndDeletedAtIsNullOrderByStartAtAsc(1L)).thenReturn(List.of());
+        when(recurrenceEventRepository.findByIdAndAccount_Id(1L, 1L)).thenReturn(Optional.of(recurrenceEvent));
+        when(eventRepository.findByRecurrenceIdAndAccount_IdAndDeletedAtIsNullOrderByStartAtAsc(1L, 1L)).thenReturn(List.of());
 
         UpdateRecurrenceEventRequest request = new UpdateRecurrenceEventRequest(
                 null,
@@ -263,7 +268,7 @@ class RecurrenceEventServiceTest {
         );
 
         // when
-        recurrenceEventService.updateRecurrenceEvent(1L, request);
+        recurrenceEventService.updateRecurrenceEvent(1L, 1L, request);
 
         // then
         assertThat(recurrenceEvent.getRecurrenceStartTime()).isEqualTo(LocalTime.parse("23:00:00"));
@@ -274,11 +279,11 @@ class RecurrenceEventServiceTest {
     @DisplayName("반복 일정 전체 수정은 존재하지 않는 recurrenceId면 RECURRENCE_EVENT_NOT_FOUND를 반환한다")
     void givenMissingRecurrenceId_whenUpdateRecurrenceEvent_thenThrowsRecurrenceEventNotFound() {
         // given
-        when(recurrenceEventRepository.findById(999L)).thenReturn(Optional.empty());
+        when(recurrenceEventRepository.findByIdAndAccount_Id(999L, 1L)).thenReturn(Optional.empty());
         UpdateRecurrenceEventRequest request = new UpdateRecurrenceEventRequest(null, null, null, null, null);
 
         // when, then
-        assertThatThrownBy(() -> recurrenceEventService.updateRecurrenceEvent(999L, request))
+        assertThatThrownBy(() -> recurrenceEventService.updateRecurrenceEvent(1L, 999L, request))
                 .isInstanceOfSatisfying(CalioException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.RECURRENCE_EVENT_NOT_FOUND)
                 );
@@ -298,8 +303,8 @@ class RecurrenceEventServiceTest {
         Event event = event("Original occurrence", "2027-02-01T09:00:00Z", "2027-02-01T10:00:00Z", 1L);
         ReflectionTestUtils.setField(event, "id", 10L);
 
-        when(recurrenceEventRepository.findById(1L)).thenReturn(Optional.of(recurrenceEvent));
-        when(eventRepository.findById(10L)).thenReturn(Optional.of(event));
+        when(recurrenceEventRepository.findByIdAndAccount_Id(1L, 1L)).thenReturn(Optional.of(recurrenceEvent));
+        when(eventRepository.findByIdAndAccount_IdAndDeletedAtIsNull(10L, 1L)).thenReturn(Optional.of(event));
         when(recurrenceEventOverrideRepository.findByEventId(10L)).thenReturn(Optional.empty());
         when(recurrenceEventOverrideRepository.save(any(RecurrenceEventOverride.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -313,7 +318,7 @@ class RecurrenceEventServiceTest {
         );
 
         // when
-        EventResponse response = recurrenceEventService.updateRecurrenceOccurrence(1L, 10L, request);
+        EventResponse response = recurrenceEventService.updateRecurrenceOccurrence(1L, 1L, 10L, request);
 
         // then
         assertThat(response.title()).isEqualTo("Updated occurrence");
@@ -340,8 +345,8 @@ class RecurrenceEventServiceTest {
         );
         Event event = event("Occurrence", "2027-02-11T09:00:00Z", "2027-02-11T10:00:00Z", 1L, tag);
 
-        when(recurrenceEventRepository.findById(1L)).thenReturn(Optional.of(recurrenceEvent));
-        when(eventRepository.findById(10L)).thenReturn(Optional.of(event));
+        when(recurrenceEventRepository.findByIdAndAccount_Id(1L, 1L)).thenReturn(Optional.of(recurrenceEvent));
+        when(eventRepository.findByIdAndAccount_IdAndDeletedAtIsNull(10L, 1L)).thenReturn(Optional.of(event));
         when(recurrenceEventOverrideRepository.findByEventId(10L)).thenReturn(Optional.empty());
         when(recurrenceEventOverrideRepository.save(any(RecurrenceEventOverride.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -355,7 +360,7 @@ class RecurrenceEventServiceTest {
         );
 
         // when
-        EventResponse response = recurrenceEventService.updateRecurrenceOccurrence(1L, 10L, request);
+        EventResponse response = recurrenceEventService.updateRecurrenceOccurrence(1L, 1L, 10L, request);
 
         // then
         assertThat(event.getTag()).isSameAs(tag);
@@ -376,13 +381,13 @@ class RecurrenceEventServiceTest {
         );
         Event event = event("Other occurrence", "2027-03-01T09:00:00Z", "2027-03-01T10:00:00Z", 2L);
 
-        when(recurrenceEventRepository.findById(1L)).thenReturn(Optional.of(recurrenceEvent));
-        when(eventRepository.findById(10L)).thenReturn(Optional.of(event));
+        when(recurrenceEventRepository.findByIdAndAccount_Id(1L, 1L)).thenReturn(Optional.of(recurrenceEvent));
+        when(eventRepository.findByIdAndAccount_IdAndDeletedAtIsNull(10L, 1L)).thenReturn(Optional.of(event));
 
         UpdateRecurrenceOccurrenceRequest request = new UpdateRecurrenceOccurrenceRequest(null, null, null, null, null);
 
         // when, then
-        assertThatThrownBy(() -> recurrenceEventService.updateRecurrenceOccurrence(1L, 10L, request))
+        assertThatThrownBy(() -> recurrenceEventService.updateRecurrenceOccurrence(1L, 1L, 10L, request))
                 .isInstanceOfSatisfying(CalioException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.RECURRENCE_OCCURRENCE_NOT_FOUND)
                 );
@@ -401,13 +406,13 @@ class RecurrenceEventServiceTest {
         );
         Event event = event("Normal event", "2027-03-11T09:00:00Z", "2027-03-11T10:00:00Z", null);
 
-        when(recurrenceEventRepository.findById(1L)).thenReturn(Optional.of(recurrenceEvent));
-        when(eventRepository.findById(10L)).thenReturn(Optional.of(event));
+        when(recurrenceEventRepository.findByIdAndAccount_Id(1L, 1L)).thenReturn(Optional.of(recurrenceEvent));
+        when(eventRepository.findByIdAndAccount_IdAndDeletedAtIsNull(10L, 1L)).thenReturn(Optional.of(event));
 
         UpdateRecurrenceOccurrenceRequest request = new UpdateRecurrenceOccurrenceRequest(null, null, null, null, null);
 
         // when, then
-        assertThatThrownBy(() -> recurrenceEventService.updateRecurrenceOccurrence(1L, 10L, request))
+        assertThatThrownBy(() -> recurrenceEventService.updateRecurrenceOccurrence(1L, 1L, 10L, request))
                 .isInstanceOfSatisfying(CalioException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.RECURRENCE_OCCURRENCE_NOT_FOUND)
                 );
@@ -424,13 +429,13 @@ class RecurrenceEventServiceTest {
                 "2027-04-02",
                 RecurrenceFrequency.DAILY
         );
-        when(recurrenceEventRepository.findById(1L)).thenReturn(Optional.of(recurrenceEvent));
-        when(eventRepository.findById(999L)).thenReturn(Optional.empty());
+        when(recurrenceEventRepository.findByIdAndAccount_Id(1L, 1L)).thenReturn(Optional.of(recurrenceEvent));
+        when(eventRepository.findByIdAndAccount_IdAndDeletedAtIsNull(999L, 1L)).thenReturn(Optional.empty());
 
         UpdateRecurrenceOccurrenceRequest request = new UpdateRecurrenceOccurrenceRequest(null, null, null, null, null);
 
         // when, then
-        assertThatThrownBy(() -> recurrenceEventService.updateRecurrenceOccurrence(1L, 999L, request))
+        assertThatThrownBy(() -> recurrenceEventService.updateRecurrenceOccurrence(1L, 1L, 999L, request))
                 .isInstanceOfSatisfying(CalioException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.EVENT_NOT_FOUND)
                 );
@@ -452,11 +457,11 @@ class RecurrenceEventServiceTest {
         Instant originalStartAt = event.getStartAt();
         Instant originalEndAt = event.getEndAt();
 
-        when(recurrenceEventRepository.findById(1L)).thenReturn(Optional.of(recurrenceEvent));
-        when(eventRepository.findById(10L)).thenReturn(Optional.of(event));
+        when(recurrenceEventRepository.findByIdAndAccount_Id(1L, 1L)).thenReturn(Optional.of(recurrenceEvent));
+        when(eventRepository.findByIdAndAccount_Id(10L, 1L)).thenReturn(Optional.of(event));
 
         // when
-        recurrenceEventService.deleteRecurrenceOccurrence(1L, 10L);
+        recurrenceEventService.deleteRecurrenceOccurrence(1L, 1L, 10L);
 
         // then
         assertThat(event.getDeletedAt()).isNotNull();
@@ -483,11 +488,11 @@ class RecurrenceEventServiceTest {
         Instant existingDeletedAt = Instant.parse("2027-04-21T12:00:00Z");
         event.softDelete(existingDeletedAt);
 
-        when(recurrenceEventRepository.findById(1L)).thenReturn(Optional.of(recurrenceEvent));
-        when(eventRepository.findById(10L)).thenReturn(Optional.of(event));
+        when(recurrenceEventRepository.findByIdAndAccount_Id(1L, 1L)).thenReturn(Optional.of(recurrenceEvent));
+        when(eventRepository.findByIdAndAccount_Id(10L, 1L)).thenReturn(Optional.of(event));
 
         // when
-        recurrenceEventService.deleteRecurrenceOccurrence(1L, 10L);
+        recurrenceEventService.deleteRecurrenceOccurrence(1L, 1L, 10L);
 
         // then
         assertThat(event.getDeletedAt()).isEqualTo(existingDeletedAt);
@@ -499,14 +504,14 @@ class RecurrenceEventServiceTest {
     @DisplayName("반복 occurrence 삭제는 recurrenceId를 먼저 확인하고 없으면 event를 조회하지 않는다")
     void givenMissingRecurrenceId_whenDeleteRecurrenceOccurrence_thenThrowsRecurrenceEventNotFound() {
         // given
-        when(recurrenceEventRepository.findById(999L)).thenReturn(Optional.empty());
+        when(recurrenceEventRepository.findByIdAndAccount_Id(999L, 1L)).thenReturn(Optional.empty());
 
         // when, then
-        assertThatThrownBy(() -> recurrenceEventService.deleteRecurrenceOccurrence(999L, 10L))
+        assertThatThrownBy(() -> recurrenceEventService.deleteRecurrenceOccurrence(1L, 999L, 10L))
                 .isInstanceOfSatisfying(CalioException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.RECURRENCE_EVENT_NOT_FOUND)
                 );
-        verify(eventRepository, never()).findById(10L);
+        verify(eventRepository, never()).findByIdAndAccount_Id(10L, 1L);
         verifyNoInteractions(recurrenceEventOverrideRepository);
     }
 
@@ -521,11 +526,11 @@ class RecurrenceEventServiceTest {
                 "2027-04-22",
                 RecurrenceFrequency.DAILY
         );
-        when(recurrenceEventRepository.findById(1L)).thenReturn(Optional.of(recurrenceEvent));
-        when(eventRepository.findById(999L)).thenReturn(Optional.empty());
+        when(recurrenceEventRepository.findByIdAndAccount_Id(1L, 1L)).thenReturn(Optional.of(recurrenceEvent));
+        when(eventRepository.findByIdAndAccount_Id(999L, 1L)).thenReturn(Optional.empty());
 
         // when, then
-        assertThatThrownBy(() -> recurrenceEventService.deleteRecurrenceOccurrence(1L, 999L))
+        assertThatThrownBy(() -> recurrenceEventService.deleteRecurrenceOccurrence(1L, 1L, 999L))
                 .isInstanceOfSatisfying(CalioException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.EVENT_NOT_FOUND)
                 );
@@ -545,11 +550,11 @@ class RecurrenceEventServiceTest {
         );
         Event event = event("Other occurrence", "2027-04-23T09:00:00Z", "2027-04-23T10:00:00Z", 2L);
 
-        when(recurrenceEventRepository.findById(1L)).thenReturn(Optional.of(recurrenceEvent));
-        when(eventRepository.findById(10L)).thenReturn(Optional.of(event));
+        when(recurrenceEventRepository.findByIdAndAccount_Id(1L, 1L)).thenReturn(Optional.of(recurrenceEvent));
+        when(eventRepository.findByIdAndAccount_Id(10L, 1L)).thenReturn(Optional.of(event));
 
         // when, then
-        assertThatThrownBy(() -> recurrenceEventService.deleteRecurrenceOccurrence(1L, 10L))
+        assertThatThrownBy(() -> recurrenceEventService.deleteRecurrenceOccurrence(1L, 1L, 10L))
                 .isInstanceOfSatisfying(CalioException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.RECURRENCE_OCCURRENCE_NOT_FOUND)
                 );
@@ -570,11 +575,11 @@ class RecurrenceEventServiceTest {
         );
         Event event = event("Normal event", "2027-04-24T09:00:00Z", "2027-04-24T10:00:00Z", null);
 
-        when(recurrenceEventRepository.findById(1L)).thenReturn(Optional.of(recurrenceEvent));
-        when(eventRepository.findById(10L)).thenReturn(Optional.of(event));
+        when(recurrenceEventRepository.findByIdAndAccount_Id(1L, 1L)).thenReturn(Optional.of(recurrenceEvent));
+        when(eventRepository.findByIdAndAccount_Id(10L, 1L)).thenReturn(Optional.of(event));
 
         // when, then
-        assertThatThrownBy(() -> recurrenceEventService.deleteRecurrenceOccurrence(1L, 10L))
+        assertThatThrownBy(() -> recurrenceEventService.deleteRecurrenceOccurrence(1L, 1L, 10L))
                 .isInstanceOfSatisfying(CalioException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.RECURRENCE_OCCURRENCE_NOT_FOUND)
                 );
@@ -596,14 +601,14 @@ class RecurrenceEventServiceTest {
         Event event = event("Occurrence", "2027-05-01T09:00:00Z", "2027-05-01T10:00:00Z", 1L);
         RecurrenceEventOverride override = new RecurrenceEventOverride(10L);
 
-        when(recurrenceEventRepository.findById(1L)).thenReturn(Optional.of(recurrenceEvent));
-        when(eventRepository.findById(10L)).thenReturn(Optional.of(event));
+        when(recurrenceEventRepository.findByIdAndAccount_Id(1L, 1L)).thenReturn(Optional.of(recurrenceEvent));
+        when(eventRepository.findByIdAndAccount_IdAndDeletedAtIsNull(10L, 1L)).thenReturn(Optional.of(event));
         when(recurrenceEventOverrideRepository.findByEventId(10L)).thenReturn(Optional.of(override));
 
         UpdateRecurrenceOccurrenceRequest request = new UpdateRecurrenceOccurrenceRequest("Updated", null, null, null, null);
 
         // when
-        recurrenceEventService.updateRecurrenceOccurrence(1L, 10L, request);
+        recurrenceEventService.updateRecurrenceOccurrence(1L, 1L, 10L, request);
 
         // then
         verify(recurrenceEventOverrideRepository, never()).save(any(RecurrenceEventOverride.class));
@@ -623,8 +628,8 @@ class RecurrenceEventServiceTest {
         Event event = event("Occurrence", "2027-06-01T09:00:00Z", "2027-06-01T10:00:00Z", 1L);
         RecurrenceEventOverride override = new RecurrenceEventOverride(10L);
 
-        when(recurrenceEventRepository.findById(1L)).thenReturn(Optional.of(recurrenceEvent));
-        when(eventRepository.findById(10L)).thenReturn(Optional.of(event));
+        when(recurrenceEventRepository.findByIdAndAccount_Id(1L, 1L)).thenReturn(Optional.of(recurrenceEvent));
+        when(eventRepository.findByIdAndAccount_IdAndDeletedAtIsNull(10L, 1L)).thenReturn(Optional.of(event));
         when(recurrenceEventOverrideRepository.findByEventId(10L))
                 .thenReturn(Optional.empty())
                 .thenReturn(Optional.of(override));
@@ -634,7 +639,7 @@ class RecurrenceEventServiceTest {
         UpdateRecurrenceOccurrenceRequest request = new UpdateRecurrenceOccurrenceRequest("Updated", null, null, null, null);
 
         // when
-        recurrenceEventService.updateRecurrenceOccurrence(1L, 10L, request);
+        recurrenceEventService.updateRecurrenceOccurrence(1L, 1L, 10L, request);
 
         // then
         verify(recurrenceEventOverrideRepository).save(any(RecurrenceEventOverride.class));
@@ -657,8 +662,8 @@ class RecurrenceEventServiceTest {
         Event retainedSecond = event("Old", "2027-01-02T09:00:00Z", "2027-01-02T10:00:00Z", 1L);
         Event stale = event("Stale", "2027-01-09T09:00:00Z", "2027-01-09T10:00:00Z", 1L);
 
-        when(recurrenceEventRepository.findById(1L)).thenReturn(Optional.of(recurrenceEvent));
-        when(eventRepository.findByRecurrenceIdAndDeletedAtIsNullOrderByStartAtAsc(1L))
+        when(recurrenceEventRepository.findByIdAndAccount_Id(1L, 1L)).thenReturn(Optional.of(recurrenceEvent));
+        when(eventRepository.findByRecurrenceIdAndAccount_IdAndDeletedAtIsNullOrderByStartAtAsc(1L, 1L))
                 .thenReturn(List.of(retainedFirst, retainedSecond, stale));
 
         UpdateRecurrenceEventRequest request = new UpdateRecurrenceEventRequest(
@@ -670,7 +675,7 @@ class RecurrenceEventServiceTest {
         );
 
         // when
-        recurrenceEventService.updateRecurrenceEvent(1L, request);
+        recurrenceEventService.updateRecurrenceEvent(1L, 1L, request);
 
         // then
         ArgumentCaptor<Iterable<Event>> deleteCaptor = ArgumentCaptor.forClass(Iterable.class);
@@ -719,7 +724,8 @@ class RecurrenceEventServiceTest {
                 LocalTime.parse("09:00:00"),
                 LocalTime.parse("10:00:00"),
                 recurrenceFrequency,
-                tag
+                tag,
+                account()
         );
         ReflectionTestUtils.setField(recurrenceEvent, "id", 1L);
         return recurrenceEvent;
@@ -730,10 +736,16 @@ class RecurrenceEventServiceTest {
     }
 
     private Event event(String title, String startAt, String endAt, Long recurrenceId, Tag tag) {
-        return new Event(title, null, Instant.parse(startAt), Instant.parse(endAt), recurrenceId, tag);
+        return new Event(title, null, Instant.parse(startAt), Instant.parse(endAt), recurrenceId, tag, account());
     }
 
     private Tag tag(String title, String colorCode) {
         return new Tag(TagType.DEFAULT, title, colorCode);
+    }
+
+    private Account account() {
+        Account account = new Account();
+        ReflectionTestUtils.setField(account, "id", 1L);
+        return account;
     }
 }
