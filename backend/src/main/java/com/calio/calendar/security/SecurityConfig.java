@@ -47,7 +47,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/tags").authenticated()
                         .requestMatchers("/api/custom-tags").authenticated()
                         .requestMatchers("/api/custom-tags/**").authenticated()
-                        .anyRequest().permitAll()
+                        .anyRequest().denyAll()
                 )
                 .exceptionHandling(exception -> exception.authenticationEntryPoint(
                         (request, response, authException) ->

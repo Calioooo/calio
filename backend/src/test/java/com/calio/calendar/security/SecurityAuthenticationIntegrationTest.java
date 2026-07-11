@@ -104,7 +104,7 @@ class SecurityAuthenticationIntegrationTest {
         accountAuthTokenRepository.saveAndFlush(new AccountAuthToken(account, accessTokenEncoder.hash(rawToken)));
 
         // when
-        mockMvc.perform(get("/api/security-test/authenticated-account")
+        mockMvc.perform(get("/api/tasks/security-test/authenticated-account")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + rawToken))
                 // then
                 .andExpect(status().isOk())
@@ -137,7 +137,7 @@ class SecurityAuthenticationIntegrationTest {
     @RestController
     static class SecurityTestController {
 
-        @GetMapping("/api/security-test/authenticated-account")
+        @GetMapping("/api/tasks/security-test/authenticated-account")
         Map<String, Object> getAuthenticatedAccount(Authentication authentication) {
             AuthenticatedAccount principal = (AuthenticatedAccount) authentication.getPrincipal();
             return Map.of(
