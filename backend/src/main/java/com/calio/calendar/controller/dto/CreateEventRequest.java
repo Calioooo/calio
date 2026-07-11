@@ -16,11 +16,6 @@ public record CreateEventRequest(
         @NotNull(message = "이벤트 종료 시각은 필수입니다.") Instant endAt,
         Long tagId
 ) {
-
-    public Event toEntity(Tag tag) {
-        return new Event(title, description, startAt, endAt, null, tag);
-    }
-
     public Event toEntity(Tag tag, Account account) {
         return new Event(title, description, startAt, endAt, null, tag, account);
     }

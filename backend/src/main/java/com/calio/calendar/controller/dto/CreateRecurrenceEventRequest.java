@@ -21,20 +21,6 @@ public record CreateRecurrenceEventRequest(
         @NotNull(message = "반복 일정 주기는 필수입니다.") RecurrenceFrequency recurrenceFrequency,
         Long tagId
 ) {
-
-    public RecurrenceEvent toEntity(Tag tag) {
-        return new RecurrenceEvent(
-                recurrenceTitle,
-                recurrenceDescription,
-                recurrenceStartDate,
-                recurrenceEndDate,
-                recurrenceStartTime,
-                recurrenceEndTime,
-                recurrenceFrequency,
-                tag
-        );
-    }
-
     public RecurrenceEvent toEntity(Tag tag, Account account) {
         return new RecurrenceEvent(
                 recurrenceTitle,
