@@ -42,27 +42,32 @@ public class Event extends BaseEntity {
     private Instant deletedAt;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "account_id", nullable = false)
+    private Account account;
+
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "tag_id", nullable = false)
     private Tag tag;
 
     protected Event() {
     }
 
-    public Event(String title, String description, Instant startAt, Instant endAt) {
-        this(title, description, startAt, endAt, null);
-    }
-
-    public Event(String title, String description, Instant startAt, Instant endAt, Long recurrenceId) {
-        this(title, description, startAt, endAt, recurrenceId, null);
-    }
-
-    public Event(String title, String description, Instant startAt, Instant endAt, Long recurrenceId, Tag tag) {
+    public Event(
+            String title,
+            String description,
+            Instant startAt,
+            Instant endAt,
+            Long recurrenceId,
+            Tag tag,
+            Account account
+    ) {
         this.title = title;
         this.description = description;
         this.startAt = startAt;
         this.endAt = endAt;
         this.recurrenceId = recurrenceId;
         this.tag = tag;
+        this.account = account;
     }
 
     public void replace(String title, String description, Instant startAt, Instant endAt) {
@@ -142,5 +147,9 @@ public class Event extends BaseEntity {
 
     public Tag getTag() {
         return tag;
+    }
+
+    public Account getAccount() {
+        return account;
     }
 }

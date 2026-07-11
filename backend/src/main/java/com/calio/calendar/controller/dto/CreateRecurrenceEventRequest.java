@@ -1,5 +1,6 @@
 package com.calio.calendar.controller.dto;
 
+import com.calio.calendar.repository.entity.Account;
 import com.calio.calendar.repository.entity.RecurrenceEvent;
 import com.calio.calendar.repository.entity.RecurrenceFrequency;
 import com.calio.calendar.repository.entity.Tag;
@@ -20,8 +21,7 @@ public record CreateRecurrenceEventRequest(
         @NotNull(message = "반복 일정 주기는 필수입니다.") RecurrenceFrequency recurrenceFrequency,
         Long tagId
 ) {
-
-    public RecurrenceEvent toEntity(Tag tag) {
+    public RecurrenceEvent toEntity(Tag tag, Account account) {
         return new RecurrenceEvent(
                 recurrenceTitle,
                 recurrenceDescription,
@@ -30,7 +30,8 @@ public record CreateRecurrenceEventRequest(
                 recurrenceStartTime,
                 recurrenceEndTime,
                 recurrenceFrequency,
-                tag
+                tag,
+                account
         );
     }
 }

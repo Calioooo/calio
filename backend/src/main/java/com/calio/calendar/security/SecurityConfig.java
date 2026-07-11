@@ -1,5 +1,6 @@
 package com.calio.calendar.security;
 
+import com.calio.calendar.exception.ErrorCode;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -16,9 +17,14 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final BearerTokenAuthenticationFilter bearerTokenAuthenticationFilter;
+    private final AuthenticationErrorResponseWriter authenticationErrorResponseWriter;
 
-    public SecurityConfig(BearerTokenAuthenticationFilter bearerTokenAuthenticationFilter) {
+    public SecurityConfig(
+            BearerTokenAuthenticationFilter bearerTokenAuthenticationFilter,
+            AuthenticationErrorResponseWriter authenticationErrorResponseWriter
+    ) {
         this.bearerTokenAuthenticationFilter = bearerTokenAuthenticationFilter;
+        this.authenticationErrorResponseWriter = authenticationErrorResponseWriter;
     }
 
     @Bean
@@ -32,17 +38,21 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST, "/api/auth/anonymous").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/national-holidays").permitAll()
-                        .requestMatchers("/api/events").permitAll()
-                        .requestMatchers("/api/events/**").permitAll()
-                        .requestMatchers("/api/recurrence-events").permitAll()
-                        .requestMatchers("/api/recurrence-events/**").permitAll()
-                        .requestMatchers("/api/tasks").permitAll()
-                        .requestMatchers("/api/tasks/**").permitAll()
-                        .requestMatchers("/api/tags").permitAll()
-                        .requestMatchers("/api/custom-tags").permitAll()
-                        .requestMatchers("/api/custom-tags/**").permitAll()
-                        .anyRequest().permitAll()
+                        .requestMatchers("/api/events").authenticated()
+                        .requestMatchers("/api/events/**").authenticated()
+                        .requestMatchers("/api/recurrence-events").authenticated()
+                        .requestMatchers("/api/recurrence-events/**").authenticated()
+                        .requestMatchers("/api/tasks").authenticated()
+                        .requestMatchers("/api/tasks/**").authenticated()
+                        .requestMatchers("/api/tags").authenticated()
+                        .requestMatchers("/api/custom-tags").authenticated()
+                        .requestMatchers("/api/custom-tags/**").authenticated()
+                        .anyRequest().denyAll()
                 )
+                .exceptionHandling(exception -> exception.authenticationEntryPoint(
+                        (request, response, authException) ->
+                                authenticationErrorResponseWriter.write(response, ErrorCode.AUTH_TOKEN_REQUIRED)
+                ))
                 .addFilterBefore(bearerTokenAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }

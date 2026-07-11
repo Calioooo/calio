@@ -6,6 +6,7 @@ import static org.mockito.Mockito.when;
 
 import com.calio.calendar.exception.CalioException;
 import com.calio.calendar.exception.ErrorCode;
+import com.calio.calendar.repository.AccountRepository;
 import com.calio.calendar.repository.EventRepository;
 import com.calio.calendar.repository.RecurrenceEventRepository;
 import com.calio.calendar.repository.TagRepository;
@@ -26,6 +27,9 @@ class TagServiceTest {
     private TagRepository tagRepository;
 
     @Mock
+    private AccountRepository accountRepository;
+
+    @Mock
     private EventRepository eventRepository;
 
     @Mock
@@ -40,12 +44,16 @@ class TagServiceTest {
         // given
         Tag defaultTag = new Tag(TagType.DEFAULT, "업무", "#2563eb");
         Tag customTag = new Tag(TagType.CUSTOM, "사용자", "#8b5cf6");
-        when(tagRepository.findById(1L)).thenReturn(Optional.of(defaultTag));
-        when(tagRepository.findById(2L)).thenReturn(Optional.of(customTag));
+        when(tagRepository.findByIdAndTagTypeAndAccountIsNull(1L, TagType.DEFAULT))
+                .thenReturn(Optional.of(defaultTag));
+        when(tagRepository.findByIdAndTagTypeAndAccountIsNull(2L, TagType.DEFAULT))
+                .thenReturn(Optional.empty());
+        when(tagRepository.findByIdAndTagTypeAndAccount_Id(2L, TagType.CUSTOM, 1L))
+                .thenReturn(Optional.of(customTag));
 
         // when
-        Tag resolvedDefaultTag = tagService.getTagOrDefault(1L);
-        Tag resolvedCustomTag = tagService.getTagOrDefault(2L);
+        Tag resolvedDefaultTag = tagService.getTagOrDefault(1L, 1L);
+        Tag resolvedCustomTag = tagService.getTagOrDefault(1L, 2L);
 
         // then
         assertThat(resolvedDefaultTag).isSameAs(defaultTag);
@@ -58,10 +66,13 @@ class TagServiceTest {
     @DisplayName("missing tagId는 TAG_NOT_FOUND로 실패한다")
     void givenMissingTagId_whenResolveTag_thenThrowsTagNotFound() {
         // given
-        when(tagRepository.findById(1L)).thenReturn(Optional.empty());
+        when(tagRepository.findByIdAndTagTypeAndAccountIsNull(1L, TagType.DEFAULT))
+                .thenReturn(Optional.empty());
+        when(tagRepository.findByIdAndTagTypeAndAccount_Id(1L, TagType.CUSTOM, 1L))
+                .thenReturn(Optional.empty());
 
         // when, then
-        assertThatThrownBy(() -> tagService.getTagOrDefault(1L))
+        assertThatThrownBy(() -> tagService.getTagOrDefault(1L, 1L))
                 .isInstanceOfSatisfying(CalioException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.TAG_NOT_FOUND)
                 );
@@ -72,11 +83,11 @@ class TagServiceTest {
     void givenNullTagId_whenResolveDefaultTag_thenReturnsFallbackTag() {
         // given
         Tag fallbackTag = new Tag(TagType.DEFAULT, "기타", "#64748B");
-        when(tagRepository.findFirstByTagTypeAndTitleOrderByIdAsc(TagType.DEFAULT, "기타"))
+        when(tagRepository.findFirstByTagTypeAndTitleAndAccountIsNullOrderByIdAsc(TagType.DEFAULT, "기타"))
                 .thenReturn(Optional.of(fallbackTag));
 
         // when
-        Tag resolvedTag = tagService.getTagOrDefault(null);
+        Tag resolvedTag = tagService.getTagOrDefault(1L, null);
 
         // then
         assertThat(resolvedTag).isSameAs(fallbackTag);
@@ -86,11 +97,11 @@ class TagServiceTest {
     @DisplayName("fallback DEFAULT 기타 태그가 없으면 DEFAULT_TAG_NOT_FOUND로 실패한다")
     void givenMissingFallbackTag_whenResolveDefaultTag_thenThrowsDefaultTagNotFound() {
         // given
-        when(tagRepository.findFirstByTagTypeAndTitleOrderByIdAsc(TagType.DEFAULT, "기타"))
+        when(tagRepository.findFirstByTagTypeAndTitleAndAccountIsNullOrderByIdAsc(TagType.DEFAULT, "기타"))
                 .thenReturn(Optional.empty());
 
         // when, then
-        assertThatThrownBy(() -> tagService.getTagOrDefault(null))
+        assertThatThrownBy(() -> tagService.getTagOrDefault(1L, null))
                 .isInstanceOfSatisfying(CalioException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.DEFAULT_TAG_NOT_FOUND)
                 );

@@ -7,9 +7,11 @@ import com.calio.calendar.controller.dto.UpdateRecurrenceEventRequest;
 import com.calio.calendar.controller.dto.UpdateRecurrenceOccurrenceRequest;
 import com.calio.calendar.exception.CalioException;
 import com.calio.calendar.exception.ErrorCode;
+import com.calio.calendar.repository.AccountRepository;
 import com.calio.calendar.repository.EventRepository;
 import com.calio.calendar.repository.RecurrenceEventOverrideRepository;
 import com.calio.calendar.repository.RecurrenceEventRepository;
+import com.calio.calendar.repository.entity.Account;
 import com.calio.calendar.repository.entity.Event;
 import com.calio.calendar.repository.entity.RecurrenceEventOverride;
 import com.calio.calendar.repository.entity.RecurrenceEvent;
@@ -34,40 +36,48 @@ public class RecurrenceEventService {
     private final RecurrenceEventRepository recurrenceEventRepository;
     private final EventRepository eventRepository;
     private final RecurrenceEventOverrideRepository recurrenceEventOverrideRepository;
+    private final AccountRepository accountRepository;
     private final TagService tagService;
 
     public RecurrenceEventService(
             RecurrenceEventRepository recurrenceEventRepository,
             EventRepository eventRepository,
             RecurrenceEventOverrideRepository recurrenceEventOverrideRepository,
+            AccountRepository accountRepository,
             TagService tagService
     ) {
         this.recurrenceEventRepository = recurrenceEventRepository;
         this.eventRepository = eventRepository;
         this.recurrenceEventOverrideRepository = recurrenceEventOverrideRepository;
+        this.accountRepository = accountRepository;
         this.tagService = tagService;
     }
 
     @Transactional
-    public RecurrenceEventResponse createRecurrenceEvent(CreateRecurrenceEventRequest request) {
+    public RecurrenceEventResponse createRecurrenceEvent(Long accountId, CreateRecurrenceEventRequest request) {
         validateRecurrenceDateRange(request.recurrenceStartDate(), request.recurrenceEndDate());
         validateRecurrenceTimeRange(request.recurrenceStartTime(), request.recurrenceEndTime());
 
-        Tag tag = tagService.getTagOrDefault(request.tagId());
-        RecurrenceEvent recurrenceEvent = recurrenceEventRepository.save(request.toEntity(tag));
+        Account account = accountRepository.getReferenceById(accountId);
+        Tag tag = tagService.getTagOrDefault(accountId, request.tagId());
+        RecurrenceEvent recurrenceEvent = recurrenceEventRepository.save(request.toEntity(tag, account));
         eventRepository.saveAll(toOccurrenceEvents(recurrenceEvent));
 
         return RecurrenceEventResponse.from(recurrenceEvent);
     }
 
-    public RecurrenceEventResponse getRecurrenceEvent(Long recurrenceId) {
-        RecurrenceEvent recurrenceEvent = findRecurrenceEvent(recurrenceId);
+    public RecurrenceEventResponse getRecurrenceEvent(Long accountId, Long recurrenceId) {
+        RecurrenceEvent recurrenceEvent = findRecurrenceEvent(accountId, recurrenceId);
         return RecurrenceEventResponse.from(recurrenceEvent);
     }
 
     @Transactional
-    public RecurrenceEventResponse updateRecurrenceEvent(Long recurrenceId, UpdateRecurrenceEventRequest request) {
-        RecurrenceEvent recurrenceEvent = findRecurrenceEvent(recurrenceId);
+    public RecurrenceEventResponse updateRecurrenceEvent(
+            Long accountId,
+            Long recurrenceId,
+            UpdateRecurrenceEventRequest request
+    ) {
+        RecurrenceEvent recurrenceEvent = findRecurrenceEvent(accountId, recurrenceId);
         validateProvidedTitle(request.title());
 
         Instant effectiveStartAt = request.startAt() == null
@@ -80,7 +90,7 @@ public class RecurrenceEventService {
 
         Tag tag = request.tagId() == null
                 ? recurrenceEvent.getTag()
-                : tagService.getTag(request.tagId());
+                : tagService.getTag(accountId, request.tagId());
         recurrenceEvent.changeTag(tag);
         recurrenceEvent.update(
                 request.title() == null ? recurrenceEvent.getRecurrenceTitle() : request.title(),
@@ -109,13 +119,14 @@ public class RecurrenceEventService {
 
     @Transactional
     public EventResponse updateRecurrenceOccurrence(
+            Long accountId,
             Long recurrenceId,
             Long eventId,
             UpdateRecurrenceOccurrenceRequest request
     ) {
-        findRecurrenceEvent(recurrenceId);
+        findRecurrenceEvent(accountId, recurrenceId);
 
-        Event event = eventRepository.findById(eventId)
+        Event event = eventRepository.findByIdAndAccount_IdAndDeletedAtIsNull(eventId, accountId)
                 .orElseThrow(() -> new CalioException(ErrorCode.EVENT_NOT_FOUND));
         validateOccurrenceOwnership(event, recurrenceId);
         validateProvidedTitle(request.title());
@@ -138,9 +149,12 @@ public class RecurrenceEventService {
     }
 
     @Transactional
-    public void deleteRecurrenceEvent(Long recurrenceId) {
-        RecurrenceEvent recurrenceEvent = findRecurrenceEvent(recurrenceId);
-        List<Event> occurrenceEvents = eventRepository.findByRecurrenceIdOrderByStartAtAsc(recurrenceId);
+    public void deleteRecurrenceEvent(Long accountId, Long recurrenceId) {
+        RecurrenceEvent recurrenceEvent = findRecurrenceEvent(accountId, recurrenceId);
+        List<Event> occurrenceEvents = eventRepository.findByRecurrenceIdAndAccount_IdOrderByStartAtAsc(
+                recurrenceId,
+                accountId
+        );
 
         deleteOccurrenceOverrides(occurrenceEvents);
         eventRepository.deleteAll(occurrenceEvents);
@@ -148,10 +162,10 @@ public class RecurrenceEventService {
     }
 
     @Transactional
-    public void deleteRecurrenceOccurrence(Long recurrenceId, Long eventId) {
-        findRecurrenceEvent(recurrenceId);
+    public void deleteRecurrenceOccurrence(Long accountId, Long recurrenceId, Long eventId) {
+        findRecurrenceEvent(accountId, recurrenceId);
 
-        Event event = eventRepository.findById(eventId)
+        Event event = eventRepository.findByIdAndAccount_Id(eventId, accountId)
                 .orElseThrow(() -> new CalioException(ErrorCode.EVENT_NOT_FOUND));
         validateOccurrenceOwnership(event, recurrenceId);
 
@@ -159,8 +173,8 @@ public class RecurrenceEventService {
         eventRepository.flush();
     }
 
-    private RecurrenceEvent findRecurrenceEvent(Long recurrenceId) {
-        return recurrenceEventRepository.findById(recurrenceId)
+    private RecurrenceEvent findRecurrenceEvent(Long accountId, Long recurrenceId) {
+        return recurrenceEventRepository.findByIdAndAccount_Id(recurrenceId, accountId)
                 .orElseThrow(() -> new CalioException(ErrorCode.RECURRENCE_EVENT_NOT_FOUND));
     }
 
@@ -233,7 +247,10 @@ public class RecurrenceEventService {
 
     private void rebuildOccurrenceEvents(RecurrenceEvent recurrenceEvent) {
         List<Event> staleEvents = new ArrayList<>(
-                eventRepository.findByRecurrenceIdAndDeletedAtIsNullOrderByStartAtAsc(recurrenceEvent.getId())
+                eventRepository.findByRecurrenceIdAndAccount_IdAndDeletedAtIsNullOrderByStartAtAsc(
+                        recurrenceEvent.getId(),
+                        recurrenceEvent.getAccount().getId()
+                )
         );
         List<Event> rebuiltEvents = new ArrayList<>();
 
@@ -306,7 +323,8 @@ public class RecurrenceEventService {
                 toInstant(occurrenceDate, recurrenceEvent.getRecurrenceStartTime()),
                 toOccurrenceEndInstant(recurrenceEvent, occurrenceDate),
                 recurrenceEvent.getId(),
-                recurrenceEvent.getTag()
+                recurrenceEvent.getTag(),
+                recurrenceEvent.getAccount()
         );
     }
 

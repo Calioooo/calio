@@ -45,6 +45,10 @@ public class RecurrenceEvent extends BaseEntity {
     private RecurrenceFrequency recurrenceFrequency;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "account_id", nullable = false)
+    private Account account;
+
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "tag_id", nullable = false)
     private Tag tag;
 
@@ -58,29 +62,9 @@ public class RecurrenceEvent extends BaseEntity {
             LocalDate recurrenceEndDate,
             LocalTime recurrenceStartTime,
             LocalTime recurrenceEndTime,
-            RecurrenceFrequency recurrenceFrequency
-    ) {
-        this(
-                recurrenceTitle,
-                recurrenceDescription,
-                recurrenceStartDate,
-                recurrenceEndDate,
-                recurrenceStartTime,
-                recurrenceEndTime,
-                recurrenceFrequency,
-                null
-        );
-    }
-
-    public RecurrenceEvent(
-            String recurrenceTitle,
-            String recurrenceDescription,
-            LocalDate recurrenceStartDate,
-            LocalDate recurrenceEndDate,
-            LocalTime recurrenceStartTime,
-            LocalTime recurrenceEndTime,
             RecurrenceFrequency recurrenceFrequency,
-            Tag tag
+            Tag tag,
+            Account account
     ) {
         this.recurrenceTitle = recurrenceTitle;
         this.recurrenceDescription = recurrenceDescription;
@@ -90,6 +74,7 @@ public class RecurrenceEvent extends BaseEntity {
         this.recurrenceEndTime = recurrenceEndTime;
         this.recurrenceFrequency = recurrenceFrequency;
         this.tag = tag;
+        this.account = account;
     }
 
     public void update(
@@ -148,5 +133,9 @@ public class RecurrenceEvent extends BaseEntity {
 
     public Tag getTag() {
         return tag;
+    }
+
+    public Account getAccount() {
+        return account;
     }
 }

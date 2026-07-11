@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static com.calio.calendar.security.TestAccountSupport.currentAccountReference;
 
 import com.calio.calendar.repository.EventRepository;
 import com.calio.calendar.repository.RecurrenceEventRepository;
@@ -16,6 +17,8 @@ import com.calio.calendar.repository.entity.RecurrenceEvent;
 import com.calio.calendar.repository.entity.RecurrenceFrequency;
 import com.calio.calendar.repository.entity.Tag;
 import com.calio.calendar.repository.entity.TagType;
+import com.calio.calendar.security.AuthenticatedAccountMockMvcTestConfig;
+import com.calio.calendar.security.WithAuthenticatedAccount;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -26,6 +29,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -38,6 +42,8 @@ import org.springframework.test.web.servlet.MvcResult;
         "spring.jpa.hibernate.ddl-auto=create-drop"
 })
 @AutoConfigureMockMvc
+@WithAuthenticatedAccount
+@Import(AuthenticatedAccountMockMvcTestConfig.class)
 class CustomTagControllerTest {
 
     @Autowired
@@ -138,7 +144,7 @@ class CustomTagControllerTest {
     @DisplayName("사용자는 custom tag만 수정할 수 있고 DEFAULT tagId는 TAG_NOT_FOUND를 받는다")
     void givenCustomAndDefaultTagIds_whenUpdateCustomTag_thenOnlyCustomTagIsUpdated() throws Exception {
         // given
-        Tag customTag = tagRepository.save(new Tag(TagType.CUSTOM, "기존", "#111111"));
+        Tag customTag = tagRepository.save(new Tag(TagType.CUSTOM, "기존", "#111111", currentAccountReference()));
         Tag defaultTag = tagRepository.save(new Tag(TagType.DEFAULT, "기타", "#64748B"));
 
         // when
@@ -164,7 +170,7 @@ class CustomTagControllerTest {
     void givenCustomTagInUse_whenDeleteCustomTag_thenReassignsAllUsagesToFallbackTag() throws Exception {
         // given
         Tag fallbackTag = tagRepository.save(new Tag(TagType.DEFAULT, "기타", "#64748B"));
-        Tag customTag = tagRepository.save(new Tag(TagType.CUSTOM, "삭제 대상", "#8B5CF6"));
+        Tag customTag = tagRepository.save(new Tag(TagType.CUSTOM, "삭제 대상", "#8B5CF6", currentAccountReference()));
         Event ordinaryEvent = eventRepository.save(event("일반", null, customTag));
         RecurrenceEvent recurrenceEvent = recurrenceEventRepository.save(recurrenceEvent(customTag));
         Event occurrenceEvent = eventRepository.save(event("반복 occurrence", recurrenceEvent.getId(), customTag));
@@ -190,7 +196,7 @@ class CustomTagControllerTest {
     void givenMissingFallbackTag_whenDeleteCustomTag_thenReturnsDefaultTagNotFoundAndKeepsReferences()
             throws Exception {
         // given
-        Tag customTag = tagRepository.save(new Tag(TagType.CUSTOM, "삭제 보류", "#8B5CF6"));
+        Tag customTag = tagRepository.save(new Tag(TagType.CUSTOM, "삭제 보류", "#8B5CF6", currentAccountReference()));
         Event ordinaryEvent = eventRepository.save(event("일반", null, customTag));
         RecurrenceEvent recurrenceEvent = recurrenceEventRepository.save(recurrenceEvent(customTag));
 
@@ -223,7 +229,8 @@ class CustomTagControllerTest {
                 Instant.parse("2026-07-01T00:00:00Z"),
                 Instant.parse("2026-07-01T01:00:00Z"),
                 recurrenceId,
-                tag
+                tag,
+                currentAccountReference()
         );
     }
 
@@ -236,7 +243,8 @@ class CustomTagControllerTest {
                 LocalTime.parse("09:00:00"),
                 LocalTime.parse("10:00:00"),
                 RecurrenceFrequency.DAILY,
-                tag
+                tag,
+                currentAccountReference()
         );
     }
 }

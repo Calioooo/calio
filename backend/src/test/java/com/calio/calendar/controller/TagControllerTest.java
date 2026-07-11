@@ -1,6 +1,7 @@
 package com.calio.calendar.controller;
 
 import static org.hamcrest.Matchers.hasSize;
+import static com.calio.calendar.security.TestAccountSupport.currentAccountReference;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -8,12 +9,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.calio.calendar.repository.TagRepository;
 import com.calio.calendar.repository.entity.Tag;
 import com.calio.calendar.repository.entity.TagType;
+import com.calio.calendar.security.AuthenticatedAccountMockMvcTestConfig;
+import com.calio.calendar.security.WithAuthenticatedAccount;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest(properties = {
@@ -24,6 +28,8 @@ import org.springframework.test.web.servlet.MockMvc;
         "spring.jpa.hibernate.ddl-auto=create-drop"
 })
 @AutoConfigureMockMvc
+@WithAuthenticatedAccount
+@Import(AuthenticatedAccountMockMvcTestConfig.class)
 class TagControllerTest {
 
     @Autowired
@@ -43,7 +49,7 @@ class TagControllerTest {
         // given
         tagRepository.save(new Tag(TagType.DEFAULT, "업무", "#2563eb"));
         tagRepository.save(new Tag(TagType.DEFAULT, "기타", "#64748b"));
-        tagRepository.save(new Tag(TagType.CUSTOM, "사용자", "#111111"));
+        tagRepository.save(new Tag(TagType.CUSTOM, "사용자", "#111111", currentAccountReference()));
 
         // when
         mockMvc.perform(get("/api/tags"))
