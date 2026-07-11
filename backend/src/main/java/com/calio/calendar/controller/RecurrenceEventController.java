@@ -8,6 +8,8 @@ import com.calio.calendar.controller.dto.UpdateRecurrenceOccurrenceRequest;
 import com.calio.calendar.security.AuthenticatedAccount;
 import com.calio.calendar.service.RecurrenceEventService;
 import jakarta.validation.Valid;
+import java.time.Instant;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -17,8 +19,10 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @Validated
@@ -58,7 +62,7 @@ public class RecurrenceEventController {
         return ResponseEntity.noContent().build();
     }
 
-    @PatchMapping("/{recurrenceId}")
+    @PutMapping("/{recurrenceId}")
     public RecurrenceEventResponse updateRecurrenceEvent(
             @AuthenticationPrincipal AuthenticatedAccount account,
             @PathVariable("recurrenceId") Long recurrenceId,
@@ -67,23 +71,22 @@ public class RecurrenceEventController {
         return recurrenceEventService.updateRecurrenceEvent(account.accountId(), recurrenceId, request);
     }
 
-    @PatchMapping("/{recurrenceId}/occurrences/{eventId}")
+    @PatchMapping("/{recurrenceId}/occurrences")
     public EventResponse updateRecurrenceOccurrence(
             @AuthenticationPrincipal AuthenticatedAccount account,
             @PathVariable("recurrenceId") Long recurrenceId,
-            @PathVariable("eventId") Long eventId,
             @Valid @RequestBody UpdateRecurrenceOccurrenceRequest request
     ) {
-        return recurrenceEventService.updateRecurrenceOccurrence(account.accountId(), recurrenceId, eventId, request);
+        return recurrenceEventService.updateRecurrenceOccurrence(account.accountId(), recurrenceId, request);
     }
 
-    @DeleteMapping("/{recurrenceId}/occurrences/{eventId}")
+    @DeleteMapping("/{recurrenceId}/occurrences")
     public ResponseEntity<Void> deleteRecurrenceOccurrence(
             @AuthenticationPrincipal AuthenticatedAccount account,
             @PathVariable("recurrenceId") Long recurrenceId,
-            @PathVariable("eventId") Long eventId
+            @RequestParam("originStartAt") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant originStartAt
     ) {
-        recurrenceEventService.deleteRecurrenceOccurrence(account.accountId(), recurrenceId, eventId);
+        recurrenceEventService.deleteRecurrenceOccurrence(account.accountId(), recurrenceId, originStartAt);
         return ResponseEntity.noContent().build();
     }
 }

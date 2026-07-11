@@ -16,10 +16,20 @@ public interface EventRepository extends JpaRepository<Event, Long> {
 
     Optional<Event> findByIdAndAccount_IdAndDeletedAtIsNull(Long id, Long accountId);
 
-    List<Event> findByStartAtBetweenAndAccount_IdAndDeletedAtIsNullOrderByStartAtAsc(
-            Instant from,
-            Instant to,
-            Long accountId
+    @Query("""
+            select event
+            from Event event
+            where event.account.id = :accountId
+              and event.deletedAt is null
+              and event.recurrenceId is null
+              and event.startAt < :to
+              and event.endAt > :from
+            order by event.startAt asc
+            """)
+    List<Event> findNormalOverlappingEvents(
+            @Param("accountId") Long accountId,
+            @Param("from") Instant from,
+            @Param("to") Instant to
     );
 
     List<Event> findByRecurrenceIdAndAccount_IdAndDeletedAtIsNullOrderByStartAtAsc(Long recurrenceId, Long accountId);

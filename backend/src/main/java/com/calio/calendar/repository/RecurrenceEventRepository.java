@@ -2,6 +2,8 @@ package com.calio.calendar.repository;
 
 import com.calio.calendar.repository.entity.RecurrenceEvent;
 import com.calio.calendar.repository.entity.Tag;
+import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -11,6 +13,19 @@ import org.springframework.data.repository.query.Param;
 public interface RecurrenceEventRepository extends JpaRepository<RecurrenceEvent, Long> {
 
     Optional<RecurrenceEvent> findByIdAndAccount_Id(Long id, Long accountId);
+
+    @Query("""
+            select recurrenceEvent
+            from RecurrenceEvent recurrenceEvent
+            where recurrenceEvent.account.id = :accountId
+              and recurrenceEvent.recurrenceStartDate <= :toDate
+              and recurrenceEvent.recurrenceEndDate >= :fromDate
+            """)
+    List<RecurrenceEvent> findEligibleRules(
+            @Param("accountId") Long accountId,
+            @Param("fromDate") LocalDate fromDate,
+            @Param("toDate") LocalDate toDate
+    );
 
     @Modifying(flushAutomatically = true)
     @Query("""

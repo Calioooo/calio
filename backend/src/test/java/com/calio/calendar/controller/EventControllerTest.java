@@ -622,7 +622,7 @@ class EventControllerTest {
 
         MvcResult listResult = mockMvc.perform(get("/api/events")
                         .param("from", "2026-06-09T00:00:00Z")
-                        .param("to", "2026-06-09T02:00:00Z"))
+                        .param("to", "2026-06-09T03:00:00Z"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(1)))
                 .andExpect(jsonPath("$[0].id").value(remainingEventId))
@@ -655,14 +655,14 @@ class EventControllerTest {
     }
 
     @Test
-    @DisplayName("사용자는 시작 시각 범위에 포함되는 일정을 시작 시각 오름차순으로 조회한다")
-    void givenEventsAcrossRangeBoundaries_whenListEvents_thenReturnsInclusiveRangeSortedByStartAt()
+    @DisplayName("사용자는 표시 시간이 요청 범위와 겹치는 일정을 시작 시각 오름차순으로 조회한다")
+    void givenEventsAcrossRangeBoundaries_whenListEvents_thenReturnsOverlappingEventsSortedByStartAt()
             throws Exception {
         // given
-        createEvent("Before", "2026-06-02T23:59:59Z", "2026-06-03T00:30:00Z");
+        long overlappingBeforeId = createEvent("Before", "2026-06-02T23:59:59Z", "2026-06-03T00:30:00Z");
         long lowerBoundaryId = createEvent("Lower", "2026-06-03T00:00:00Z", "2026-06-03T01:00:00Z");
         long middleId = createEvent("Middle", "2026-06-03T01:00:00Z", "2026-06-03T02:00:00Z");
-        long upperBoundaryId = createEvent("Upper", "2026-06-03T02:00:00Z", "2026-06-03T03:00:00Z");
+        createEvent("Upper", "2026-06-03T02:00:00Z", "2026-06-03T03:00:00Z");
         createEvent("After", "2026-06-03T02:00:01Z", "2026-06-03T03:30:00Z");
 
         // when
@@ -672,9 +672,9 @@ class EventControllerTest {
                 // then
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(3)))
-                .andExpect(jsonPath("$[0].id").value(lowerBoundaryId))
-                .andExpect(jsonPath("$[1].id").value(middleId))
-                .andExpect(jsonPath("$[2].id").value(upperBoundaryId));
+                .andExpect(jsonPath("$[0].id").value(overlappingBeforeId))
+                .andExpect(jsonPath("$[1].id").value(lowerBoundaryId))
+                .andExpect(jsonPath("$[2].id").value(middleId));
     }
 
     @Test
@@ -684,7 +684,7 @@ class EventControllerTest {
         // given
         long firstId = createEvent("First", "2026-07-01T00:00:00Z", "2026-07-01T01:00:00Z");
         long importantId = createEvent("Important", "2026-07-01T01:00:00Z", "2026-07-01T02:00:00Z");
-        long lastId = createEvent("Last", "2026-07-01T02:00:00Z", "2026-07-01T03:00:00Z");
+        createEvent("Last", "2026-07-01T02:00:00Z", "2026-07-01T03:00:00Z");
         updateImportantEventResult(importantId, true)
                 .andExpect(status().isOk());
 
@@ -694,13 +694,11 @@ class EventControllerTest {
                         .param("to", "2026-07-01T02:00:00Z"))
                 // then
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(3)))
+                .andExpect(jsonPath("$", hasSize(2)))
                 .andExpect(jsonPath("$[0].id").value(firstId))
                 .andExpect(jsonPath("$[0].importantEvent").value(false))
                 .andExpect(jsonPath("$[1].id").value(importantId))
-                .andExpect(jsonPath("$[1].importantEvent").value(true))
-                .andExpect(jsonPath("$[2].id").value(lastId))
-                .andExpect(jsonPath("$[2].importantEvent").value(false));
+                .andExpect(jsonPath("$[1].importantEvent").value(true));
     }
 
     private long createEvent(String title, String startAt, String endAt) throws Exception {
