@@ -35,10 +35,6 @@ public class Task extends BaseEntity {
     protected Task() {
     }
 
-    public Task(String taskTitle) {
-        this(taskTitle, null);
-    }
-
     public Task(String taskTitle, Account account) {
         this.taskTitle = taskTitle;
         this.completed = false;

@@ -52,18 +52,6 @@ public class Event extends BaseEntity {
     protected Event() {
     }
 
-    public Event(String title, String description, Instant startAt, Instant endAt) {
-        this(title, description, startAt, endAt, null);
-    }
-
-    public Event(String title, String description, Instant startAt, Instant endAt, Long recurrenceId) {
-        this(title, description, startAt, endAt, recurrenceId, null);
-    }
-
-    public Event(String title, String description, Instant startAt, Instant endAt, Long recurrenceId, Tag tag) {
-        this(title, description, startAt, endAt, recurrenceId, tag, null);
-    }
-
     public Event(
             String title,
             String description,

@@ -62,50 +62,6 @@ public class RecurrenceEvent extends BaseEntity {
             LocalDate recurrenceEndDate,
             LocalTime recurrenceStartTime,
             LocalTime recurrenceEndTime,
-            RecurrenceFrequency recurrenceFrequency
-    ) {
-        this(
-                recurrenceTitle,
-                recurrenceDescription,
-                recurrenceStartDate,
-                recurrenceEndDate,
-                recurrenceStartTime,
-                recurrenceEndTime,
-                recurrenceFrequency,
-                null
-        );
-    }
-
-    public RecurrenceEvent(
-            String recurrenceTitle,
-            String recurrenceDescription,
-            LocalDate recurrenceStartDate,
-            LocalDate recurrenceEndDate,
-            LocalTime recurrenceStartTime,
-            LocalTime recurrenceEndTime,
-            RecurrenceFrequency recurrenceFrequency,
-            Tag tag
-    ) {
-        this(
-                recurrenceTitle,
-                recurrenceDescription,
-                recurrenceStartDate,
-                recurrenceEndDate,
-                recurrenceStartTime,
-                recurrenceEndTime,
-                recurrenceFrequency,
-                tag,
-                null
-        );
-    }
-
-    public RecurrenceEvent(
-            String recurrenceTitle,
-            String recurrenceDescription,
-            LocalDate recurrenceStartDate,
-            LocalDate recurrenceEndDate,
-            LocalTime recurrenceStartTime,
-            LocalTime recurrenceEndTime,
             RecurrenceFrequency recurrenceFrequency,
             Tag tag,
             Account account
