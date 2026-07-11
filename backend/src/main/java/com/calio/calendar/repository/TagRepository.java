@@ -8,12 +8,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface TagRepository extends JpaRepository<Tag, Long> {
 
-    List<Tag> findAllByOrderByIdAsc();
-
-    List<Tag> findByTagTypeOrderByIdAsc(TagType tagType);
-
-    Optional<Tag> findByIdAndTagType(Long id, TagType tagType);
-
     List<Tag> findByTagTypeAndAccountIsNullOrderByIdAsc(TagType tagType);
 
     List<Tag> findByTagTypeAndAccount_IdOrderByIdAsc(TagType tagType, Long accountId);
@@ -21,8 +15,6 @@ public interface TagRepository extends JpaRepository<Tag, Long> {
     Optional<Tag> findByIdAndTagTypeAndAccountIsNull(Long id, TagType tagType);
 
     Optional<Tag> findByIdAndTagTypeAndAccount_Id(Long id, TagType tagType, Long accountId);
-
-    Optional<Tag> findFirstByTagTypeAndTitleOrderByIdAsc(TagType tagType, String title);
 
     Optional<Tag> findFirstByTagTypeAndTitleAndAccountIsNullOrderByIdAsc(TagType tagType, String title);
 }

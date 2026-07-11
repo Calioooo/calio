@@ -59,7 +59,7 @@ class EventControllerTest {
 
     @BeforeEach
     void setUpDefaultTag() {
-        tagRepository.findFirstByTagTypeAndTitleOrderByIdAsc(TagType.DEFAULT, "기타")
+        tagRepository.findFirstByTagTypeAndTitleAndAccountIsNullOrderByIdAsc(TagType.DEFAULT, "기타")
                 .orElseGet(() -> tagRepository.save(new Tag(TagType.DEFAULT, "기타", "#64748B")));
     }
 

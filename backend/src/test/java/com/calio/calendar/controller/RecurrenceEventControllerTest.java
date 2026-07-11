@@ -66,9 +66,12 @@ class RecurrenceEventControllerTest {
     @Autowired
     private TagRepository tagRepository;
 
+    private Long currentAccountId;
+
     @BeforeEach
     void setUpDefaultTag() {
-        tagRepository.findFirstByTagTypeAndTitleOrderByIdAsc(TagType.DEFAULT, "기타")
+        currentAccountId = currentAccountReference().getId();
+        tagRepository.findFirstByTagTypeAndTitleAndAccountIsNullOrderByIdAsc(TagType.DEFAULT, "기타")
                 .orElseGet(() -> tagRepository.save(new Tag(TagType.DEFAULT, "기타", "#64748B")));
     }
 
@@ -153,7 +156,10 @@ class RecurrenceEventControllerTest {
         long recurrenceId = readResponse(createResult).get("recurrenceId").asLong();
         assertThat(recurrenceEventRepository.findById(recurrenceId))
                 .hasValueSatisfying(rule -> assertThat(rule.getTag().getId()).isEqualTo(workTag.getId()));
-        assertThat(eventRepository.findByRecurrenceIdAndDeletedAtIsNullOrderByStartAtAsc(recurrenceId))
+        assertThat(eventRepository.findByRecurrenceIdAndAccount_IdAndDeletedAtIsNullOrderByStartAtAsc(
+                recurrenceId,
+                currentAccountId
+        ))
                 .allSatisfy(event -> assertThat(event.getTag().getId()).isEqualTo(workTag.getId()));
     }
 
@@ -186,7 +192,10 @@ class RecurrenceEventControllerTest {
         long recurrenceId = readResponse(createResult).get("recurrenceId").asLong();
         assertThat(recurrenceEventRepository.findById(recurrenceId))
                 .hasValueSatisfying(rule -> assertThat(rule.getTag().getId()).isEqualTo(customTag.getId()));
-        assertThat(eventRepository.findByRecurrenceIdAndDeletedAtIsNullOrderByStartAtAsc(recurrenceId))
+        assertThat(eventRepository.findByRecurrenceIdAndAccount_IdAndDeletedAtIsNullOrderByStartAtAsc(
+                recurrenceId,
+                currentAccountId
+        ))
                 .allSatisfy(event -> assertThat(event.getTag().getId()).isEqualTo(customTag.getId()));
     }
 
@@ -239,7 +248,10 @@ class RecurrenceEventControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.tag.id").value(workTag.getId()));
 
-        assertThat(eventRepository.findByRecurrenceIdAndDeletedAtIsNullOrderByStartAtAsc(recurrenceId))
+        assertThat(eventRepository.findByRecurrenceIdAndAccount_IdAndDeletedAtIsNullOrderByStartAtAsc(
+                recurrenceId,
+                currentAccountId
+        ))
                 .allSatisfy(event -> assertThat(event.getTag().getId()).isEqualTo(workTag.getId()));
     }
 
@@ -274,7 +286,10 @@ class RecurrenceEventControllerTest {
 
         assertThat(recurrenceEventRepository.findById(recurrenceId))
                 .hasValueSatisfying(rule -> assertThat(rule.getTag().getId()).isEqualTo(updatedTag.getId()));
-        assertThat(eventRepository.findByRecurrenceIdAndDeletedAtIsNullOrderByStartAtAsc(recurrenceId))
+        assertThat(eventRepository.findByRecurrenceIdAndAccount_IdAndDeletedAtIsNullOrderByStartAtAsc(
+                recurrenceId,
+                currentAccountId
+        ))
                 .allSatisfy(event -> assertThat(event.getTag().getId()).isEqualTo(updatedTag.getId()));
     }
 
@@ -291,7 +306,10 @@ class RecurrenceEventControllerTest {
                 "2030-08-02",
                 "DAILY"
         );
-        List<Long> occurrenceEventIds = eventRepository.findByRecurrenceIdOrderByStartAtAsc(recurrenceId)
+        List<Long> occurrenceEventIds = eventRepository.findByRecurrenceIdAndAccount_IdOrderByStartAtAsc(
+                        recurrenceId,
+                        currentAccountId
+                )
                 .stream()
                 .map(Event::getId)
                 .toList();
@@ -318,7 +336,10 @@ class RecurrenceEventControllerTest {
 
         assertThat(deleteResult.getResponse().getContentAsString(StandardCharsets.UTF_8)).isEmpty();
         assertThat(recurrenceEventRepository.existsById(recurrenceId)).isFalse();
-        assertThat(eventRepository.findByRecurrenceIdOrderByStartAtAsc(recurrenceId)).isEmpty();
+        assertThat(eventRepository.findByRecurrenceIdAndAccount_IdOrderByStartAtAsc(
+                recurrenceId,
+                currentAccountId
+        )).isEmpty();
         assertThat(occurrenceEventIds)
                 .allSatisfy(eventId -> {
                     assertThat(eventRepository.findById(eventId)).isEmpty();
@@ -1455,7 +1476,10 @@ class RecurrenceEventControllerTest {
     }
 
     private void assertStoredOccurrences(long recurrenceId, String... expectedStartAtValues) {
-        var occurrences = eventRepository.findByRecurrenceIdAndDeletedAtIsNullOrderByStartAtAsc(recurrenceId);
+        var occurrences = eventRepository.findByRecurrenceIdAndAccount_IdAndDeletedAtIsNullOrderByStartAtAsc(
+                recurrenceId,
+                currentAccountId
+        );
 
         assertThat(occurrences)
                 .hasSize(expectedStartAtValues.length)
@@ -1474,7 +1498,10 @@ class RecurrenceEventControllerTest {
             String expectedDescription,
             String expectedEndAtSuffix
     ) {
-        var occurrences = eventRepository.findByRecurrenceIdAndDeletedAtIsNullOrderByStartAtAsc(recurrenceId);
+        var occurrences = eventRepository.findByRecurrenceIdAndAccount_IdAndDeletedAtIsNullOrderByStartAtAsc(
+                recurrenceId,
+                currentAccountId
+        );
 
         assertThat(occurrences)
                 .allSatisfy(event -> {
