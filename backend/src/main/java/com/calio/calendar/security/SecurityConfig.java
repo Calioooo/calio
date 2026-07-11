@@ -36,7 +36,7 @@ public class SecurityConfig {
                 .logout(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.POST, "/api/auth/anonymous").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/guest").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/national-holidays").permitAll()
                         .requestMatchers("/api/events").authenticated()
                         .requestMatchers("/api/events/**").authenticated()

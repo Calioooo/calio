@@ -52,10 +52,10 @@ class AuthControllerTest {
     }
 
     @Test
-    @DisplayName("익명 인증 발급은 인증 없이 Account와 tokenHash만 저장하고 raw token을 한 번만 반환한다")
-    void givenNoAuthentication_whenCreateAnonymousToken_thenReturnsRawTokenAndPersistsOnlyHash() throws Exception {
+    @DisplayName("게스트 인증 발급은 인증 없이 Account와 tokenHash만 저장하고 raw token을 한 번만 반환한다")
+    void givenNoAuthentication_whenCreateGuestToken_thenReturnsRawTokenAndPersistsOnlyHash() throws Exception {
         // when
-        MvcResult result = mockMvc.perform(post("/api/auth/anonymous"))
+        MvcResult result = mockMvc.perform(post("/api/auth/guest"))
                 // then
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.accessToken").isString())

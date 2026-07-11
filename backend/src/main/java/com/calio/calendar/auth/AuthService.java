@@ -1,6 +1,6 @@
 package com.calio.calendar.auth;
 
-import com.calio.calendar.auth.dto.AnonymousAuthResponse;
+import com.calio.calendar.auth.dto.GuestAuthResponse;
 import com.calio.calendar.repository.AccountAuthTokenRepository;
 import com.calio.calendar.repository.AccountRepository;
 import com.calio.calendar.repository.entity.Account;
@@ -26,12 +26,12 @@ public class AuthService {
     }
 
     @Transactional
-    public AnonymousAuthResponse issueAnonymousToken() {
+    public GuestAuthResponse issueGuestToken() {
         Account account = accountRepository.save(new Account());
         String rawToken = accessTokenEncoder.generateRawToken();
         String tokenHash = accessTokenEncoder.hash(rawToken);
 
         accountAuthTokenRepository.save(new AccountAuthToken(account, tokenHash));
-        return AnonymousAuthResponse.bearer(rawToken);
+        return GuestAuthResponse.bearer(rawToken);
     }
 }

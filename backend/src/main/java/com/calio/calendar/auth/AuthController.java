@@ -1,6 +1,6 @@
 package com.calio.calendar.auth;
 
-import com.calio.calendar.auth.dto.AnonymousAuthResponse;
+import com.calio.calendar.auth.dto.GuestAuthResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -17,9 +17,9 @@ public class AuthController {
         this.authService = authService;
     }
 
-    @PostMapping("/anonymous")
-    public ResponseEntity<AnonymousAuthResponse> createAnonymousToken() {
-        AnonymousAuthResponse response = authService.issueAnonymousToken();
+    @PostMapping("/guest")
+    public ResponseEntity<GuestAuthResponse> createGuestToken() {
+        GuestAuthResponse response = authService.issueGuestToken();
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 }
