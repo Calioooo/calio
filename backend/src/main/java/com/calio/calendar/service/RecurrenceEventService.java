@@ -251,8 +251,16 @@ public class RecurrenceEventService {
 
     private boolean isOccurrenceStartBeforeRuleEnd(RecurrenceEvent recurrenceEvent, LocalDate occurrenceDate) {
         Instant occurrenceStartAt = toInstant(occurrenceDate, recurrenceEvent.getRecurrenceStartTime());
-        Instant ruleEndAt = toInstant(recurrenceEvent.getRecurrenceEndDate(), recurrenceEvent.getRecurrenceEndTime());
+        Instant ruleEndAt = recurrenceEndAt(recurrenceEvent);
         return occurrenceStartAt.isBefore(ruleEndAt);
+    }
+
+    private Instant recurrenceEndAt(RecurrenceEvent recurrenceEvent) {
+        LocalDate recurrenceEndDate = recurrenceEvent.getRecurrenceStartTime()
+                .isBefore(recurrenceEvent.getRecurrenceEndTime())
+                ? recurrenceEvent.getRecurrenceEndDate()
+                : recurrenceEvent.getRecurrenceEndDate().plusDays(1);
+        return toInstant(recurrenceEndDate, recurrenceEvent.getRecurrenceEndTime());
     }
 
     private Instant toInstant(LocalDate date, LocalTime time) {
@@ -302,7 +310,7 @@ public class RecurrenceEventService {
     }
 
     private void validateRecurrenceTimeRange(LocalTime recurrenceStartTime, LocalTime recurrenceEndTime) {
-        if (recurrenceStartTime.isBefore(recurrenceEndTime)) {
+        if (!recurrenceStartTime.equals(recurrenceEndTime)) {
             return;
         }
 

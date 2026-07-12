@@ -224,7 +224,11 @@ public class EventService {
     }
 
     private Instant recurrenceEndAt(RecurrenceEvent recurrenceEvent) {
-        return toInstant(recurrenceEvent.getRecurrenceEndDate(), recurrenceEvent.getRecurrenceEndTime());
+        LocalDate recurrenceEndDate = recurrenceEvent.getRecurrenceStartTime()
+                .isBefore(recurrenceEvent.getRecurrenceEndTime())
+                ? recurrenceEvent.getRecurrenceEndDate()
+                : recurrenceEvent.getRecurrenceEndDate().plusDays(1);
+        return toInstant(recurrenceEndDate, recurrenceEvent.getRecurrenceEndTime());
     }
 
     private Instant toInstant(LocalDate date, LocalTime time) {

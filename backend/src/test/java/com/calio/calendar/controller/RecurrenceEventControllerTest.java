@@ -194,6 +194,52 @@ class RecurrenceEventControllerTest {
     }
 
     @Test
+    @DisplayName("마지막 overnight occurrence는 조회, 수정, 삭제 대상이 된다")
+    void givenLastOvernightOccurrence_whenListPatchAndDelete_thenUsesOvernightEndBoundary()
+            throws Exception {
+        // given
+        long recurrenceId = createRecurrenceEvent(
+                "Overnight target",
+                "2027-08-01",
+                "2027-08-03",
+                "23:00:00",
+                "01:00:00",
+                "DAILY"
+        );
+
+        // when, then
+        mockMvc.perform(get("/api/events")
+                        .param("from", "2027-08-04T00:30:00Z")
+                        .param("to", "2027-08-04T00:45:00Z"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].originStartAt").value("2027-08-03T23:00:00Z"))
+                .andExpect(jsonPath("$[0].startAt").value("2027-08-03T23:00:00Z"))
+                .andExpect(jsonPath("$[0].endAt").value("2027-08-04T01:00:00Z"));
+
+        patchOccurrence(
+                recurrenceId,
+                "2027-08-03T23:00:00Z",
+                "2027-08-05T02:00:00Z",
+                "2027-08-05T03:00:00Z"
+        );
+        mockMvc.perform(get("/api/events")
+                        .param("from", "2027-08-05T02:30:00Z")
+                        .param("to", "2027-08-05T02:45:00Z"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].originStartAt").value("2027-08-03T23:00:00Z"))
+                .andExpect(jsonPath("$[0].startAt").value("2027-08-05T02:00:00Z"));
+
+        deleteOccurrence(recurrenceId, "2027-08-03T23:00:00Z");
+        mockMvc.perform(get("/api/events")
+                        .param("from", "2027-08-05T02:30:00Z")
+                        .param("to", "2027-08-05T02:45:00Z"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(0)));
+    }
+
+    @Test
     @DisplayName("반복 일정 전체 PUT은 rule을 갱신하고 해당 recurrence override를 hard-delete한다")
     void givenWholeRecurrencePut_whenOverridesExist_thenUpdatesRuleAndDeletesOverrides() throws Exception {
         // given
@@ -367,26 +413,48 @@ class RecurrenceEventControllerTest {
 
     private long createRecurrenceEvent(String title, String startDate, String endDate, String frequency)
             throws Exception {
+        return createRecurrenceEvent(title, startDate, endDate, "09:00:00", "10:00:00", frequency);
+    }
+
+    private long createRecurrenceEvent(
+            String title,
+            String startDate,
+            String endDate,
+            String startTime,
+            String endTime,
+            String frequency
+    ) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/recurrence-events")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(recurrenceRequest(title, startDate, endDate, frequency)))
+                        .content(recurrenceRequest(title, startDate, endDate, startTime, endTime, frequency)))
                 .andExpect(status().isCreated())
                 .andReturn();
         return readResponse(result).get("recurrenceId").asLong();
     }
 
     private String recurrenceRequest(String title, String startDate, String endDate, String frequency) {
+        return recurrenceRequest(title, startDate, endDate, "09:00:00", "10:00:00", frequency);
+    }
+
+    private String recurrenceRequest(
+            String title,
+            String startDate,
+            String endDate,
+            String startTime,
+            String endTime,
+            String frequency
+    ) {
         return """
                 {
                   "recurrenceTitle": "%s",
                   "recurrenceDescription": "memo",
                   "recurrenceStartDate": "%s",
                   "recurrenceEndDate": "%s",
-                  "recurrenceStartTime": "09:00:00",
-                  "recurrenceEndTime": "10:00:00",
+                  "recurrenceStartTime": "%s",
+                  "recurrenceEndTime": "%s",
                   "recurrenceFrequency": "%s"
                 }
-                """.formatted(title, startDate, endDate, frequency);
+                """.formatted(title, startDate, endDate, startTime, endTime, frequency);
     }
 
     private void patchOccurrence(Long recurrenceId, String originStartAt, String startAt, String endAt)
