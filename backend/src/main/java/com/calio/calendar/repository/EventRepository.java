@@ -26,7 +26,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
               and event.endAt > :from
             order by event.startAt asc
             """)
-    List<Event> findNormalOverlappingEvents(
+    List<Event> findNormalEvents(
             @Param("accountId") Long accountId,
             @Param("from") Instant from,
             @Param("to") Instant to

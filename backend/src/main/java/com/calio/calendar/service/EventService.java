@@ -93,7 +93,7 @@ public class EventService {
     @Transactional(readOnly = true)
     public List<EventResponse> listEvents(Long accountId, Instant from, Instant to) {
         validateListTimeRange(from, to);
-        List<EventResponse> normalEvents = eventRepository.findNormalOverlappingEvents(accountId, from, to)
+        List<EventResponse> normalEvents = eventRepository.findNormalEvents(accountId, from, to)
                 .stream()
                 .map(EventResponse::from)
                 .toList();
