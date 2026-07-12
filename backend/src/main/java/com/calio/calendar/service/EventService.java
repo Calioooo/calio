@@ -115,7 +115,7 @@ public class EventService {
         Set<OccurrenceKey> responseKeys = new HashSet<>();
 
         for (RecurrenceEvent recurrenceEvent : recurrenceEvents) {
-            responses.addAll(baseOccurrenceResponses(recurrenceEvent, from, to, responseKeys));
+            responses.addAll(nonOverriddenOccurrenceResponses(recurrenceEvent, from, to, responseKeys));
         }
 
         recurrenceEventOverrideRepository.findModifiedOverlappingOverrides(accountId, from, to)
@@ -133,7 +133,7 @@ public class EventService {
                 .toList();
     }
 
-    private List<EventResponse> baseOccurrenceResponses(
+    private List<EventResponse> nonOverriddenOccurrenceResponses(
             RecurrenceEvent recurrenceEvent,
             Instant from,
             Instant to,
