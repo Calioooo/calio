@@ -3,7 +3,9 @@ package com.calio.calendar.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -35,6 +37,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -212,6 +215,40 @@ class RecurrenceEventServiceTest {
         assertThat(override.getOverrideStartAt()).isNull();
         assertThat(override.getOverrideEndAt()).isNull();
         verify(recurrenceEventOverrideRepository).flush();
+    }
+
+    @Test
+    @DisplayName("단일 occurrence DELETE의 override 생성 경합은 unique constraint 충돌 후 기존 override를 삭제 상태로 전환한다")
+    void givenDuplicateDeleteOverrideRace_whenDeleteRecurrenceOccurrence_thenMarksExistingOverrideDeleted() {
+        // given
+        RecurrenceEvent recurrenceEvent = recurrenceEvent("Rule", "2027-05-11", "2027-05-11");
+        Instant originStartAt = Instant.parse("2027-05-11T09:00:00Z");
+        RecurrenceEventOverride existingOverride = RecurrenceEventOverride.modified(
+                recurrenceEvent,
+                originStartAt,
+                Instant.parse("2027-05-12T09:00:00Z"),
+                Instant.parse("2027-05-12T10:00:00Z")
+        );
+        when(recurrenceEventRepository.findByIdAndAccount_Id(10L, 1L)).thenReturn(Optional.of(recurrenceEvent));
+        when(recurrenceEventOverrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(10L, originStartAt))
+                .thenReturn(Optional.empty())
+                .thenReturn(Optional.of(existingOverride));
+        when(recurrenceEventOverrideRepository.save(any(RecurrenceEventOverride.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        doThrow(new DuplicateKeyException("duplicate recurrence origin"))
+                .doNothing()
+                .when(recurrenceEventOverrideRepository)
+                .flush();
+
+        // when
+        recurrenceEventService.deleteRecurrenceOccurrence(1L, 10L, originStartAt);
+
+        // then
+        assertThat(existingOverride.getDeletedAt()).isNotNull();
+        assertThat(existingOverride.getOverrideStartAt()).isNull();
+        assertThat(existingOverride.getOverrideEndAt()).isNull();
+        verify(recurrenceEventOverrideRepository).save(any(RecurrenceEventOverride.class));
+        verify(recurrenceEventOverrideRepository, times(2)).flush();
     }
 
     @Test

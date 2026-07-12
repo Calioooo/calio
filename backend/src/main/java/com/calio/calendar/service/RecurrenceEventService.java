@@ -140,13 +140,34 @@ public class RecurrenceEventService {
                 .findByRecurrenceEvent_IdAndOriginStartAt(recurrenceId, originStartAt)
                 .orElse(null);
         if (override == null) {
+            saveDeletedOverride(recurrenceEvent, originStartAt);
+            return;
+        }
+
+        markDeletedOverride(override);
+    }
+
+    private void saveDeletedOverride(RecurrenceEvent recurrenceEvent, Instant originStartAt) {
+        try {
             recurrenceEventOverrideRepository.save(
                     RecurrenceEventOverride.deleted(recurrenceEvent, originStartAt, Instant.now())
             );
             recurrenceEventOverrideRepository.flush();
-            return;
+        } catch (DuplicateKeyException exception) {
+            markExistingOverrideDeleted(recurrenceEvent.getId(), originStartAt);
+        } catch (DataIntegrityViolationException exception) {
+            markExistingOverrideDeleted(recurrenceEvent.getId(), originStartAt);
         }
+    }
 
+    private void markExistingOverrideDeleted(Long recurrenceId, Instant originStartAt) {
+        RecurrenceEventOverride override = recurrenceEventOverrideRepository
+                .findByRecurrenceEvent_IdAndOriginStartAt(recurrenceId, originStartAt)
+                .orElseThrow(() -> new CalioException(ErrorCode.INTERNAL_SERVER_ERROR));
+        markDeletedOverride(override);
+    }
+
+    private void markDeletedOverride(RecurrenceEventOverride override) {
         override.markDeleted(Instant.now());
         recurrenceEventOverrideRepository.flush();
     }
