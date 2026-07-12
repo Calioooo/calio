@@ -1,0 +1,69 @@
+name: Backend CD
+
+on:
+  push:
+    branches: [dev]
+    paths:
+      - 'backend/**'
+      - 'infra/compose/**'
+      - '.github/workflows/backend-cd.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  BACKEND_IMAGE: ghcr.io/calioooo/calio-backend
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: backend-cd-dev
+      cancel-in-progress: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          file: backend/Dockerfile
+          push: true
+          tags: |
+            ${{ env.BACKEND_IMAGE }}:latest
+            ${{ env.BACKEND_IMAGE }}:${{ github.sha }}
+
+      - name: Sync compose file to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          source: infra/compose/docker-compose.yml
+          target: ${{ secrets.SERVER_DEPLOY_PATH }}
+          strip_components: 2
+
+      - name: Deploy backend on server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            set -e
+            cd "${{ secrets.SERVER_DEPLOY_PATH }}"
+            docker compose pull app
+            docker compose up -d --remove-orphans
+            docker image prune -f
