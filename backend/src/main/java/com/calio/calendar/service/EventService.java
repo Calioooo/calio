@@ -163,7 +163,7 @@ public class EventService {
         List<Instant> originStartAts = new ArrayList<>();
         long intervalIndex = firstWindowIntervalIndex(recurrenceEvent, from);
         Instant originStartAt = occurrenceStartAt(recurrenceEvent, intervalIndex);
-        Instant recurrenceEndAt = recurrenceEndAt(recurrenceEvent);
+        Instant recurrenceEndAt = recurrenceEvent.getRecurrenceEndAt();
 
         while (originStartAt.isBefore(recurrenceEndAt) && originStartAt.isBefore(to)) {
             OccurrenceDisplayTime displayTime = occurrenceDisplayTime(recurrenceEvent, originStartAt);
@@ -221,14 +221,6 @@ public class EventService {
                 ? occurrenceDate
                 : occurrenceDate.plusDays(1);
         return new OccurrenceDisplayTime(originStartAt, toInstant(endDate, recurrenceEvent.getRecurrenceEndTime()));
-    }
-
-    private Instant recurrenceEndAt(RecurrenceEvent recurrenceEvent) {
-        LocalDate recurrenceEndDate = recurrenceEvent.getRecurrenceStartTime()
-                .isBefore(recurrenceEvent.getRecurrenceEndTime())
-                ? recurrenceEvent.getRecurrenceEndDate()
-                : recurrenceEvent.getRecurrenceEndDate().plusDays(1);
-        return toInstant(recurrenceEndDate, recurrenceEvent.getRecurrenceEndTime());
     }
 
     private Instant toInstant(LocalDate date, LocalTime time) {

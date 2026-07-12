@@ -251,16 +251,8 @@ public class RecurrenceEventService {
 
     private boolean isOccurrenceStartBeforeRuleEnd(RecurrenceEvent recurrenceEvent, LocalDate occurrenceDate) {
         Instant occurrenceStartAt = toInstant(occurrenceDate, recurrenceEvent.getRecurrenceStartTime());
-        Instant ruleEndAt = recurrenceEndAt(recurrenceEvent);
+        Instant ruleEndAt = recurrenceEvent.getRecurrenceEndAt();
         return occurrenceStartAt.isBefore(ruleEndAt);
-    }
-
-    private Instant recurrenceEndAt(RecurrenceEvent recurrenceEvent) {
-        LocalDate recurrenceEndDate = recurrenceEvent.getRecurrenceStartTime()
-                .isBefore(recurrenceEvent.getRecurrenceEndTime())
-                ? recurrenceEvent.getRecurrenceEndDate()
-                : recurrenceEvent.getRecurrenceEndDate().plusDays(1);
-        return toInstant(recurrenceEndDate, recurrenceEvent.getRecurrenceEndTime());
     }
 
     private Instant toInstant(LocalDate date, LocalTime time) {

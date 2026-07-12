@@ -11,8 +11,10 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.ZoneOffset;
 
 @Entity
 @Table(name = "recurrence_events")
@@ -129,6 +131,13 @@ public class RecurrenceEvent extends BaseEntity {
 
     public RecurrenceFrequency getRecurrenceFrequency() {
         return recurrenceFrequency;
+    }
+
+    public Instant getRecurrenceEndAt() {
+        LocalDate endDate = recurrenceStartTime.isBefore(recurrenceEndTime)
+                ? recurrenceEndDate
+                : recurrenceEndDate.plusDays(1);
+        return endDate.atTime(recurrenceEndTime).toInstant(ZoneOffset.UTC);
     }
 
     public Tag getTag() {
