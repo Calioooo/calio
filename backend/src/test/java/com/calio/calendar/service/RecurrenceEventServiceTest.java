@@ -94,13 +94,18 @@ class RecurrenceEventServiceTest {
     void givenUpdateRequest_whenUpdateRecurrenceEvent_thenDeletesOverridesWithoutRebuildingEvents() {
         // given
         RecurrenceEvent recurrenceEvent = recurrenceEvent("Original", "2027-02-01", "2027-02-02");
+        Tag fallbackTag = tag();
         when(recurrenceEventRepository.findByIdAndAccount_Id(10L, 1L)).thenReturn(Optional.of(recurrenceEvent));
+        when(tagService.getTagOrDefault(1L, null)).thenReturn(fallbackTag);
         UpdateRecurrenceEventRequest request = new UpdateRecurrenceEventRequest(
                 "Updated",
                 null,
-                Instant.parse("2027-02-03T11:00:00Z"),
-                Instant.parse("2027-02-10T12:00:00Z"),
-                RecurrenceFrequency.WEEKLY
+                LocalDate.parse("2027-02-03"),
+                LocalDate.parse("2027-02-10"),
+                LocalTime.parse("11:00:00"),
+                LocalTime.parse("12:00:00"),
+                RecurrenceFrequency.WEEKLY,
+                null
         );
 
         // when
@@ -108,7 +113,12 @@ class RecurrenceEventServiceTest {
 
         // then
         assertThat(recurrenceEvent.getRecurrenceTitle()).isEqualTo("Updated");
+        assertThat(recurrenceEvent.getRecurrenceStartDate()).isEqualTo(LocalDate.parse("2027-02-03"));
+        assertThat(recurrenceEvent.getRecurrenceEndDate()).isEqualTo(LocalDate.parse("2027-02-10"));
+        assertThat(recurrenceEvent.getRecurrenceStartTime()).isEqualTo(LocalTime.parse("11:00:00"));
+        assertThat(recurrenceEvent.getRecurrenceEndTime()).isEqualTo(LocalTime.parse("12:00:00"));
         assertThat(recurrenceEvent.getRecurrenceFrequency()).isEqualTo(RecurrenceFrequency.WEEKLY);
+        assertThat(recurrenceEvent.getTag()).isSameAs(fallbackTag);
         verify(recurrenceEventOverrideRepository).deleteByRecurrenceEvent_Id(10L);
         verify(eventRepository, never()).saveAll(any());
         verify(eventRepository, never()).deleteAll(any(Iterable.class));

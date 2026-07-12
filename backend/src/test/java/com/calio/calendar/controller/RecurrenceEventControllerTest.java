@@ -210,15 +210,21 @@ class RecurrenceEventControllerTest {
                         .content("""
                                 {
                                   "title": "Updated whole",
-                                  "startAt": "2027-02-03T11:00:00Z",
-                                  "endAt": "2027-02-10T12:00:00Z",
+                                  "description": null,
+                                  "startDate": "2027-02-03",
+                                  "endDate": "2027-02-10",
+                                  "startTime": "11:00:00",
+                                  "endTime": "12:00:00",
                                   "recurrenceFrequency": "WEEKLY"
                                 }
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.recurrenceTitle").value("Updated whole"))
+                .andExpect(jsonPath("$.recurrenceDescription").doesNotExist())
                 .andExpect(jsonPath("$.recurrenceStartDate").value("2027-02-03"))
                 .andExpect(jsonPath("$.recurrenceEndDate").value("2027-02-10"))
+                .andExpect(jsonPath("$.recurrenceStartTime").value("11:00:00"))
+                .andExpect(jsonPath("$.recurrenceEndTime").value("12:00:00"))
                 .andExpect(jsonPath("$.recurrenceFrequency").value("WEEKLY"));
 
         // then
@@ -228,6 +234,45 @@ class RecurrenceEventControllerTest {
         )).isEmpty();
         assertThat(eventRepository.findByRecurrenceIdAndAccount_IdOrderByStartAtAsc(recurrenceId, currentAccountId))
                 .isEmpty();
+    }
+
+    @Test
+    @DisplayName("반복 일정 전체 PUT은 날짜와 시각 범위가 유효하지 않으면 지정된 errorCode를 반환한다")
+    void givenInvalidWholeRecurrencePutRanges_whenPutRecurrenceEvent_thenReturnsContractErrorCodes()
+            throws Exception {
+        // given
+        long recurrenceId = createRecurrenceEvent("Invalid whole update", "2027-02-01", "2027-02-02", "DAILY");
+
+        // when, then
+        mockMvc.perform(put("/api/recurrence-events/{recurrenceId}", recurrenceId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Invalid date",
+                                  "startDate": "2027-02-10",
+                                  "endDate": "2027-02-03",
+                                  "startTime": "11:00:00",
+                                  "endTime": "12:00:00",
+                                  "recurrenceFrequency": "WEEKLY"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("INVALID_RECURRENCE_DATE_RANGE"));
+
+        mockMvc.perform(put("/api/recurrence-events/{recurrenceId}", recurrenceId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Invalid time",
+                                  "startDate": "2027-02-03",
+                                  "endDate": "2027-02-10",
+                                  "startTime": "12:00:00",
+                                  "endTime": "12:00:00",
+                                  "recurrenceFrequency": "WEEKLY"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("INVALID_RECURRENCE_TIME_RANGE"));
     }
 
     @Test

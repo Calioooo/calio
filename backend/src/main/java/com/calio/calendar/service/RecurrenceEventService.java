@@ -73,37 +73,19 @@ public class RecurrenceEventService {
     ) {
         RecurrenceEvent recurrenceEvent = findRecurrenceEvent(accountId, recurrenceId);
         validateProvidedTitle(request.title());
+        validateRecurrenceDateRange(request.startDate(), request.endDate());
+        validateRecurrenceTimeRange(request.startTime(), request.endTime());
 
-        Instant effectiveStartAt = request.startAt() == null
-                ? toInstant(recurrenceEvent.getRecurrenceStartDate(), recurrenceEvent.getRecurrenceStartTime())
-                : request.startAt();
-        Instant effectiveEndAt = request.endAt() == null
-                ? toInstant(recurrenceEvent.getRecurrenceEndDate(), recurrenceEvent.getRecurrenceEndTime())
-                : request.endAt();
-        validateRecurrenceUpdateTimeRange(effectiveStartAt, effectiveEndAt);
-
-        Tag tag = request.tagId() == null
-                ? recurrenceEvent.getTag()
-                : tagService.getTag(accountId, request.tagId());
+        Tag tag = tagService.getTagOrDefault(accountId, request.tagId());
         recurrenceEvent.changeTag(tag);
         recurrenceEvent.update(
-                request.title() == null ? recurrenceEvent.getRecurrenceTitle() : request.title(),
-                request.description() == null ? recurrenceEvent.getRecurrenceDescription() : request.description(),
-                request.startAt() == null
-                        ? recurrenceEvent.getRecurrenceStartDate()
-                        : request.startAt().atOffset(ZoneOffset.UTC).toLocalDate(),
-                request.endAt() == null
-                        ? recurrenceEvent.getRecurrenceEndDate()
-                        : request.endAt().atOffset(ZoneOffset.UTC).toLocalDate(),
-                request.startAt() == null
-                        ? recurrenceEvent.getRecurrenceStartTime()
-                        : request.startAt().atOffset(ZoneOffset.UTC).toLocalTime(),
-                request.endAt() == null
-                        ? recurrenceEvent.getRecurrenceEndTime()
-                        : request.endAt().atOffset(ZoneOffset.UTC).toLocalTime(),
-                request.recurrenceFrequency() == null
-                        ? recurrenceEvent.getRecurrenceFrequency()
-                        : request.recurrenceFrequency()
+                request.title(),
+                request.description(),
+                request.startDate(),
+                request.endDate(),
+                request.startTime(),
+                request.endTime(),
+                request.recurrenceFrequency()
         );
         recurrenceEventRepository.flush();
         recurrenceEventOverrideRepository.deleteByRecurrenceEvent_Id(recurrenceId);
@@ -175,19 +157,11 @@ public class RecurrenceEventService {
     }
 
     private void validateProvidedTitle(String title) {
-        if (title == null || !title.isBlank()) {
+        if (title != null && !title.isBlank()) {
             return;
         }
 
         throw new CalioException(ErrorCode.VALIDATION_FAILED);
-    }
-
-    private void validateRecurrenceUpdateTimeRange(Instant startAt, Instant endAt) {
-        if (startAt.isBefore(endAt)) {
-            return;
-        }
-
-        throw new CalioException(ErrorCode.INVALID_RECURRENCE_TIME_RANGE);
     }
 
     private void validateEventTimeRange(Instant startAt, Instant endAt) {
