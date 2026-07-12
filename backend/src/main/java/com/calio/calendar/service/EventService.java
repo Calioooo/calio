@@ -19,6 +19,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -139,7 +140,11 @@ public class EventService {
             Instant to,
             Set<OccurrenceKey> responseKeys
     ) {
-        List<Instant> originStartAts = originStartAts(recurrenceEvent);
+        List<Instant> originStartAts = originStartAts(recurrenceEvent, from, to);
+        if (originStartAts.isEmpty()) {
+            return List.of();
+        }
+
         Set<Instant> overriddenOrigins = recurrenceEventOverrideRepository
                 .findByRecurrenceEvent_IdAndOriginStartAtIn(recurrenceEvent.getId(), originStartAts)
                 .stream()
@@ -159,14 +164,16 @@ public class EventService {
                 .toList();
     }
 
-    private List<Instant> originStartAts(RecurrenceEvent recurrenceEvent) {
+    private List<Instant> originStartAts(RecurrenceEvent recurrenceEvent, Instant from, Instant to) {
         List<Instant> originStartAts = new ArrayList<>();
-        int intervalIndex = 0;
+        long intervalIndex = firstWindowIntervalIndex(recurrenceEvent, from);
         Instant originStartAt = occurrenceStartAt(recurrenceEvent, intervalIndex);
         Instant recurrenceEndAt = recurrenceEndAt(recurrenceEvent);
 
-        while (originStartAt.isBefore(recurrenceEndAt)) {
-            originStartAts.add(originStartAt);
+        while (originStartAt.isBefore(recurrenceEndAt) && originStartAt.isBefore(to)) {
+            if (overlaps(originStartAt, toOccurrenceEndAt(recurrenceEvent, originStartAt), from, to)) {
+                originStartAts.add(originStartAt);
+            }
             intervalIndex++;
             originStartAt = occurrenceStartAt(recurrenceEvent, intervalIndex);
         }
@@ -174,7 +181,23 @@ public class EventService {
         return originStartAts;
     }
 
-    private Instant occurrenceStartAt(RecurrenceEvent recurrenceEvent, int intervalIndex) {
+    private long firstWindowIntervalIndex(RecurrenceEvent recurrenceEvent, Instant from) {
+        LocalDate recurrenceStartDate = recurrenceEvent.getRecurrenceStartDate();
+        LocalDate generationWindowStartDate = toUtcDate(from).minusDays(1);
+        if (!generationWindowStartDate.isAfter(recurrenceStartDate)) {
+            return 0;
+        }
+
+        long intervalIndex = switch (recurrenceEvent.getRecurrenceFrequency()) {
+            case DAILY -> ChronoUnit.DAYS.between(recurrenceStartDate, generationWindowStartDate);
+            case WEEKLY -> ChronoUnit.WEEKS.between(recurrenceStartDate, generationWindowStartDate);
+            case MONTHLY -> ChronoUnit.MONTHS.between(recurrenceStartDate, generationWindowStartDate);
+            case YEARLY -> ChronoUnit.YEARS.between(recurrenceStartDate, generationWindowStartDate);
+        };
+        return Math.max(0, intervalIndex - 1);
+    }
+
+    private Instant occurrenceStartAt(RecurrenceEvent recurrenceEvent, long intervalIndex) {
         LocalDate startDate = recurrenceEvent.getRecurrenceStartDate();
         LocalDate occurrenceDate = switch (recurrenceEvent.getRecurrenceFrequency()) {
             case DAILY -> startDate.plusDays(intervalIndex);
