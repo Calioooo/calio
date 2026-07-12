@@ -153,12 +153,7 @@ public class EventService {
 
         return originStartAts.stream()
                 .filter(originStartAt -> !overriddenOrigins.contains(originStartAt))
-                .map(originStartAt -> EventResponse.recurrenceOccurrence(
-                        recurrenceEvent,
-                        originStartAt,
-                        originStartAt,
-                        toOccurrenceEndAt(recurrenceEvent, originStartAt)
-                ))
+                .map(originStartAt -> toRecurrenceOccurrenceResponse(recurrenceEvent, originStartAt))
                 .filter(response -> overlaps(response.startAt(), response.endAt(), from, to))
                 .filter(response -> responseKeys.add(OccurrenceKey.from(response)))
                 .toList();
@@ -171,7 +166,8 @@ public class EventService {
         Instant recurrenceEndAt = recurrenceEndAt(recurrenceEvent);
 
         while (originStartAt.isBefore(recurrenceEndAt) && originStartAt.isBefore(to)) {
-            if (overlaps(originStartAt, toOccurrenceEndAt(recurrenceEvent, originStartAt), from, to)) {
+            OccurrenceDisplayTime displayTime = occurrenceDisplayTime(recurrenceEvent, originStartAt);
+            if (overlaps(displayTime.startAt(), displayTime.endAt(), from, to)) {
                 originStartAts.add(originStartAt);
             }
             intervalIndex++;
@@ -208,13 +204,23 @@ public class EventService {
         return toInstant(occurrenceDate, recurrenceEvent.getRecurrenceStartTime());
     }
 
-    private Instant toOccurrenceEndAt(RecurrenceEvent recurrenceEvent, Instant originStartAt) {
+    private EventResponse toRecurrenceOccurrenceResponse(RecurrenceEvent recurrenceEvent, Instant originStartAt) {
+        OccurrenceDisplayTime displayTime = occurrenceDisplayTime(recurrenceEvent, originStartAt);
+        return EventResponse.recurrenceOccurrence(
+                recurrenceEvent,
+                originStartAt,
+                displayTime.startAt(),
+                displayTime.endAt()
+        );
+    }
+
+    private OccurrenceDisplayTime occurrenceDisplayTime(RecurrenceEvent recurrenceEvent, Instant originStartAt) {
         LocalDate occurrenceDate = originStartAt.atOffset(ZoneOffset.UTC).toLocalDate();
         LocalDate endDate = recurrenceEvent.getRecurrenceStartTime()
                 .isBefore(recurrenceEvent.getRecurrenceEndTime())
                 ? occurrenceDate
                 : occurrenceDate.plusDays(1);
-        return toInstant(endDate, recurrenceEvent.getRecurrenceEndTime());
+        return new OccurrenceDisplayTime(originStartAt, toInstant(endDate, recurrenceEvent.getRecurrenceEndTime()));
     }
 
     private Instant recurrenceEndAt(RecurrenceEvent recurrenceEvent) {
@@ -263,5 +269,8 @@ public class EventService {
         private static OccurrenceKey from(RecurrenceEventOverride override) {
             return new OccurrenceKey(override.getRecurrenceId(), override.getOriginStartAt());
         }
+    }
+
+    private record OccurrenceDisplayTime(Instant startAt, Instant endAt) {
     }
 }
