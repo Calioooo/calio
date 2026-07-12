@@ -21,7 +21,7 @@ public interface RecurrenceEventRepository extends JpaRepository<RecurrenceEvent
               and recurrenceEvent.recurrenceStartDate <= :toDate
               and recurrenceEvent.recurrenceEndDate >= :fromDate
             """)
-    List<RecurrenceEvent> findEligibleRules(
+    List<RecurrenceEvent> findRecurrenceEvents(
             @Param("accountId") Long accountId,
             @Param("fromDate") LocalDate fromDate,
             @Param("toDate") LocalDate toDate

@@ -106,7 +106,7 @@ public class EventService {
     }
 
     private List<EventResponse> listRecurrenceOccurrences(Long accountId, Instant from, Instant to) {
-        List<RecurrenceEvent> recurrenceEvents = recurrenceEventRepository.findEligibleRules(
+        List<RecurrenceEvent> recurrenceEvents = recurrenceEventRepository.findRecurrenceEvents(
                 accountId,
                 toUtcDate(from).minusDays(1),
                 toUtcDate(to)

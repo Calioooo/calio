@@ -51,7 +51,7 @@ class RecurrenceEventRepositoryTest {
         ));
 
         // when
-        var candidates = recurrenceEventRepository.findEligibleRules(
+        var candidates = recurrenceEventRepository.findRecurrenceEvents(
                 account.getId(),
                 LocalDate.parse("2027-07-01"),
                 LocalDate.parse("2027-07-02")
