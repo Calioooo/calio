@@ -1,6 +1,6 @@
 package com.calio.calendar.security;
 
-import com.calio.calendar.repository.entity.Account;
+import com.calio.calendar.account.domain.Account;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.util.ReflectionTestUtils;
 

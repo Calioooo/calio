@@ -1,7 +1,7 @@
 package com.calio.calendar.security;
 
-import com.calio.calendar.controller.dto.ErrorProblemDetail;
-import com.calio.calendar.exception.ErrorCode;
+import com.calio.calendar.common.error.ErrorProblemDetail;
+import com.calio.calendar.common.error.ErrorCode;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;

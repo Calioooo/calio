@@ -1,6 +1,6 @@
 package com.calio.calendar.security;
 
-import com.calio.calendar.exception.ErrorCode;
+import com.calio.calendar.common.error.ErrorCode;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

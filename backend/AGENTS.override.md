@@ -5,20 +5,26 @@
 - backend는 Java(21) + Spring boot(4.0.6) 기반 서비스다.
 - Spring MVC / Controller /Service / Repository 경계를 명확히 유지한다.
 - 비즈니스 의미와 상태 판단은 transport layer가 아니라 service layer에서 처리한다.
-- 구조는 전역 `controller`, `service`, `repository`를 두는 단순 layered 구조를 따른다.
+- 구조는 기능 도메인을 최상위 패키지로 두고, 각 도메인 안에 `controller`, `service`, `repository`, `domain` 경계를 두는 기능 중심 구조를 따른다.
 
 ## 구조 원칙
 
-- 패키지는 전역 레이어 기준으로 나눈다.
-- 기본 구조는 `controller`, `service`, `repository`를 기준으로 나눈다.
-- request / response DTO는 transport 경계 모델이므로 `controller/dto` 아래에 둔다.
-- persistence model인 entity는 `repository/entity` 아래에 둔다.
+- 패키지는 `account`, `auth`, `event`, `recurrence`, `task`, `tag`, `holiday` 같은 기능 도메인 기준으로 나눈다.
+- 각 기능 도메인 안에서 필요에 따라 `controller`, `service`, `repository`, `domain`, `client`, `scheduler` 하위 패키지를 사용한다.
+- request / response DTO는 transport 경계 모델이므로 해당 도메인의 `controller/dto` 아래에 둔다.
+- 외부 API 요청·응답 DTO는 해당 도메인의 `client/dto` 아래에 둔다.
+- persistence model을 포함한 도메인 모델과 닫힌 enum은 해당 도메인의 `domain` 아래에 둔다.
+- 공통 persistence 기반 모델은 `common/persistence` 아래에 둔다.
+- 외부 연동 client와 해당 client에 전속된 properties는 기능 도메인의 `client` 아래에 둔다.
+- 주기적인 job은 해당 도메인의 `scheduler` 아래에 두고, 실제 업무 흐름은 service에 위임한다.
+- 기능 도메인에 속하지 않는 공통 설정, 오류, persistence 기반 기능만 `common` 아래에 둔다.
+- 인증·인가 파이프라인은 `security` 패키지가 소유하며, 파일 수와 책임이 커지면 그 안에서 계층적으로 분리한다.
 - controller는 transport layer로 유지하고 business logic을 넣지 않는다.
 - service는 유스케이스 흐름과 비즈니스 규칙 적용의 중심이 된다.
 - repository는 persistence 접근만 담당한다.
-- domain model을 별도로 두지 않고 entity를 중심 모델로 사용한다.
+- 서로 다른 도메인이 필요 없이 내부 구현을 소유하거나 DTO를 공유하지 않도록 한다.
 - 공통 로직은 무분별하게 퍼뜨리지 않고, 실제로 공통성이 확인된 경우에만 `common`으로 올린다.
-- 구조는 단순하게 시작하되, 나중에 기능별 도메인 구조로 진화할 수 있도록 기능 응집도를 유지한다.
+- 새 레이어나 공용 패키지를 추가하기보다 기존 기능 도메인의 구조를 우선 확장한다.
 
 ## 구현 규칙
 
@@ -80,6 +86,8 @@
 ## 테스트 기대치
 
 - 테스트는 `unit test`와 `integration test` 두 종류로 구분한다.
+- 테스트 패키지는 검증 대상 production 패키지를 따르고, 기능 도메인과 레이어 경계를 동일하게 유지한다.
+- package-private 테스트 지점을 사용하기 위해 production 가시성을 넓히지 않고, 테스트를 검증 대상과 같은 패키지에 둔다.
 - unit test는 핵심 비즈니스 규칙과 정책 로직을 빠르게 검증하는 데 사용한다.
 - integration test는 controller, service, repository, validation, 예외 처리, 응답 계약이 함께 동작하는 흐름을 검증하는 데
 사용한다.
