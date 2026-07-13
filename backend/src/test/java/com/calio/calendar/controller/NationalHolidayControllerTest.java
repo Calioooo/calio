@@ -3,6 +3,7 @@ package com.calio.calendar.controller;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -124,9 +125,10 @@ class NationalHolidayControllerTest {
                         .param("to", "2026-05-05"))
                 // then
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("INVALID_TIME_RANGE"))
-                .andExpect(jsonPath("$.message").value("Invalid time range."))
-                .andExpect(jsonPath("$.*", hasSize(2)));
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.title").value("INVALID_TIME_RANGE"))
+                .andExpect(jsonPath("$.detail").value("Invalid time range."))
+                .andExpect(jsonPath("$.*", hasSize(6)));
     }
 
     @Test
@@ -136,16 +138,16 @@ class NationalHolidayControllerTest {
         mockMvc.perform(get("/api/national-holidays")
                         .param("to", "2026-05-05"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"))
-                .andExpect(jsonPath("$.message").value("Validation failed."))
-                .andExpect(jsonPath("$.*", hasSize(2)));
+                .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.detail").value("Validation failed."))
+                .andExpect(jsonPath("$.*", hasSize(6)));
 
         mockMvc.perform(get("/api/national-holidays")
                         .param("from", "2026-05-05"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"))
-                .andExpect(jsonPath("$.message").value("Validation failed."))
-                .andExpect(jsonPath("$.*", hasSize(2)));
+                .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.detail").value("Validation failed."))
+                .andExpect(jsonPath("$.*", hasSize(6)));
     }
 
     @Test
@@ -157,9 +159,9 @@ class NationalHolidayControllerTest {
                         .param("to", "2026-06-06"))
                 // then
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"))
-                .andExpect(jsonPath("$.message").value("Validation failed."))
-                .andExpect(jsonPath("$.*", hasSize(2)));
+                .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.detail").value("Validation failed."))
+                .andExpect(jsonPath("$.*", hasSize(6)));
     }
 
     @Test

@@ -1,6 +1,6 @@
 package com.calio.calendar.security;
 
-import com.calio.calendar.controller.dto.ErrorResponse;
+import com.calio.calendar.controller.dto.ErrorProblemDetail;
 import com.calio.calendar.exception.ErrorCode;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -19,11 +19,9 @@ public class AuthenticationErrorResponseWriter {
 
     public void write(HttpServletResponse response, ErrorCode errorCode) throws IOException {
         response.setStatus(errorCode.getStatus().value());
-        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        response.getWriter().write(objectMapper.writeValueAsString(toResponse(errorCode)));
-    }
-
-    private ErrorResponse toResponse(ErrorCode errorCode) {
-        return new ErrorResponse(errorCode.name(), errorCode.getDefaultMessage());
+        response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
+        response.getWriter().write(objectMapper.writeValueAsString(
+                ErrorProblemDetail.from(errorCode, errorCode.getDefaultMessage())
+        ));
     }
 }

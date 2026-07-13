@@ -2,6 +2,7 @@ package com.calio.calendar.security;
 
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -21,6 +22,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -60,22 +62,23 @@ class SecurityAuthenticationIntegrationTest {
     }
 
     @Test
-    @DisplayName("잘못된 Bearer token은 기존 ErrorResponse 구조로 AUTH_TOKEN_INVALID를 반환한다")
-    void givenInvalidBearerToken_whenRequestWithAuthorizationHeader_thenReturnsInvalidTokenErrorResponse()
+    @DisplayName("잘못된 Bearer token은 ProblemDetail 구조로 AUTH_TOKEN_INVALID를 반환한다")
+    void givenInvalidBearerToken_whenRequestWithAuthorizationHeader_thenReturnsInvalidTokenProblemDetail()
             throws Exception {
         // when
         mockMvc.perform(get("/api/security-test/authenticated-account")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer invalid-token"))
                 // then
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.errorCode").value("AUTH_TOKEN_INVALID"))
-                .andExpect(jsonPath("$.message").value("Authentication token is invalid."))
-                .andExpect(jsonPath("$.*", hasSize(2)));
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.title").value("AUTH_TOKEN_INVALID"))
+                .andExpect(jsonPath("$.detail").value("Authentication token is invalid."))
+                .andExpect(jsonPath("$.*", hasSize(5)));
     }
 
     @Test
-    @DisplayName("revoked Bearer token은 기존 ErrorResponse 구조로 AUTH_TOKEN_REVOKED를 반환한다")
-    void givenRevokedBearerToken_whenRequestWithAuthorizationHeader_thenReturnsRevokedTokenErrorResponse()
+    @DisplayName("revoked Bearer token은 ProblemDetail 구조로 AUTH_TOKEN_REVOKED를 반환한다")
+    void givenRevokedBearerToken_whenRequestWithAuthorizationHeader_thenReturnsRevokedTokenProblemDetail()
             throws Exception {
         // given
         String rawToken = "revoked-token";
@@ -89,9 +92,10 @@ class SecurityAuthenticationIntegrationTest {
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + rawToken))
                 // then
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.errorCode").value("AUTH_TOKEN_REVOKED"))
-                .andExpect(jsonPath("$.message").value("Authentication token is revoked."))
-                .andExpect(jsonPath("$.*", hasSize(2)));
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.title").value("AUTH_TOKEN_REVOKED"))
+                .andExpect(jsonPath("$.detail").value("Authentication token is revoked."))
+                .andExpect(jsonPath("$.*", hasSize(5)));
     }
 
     @Test
@@ -119,9 +123,10 @@ class SecurityAuthenticationIntegrationTest {
         // when, then
         mockMvc.perform(get("/api/tasks"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.errorCode").value("AUTH_TOKEN_REQUIRED"))
-                .andExpect(jsonPath("$.message").value("Authentication token is required."))
-                .andExpect(jsonPath("$.*", hasSize(2)));
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.title").value("AUTH_TOKEN_REQUIRED"))
+                .andExpect(jsonPath("$.detail").value("Authentication token is required."))
+                .andExpect(jsonPath("$.*", hasSize(5)));
     }
 
     @Test
@@ -131,7 +136,7 @@ class SecurityAuthenticationIntegrationTest {
         // when, then
         mockMvc.perform(get("/api/national-holidays"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"));
+                .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"));
     }
 
     @RestController

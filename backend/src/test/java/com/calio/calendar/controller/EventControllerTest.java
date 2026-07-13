@@ -98,8 +98,8 @@ class EventControllerTest {
                 .andReturn();
 
         JsonNode response = readResponse(result);
-        assertThat(response.get("createdAt").asText()).isNotEqualTo("2000-01-01T00:00:00Z");
-        assertThat(response.get("updatedAt").asText()).isNotEqualTo("2000-01-01T00:00:00Z");
+        assertThat(response.get("createdAt").asString()).isNotEqualTo("2000-01-01T00:00:00Z");
+        assertThat(response.get("updatedAt").asString()).isNotEqualTo("2000-01-01T00:00:00Z");
     }
 
     @Test
@@ -230,7 +230,7 @@ class EventControllerTest {
                                 """))
                 // then
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.errorCode").value("TAG_NOT_FOUND"));
+                .andExpect(jsonPath("$.title").value("TAG_NOT_FOUND"));
     }
 
     @Test
@@ -255,7 +255,7 @@ class EventControllerTest {
                                 """.formatted(otherAccountTag.getId())))
                 // then
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.errorCode").value("TAG_NOT_FOUND"));
+                .andExpect(jsonPath("$.title").value("TAG_NOT_FOUND"));
     }
 
     @Test
@@ -276,8 +276,8 @@ class EventControllerTest {
                         .content(requestBody))
                 // then
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"))
-                .andExpect(jsonPath("$.message").isString());
+                .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.detail").isString());
     }
 
     @Test
@@ -298,8 +298,8 @@ class EventControllerTest {
                         .content(requestBody))
                 // then
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("INVALID_TIME_RANGE"))
-                .andExpect(jsonPath("$.message").isString());
+                .andExpect(jsonPath("$.title").value("INVALID_TIME_RANGE"))
+                .andExpect(jsonPath("$.detail").isString());
     }
 
     @Test
@@ -374,9 +374,9 @@ class EventControllerTest {
                         .content("{}"))
                 // then
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"))
-                .andExpect(jsonPath("$.message").isString())
-                .andExpect(jsonPath("$.*", hasSize(2)));
+                .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.detail").isString())
+                .andExpect(jsonPath("$.*", hasSize(6)));
     }
 
     @Test
@@ -396,9 +396,9 @@ class EventControllerTest {
                                 """))
                 // then
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"))
-                .andExpect(jsonPath("$.message").isString())
-                .andExpect(jsonPath("$.*", hasSize(2)));
+                .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.detail").isString())
+                .andExpect(jsonPath("$.*", hasSize(6)));
     }
 
     @Test
@@ -411,9 +411,9 @@ class EventControllerTest {
         updateImportantEventResult(missingEventId, true)
                 // then
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.errorCode").value("EVENT_NOT_FOUND"))
-                .andExpect(jsonPath("$.message").isString())
-                .andExpect(jsonPath("$.*", hasSize(2)));
+                .andExpect(jsonPath("$.title").value("EVENT_NOT_FOUND"))
+                .andExpect(jsonPath("$.detail").isString())
+                .andExpect(jsonPath("$.*", hasSize(6)));
     }
 
     @Test
@@ -448,7 +448,7 @@ class EventControllerTest {
         MvcResult persistedResult = mockMvc.perform(get("/api/events/{eventId}", eventId))
                 .andExpect(status().isOk())
                 .andReturn();
-        String persistedCreatedAt = readResponse(persistedResult).get("createdAt").asText();
+        String persistedCreatedAt = readResponse(persistedResult).get("createdAt").asString();
 
         String requestBody = """
                 {
@@ -479,7 +479,7 @@ class EventControllerTest {
 
         JsonNode updatedEvent = readResponse(updateResult);
         assertThat(updatedEvent.get("description").isNull()).isTrue();
-        assertThat(updatedEvent.get("updatedAt").asText()).isNotEqualTo("2000-01-01T00:00:00Z");
+        assertThat(updatedEvent.get("updatedAt").asString()).isNotEqualTo("2000-01-01T00:00:00Z");
     }
 
     @Test
@@ -501,9 +501,9 @@ class EventControllerTest {
                         .content(requestBody))
                 // then
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"))
-                .andExpect(jsonPath("$.message").isString())
-                .andExpect(jsonPath("$.*", hasSize(2)));
+                .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.detail").isString())
+                .andExpect(jsonPath("$.*", hasSize(6)));
     }
 
     @Test
@@ -522,9 +522,9 @@ class EventControllerTest {
                                 }
                                 """))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"))
-                .andExpect(jsonPath("$.message").isString())
-                .andExpect(jsonPath("$.*", hasSize(2)));
+                .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.detail").isString())
+                .andExpect(jsonPath("$.*", hasSize(6)));
 
         mockMvc.perform(put("/api/events/{eventId}", eventId)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -535,9 +535,9 @@ class EventControllerTest {
                                 }
                                 """))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"))
-                .andExpect(jsonPath("$.message").isString())
-                .andExpect(jsonPath("$.*", hasSize(2)));
+                .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.detail").isString())
+                .andExpect(jsonPath("$.*", hasSize(6)));
     }
 
     @Test
@@ -559,9 +559,9 @@ class EventControllerTest {
                         .content(requestBody))
                 // then
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("INVALID_TIME_RANGE"))
-                .andExpect(jsonPath("$.message").isString())
-                .andExpect(jsonPath("$.*", hasSize(2)));
+                .andExpect(jsonPath("$.title").value("INVALID_TIME_RANGE"))
+                .andExpect(jsonPath("$.detail").isString())
+                .andExpect(jsonPath("$.*", hasSize(6)));
     }
 
     @Test
@@ -583,9 +583,9 @@ class EventControllerTest {
                         .content(requestBody))
                 // then
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.errorCode").value("EVENT_NOT_FOUND"))
-                .andExpect(jsonPath("$.message").isString())
-                .andExpect(jsonPath("$.*", hasSize(2)));
+                .andExpect(jsonPath("$.title").value("EVENT_NOT_FOUND"))
+                .andExpect(jsonPath("$.detail").isString())
+                .andExpect(jsonPath("$.*", hasSize(6)));
     }
 
     @Test
@@ -598,8 +598,8 @@ class EventControllerTest {
         mockMvc.perform(get("/api/events/{eventId}", missingEventId))
                 // then
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.errorCode").value("EVENT_NOT_FOUND"))
-                .andExpect(jsonPath("$.message").isString());
+                .andExpect(jsonPath("$.title").value("EVENT_NOT_FOUND"))
+                .andExpect(jsonPath("$.detail").isString());
     }
 
     @Test
@@ -618,7 +618,7 @@ class EventControllerTest {
 
         mockMvc.perform(get("/api/events/{eventId}", deletedEventId))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.errorCode").value("EVENT_NOT_FOUND"));
+                .andExpect(jsonPath("$.title").value("EVENT_NOT_FOUND"));
 
         MvcResult listResult = mockMvc.perform(get("/api/events")
                         .param("from", "2026-06-09T00:00:00Z")
@@ -643,15 +643,15 @@ class EventControllerTest {
         // when, then
         mockMvc.perform(delete("/api/events/{eventId}", missingEventId))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.errorCode").value("EVENT_NOT_FOUND"))
-                .andExpect(jsonPath("$.message").isString())
-                .andExpect(jsonPath("$.*", hasSize(2)));
+                .andExpect(jsonPath("$.title").value("EVENT_NOT_FOUND"))
+                .andExpect(jsonPath("$.detail").isString())
+                .andExpect(jsonPath("$.*", hasSize(6)));
 
         mockMvc.perform(delete("/api/events/{eventId}", eventId))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.errorCode").value("EVENT_NOT_FOUND"))
-                .andExpect(jsonPath("$.message").isString())
-                .andExpect(jsonPath("$.*", hasSize(2)));
+                .andExpect(jsonPath("$.title").value("EVENT_NOT_FOUND"))
+                .andExpect(jsonPath("$.detail").isString())
+                .andExpect(jsonPath("$.*", hasSize(6)));
     }
 
     @Test
@@ -706,7 +706,7 @@ class EventControllerTest {
     }
 
     private MvcResult createEventResult(String title, String startAt, String endAt) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/events")
+        return mockMvc.perform(post("/api/events")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -717,8 +717,6 @@ class EventControllerTest {
                                 """.formatted(title, startAt, endAt)))
                 .andExpect(status().isCreated())
                 .andReturn();
-
-        return result;
     }
 
     private ResultActions updateImportantEventResult(long eventId, boolean importantEvent) throws Exception {
