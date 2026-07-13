@@ -42,7 +42,7 @@ public class BearerTokenAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
-        boolean authenticated = authenticateWithBearerToken(authorizationHeader, response);
+        boolean authenticated = authenticateWithBearerToken(authorizationHeader, request, response);
         if (!authenticated) {
             return;
         }
@@ -50,7 +50,11 @@ public class BearerTokenAuthenticationFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
-    private boolean authenticateWithBearerToken(String authorizationHeader, HttpServletResponse response)
+    private boolean authenticateWithBearerToken(
+            String authorizationHeader,
+            HttpServletRequest request,
+            HttpServletResponse response
+    )
             throws IOException {
         try {
             String rawToken = extractBearerToken(authorizationHeader);
@@ -59,7 +63,7 @@ public class BearerTokenAuthenticationFilter extends OncePerRequestFilter {
             return true;
         } catch (CalioException exception) {
             SecurityContextHolder.clearContext();
-            errorResponseWriter.write(response, exception.getErrorCode());
+            errorResponseWriter.write(request, response, exception.getErrorCode());
             return false;
         }
     }

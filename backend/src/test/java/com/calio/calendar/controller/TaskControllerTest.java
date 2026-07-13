@@ -85,8 +85,8 @@ class TaskControllerTest {
                 .andReturn();
 
         JsonNode response = readResponse(result);
-        assertThat(response.get("createdAt").asText()).isNotEqualTo("2000-01-01T00:00:00Z");
-        assertThat(response.get("updatedAt").asText()).isNotEqualTo("2000-01-01T00:00:00Z");
+        assertThat(response.get("createdAt").asString()).isNotEqualTo("2000-01-01T00:00:00Z");
+        assertThat(response.get("updatedAt").asString()).isNotEqualTo("2000-01-01T00:00:00Z");
     }
 
     @Test
@@ -98,9 +98,9 @@ class TaskControllerTest {
                         .content("{}"))
                 // then
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"))
-                .andExpect(jsonPath("$.message").isString())
-                .andExpect(jsonPath("$.*", hasSize(2)));
+                .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.detail").isString())
+                .andExpect(jsonPath("$.*", hasSize(6)));
     }
 
     @Test
@@ -116,9 +116,9 @@ class TaskControllerTest {
                                 """))
                 // then
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"))
-                .andExpect(jsonPath("$.message").isString())
-                .andExpect(jsonPath("$.*", hasSize(2)));
+                .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.detail").isString())
+                .andExpect(jsonPath("$.*", hasSize(6)));
     }
 
     @Test
@@ -134,9 +134,9 @@ class TaskControllerTest {
                                 """))
                 // then
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"))
-                .andExpect(jsonPath("$.message").isString())
-                .andExpect(jsonPath("$.*", hasSize(2)));
+                .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.detail").isString())
+                .andExpect(jsonPath("$.*", hasSize(6)));
     }
 
     @Test
@@ -208,9 +208,9 @@ class TaskControllerTest {
                                 """))
                 // then
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.errorCode").value("COMPLETED_TASK_TITLE_UPDATE_NOT_ALLOWED"))
-                .andExpect(jsonPath("$.message").value("Completed task title update is not allowed."))
-                .andExpect(jsonPath("$.*", hasSize(2)));
+                .andExpect(jsonPath("$.title").value("COMPLETED_TASK_TITLE_UPDATE_NOT_ALLOWED"))
+                .andExpect(jsonPath("$.detail").value("Completed task title update is not allowed."))
+                .andExpect(jsonPath("$.*", hasSize(6)));
 
         Task persistedTask = taskRepository.findById(task.getTaskId()).orElseThrow();
         assertThat(persistedTask.getTaskTitle()).isEqualTo("Completed task");
@@ -231,8 +231,8 @@ class TaskControllerTest {
                                 """))
                 // then
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.errorCode").value("TASK_NOT_FOUND"))
-                .andExpect(jsonPath("$.message").value("Task not found."));
+                .andExpect(jsonPath("$.title").value("TASK_NOT_FOUND"))
+                .andExpect(jsonPath("$.detail").value("Task not found."));
     }
 
     @Test
@@ -247,9 +247,9 @@ class TaskControllerTest {
                         .content("{}"))
                 // then
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"))
-                .andExpect(jsonPath("$.message").value("Validation failed."))
-                .andExpect(jsonPath("$.*", hasSize(2)));
+                .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.detail").value("Validation failed."))
+                .andExpect(jsonPath("$.*", hasSize(6)));
     }
 
     @Test
@@ -268,9 +268,9 @@ class TaskControllerTest {
                                 """))
                 // then
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"))
-                .andExpect(jsonPath("$.message").value("Validation failed."))
-                .andExpect(jsonPath("$.*", hasSize(2)));
+                .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.detail").value("Validation failed."))
+                .andExpect(jsonPath("$.*", hasSize(6)));
     }
 
     @Test
@@ -289,9 +289,9 @@ class TaskControllerTest {
                                 """))
                 // then
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"))
-                .andExpect(jsonPath("$.message").value("Validation failed."))
-                .andExpect(jsonPath("$.*", hasSize(2)));
+                .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.detail").value("Validation failed."))
+                .andExpect(jsonPath("$.*", hasSize(6)));
     }
 
     @Test
@@ -305,9 +305,9 @@ class TaskControllerTest {
                         .contentType(MediaType.APPLICATION_JSON))
                 // then
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"))
-                .andExpect(jsonPath("$.message").value("Validation failed."))
-                .andExpect(jsonPath("$.*", hasSize(2)));
+                .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.detail").value("Validation failed."))
+                .andExpect(jsonPath("$.*", hasSize(6)));
     }
 
     @Test
@@ -322,9 +322,9 @@ class TaskControllerTest {
                         .content("{\"taskTitle\":"))
                 // then
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"))
-                .andExpect(jsonPath("$.message").value("Validation failed."))
-                .andExpect(jsonPath("$.*", hasSize(2)));
+                .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.detail").value("Validation failed."))
+                .andExpect(jsonPath("$.*", hasSize(6)));
     }
 
     @Test
@@ -340,9 +340,9 @@ class TaskControllerTest {
                                 """))
                 // then
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"))
-                .andExpect(jsonPath("$.message").value("Validation failed."))
-                .andExpect(jsonPath("$.*", hasSize(2)));
+                .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.detail").value("Validation failed."))
+                .andExpect(jsonPath("$.*", hasSize(6)));
     }
 
     @Test
@@ -364,7 +364,7 @@ class TaskControllerTest {
         JsonNode response = readResponse(result);
         Task task = taskRepository.findById(taskId).orElseThrow();
         assertThat(task.isCompleted()).isTrue();
-        assertThat(task.getCompletedAt()).isEqualTo(Instant.parse(response.get("completedAt").asText()));
+        assertThat(task.getCompletedAt()).isEqualTo(Instant.parse(response.get("completedAt").asString()));
     }
 
     @Test
@@ -458,8 +458,8 @@ class TaskControllerTest {
         mockMvc.perform(delete("/api/tasks/{taskId}", 999999L))
                 // then
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.errorCode").value("TASK_NOT_FOUND"))
-                .andExpect(jsonPath("$.message").value("Task not found."));
+                .andExpect(jsonPath("$.title").value("TASK_NOT_FOUND"))
+                .andExpect(jsonPath("$.detail").value("Task not found."));
     }
 
     @Test
@@ -469,8 +469,8 @@ class TaskControllerTest {
         mockMvc.perform(patch("/api/tasks/{taskId}/uncomplete", 999999L))
                 // then
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.errorCode").value("TASK_NOT_FOUND"))
-                .andExpect(jsonPath("$.message").value("Task not found."));
+                .andExpect(jsonPath("$.title").value("TASK_NOT_FOUND"))
+                .andExpect(jsonPath("$.detail").value("Task not found."));
     }
 
     private long createTask(String taskTitle) throws Exception {

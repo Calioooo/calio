@@ -283,7 +283,7 @@ class RecurrenceEventControllerTest {
     }
 
     @Test
-    @DisplayName("반복 일정 전체 PUT은 날짜와 시각 범위가 유효하지 않으면 지정된 errorCode를 반환한다")
+    @DisplayName("반복 일정 전체 PUT은 날짜와 시각 범위가 유효하지 않으면 ProblemDetail title를 반환한다")
     void givenInvalidWholeRecurrencePutRanges_whenPutRecurrenceEvent_thenReturnsContractErrorCodes()
             throws Exception {
         // given
@@ -303,7 +303,7 @@ class RecurrenceEventControllerTest {
                                 }
                                 """))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("INVALID_RECURRENCE_DATE_RANGE"));
+                .andExpect(jsonPath("$.title").value("INVALID_RECURRENCE_DATE_RANGE"));
 
         mockMvc.perform(put("/api/recurrence-events/{recurrenceId}", recurrenceId)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -318,11 +318,11 @@ class RecurrenceEventControllerTest {
                                 }
                                 """))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("INVALID_RECURRENCE_TIME_RANGE"));
+                .andExpect(jsonPath("$.title").value("INVALID_RECURRENCE_TIME_RANGE"));
     }
 
     @Test
-    @DisplayName("단일 occurrence PATCH는 잘못된 시간 범위와 생성 불가능한 originStartAt을 지정된 errorCode로 반환한다")
+    @DisplayName("단일 occurrence PATCH는 잘못된 시간 범위와 생성 불가능한 originStartAt을 ProblemDetail title로 반환한다")
     void givenInvalidOccurrencePatch_whenPatch_thenReturnsContractErrorCodes() throws Exception {
         // given
         long recurrenceId = createRecurrenceEvent("Invalid patch", "2027-03-01", "2027-03-01", "DAILY");
@@ -338,7 +338,7 @@ class RecurrenceEventControllerTest {
                                 }
                                 """))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("INVALID_TIME_RANGE"));
+                .andExpect(jsonPath("$.title").value("INVALID_TIME_RANGE"));
 
         mockMvc.perform(patch("/api/recurrence-events/{recurrenceId}/occurrences", recurrenceId)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -350,7 +350,7 @@ class RecurrenceEventControllerTest {
                                 }
                                 """))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.errorCode").value("RECURRENCE_OCCURRENCE_NOT_FOUND"));
+                .andExpect(jsonPath("$.title").value("RECURRENCE_OCCURRENCE_NOT_FOUND"));
 
         mockMvc.perform(patch("/api/recurrence-events/{recurrenceId}/occurrences", 999999L)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -362,7 +362,7 @@ class RecurrenceEventControllerTest {
                                 }
                                 """))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.errorCode").value("RECURRENCE_EVENT_NOT_FOUND"));
+                .andExpect(jsonPath("$.title").value("RECURRENCE_EVENT_NOT_FOUND"));
     }
 
     @Test
@@ -383,7 +383,7 @@ class RecurrenceEventControllerTest {
                                 }
                                 """))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.errorCode").value("RECURRENCE_OCCURRENCE_NOT_FOUND"));
+                .andExpect(jsonPath("$.title").value("RECURRENCE_OCCURRENCE_NOT_FOUND"));
     }
 
     @Test
@@ -393,7 +393,7 @@ class RecurrenceEventControllerTest {
                         .param("from", "2027-05-02T00:00:00Z")
                         .param("to", "2027-05-01T00:00:00Z"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("INVALID_TIME_RANGE"));
+                .andExpect(jsonPath("$.title").value("INVALID_TIME_RANGE"));
     }
 
     private long createEvent(String title, String startAt, String endAt) throws Exception {
@@ -430,10 +430,6 @@ class RecurrenceEventControllerTest {
                 .andExpect(status().isCreated())
                 .andReturn();
         return readResponse(result).get("recurrenceId").asLong();
-    }
-
-    private String recurrenceRequest(String title, String startDate, String endDate, String frequency) {
-        return recurrenceRequest(title, startDate, endDate, "09:00:00", "10:00:00", frequency);
     }
 
     private String recurrenceRequest(

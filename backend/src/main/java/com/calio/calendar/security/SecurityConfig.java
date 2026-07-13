@@ -28,7 +28,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) {
         return http
                 .csrf(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
@@ -51,7 +51,7 @@ public class SecurityConfig {
                 )
                 .exceptionHandling(exception -> exception.authenticationEntryPoint(
                         (request, response, authException) ->
-                                authenticationErrorResponseWriter.write(response, ErrorCode.AUTH_TOKEN_REQUIRED)
+                                authenticationErrorResponseWriter.write(request, response, ErrorCode.AUTH_TOKEN_REQUIRED)
                 ))
                 .addFilterBefore(bearerTokenAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();

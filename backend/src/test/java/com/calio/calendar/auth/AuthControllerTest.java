@@ -64,7 +64,7 @@ class AuthControllerTest {
                 .andReturn();
 
         JsonNode response = objectMapper.readTree(result.getResponse().getContentAsString());
-        String rawToken = response.get("accessToken").asText();
+        String rawToken = response.get("accessToken").asString();
         AccountAuthToken persistedToken = accountAuthTokenRepository.findAll().getFirst();
 
         assertThat(rawToken).isNotBlank();

@@ -113,7 +113,7 @@ class CustomTagControllerTest {
                         .content(customTagRequest(" ", "#22C55E")))
                 // then
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"));
+                .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"));
     }
 
     @Test
@@ -125,7 +125,7 @@ class CustomTagControllerTest {
                         .content(customTagRequest("색상 공백", " ")))
                 // then
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"));
+                .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"));
     }
 
     @Test
@@ -137,7 +137,7 @@ class CustomTagControllerTest {
                         .content(customTagRequest("색상 오류", "22C55E")))
                 // then
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("INVALID_TAG_COLOR_CODE"));
+                .andExpect(jsonPath("$.title").value("INVALID_TAG_COLOR_CODE"));
     }
 
     @Test
@@ -162,7 +162,7 @@ class CustomTagControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(customTagRequest("기본 수정", "#000000")))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.errorCode").value("TAG_NOT_FOUND"));
+                .andExpect(jsonPath("$.title").value("TAG_NOT_FOUND"));
     }
 
     @Test
@@ -204,7 +204,7 @@ class CustomTagControllerTest {
         mockMvc.perform(delete("/api/custom-tags/{tagId}", customTag.getId()))
                 // then
                 .andExpect(status().is5xxServerError())
-                .andExpect(jsonPath("$.errorCode").value("DEFAULT_TAG_NOT_FOUND"));
+                .andExpect(jsonPath("$.title").value("DEFAULT_TAG_NOT_FOUND"));
 
         assertThat(tagRepository.existsById(customTag.getId())).isTrue();
         assertThat(eventRepository.findById(ordinaryEvent.getId()))

@@ -2,10 +2,15 @@ package com.calio.calendar.client;
 
 import com.calio.calendar.client.dto.HolidayApiResponse;
 import com.calio.calendar.config.HolidayApiProperties;
+import com.calio.calendar.exception.CalioException;
+import com.calio.calendar.exception.ErrorCode;
 import java.time.Duration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.ResourceAccessException;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
@@ -13,6 +18,7 @@ import tools.jackson.databind.ObjectMapper;
 @Component
 public class HolidayApiClient {
 
+    private static final Logger log = LoggerFactory.getLogger(HolidayApiClient.class);
     private static final int MAX_RETRY_COUNT = 1;
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
     private static final Duration READ_TIMEOUT = Duration.ofSeconds(15);
@@ -33,13 +39,17 @@ public class HolidayApiClient {
                 .build();
     }
 
-    public HolidayApiResponse fetchHolidays(int year) throws JacksonException {
+    public HolidayApiResponse fetchHolidays(int year) {
         if (!holidayApiProperties.hasServiceKey()) {
             throw new IllegalStateException("Holiday API service key is missing");
         }
 
-        String responseBody = fetchResponseBodyWithRetry(year);
-        return HolidayApiResponse.fromJson(responseBody, objectMapper);
+        try {
+            String responseBody = fetchResponseBodyWithRetry(year);
+            return HolidayApiResponse.fromJson(responseBody, objectMapper);
+        } catch (JacksonException | RestClientException exception) {
+            throw new CalioException(ErrorCode.EXTERNAL_API_UNAVAILABLE, exception);
+        }
     }
 
     private String fetchResponseBodyWithRetry(int year) {
@@ -52,6 +62,12 @@ public class HolidayApiClient {
                     throw exception;
                 }
                 attempt++;
+                log.debug(
+                        "Holiday API request failed. year={} attempt={} message={}",
+                        year,
+                        attempt,
+                        exception.getMessage()
+                );
             }
         }
     }
