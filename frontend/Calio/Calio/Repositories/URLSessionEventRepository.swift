@@ -12,17 +12,20 @@ struct URLSessionEventRepository: EventRepository {
     private let session: URLSession
     private let jsonDecoder: JSONDecoder
     private let jsonEncoder: JSONEncoder
+    private let authTokenProvider: AuthTokenProvider?
 
     init(
         baseURL: URL = CalioAPIConfig.baseURL,
         session: URLSession = .shared,
         jsonDecoder: JSONDecoder = EventJSONCoding.makeDecoder(),
-        jsonEncoder: JSONEncoder = EventJSONCoding.makeEncoder()
+        jsonEncoder: JSONEncoder = EventJSONCoding.makeEncoder(),
+        authTokenProvider: AuthTokenProvider? = KeychainAuthTokenStore.shared
     ) {
         self.baseURL = baseURL
         self.session = session
         self.jsonDecoder = jsonDecoder
         self.jsonEncoder = jsonEncoder
+        self.authTokenProvider = authTokenProvider
     }
 
     func fetchEvents(from startDate: Date, to endDate: Date) async throws -> [EventResponseDTO] {
@@ -195,7 +198,17 @@ struct URLSessionEventRepository: EventRepository {
         var request = URLRequest(url: url)
         request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Accept")
+        setAuthorizationHeaderIfNeeded(on: &request)
         return request
+    }
+
+    private func setAuthorizationHeaderIfNeeded(on request: inout URLRequest) {
+        guard let accessToken = authTokenProvider?.accessToken,
+              !accessToken.isEmpty else {
+            return
+        }
+
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
     }
 
     private func makeRequest<Body: Encodable>(
@@ -266,17 +279,20 @@ struct URLSessionTagRepository: TagRepository {
     private let session: URLSession
     private let jsonDecoder: JSONDecoder
     private let jsonEncoder: JSONEncoder
+    private let authTokenProvider: AuthTokenProvider?
 
     init(
         baseURL: URL = CalioAPIConfig.baseURL,
         session: URLSession = .shared,
         jsonDecoder: JSONDecoder = EventJSONCoding.makeDecoder(),
-        jsonEncoder: JSONEncoder = EventJSONCoding.makeEncoder()
+        jsonEncoder: JSONEncoder = EventJSONCoding.makeEncoder(),
+        authTokenProvider: AuthTokenProvider? = KeychainAuthTokenStore.shared
     ) {
         self.baseURL = baseURL
         self.session = session
         self.jsonDecoder = jsonDecoder
         self.jsonEncoder = jsonEncoder
+        self.authTokenProvider = authTokenProvider
     }
 
     func fetchTags() async throws -> [TagResponseDTO] {
@@ -321,7 +337,17 @@ struct URLSessionTagRepository: TagRepository {
         var request = URLRequest(url: url)
         request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Accept")
+        setAuthorizationHeaderIfNeeded(on: &request)
         return request
+    }
+
+    private func setAuthorizationHeaderIfNeeded(on request: inout URLRequest) {
+        guard let accessToken = authTokenProvider?.accessToken,
+              !accessToken.isEmpty else {
+            return
+        }
+
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
     }
 
     private func makeRequest<Body: Encodable>(

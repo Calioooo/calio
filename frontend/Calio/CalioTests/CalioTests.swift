@@ -1739,6 +1739,109 @@ struct CalioTests {
         #expect(requestBodyData(from: capturedRequests[2]) == nil)
     }
 
+    @Test func urlSessionAuthRepositoryIssuesGuestTokenWithBackendContract() async throws {
+        let responseJSON = """
+        {
+          "accessToken": "guest-token",
+          "tokenType": "Bearer"
+        }
+        """.data(using: .utf8)!
+        var capturedRequest: URLRequest?
+        MockURLProtocol.requestHandler = { request in
+            capturedRequest = request
+            let response = HTTPURLResponse(
+                url: request.url!,
+                statusCode: 201,
+                httpVersion: nil,
+                headerFields: nil
+            )!
+            return (response, responseJSON)
+        }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        let repository = URLSessionAuthRepository(
+            baseURL: URL(string: "https://example.test")!,
+            session: session
+        )
+
+        let response = try await repository.issueGuestToken()
+        let request = try #require(capturedRequest)
+
+        #expect(response == GuestAuthResponseDTO(accessToken: "guest-token", tokenType: "Bearer"))
+        #expect(request.url?.absoluteString == "https://example.test/api/auth/guest")
+        #expect(request.httpMethod == "POST")
+        #expect(request.value(forHTTPHeaderField: "Accept") == "application/json")
+        #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
+        #expect(requestBodyData(from: request) == nil)
+    }
+
+    @Test func authServiceIssuesGuestTokenOnceAndStoresRawToken() async throws {
+        let repository = RecordingAuthRepository(
+            response: GuestAuthResponseDTO(accessToken: "guest-token", tokenType: "Bearer")
+        )
+        let tokenStore = InMemoryAuthTokenStore()
+        let service = AuthService(repository: repository, tokenStore: tokenStore)
+
+        let token = try await service.ensureGuestAuthentication()
+        let reusedToken = try await service.ensureGuestAuthentication()
+
+        #expect(token == "guest-token")
+        #expect(reusedToken == "guest-token")
+        #expect(tokenStore.accessToken == "guest-token")
+        #expect(repository.issueGuestTokenCallCount == 1)
+    }
+
+    @Test func urlSessionProtectedRepositoriesAttachStoredBearerToken() async throws {
+        let tagResponseJSON = """
+        [
+          {
+            "id": 1,
+            "title": "업무",
+            "colorCode": "#3B82F6",
+            "tagType": "DEFAULT"
+          }
+        ]
+        """.data(using: .utf8)!
+        var capturedRequests: [URLRequest] = []
+        MockURLProtocol.requestHandler = { request in
+            capturedRequests.append(request)
+            let response = HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            )!
+            let data = request.url?.path == "/api/events" ? Data("[]".utf8) : tagResponseJSON
+            return (response, data)
+        }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        let tokenProvider = StaticAuthTokenProvider(accessToken: "guest-token")
+        let eventRepository = URLSessionEventRepository(
+            baseURL: URL(string: "https://example.test")!,
+            session: session,
+            authTokenProvider: tokenProvider
+        )
+        let tagRepository = URLSessionTagRepository(
+            baseURL: URL(string: "https://example.test")!,
+            session: session,
+            authTokenProvider: tokenProvider
+        )
+
+        _ = try await eventRepository.fetchEvents(
+            from: Date(timeIntervalSince1970: 0),
+            to: Date(timeIntervalSince1970: 3600)
+        )
+        _ = try await tagRepository.fetchTags()
+
+        #expect(capturedRequests.map { $0.value(forHTTPHeaderField: "Authorization") } == [
+            "Bearer guest-token",
+            "Bearer guest-token"
+        ])
+    }
+
     @Test func urlSessionNationalHolidayRepositoryFetchesWithLocalDateQuery() async throws {
         let responseJSON = """
         [
@@ -3313,4 +3416,42 @@ private final class MockURLProtocol: URLProtocol {
     }
 
     override func stopLoading() {}
+}
+
+private struct StaticAuthTokenProvider: AuthTokenProvider {
+    let accessToken: String?
+}
+
+private final class InMemoryAuthTokenStore: AuthTokenStore {
+    private var storedAccessToken: String?
+
+    var accessToken: String? {
+        storedAccessToken
+    }
+
+    func loadAccessToken() throws -> String? {
+        storedAccessToken
+    }
+
+    func saveAccessToken(_ accessToken: String) throws {
+        storedAccessToken = accessToken
+    }
+
+    func deleteAccessToken() throws {
+        storedAccessToken = nil
+    }
+}
+
+private final class RecordingAuthRepository: AuthRepository {
+    private let response: GuestAuthResponseDTO
+    private(set) var issueGuestTokenCallCount = 0
+
+    init(response: GuestAuthResponseDTO) {
+        self.response = response
+    }
+
+    func issueGuestToken() async throws -> GuestAuthResponseDTO {
+        issueGuestTokenCallCount += 1
+        return response
+    }
 }
