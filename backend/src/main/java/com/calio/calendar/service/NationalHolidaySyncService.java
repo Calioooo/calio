@@ -3,6 +3,7 @@ package com.calio.calendar.service;
 import com.calio.calendar.client.HolidayApiClient;
 import com.calio.calendar.client.dto.HolidayApiItem;
 import com.calio.calendar.client.dto.HolidayApiResponse;
+import com.calio.calendar.exception.CalioException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -53,13 +54,21 @@ public class NationalHolidaySyncService {
             nationalHolidayPersistenceService.applySnapshot(year, providerRows);
         } catch (Exception exception) {
             log.warn(
-                    "National holiday sync failed. year={} resultCode={} message={}",
+                    "National holiday sync failed. year={} resultCode={} errorCode={} message={}",
                     year,
                     response == null ? null : response.resultCode(),
+                    errorCode(exception),
                     exception.getMessage(),
                     exception
             );
         }
+    }
+
+    private String errorCode(Exception exception) {
+        if (exception instanceof CalioException calioException) {
+            return calioException.getErrorCode().name();
+        }
+        return null;
     }
 
     private Set<NationalHolidayProviderRow> toProviderRows(List<HolidayApiItem> items) {

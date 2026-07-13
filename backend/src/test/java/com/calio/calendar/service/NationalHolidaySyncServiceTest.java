@@ -6,6 +6,8 @@ import com.calio.calendar.client.HolidayApiClient;
 import com.calio.calendar.client.dto.HolidayApiItem;
 import com.calio.calendar.client.dto.HolidayApiResponse;
 import com.calio.calendar.config.HolidayApiProperties;
+import com.calio.calendar.exception.CalioException;
+import com.calio.calendar.exception.ErrorCode;
 import com.calio.calendar.repository.NationalHolidayRepository;
 import com.calio.calendar.repository.entity.NationalHoliday;
 import java.lang.reflect.Proxy;
@@ -16,7 +18,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DuplicateKeyException;
-import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.TransactionException;
 import org.springframework.transaction.support.AbstractPlatformTransactionManager;
@@ -102,10 +103,13 @@ class NationalHolidaySyncServiceTest {
     }
 
     @Test
-    @DisplayName("한 year의 API 실패는 year range의 다음 year sync를 막지 않는다")
-    void givenOneYearApiFailure_whenSyncYearRange_thenContinuesNextYear() {
+    @DisplayName("한 year의 외부 API 장애는 EXTERNAL_API_UNAVAILABLE 예외로 처리되어 다음 year sync를 막지 않는다")
+    void givenOneYearExternalApiFailure_whenSyncYearRange_thenContinuesNextYear() {
         // given
-        holidayApiClient.addFailure(2026, new IllegalStateException("api failure"));
+        holidayApiClient.addFailure(
+                2026,
+                new CalioException(ErrorCode.EXTERNAL_API_UNAVAILABLE, new IllegalStateException("api failure"))
+        );
         holidayApiClient.addResponse(2027, new HolidayApiResponse(
                 "00",
                 List.of(new HolidayApiItem("20270101", "신정", "Y"))
