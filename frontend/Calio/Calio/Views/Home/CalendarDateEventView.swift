@@ -13,13 +13,13 @@ struct CalendarDateEventView: View {
     private let contentTopPadding: CGFloat = 12
     private let contentBottomPadding: CGFloat = 24
     
-    let items: [CalendarDateCellItem]
+    let items: [CalendarDayItem]
     let tags: [CalendarTag]
     let referenceDay: DayKey
-    let eventAreaState: CalendarEventAreaState
+    let eventLoadState: CalendarEventLoadState
     let onReferenceDayChanged: (DayKey) -> Void
     let onVisibleRangeChanged: (CalendarVisibleIndexRange) -> Void
-    let onRetryEvents: () -> Void
+    let onRetryEventLoading: () -> Void
     let isEventMutating: Bool
     let isTagMutating: Bool
     let eventMutationFailureMessage: String?
@@ -38,13 +38,13 @@ struct CalendarDateEventView: View {
     let onDeleteCustomTag: (CalendarTag) async -> Bool
 
     init(
-        items: [CalendarDateCellItem],
+        items: [CalendarDayItem],
         tags: [CalendarTag] = [],
         referenceDay: DayKey,
-        eventAreaState: CalendarEventAreaState,
+        eventLoadState: CalendarEventLoadState,
         onReferenceDayChanged: @escaping (DayKey) -> Void,
         onVisibleRangeChanged: @escaping (CalendarVisibleIndexRange) -> Void,
-        onRetryEvents: @escaping () -> Void,
+        onRetryEventLoading: @escaping () -> Void,
         isEventMutating: Bool = false,
         isTagMutating: Bool = false,
         eventMutationFailureMessage: String? = nil,
@@ -65,10 +65,10 @@ struct CalendarDateEventView: View {
         self.items = items
         self.tags = tags
         self.referenceDay = referenceDay
-        self.eventAreaState = eventAreaState
+        self.eventLoadState = eventLoadState
         self.onReferenceDayChanged = onReferenceDayChanged
         self.onVisibleRangeChanged = onVisibleRangeChanged
-        self.onRetryEvents = onRetryEvents
+        self.onRetryEventLoading = onRetryEventLoading
         self.isEventMutating = isEventMutating
         self.isTagMutating = isTagMutating
         self.eventMutationFailureMessage = eventMutationFailureMessage
@@ -94,8 +94,8 @@ struct CalendarDateEventView: View {
     var body: some View {
         VStack(spacing: 0) {
             CalendarEventStatusBannerView(
-                state: eventAreaState,
-                onRetry: onRetryEvents
+                state: eventLoadState,
+                onRetry: onRetryEventLoading
             )
 
             GeometryReader { _ in
@@ -271,7 +271,7 @@ struct CalendarDateEventView: View {
         )
     }
     
-    let items: [CalendarDateCellItem] = (0..<7).map { offset in
+    let items: [CalendarDayItem] = (0..<7).map { offset in
         let date = calendar.date(
             byAdding: .day,
             value: offset,
@@ -312,7 +312,7 @@ struct CalendarDateEventView: View {
             []
         }
         
-        return CalendarDateCellItem(
+        return CalendarDayItem(
             id: day,
             weekday: dateService.getWeekday(from: date),
             monthText: dateService.monthText(from: date),
@@ -325,10 +325,10 @@ struct CalendarDateEventView: View {
     CalendarDateEventView(
         items: items,
         referenceDay: items[0].id,
-        eventAreaState: .idle,
+        eventLoadState: .idle,
         onReferenceDayChanged: { _ in },
         onVisibleRangeChanged: { _ in },
-        onRetryEvents: {}
+        onRetryEventLoading: {}
     )
     .frame(height: 110)
 }

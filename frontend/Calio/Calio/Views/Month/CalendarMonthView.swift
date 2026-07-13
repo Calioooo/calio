@@ -13,7 +13,7 @@ struct CalendarMonthView: View {
     private let rowCount = 6
     private let maxVisibleEventDotCount = 3
     
-    let items: [CalendarDateCellItem]
+    let items: [CalendarDayItem]
     let referenceDay: DayKey
     let onSelectedDay: (DayKey) -> Void
     let onMonthChanged: (Int) -> Void
@@ -124,7 +124,7 @@ struct CalendarMonthView: View {
         }
     }
 
-    private func aggregateDotColors(for item: CalendarDateCellItem?) -> [Color] {
+    private func aggregateDotColors(for item: CalendarDayItem?) -> [Color] {
         guard let item else {
             return []
         }
@@ -133,7 +133,7 @@ struct CalendarMonthView: View {
             + item.events.map { Color(hex: $0.tag.colorCode) }
     }
     
-    private var itemsByDay: [DayKey: CalendarDateCellItem] {
+    private var itemsByDay: [DayKey: CalendarDayItem] {
         Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })
     }
     
@@ -173,7 +173,7 @@ struct CalendarMonthView: View {
     }
     
     private func dayTextColor(
-        for item: CalendarDateCellItem?,
+        for item: CalendarDayItem?,
         isCurrentMonth: Bool
     ) -> Color {
         if item?.isToday == true {

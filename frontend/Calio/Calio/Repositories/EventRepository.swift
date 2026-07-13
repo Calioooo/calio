@@ -19,12 +19,11 @@ protocol EventRepository {
     ) async throws -> RecurrenceEventResponseDTO
     func updateRecurrenceOccurrence(
         recurrenceId: Int64,
-        eventId: Int64,
         request: UpdateRecurrenceOccurrenceRequestDTO
     ) async throws -> EventResponseDTO
     func deleteEvent(eventId: Int64) async throws
     func deleteRecurrenceEvent(recurrenceId: Int64) async throws
-    func deleteRecurrenceOccurrence(recurrenceId: Int64, eventId: Int64) async throws
+    func deleteRecurrenceOccurrence(recurrenceId: Int64, originStartAt: Date) async throws
 }
 
 protocol TagRepository {

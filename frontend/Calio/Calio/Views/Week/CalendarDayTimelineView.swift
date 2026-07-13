@@ -13,10 +13,10 @@ struct CalendarDayTimelineView: View {
     private let timelineStartHour = 0
     private let timelineEndHour = 23
     
-    let items: [CalendarDateCellItem]
+    let items: [CalendarDayItem]
     let referenceDay: DayKey
-    let eventAreaState: CalendarEventAreaState
-    let onRetryEvents: () -> Void
+    let eventLoadState: CalendarEventLoadState
+    let onRetryEventLoading: () -> Void
     
     var body: some View {
         GeometryReader { geometry in
@@ -34,8 +34,8 @@ struct CalendarDayTimelineView: View {
                     .padding(.leading, metrics.titleLeadingPadding)
 
                 CalendarEventStatusBannerView(
-                    state: eventAreaState,
-                    onRetry: onRetryEvents
+                    state: eventLoadState,
+                    onRetry: onRetryEventLoading
                 )
                 
                 dayHeader(metrics: metrics)
@@ -222,7 +222,7 @@ struct CalendarDayTimelineView: View {
         }
     }
     
-    private var currentItem: CalendarDateCellItem? {
+    private var currentItem: CalendarDayItem? {
         Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })[referenceDay]
     }
     
@@ -507,7 +507,7 @@ private struct DayTimelineEventLayout: Identifiable {
     let width: CGFloat
     let height: CGFloat
     
-    var id: Int64 {
+    var id: String {
         event.id
     }
 }
@@ -571,7 +571,7 @@ private extension UIView {
         value: 1,
         to: startOfDay
     ) ?? startOfDay
-    let item = CalendarDateCellItem(
+    let item = CalendarDayItem(
         id: day,
         weekday: dateService.getWeekday(from: date),
         monthText: dateService.monthText(from: date),
@@ -595,7 +595,7 @@ private extension UIView {
     CalendarDayTimelineView(
         items: [item],
         referenceDay: day,
-        eventAreaState: .idle,
-        onRetryEvents: {}
+        eventLoadState: .idle,
+        onRetryEventLoading: {}
     )
 }

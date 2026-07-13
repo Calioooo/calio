@@ -364,7 +364,7 @@ struct CalendarEventDetailView: View {
     }
 
     private var canSaveEdit: Bool {
-        CalendarEventFormView.canSave(
+        CalendarEventFormRules.canSave(
             title: editInput.title,
             startAt: editInput.startAt,
             endAt: editInput.endAt,
@@ -495,26 +495,18 @@ struct CalendarEventDetailView: View {
             return
         }
 
-        let input = EventUpdateInput(
-            title: editInput.title.trimmingCharacters(in: .whitespacesAndNewlines),
-            description: editInput.description,
-            startAt: recurrenceInput.startDate,
-            endAt: recurrenceInput.endDate,
-            tagId: editInput.tag?.id
-        )
-
         Task {
             let didUpdate = await onUpdateRecurrenceSeries(
                 recurrenceId,
                 RecurrenceEventSeriesEditInput(
-                    title: input.title,
-                    description: input.description,
+                    title: editInput.title.trimmingCharacters(in: .whitespacesAndNewlines),
+                    description: editInput.description,
                     recurrenceStartDate: recurrenceInput.startDate,
                     recurrenceEndDate: recurrenceInput.endDate,
                     recurrenceStartTime: recurrenceInput.startTime,
                     recurrenceEndTime: recurrenceInput.endTime,
                     recurrenceFrequency: recurrenceInput.frequency,
-                    tagId: input.tagId
+                    tagId: editInput.tag?.id
                 )
             )
 

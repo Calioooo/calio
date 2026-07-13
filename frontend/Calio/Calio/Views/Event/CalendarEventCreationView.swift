@@ -63,7 +63,7 @@ struct CalendarEventCreationView: View {
             initialValue: RecurrenceInput(
                 isEnabled: false,
                 startDate: startAt,
-                endDate: startAt,
+                endDate: endAt,
                 startTime: startAt,
                 endTime: endAt,
                 frequency: .daily
@@ -138,7 +138,7 @@ struct CalendarEventCreationView: View {
     }
     
     private var canSave: Bool {
-        CalendarEventFormView.canSave(
+        CalendarEventFormRules.canSave(
             title: eventInput.title,
             startAt: eventInput.startAt,
             endAt: eventInput.endAt,
@@ -247,7 +247,7 @@ struct CalendarEventCreationView: View {
 
     private func resetRecurrenceFieldsFromSingleEventTime() {
         recurrenceInput.startDate = eventInput.startAt
-        recurrenceInput.endDate = eventInput.startAt
+        recurrenceInput.endDate = eventInput.endAt
         recurrenceInput.startTime = eventInput.startAt
         recurrenceInput.endTime = eventInput.endAt
         recurrenceInput.frequency = .daily

@@ -85,7 +85,7 @@ struct URLSessionEventRepository: EventRepository {
         request requestDTO: UpdateRecurrenceEventRequestDTO
     ) async throws -> RecurrenceEventResponseDTO {
         let request = try makeRequest(
-            method: "PATCH",
+            method: "PUT",
             url: recurrenceEventURL(recurrenceId: recurrenceId),
             body: requestDTO
         )
@@ -95,12 +95,11 @@ struct URLSessionEventRepository: EventRepository {
 
     func updateRecurrenceOccurrence(
         recurrenceId: Int64,
-        eventId: Int64,
         request requestDTO: UpdateRecurrenceOccurrenceRequestDTO
     ) async throws -> EventResponseDTO {
         let request = try makeRequest(
             method: "PATCH",
-            url: recurrenceOccurrenceURL(recurrenceId: recurrenceId, eventId: eventId),
+            url: recurrenceOccurrenceURL(recurrenceId: recurrenceId),
             body: requestDTO
         )
 
@@ -125,10 +124,15 @@ struct URLSessionEventRepository: EventRepository {
         try await emptyResponse(for: request)
     }
 
-    func deleteRecurrenceOccurrence(recurrenceId: Int64, eventId: Int64) async throws {
+    func deleteRecurrenceOccurrence(recurrenceId: Int64, originStartAt: Date) async throws {
         let request = try makeRequest(
             method: "DELETE",
-            url: recurrenceOccurrenceURL(recurrenceId: recurrenceId, eventId: eventId)
+            url: recurrenceOccurrenceURL(
+                recurrenceId: recurrenceId,
+                queryItems: [
+                    URLQueryItem(name: "originStartAt", value: EventJSONCoding.string(from: originStartAt))
+                ]
+            )
         )
 
         try await emptyResponse(for: request)
@@ -169,10 +173,22 @@ struct URLSessionEventRepository: EventRepository {
         try recurrenceEventsURL().appendingPathComponent(String(recurrenceId))
     }
 
-    private func recurrenceOccurrenceURL(recurrenceId: Int64, eventId: Int64) throws -> URL {
-        try recurrenceEventURL(recurrenceId: recurrenceId)
-            .appendingPathComponent("occurrences")
-            .appendingPathComponent(String(eventId))
+    private func recurrenceOccurrenceURL(
+        recurrenceId: Int64,
+        queryItems: [URLQueryItem] = []
+    ) throws -> URL {
+        var components = URLComponents(
+            url: try recurrenceEventURL(recurrenceId: recurrenceId)
+                .appendingPathComponent("occurrences"),
+            resolvingAgainstBaseURL: false
+        )
+        components?.queryItems = queryItems.isEmpty ? nil : queryItems
+
+        guard let url = components?.url else {
+            throw EventRepositoryError.invalidURL
+        }
+
+        return url
     }
 
     private func makeRequest(method: String, url: URL) -> URLRequest {

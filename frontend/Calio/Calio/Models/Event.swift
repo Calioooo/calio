@@ -36,7 +36,8 @@ struct CalendarTag: Identifiable, Equatable {
 }
 
 struct Event: Identifiable {
-    let id: Int64
+    let id: String
+    let backendId: Int64?
     let title: String
     let description: String
     let startAt: Date
@@ -45,9 +46,10 @@ struct Event: Identifiable {
     let importantEvent: Bool
     let recurrenceId: Int64?
     let isRecurrenceOccurrence: Bool
+    let originStartAt: Date?
     
     init(
-        id: Int64 = 0,
+        id: Int64? = nil,
         title: String,
         description: String,
         startAt: Date,
@@ -55,9 +57,10 @@ struct Event: Identifiable {
         tag: CalendarTag = .fallback,
         importantEvent: Bool = false,
         recurrenceId: Int64? = nil,
-        isRecurrenceOccurrence: Bool = false
+        isRecurrenceOccurrence: Bool = false,
+        originStartAt: Date? = nil
     ) {
-        self.id = id
+        self.backendId = id
         self.title = title
         self.description = description
         self.startAt = startAt
@@ -66,5 +69,35 @@ struct Event: Identifiable {
         self.importantEvent = importantEvent
         self.recurrenceId = recurrenceId
         self.isRecurrenceOccurrence = isRecurrenceOccurrence
+        self.originStartAt = originStartAt
+        self.id = Self.makeStableID(
+            backendId: id,
+            recurrenceId: recurrenceId,
+            originStartAt: originStartAt,
+            isRecurrenceOccurrence: isRecurrenceOccurrence
+        )
+    }
+
+    private static func makeStableID(
+        backendId: Int64?,
+        recurrenceId: Int64?,
+        originStartAt: Date?,
+        isRecurrenceOccurrence: Bool
+    ) -> String {
+        if isRecurrenceOccurrence,
+           let recurrenceId,
+           let originStartAt {
+            return "recurrence:\(recurrenceId):\(millisecondsSince1970(originStartAt))"
+        }
+
+        if let backendId {
+            return "event:\(backendId)"
+        }
+
+        return "event:temporary"
+    }
+
+    private static func millisecondsSince1970(_ date: Date) -> Int64 {
+        Int64((date.timeIntervalSince1970 * 1_000).rounded())
     }
 }

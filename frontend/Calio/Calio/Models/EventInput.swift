@@ -138,34 +138,37 @@ struct RecurrenceEventSeriesEditInput: Equatable {
 struct RecurrenceEventUpdateInput: Equatable {
     let title: String
     let description: String
-    let startAt: Date
-    let endAt: Date
+    let recurrenceStartDate: Date
+    let recurrenceEndDate: Date
+    let recurrenceStartTime: Date
+    let recurrenceEndTime: Date
     let recurrenceFrequency: RecurrenceFrequency
     let tagId: Int64?
 
     init(
         title: String,
         description: String,
-        startAt: Date,
-        endAt: Date,
+        recurrenceStartDate: Date,
+        recurrenceEndDate: Date,
+        recurrenceStartTime: Date,
+        recurrenceEndTime: Date,
         recurrenceFrequency: RecurrenceFrequency,
         tagId: Int64? = nil
     ) {
         self.title = title
         self.description = description
-        self.startAt = startAt
-        self.endAt = endAt
+        self.recurrenceStartDate = recurrenceStartDate
+        self.recurrenceEndDate = recurrenceEndDate
+        self.recurrenceStartTime = recurrenceStartTime
+        self.recurrenceEndTime = recurrenceEndTime
         self.recurrenceFrequency = recurrenceFrequency
         self.tagId = tagId
     }
 }
 
 struct RecurrenceOccurrenceUpdateInput: Equatable {
-    let title: String
-    let description: String
     let startAt: Date
     let endAt: Date
-    let isImportant: Bool
 }
 
 enum CalendarEventCreationSubmitInput: Equatable {

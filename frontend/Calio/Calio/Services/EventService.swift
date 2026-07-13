@@ -28,7 +28,7 @@ struct EventService {
     func createEvent(_ input: EventCreateInput) async throws -> Event {
         let request = CreateEventRequestDTO(
             title: input.title,
-            description: input.description,
+            description: backendDescription(from: input.description),
             startAt: input.startAt,
             endAt: input.endAt,
             tagId: input.tagId
@@ -47,7 +47,7 @@ struct EventService {
     func updateEvent(eventId: Int64, input: EventUpdateInput) async throws -> Event {
         let request = UpdateEventRequestDTO(
             title: input.title,
-            description: input.description,
+            description: backendDescription(from: input.description),
             startAt: input.startAt,
             endAt: input.endAt,
             tagId: input.tagId
@@ -82,9 +82,11 @@ struct EventService {
     ) async throws -> RecurrenceEventDetails {
         let request = UpdateRecurrenceEventRequestDTO(
             title: input.title,
-            description: input.description,
-            startAt: input.startAt,
-            endAt: input.endAt,
+            description: backendDescription(from: input.description),
+            startDate: CalendarDateService.utcDateString(from: input.recurrenceStartDate),
+            endDate: CalendarDateService.utcDateString(from: input.recurrenceEndDate),
+            startTime: CalendarDateService.utcTimeString(from: input.recurrenceStartTime),
+            endTime: CalendarDateService.utcTimeString(from: input.recurrenceEndTime),
             recurrenceFrequency: input.recurrenceFrequency,
             tagId: input.tagId
         )
@@ -106,21 +108,18 @@ struct EventService {
 
     func updateRecurrenceOccurrence(
         recurrenceId: Int64,
-        eventId: Int64,
+        originStartAt: Date,
         input: RecurrenceOccurrenceUpdateInput
     ) async throws -> Event {
         let request = UpdateRecurrenceOccurrenceRequestDTO(
-            title: input.title,
-            description: input.description,
+            originStartAt: originStartAt,
             startAt: input.startAt,
-            endAt: input.endAt,
-            isImportant: input.isImportant
+            endAt: input.endAt
         )
 
         do {
             let response = try await repository.updateRecurrenceOccurrence(
                 recurrenceId: recurrenceId,
-                eventId: eventId,
                 request: request
             )
             return mapToEvent(response)
@@ -151,11 +150,11 @@ struct EventService {
         }
     }
 
-    func deleteRecurrenceOccurrence(recurrenceId: Int64, eventId: Int64) async throws {
+    func deleteRecurrenceOccurrence(recurrenceId: Int64, originStartAt: Date) async throws {
         do {
             try await repository.deleteRecurrenceOccurrence(
                 recurrenceId: recurrenceId,
-                eventId: eventId
+                originStartAt: originStartAt
             )
         } catch let error as EventRepositoryError {
             throw mapToServiceError(error)
@@ -167,7 +166,7 @@ struct EventService {
     func createRecurrenceEvent(_ input: RecurrenceEventCreateInput) async throws {
         let request = CreateRecurrenceEventRequestDTO(
             recurrenceTitle: input.title,
-            recurrenceDescription: input.description,
+            recurrenceDescription: backendDescription(from: input.description),
             recurrenceStartDate: CalendarDateService.utcDateString(from: input.recurrenceStartDate),
             recurrenceEndDate: CalendarDateService.utcDateString(from: input.recurrenceEndDate),
             recurrenceStartTime: CalendarDateService.utcTimeString(from: input.recurrenceStartTime),
@@ -195,7 +194,8 @@ struct EventService {
             tag: mapToCalendarTag(dto.tag),
             importantEvent: dto.importantEvent,
             recurrenceId: dto.recurrenceId,
-            isRecurrenceOccurrence: dto.isRecurrenceOccurrence
+            isRecurrenceOccurrence: dto.isRecurrenceOccurrence,
+            originStartAt: dto.originStartAt
         )
     }
 
@@ -224,6 +224,10 @@ struct EventService {
             colorCode: dto.colorCode,
             tagType: dto.tagType
         )
+    }
+
+    private func backendDescription(from description: String) -> String? {
+        description.isEmpty ? nil : description
     }
 
     private func mapToServiceError(_ error: EventRepositoryError) -> EventServiceError {

@@ -103,52 +103,35 @@ struct StubEventRepository: EventRepository, TagRepository {
         recurrenceId: Int64,
         request: UpdateRecurrenceEventRequestDTO
     ) async throws -> RecurrenceEventResponseDTO {
-        guard let title = request.title,
-              let startAt = request.startAt,
-              let endAt = request.endAt,
-              let recurrenceFrequency = request.recurrenceFrequency
-        else {
-            throw EventRepositoryError.invalidResponse
-        }
-
-        return RecurrenceEventResponseDTO(
+        RecurrenceEventResponseDTO(
             recurrenceId: recurrenceId,
-            recurrenceTitle: title,
+            recurrenceTitle: request.title,
             recurrenceDescription: request.description,
-            recurrenceStartDate: CalendarDateService.utcDateString(from: startAt),
-            recurrenceEndDate: CalendarDateService.utcDateString(from: endAt),
-            recurrenceStartTime: CalendarDateService.utcTimeString(from: startAt),
-            recurrenceEndTime: CalendarDateService.utcTimeString(from: endAt),
-            recurrenceFrequency: recurrenceFrequency,
+            recurrenceStartDate: request.startDate,
+            recurrenceEndDate: request.endDate,
+            recurrenceStartTime: request.startTime,
+            recurrenceEndTime: request.endTime,
+            recurrenceFrequency: request.recurrenceFrequency,
             tag: tag(for: request.tagId)
         )
     }
 
     func updateRecurrenceOccurrence(
         recurrenceId: Int64,
-        eventId: Int64,
         request: UpdateRecurrenceOccurrenceRequestDTO
     ) async throws -> EventResponseDTO {
-        guard let title = request.title,
-              let startAt = request.startAt,
-              let endAt = request.endAt,
-              let isImportant = request.isImportant
-        else {
-            throw EventRepositoryError.invalidResponse
-        }
-
-        return EventResponseDTO(
-            id: eventId,
-            title: title,
-            description: request.description,
-            startAt: startAt,
-            endAt: endAt,
-            importantEvent: isImportant,
+        EventResponseDTO(
+            id: nil,
+            title: "반복 일정",
+            description: nil,
+            startAt: request.startAt,
+            endAt: request.endAt,
             recurrenceId: recurrenceId,
             isRecurrenceOccurrence: true,
+            originStartAt: request.originStartAt,
             tag: Self.defaultTags[0],
-            createdAt: startAt,
-            updatedAt: endAt
+            createdAt: request.startAt,
+            updatedAt: request.endAt
         )
     }
 
@@ -156,7 +139,7 @@ struct StubEventRepository: EventRepository, TagRepository {
 
     func deleteRecurrenceEvent(recurrenceId: Int64) async throws {}
 
-    func deleteRecurrenceOccurrence(recurrenceId: Int64, eventId: Int64) async throws {}
+    func deleteRecurrenceOccurrence(recurrenceId: Int64, originStartAt: Date) async throws {}
     
     private func sampleEvents(around baseDate: Date) -> [EventResponseDTO] {
         [

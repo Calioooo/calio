@@ -8,14 +8,14 @@
 import SwiftUI
 
 struct CalendarScheduleDrawerView: View {
-    let items: [CalendarDateCellItem]
+    let items: [CalendarDayItem]
     let tags: [CalendarTag]
     let referenceDay: DayKey
     let displayMode: CalendarDisplayMode
-    let eventAreaState: CalendarEventAreaState
+    let eventLoadState: CalendarEventLoadState
     let onReferenceDayChanged: (DayKey) -> Void
     let onVisibleRangeChanged: (CalendarVisibleIndexRange) -> Void
-    let onRetryEvents: () -> Void
+    let onRetryEventLoading: () -> Void
     let onDragEnded: (CGSize) -> Void
     let isEventMutating: Bool
     let isTagMutating: Bool
@@ -35,14 +35,14 @@ struct CalendarScheduleDrawerView: View {
     let onDeleteCustomTag: (CalendarTag) async -> Bool
 
     init(
-        items: [CalendarDateCellItem],
+        items: [CalendarDayItem],
         tags: [CalendarTag] = [],
         referenceDay: DayKey,
         displayMode: CalendarDisplayMode,
-        eventAreaState: CalendarEventAreaState,
+        eventLoadState: CalendarEventLoadState,
         onReferenceDayChanged: @escaping (DayKey) -> Void,
         onVisibleRangeChanged: @escaping (CalendarVisibleIndexRange) -> Void,
-        onRetryEvents: @escaping () -> Void,
+        onRetryEventLoading: @escaping () -> Void,
         onDragEnded: @escaping (CGSize) -> Void,
         isEventMutating: Bool = false,
         isTagMutating: Bool = false,
@@ -65,10 +65,10 @@ struct CalendarScheduleDrawerView: View {
         self.tags = tags
         self.referenceDay = referenceDay
         self.displayMode = displayMode
-        self.eventAreaState = eventAreaState
+        self.eventLoadState = eventLoadState
         self.onReferenceDayChanged = onReferenceDayChanged
         self.onVisibleRangeChanged = onVisibleRangeChanged
-        self.onRetryEvents = onRetryEvents
+        self.onRetryEventLoading = onRetryEventLoading
         self.onDragEnded = onDragEnded
         self.isEventMutating = isEventMutating
         self.isTagMutating = isTagMutating
@@ -96,10 +96,10 @@ struct CalendarScheduleDrawerView: View {
                 items: items,
                 tags: tags,
                 referenceDay: referenceDay,
-                eventAreaState: eventAreaState,
+                eventLoadState: eventLoadState,
                 onReferenceDayChanged: onReferenceDayChanged,
                 onVisibleRangeChanged: onVisibleRangeChanged,
-                onRetryEvents: onRetryEvents,
+                onRetryEventLoading: onRetryEventLoading,
                 isEventMutating: isEventMutating,
                 isTagMutating: isTagMutating,
                 eventMutationFailureMessage: eventMutationFailureMessage,
@@ -172,10 +172,10 @@ struct CalendarScheduleDrawerView: View {
         items: [],
         referenceDay: DayKey(date: Date()),
         displayMode: .week,
-        eventAreaState: .idle,
+        eventLoadState: .idle,
         onReferenceDayChanged: { _ in },
         onVisibleRangeChanged: { _ in },
-        onRetryEvents: {},
+        onRetryEventLoading: {},
         onDragEnded: { _ in }
     )
 }

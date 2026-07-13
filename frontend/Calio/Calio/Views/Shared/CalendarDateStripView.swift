@@ -10,7 +10,7 @@ import SwiftUI
 struct CalendarDateStripView: View {
     private let dateCellCount = 7
     
-    let items: [CalendarDateCellItem]
+    let items: [CalendarDayItem]
     let referenceDay: DayKey
     let onReferenceDayChanged: (DayKey) -> Void
     
@@ -140,7 +140,7 @@ struct CalendarDateStripView: View {
         )
     }
     
-    let items: [CalendarDateCellItem] = (0..<7).map { offset in
+    let items: [CalendarDayItem] = (0..<7).map { offset in
         let date = calendar.date(
             byAdding: .day,
             value: offset,
@@ -181,7 +181,7 @@ struct CalendarDateStripView: View {
             []
         }
         
-        return CalendarDateCellItem(
+        return CalendarDayItem(
             id: day,
             weekday: dateService.getWeekday(from: date),
             monthText: dateService.monthText(from: date),

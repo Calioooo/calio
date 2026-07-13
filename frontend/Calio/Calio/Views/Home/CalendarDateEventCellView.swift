@@ -9,11 +9,8 @@ import SwiftUI
 import UIKit
 
 struct CalendarDateEventCellView: View {
-    private let maxVisibleEventRowCount = 3
-    private let eventChipHorizontalPadding: CGFloat = 20
-    private let eventChipSpacing: CGFloat = 8
-    private let eventChipFont = UIFont.systemFont(ofSize: 13, weight: .medium)
-    private let lowerScreenPopoverThreshold: CGFloat = 0.62
+    private let chipLayoutBuilder = CalendarDateEventChipLayoutBuilder()
+    private let popoverEdgeResolver = CalendarDateEventPopoverEdgeResolver()
     
     let day: DayKey
     let weekday: CalendarWeekday
@@ -27,7 +24,7 @@ struct CalendarDateEventCellView: View {
     let events: [Event]
     let holidays: [NationalHoliday]
 
-    @State private var eventChipFrames: [Int64: CGRect] = [:]
+    @State private var eventChipFrames: [String: CGRect] = [:]
 
     init(
         day: DayKey,
@@ -57,7 +54,10 @@ struct CalendarDateEventCellView: View {
     
     var body: some View {
         GeometryReader { geometry in
-            let chipLayout = eventChipLayout(maxWidth: geometry.size.width)
+            let chipLayout = chipLayoutBuilder.make(
+                chips: calendarChips,
+                maxWidth: geometry.size.width
+            )
 
             ZStack(alignment: .topLeading) {
                 Color.clear
@@ -69,7 +69,7 @@ struct CalendarDateEventCellView: View {
                         .font(.system(size: 18, weight: .medium))
                         .frame(maxWidth: .infinity, alignment: .leading)
 
-                    FlowLayout(spacing: eventChipSpacing) {
+                    FlowLayout(spacing: chipLayoutBuilder.spacing) {
                         ForEach(chipLayout.visibleChips) { chip in
                             switch chip.kind {
                             case .holiday(let holiday):
@@ -174,81 +174,16 @@ struct CalendarDateEventCellView: View {
     }
 
     private func popoverArrowEdge(for event: Event) -> Edge {
-        guard let frame = eventChipFrames[event.id] else {
-            return .top
-        }
-
-        let screenHeight = UIScreen.main.bounds.height
-        let isLowerScreenChip = frame.midY > screenHeight * lowerScreenPopoverThreshold
-
-        return isLowerScreenChip ? .bottom : .top
-    }
-    
-    private func eventChipLayout(maxWidth: CGFloat) -> EventChipLayout {
-        let chips = calendarChips
-
-        guard maxWidth > 0 else {
-            return EventChipLayout(visibleChips: [], hiddenChipCount: chips.count)
-        }
-        
-        var visibleChips: [CalendarDateEventChip] = []
-        
-        for chip in chips {
-            let candidateChips = visibleChips + [chip]
-            let hiddenChipCount = chips.count - candidateChips.count
-            
-            guard calendarChipsFit(
-                visibleChips: candidateChips,
-                hiddenChipCount: hiddenChipCount,
-                maxWidth: maxWidth
-            ) else {
-                break
-            }
-            
-            visibleChips = candidateChips
-        }
-        
-        return EventChipLayout(
-            visibleChips: visibleChips,
-            hiddenChipCount: chips.count - visibleChips.count
+        popoverEdgeResolver.arrowEdge(
+            for: eventChipFrames[event.id],
+            screenHeight: UIScreen.main.bounds.height
         )
-    }
-    
-    private func calendarChipsFit(
-        visibleChips: [CalendarDateEventChip],
-        hiddenChipCount: Int,
-        maxWidth: CGFloat
-    ) -> Bool {
-        let chipWidths = visibleChips.map { chipWidth(text: $0.title, maxWidth: maxWidth) }
-        let hiddenWidth = hiddenChipCount > 0
-            ? [chipWidth(text: "+\(hiddenChipCount) more", maxWidth: maxWidth)]
-            : []
-        
-        return rowCount(for: chipWidths + hiddenWidth, maxWidth: maxWidth) <= maxVisibleEventRowCount
     }
 
     var calendarChips: [CalendarDateEventChip] {
         holidays.map { CalendarDateEventChip(kind: .holiday($0)) }
             + events.map { CalendarDateEventChip(kind: .event($0)) }
     }
-    
-    private func chipWidth(text: String, maxWidth: CGFloat) -> CGFloat {
-        let textWidth = (text as NSString).size(withAttributes: [.font: eventChipFont]).width
-        
-        return min(textWidth + eventChipHorizontalPadding, maxWidth)
-    }
-    
-    private func rowCount(for widths: [CGFloat], maxWidth: CGFloat) -> Int {
-        widths.reduce(into: EventChipRows()) { rows, width in
-            rows.append(width: width, maxWidth: maxWidth, spacing: eventChipSpacing)
-        }
-        .count
-    }
-}
-
-private struct EventChipLayout {
-    let visibleChips: [CalendarDateEventChip]
-    let hiddenChipCount: Int
 }
 
 struct CalendarDateEventChip: Identifiable {
@@ -259,7 +194,7 @@ struct CalendarDateEventChip: Identifiable {
         case .holiday(let holiday):
             return "holiday-\(holiday.id)"
         case .event(let event):
-            return "event-\(event.id)"
+            return event.id
         }
     }
 
@@ -287,28 +222,6 @@ struct CalendarDateEventSelection: Equatable {
         rhs: CalendarDateEventSelection
     ) -> Bool {
         lhs.day == rhs.day && lhs.event.id == rhs.event.id
-    }
-}
-
-private struct EventChipRows {
-    private(set) var count = 0
-    private var currentRowWidth: CGFloat = 0
-    
-    mutating func append(width: CGFloat, maxWidth: CGFloat, spacing: CGFloat) {
-        guard count > 0 else {
-            count = 1
-            currentRowWidth = width
-            return
-        }
-        
-        let nextRowWidth = currentRowWidth + spacing + width
-        guard nextRowWidth <= maxWidth else {
-            count += 1
-            currentRowWidth = width
-            return
-        }
-        
-        currentRowWidth = nextRowWidth
     }
 }
 

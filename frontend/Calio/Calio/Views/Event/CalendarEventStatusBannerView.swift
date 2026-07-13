@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct CalendarEventStatusBannerView: View {
-    let state: CalendarEventAreaState
+    let state: CalendarEventLoadState
     let onRetry: () -> Void
 
     var body: some View {

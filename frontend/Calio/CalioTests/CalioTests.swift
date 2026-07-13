@@ -42,10 +42,10 @@ struct CalioTests {
             items: [],
             referenceDay: DayKey(date: Date()),
             displayMode: .week,
-            eventAreaState: .idle,
+            eventLoadState: .idle,
             onReferenceDayChanged: { _ in },
             onVisibleRangeChanged: { _ in },
-            onRetryEvents: {},
+            onRetryEventLoading: {},
             onDragEnded: { _ in }
         )
 
@@ -127,10 +127,10 @@ struct CalioTests {
         let eventList = CalendarDateEventView(
             items: items,
             referenceDay: items[0].id,
-            eventAreaState: .idle,
+            eventLoadState: .idle,
             onReferenceDayChanged: { _ in },
             onVisibleRangeChanged: { _ in },
-            onRetryEvents: {}
+            onRetryEventLoading: {}
         )
         
         #expect(strip.items.count == 2)
@@ -142,9 +142,9 @@ struct CalioTests {
     @MainActor
     @Test func dateEventCellSeparatesEventSelectionFromDateSelection() async throws {
         let event = makeEvent(on: Date())
-        var selectedEventID: Int64?
+        var selectedEventID: String?
         var dateSelectionCount = 0
-        var detailEventID: Int64?
+        var detailEventID: String?
         let cell = CalendarDateEventCellView(
             day: DayKey(year: 2026, month: 6, day: 28),
             weekday: .monday,
@@ -184,7 +184,7 @@ struct CalioTests {
             day: DayKey(year: 2026, month: 6, day: 6),
             title: "현충일"
         )
-        var selectedEventID: Int64?
+        var selectedEventID: String?
         let cell = CalendarDateEventCellView(
             day: holiday.day,
             weekday: .saturday,
@@ -208,6 +208,202 @@ struct CalioTests {
             Issue.record("holiday chip이 event chip보다 앞에 있어야 합니다.")
         }
         #expect(selectedEventID == nil)
+    }
+
+    @Test func dateEventChipLayoutReservesLastVisibleRowForOverflow() async throws {
+        let chips = (1...4).map { index in
+            CalendarDateEventChip(
+                kind: .event(
+                    makeEvent(
+                        id: Int64(index),
+                        title: "긴 일정 제목",
+                        on: Date()
+                    )
+                )
+            )
+        }
+        let builder = CalendarDateEventChipLayoutBuilder(maxVisibleRowCount: 3)
+
+        let layout = builder.make(chips: chips, maxWidth: 40)
+
+        #expect(layout.visibleChips.map(\.id) == ["event:1", "event:2"])
+        #expect(layout.hiddenChipCount == 2)
+    }
+
+    @Test func dateEventChipLayoutHidesAllChipsWhenWidthIsUnavailable() async throws {
+        let chips = [
+            CalendarDateEventChip(kind: .event(makeEvent(id: 1, title: "일정", on: Date()))),
+            CalendarDateEventChip(kind: .event(makeEvent(id: 2, title: "일정", on: Date())))
+        ]
+        let builder = CalendarDateEventChipLayoutBuilder(maxVisibleRowCount: 3)
+
+        let layout = builder.make(chips: chips, maxWidth: 0)
+
+        #expect(layout.visibleChips.isEmpty)
+        #expect(layout.hiddenChipCount == 2)
+    }
+
+    @Test func dateEventPopoverEdgeUsesTopForUpperChipsAndBottomForLowerChips() async throws {
+        let resolver = CalendarDateEventPopoverEdgeResolver(lowerScreenThreshold: 0.62)
+
+        #expect(resolver.arrowEdge(for: nil, screenHeight: 1000) == .top)
+        #expect(resolver.arrowEdge(
+            for: CGRect(x: 0, y: 200, width: 40, height: 20),
+            screenHeight: 1000
+        ) == .top)
+        #expect(resolver.arrowEdge(
+            for: CGRect(x: 0, y: 700, width: 40, height: 20),
+            screenHeight: 1000
+        ) == .bottom)
+    }
+
+    @Test func monthEventLayoutCreatesSingleSpanForMultiDayEventInSameWeek() async throws {
+        let calendar = fixedCalendar
+        let monthStartDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 1)))
+        let gridDays = makeMonthGridDays(referenceDate: monthStartDate, calendar: calendar)
+        let startAt = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 3, hour: 9)))
+        let endAt = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 6, hour: 10)))
+        let event = makeEvent(
+            id: 30,
+            title: "여러 날짜 일정",
+            startAt: startAt,
+            endAt: endAt
+        )
+        let itemDays = [3, 4, 5, 6].map { day -> CalendarDayItem in
+            let date = calendar.date(from: DateComponents(year: 2026, month: 6, day: day)) ?? monthStartDate
+            return makeDateCellItem(date: date, calendar: calendar, events: [event])
+        }
+
+        let layout = MonthEventLayoutBuilder.make(
+            items: itemDays,
+            days: gridDays,
+            maxVisibleRowCount: 3,
+            calendar: calendar
+        )
+        let span = try #require(layout.spans.first)
+
+        #expect(layout.spans.count == 1)
+        #expect(span.chip.id == "event:30")
+        #expect(span.weekRowIndex == 0)
+        #expect(span.startColumn == 3)
+        #expect(span.columnSpan == 4)
+        #expect(span.days == [
+            DayKey(year: 2026, month: 6, day: 3),
+            DayKey(year: 2026, month: 6, day: 4),
+            DayKey(year: 2026, month: 6, day: 5),
+            DayKey(year: 2026, month: 6, day: 6)
+        ])
+        #expect(layout.hiddenCountByDay.isEmpty)
+    }
+
+    @Test func monthEventLayoutUsesLastVisibleRowForOverflowCount() async throws {
+        let calendar = fixedCalendar
+        let monthStartDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 1)))
+        let gridDays = makeMonthGridDays(referenceDate: monthStartDate, calendar: calendar)
+        let eventDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 3, hour: 9)))
+        let eventDay = DayKey(year: 2026, month: 6, day: 3)
+        let events: [Event] = (0..<4).map { offset in
+            let startAt = eventDate.addingTimeInterval(TimeInterval(offset * 3600))
+            let endAt = eventDate.addingTimeInterval(TimeInterval((offset + 1) * 3600))
+
+            return makeEvent(
+                id: Int64(offset + 1),
+                title: "일정",
+                startAt: startAt,
+                endAt: endAt
+            )
+        }
+        let item = makeDateCellItem(date: eventDate, calendar: calendar, events: events)
+
+        let layout = MonthEventLayoutBuilder.make(
+            items: [item],
+            days: gridDays,
+            maxVisibleRowCount: 3,
+            calendar: calendar
+        )
+
+        let visibleRowIndexes = layout.spans.map { span in span.eventRowIndex }
+
+        #expect(visibleRowIndexes == [0, 1])
+        #expect(layout.hiddenCountByDay[eventDay] == 2)
+    }
+
+    @Test func weekTimelineLayoutSplitsTwoOverlappingEventsIntoColumns() async throws {
+        let calendar = fixedCalendar
+        let dayDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 3)))
+        let item = makeDateCellItem(
+            date: dayDate,
+            calendar: calendar,
+            events: [
+                makeEvent(
+                    id: 1,
+                    title: "첫 일정",
+                    startAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 3, hour: 7))),
+                    endAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 3, hour: 9)))
+                ),
+                makeEvent(
+                    id: 2,
+                    title: "두 번째 일정",
+                    startAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 3, hour: 8))),
+                    endAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 3, hour: 10)))
+                )
+            ]
+        )
+        let metrics = makeTimelineMetrics()
+        let builder = TimelineEventLayoutBuilder(
+            calendar: calendar,
+            timelineStartHour: 0,
+            hourCount: 24
+        )
+
+        let layouts = builder.make(items: [item], metrics: metrics)
+
+        #expect(layouts.count == 2)
+        #expect(layouts.map(\.title) == ["첫 일정", "두 번째 일정"])
+        #expect(layouts[0].width == layouts[1].width)
+        #expect(layouts[0].x < layouts[1].x)
+    }
+
+    @Test func weekTimelineLayoutUsesOverflowWhenThreeEventsOverlapAtSameTime() async throws {
+        let calendar = fixedCalendar
+        let dayDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 3)))
+        let events = [
+            makeEvent(
+                id: 1,
+                title: "긴 일정",
+                startAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 3, hour: 7))),
+                endAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 3, hour: 10)))
+            ),
+            makeEvent(
+                id: 2,
+                title: "겹친 일정",
+                startAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 3, hour: 8))),
+                endAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 3, hour: 11)))
+            ),
+            makeEvent(
+                id: 3,
+                title: "세 번째 일정",
+                startAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 3, hour: 9))),
+                endAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 3, hour: 12)))
+            )
+        ]
+        let item = makeDateCellItem(date: dayDate, calendar: calendar, events: events)
+        let builder = TimelineEventLayoutBuilder(
+            calendar: calendar,
+            timelineStartHour: 0,
+            hourCount: 24
+        )
+
+        let layouts = builder.make(items: [item], metrics: makeTimelineMetrics())
+
+        #expect(builder.maxSimultaneousOverlap(in: events, on: item.id) == 3)
+        #expect(layouts.count == 2)
+        #expect(layouts.map(\.title) == ["긴 일정", "+2"])
+        if case .showOverlapGroup(let overlapEvents) = layouts[1].tapAction {
+            #expect(overlapEvents.map(\.backendId) == [1, 2, 3])
+        } else {
+            Issue.record("overflow layout은 겹친 일정 목록을 보여야 합니다.")
+        }
     }
 
     @Test func nationalHolidayResponseDTOKeepsHolidayDateStringAndMapsToDayKey() async throws {
@@ -291,7 +487,7 @@ struct CalioTests {
     @MainActor
     @Test func sharedEventSummaryPopoverForwardsDetailActionForSelectedEvent() async throws {
         let event = makeEvent(id: 91, on: Date())
-        var detailEventID: Int64?
+        var detailEventID: String?
         let popover = CalendarEventSummaryPopoverView(
             event: event,
             onShowDetail: { detailEvent in
@@ -421,7 +617,7 @@ struct CalioTests {
 
         #expect(form.title == "회의")
         #expect(form.mode == .create)
-        #expect(CalendarEventFormView.canSave(title: "회의", startAt: startAt, endAt: endAt))
+        #expect(CalendarEventFormRules.canSave(title: "회의", startAt: startAt, endAt: endAt))
     }
 
     @MainActor
@@ -446,6 +642,38 @@ struct CalioTests {
         #expect(!form.mode.showsRecurrenceFields)
         #expect(form.recurrenceInput == nil)
         #expect(form.title == "수정할 일정")
+    }
+
+    @Test func tagManagementRulesSeparateDefaultAndCustomTagsAndPreferEtcFallback() async throws {
+        let workTag = CalendarTag(id: 1, title: "업무", colorCode: "#3B82F6", tagType: .defaultTag)
+        let etcTag = CalendarTag(id: 2, title: "기타", colorCode: "#64748B", tagType: .defaultTag)
+        let customTag = CalendarTag(id: 3, title: "운동", colorCode: "#10B981", tagType: .custom)
+        let rules = CalendarTagManagementRules(tags: [workTag, customTag, etcTag])
+
+        #expect(rules.defaultTags == [workTag, etcTag])
+        #expect(rules.customTags == [customTag])
+        #expect(rules.fallbackTag == etcTag)
+    }
+
+    @Test func tagManagementRulesFallbackToFirstTagThenBuiltInFallback() async throws {
+        let customTag = CalendarTag(id: 3, title: "운동", colorCode: "#10B981", tagType: .custom)
+
+        #expect(CalendarTagManagementRules(tags: [customTag]).fallbackTag == customTag)
+        #expect(CalendarTagManagementRules(tags: []).fallbackTag == .fallback)
+    }
+
+    @Test func tagEditInputRulesLimitTrimAndValidateTitle() async throws {
+        let rules = CalendarTagEditInputRules(maxTitleLength: 12)
+        let longTitle = "123456789012345"
+        let validInput = CustomTagInput(title: "  운동  ", colorCode: "#10B981")
+        let blankInput = CustomTagInput(title: "   ", colorCode: "#10B981")
+        let longInput = CustomTagInput(title: longTitle, colorCode: "#10B981")
+
+        #expect(rules.limitedTitle(longTitle) == "123456789012")
+        #expect(rules.saveInput(from: validInput) == CustomTagInput(title: "운동", colorCode: "#10B981"))
+        #expect(rules.canSave(validInput))
+        #expect(!rules.canSave(blankInput))
+        #expect(!rules.canSave(longInput))
     }
 
     @MainActor
@@ -592,7 +820,7 @@ struct CalioTests {
 
         viewModel.setReferenceDay(makeDayKey(dayOffset: 3, from: baseDate, calendar: calendar))
 
-        #expect(viewModel.state.daysByKey[DayKey(date: baseDate, calendar: calendar)]?.events.map(\.id) == [42])
+        #expect(viewModel.state.daysByKey[DayKey(date: baseDate, calendar: calendar)]?.events.map(\.backendId) == [42])
     }
 
     @MainActor
@@ -685,7 +913,7 @@ struct CalioTests {
             initialState: initialState
         )
 
-        viewModel.retryReferenceMonthEvents()
+        viewModel.retryEventLoading()
         viewModel.loadAdditionalEventsIfNeeded(
             visibleRange: CalendarVisibleIndexRange(startIndex: 0, endIndex: 6)
         )
@@ -714,7 +942,7 @@ struct CalioTests {
         viewModel.selectYearMonth(year: 2036, month: 6)
         let didRequestTargetMonths = await repository.waitForRequestCount(3)
         let didExposeFailure = await waitUntil {
-            viewModel.referenceEventAreaState == .failed("일정을 불러오지 못했습니다. 네트워크 연결을 확인해 주세요.")
+            viewModel.eventLoadState == .failed("일정을 불러오지 못했습니다. 네트워크 연결을 확인해 주세요.")
         }
 
         #expect(didRequestTargetMonths)
@@ -744,10 +972,10 @@ struct CalioTests {
         let startAt = Date()
         let endAt = startAt.addingTimeInterval(3600)
 
-        #expect(CalendarEventFormView.canSave(title: "회의", startAt: startAt, endAt: endAt))
-        #expect(!CalendarEventFormView.canSave(title: "   ", startAt: startAt, endAt: endAt))
-        #expect(!CalendarEventFormView.canSave(title: "회의", startAt: startAt, endAt: startAt))
-        #expect(!CalendarEventFormView.canSave(title: "회의", startAt: startAt, endAt: startAt.addingTimeInterval(-1)))
+        #expect(CalendarEventFormRules.canSave(title: "회의", startAt: startAt, endAt: endAt))
+        #expect(!CalendarEventFormRules.canSave(title: "   ", startAt: startAt, endAt: endAt))
+        #expect(!CalendarEventFormRules.canSave(title: "회의", startAt: startAt, endAt: startAt))
+        #expect(!CalendarEventFormRules.canSave(title: "회의", startAt: startAt, endAt: startAt.addingTimeInterval(-1)))
     }
 
     @Test func eventCreationSaveValidationChecksRecurrenceEndDateWithUTCDate() async throws {
@@ -758,7 +986,7 @@ struct CalioTests {
         let sameUTCDate = startAt
         let previousUTCDate = try #require(kstCalendar.date(from: DateComponents(year: 2026, month: 7, day: 31, hour: 8)))
 
-        #expect(CalendarEventFormView.canSave(
+        #expect(CalendarEventFormRules.canSave(
             title: "반복 회의",
             startAt: startAt,
             endAt: endAt,
@@ -768,7 +996,7 @@ struct CalioTests {
             recurrenceStartTime: startAt,
             recurrenceEndTime: endAt
         ))
-        #expect(!CalendarEventFormView.canSave(
+        #expect(!CalendarEventFormRules.canSave(
             title: "반복 회의",
             startAt: startAt,
             endAt: endAt,
@@ -778,7 +1006,7 @@ struct CalioTests {
             recurrenceStartTime: startAt,
             recurrenceEndTime: endAt
         ))
-        #expect(!CalendarEventFormView.canSave(
+        #expect(!CalendarEventFormRules.canSave(
             title: "반복 회의",
             startAt: startAt,
             endAt: endAt,
@@ -862,43 +1090,45 @@ struct CalioTests {
     }
 
     @Test func updateRecurrenceEventRequestDTOEncodesOnlyBackendContractFields() async throws {
-        let startAt = Date(timeIntervalSince1970: 1_780_000_000)
-        let endAt = startAt.addingTimeInterval(3600)
         let request = UpdateRecurrenceEventRequestDTO(
             title: "수정 반복 일정",
             description: "수정 설명",
-            startAt: startAt,
-            endAt: endAt,
+            startDate: "2026-08-01",
+            endDate: "2026-08-31",
+            startTime: "09:00:00",
+            endTime: "10:00:00",
             recurrenceFrequency: .weekly
         )
 
         let data = try EventJSONCoding.makeEncoder().encode(request)
         let object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
 
-        #expect(Set(object.keys) == ["title", "description", "startAt", "endAt", "recurrenceFrequency"])
+        #expect(Set(object.keys) == ["title", "description", "startDate", "endDate", "startTime", "endTime", "recurrenceFrequency"])
         #expect(object["title"] as? String == "수정 반복 일정")
+        #expect(object["startDate"] as? String == "2026-08-01")
+        #expect(object["startTime"] as? String == "09:00:00")
         #expect(object["recurrenceFrequency"] as? String == "WEEKLY")
         #expect(object["isImportant"] == nil)
         #expect(object["colorCode"] == nil)
     }
 
     @Test func updateRecurrenceOccurrenceRequestDTOEncodesOnlyBackendContractFields() async throws {
+        let originStartAt = Date(timeIntervalSince1970: 1_779_996_400)
         let startAt = Date(timeIntervalSince1970: 1_780_000_000)
         let endAt = startAt.addingTimeInterval(3600)
         let request = UpdateRecurrenceOccurrenceRequestDTO(
-            title: "수정 반복 항목",
-            description: "수정 설명",
+            originStartAt: originStartAt,
             startAt: startAt,
-            endAt: endAt,
-            isImportant: true
+            endAt: endAt
         )
 
         let data = try EventJSONCoding.makeEncoder().encode(request)
         let object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
 
-        #expect(Set(object.keys) == ["title", "description", "startAt", "endAt", "isImportant"])
-        #expect(object["title"] as? String == "수정 반복 항목")
-        #expect(object["isImportant"] as? Bool == true)
+        #expect(Set(object.keys) == ["originStartAt", "startAt", "endAt"])
+        #expect(object["originStartAt"] as? String == EventJSONCoding.string(from: originStartAt))
+        #expect(object["title"] == nil)
+        #expect(object["isImportant"] == nil)
         #expect(object["importantEvent"] == nil)
         #expect(object["recurrenceFrequency"] == nil)
     }
@@ -970,7 +1200,7 @@ struct CalioTests {
             )
         )
 
-        #expect(event.id == 77)
+        #expect(event.backendId == 77)
         #expect(event.title == "제품 리뷰")
         #expect(event.description == "")
         #expect(event.startAt == startAt)
@@ -1009,7 +1239,7 @@ struct CalioTests {
             )
         )
 
-        #expect(event.id == 90)
+        #expect(event.backendId == 90)
         #expect(event.importantEvent)
         #expect(event.recurrenceId == 700)
         #expect(event.isRecurrenceOccurrence)
@@ -1075,8 +1305,9 @@ struct CalioTests {
         #expect(details.recurrenceFrequency == .weekly)
     }
 
-    @Test func eventServiceUpdatesRecurrenceOccurrenceWithPreservedImportantState() async throws {
+    @Test func eventServiceUpdatesRecurrenceOccurrenceWithOriginStartAtOnly() async throws {
         let calendar = fixedCalendar
+        let originStartAt = try #require(calendar.date(from: DateComponents(year: 2026, month: 8, day: 1, hour: 8)))
         let startAt = try #require(calendar.date(from: DateComponents(year: 2026, month: 8, day: 1, hour: 9)))
         let endAt = startAt.addingTimeInterval(3600)
         let repository = RecordingEventRepository()
@@ -1084,21 +1315,18 @@ struct CalioTests {
 
         _ = try await service.updateRecurrenceOccurrence(
             recurrenceId: 700,
-            eventId: 701,
+            originStartAt: originStartAt,
             input: RecurrenceOccurrenceUpdateInput(
-                title: "수정 반복 항목",
-                description: "설명",
                 startAt: startAt,
-                endAt: endAt,
-                isImportant: true
+                endAt: endAt
             )
         )
         let request = try #require(repository.updateRecurrenceOccurrenceRequests.first)
 
         #expect(request.recurrenceId == 700)
-        #expect(request.eventId == 701)
-        #expect(request.request.title == "수정 반복 항목")
-        #expect(request.request.isImportant == true)
+        #expect(request.request.originStartAt == originStartAt)
+        #expect(request.request.startAt == startAt)
+        #expect(request.request.endAt == endAt)
     }
 
     @Test func eventServiceMapsRecurrenceUpdateInvalidTimeRangeLikeExistingInvalidRange() async throws {
@@ -1120,8 +1348,10 @@ struct CalioTests {
                 input: RecurrenceEventUpdateInput(
                     title: "반복 수정",
                     description: "",
-                    startAt: Date(timeIntervalSince1970: 0),
-                    endAt: Date(timeIntervalSince1970: 3600),
+                    recurrenceStartDate: Date(timeIntervalSince1970: 0),
+                    recurrenceEndDate: Date(timeIntervalSince1970: 0),
+                    recurrenceStartTime: Date(timeIntervalSince1970: 0),
+                    recurrenceEndTime: Date(timeIntervalSince1970: 3600),
                     recurrenceFrequency: .daily
                 )
             )
@@ -1324,7 +1554,7 @@ struct CalioTests {
         #expect(object["colorCode"] == nil)
     }
 
-    @Test func urlSessionEventRepositoryUpdatesRecurrenceEndpointsWithPatchBodies() async throws {
+    @Test func urlSessionEventRepositoryUpdatesRecurrenceEndpointsWithBackendContractBodies() async throws {
         let recurrenceResponseJSON = """
         {
           "recurrenceId": 700,
@@ -1372,7 +1602,7 @@ struct CalioTests {
                 httpVersion: nil,
                 headerFields: nil
             )!
-            let isOccurrenceUpdate = request.url?.path.contains("/occurrences/") == true
+            let isOccurrenceUpdate = request.url?.path.hasSuffix("/occurrences") == true
             let data = isOccurrenceUpdate ? occurrenceResponseJSON : recurrenceResponseJSON
             return (response, data)
         }
@@ -1389,28 +1619,27 @@ struct CalioTests {
             request: UpdateRecurrenceEventRequestDTO(
                 title: "수정 반복 일정",
                 description: "설명",
-                startAt: Date(timeIntervalSince1970: 0),
-                endAt: Date(timeIntervalSince1970: 3600),
+                startDate: "1970-01-01",
+                endDate: "1970-01-01",
+                startTime: "00:00:00",
+                endTime: "01:00:00",
                 recurrenceFrequency: .weekly
             )
         )
         _ = try await repository.updateRecurrenceOccurrence(
             recurrenceId: 700,
-            eventId: 701,
             request: UpdateRecurrenceOccurrenceRequestDTO(
-                title: "수정 반복 항목",
-                description: "설명",
+                originStartAt: Date(timeIntervalSince1970: 0),
                 startAt: Date(timeIntervalSince1970: 0),
-                endAt: Date(timeIntervalSince1970: 3600),
-                isImportant: true
+                endAt: Date(timeIntervalSince1970: 3600)
             )
         )
 
         #expect(capturedRequests.map { $0.url?.absoluteString } == [
             "https://example.test/api/recurrence-events/700",
-            "https://example.test/api/recurrence-events/700/occurrences/701"
+            "https://example.test/api/recurrence-events/700/occurrences"
         ])
-        #expect(capturedRequests.allSatisfy { $0.httpMethod == "PATCH" })
+        #expect(capturedRequests.map(\.httpMethod) == ["PUT", "PATCH"])
     }
 
     @Test func urlSessionEventRepositoryDeletesWithoutRequestBodiesAndAcceptsNoContent() async throws {
@@ -1435,12 +1664,15 @@ struct CalioTests {
 
         try await repository.deleteEvent(eventId: 1)
         try await repository.deleteRecurrenceEvent(recurrenceId: 2)
-        try await repository.deleteRecurrenceOccurrence(recurrenceId: 2, eventId: 3)
+        try await repository.deleteRecurrenceOccurrence(
+            recurrenceId: 2,
+            originStartAt: Date(timeIntervalSince1970: 0)
+        )
 
         #expect(capturedRequests.map { $0.url?.absoluteString } == [
             "https://example.test/api/events/1",
             "https://example.test/api/recurrence-events/2",
-            "https://example.test/api/recurrence-events/2/occurrences/3"
+            "https://example.test/api/recurrence-events/2/occurrences?originStartAt=1970-01-01T00:00:00Z"
         ])
         #expect(capturedRequests.allSatisfy { $0.httpMethod == "DELETE" })
         #expect(capturedRequests.allSatisfy { requestBodyData(from: $0) == nil })
@@ -1619,7 +1851,7 @@ struct CalioTests {
 
         viewModel.loadInitialIfNeeded()
         let didLoadEvents = await waitUntil {
-            viewModel.state.daysByKey[DayKey(date: baseDate, calendar: calendar)]?.events.map(\.id) == [44]
+            viewModel.state.daysByKey[DayKey(date: baseDate, calendar: calendar)]?.events.map(\.backendId) == [44]
         }
         let didStoreHolidayFailure = await waitUntil {
             if case .failed = viewModel.state.monthHolidayCache[YearMonthKey(year: 2026, month: 6)] {
@@ -1631,7 +1863,7 @@ struct CalioTests {
 
         #expect(didLoadEvents)
         #expect(didStoreHolidayFailure)
-        #expect(viewModel.referenceEventAreaState == .idle)
+        #expect(viewModel.eventLoadState == .idle)
         #expect(viewModel.state.daysByKey[DayKey(date: baseDate, calendar: calendar)]?.holidays.isEmpty == true)
     }
 
@@ -1661,7 +1893,7 @@ struct CalioTests {
         let eventDay = DayKey(date: createdEvent.startAt, calendar: calendar)
 
         #expect(didCreate)
-        #expect(viewModel.state.daysByKey[eventDay]?.events.map(\.id) == [99])
+        #expect(viewModel.state.daysByKey[eventDay]?.events.map(\.backendId) == [99])
         #expect(viewModel.createState == .idle)
     }
 
@@ -1732,7 +1964,7 @@ struct CalioTests {
         #expect(didCreate)
         #expect(viewModel.state.monthEventCache[monthKey]?.isLoading == true)
         #expect(viewModel.state.monthEventCache[monthKey]?.loadedEvents.isEmpty == true)
-        #expect(viewModel.state.daysByKey[DayKey(date: createdEvent.startAt, calendar: calendar)]?.events.map(\.id) == [101])
+        #expect(viewModel.state.daysByKey[DayKey(date: createdEvent.startAt, calendar: calendar)]?.events.map(\.backendId) == [101])
     }
 
     @MainActor
@@ -1869,7 +2101,7 @@ struct CalioTests {
         let updatedStartAt = try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 2, hour: 9)))
         let originalEvent = makeEvent(id: 501, title: "월 이동 일정", on: baseDate)
         let updatedEvent = Event(
-            id: originalEvent.id,
+            id: originalEvent.backendId,
             title: "수정된 일정",
             description: "수정",
             startAt: updatedStartAt,
@@ -1990,7 +2222,7 @@ struct CalioTests {
 
         #expect(didDelete)
         #expect(didRequestOriginalMonth)
-        #expect(repository.deleteEventIDs == [event.id])
+        #expect(repository.deleteEventIDs == [502])
         #expect(repository.requestMonthKeys(calendar: calendar) == [
             YearMonthKey(year: 2026, month: 6)
         ])
@@ -2008,7 +2240,8 @@ struct CalioTests {
             endAt: baseDate.addingTimeInterval(3600),
             tag: .sample(colorCode: "#4F46E5"),
             recurrenceId: 700,
-            isRecurrenceOccurrence: true
+            isRecurrenceOccurrence: true,
+            originStartAt: baseDate
         )
         let repository = RecordingEventRepository()
         let viewModel = CalendarHomeViewModel(
@@ -2034,6 +2267,7 @@ struct CalioTests {
         #expect(didDeleteOccurrence)
         #expect(didRequestDefaultRange)
         #expect(repository.deleteRecurrenceOccurrenceRequests.count == 1)
+        #expect(repository.deleteRecurrenceOccurrenceRequests.first?.originStartAt == baseDate)
         #expect(repository.requestMonthKeys(calendar: calendar) == [
             YearMonthKey(year: 2026, month: 5),
             YearMonthKey(year: 2026, month: 6),
@@ -2075,7 +2309,7 @@ struct CalioTests {
     }
 
     @MainActor
-    @Test func calendarHomeViewModelRecurrenceOccurrenceUpdatePreservesImportantAndRefetchesDefaultRange() async throws {
+    @Test func calendarHomeViewModelRecurrenceOccurrenceUpdateSendsOriginStartAtAndRefetchesDefaultRange() async throws {
         let calendar = fixedCalendar
         let baseDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8)))
         let event = Event(
@@ -2087,7 +2321,8 @@ struct CalioTests {
             tag: .sample(colorCode: "#4F46E5"),
             importantEvent: true,
             recurrenceId: 700,
-            isRecurrenceOccurrence: true
+            isRecurrenceOccurrence: true,
+            originStartAt: baseDate
         )
         let repository = RecordingEventRepository()
         let viewModel = CalendarHomeViewModel(
@@ -2122,8 +2357,8 @@ struct CalioTests {
         #expect(didUpdate)
         #expect(didRequestDefaultRange)
         #expect(request.recurrenceId == 700)
-        #expect(request.eventId == 701)
-        #expect(request.request.isImportant == true)
+        #expect(request.request.originStartAt == baseDate)
+        #expect(request.request.endAt == baseDate.addingTimeInterval(7200))
         #expect(repository.requestMonthKeys(calendar: calendar) == [
             YearMonthKey(year: 2026, month: 5),
             YearMonthKey(year: 2026, month: 6),
@@ -2177,8 +2412,10 @@ struct CalioTests {
         #expect(request.recurrenceId == 700)
         #expect(request.request.title == "수정 반복 일정")
         #expect(request.request.recurrenceFrequency == .monthly)
-        #expect(request.request.startAt.map { EventJSONCoding.string(from: $0) } == "2026-08-01T09:00:00Z")
-        #expect(request.request.endAt.map { EventJSONCoding.string(from: $0) } == "2026-08-31T10:30:00Z")
+        #expect(request.request.startDate == "2026-08-01")
+        #expect(request.request.endDate == "2026-08-31")
+        #expect(request.request.startTime == "09:00:00")
+        #expect(request.request.endTime == "10:30:00")
     }
     
     private var fixedCalendar: Calendar {
@@ -2217,11 +2454,11 @@ struct CalioTests {
         calendar: Calendar,
         events: [Event] = [],
         holidays: [NationalHoliday] = []
-    ) -> CalendarDateCellItem {
+    ) -> CalendarDayItem {
         let date = calendar.date(byAdding: .day, value: dayOffset, to: baseDate) ?? baseDate
         let dateService = CalendarDateService(calendar: calendar)
         
-        return CalendarDateCellItem(
+        return CalendarDayItem(
             id: DayKey(date: date, calendar: calendar),
             weekday: dateService.getWeekday(from: date),
             monthText: dateService.monthText(from: date),
@@ -2229,6 +2466,69 @@ struct CalioTests {
             isToday: false,
             events: events,
             holidays: holidays
+        )
+    }
+
+    private func makeDateCellItem(
+        date: Date,
+        calendar: Calendar,
+        events: [Event] = [],
+        holidays: [NationalHoliday] = []
+    ) -> CalendarDayItem {
+        let dateService = CalendarDateService(calendar: calendar)
+
+        return CalendarDayItem(
+            id: DayKey(date: date, calendar: calendar),
+            weekday: dateService.getWeekday(from: date),
+            monthText: dateService.monthText(from: date),
+            dayText: dateService.dayText(from: date),
+            isToday: false,
+            events: events,
+            holidays: holidays
+        )
+    }
+
+    private func makeMonthGridDays(
+        referenceDate: Date,
+        calendar: Calendar
+    ) -> [DayKey] {
+        let monthComponents = calendar.dateComponents([.year, .month], from: referenceDate)
+        guard let firstDayOfMonth = calendar.date(from: monthComponents) else {
+            return []
+        }
+
+        let firstWeekdayIndex = calendar.component(.weekday, from: firstDayOfMonth) - 1
+        guard let gridStartDate = calendar.date(
+            byAdding: .day,
+            value: firstWeekdayIndex * -1,
+            to: firstDayOfMonth
+        ) else {
+            return []
+        }
+
+        return (0..<42).compactMap { offset in
+            guard let date = calendar.date(
+                byAdding: .day,
+                value: offset,
+                to: gridStartDate
+            ) else {
+                return nil
+            }
+
+            return DayKey(date: date, calendar: calendar)
+        }
+    }
+
+    private func makeTimelineMetrics() -> TimelineMetrics {
+        TimelineMetrics(
+            timeColumnWidth: 56,
+            dayColumnWidth: 100,
+            topBarHeight: 50,
+            headerHeight: 90,
+            fullDayEventRowHeight: 52,
+            hourHeight: 60,
+            visibleDayCount: 5,
+            hourCount: 24
         )
     }
 
@@ -2280,9 +2580,25 @@ struct CalioTests {
         )
     }
 
+    private func makeEvent(
+        id: Int64,
+        title: String,
+        startAt: Date,
+        endAt: Date
+    ) -> Event {
+        Event(
+            id: id,
+            title: title,
+            description: "",
+            startAt: startAt,
+            endAt: endAt,
+            tag: .sample(colorCode: "#4F46E5")
+        )
+    }
+
     private func makeEventResponse(from event: Event) -> EventResponseDTO {
         EventResponseDTO(
-            id: event.id,
+            id: event.backendId,
             title: event.title,
             description: event.description,
             startAt: event.startAt,
@@ -2461,10 +2777,10 @@ private final class RecordingEventRepository: EventRepository {
     private var storedFetchRecurrenceEventIDs: [Int64] = []
     private var storedUpdateRequests: [(eventId: Int64, request: UpdateEventRequestDTO)] = []
     private var storedUpdateRecurrenceEventRequests: [(recurrenceId: Int64, request: UpdateRecurrenceEventRequestDTO)] = []
-    private var storedUpdateRecurrenceOccurrenceRequests: [(recurrenceId: Int64, eventId: Int64, request: UpdateRecurrenceOccurrenceRequestDTO)] = []
+    private var storedUpdateRecurrenceOccurrenceRequests: [(recurrenceId: Int64, request: UpdateRecurrenceOccurrenceRequestDTO)] = []
     private var storedDeleteEventIDs: [Int64] = []
     private var storedDeleteRecurrenceEventIDs: [Int64] = []
-    private var storedDeleteRecurrenceOccurrenceRequests: [(recurrenceId: Int64, eventId: Int64)] = []
+    private var storedDeleteRecurrenceOccurrenceRequests: [(recurrenceId: Int64, originStartAt: Date)] = []
     private var suspendedContinuations: [CheckedContinuation<[EventResponseDTO], Error>] = []
     private var suspendedCreateContinuations: [CheckedContinuation<EventResponseDTO, Error>] = []
     private var requestCountWaiters: [CountWaiter] = []
@@ -2618,7 +2934,7 @@ private final class RecordingEventRepository: EventRepository {
         }
     }
 
-    var updateRecurrenceOccurrenceRequests: [(recurrenceId: Int64, eventId: Int64, request: UpdateRecurrenceOccurrenceRequestDTO)] {
+    var updateRecurrenceOccurrenceRequests: [(recurrenceId: Int64, request: UpdateRecurrenceOccurrenceRequestDTO)] {
         locked {
             storedUpdateRecurrenceOccurrenceRequests
         }
@@ -2636,7 +2952,7 @@ private final class RecordingEventRepository: EventRepository {
         }
     }
 
-    var deleteRecurrenceOccurrenceRequests: [(recurrenceId: Int64, eventId: Int64)] {
+    var deleteRecurrenceOccurrenceRequests: [(recurrenceId: Int64, originStartAt: Date)] {
         locked {
             storedDeleteRecurrenceOccurrenceRequests
         }
@@ -2737,11 +3053,10 @@ private final class RecordingEventRepository: EventRepository {
 
     func updateRecurrenceOccurrence(
         recurrenceId: Int64,
-        eventId: Int64,
         request: UpdateRecurrenceOccurrenceRequestDTO
     ) async throws -> EventResponseDTO {
         locked {
-            storedUpdateRecurrenceOccurrenceRequests.append((recurrenceId, eventId, request))
+            storedUpdateRecurrenceOccurrenceRequests.append((recurrenceId, request))
         }
 
         if let updateRecurrenceOccurrenceError {
@@ -2771,9 +3086,9 @@ private final class RecordingEventRepository: EventRepository {
         }
     }
 
-    func deleteRecurrenceOccurrence(recurrenceId: Int64, eventId: Int64) async throws {
+    func deleteRecurrenceOccurrence(recurrenceId: Int64, originStartAt: Date) async throws {
         locked {
-            storedDeleteRecurrenceOccurrenceRequests.append((recurrenceId, eventId))
+            storedDeleteRecurrenceOccurrenceRequests.append((recurrenceId, originStartAt))
         }
 
         if let recurrenceOccurrenceDeleteError {

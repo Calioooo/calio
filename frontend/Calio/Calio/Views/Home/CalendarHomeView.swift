@@ -35,10 +35,10 @@ struct CalendarHomeView: View {
                     tags: viewModel.tags,
                     referenceDay: viewModel.referenceDay,
                     displayMode: displayMode,
-                    eventAreaState: viewModel.referenceEventAreaState,
+                    eventLoadState: viewModel.eventLoadState,
                     onReferenceDayChanged: viewModel.setReferenceDay(_:),
                     onVisibleRangeChanged: viewModel.loadAdditionalEventsIfNeeded(visibleRange:),
-                    onRetryEvents: viewModel.retryReferenceMonthEvents,
+                    onRetryEventLoading: viewModel.retryEventLoading,
                     onDragEnded: updateDisplayMode(after:),
                     isEventMutating: viewModel.mutationState.isMutating,
                     isTagMutating: viewModel.tagMutationState.isMutating,
@@ -63,23 +63,11 @@ struct CalendarHomeView: View {
                 viewModel.loadTagsIfNeeded()
                 viewModel.loadInitialIfNeeded()
             }
-            .sheet(isPresented: $isShowingEventCreationView) {
-                CalendarEventCreationView(
-                    referenceDay: viewModel.referenceDay,
-                    tags: viewModel.tags,
-                    isSaving: viewModel.createState.isSaving,
-                    isTagMutating: viewModel.tagMutationState.isMutating,
-                    failureMessage: viewModel.createState.failureMessage,
-                    tagMutationFailureMessage: viewModel.tagMutationState.failureMessage,
-                    onSave: { input in
-                        await viewModel.createEvent(input)
-                    },
-                    onResetTagMutation: viewModel.resetTagMutationState,
-                    onCreateCustomTag: viewModel.createCustomTag(_:),
-                    onUpdateCustomTag: viewModel.updateCustomTag(_:input:),
-                    onDeleteCustomTag: viewModel.deleteCustomTag(_:)
-                )
-            }
+            .eventCreationSheet(
+                isPresented: $isShowingEventCreationView,
+                viewModel: viewModel,
+                referenceDay: viewModel.referenceDay
+            )
         }
     }
     
@@ -96,7 +84,7 @@ struct CalendarHomeView: View {
     @ViewBuilder
     private func calendarHeader(
         in geometry: GeometryProxy,
-        items: [CalendarDateCellItem]
+        items: [CalendarDayItem]
     ) -> some View {
         switch displayMode {
         case .week:

@@ -1,5 +1,5 @@
 //
-//  CalendarDateCellItem.swift
+//  CalendarDayItem.swift
 //  Calio
 //
 //  Created by 김준하 on 6/7/26.
@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct CalendarDateCellItem: Identifiable {
+struct CalendarDayItem: Identifiable {
     let id: DayKey
     let weekday: CalendarWeekday
     let monthText: String

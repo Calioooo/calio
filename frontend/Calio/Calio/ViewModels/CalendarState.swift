@@ -175,7 +175,7 @@ enum CalendarMonthHolidayFailure: Equatable {
     }
 }
 
-enum CalendarEventAreaState: Equatable {
+enum CalendarEventLoadState: Equatable {
     case idle
     case loading
     case failed(String)
@@ -184,8 +184,8 @@ enum CalendarEventAreaState: Equatable {
 struct CalendarState {
     let startDate: Date
     let endDate: Date
-    let daysByKey: [DayKey: CalendarDateCellItem]
-    private let orderedDateCellItems: [CalendarDateCellItem]
+    let daysByKey: [DayKey: CalendarDayItem]
+    private let orderedDateCellItems: [CalendarDayItem]
     let monthEventCache: [YearMonthKey: CalendarMonthEventCacheEntry]
     let monthHolidayCache: [YearMonthKey: CalendarMonthHolidayCacheEntry]
     
@@ -197,7 +197,7 @@ struct CalendarState {
     init(
         startDate: Date,
         endDate: Date,
-        daysByKey: [DayKey: CalendarDateCellItem],
+        daysByKey: [DayKey: CalendarDayItem],
         monthEventCache: [YearMonthKey: CalendarMonthEventCacheEntry] = [:],
         monthHolidayCache: [YearMonthKey: CalendarMonthHolidayCacheEntry] = [:]
     ) {
@@ -214,8 +214,8 @@ struct CalendarState {
     private init(
         startDate: Date,
         endDate: Date,
-        daysByKey: [DayKey: CalendarDateCellItem],
-        orderedDateCellItems: [CalendarDateCellItem],
+        daysByKey: [DayKey: CalendarDayItem],
+        orderedDateCellItems: [CalendarDayItem],
         monthEventCache: [YearMonthKey: CalendarMonthEventCacheEntry],
         monthHolidayCache: [YearMonthKey: CalendarMonthHolidayCacheEntry]
     ) {
@@ -234,7 +234,7 @@ struct CalendarState {
     func appended(
         startDate newStartDate: Date,
         endDate newEndDate: Date,
-        daysByKey newDaysByKey: [DayKey: CalendarDateCellItem],
+        daysByKey newDaysByKey: [DayKey: CalendarDayItem],
         monthEventCache newMonthEventCache: [YearMonthKey: CalendarMonthEventCacheEntry]? = nil,
         monthHolidayCache newMonthHolidayCache: [YearMonthKey: CalendarMonthHolidayCacheEntry]? = nil
     ) -> CalendarState {
@@ -244,7 +244,7 @@ struct CalendarState {
         let newOrderedItems = newDaysByKey.values.sorted { earlierCandidate, laterCandidate in
             earlierCandidate.id < laterCandidate.id
         }
-        let updatedOrderedItems: [CalendarDateCellItem]
+        let updatedOrderedItems: [CalendarDayItem]
 
         if newEndDate < startDate {
             updatedOrderedItems = newOrderedItems + orderedDateCellItems
@@ -269,7 +269,7 @@ struct CalendarState {
     func replacingDateCells(
         startDate newStartDate: Date,
         endDate newEndDate: Date,
-        daysByKey newDaysByKey: [DayKey: CalendarDateCellItem],
+        daysByKey newDaysByKey: [DayKey: CalendarDayItem],
         monthEventCache newMonthEventCache: [YearMonthKey: CalendarMonthEventCacheEntry]? = nil,
         monthHolidayCache newMonthHolidayCache: [YearMonthKey: CalendarMonthHolidayCacheEntry]? = nil
     ) -> CalendarState {
@@ -284,7 +284,7 @@ struct CalendarState {
 
     func replacingMonthEventCache(
         _ newMonthEventCache: [YearMonthKey: CalendarMonthEventCacheEntry],
-        updatingDateCells newDaysByKey: [DayKey: CalendarDateCellItem] = [:]
+        updatingDateCells newDaysByKey: [DayKey: CalendarDayItem] = [:]
     ) -> CalendarState {
         guard !newDaysByKey.isEmpty else {
             return CalendarState(
@@ -316,7 +316,7 @@ struct CalendarState {
 
     func replacingMonthHolidayCache(
         _ newMonthHolidayCache: [YearMonthKey: CalendarMonthHolidayCacheEntry],
-        updatingDateCells newDaysByKey: [DayKey: CalendarDateCellItem] = [:]
+        updatingDateCells newDaysByKey: [DayKey: CalendarDayItem] = [:]
     ) -> CalendarState {
         guard !newDaysByKey.isEmpty else {
             return CalendarState(
@@ -346,7 +346,7 @@ struct CalendarState {
         )
     }
     
-    func loadedDateCellItems(calendar: Calendar) -> [CalendarDateCellItem] {
+    func loadedDateCellItems(calendar: Calendar) -> [CalendarDayItem] {
         return orderedDateCellItems
     }
 }
