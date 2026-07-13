@@ -1,10 +1,10 @@
 package com.calio.calendar.security;
 
-import com.calio.calendar.auth.AccessTokenEncoder;
-import com.calio.calendar.exception.CalioException;
-import com.calio.calendar.exception.ErrorCode;
-import com.calio.calendar.repository.AccountAuthTokenRepository;
-import com.calio.calendar.repository.entity.AccountAuthToken;
+import com.calio.calendar.auth.service.AccessTokenEncoder;
+import com.calio.calendar.common.error.CalioException;
+import com.calio.calendar.common.error.ErrorCode;
+import com.calio.calendar.account.repository.AccountAuthTokenRepository;
+import com.calio.calendar.account.domain.AccountAuthToken;
 import java.time.Clock;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

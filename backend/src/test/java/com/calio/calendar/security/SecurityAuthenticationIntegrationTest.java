@@ -6,12 +6,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.calio.calendar.auth.AccessTokenEncoder;
-import com.calio.calendar.repository.AccountAuthTokenRepository;
-import com.calio.calendar.repository.AccountRepository;
-import com.calio.calendar.repository.TaskRepository;
-import com.calio.calendar.repository.entity.Account;
-import com.calio.calendar.repository.entity.AccountAuthToken;
+import com.calio.calendar.auth.service.AccessTokenEncoder;
+import com.calio.calendar.account.repository.AccountAuthTokenRepository;
+import com.calio.calendar.account.repository.AccountRepository;
+import com.calio.calendar.task.repository.TaskRepository;
+import com.calio.calendar.account.domain.Account;
+import com.calio.calendar.account.domain.AccountAuthToken;
 import java.time.Instant;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;

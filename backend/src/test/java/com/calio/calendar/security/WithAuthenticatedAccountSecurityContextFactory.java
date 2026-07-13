@@ -1,7 +1,7 @@
 package com.calio.calendar.security;
 
-import com.calio.calendar.repository.AccountRepository;
-import com.calio.calendar.repository.entity.Account;
+import com.calio.calendar.account.repository.AccountRepository;
+import com.calio.calendar.account.domain.Account;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
