@@ -30,6 +30,6 @@ public class HolidayApiProperties {
     }
 
     public boolean hasServiceKey() {
-        return serviceKey != null && !serviceKey.isBlank();
+        return !serviceKey.isBlank();
     }
 }

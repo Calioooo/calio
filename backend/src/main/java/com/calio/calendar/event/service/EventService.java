@@ -237,7 +237,7 @@ public class EventService {
     }
 
     private Event findEvent(Long accountId, Long eventId) {
-        return eventRepository.findByIdAndAccount_IdAndDeletedAtIsNull(eventId, accountId)
+        return eventRepository.findByIdAndAccount_Id(eventId, accountId)
                 .orElseThrow(() -> new CalioException(ErrorCode.EVENT_NOT_FOUND));
     }
 

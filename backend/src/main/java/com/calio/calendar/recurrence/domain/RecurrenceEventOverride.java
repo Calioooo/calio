@@ -93,10 +93,6 @@ public class RecurrenceEventOverride extends BaseEntity {
         return deletedAt != null;
     }
 
-    public Long getOverrideId() {
-        return overrideId;
-    }
-
     public RecurrenceEvent getRecurrenceEvent() {
         return recurrenceEvent;
     }

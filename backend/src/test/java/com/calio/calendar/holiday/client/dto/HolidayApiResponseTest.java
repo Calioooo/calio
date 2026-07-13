@@ -12,7 +12,7 @@ class HolidayApiResponseTest {
 
     @Test
     @DisplayName("배열 형태의 items.item을 HolidayApiItem 목록으로 반환한다")
-    void givenArrayItem_whenParseHolidayApiResponse_thenReadsItems() throws Exception {
+    void givenArrayItem_whenParseHolidayApiResponse_thenReadsItems() {
         // given
         String json = """
                 {
@@ -48,14 +48,14 @@ class HolidayApiResponseTest {
         // then
         assertThat(response.resultCode()).isEqualTo("00");
         assertThat(response.items()).hasSize(2);
-        assertThat(response.items().get(0).locdate()).isEqualTo("20260101");
-        assertThat(response.items().get(0).dateName()).isEqualTo("신정");
-        assertThat(response.items().get(0).isHoliday()).isEqualTo("Y");
+        assertThat(response.items().getFirst().locdate()).isEqualTo("20260101");
+        assertThat(response.items().getFirst().dateName()).isEqualTo("신정");
+        assertThat(response.items().getFirst().isHoliday()).isEqualTo("Y");
     }
 
     @Test
     @DisplayName("공휴일 API 응답은 단일 객체 형태의 items.item도 provider item 목록으로 정규화한다")
-    void givenSingleObjectItem_whenParseHolidayApiResponse_thenNormalizesItemList() throws Exception {
+    void givenSingleObjectItem_whenParseHolidayApiResponse_thenNormalizesItemList() {
         // given
         String json = """
                 {

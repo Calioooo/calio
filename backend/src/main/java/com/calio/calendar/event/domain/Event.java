@@ -41,9 +41,6 @@ public class Event extends BaseEntity {
     @Column(name = "recurrence_id")
     private Long recurrenceId;
 
-    @Column(name = "deleted_at")
-    private Instant deletedAt;
-
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "account_id", nullable = false)
     private Account account;
@@ -85,31 +82,12 @@ public class Event extends BaseEntity {
         changeTag(tag);
     }
 
-    public void updateOccurrence(
-            String title,
-            String description,
-            Instant startAt,
-            Instant endAt,
-            boolean importantEvent
-    ) {
-        replace(title, description, startAt, endAt);
-        changeImportantEvent(importantEvent);
-    }
-
     public void changeImportantEvent(boolean importantEvent) {
         this.importantEvent = importantEvent;
     }
 
     public void changeTag(Tag tag) {
         this.tag = tag;
-    }
-
-    public void softDelete(Instant deletedAt) {
-        if (this.deletedAt != null) {
-            return;
-        }
-
-        this.deletedAt = deletedAt;
     }
 
     public Long getId() {
@@ -134,10 +112,6 @@ public class Event extends BaseEntity {
 
     public boolean importantEvent() {
         return importantEvent;
-    }
-
-    public Instant getDeletedAt() {
-        return deletedAt;
     }
 
     public Optional<Long> getRecurrenceId() {

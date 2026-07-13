@@ -14,13 +14,10 @@ public interface EventRepository extends JpaRepository<Event, Long> {
 
     Optional<Event> findByIdAndAccount_Id(Long id, Long accountId);
 
-    Optional<Event> findByIdAndAccount_IdAndDeletedAtIsNull(Long id, Long accountId);
-
     @Query("""
             select event
             from Event event
             where event.account.id = :accountId
-              and event.deletedAt is null
               and event.recurrenceId is null
               and event.startAt < :to
               and event.endAt > :from
@@ -31,8 +28,6 @@ public interface EventRepository extends JpaRepository<Event, Long> {
             @Param("from") Instant from,
             @Param("to") Instant to
     );
-
-    List<Event> findByRecurrenceIdAndAccount_IdAndDeletedAtIsNullOrderByStartAtAsc(Long recurrenceId, Long accountId);
 
     List<Event> findByRecurrenceIdAndAccount_IdOrderByStartAtAsc(Long recurrenceId, Long accountId);
 
