@@ -5,9 +5,11 @@ import com.calio.calendar.exception.ErrorCode;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.net.URI;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
+import org.springframework.http.ProblemDetail;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
@@ -33,8 +35,8 @@ public class AuthenticationErrorResponseWriter {
         );
         response.setStatus(errorCode.getStatus().value());
         response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
-        response.getWriter().write(objectMapper.writeValueAsString(
-                ErrorProblemDetail.from(errorCode, errorCode.getDefaultMessage())
-        ));
+        ProblemDetail problemDetail = ErrorProblemDetail.from(errorCode, errorCode.getDefaultMessage());
+        problemDetail.setInstance(URI.create(request.getRequestURI()));
+        response.getWriter().write(objectMapper.writeValueAsString(problemDetail));
     }
 }

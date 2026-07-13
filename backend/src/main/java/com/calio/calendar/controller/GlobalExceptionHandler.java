@@ -65,12 +65,12 @@ public class GlobalExceptionHandler {
     ) {
         ErrorCode errorCode = ErrorCode.INTERNAL_SERVER_ERROR;
         log.error(
-                "Unhandled API exception. errorCode={} accountId={} method={} path={}",
+                "Unhandled API exception. status={} errorCode={} accountId={} method={} path={}",
+                errorCode.getStatus().value(),
                 errorCode.name(),
                 currentAccountId(),
                 request.getMethod(),
-                request.getRequestURI(),
-                exception
+                request.getRequestURI()
         );
         return toResponse(errorCode, errorCode.getDefaultMessage());
     }
@@ -94,8 +94,7 @@ public class GlobalExceptionHandler {
                     errorCode.name(),
                     currentAccountId(),
                     request.getMethod(),
-                    request.getRequestURI(),
-                    exception
+                    request.getRequestURI()
             );
             return;
         }
