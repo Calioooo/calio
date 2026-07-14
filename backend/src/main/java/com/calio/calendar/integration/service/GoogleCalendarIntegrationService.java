@@ -43,7 +43,6 @@ public class GoogleCalendarIntegrationService {
     }
 
     public GoogleCalendarIntegrationResponse connect(Long accountId, GoogleCalendarConnectRequest request) {
-        validateAuthorizationCode(request.authorizationCode());
         validateConfiguration();
 
         Instant tokenReceivedAt = Instant.now(clock);
@@ -81,15 +80,6 @@ public class GoogleCalendarIntegrationService {
             throw new CalioException(ErrorCode.GOOGLE_CALENDAR_CONFIGURATION_MISSING);
         }
         tokenEncryptor.validateConfigured();
-    }
-
-    private void validateAuthorizationCode(String authorizationCode) {
-        if (authorizationCode != null && !authorizationCode.isBlank()) {
-            return;
-        }
-
-        logIntegrationFailure("validateAuthorizationCode", ErrorCode.GOOGLE_CALENDAR_AUTHORIZATION_CODE_REQUIRED);
-        throw new CalioException(ErrorCode.GOOGLE_CALENDAR_AUTHORIZATION_CODE_REQUIRED);
     }
 
     private EncryptedGoogleTokens encryptTokens(GoogleTokenResponse tokenResponse) {

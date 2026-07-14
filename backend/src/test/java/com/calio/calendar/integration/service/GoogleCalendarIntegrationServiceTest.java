@@ -71,23 +71,6 @@ class GoogleCalendarIntegrationServiceTest {
         assertThat(persistenceService.saveCount).isZero();
     }
 
-    @Test
-    @DisplayName("connect는 authorizationCode가 비어 있으면 Google 외부 호출 전에 거부한다")
-    void givenBlankAuthorizationCode_whenConnect_thenRejectsBeforeExternalCall() {
-        // given
-        FakeGoogleOAuthClient googleOAuthClient = new FakeGoogleOAuthClient(googleOAuthProperties);
-        FakePersistenceService persistenceService = new FakePersistenceService();
-        GoogleCalendarIntegrationService service = service(googleOAuthClient, persistenceService);
-
-        // when, then
-        assertThatThrownBy(() -> service.connect(ACCOUNT_ID, new GoogleCalendarConnectRequest(" ")))
-                .isInstanceOfSatisfying(CalioException.class, exception ->
-                        assertThat(exception.getErrorCode())
-                                .isEqualTo(ErrorCode.GOOGLE_CALENDAR_AUTHORIZATION_CODE_REQUIRED));
-        assertThat(googleOAuthClient.exchangeCount).isZero();
-        assertThat(persistenceService.saveCount).isZero();
-    }
-
     private GoogleCalendarIntegrationService service(
             FakeGoogleOAuthClient googleOAuthClient,
             FakePersistenceService persistenceService
