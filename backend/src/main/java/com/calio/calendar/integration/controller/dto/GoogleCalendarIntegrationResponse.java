@@ -21,11 +21,10 @@ public record GoogleCalendarIntegrationResponse(
     }
 
     public static GoogleCalendarIntegrationResponse from(GoogleCalendarIntegration integration) {
-        if (integration.getConnectionStatus() != GoogleCalendarConnectionStatus.CONNECTED) {
-            return disconnected();
-        }
-
-        return connected(integration);
+        return switch (integration.getConnectionStatus()) {
+            case CONNECTED -> connected(integration);
+            case DISCONNECTED -> disconnected();
+        };
     }
 
     public static GoogleCalendarIntegrationResponse disconnected() {
