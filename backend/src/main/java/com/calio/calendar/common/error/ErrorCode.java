@@ -35,7 +35,7 @@ public enum ErrorCode {
     GOOGLE_TOKEN_RESPONSE_INVALID(HttpStatus.BAD_GATEWAY, "Google token response is invalid."),
     GOOGLE_USER_INFO_FETCH_FAILED(HttpStatus.BAD_GATEWAY, "Google user info fetch failed."),
     GOOGLE_USER_INFO_INVALID(HttpStatus.BAD_GATEWAY, "Google user info response is invalid."),
-    GOOGLE_REFRESH_TOKEN_ENCRYPTION_FAILED(
+    GOOGLE_TOKEN_ENCRYPTION_FAILED(
             HttpStatus.INTERNAL_SERVER_ERROR,
             "Google token encryption failed."
     ),

@@ -88,8 +88,8 @@ public class GoogleCalendarIntegrationService {
 
     private EncryptedGoogleTokens encryptTokens(GoogleTokenResponse tokenResponse) {
         return new EncryptedGoogleTokens(
-                tokenEncryptor.encrypt(tokenResponse.refreshToken()),
-                tokenEncryptor.encrypt(tokenResponse.accessToken())
+                tokenEncryptor.encryptRefreshToken(tokenResponse.refreshToken()),
+                tokenEncryptor.encryptAccessToken(tokenResponse.accessToken())
         );
     }
 

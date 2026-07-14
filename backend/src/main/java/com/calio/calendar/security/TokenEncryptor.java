@@ -11,11 +11,14 @@ import java.util.Base64;
 import javax.crypto.Cipher;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 @Component
 public class TokenEncryptor {
 
+    private static final Logger log = LoggerFactory.getLogger(TokenEncryptor.class);
     private static final String ENVELOPE_VERSION = "v1";
     private static final String KEY_VERSION = "google-refresh-token-key:v1";
     private static final String AES_ALGORITHM = "AES";
@@ -37,13 +40,30 @@ public class TokenEncryptor {
         encryptionKey();
     }
 
-    public String encrypt(String plaintext) {
+    public String encryptRefreshToken(String plaintext) {
+        return encrypt(plaintext, GoogleTokenType.REFRESH_TOKEN);
+    }
+
+    public String encryptAccessToken(String plaintext) {
+        return encrypt(plaintext, GoogleTokenType.ACCESS_TOKEN);
+    }
+
+    String encrypt(String plaintext) {
+        return encrypt(plaintext, GoogleTokenType.UNKNOWN_TOKEN);
+    }
+
+    private String encrypt(String plaintext, GoogleTokenType tokenType) {
         try {
             byte[] nonce = randomNonce();
             byte[] encrypted = encrypt(plaintext.getBytes(StandardCharsets.UTF_8), nonce);
             return TokenEnvelope.fromEncryptedBytes(KEY_VERSION, nonce, encrypted).serialize();
         } catch (GeneralSecurityException | IllegalArgumentException exception) {
-            throw new CalioException(ErrorCode.GOOGLE_REFRESH_TOKEN_ENCRYPTION_FAILED, exception);
+            log.warn(
+                    "Google token encryption failed. tokenType={} causeType={}",
+                    tokenType,
+                    exception.getClass().getSimpleName()
+            );
+            throw new CalioException(ErrorCode.GOOGLE_TOKEN_ENCRYPTION_FAILED, exception);
         }
     }
 
@@ -54,7 +74,12 @@ public class TokenEncryptor {
             byte[] plaintext = decrypt(encrypted, envelope.nonce());
             return new String(plaintext, StandardCharsets.UTF_8);
         } catch (GeneralSecurityException | IllegalArgumentException exception) {
-            throw new CalioException(ErrorCode.GOOGLE_REFRESH_TOKEN_ENCRYPTION_FAILED, exception);
+            log.warn(
+                    "Google token decryption failed. tokenType={} causeType={}",
+                    GoogleTokenType.UNKNOWN_TOKEN,
+                    exception.getClass().getSimpleName()
+            );
+            throw new CalioException(ErrorCode.GOOGLE_TOKEN_ENCRYPTION_FAILED, exception);
         }
     }
 
@@ -103,6 +128,12 @@ public class TokenEncryptor {
         byte[] nonce = new byte[GCM_NONCE_BYTES];
         secureRandom.nextBytes(nonce);
         return nonce;
+    }
+
+    private enum GoogleTokenType {
+        REFRESH_TOKEN,
+        ACCESS_TOKEN,
+        UNKNOWN_TOKEN
     }
 
     private record TokenEnvelope(
