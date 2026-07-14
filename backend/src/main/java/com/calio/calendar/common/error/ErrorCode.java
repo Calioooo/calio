@@ -23,6 +23,26 @@ public enum ErrorCode {
     INVALID_RECURRENCE_TIME_RANGE(HttpStatus.BAD_REQUEST, "Invalid recurrence time range."),
     INVALID_RECURRENCE_FREQUENCY(HttpStatus.BAD_REQUEST, "Invalid recurrence frequency."),
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "Validation failed."),
+    GOOGLE_CALENDAR_AUTHORIZATION_CODE_REQUIRED(
+            HttpStatus.BAD_REQUEST,
+            "Google Calendar authorization code is required."
+    ),
+    GOOGLE_CALENDAR_CONFIGURATION_MISSING(
+            HttpStatus.INTERNAL_SERVER_ERROR,
+            "Google Calendar integration configuration is missing."
+    ),
+    GOOGLE_TOKEN_EXCHANGE_FAILED(HttpStatus.BAD_GATEWAY, "Google token exchange failed."),
+    GOOGLE_TOKEN_RESPONSE_INVALID(HttpStatus.BAD_GATEWAY, "Google token response is invalid."),
+    GOOGLE_USER_INFO_FETCH_FAILED(HttpStatus.BAD_GATEWAY, "Google user info fetch failed."),
+    GOOGLE_USER_INFO_INVALID(HttpStatus.BAD_GATEWAY, "Google user info response is invalid."),
+    GOOGLE_REFRESH_TOKEN_ENCRYPTION_FAILED(
+            HttpStatus.INTERNAL_SERVER_ERROR,
+            "Google token encryption failed."
+    ),
+    GOOGLE_CALENDAR_INTEGRATION_SAVE_FAILED(
+            HttpStatus.INTERNAL_SERVER_ERROR,
+            "Google Calendar integration save failed."
+    ),
 
     EXTERNAL_API_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "External API is temporarily unavailable."),
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error.");
