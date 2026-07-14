@@ -47,6 +47,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/tags").authenticated()
                         .requestMatchers("/api/custom-tags").authenticated()
                         .requestMatchers("/api/custom-tags/**").authenticated()
+                        .requestMatchers("/api/integrations/google-calendar").authenticated()
                         .anyRequest().denyAll()
                 )
                 .exceptionHandling(exception -> exception.authenticationEntryPoint(
