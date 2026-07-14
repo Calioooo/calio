@@ -4,15 +4,14 @@ import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.security.GeneralSecurityException;
-import java.security.SecureRandom;
 import java.util.Arrays;
 import java.util.Base64;
-import javax.crypto.Cipher;
-import javax.crypto.spec.GCMParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.BeansException;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.security.crypto.encrypt.BytesEncryptor;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -21,23 +20,19 @@ public class TokenEncryptor {
     private static final Logger log = LoggerFactory.getLogger(TokenEncryptor.class);
     private static final String ENVELOPE_VERSION = "v1";
     private static final String KEY_VERSION = "google-refresh-token-key:v1";
-    private static final String AES_ALGORITHM = "AES";
-    private static final String CIPHER_TRANSFORMATION = "AES/GCM/NoPadding";
-    private static final int AES_256_KEY_BYTES = 32;
-    private static final int GCM_NONCE_BYTES = 12;
-    private static final int GCM_TAG_BITS = 128;
-    private static final int GCM_TAG_BYTES = GCM_TAG_BITS / Byte.SIZE;
+    private static final int GCM_NONCE_BYTES = 16;
+    private static final int GCM_TAG_BYTES = 16;
 
-    private final TokenEncryptionProperties properties;
-    private final SecureRandom secureRandom;
+    private final ObjectProvider<BytesEncryptor> bytesEncryptorProvider;
 
-    public TokenEncryptor(TokenEncryptionProperties properties) {
-        this.properties = properties;
-        this.secureRandom = new SecureRandom();
+    public TokenEncryptor(
+            @Qualifier("googleTokenBytesEncryptor") ObjectProvider<BytesEncryptor> bytesEncryptorProvider
+    ) {
+        this.bytesEncryptorProvider = bytesEncryptorProvider;
     }
 
     public void validateConfigured() {
-        encryptionKey();
+        bytesEncryptor();
     }
 
     public String encryptRefreshToken(String plaintext) {
@@ -54,10 +49,11 @@ public class TokenEncryptor {
 
     private String encrypt(String plaintext, GoogleTokenType tokenType) {
         try {
-            byte[] nonce = randomNonce();
-            byte[] encrypted = encrypt(plaintext.getBytes(StandardCharsets.UTF_8), nonce);
-            return TokenEnvelope.fromEncryptedBytes(KEY_VERSION, nonce, encrypted).serialize();
-        } catch (GeneralSecurityException | IllegalArgumentException exception) {
+            byte[] encrypted = bytesEncryptor().encrypt(plaintext.getBytes(StandardCharsets.UTF_8));
+            return TokenEnvelope.fromEncryptedBytes(KEY_VERSION, encrypted).serialize();
+        } catch (CalioException exception) {
+            throw exception;
+        } catch (RuntimeException exception) {
             log.warn(
                     "Google token encryption failed. tokenType={} causeType={}",
                     tokenType,
@@ -70,10 +66,11 @@ public class TokenEncryptor {
     public String decrypt(String envelopeValue) {
         try {
             TokenEnvelope envelope = TokenEnvelope.parse(envelopeValue);
-            byte[] encrypted = envelope.encryptedBytes();
-            byte[] plaintext = decrypt(encrypted, envelope.nonce());
+            byte[] plaintext = bytesEncryptor().decrypt(envelope.encryptedBytes());
             return new String(plaintext, StandardCharsets.UTF_8);
-        } catch (GeneralSecurityException | IllegalArgumentException exception) {
+        } catch (CalioException exception) {
+            throw exception;
+        } catch (RuntimeException exception) {
             log.warn(
                     "Google token decryption failed. tokenType={} causeType={}",
                     GoogleTokenType.UNKNOWN_TOKEN,
@@ -83,51 +80,23 @@ public class TokenEncryptor {
         }
     }
 
-    private byte[] encrypt(byte[] plaintext, byte[] nonce) throws GeneralSecurityException {
-        Cipher cipher = Cipher.getInstance(CIPHER_TRANSFORMATION);
-        cipher.init(Cipher.ENCRYPT_MODE, secretKey(), new GCMParameterSpec(GCM_TAG_BITS, nonce));
-        return cipher.doFinal(plaintext);
-    }
-
-    private byte[] decrypt(byte[] encrypted, byte[] nonce) throws GeneralSecurityException {
-        Cipher cipher = Cipher.getInstance(CIPHER_TRANSFORMATION);
-        cipher.init(Cipher.DECRYPT_MODE, secretKey(), new GCMParameterSpec(GCM_TAG_BITS, nonce));
-        return cipher.doFinal(encrypted);
-    }
-
-    private SecretKeySpec secretKey() {
-        return new SecretKeySpec(encryptionKey(), AES_ALGORITHM);
-    }
-
-    private byte[] encryptionKey() {
-        if (!properties.hasGoogleRefreshTokenKey()) {
-            throw new CalioException(ErrorCode.GOOGLE_CALENDAR_CONFIGURATION_MISSING);
-        }
-
-        byte[] key = decodeKey(properties.getGoogleRefreshTokenKey());
-        if (key.length != AES_256_KEY_BYTES) {
-            throw new CalioException(ErrorCode.GOOGLE_CALENDAR_CONFIGURATION_MISSING);
-        }
-        return key;
-    }
-
-    private byte[] decodeKey(String keyValue) {
-        byte[] rawKey = keyValue.getBytes(StandardCharsets.UTF_8);
-        if (rawKey.length == AES_256_KEY_BYTES) {
-            return rawKey;
-        }
-
+    private BytesEncryptor bytesEncryptor() {
         try {
-            return Base64.getDecoder().decode(keyValue);
-        } catch (IllegalArgumentException exception) {
-            return rawKey;
+            return bytesEncryptorProvider.getObject();
+        } catch (BeansException exception) {
+            throw calioExceptionFrom(exception);
         }
     }
 
-    private byte[] randomNonce() {
-        byte[] nonce = new byte[GCM_NONCE_BYTES];
-        secureRandom.nextBytes(nonce);
-        return nonce;
+    private RuntimeException calioExceptionFrom(BeansException exception) {
+        Throwable cause = exception;
+        while (cause != null) {
+            if (cause instanceof CalioException calioException) {
+                return calioException;
+            }
+            cause = cause.getCause();
+        }
+        return exception;
     }
 
     private enum GoogleTokenType {
@@ -146,14 +115,15 @@ public class TokenEncryptor {
         private static final Base64.Encoder ENCODER = Base64.getUrlEncoder().withoutPadding();
         private static final Base64.Decoder DECODER = Base64.getUrlDecoder();
 
-        static TokenEnvelope fromEncryptedBytes(String keyVersion, byte[] nonce, byte[] encrypted) {
-            if (encrypted.length <= GCM_TAG_BYTES) {
+        static TokenEnvelope fromEncryptedBytes(String keyVersion, byte[] encrypted) {
+            if (encrypted.length < GCM_NONCE_BYTES + GCM_TAG_BYTES) {
                 throw new IllegalArgumentException("Invalid encrypted token");
             }
 
-            int ciphertextLength = encrypted.length - GCM_TAG_BYTES;
-            byte[] ciphertext = Arrays.copyOfRange(encrypted, 0, ciphertextLength);
-            byte[] authenticationTag = Arrays.copyOfRange(encrypted, ciphertextLength, encrypted.length);
+            byte[] nonce = Arrays.copyOfRange(encrypted, 0, GCM_NONCE_BYTES);
+            int authenticationTagOffset = encrypted.length - GCM_TAG_BYTES;
+            byte[] ciphertext = Arrays.copyOfRange(encrypted, GCM_NONCE_BYTES, authenticationTagOffset);
+            byte[] authenticationTag = Arrays.copyOfRange(encrypted, authenticationTagOffset, encrypted.length);
             return new TokenEnvelope(keyVersion, nonce, ciphertext, authenticationTag);
         }
 
@@ -183,7 +153,8 @@ public class TokenEncryptor {
         }
 
         byte[] encryptedBytes() {
-            return ByteBuffer.allocate(ciphertext.length + authenticationTag.length)
+            return ByteBuffer.allocate(nonce.length + ciphertext.length + authenticationTag.length)
+                    .put(nonce)
                     .put(ciphertext)
                     .put(authenticationTag)
                     .array();

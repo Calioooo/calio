@@ -12,6 +12,7 @@ import com.calio.calendar.external.google.dto.GoogleUserInfoResponse;
 import com.calio.calendar.integration.controller.dto.GoogleCalendarConnectRequest;
 import com.calio.calendar.integration.controller.dto.GoogleCalendarIntegrationResponse;
 import com.calio.calendar.integration.domain.GoogleCalendarIntegration;
+import com.calio.calendar.security.TokenEncryptionConfig;
 import com.calio.calendar.security.TokenEncryptionProperties;
 import com.calio.calendar.security.TokenEncryptor;
 import java.time.Clock;
@@ -19,6 +20,8 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.security.crypto.encrypt.BytesEncryptor;
 import tools.jackson.databind.ObjectMapper;
 
 class GoogleCalendarIntegrationServiceTest {
@@ -27,7 +30,9 @@ class GoogleCalendarIntegrationServiceTest {
     private static final Instant NOW = Instant.parse("2026-07-14T12:00:00Z");
 
     private final GoogleOAuthProperties googleOAuthProperties = googleOAuthProperties();
-    private final TokenEncryptor tokenEncryptor = new TokenEncryptor(tokenEncryptionProperties());
+    private final BytesEncryptor bytesEncryptor = new TokenEncryptionConfig()
+            .googleTokenBytesEncryptor(tokenEncryptionProperties());
+    private final TokenEncryptor tokenEncryptor = new TokenEncryptor(objectProvider(bytesEncryptor));
     private final Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
 
     @Test
@@ -98,6 +103,16 @@ class GoogleCalendarIntegrationServiceTest {
         TokenEncryptionProperties properties = new TokenEncryptionProperties();
         properties.setGoogleRefreshTokenKey("12345678901234567890123456789012");
         return properties;
+    }
+
+    private ObjectProvider<BytesEncryptor> objectProvider(BytesEncryptor bytesEncryptor) {
+        return new ObjectProvider<>() {
+
+            @Override
+            public BytesEncryptor getObject() {
+                return bytesEncryptor;
+            }
+        };
     }
 
     private static class FakeGoogleOAuthClient extends GoogleOAuthClient {

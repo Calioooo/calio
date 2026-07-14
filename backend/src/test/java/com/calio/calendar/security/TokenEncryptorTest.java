@@ -2,13 +2,16 @@ package com.calio.calendar.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.security.crypto.encrypt.BytesEncryptor;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class TokenEncryptorTest {
 
     private final TokenEncryptionProperties properties = tokenEncryptionProperties();
-    private final TokenEncryptor tokenEncryptor = new TokenEncryptor(properties);
+    private final BytesEncryptor bytesEncryptor = new TokenEncryptionConfig().googleTokenBytesEncryptor(properties);
+    private final TokenEncryptor tokenEncryptor = new TokenEncryptor(objectProvider(bytesEncryptor));
 
     @Test
     @DisplayName("TokenEncryptor는 AES-GCM envelope를 복호화 가능한 형태로 저장한다")
@@ -44,5 +47,15 @@ class TokenEncryptorTest {
         TokenEncryptionProperties encryptionProperties = new TokenEncryptionProperties();
         encryptionProperties.setGoogleRefreshTokenKey("12345678901234567890123456789012");
         return encryptionProperties;
+    }
+
+    private ObjectProvider<BytesEncryptor> objectProvider(BytesEncryptor bytesEncryptor) {
+        return new ObjectProvider<>() {
+
+            @Override
+            public BytesEncryptor getObject() {
+                return bytesEncryptor;
+            }
+        };
     }
 }
