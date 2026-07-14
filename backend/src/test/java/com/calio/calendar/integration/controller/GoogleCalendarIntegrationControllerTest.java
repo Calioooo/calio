@@ -27,6 +27,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.client.RestClient;
 import tools.jackson.databind.ObjectMapper;
 
 @SpringBootTest(properties = {
@@ -141,7 +142,7 @@ class GoogleCalendarIntegrationControllerTest {
         private GoogleUserInfoResponse userInfoResponse;
 
         FakeGoogleOAuthClient(GoogleOAuthProperties properties) {
-            super(properties, new ObjectMapper());
+            super(properties, new ObjectMapper(), RestClient.create());
         }
 
         @Override

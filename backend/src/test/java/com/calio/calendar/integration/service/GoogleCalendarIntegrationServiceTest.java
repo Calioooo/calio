@@ -21,6 +21,7 @@ import java.time.ZoneOffset;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.crypto.encrypt.BytesEncryptor;
+import org.springframework.web.client.RestClient;
 import tools.jackson.databind.ObjectMapper;
 
 class GoogleCalendarIntegrationServiceTest {
@@ -112,7 +113,7 @@ class GoogleCalendarIntegrationServiceTest {
         private int exchangeCount;
 
         FakeGoogleOAuthClient(GoogleOAuthProperties properties) {
-            super(properties, new ObjectMapper());
+            super(properties, new ObjectMapper(), RestClient.create());
         }
 
         @Override

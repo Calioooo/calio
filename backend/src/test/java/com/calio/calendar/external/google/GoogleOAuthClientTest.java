@@ -30,7 +30,7 @@ class GoogleOAuthClientTest {
         // given
         RestClient.Builder restClientBuilder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
-        GoogleOAuthClient client = new GoogleOAuthClient(properties(), objectMapper, restClientBuilder);
+        GoogleOAuthClient client = new GoogleOAuthClient(properties(), objectMapper, restClientBuilder.build());
         server.expect(requestTo("https://oauth.example.test/token"))
                 .andExpect(method(HttpMethod.POST))
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_FORM_URLENCODED))
@@ -65,7 +65,7 @@ class GoogleOAuthClientTest {
         // given
         RestClient.Builder restClientBuilder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
-        GoogleOAuthClient client = new GoogleOAuthClient(properties(), objectMapper, restClientBuilder);
+        GoogleOAuthClient client = new GoogleOAuthClient(properties(), objectMapper, restClientBuilder.build());
         server.expect(requestTo("https://oauth.example.test/userinfo"))
                 .andExpect(method(HttpMethod.GET))
                 .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer access-token"))
