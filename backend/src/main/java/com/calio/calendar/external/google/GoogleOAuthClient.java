@@ -4,12 +4,14 @@ import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.external.google.dto.GoogleTokenResponse;
 import com.calio.calendar.external.google.dto.GoogleUserInfoResponse;
+import java.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -23,16 +25,27 @@ import tools.jackson.databind.ObjectMapper;
 public class GoogleOAuthClient {
 
     private static final Logger log = LoggerFactory.getLogger(GoogleOAuthClient.class);
+    private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
+    private static final Duration READ_TIMEOUT = Duration.ofSeconds(15);
     private static final String AUTHORIZATION_CODE_GRANT = "authorization_code";
 
     private final GoogleOAuthProperties properties;
     private final ObjectMapper objectMapper;
     private final RestClient restClient;
 
+    @Autowired
     public GoogleOAuthClient(
             GoogleOAuthProperties properties,
             ObjectMapper objectMapper,
-            @Qualifier(GoogleOAuthClientConfig.GOOGLE_OAUTH_REST_CLIENT) RestClient restClient
+            RestClient.Builder restClientBuilder
+    ) {
+        this(properties, objectMapper, createRestClient(restClientBuilder));
+    }
+
+    GoogleOAuthClient(
+            GoogleOAuthProperties properties,
+            ObjectMapper objectMapper,
+            RestClient restClient
     ) {
         this.properties = properties;
         this.objectMapper = objectMapper;
@@ -106,6 +119,19 @@ public class GoogleOAuthClient {
         form.add("redirect_uri", properties.getRedirectUri());
         form.add("grant_type", AUTHORIZATION_CODE_GRANT);
         return form;
+    }
+
+    private static RestClient createRestClient(RestClient.Builder restClientBuilder) {
+        return restClientBuilder
+                .requestFactory(createRequestFactory())
+                .build();
+    }
+
+    private static SimpleClientHttpRequestFactory createRequestFactory() {
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(CONNECT_TIMEOUT);
+        requestFactory.setReadTimeout(READ_TIMEOUT);
+        return requestFactory;
     }
 
 }

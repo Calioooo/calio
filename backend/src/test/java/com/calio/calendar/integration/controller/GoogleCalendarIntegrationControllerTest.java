@@ -142,7 +142,7 @@ class GoogleCalendarIntegrationControllerTest {
         private GoogleUserInfoResponse userInfoResponse;
 
         FakeGoogleOAuthClient(GoogleOAuthProperties properties) {
-            super(properties, new ObjectMapper(), RestClient.create());
+            super(properties, new ObjectMapper(), RestClient.builder());
         }
 
         @Override

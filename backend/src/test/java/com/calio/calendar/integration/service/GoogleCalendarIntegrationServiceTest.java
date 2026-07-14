@@ -113,7 +113,7 @@ class GoogleCalendarIntegrationServiceTest {
         private int exchangeCount;
 
         FakeGoogleOAuthClient(GoogleOAuthProperties properties) {
-            super(properties, new ObjectMapper(), RestClient.create());
+            super(properties, new ObjectMapper(), RestClient.builder());
         }
 
         @Override
