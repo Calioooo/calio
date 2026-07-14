@@ -7,9 +7,9 @@ import java.util.Base64;
 import javax.crypto.spec.SecretKeySpec;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.security.crypto.encrypt.AesBytesEncryptor;
 import org.springframework.security.crypto.encrypt.BytesEncryptor;
+import org.springframework.security.crypto.keygen.KeyGenerators;
 
 @Configuration
 public class TokenEncryptionConfig {
@@ -17,13 +17,13 @@ public class TokenEncryptionConfig {
     private static final String GOOGLE_TOKEN_BYTES_ENCRYPTOR = "googleTokenBytesEncryptor";
     private static final String AES_ALGORITHM = "AES";
     private static final int AES_256_KEY_BYTES = 32;
+    private static final int GCM_NONCE_BYTES = 12;
 
     @Bean(GOOGLE_TOKEN_BYTES_ENCRYPTOR)
-    @Lazy
     public BytesEncryptor googleTokenBytesEncryptor(TokenEncryptionProperties properties) {
         return new AesBytesEncryptor(
                 new SecretKeySpec(encryptionKey(properties), AES_ALGORITHM),
-                AesBytesEncryptor.CipherAlgorithm.GCM.defaultIvGenerator(),
+                KeyGenerators.secureRandom(GCM_NONCE_BYTES),
                 AesBytesEncryptor.CipherAlgorithm.GCM
         );
     }

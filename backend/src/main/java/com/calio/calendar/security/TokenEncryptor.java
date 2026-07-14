@@ -8,8 +8,6 @@ import java.util.Arrays;
 import java.util.Base64;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.BeansException;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.security.crypto.encrypt.BytesEncryptor;
 import org.springframework.stereotype.Component;
@@ -20,19 +18,15 @@ public class TokenEncryptor {
     private static final Logger log = LoggerFactory.getLogger(TokenEncryptor.class);
     private static final String ENVELOPE_VERSION = "v1";
     private static final String KEY_VERSION = "google-refresh-token-key:v1";
-    private static final int GCM_NONCE_BYTES = 16;
+    private static final int GCM_NONCE_BYTES = 12;
     private static final int GCM_TAG_BYTES = 16;
 
-    private final ObjectProvider<BytesEncryptor> bytesEncryptorProvider;
+    private final BytesEncryptor bytesEncryptor;
 
     public TokenEncryptor(
-            @Qualifier("googleTokenBytesEncryptor") ObjectProvider<BytesEncryptor> bytesEncryptorProvider
+            @Qualifier("googleTokenBytesEncryptor") BytesEncryptor bytesEncryptor
     ) {
-        this.bytesEncryptorProvider = bytesEncryptorProvider;
-    }
-
-    public void validateConfigured() {
-        bytesEncryptor();
+        this.bytesEncryptor = bytesEncryptor;
     }
 
     public String encryptRefreshToken(String plaintext) {
@@ -49,7 +43,7 @@ public class TokenEncryptor {
 
     private String encrypt(String plaintext, GoogleTokenType tokenType) {
         try {
-            byte[] encrypted = bytesEncryptor().encrypt(plaintext.getBytes(StandardCharsets.UTF_8));
+            byte[] encrypted = bytesEncryptor.encrypt(plaintext.getBytes(StandardCharsets.UTF_8));
             return TokenEnvelope.fromEncryptedBytes(KEY_VERSION, encrypted).serialize();
         } catch (CalioException exception) {
             throw exception;
@@ -66,7 +60,7 @@ public class TokenEncryptor {
     public String decrypt(String envelopeValue) {
         try {
             TokenEnvelope envelope = TokenEnvelope.parse(envelopeValue);
-            byte[] plaintext = bytesEncryptor().decrypt(envelope.encryptedBytes());
+            byte[] plaintext = bytesEncryptor.decrypt(envelope.encryptedBytes());
             return new String(plaintext, StandardCharsets.UTF_8);
         } catch (CalioException exception) {
             throw exception;
@@ -78,25 +72,6 @@ public class TokenEncryptor {
             );
             throw new CalioException(ErrorCode.GOOGLE_TOKEN_ENCRYPTION_FAILED, exception);
         }
-    }
-
-    private BytesEncryptor bytesEncryptor() {
-        try {
-            return bytesEncryptorProvider.getObject();
-        } catch (BeansException exception) {
-            throw calioExceptionFrom(exception);
-        }
-    }
-
-    private RuntimeException calioExceptionFrom(BeansException exception) {
-        Throwable cause = exception;
-        while (cause != null) {
-            if (cause instanceof CalioException calioException) {
-                return calioException;
-            }
-            cause = cause.getCause();
-        }
-        return exception;
     }
 
     private enum GoogleTokenType {

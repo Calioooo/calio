@@ -79,7 +79,6 @@ public class GoogleCalendarIntegrationService {
             logIntegrationFailure("validateConfiguration", ErrorCode.GOOGLE_CALENDAR_CONFIGURATION_MISSING);
             throw new CalioException(ErrorCode.GOOGLE_CALENDAR_CONFIGURATION_MISSING);
         }
-        tokenEncryptor.validateConfigured();
     }
 
     private EncryptedGoogleTokens encryptTokens(GoogleTokenResponse tokenResponse) {

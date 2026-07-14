@@ -33,4 +33,4 @@ external:
 
 security:
   token-encryption:
-    google-refresh-token-key: ${GOOGLE_TOKEN_ENCRYPTION_KEY:}
+    google-refresh-token-key: ${GOOGLE_TOKEN_ENCRYPTION_KEY}

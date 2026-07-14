@@ -20,7 +20,6 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.security.crypto.encrypt.BytesEncryptor;
 import tools.jackson.databind.ObjectMapper;
 
@@ -32,7 +31,7 @@ class GoogleCalendarIntegrationServiceTest {
     private final GoogleOAuthProperties googleOAuthProperties = googleOAuthProperties();
     private final BytesEncryptor bytesEncryptor = new TokenEncryptionConfig()
             .googleTokenBytesEncryptor(tokenEncryptionProperties());
-    private final TokenEncryptor tokenEncryptor = new TokenEncryptor(objectProvider(bytesEncryptor));
+    private final TokenEncryptor tokenEncryptor = new TokenEncryptor(bytesEncryptor);
     private final Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
 
     @Test
@@ -103,16 +102,6 @@ class GoogleCalendarIntegrationServiceTest {
         TokenEncryptionProperties properties = new TokenEncryptionProperties();
         properties.setGoogleRefreshTokenKey("12345678901234567890123456789012");
         return properties;
-    }
-
-    private ObjectProvider<BytesEncryptor> objectProvider(BytesEncryptor bytesEncryptor) {
-        return new ObjectProvider<>() {
-
-            @Override
-            public BytesEncryptor getObject() {
-                return bytesEncryptor;
-            }
-        };
     }
 
     private static class FakeGoogleOAuthClient extends GoogleOAuthClient {
