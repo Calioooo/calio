@@ -10,19 +10,31 @@ import SwiftUI
 struct ContentView: View {
     @State private var selectedTab = 0
     @State private var authState: AuthBootstrapState = .loading
+    @State private var googleCalendarAuthCode: GoogleCalendarAuthCodeAlert?
+    @State private var googleCalendarAuthFailureMessage: String?
     @StateObject private var viewModel: CalendarHomeViewModel
     private let authService: AuthService
+    private let googleCalendarAuthorizationService: GoogleCalendarAuthorizationService
 
     @MainActor
-    init(authService: AuthService = AuthService()) {
+    init(
+        authService: AuthService = AuthService(),
+        googleCalendarAuthorizationService: GoogleCalendarAuthorizationService = GoogleCalendarAuthorizationService()
+    ) {
         _viewModel = StateObject(wrappedValue: CalendarHomeViewModel())
         self.authService = authService
+        self.googleCalendarAuthorizationService = googleCalendarAuthorizationService
     }
 
     @MainActor
-    init(viewModel: CalendarHomeViewModel, authService: AuthService = AuthService()) {
+    init(
+        viewModel: CalendarHomeViewModel,
+        authService: AuthService = AuthService(),
+        googleCalendarAuthorizationService: GoogleCalendarAuthorizationService = GoogleCalendarAuthorizationService()
+    ) {
         _viewModel = StateObject(wrappedValue: viewModel)
         self.authService = authService
+        self.googleCalendarAuthorizationService = googleCalendarAuthorizationService
     }
     
     var body: some View {
@@ -39,25 +51,58 @@ struct ContentView: View {
         .task {
             await bootstrapAuthenticationIfNeeded()
         }
+        .alert(item: $googleCalendarAuthCode) { authCode in
+            Alert(
+                title: Text("serverAuthCode"),
+                message: Text(authCode.value),
+                dismissButton: .default(Text("확인"))
+            )
+        }
+        .alert(
+            "Google Calendar 연동 실패",
+            isPresented: Binding(
+                get: { googleCalendarAuthFailureMessage != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        googleCalendarAuthFailureMessage = nil
+                    }
+                }
+            )
+        ) {
+            Button("확인", role: .cancel) {
+                googleCalendarAuthFailureMessage = nil
+            }
+        } message: {
+            Text(googleCalendarAuthFailureMessage ?? "")
+        }
     }
 
     private var authenticatedContent: some View {
         TabView(selection: $selectedTab) {
-            CalendarHomeView(viewModel: viewModel)
+            CalendarHomeView(
+                viewModel: viewModel,
+                onGoogleCalendarConnectTapped: requestGoogleCalendarAuthorization
+            )
                 .tabItem {
                     Image(systemName: "calendar")
                     Text("Home")
                 }
                 .tag(0)
             
-            CalendarWeekTimelineScreen(viewModel: viewModel)
+            CalendarWeekTimelineScreen(
+                viewModel: viewModel,
+                onGoogleCalendarConnectTapped: requestGoogleCalendarAuthorization
+            )
                 .tabItem {
                     Image(systemName: "calendar.day.timeline.left")
                     Text("Week")
                 }
                 .tag(1)
             
-            CalendarMonthScheduleScreen(viewModel: viewModel)
+            CalendarMonthScheduleScreen(
+                viewModel: viewModel,
+                onGoogleCalendarConnectTapped: requestGoogleCalendarAuthorization
+            )
                 .tabItem {
                     Image(systemName: "calendar")
                     Text("Month")
@@ -109,12 +154,29 @@ struct ContentView: View {
             await bootstrapAuthenticationIfNeeded()
         }
     }
+
+    private func requestGoogleCalendarAuthorization() {
+        Task {
+            do {
+                let serverAuthCode = try await googleCalendarAuthorizationService.requestServerAuthCode()
+                debugPrint("Google Calendar serverAuthCode: \(serverAuthCode)")
+                googleCalendarAuthCode = GoogleCalendarAuthCodeAlert(value: serverAuthCode)
+            } catch {
+                googleCalendarAuthFailureMessage = "Google Calendar 인증 코드를 가져오지 못했습니다."
+            }
+        }
+    }
 }
 
 private enum AuthBootstrapState: Equatable {
     case loading
     case authenticated
     case failed
+}
+
+private struct GoogleCalendarAuthCodeAlert: Identifiable {
+    let id = UUID()
+    let value: String
 }
 
 #Preview {

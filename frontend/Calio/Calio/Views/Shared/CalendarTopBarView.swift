@@ -12,6 +12,7 @@ struct CalendarTopBarView: View {
     let showsTodayButton: Bool
     let onSelectedYearMonth: (Int, Int) -> Void
     let onTodayTapped: () -> Void
+    let onGoogleCalendarConnectTapped: () -> Void
     let onCreateTapped: () -> Void
 
     var body: some View {
@@ -29,6 +30,16 @@ struct CalendarTopBarView: View {
                     .buttonStyle(.plain)
                     .accessibilityLabel("오늘로 이동")
             }
+
+            Button(action: onGoogleCalendarConnectTapped) {
+                Image(systemName: "calendar.badge.plus")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .frame(width: 36, height: 36)
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Google Calendar 연동")
 
             Button(action: onCreateTapped) {
                 Image(systemName: "plus")
@@ -51,6 +62,7 @@ struct CalendarTopBarView: View {
         showsTodayButton: true,
         onSelectedYearMonth: { _, _ in },
         onTodayTapped: {},
+        onGoogleCalendarConnectTapped: {},
         onCreateTapped: {}
     )
 }

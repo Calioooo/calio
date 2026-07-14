@@ -12,6 +12,15 @@ struct CalendarMonthScheduleScreen: View {
     @State private var isShowingEventCreationView = false
     @State private var selectedDateRange: CalendarDateRange?
     @State private var selectedDay: DayKey?
+    private let onGoogleCalendarConnectTapped: () -> Void
+
+    init(
+        viewModel: CalendarHomeViewModel,
+        onGoogleCalendarConnectTapped: @escaping () -> Void = {}
+    ) {
+        self.viewModel = viewModel
+        self.onGoogleCalendarConnectTapped = onGoogleCalendarConnectTapped
+    }
 
     var body: some View {
         CalendarMonthScheduleView(
@@ -22,6 +31,7 @@ struct CalendarMonthScheduleScreen: View {
             onSelectedYearMonth: viewModel.selectMonthFirstDay(year:month:),
             showsTodayButton: !viewModel.isReferenceDayToday,
             onTodayTapped: viewModel.moveToToday,
+            onGoogleCalendarConnectTapped: onGoogleCalendarConnectTapped,
             onCreateTapped: {
                 startCreatingEvent()
             },

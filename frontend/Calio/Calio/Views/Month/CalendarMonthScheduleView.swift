@@ -33,6 +33,7 @@ struct CalendarMonthScheduleView: View {
     let onSelectedYearMonth: (Int, Int) -> Void
     let showsTodayButton: Bool
     let onTodayTapped: () -> Void
+    let onGoogleCalendarConnectTapped: () -> Void
     let onCreateTapped: () -> Void
     let onCreateInRangeTapped: (CalendarDateRange) -> Void
     let onCreateInDayTapped: (DayKey) -> Void
@@ -73,6 +74,7 @@ struct CalendarMonthScheduleView: View {
             showsTodayButton: showsTodayButton,
             onSelectedYearMonth: onSelectedYearMonth,
             onTodayTapped: onTodayTapped,
+            onGoogleCalendarConnectTapped: onGoogleCalendarConnectTapped,
             onCreateTapped: onCreateTapped
         )
     }
@@ -1124,6 +1126,7 @@ private struct Triangle: Shape {
         onSelectedYearMonth: { _, _ in },
         showsTodayButton: true,
         onTodayTapped: {},
+        onGoogleCalendarConnectTapped: {},
         onCreateTapped: {},
         onCreateInRangeTapped: { _ in },
         onCreateInDayTapped: { _ in }

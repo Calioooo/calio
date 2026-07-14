@@ -24,6 +24,7 @@ struct CalendarWeekTimelineView: View {
     let onSelectedYearMonth: (Int, Int) -> Void
     let showsTodayButton: Bool
     let onTodayTapped: () -> Void
+    let onGoogleCalendarConnectTapped: () -> Void
     let onCreateTapped: () -> Void
     let onRetryEventLoading: () -> Void
     let isEventMutating: Bool
@@ -53,6 +54,7 @@ struct CalendarWeekTimelineView: View {
         onSelectedYearMonth: @escaping (Int, Int) -> Void,
         showsTodayButton: Bool = false,
         onTodayTapped: @escaping () -> Void = {},
+        onGoogleCalendarConnectTapped: @escaping () -> Void = {},
         onCreateTapped: @escaping () -> Void = {},
         onRetryEventLoading: @escaping () -> Void,
         isEventMutating: Bool = false,
@@ -81,6 +83,7 @@ struct CalendarWeekTimelineView: View {
         self.onSelectedYearMonth = onSelectedYearMonth
         self.showsTodayButton = showsTodayButton
         self.onTodayTapped = onTodayTapped
+        self.onGoogleCalendarConnectTapped = onGoogleCalendarConnectTapped
         self.onCreateTapped = onCreateTapped
         self.onRetryEventLoading = onRetryEventLoading
         self.isEventMutating = isEventMutating
@@ -119,6 +122,7 @@ struct CalendarWeekTimelineView: View {
                         showsTodayButton: showsTodayButton,
                         onSelectedYearMonth: onSelectedYearMonth,
                         onTodayTapped: onTodayTapped,
+                        onGoogleCalendarConnectTapped: onGoogleCalendarConnectTapped,
                         onCreateTapped: onCreateTapped
                     )
                         .frame(

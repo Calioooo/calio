@@ -11,14 +11,19 @@ struct CalendarHomeView: View {
     @StateObject private var viewModel: CalendarHomeViewModel
     @State private var displayMode: CalendarDisplayMode = .week
     @State private var isShowingEventCreationView = false
+    private let onGoogleCalendarConnectTapped: () -> Void
     
     private let minimumStripViewHeight: CGFloat = 110
     private let stripViewHeightRatio: CGFloat = 0.2
     private let minimumMonthViewHeight: CGFloat = 380
     private let monthViewHeightRatio: CGFloat = 0.42
     
-    init(viewModel: CalendarHomeViewModel) {
+    init(
+        viewModel: CalendarHomeViewModel,
+        onGoogleCalendarConnectTapped: @escaping () -> Void = {}
+    ) {
         _viewModel = StateObject(wrappedValue: viewModel)
+        self.onGoogleCalendarConnectTapped = onGoogleCalendarConnectTapped
     }
     
 
@@ -77,6 +82,7 @@ struct CalendarHomeView: View {
             showsTodayButton: !viewModel.isReferenceDayToday,
             onSelectedYearMonth: viewModel.selectYearMonth(year:month:),
             onTodayTapped: viewModel.moveToToday,
+            onGoogleCalendarConnectTapped: onGoogleCalendarConnectTapped,
             onCreateTapped: startCreatingEvent
         )
     }
