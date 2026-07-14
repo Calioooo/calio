@@ -12,11 +12,15 @@ import com.calio.calendar.integration.domain.GoogleCalendarIntegration;
 import com.calio.calendar.security.TokenEncryptor;
 import java.time.Clock;
 import java.time.Instant;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 @Service
 public class GoogleCalendarIntegrationService {
+
+    private static final Logger log = LoggerFactory.getLogger(GoogleCalendarIntegrationService.class);
 
     private final GoogleOAuthProperties googleOAuthProperties;
     private final GoogleOAuthClient googleOAuthClient;
@@ -73,6 +77,7 @@ public class GoogleCalendarIntegrationService {
 
     private void validateConfiguration() {
         if (!googleOAuthProperties.isConfigured()) {
+            logIntegrationFailure("validateConfiguration", ErrorCode.GOOGLE_CALENDAR_CONFIGURATION_MISSING);
             throw new CalioException(ErrorCode.GOOGLE_CALENDAR_CONFIGURATION_MISSING);
         }
         tokenEncryptor.validateConfigured();
@@ -83,6 +88,7 @@ public class GoogleCalendarIntegrationService {
             return;
         }
 
+        logIntegrationFailure("validateAuthorizationCode", ErrorCode.GOOGLE_CALENDAR_AUTHORIZATION_CODE_REQUIRED);
         throw new CalioException(ErrorCode.GOOGLE_CALENDAR_AUTHORIZATION_CODE_REQUIRED);
     }
 
@@ -117,8 +123,30 @@ public class GoogleCalendarIntegrationService {
         try {
             return persist(accountId, userInfo, encryptedTokens, accessTokenExpiresAt, connectedAt);
         } catch (DataIntegrityViolationException exception) {
+            logIntegrationFailure(
+                    "saveOrReplace",
+                    ErrorCode.GOOGLE_CALENDAR_INTEGRATION_SAVE_FAILED,
+                    exception
+            );
             throw new CalioException(ErrorCode.GOOGLE_CALENDAR_INTEGRATION_SAVE_FAILED, exception);
         }
+    }
+
+    private void logIntegrationFailure(String operation, ErrorCode errorCode) {
+        log.warn(
+                "Google Calendar integration failure. operation={} errorCode={}",
+                operation,
+                errorCode.name()
+        );
+    }
+
+    private void logIntegrationFailure(String operation, ErrorCode errorCode, Exception exception) {
+        log.warn(
+                "Google Calendar integration failure. operation={} errorCode={} causeType={}",
+                operation,
+                errorCode.name(),
+                exception.getClass().getSimpleName()
+        );
     }
 
     private GoogleCalendarIntegration persist(
