@@ -35,10 +35,10 @@ public class GoogleCalendarIntegrationController {
     }
 
     @GetMapping
-    public GoogleCalendarIntegrationResponse getConnection(
+    public GoogleCalendarIntegrationResponse getConnectionStatus(
             @AuthenticationPrincipal AuthenticatedAccount account
     ) {
-        return googleCalendarIntegrationService.getConnection(account.accountId());
+        return googleCalendarIntegrationService.getConnectionStatus(account.accountId());
     }
 
     @DeleteMapping

@@ -62,7 +62,7 @@ public class GoogleCalendarIntegrationService {
         return GoogleCalendarIntegrationResponse.connected(integration);
     }
 
-    public GoogleCalendarIntegrationResponse getConnection(Long accountId) {
+    public GoogleCalendarIntegrationResponse getConnectionStatus(Long accountId) {
         GoogleCalendarIntegration integration = persistenceService.findByAccountIdOrNull(accountId);
         if (integration == null) {
             return GoogleCalendarIntegrationResponse.disconnected();
