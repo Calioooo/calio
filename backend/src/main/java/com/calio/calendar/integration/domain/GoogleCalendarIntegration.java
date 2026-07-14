@@ -111,18 +111,6 @@ public class GoogleCalendarIntegration extends BaseEntity {
         return googleEmail;
     }
 
-    public String getEncryptedRefreshToken() {
-        return encryptedRefreshToken;
-    }
-
-    public String getEncryptedAccessToken() {
-        return encryptedAccessToken;
-    }
-
-    public Instant getAccessTokenExpiresAt() {
-        return accessTokenExpiresAt;
-    }
-
     public GoogleCalendarConnectionStatus getConnectionStatus() {
         return connectionStatus;
     }
