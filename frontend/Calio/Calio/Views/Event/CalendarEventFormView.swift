@@ -35,6 +35,7 @@ struct CalendarEventFormView: View {
 
     let mode: CalendarEventFormMode
     let onRecurrenceEnabled: () -> Void
+    let onTitleChanged: (String) -> Void
     let onResetTagMutation: () -> Void
     let onCreateCustomTag: (CustomTagInput) async -> Bool
     let onUpdateCustomTag: (CalendarTag, CustomTagInput) async -> Bool
@@ -50,6 +51,7 @@ struct CalendarEventFormView: View {
         tagMutationFailureMessage: String? = nil,
         mode: CalendarEventFormMode = .create,
         onRecurrenceEnabled: @escaping () -> Void,
+        onTitleChanged: @escaping (String) -> Void = { _ in },
         onResetTagMutation: @escaping () -> Void = {},
         onCreateCustomTag: @escaping (CustomTagInput) async -> Bool = { _ in false },
         onUpdateCustomTag: @escaping (CalendarTag, CustomTagInput) async -> Bool = { _, _ in false },
@@ -62,6 +64,7 @@ struct CalendarEventFormView: View {
         self.tagMutationFailureMessage = tagMutationFailureMessage
         self.mode = mode
         self.onRecurrenceEnabled = onRecurrenceEnabled
+        self.onTitleChanged = onTitleChanged
         self.onResetTagMutation = onResetTagMutation
         self.onCreateCustomTag = onCreateCustomTag
         self.onUpdateCustomTag = onUpdateCustomTag
@@ -95,6 +98,9 @@ struct CalendarEventFormView: View {
             TextField("일정 제목", text: $eventInput.title)
                 .font(.system(size: 20, weight: .semibold))
                 .submitLabel(.next)
+                .onChange(of: eventInput.title) { _, title in
+                    onTitleChanged(title)
+                }
         }
     }
 

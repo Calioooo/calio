@@ -11,6 +11,10 @@ struct CalendarEventCreationView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var eventInput: EventInput
     @State private var recurrenceInput: RecurrenceInput
+    @State private var lastParsedTitle: String?
+    private let eventTextParser: LocalEventTextParser
+    private let parserReferenceDate: Date
+    private let calendar: Calendar
     
     let tags: [CalendarTag]
     let isSaving: Bool
@@ -49,6 +53,7 @@ struct CalendarEventCreationView: View {
         )
         let startAt = initialTimeRange.startAt
         let endAt = initialTimeRange.endAt
+        let eventTextParser = LocalEventTextParser(calendar: calendar)
         
         _eventInput = State(
             initialValue: EventInput(
@@ -69,6 +74,9 @@ struct CalendarEventCreationView: View {
                 frequency: .daily
             )
         )
+        self.eventTextParser = eventTextParser
+        self.parserReferenceDate = startAt
+        self.calendar = calendar
         self.tags = tags
         self.isSaving = isSaving
         self.isTagMutating = isTagMutating
@@ -92,6 +100,7 @@ struct CalendarEventCreationView: View {
                     isTagMutating: isTagMutating,
                     tagMutationFailureMessage: tagMutationFailureMessage,
                     onRecurrenceEnabled: resetRecurrenceFieldsFromSingleEventTime,
+                    onTitleChanged: applyParsedTitleIfNeeded,
                     onResetTagMutation: onResetTagMutation,
                     onCreateCustomTag: onCreateCustomTag,
                     onUpdateCustomTag: onUpdateCustomTag,
@@ -182,6 +191,37 @@ struct CalendarEventCreationView: View {
 
             if didSave {
                 dismiss()
+            }
+        }
+    }
+
+    private func applyParsedTitleIfNeeded(_ title: String) {
+        guard title != lastParsedTitle,
+              let parseResult = eventTextParser.parse(title, referenceDate: parserReferenceDate) else {
+            return
+        }
+
+        lastParsedTitle = title
+
+        if let startAt = parseResult.startAt {
+            eventInput.startAt = startAt
+            eventInput.endAt = parseResult.endAt ?? startAt.addingTimeInterval(3600)
+        }
+
+        if let recurrenceFrequency = parseResult.recurrenceFrequency {
+            recurrenceInput.isEnabled = true
+            recurrenceInput.frequency = recurrenceFrequency
+            recurrenceInput.startDate = eventInput.startAt
+            recurrenceInput.startTime = eventInput.startAt
+            recurrenceInput.endTime = eventInput.endAt
+
+            if recurrenceInput.endDate < recurrenceInput.startDate {
+                recurrenceInput.endDate = recurrenceInput.startDate
+            }
+
+            if recurrenceInput.endDate == recurrenceInput.startDate,
+               let defaultEndDate = calendar.date(byAdding: .year, value: 1, to: recurrenceInput.startDate) {
+                recurrenceInput.endDate = defaultEndDate
             }
         }
     }

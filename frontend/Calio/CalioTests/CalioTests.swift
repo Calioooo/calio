@@ -1018,6 +1018,183 @@ struct CalioTests {
         ))
     }
 
+    @Test func localEventTextParserEvalCasesMatchExpectedDrafts() async throws {
+        let calendar = fixedCalendar
+        let referenceDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 14, hour: 9)))
+        let parser = LocalEventTextParser(calendar: calendar)
+        let cases: [LocalEventTextParserEvalCase] = [
+            LocalEventTextParserEvalCase(
+                text: "내일 오후 3시 회의",
+                title: "회의",
+                startAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 15, hour: 15))),
+                endAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 15, hour: 16)))
+            ),
+            LocalEventTextParserEvalCase(
+                text: "오늘 14:00-15:30 디자인 리뷰",
+                title: "디자인 리뷰",
+                startAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 14, hour: 14))),
+                endAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 14, hour: 15, minute: 30)))
+            ),
+            LocalEventTextParserEvalCase(
+                text: "모레 오전 10시 병원",
+                title: "병원",
+                startAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 16, hour: 10))),
+                endAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 16, hour: 11)))
+            ),
+            LocalEventTextParserEvalCase(
+                text: "다음주 월요일 7시 스탠드업",
+                title: "스탠드업",
+                startAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 20, hour: 7))),
+                endAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 20, hour: 8)))
+            ),
+            LocalEventTextParserEvalCase(
+                text: "금요일 저녁 7시 약속",
+                title: "약속",
+                startAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 17, hour: 19))),
+                endAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 17, hour: 20)))
+            ),
+            LocalEventTextParserEvalCase(
+                text: "7월 20일 오후 2시 세미나",
+                title: "세미나",
+                startAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 20, hour: 14))),
+                endAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 20, hour: 15)))
+            ),
+            LocalEventTextParserEvalCase(
+                text: "8/3 09:30 면담",
+                title: "면담",
+                startAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 8, day: 3, hour: 9, minute: 30))),
+                endAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 8, day: 3, hour: 10, minute: 30)))
+            ),
+            LocalEventTextParserEvalCase(
+                text: "20일 11시 미팅",
+                title: "미팅",
+                startAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 20, hour: 11))),
+                endAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 20, hour: 12)))
+            ),
+            LocalEventTextParserEvalCase(
+                text: "매주 월요일 오전 10시 스탠드업",
+                title: "스탠드업",
+                startAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 20, hour: 10))),
+                endAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 20, hour: 11))),
+                recurrenceFrequency: .weekly
+            ),
+            LocalEventTextParserEvalCase(
+                text: "매일 오전 10시 루틴",
+                title: "루틴",
+                startAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 14, hour: 10))),
+                endAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 14, hour: 11))),
+                recurrenceFrequency: .daily
+            ),
+            LocalEventTextParserEvalCase(
+                text: "7시 저녁 약속",
+                title: "약속",
+                startAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 14, hour: 19))),
+                endAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 14, hour: 20)))
+            ),
+            LocalEventTextParserEvalCase(
+                text: "매월 20일 오후 4시 정산",
+                title: "정산",
+                startAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 20, hour: 16))),
+                endAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 20, hour: 17))),
+                recurrenceFrequency: .monthly
+            ),
+            LocalEventTextParserEvalCase(
+                text: "이번주 목요일 오후 6시 회식",
+                title: "회식",
+                startAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 16, hour: 18))),
+                endAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 16, hour: 19)))
+            ),
+            LocalEventTextParserEvalCase(
+                text: "내일 오후 3시부터 4시까지 면접",
+                title: "면접",
+                startAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 15, hour: 15))),
+                endAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 15, hour: 16)))
+            ),
+            LocalEventTextParserEvalCase(
+                text: "오늘 오전 12시 배포 점검",
+                title: "배포 점검",
+                startAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 14, hour: 0))),
+                endAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 14, hour: 1)))
+            ),
+            LocalEventTextParserEvalCase(
+                text: "오늘 오후 12시 점심",
+                title: "점심",
+                startAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 14, hour: 12))),
+                endAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 14, hour: 13)))
+            ),
+            LocalEventTextParserEvalCase(
+                text: "12월 31일 밤 11시 송년회",
+                title: "송년회",
+                startAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 12, day: 31, hour: 23))),
+                endAt: try #require(calendar.date(from: DateComponents(year: 2027, month: 1, day: 1, hour: 0)))
+            ),
+            LocalEventTextParserEvalCase(
+                text: "1/2 오전 9시 신년 계획",
+                title: "신년 계획",
+                startAt: try #require(calendar.date(from: DateComponents(year: 2027, month: 1, day: 2, hour: 9))),
+                endAt: try #require(calendar.date(from: DateComponents(year: 2027, month: 1, day: 2, hour: 10)))
+            ),
+            LocalEventTextParserEvalCase(
+                text: "매년 8/3 9시 생일",
+                title: "생일",
+                startAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 8, day: 3, hour: 9))),
+                endAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 8, day: 3, hour: 10))),
+                recurrenceFrequency: .yearly
+            ),
+            LocalEventTextParserEvalCase(
+                text: "매주 금요일 14:00~15:00 리뷰",
+                title: "리뷰",
+                startAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 17, hour: 14))),
+                endAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 17, hour: 15))),
+                recurrenceFrequency: .weekly
+            )
+        ]
+
+        var passedCount = 0
+
+        for testCase in cases {
+            let result = try #require(parser.parse(testCase.text, referenceDate: referenceDate))
+            let didPass = result.title == testCase.title
+                && result.startAt == testCase.startAt
+                && result.endAt == testCase.endAt
+                && result.recurrenceFrequency == testCase.recurrenceFrequency
+
+            if didPass {
+                passedCount += 1
+            }
+
+            #expect(result.title == testCase.title, "title mismatch: \(testCase.text)")
+            #expect(result.startAt == testCase.startAt, "startAt mismatch: \(testCase.text)")
+            #expect(result.endAt == testCase.endAt, "endAt mismatch: \(testCase.text)")
+            #expect(result.recurrenceFrequency == testCase.recurrenceFrequency, "recurrence mismatch: \(testCase.text)")
+        }
+
+        #expect(passedCount == cases.count)
+    }
+
+    @Test func localEventTextParserIgnoresPlainTitleWithoutDateTimeSignal() async throws {
+        let parser = LocalEventTextParser(calendar: fixedCalendar)
+
+        #expect(parser.parse("회의") == nil)
+    }
+
+    @Test func localEventTextParserRejectsUnsupportedAmbiguousExpressions() async throws {
+        let calendar = fixedCalendar
+        let referenceDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 14, hour: 9)))
+        let parser = LocalEventTextParser(calendar: calendar)
+        let unsupportedTexts = [
+            "격주 화요일 오전 10시 스탠드업",
+            "평일마다 오전 9시 운동",
+            "주말 오후 2시 약속",
+            "매월 둘째 화요일 오후 3시 회의",
+            "매월 말일 오후 4시 정산"
+        ]
+
+        for text in unsupportedTexts {
+            #expect(parser.parse(text, referenceDate: referenceDate) == nil, "unsupported expression should not be parsed: \(text)")
+        }
+    }
+
     @Test func createEventRequestDTOEncodesOnlyBackendContractFields() async throws {
         let startAt = Date(timeIntervalSince1970: 1_780_000_000)
         let endAt = startAt.addingTimeInterval(3600)
@@ -2525,6 +2702,28 @@ struct CalioTests {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!
         return calendar
+    }
+
+    private struct LocalEventTextParserEvalCase {
+        let text: String
+        let title: String
+        let startAt: Date
+        let endAt: Date
+        let recurrenceFrequency: RecurrenceFrequency?
+
+        init(
+            text: String,
+            title: String,
+            startAt: Date,
+            endAt: Date,
+            recurrenceFrequency: RecurrenceFrequency? = nil
+        ) {
+            self.text = text
+            self.title = title
+            self.startAt = startAt
+            self.endAt = endAt
+            self.recurrenceFrequency = recurrenceFrequency
+        }
     }
 
     @MainActor
