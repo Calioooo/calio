@@ -5,8 +5,11 @@ import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.external.google.dto.GoogleTokenResponse;
 import com.calio.calendar.external.google.dto.GoogleUserInfoResponse;
 import java.time.Duration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
@@ -14,12 +17,14 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
 @Component
 public class GoogleOAuthClient {
 
+    private static final Logger log = LoggerFactory.getLogger(GoogleOAuthClient.class);
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
     private static final Duration READ_TIMEOUT = Duration.ofSeconds(15);
     private static final String AUTHORIZATION_CODE_GRANT = "authorization_code";
@@ -57,10 +62,13 @@ public class GoogleOAuthClient {
                     .body(String.class);
             return GoogleTokenResponse.fromJson(responseBody, objectMapper);
         } catch (CalioException exception) {
+            logGoogleApiFailure("tokenExchange", exception.getErrorCode(), exception);
             throw exception;
         } catch (JacksonException exception) {
+            logGoogleApiFailure("tokenExchange", ErrorCode.GOOGLE_TOKEN_RESPONSE_INVALID, exception);
             throw new CalioException(ErrorCode.GOOGLE_TOKEN_RESPONSE_INVALID, exception);
         } catch (RestClientException exception) {
+            logGoogleApiFailure("tokenExchange", ErrorCode.GOOGLE_TOKEN_EXCHANGE_FAILED, exception);
             throw new CalioException(ErrorCode.GOOGLE_TOKEN_EXCHANGE_FAILED, exception);
         }
     }
@@ -74,12 +82,33 @@ public class GoogleOAuthClient {
                     .body(String.class);
             return GoogleUserInfoResponse.fromJson(responseBody, objectMapper);
         } catch (CalioException exception) {
+            logGoogleApiFailure("userInfoFetch", exception.getErrorCode(), exception);
             throw exception;
         } catch (JacksonException exception) {
+            logGoogleApiFailure("userInfoFetch", ErrorCode.GOOGLE_USER_INFO_INVALID, exception);
             throw new CalioException(ErrorCode.GOOGLE_USER_INFO_INVALID, exception);
         } catch (RestClientException exception) {
+            logGoogleApiFailure("userInfoFetch", ErrorCode.GOOGLE_USER_INFO_FETCH_FAILED, exception);
             throw new CalioException(ErrorCode.GOOGLE_USER_INFO_FETCH_FAILED, exception);
         }
+    }
+
+    private void logGoogleApiFailure(String operation, ErrorCode errorCode, Exception exception) {
+        log.warn(
+                "Google OAuth client failure. operation={} errorCode={} causeType={} httpStatus={}",
+                operation,
+                errorCode.name(),
+                exception.getClass().getSimpleName(),
+                httpStatusOrNull(exception)
+        );
+    }
+
+    private Integer httpStatusOrNull(Exception exception) {
+        if (exception instanceof RestClientResponseException responseException) {
+            HttpStatusCode statusCode = responseException.getStatusCode();
+            return statusCode.value();
+        }
+        return null;
     }
 
     private MultiValueMap<String, String> tokenExchangeForm(String authorizationCode) {
