@@ -19,10 +19,6 @@ public record GoogleCalendarIntegrationResponse(
         );
     }
 
-    public static GoogleCalendarIntegrationResponse from(GoogleCalendarIntegration integration) {
-        return connected(integration);
-    }
-
     public static GoogleCalendarIntegrationResponse disconnected() {
         return new GoogleCalendarIntegrationResponse(false, null, null, null);
     }
