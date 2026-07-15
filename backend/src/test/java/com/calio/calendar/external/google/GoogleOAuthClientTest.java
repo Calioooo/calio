@@ -1,20 +1,25 @@
 package com.calio.calendar.external.google;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
+import com.calio.calendar.common.error.CalioException;
+import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.external.google.dto.GoogleTokenResponse;
 import com.calio.calendar.external.google.dto.GoogleUserInfoResponse;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
@@ -86,10 +91,73 @@ class GoogleOAuthClientTest {
         server.verify();
     }
 
+    @Test
+    @DisplayName("GoogleOAuthClient는 refresh token revoke를 form encoding으로 revoke endpoint에 보낸다")
+    void givenRefreshToken_whenRevokeToken_thenSendsFormEncodedRevokeRequest() {
+        // given
+        RestClient.Builder restClientBuilder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
+        GoogleOAuthClient client = new GoogleOAuthClient(properties(), objectMapper, restClientBuilder.build());
+        server.expect(requestTo("https://oauth.example.test/revoke"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_FORM_URLENCODED))
+                .andExpect(content().string(containsString("token=refresh-token")))
+                .andRespond(withSuccess("", MediaType.APPLICATION_JSON));
+
+        // when
+        boolean revoked = client.revokeToken("refresh-token");
+
+        // then
+        assertThat(revoked).isTrue();
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("GoogleOAuthClient는 revoke 응답의 invalid_token error를 삭제 허용 상태로 반환한다")
+    void givenInvalidTokenRevokeResponse_whenRevokeToken_thenReturnsFalse() {
+        // given
+        RestClient.Builder restClientBuilder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
+        GoogleOAuthClient client = new GoogleOAuthClient(properties(), objectMapper, restClientBuilder.build());
+        server.expect(requestTo("https://oauth.example.test/revoke"))
+                .andRespond(withStatus(HttpStatus.BAD_REQUEST)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body("""
+                                {
+                                  "error": "invalid_token"
+                                }
+                                """));
+
+        // when
+        boolean revoked = client.revokeToken("refresh-token");
+
+        // then
+        assertThat(revoked).isFalse();
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("GoogleOAuthClient는 invalid_token 외 revoke 실패를 GOOGLE_TOKEN_REVOKE_FAILED로 반환한다")
+    void givenUnexpectedRevokeFailure_whenRevokeToken_thenThrowsRevokeFailed() {
+        // given
+        RestClient.Builder restClientBuilder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
+        GoogleOAuthClient client = new GoogleOAuthClient(properties(), objectMapper, restClientBuilder.build());
+        server.expect(requestTo("https://oauth.example.test/revoke"))
+                .andRespond(withStatus(HttpStatus.BAD_GATEWAY));
+
+        // when, then
+        assertThatThrownBy(() -> client.revokeToken("refresh-token"))
+                .isInstanceOfSatisfying(CalioException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.GOOGLE_TOKEN_REVOKE_FAILED));
+        server.verify();
+    }
+
     private GoogleOAuthProperties properties() {
         GoogleOAuthProperties properties = new GoogleOAuthProperties();
         properties.setTokenUrl("https://oauth.example.test/token");
         properties.setUserInfoUrl("https://oauth.example.test/userinfo");
+        properties.setRevokeUrl("https://oauth.example.test/revoke");
         properties.setClientId("client-id");
         properties.setClientSecret("client-secret");
         properties.setRedirectUri("https://example.com/oauth/callback");

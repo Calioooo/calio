@@ -27,6 +27,7 @@ external:
     oauth:
       token-url: https://oauth2.googleapis.com/token
       user-info-url: https://www.googleapis.com/oauth2/v3/userinfo
+      revoke-url: https://oauth2.googleapis.com/revoke
       client-id: ${GOOGLE_OAUTH_CLIENT_ID:}
       client-secret: ${GOOGLE_OAUTH_CLIENT_SECRET:}
       redirect-uri: ${GOOGLE_OAUTH_REDIRECT_URI:}

@@ -71,6 +71,13 @@ public class GoogleCalendarIntegrationService {
     }
 
     public void disconnect(Long accountId) {
+        GoogleCalendarIntegration integration = persistenceService.findByAccountIdOrNull(accountId);
+        if (integration == null) {
+            return;
+        }
+
+        String refreshToken = tokenEncryptor.decrypt(integration.encryptedRefreshTokenForRevocation());
+        googleOAuthClient.revokeToken(refreshToken);
         persistenceService.deleteByAccountId(accountId);
     }
 

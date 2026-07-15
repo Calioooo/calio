@@ -9,6 +9,7 @@ public class GoogleOAuthProperties {
 
     private String tokenUrl = "https://oauth2.googleapis.com/token";
     private String userInfoUrl = "https://www.googleapis.com/oauth2/v3/userinfo";
+    private String revokeUrl = "https://oauth2.googleapis.com/revoke";
     private String clientId;
     private String clientSecret;
     private String redirectUri;
@@ -27,6 +28,14 @@ public class GoogleOAuthProperties {
 
     public void setUserInfoUrl(String userInfoUrl) {
         this.userInfoUrl = userInfoUrl;
+    }
+
+    public String getRevokeUrl() {
+        return revokeUrl;
+    }
+
+    public void setRevokeUrl(String revokeUrl) {
+        this.revokeUrl = revokeUrl;
     }
 
     public String getClientId() {
@@ -56,6 +65,7 @@ public class GoogleOAuthProperties {
     public boolean isConfigured() {
         return hasText(tokenUrl)
                 && hasText(userInfoUrl)
+                && hasText(revokeUrl)
                 && hasText(clientId)
                 && hasText(clientSecret)
                 && hasText(redirectUri);

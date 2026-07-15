@@ -19,6 +19,7 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 @Component
@@ -28,6 +29,7 @@ public class GoogleOAuthClient {
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
     private static final Duration READ_TIMEOUT = Duration.ofSeconds(15);
     private static final String AUTHORIZATION_CODE_GRANT = "authorization_code";
+    private static final String INVALID_TOKEN_ERROR = "invalid_token";
 
     private final GoogleOAuthProperties properties;
     private final ObjectMapper objectMapper;
@@ -93,11 +95,42 @@ public class GoogleOAuthClient {
         }
     }
 
+    public boolean revokeToken(String token) {
+        try {
+            restClient.post()
+                    .uri(properties.getRevokeUrl())
+                    .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                    .body(tokenRevokeForm(token))
+                    .retrieve()
+                    .toBodilessEntity();
+            return true;
+        } catch (RestClientResponseException exception) {
+            if (isInvalidTokenRevokeResponse(exception)) {
+                logInvalidTokenRevoke(exception);
+                return false;
+            }
+            logGoogleApiFailure("tokenRevoke", ErrorCode.GOOGLE_TOKEN_REVOKE_FAILED, exception);
+            throw new CalioException(ErrorCode.GOOGLE_TOKEN_REVOKE_FAILED, exception);
+        } catch (RestClientException exception) {
+            logGoogleApiFailure("tokenRevoke", ErrorCode.GOOGLE_TOKEN_REVOKE_FAILED, exception);
+            throw new CalioException(ErrorCode.GOOGLE_TOKEN_REVOKE_FAILED, exception);
+        }
+    }
+
     private void logGoogleApiFailure(String operation, ErrorCode errorCode, Exception exception) {
         log.warn(
                 "Google OAuth client failure. operation={} errorCode={} causeType={} httpStatus={}",
                 operation,
                 errorCode.name(),
+                exception.getClass().getSimpleName(),
+                httpStatusOrNull(exception)
+        );
+    }
+
+    private void logInvalidTokenRevoke(RestClientResponseException exception) {
+        log.warn(
+                "Google OAuth token revoke returned invalid token. operation={} causeType={} httpStatus={}",
+                "tokenRevoke",
                 exception.getClass().getSimpleName(),
                 httpStatusOrNull(exception)
         );
@@ -119,6 +152,22 @@ public class GoogleOAuthClient {
         form.add("redirect_uri", properties.getRedirectUri());
         form.add("grant_type", AUTHORIZATION_CODE_GRANT);
         return form;
+    }
+
+    private MultiValueMap<String, String> tokenRevokeForm(String token) {
+        MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+        form.add("token", token);
+        return form;
+    }
+
+    private boolean isInvalidTokenRevokeResponse(RestClientResponseException exception) {
+        try {
+            JsonNode root = objectMapper.readTree(exception.getResponseBodyAsString());
+            JsonNode error = root.get("error");
+            return error != null && INVALID_TOKEN_ERROR.equals(error.asString());
+        } catch (JacksonException ignored) {
+            return false;
+        }
     }
 
     private static RestClient createRestClient(RestClient.Builder restClientBuilder) {

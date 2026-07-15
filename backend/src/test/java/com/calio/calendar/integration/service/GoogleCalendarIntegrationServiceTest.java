@@ -76,6 +76,58 @@ class GoogleCalendarIntegrationServiceTest {
         assertThat(persistenceService.saveCount).isZero();
     }
 
+    @Test
+    @DisplayName("disconnect는 저장된 refresh token을 복호화해 Google revoke를 성공한 뒤 row를 삭제한다")
+    void givenConnectedIntegration_whenDisconnect_thenRevokesRefreshTokenBeforeDelete() {
+        // given
+        FakeGoogleOAuthClient googleOAuthClient = new FakeGoogleOAuthClient(googleOAuthProperties);
+        FakePersistenceService persistenceService = new FakePersistenceService();
+        persistenceService.integration = integrationWithRefreshToken("refresh-token");
+        GoogleCalendarIntegrationService service = service(googleOAuthClient, persistenceService);
+
+        // when
+        service.disconnect(ACCOUNT_ID);
+
+        // then
+        assertThat(googleOAuthClient.revokedToken).isEqualTo("refresh-token");
+        assertThat(persistenceService.deleteCount).isOne();
+    }
+
+    @Test
+    @DisplayName("disconnect는 Google revoke가 invalid_token이면 row를 삭제한다")
+    void givenInvalidTokenRevokeResponse_whenDisconnect_thenDeletesIntegrationRow() {
+        // given
+        FakeGoogleOAuthClient googleOAuthClient = new FakeGoogleOAuthClient(googleOAuthProperties);
+        googleOAuthClient.revokeResult = false;
+        FakePersistenceService persistenceService = new FakePersistenceService();
+        persistenceService.integration = integrationWithRefreshToken("refresh-token");
+        GoogleCalendarIntegrationService service = service(googleOAuthClient, persistenceService);
+
+        // when
+        service.disconnect(ACCOUNT_ID);
+
+        // then
+        assertThat(googleOAuthClient.revokedToken).isEqualTo("refresh-token");
+        assertThat(persistenceService.deleteCount).isOne();
+    }
+
+    @Test
+    @DisplayName("disconnect는 invalid_token 외 Google revoke 실패 시 기존 row를 삭제하지 않는다")
+    void givenUnexpectedRevokeFailure_whenDisconnect_thenKeepsIntegrationRow() {
+        // given
+        FakeGoogleOAuthClient googleOAuthClient = new FakeGoogleOAuthClient(googleOAuthProperties);
+        googleOAuthClient.tokenRevokeException = new CalioException(ErrorCode.GOOGLE_TOKEN_REVOKE_FAILED);
+        FakePersistenceService persistenceService = new FakePersistenceService();
+        persistenceService.integration = integrationWithRefreshToken("refresh-token");
+        GoogleCalendarIntegrationService service = service(googleOAuthClient, persistenceService);
+
+        // when, then
+        assertThatThrownBy(() -> service.disconnect(ACCOUNT_ID))
+                .isInstanceOfSatisfying(CalioException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.GOOGLE_TOKEN_REVOKE_FAILED));
+        assertThat(persistenceService.deleteCount).isZero();
+    }
+
     private GoogleCalendarIntegrationService service(
             FakeGoogleOAuthClient googleOAuthClient,
             FakePersistenceService persistenceService
@@ -93,6 +145,7 @@ class GoogleCalendarIntegrationServiceTest {
         GoogleOAuthProperties properties = new GoogleOAuthProperties();
         properties.setTokenUrl("https://oauth2.googleapis.com/token");
         properties.setUserInfoUrl("https://www.googleapis.com/oauth2/v3/userinfo");
+        properties.setRevokeUrl("https://oauth2.googleapis.com/revoke");
         properties.setClientId("client-id");
         properties.setClientSecret("client-secret");
         properties.setRedirectUri("https://example.com/oauth/callback");
@@ -105,12 +158,27 @@ class GoogleCalendarIntegrationServiceTest {
         return properties;
     }
 
+    private GoogleCalendarIntegration integrationWithRefreshToken(String refreshToken) {
+        return new GoogleCalendarIntegration(
+                ACCOUNT_ID,
+                "google-subject",
+                "user@example.com",
+                tokenEncryptor.encryptRefreshToken(refreshToken),
+                tokenEncryptor.encryptAccessToken("access-token"),
+                NOW.plusSeconds(3600),
+                NOW
+        );
+    }
+
     private static class FakeGoogleOAuthClient extends GoogleOAuthClient {
 
         private GoogleTokenResponse tokenResponse;
         private GoogleUserInfoResponse userInfoResponse;
         private RuntimeException tokenExchangeException;
+        private RuntimeException tokenRevokeException;
         private int exchangeCount;
+        private boolean revokeResult = true;
+        private String revokedToken;
 
         FakeGoogleOAuthClient(GoogleOAuthProperties properties) {
             super(properties, new ObjectMapper(), RestClient.builder());
@@ -129,14 +197,25 @@ class GoogleCalendarIntegrationServiceTest {
         public GoogleUserInfoResponse fetchUserInfo(String accessToken) {
             return userInfoResponse;
         }
+
+        @Override
+        public boolean revokeToken(String token) {
+            if (tokenRevokeException != null) {
+                throw tokenRevokeException;
+            }
+            revokedToken = token;
+            return revokeResult;
+        }
     }
 
     private static class FakePersistenceService extends GoogleCalendarIntegrationPersistenceService {
 
         private int saveCount;
+        private int deleteCount;
         private String savedRefreshToken;
         private String savedAccessToken;
         private Instant savedAccessTokenExpiresAt;
+        private GoogleCalendarIntegration integration;
 
         FakePersistenceService() {
             super(null);
@@ -165,6 +244,16 @@ class GoogleCalendarIntegrationServiceTest {
                     accessTokenExpiresAt,
                     connectedAt
             );
+        }
+
+        @Override
+        public GoogleCalendarIntegration findByAccountIdOrNull(Long accountId) {
+            return integration;
+        }
+
+        @Override
+        public void deleteByAccountId(Long accountId) {
+            deleteCount++;
         }
     }
 }
