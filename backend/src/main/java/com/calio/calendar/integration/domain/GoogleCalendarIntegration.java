@@ -100,7 +100,7 @@ public class GoogleCalendarIntegration extends BaseEntity {
         return googleEmail;
     }
 
-    public String encryptedRefreshTokenForRevocation() {
+    public String getEncryptedRefreshToken() {
         return encryptedRefreshToken;
     }
 

@@ -76,7 +76,7 @@ public class GoogleCalendarIntegrationService {
             return;
         }
 
-        String refreshToken = tokenEncryptor.decrypt(integration.encryptedRefreshTokenForRevocation());
+        String refreshToken = tokenEncryptor.decrypt(integration.getEncryptedRefreshToken());
         googleOAuthClient.revokeToken(refreshToken);
         persistenceService.deleteByAccountId(accountId);
     }
