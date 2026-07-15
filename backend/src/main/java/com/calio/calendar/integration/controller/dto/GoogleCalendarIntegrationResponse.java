@@ -1,6 +1,5 @@
 package com.calio.calendar.integration.controller.dto;
 
-import com.calio.calendar.integration.domain.GoogleCalendarConnectionStatus;
 import com.calio.calendar.integration.domain.GoogleCalendarIntegration;
 import java.time.Instant;
 
@@ -21,10 +20,7 @@ public record GoogleCalendarIntegrationResponse(
     }
 
     public static GoogleCalendarIntegrationResponse from(GoogleCalendarIntegration integration) {
-        return switch (integration.getConnectionStatus()) {
-            case CONNECTED -> connected(integration);
-            case DISCONNECTED -> disconnected();
-        };
+        return connected(integration);
     }
 
     public static GoogleCalendarIntegrationResponse disconnected() {

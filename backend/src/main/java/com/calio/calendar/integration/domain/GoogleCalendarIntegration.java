@@ -3,8 +3,6 @@ package com.calio.calendar.integration.domain;
 import com.calio.calendar.common.domain.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -44,15 +42,8 @@ public class GoogleCalendarIntegration extends BaseEntity {
     @Column(name = "access_token_expires_at", nullable = false)
     private Instant accessTokenExpiresAt;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "connection_status", nullable = false, length = 32)
-    private GoogleCalendarConnectionStatus connectionStatus;
-
     @Column(name = "connected_at", nullable = false)
     private Instant connectedAt;
-
-    @Column(name = "disconnected_at")
-    private Instant disconnectedAt;
 
     protected GoogleCalendarIntegration() {
     }
@@ -90,9 +81,7 @@ public class GoogleCalendarIntegration extends BaseEntity {
         this.encryptedRefreshToken = encryptedRefreshToken;
         this.encryptedAccessToken = encryptedAccessToken;
         this.accessTokenExpiresAt = accessTokenExpiresAt;
-        this.connectionStatus = GoogleCalendarConnectionStatus.CONNECTED;
         this.connectedAt = connectedAt;
-        this.disconnectedAt = null;
     }
 
     public Long getId() {
@@ -115,15 +104,7 @@ public class GoogleCalendarIntegration extends BaseEntity {
         return encryptedRefreshToken;
     }
 
-    public GoogleCalendarConnectionStatus getConnectionStatus() {
-        return connectionStatus;
-    }
-
     public Instant getConnectedAt() {
         return connectedAt;
-    }
-
-    public Instant getDisconnectedAt() {
-        return disconnectedAt;
     }
 }
