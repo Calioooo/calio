@@ -12,6 +12,7 @@ struct LocalEventTextParseResult: Equatable {
     let startAt: Date?
     let endAt: Date?
     let recurrenceFrequency: RecurrenceFrequency?
+    let isAllDay: Bool
 }
 
 struct LocalEventTextParser {
@@ -35,29 +36,64 @@ struct LocalEventTextParser {
 
         var matchedRanges: [Range<String.Index>] = []
         let recurrenceFrequency = parseRecurrenceFrequency(in: trimmedText, matchedRanges: &matchedRanges)
-        let parsedDate = parseDate(in: trimmedText, referenceDate: referenceDate, matchedRanges: &matchedRanges)
+        let parsedDateRange: ParsedDateRange?
+        switch parseDateRange(
+            in: trimmedText,
+            referenceDate: referenceDate,
+            matchedRanges: &matchedRanges
+        ) {
+        case .notFound:
+            parsedDateRange = nil
+        case .invalid:
+            return nil
+        case .success(let dateRange):
+            parsedDateRange = dateRange
+        }
+        let parsedDate = parsedDateRange?.startDate ?? parseDate(
+            in: trimmedText,
+            referenceDate: referenceDate,
+            matchedRanges: &matchedRanges
+        )
         let parsedTime = parseTime(in: trimmedText, matchedRanges: &matchedRanges)
 
         guard parsedDate != nil || parsedTime != nil || recurrenceFrequency != nil else {
             return nil
         }
 
-        let startAt = makeStartAt(
-            date: parsedDate,
-            time: parsedTime?.start,
-            referenceDate: referenceDate
-        )
-        let endAt = makeEndAt(
-            startAt: startAt,
-            endTime: parsedTime?.end,
-            referenceDate: referenceDate
-        )
+        guard parsedDateRange == nil || parsedTime == nil else {
+            return nil
+        }
+
+        let startAt: Date?
+        let endAt: Date?
+
+        let isAllDay = parsedDate != nil && parsedTime == nil
+
+        if let parsedDateRange {
+            startAt = parsedDateRange.startDate
+            endAt = calendar.date(byAdding: .day, value: 1, to: parsedDateRange.inclusiveEndDate)
+        } else if isAllDay, let parsedDate {
+            startAt = calendar.startOfDay(for: parsedDate)
+            endAt = calendar.date(byAdding: .day, value: 1, to: parsedDate)
+        } else {
+            startAt = makeStartAt(
+                date: parsedDate,
+                time: parsedTime?.start,
+                referenceDate: referenceDate
+            )
+            endAt = makeEndAt(
+                startAt: startAt,
+                endTime: parsedTime?.end,
+                referenceDate: referenceDate
+            )
+        }
 
         return LocalEventTextParseResult(
             title: cleanedTitle(from: trimmedText, removing: matchedRanges),
             startAt: startAt,
             endAt: endAt,
-            recurrenceFrequency: recurrenceFrequency
+            recurrenceFrequency: recurrenceFrequency,
+            isAllDay: isAllDay
         )
     }
 
@@ -98,6 +134,88 @@ struct LocalEventTextParser {
         ]
 
         return unsupportedKeywords.contains { text.contains($0) }
+    }
+
+    private func parseDateRange(
+        in text: String,
+        referenceDate: Date,
+        matchedRanges: inout [Range<String.Index>]
+    ) -> DateRangeParseResult {
+        if let match = firstMatch(
+            in: text,
+            pattern: #"(?<!\d)(\d{1,2})\s*/\s*(\d{1,2})\s*(?:-|~)\s*(\d{1,2})\s*/\s*(\d{1,2})(?!\d)(?:\s*동안)?"#
+        ), let startMonth = match.intValue(at: 1),
+           let startDay = match.intValue(at: 2),
+           let endMonth = match.intValue(at: 3),
+           let endDay = match.intValue(at: 4) {
+            guard let dateRange = dateRange(
+                startMonth: startMonth,
+                startDay: startDay,
+                endMonth: endMonth,
+                endDay: endDay,
+                referenceDate: referenceDate
+            ) else {
+                return .invalid
+            }
+            matchedRanges.append(match.range)
+            return .success(dateRange)
+        }
+
+        if let match = firstMatch(
+            in: text,
+            pattern: #"(\d{1,2})\s*월\s*(\d{1,2})\s*일\s*(?:-|~)\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일(?:\s*동안)?"#
+        ), let startMonth = match.intValue(at: 1),
+           let startDay = match.intValue(at: 2),
+           let endMonth = match.intValue(at: 3),
+           let endDay = match.intValue(at: 4) {
+            guard let dateRange = dateRange(
+                startMonth: startMonth,
+                startDay: startDay,
+                endMonth: endMonth,
+                endDay: endDay,
+                referenceDate: referenceDate
+            ) else {
+                return .invalid
+            }
+            matchedRanges.append(match.range)
+            return .success(dateRange)
+        }
+
+        if let match = firstMatch(
+            in: text,
+            pattern: #"(\d{1,2})\s*월\s*(\d{1,2})\s*일\s*부터\s*(\d{1,2})\s*일\s*까지(?:\s*동안)?"#
+        ), let startMonth = match.intValue(at: 1),
+           let startDay = match.intValue(at: 2),
+           let endDay = match.intValue(at: 3) {
+            guard let dateRange = dateRange(
+                startMonth: startMonth,
+                startDay: startDay,
+                endDay: endDay,
+                referenceDate: referenceDate
+            ) else {
+                return .invalid
+            }
+            matchedRanges.append(match.range)
+            return .success(dateRange)
+        }
+
+        if let match = firstMatch(
+            in: text,
+            pattern: #"(?<!\d)(\d{1,2})(?:\s*일)?\s*~\s*(\d{1,2})\s*일(?:\s*동안)?"#
+        ), let startDay = match.intValue(at: 1),
+           let endDay = match.intValue(at: 2) {
+            guard let dateRange = dateRange(
+                startDay: startDay,
+                endDay: endDay,
+                referenceDate: referenceDate
+            ) else {
+                return .invalid
+            }
+            matchedRanges.append(match.range)
+            return .success(dateRange)
+        }
+
+        return .notFound
     }
 
     private func parseDate(
@@ -389,6 +507,146 @@ struct LocalEventTextParser {
         return candidate
     }
 
+    private func dateRange(
+        startMonth: Int,
+        startDay: Int,
+        endMonth: Int,
+        endDay: Int,
+        referenceDate: Date
+    ) -> ParsedDateRange? {
+        guard let startDate = futureDate(
+            month: startMonth,
+            day: startDay,
+            referenceDate: referenceDate
+        ) else {
+            return nil
+        }
+
+        var endYear = calendar.component(.year, from: startDate)
+        if endMonth < startMonth {
+            endYear += 1
+        } else if endMonth == startMonth, endDay < startDay {
+            return nil
+        }
+
+        guard let endDate = exactDate(year: endYear, month: endMonth, day: endDay),
+              endDate >= startDate else {
+            return nil
+        }
+
+        return ParsedDateRange(startDate: startDate, inclusiveEndDate: endDate)
+    }
+
+    private func dateRange(
+        startMonth: Int,
+        startDay: Int,
+        endDay: Int,
+        referenceDate: Date
+    ) -> ParsedDateRange? {
+        guard let startDate = futureDate(
+            month: startMonth,
+            day: startDay,
+            referenceDate: referenceDate
+        ) else {
+            return nil
+        }
+
+        return dateRange(startDate: startDate, startDay: startDay, endDay: endDay)
+    }
+
+    private func dateRange(
+        startDay: Int,
+        endDay: Int,
+        referenceDate: Date
+    ) -> ParsedDateRange? {
+        let referenceComponents = calendar.dateComponents([.year, .month], from: referenceDate)
+        guard let referenceYear = referenceComponents.year,
+              let referenceMonth = referenceComponents.month,
+              var startDate = exactDate(year: referenceYear, month: referenceMonth, day: startDay) else {
+            return nil
+        }
+
+        if startDate < calendar.startOfDay(for: referenceDate) {
+            guard let nextMonth = calendar.date(byAdding: .month, value: 1, to: startDate),
+                  let nextStartDate = exactDate(
+                    year: calendar.component(.year, from: nextMonth),
+                    month: calendar.component(.month, from: nextMonth),
+                    day: startDay
+                  ) else {
+                return nil
+            }
+            startDate = nextStartDate
+        }
+
+        return dateRange(startDate: startDate, startDay: startDay, endDay: endDay)
+    }
+
+    private func dateRange(
+        startDate: Date,
+        startDay: Int,
+        endDay: Int
+    ) -> ParsedDateRange? {
+        let startComponents = calendar.dateComponents([.year, .month], from: startDate)
+        guard let startYear = startComponents.year,
+              let startMonth = startComponents.month else {
+            return nil
+        }
+
+        var endYear = startYear
+        var endMonth = startMonth
+        if endDay < startDay {
+            guard let nextMonth = calendar.date(
+                byAdding: .month,
+                value: 1,
+                to: startDate
+            ) else {
+                return nil
+            }
+            endYear = calendar.component(.year, from: nextMonth)
+            endMonth = calendar.component(.month, from: nextMonth)
+        }
+
+        guard let endDate = exactDate(year: endYear, month: endMonth, day: endDay) else {
+            return nil
+        }
+
+        return ParsedDateRange(startDate: startDate, inclusiveEndDate: endDate)
+    }
+
+    private func futureDate(
+        month: Int,
+        day: Int,
+        referenceDate: Date
+    ) -> Date? {
+        let referenceYear = calendar.component(.year, from: referenceDate)
+        guard let candidate = exactDate(year: referenceYear, month: month, day: day) else {
+            return nil
+        }
+
+        if candidate < calendar.startOfDay(for: referenceDate) {
+            return exactDate(year: referenceYear + 1, month: month, day: day)
+        }
+
+        return candidate
+    }
+
+    private func exactDate(year: Int, month: Int, day: Int) -> Date? {
+        guard let date = calendar.date(
+            from: DateComponents(year: year, month: month, day: day)
+        ) else {
+            return nil
+        }
+
+        let components = calendar.dateComponents([.year, .month, .day], from: date)
+        guard components.year == year,
+              components.month == month,
+              components.day == day else {
+            return nil
+        }
+
+        return calendar.startOfDay(for: date)
+    }
+
     private func nearestFutureWeekday(containing date: Date, weekdayIndex: Int) -> Date? {
         let currentWeekday = calendar.component(.weekday, from: date)
         let currentIndex = weekdayIndexFromCalendarWeekday(currentWeekday)
@@ -464,6 +722,17 @@ struct LocalEventTextParser {
 private struct TimeOfDay: Equatable {
     let hour: Int
     let minute: Int
+}
+
+private struct ParsedDateRange: Equatable {
+    let startDate: Date
+    let inclusiveEndDate: Date
+}
+
+private enum DateRangeParseResult {
+    case notFound
+    case invalid
+    case success(ParsedDateRange)
 }
 
 private struct RegexMatch {

@@ -29,7 +29,8 @@ enum CalendarEventFormRules {
         recurrenceStartDate: Date,
         recurrenceEndDate: Date,
         recurrenceStartTime: Date,
-        recurrenceEndTime: Date
+        recurrenceEndTime: Date,
+        isAllDay: Bool = false
     ) -> Bool {
         guard !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return false
@@ -40,7 +41,7 @@ enum CalendarEventFormRules {
         }
 
         return !isUTCDate(recurrenceEndDate, before: recurrenceStartDate)
-            && isUTCTime(recurrenceStartTime, before: recurrenceEndTime)
+            && (isAllDay || isUTCTime(recurrenceStartTime, before: recurrenceEndTime))
     }
 
     private static func isUTCDate(_ candidate: Date, before startAt: Date) -> Bool {

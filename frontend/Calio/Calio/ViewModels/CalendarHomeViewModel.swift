@@ -429,7 +429,8 @@ final class CalendarHomeViewModel: ObservableObject {
                 originStartAt: originStartAt,
                 input: RecurrenceOccurrenceUpdateInput(
                     startAt: input.startAt,
-                    endAt: input.endAt
+                    endAt: input.endAt,
+                    isAllDay: input.isAllDay
                 )
             )
             invalidateMonthEventCache()
@@ -466,6 +467,7 @@ final class CalendarHomeViewModel: ObservableObject {
                     recurrenceStartTime: input.recurrenceStartTime,
                     recurrenceEndTime: input.recurrenceEndTime,
                     recurrenceFrequency: input.recurrenceFrequency,
+                    isAllDay: input.isAllDay,
                     tagId: input.tagId
                 )
             )

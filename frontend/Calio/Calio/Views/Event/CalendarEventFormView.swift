@@ -11,6 +11,7 @@ struct EventInput: Equatable {
     var title: String
     var startAt: Date
     var endAt: Date
+    var isAllDay: Bool = false
     var description: String
     var tag: CalendarTag?
 }
@@ -35,13 +36,13 @@ struct CalendarEventFormView: View {
 
     let mode: CalendarEventFormMode
     let onRecurrenceEnabled: () -> Void
-    let onTitleChanged: (String) -> Void
     let onResetTagMutation: () -> Void
     let onCreateCustomTag: (CustomTagInput) async -> Bool
     let onUpdateCustomTag: (CalendarTag, CustomTagInput) async -> Bool
     let onDeleteCustomTag: (CalendarTag) async -> Bool
 
     @State private var isShowingTagManagement = false
+    @State private var previousTimedRange: (startAt: Date, endAt: Date)?
 
     init(
         eventInput: Binding<EventInput>,
@@ -51,7 +52,6 @@ struct CalendarEventFormView: View {
         tagMutationFailureMessage: String? = nil,
         mode: CalendarEventFormMode = .create,
         onRecurrenceEnabled: @escaping () -> Void,
-        onTitleChanged: @escaping (String) -> Void = { _ in },
         onResetTagMutation: @escaping () -> Void = {},
         onCreateCustomTag: @escaping (CustomTagInput) async -> Bool = { _ in false },
         onUpdateCustomTag: @escaping (CalendarTag, CustomTagInput) async -> Bool = { _, _ in false },
@@ -64,7 +64,6 @@ struct CalendarEventFormView: View {
         self.tagMutationFailureMessage = tagMutationFailureMessage
         self.mode = mode
         self.onRecurrenceEnabled = onRecurrenceEnabled
-        self.onTitleChanged = onTitleChanged
         self.onResetTagMutation = onResetTagMutation
         self.onCreateCustomTag = onCreateCustomTag
         self.onUpdateCustomTag = onUpdateCustomTag
@@ -98,9 +97,6 @@ struct CalendarEventFormView: View {
             TextField("일정 제목", text: $eventInput.title)
                 .font(.system(size: 20, weight: .semibold))
                 .submitLabel(.next)
-                .onChange(of: eventInput.title) { _, title in
-                    onTitleChanged(title)
-                }
         }
     }
 
@@ -109,7 +105,9 @@ struct CalendarEventFormView: View {
         if let recurrenceInput,
            mode.usesRecurrenceDateAndTime(isRecurrenceEnabled: recurrenceInput.wrappedValue.isEnabled) {
             recurrenceDateSection(recurrenceInput)
-            recurrenceTimeSection(recurrenceInput)
+            if !eventInput.isAllDay {
+                recurrenceTimeSection(recurrenceInput)
+            }
         } else {
             singleEventTimeSection
         }
@@ -145,23 +143,41 @@ struct CalendarEventFormView: View {
 
     private var singleEventTimeSection: some View {
         Section {
-            DatePicker(
-                "시작",
-                selection: $eventInput.startAt,
-                displayedComponents: [.date, .hourAndMinute]
-            )
+            if mode.allowsAllDayToggle {
+                Toggle("하루 종일", isOn: allDayBinding)
+            }
 
-            DatePicker(
-                "종료",
-                selection: $eventInput.endAt,
-                in: eventInput.startAt...,
-                displayedComponents: [.date, .hourAndMinute]
-            )
+            if eventInput.isAllDay {
+                DatePicker("시작일", selection: $eventInput.startAt, displayedComponents: [.date])
+                DatePicker(
+                    "종료일",
+                    selection: inclusiveAllDayEndBinding,
+                    in: eventInput.startAt...,
+                    displayedComponents: [.date]
+                )
+            } else {
+                DatePicker(
+                    "시작",
+                    selection: $eventInput.startAt,
+                    displayedComponents: [.date, .hourAndMinute]
+                )
+
+                DatePicker(
+                    "종료",
+                    selection: $eventInput.endAt,
+                    in: eventInput.startAt...,
+                    displayedComponents: [.date, .hourAndMinute]
+                )
+            }
         }
     }
 
     private func recurrenceDateSection(_ recurrenceInput: Binding<RecurrenceInput>) -> some View {
         Section("반복 기간") {
+            if mode.allowsAllDayToggle {
+                Toggle("하루 종일", isOn: allDayBinding)
+            }
+
             DatePicker(
                 "반복 시작일",
                 selection: recurrenceInput.startDate,
@@ -343,6 +359,54 @@ struct CalendarEventFormView: View {
         tags.isEmpty ? eventInput.tag.map { [$0] } ?? [] : tags
     }
 
+    private var allDayBinding: Binding<Bool> {
+        Binding(
+            get: { eventInput.isAllDay },
+            set: { setAllDay($0) }
+        )
+    }
+
+    private var inclusiveAllDayEndBinding: Binding<Date> {
+        let calendar = Calendar.current
+        return Binding(
+            get: {
+                calendar.date(byAdding: .day, value: -1, to: eventInput.endAt)
+                    ?? eventInput.startAt
+            },
+            set: { inclusiveEndDate in
+                eventInput.endAt = calendar.date(
+                    byAdding: .day,
+                    value: 1,
+                    to: calendar.startOfDay(for: inclusiveEndDate)
+                ) ?? eventInput.endAt
+            }
+        )
+    }
+
+    private func setAllDay(_ isAllDay: Bool) {
+        guard eventInput.isAllDay != isAllDay else { return }
+
+        let calendar = Calendar.current
+        if isAllDay {
+            previousTimedRange = (eventInput.startAt, eventInput.endAt)
+            let startDate = calendar.startOfDay(for: eventInput.startAt)
+            let inclusiveEndDate = max(startDate, calendar.startOfDay(for: eventInput.endAt))
+            eventInput.startAt = startDate
+            eventInput.endAt = calendar.date(byAdding: .day, value: 1, to: inclusiveEndDate)
+                ?? inclusiveEndDate
+        } else if let previousTimedRange {
+            eventInput.startAt = previousTimedRange.startAt
+            eventInput.endAt = previousTimedRange.endAt
+        } else {
+            let startDate = calendar.startOfDay(for: eventInput.startAt)
+            eventInput.startAt = calendar.date(bySettingHour: 9, minute: 0, second: 0, of: startDate)
+                ?? startDate
+            eventInput.endAt = calendar.date(byAdding: .hour, value: 1, to: eventInput.startAt)
+                ?? eventInput.startAt
+        }
+        eventInput.isAllDay = isAllDay
+    }
+
 }
 
 enum CalendarEventFormMode: Equatable {
@@ -370,6 +434,10 @@ enum CalendarEventFormMode: Equatable {
 
     var allowsRecurrenceToggle: Bool {
         self == .create
+    }
+
+    var allowsAllDayToggle: Bool {
+        self != .editRecurrenceOccurrence
     }
 
     var showsTagField: Bool {

@@ -47,6 +47,49 @@ struct CalendarDateService {
         )
     }
 
+    nonisolated static func localDateString(
+        from date: Date,
+        calendar: Calendar = .current
+    ) -> String {
+        let components = calendar.dateComponents([.year, .month, .day], from: date)
+        return String(
+            format: "%04d-%02d-%02d",
+            components.year ?? 0,
+            components.month ?? 0,
+            components.day ?? 0
+        )
+    }
+
+    nonisolated static func localDate(
+        from string: String,
+        calendar: Calendar = .current
+    ) throws -> Date {
+        let values = string.split(separator: "-", omittingEmptySubsequences: false)
+        guard values.count == 3,
+              let year = Int(values[0]),
+              let month = Int(values[1]),
+              let day = Int(values[2]) else {
+            throw CalendarDateServiceError.invalidLocalDate
+        }
+
+        var components = DateComponents()
+        components.calendar = calendar
+        components.timeZone = calendar.timeZone
+        components.year = year
+        components.month = month
+        components.day = day
+
+        guard let date = calendar.date(from: components),
+              calendar.dateComponents([.year, .month, .day], from: date) == DateComponents(
+                year: year,
+                month: month,
+                day: day
+              ) else {
+            throw CalendarDateServiceError.invalidLocalDate
+        }
+        return date
+    }
+
     nonisolated static func utcTimeString(from date: Date) -> String {
         let utcCalendar = makeUTCCalendar()
         let components = utcCalendar.dateComponents([.hour, .minute, .second], from: date)
@@ -146,4 +189,5 @@ struct CalendarDateService {
 enum CalendarDateServiceError: Error, Equatable {
     case invalidUTCDate
     case invalidUTCTime
+    case invalidLocalDate
 }

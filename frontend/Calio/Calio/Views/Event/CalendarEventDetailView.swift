@@ -77,6 +77,7 @@ struct CalendarEventDetailView: View {
                 title: event.title,
                 startAt: event.startAt,
                 endAt: event.endAt,
+                isAllDay: event.isAllDay,
                 description: event.description,
                 tag: event.tag
             )
@@ -280,24 +281,33 @@ struct CalendarEventDetailView: View {
         }
     }
 
+    @ViewBuilder
     private var timeSection: some View {
         Section("시간") {
             Label(
                 CalendarEventDisplayText.dateRange(
                     startAt: event.startAt,
-                    endAt: event.endAt
+                    endAt: event.isAllDay ? inclusiveAllDayEndAt : event.endAt
                 ),
                 systemImage: "calendar"
             )
 
-            Label(
-                CalendarEventDisplayText.timeRange(
-                    startAt: event.startAt,
-                    endAt: event.endAt
-                ),
-                systemImage: "clock"
-            )
+            if event.isAllDay {
+                Label("하루 종일", systemImage: "sun.max")
+            } else {
+                Label(
+                    CalendarEventDisplayText.timeRange(
+                        startAt: event.startAt,
+                        endAt: event.endAt
+                    ),
+                    systemImage: "clock"
+                )
+            }
         }
+    }
+
+    private var inclusiveAllDayEndAt: Date {
+        Calendar.current.date(byAdding: .day, value: -1, to: event.endAt) ?? event.endAt
     }
 
     private var statusSection: some View {
@@ -372,7 +382,8 @@ struct CalendarEventDetailView: View {
             recurrenceStartDate: recurrenceInput.startDate,
             recurrenceEndDate: recurrenceInput.endDate,
             recurrenceStartTime: recurrenceInput.startTime,
-            recurrenceEndTime: recurrenceInput.endTime
+            recurrenceEndTime: recurrenceInput.endTime,
+            isAllDay: editInput.isAllDay
         )
     }
 
@@ -423,6 +434,7 @@ struct CalendarEventDetailView: View {
             editInput.description = details.description
             editInput.startAt = details.recurrenceStartDate
             editInput.endAt = details.recurrenceEndDate
+            editInput.isAllDay = details.isAllDay
             recurrenceInput = RecurrenceInput(
                 isEnabled: true,
                 startDate: details.recurrenceStartDate,
@@ -440,6 +452,7 @@ struct CalendarEventDetailView: View {
         editInput.description = event.description
         editInput.startAt = event.startAt
         editInput.endAt = event.endAt
+        editInput.isAllDay = event.isAllDay
         editInput.tag = event.tag
     }
 
@@ -462,6 +475,7 @@ struct CalendarEventDetailView: View {
             description: editInput.description,
             startAt: editInput.startAt,
             endAt: editInput.endAt,
+            isAllDay: editInput.isAllDay,
             tagId: editInput.tag?.id
         )
     }
@@ -506,6 +520,7 @@ struct CalendarEventDetailView: View {
                     recurrenceStartTime: recurrenceInput.startTime,
                     recurrenceEndTime: recurrenceInput.endTime,
                     recurrenceFrequency: recurrenceInput.frequency,
+                    isAllDay: editInput.isAllDay,
                     tagId: editInput.tag?.id
                 )
             )

@@ -1147,6 +1147,41 @@ struct CalioTests {
                 startAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 17, hour: 14))),
                 endAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 17, hour: 15))),
                 recurrenceFrequency: .weekly
+            ),
+            LocalEventTextParserEvalCase(
+                text: "7/18-7/21 여행",
+                title: "여행",
+                startAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 18))),
+                endAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 22))),
+                isAllDay: true
+            ),
+            LocalEventTextParserEvalCase(
+                text: "7/18~7/21 여행",
+                title: "여행",
+                startAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 18))),
+                endAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 22))),
+                isAllDay: true
+            ),
+            LocalEventTextParserEvalCase(
+                text: "7월 18일~7월 21일 여행",
+                title: "여행",
+                startAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 18))),
+                endAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 22))),
+                isAllDay: true
+            ),
+            LocalEventTextParserEvalCase(
+                text: "7월 18일부터 21일까지 여행",
+                title: "여행",
+                startAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 18))),
+                endAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 22))),
+                isAllDay: true
+            ),
+            LocalEventTextParserEvalCase(
+                text: "18~21일 동안 여행",
+                title: "여행",
+                startAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 18))),
+                endAt: try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 22))),
+                isAllDay: true
             )
         ]
 
@@ -1158,6 +1193,7 @@ struct CalioTests {
                 && result.startAt == testCase.startAt
                 && result.endAt == testCase.endAt
                 && result.recurrenceFrequency == testCase.recurrenceFrequency
+                && result.isAllDay == testCase.isAllDay
 
             if didPass {
                 passedCount += 1
@@ -1167,9 +1203,41 @@ struct CalioTests {
             #expect(result.startAt == testCase.startAt, "startAt mismatch: \(testCase.text)")
             #expect(result.endAt == testCase.endAt, "endAt mismatch: \(testCase.text)")
             #expect(result.recurrenceFrequency == testCase.recurrenceFrequency, "recurrence mismatch: \(testCase.text)")
+            #expect(result.isAllDay == testCase.isAllDay, "all-day mismatch: \(testCase.text)")
         }
 
         #expect(passedCount == cases.count)
+    }
+
+    @Test func localEventTextParserDateRangesHandleYearRolloverAndRejectInvalidRanges() async throws {
+        let calendar = fixedCalendar
+        let referenceDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 14, hour: 9)))
+        let parser = LocalEventTextParser(calendar: calendar)
+        let yearRollover = try #require(parser.parse("12/30-1/2 여행", referenceDate: referenceDate))
+
+        #expect(yearRollover.title == "여행")
+        #expect(yearRollover.startAt == calendar.date(from: DateComponents(year: 2026, month: 12, day: 30)))
+        #expect(yearRollover.endAt == calendar.date(from: DateComponents(year: 2027, month: 1, day: 3)))
+        #expect(yearRollover.isAllDay)
+        #expect(parser.parse("7/21-7/18 여행", referenceDate: referenceDate) == nil)
+        #expect(parser.parse("2/30-3/2 여행", referenceDate: referenceDate) == nil)
+    }
+
+    @Test func localEventTextParserTreatsDateWithoutTimeAsAllDay() async throws {
+        let calendar = fixedCalendar
+        let referenceDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 14, hour: 9)))
+        let parser = LocalEventTextParser(calendar: calendar)
+
+        let relativeDate = try #require(parser.parse("내일 팀 워크숍", referenceDate: referenceDate))
+        #expect(relativeDate.title == "팀 워크숍")
+        #expect(relativeDate.startAt == calendar.date(from: DateComponents(year: 2026, month: 7, day: 15)))
+        #expect(relativeDate.endAt == calendar.date(from: DateComponents(year: 2026, month: 7, day: 16)))
+        #expect(relativeDate.isAllDay)
+
+        let explicitDate = try #require(parser.parse("7월 18일 여행 준비", referenceDate: referenceDate))
+        #expect(explicitDate.startAt == calendar.date(from: DateComponents(year: 2026, month: 7, day: 18)))
+        #expect(explicitDate.endAt == calendar.date(from: DateComponents(year: 2026, month: 7, day: 19)))
+        #expect(explicitDate.isAllDay)
     }
 
     @Test func localEventTextParserIgnoresPlainTitleWithoutDateTimeSignal() async throws {
@@ -1195,6 +1263,74 @@ struct CalioTests {
         }
     }
 
+    @Test func quickEventCreationDraftUsesParsedValuesForRecurringSubmission() async throws {
+        let calendar = fixedCalendar
+        let referenceDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 14, hour: 9)))
+        let referenceDay = DayKey(date: referenceDate, calendar: calendar)
+        let parser = LocalEventTextParser(calendar: calendar)
+        let parseResult = try #require(
+            parser.parse(
+                "매주 월요일 오전 10시 스탠드업",
+                referenceDate: referenceDate
+            )
+        )
+        let draft = CalendarEventCreationDraft(
+            referenceDay: referenceDay,
+            calendar: calendar
+        ).applying(parseResult, calendar: calendar)
+
+        #expect(draft.eventInput.title == "스탠드업")
+        #expect(draft.eventInput.startAt == calendar.date(from: DateComponents(year: 2026, month: 7, day: 20, hour: 10)))
+        #expect(draft.eventInput.endAt == calendar.date(from: DateComponents(year: 2026, month: 7, day: 20, hour: 11)))
+        #expect(draft.recurrenceInput.isEnabled)
+        #expect(draft.recurrenceInput.frequency == .weekly)
+        #expect(draft.recurrenceInput.endDate == calendar.date(from: DateComponents(year: 2027, month: 7, day: 20, hour: 10)))
+        #expect(draft.canSave)
+
+        guard case .recurring(let input) = draft.submitInput else {
+            Issue.record("반복 파싱 결과는 반복 일정 생성 요청이어야 합니다.")
+            return
+        }
+
+        #expect(input.title == "스탠드업")
+        #expect(input.recurrenceStartDate == draft.recurrenceInput.startDate)
+        #expect(input.recurrenceEndDate == draft.recurrenceInput.endDate)
+        #expect(input.recurrenceStartTime == draft.recurrenceInput.startTime)
+        #expect(input.recurrenceEndTime == draft.recurrenceInput.endTime)
+        #expect(input.recurrenceFrequency == .weekly)
+    }
+
+    @Test func detailedEventCreationPreservesUnparsedQuickInputAsTitle() async throws {
+        let calendar = fixedCalendar
+        let referenceDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 14, hour: 9)))
+        let draft = CalendarEventCreationDraft(
+            referenceDay: DayKey(date: referenceDate, calendar: calendar),
+            calendar: calendar
+        ).replacingTitle(with: "  파싱되지 않은 회의 제목  ")
+
+        #expect(draft.eventInput.title == "파싱되지 않은 회의 제목")
+        #expect(!draft.recurrenceInput.isEnabled)
+        #expect(draft.canSave)
+
+        guard case .single(let input) = draft.submitInput else {
+            Issue.record("일반 제목은 단일 일정 생성 요청이어야 합니다.")
+            return
+        }
+
+        #expect(input.title == "파싱되지 않은 회의 제목")
+        #expect(input.startAt == draft.eventInput.startAt)
+        #expect(input.endAt == draft.eventInput.endAt)
+    }
+
+    @Test func eventCreationEntryModeUsesDetailForSelectedDateRangeOnly() async throws {
+        let startDay = DayKey(year: 2026, month: 7, day: 18)
+        let endDay = DayKey(year: 2026, month: 7, day: 21)
+        let dateRange = CalendarDateRange(startDay: startDay, endDay: endDay)
+
+        #expect(CalendarEventCreationEntryMode(initialDateRange: nil) == .quick)
+        #expect(CalendarEventCreationEntryMode(initialDateRange: dateRange) == .detailed)
+    }
+
     @Test func createEventRequestDTOEncodesOnlyBackendContractFields() async throws {
         let startAt = Date(timeIntervalSince1970: 1_780_000_000)
         let endAt = startAt.addingTimeInterval(3600)
@@ -1208,12 +1344,35 @@ struct CalioTests {
         let data = try EventJSONCoding.makeEncoder().encode(request)
         let object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
 
-        #expect(Set(object.keys) == ["title", "description", "startAt", "endAt"])
+        #expect(Set(object.keys) == ["title", "description", "startAt", "endAt", "allDay"])
         #expect(object["title"] as? String == "저녁 약속")
         #expect(object["description"] as? String == "식당 예약")
         #expect(object["selectedColorCode"] == nil)
         #expect(object["colorCode"] == nil)
         #expect((object["startAt"] as? String)?.hasSuffix("Z") == true)
+        #expect(object["allDay"] as? Bool == false)
+    }
+
+    @Test func createAllDayEventRequestDTOEncodesCanonicalDatesWithoutInstants() async throws {
+        let request = CreateEventRequestDTO(
+            title: "여행",
+            description: nil,
+            startAt: nil,
+            endAt: nil,
+            allDay: true,
+            startDate: "2026-07-18",
+            endDate: "2026-07-22"
+        )
+
+        let data = try EventJSONCoding.makeEncoder().encode(request)
+        let object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+
+        #expect(Set(object.keys) == ["title", "allDay", "startDate", "endDate"])
+        #expect(object["allDay"] as? Bool == true)
+        #expect(object["startDate"] as? String == "2026-07-18")
+        #expect(object["endDate"] as? String == "2026-07-22")
+        #expect(object["startAt"] == nil)
+        #expect(object["endAt"] == nil)
     }
 
     @Test func updateEventRequestDTOEncodesOnlyBackendContractFields() async throws {
@@ -1229,7 +1388,7 @@ struct CalioTests {
         let data = try EventJSONCoding.makeEncoder().encode(request)
         let object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
 
-        #expect(Set(object.keys) == ["title", "description", "startAt", "endAt"])
+        #expect(Set(object.keys) == ["title", "description", "startAt", "endAt", "allDay"])
         #expect(object["title"] as? String == "수정 일정")
         #expect(object["description"] as? String == "수정 메모")
         #expect(object["importantEvent"] == nil)
@@ -1259,7 +1418,8 @@ struct CalioTests {
             "recurrenceEndDate",
             "recurrenceStartTime",
             "recurrenceEndTime",
-            "recurrenceFrequency"
+            "recurrenceFrequency",
+            "allDay"
         ])
         #expect(object["recurrenceFrequency"] as? String == "DAILY")
         #expect(object["colorCode"] == nil)
@@ -1280,7 +1440,7 @@ struct CalioTests {
         let data = try EventJSONCoding.makeEncoder().encode(request)
         let object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
 
-        #expect(Set(object.keys) == ["title", "description", "startDate", "endDate", "startTime", "endTime", "recurrenceFrequency"])
+        #expect(Set(object.keys) == ["title", "description", "startDate", "endDate", "startTime", "endTime", "recurrenceFrequency", "allDay"])
         #expect(object["title"] as? String == "수정 반복 일정")
         #expect(object["startDate"] as? String == "2026-08-01")
         #expect(object["startTime"] as? String == "09:00:00")
@@ -1384,6 +1544,75 @@ struct CalioTests {
         #expect(event.endAt == endAt)
         #expect(event.tag.colorCode == "#4F46E5")
         #expect(repository.createRequests.count == 1)
+    }
+
+    @Test func eventServiceCreatesAllDayEventWithCanonicalLocalDates() async throws {
+        let calendar = Calendar.current
+        let startAt = try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 18)))
+        let endAt = try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 22)))
+        let repository = RecordingEventRepository(
+            createResponse: EventResponseDTO(
+                id: 77,
+                title: "여행",
+                description: nil,
+                startAt: Date(timeIntervalSince1970: 0),
+                endAt: Date(timeIntervalSince1970: 86_400),
+                allDay: true,
+                startDate: "2026-07-18",
+                endDate: "2026-07-22",
+                createdAt: Date(timeIntervalSince1970: 0),
+                updatedAt: Date(timeIntervalSince1970: 0)
+            )
+        )
+        let service = EventService(repository: repository)
+
+        let event = try await service.createEvent(
+            EventCreateInput(
+                title: "여행",
+                description: "",
+                startAt: startAt,
+                endAt: endAt,
+                isAllDay: true
+            )
+        )
+        let request = try #require(repository.createRequests.first)
+
+        #expect(request.allDay)
+        #expect(request.startAt == nil)
+        #expect(request.endAt == nil)
+        #expect(request.startDate == "2026-07-18")
+        #expect(request.endDate == "2026-07-22")
+        #expect(event.isAllDay)
+        #expect(event.startAt == startAt)
+        #expect(event.endAt == endAt)
+    }
+
+    @Test func eventServiceCreatesAllDayRecurrenceWithoutTimeFields() async throws {
+        let calendar = Calendar.current
+        let startDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 8, day: 1)))
+        let endDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 8, day: 31)))
+        let repository = RecordingEventRepository()
+        let service = EventService(repository: repository)
+
+        try await service.createRecurrenceEvent(
+            RecurrenceEventCreateInput(
+                title: "매일 휴가",
+                description: "",
+                recurrenceStartDate: startDate,
+                recurrenceEndDate: endDate,
+                recurrenceStartTime: startDate,
+                recurrenceEndTime: endDate,
+                recurrenceFrequency: .daily,
+                isAllDay: true
+            )
+        )
+        let request = try #require(repository.recurrenceCreateRequests.first)
+
+        #expect(request.allDay)
+        #expect(request.recurrenceStartDate == "2026-08-01")
+        #expect(request.recurrenceEndDate == "2026-08-31")
+        #expect(request.recurrenceStartTime == nil)
+        #expect(request.recurrenceEndTime == nil)
     }
 
     @Test func eventServiceUpdateEventMapsRepositoryResponseAndPreservesCanonicalFields() async throws {
@@ -1506,6 +1735,32 @@ struct CalioTests {
         #expect(request.request.endAt == endAt)
     }
 
+    @Test func eventServiceUpdatesAllDayRecurrenceOccurrenceWithCanonicalDates() async throws {
+        let calendar = Calendar.current
+        let originStartAt = Date(timeIntervalSince1970: 1_786_752_000)
+        let startAt = try #require(calendar.date(from: DateComponents(year: 2026, month: 8, day: 10)))
+        let endAt = try #require(calendar.date(from: DateComponents(year: 2026, month: 8, day: 11)))
+        let repository = RecordingEventRepository()
+        let service = EventService(repository: repository)
+
+        _ = try await service.updateRecurrenceOccurrence(
+            recurrenceId: 700,
+            originStartAt: originStartAt,
+            input: RecurrenceOccurrenceUpdateInput(
+                startAt: startAt,
+                endAt: endAt,
+                isAllDay: true
+            )
+        )
+        let request = try #require(repository.updateRecurrenceOccurrenceRequests.first)
+
+        #expect(request.request.originStartAt == originStartAt)
+        #expect(request.request.startAt == nil)
+        #expect(request.request.endAt == nil)
+        #expect(request.request.startDate == "2026-08-10")
+        #expect(request.request.endDate == "2026-08-11")
+    }
+
     @Test func eventServiceMapsRecurrenceUpdateInvalidTimeRangeLikeExistingInvalidRange() async throws {
         let repository = RecordingEventRepository(
             updateRecurrenceError: EventRepositoryError.backend(
@@ -1597,7 +1852,7 @@ struct CalioTests {
         #expect(request.url?.absoluteString == "https://example.test/api/events")
         #expect(request.httpMethod == "POST")
         #expect(request.value(forHTTPHeaderField: "Content-Type") == "application/json")
-        #expect(Set(object.keys) == ["title", "description", "startAt", "endAt"])
+        #expect(Set(object.keys) == ["title", "description", "startAt", "endAt", "allDay"])
         #expect(object["title"] as? String == "새 일정")
         #expect(object["selectedColorCode"] == nil)
     }
@@ -1665,7 +1920,8 @@ struct CalioTests {
             "recurrenceEndDate",
             "recurrenceStartTime",
             "recurrenceEndTime",
-            "recurrenceFrequency"
+            "recurrenceFrequency",
+            "allDay"
         ])
         #expect(object["recurrenceFrequency"] as? String == "MONTHLY")
         #expect(object["colorCode"] == nil)
@@ -1727,7 +1983,7 @@ struct CalioTests {
         #expect(event.id == 88)
         #expect(request.url?.absoluteString == "https://example.test/api/events/88")
         #expect(request.httpMethod == "PUT")
-        #expect(Set(object.keys) == ["title", "description", "startAt", "endAt"])
+        #expect(Set(object.keys) == ["title", "description", "startAt", "endAt", "allDay"])
         #expect(object["colorCode"] == nil)
     }
 
@@ -2710,19 +2966,22 @@ struct CalioTests {
         let startAt: Date
         let endAt: Date
         let recurrenceFrequency: RecurrenceFrequency?
+        let isAllDay: Bool
 
         init(
             text: String,
             title: String,
             startAt: Date,
             endAt: Date,
-            recurrenceFrequency: RecurrenceFrequency? = nil
+            recurrenceFrequency: RecurrenceFrequency? = nil,
+            isAllDay: Bool = false
         ) {
             self.text = text
             self.title = title
             self.startAt = startAt
             self.endAt = endAt
             self.recurrenceFrequency = recurrenceFrequency
+            self.isAllDay = isAllDay
         }
     }
 

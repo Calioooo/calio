@@ -46,12 +46,19 @@ struct StubEventRepository: EventRepository, TagRepository {
     func deleteCustomTag(tagId: Int64) async throws {}
 
     func createEvent(_ request: CreateEventRequestDTO) async throws -> EventResponseDTO {
-        EventResponseDTO(
+        let startAt = try request.startAt
+            ?? CalendarDateService.localDate(from: request.startDate ?? "")
+        let endAt = try request.endAt
+            ?? CalendarDateService.localDate(from: request.endDate ?? "")
+        return EventResponseDTO(
             id: Int64(Date().timeIntervalSince1970),
             title: request.title,
             description: request.description,
-            startAt: request.startAt,
-            endAt: request.endAt,
+            startAt: startAt,
+            endAt: endAt,
+            allDay: request.allDay,
+            startDate: request.startDate,
+            endDate: request.endDate,
             tag: tag(for: request.tagId),
             createdAt: Date(),
             updatedAt: Date()
@@ -68,6 +75,7 @@ struct StubEventRepository: EventRepository, TagRepository {
             recurrenceStartTime: request.recurrenceStartTime,
             recurrenceEndTime: request.recurrenceEndTime,
             recurrenceFrequency: request.recurrenceFrequency,
+            allDay: request.allDay,
             tag: tag(for: request.tagId)
         )
     }
@@ -87,12 +95,19 @@ struct StubEventRepository: EventRepository, TagRepository {
     }
 
     func updateEvent(eventId: Int64, request: UpdateEventRequestDTO) async throws -> EventResponseDTO {
-        EventResponseDTO(
+        let startAt = try request.startAt
+            ?? CalendarDateService.localDate(from: request.startDate ?? "")
+        let endAt = try request.endAt
+            ?? CalendarDateService.localDate(from: request.endDate ?? "")
+        return EventResponseDTO(
             id: eventId,
             title: request.title,
             description: request.description,
-            startAt: request.startAt,
-            endAt: request.endAt,
+            startAt: startAt,
+            endAt: endAt,
+            allDay: request.allDay,
+            startDate: request.startDate,
+            endDate: request.endDate,
             tag: tag(for: request.tagId),
             createdAt: Date(),
             updatedAt: Date()
@@ -112,6 +127,7 @@ struct StubEventRepository: EventRepository, TagRepository {
             recurrenceStartTime: request.startTime,
             recurrenceEndTime: request.endTime,
             recurrenceFrequency: request.recurrenceFrequency,
+            allDay: request.allDay,
             tag: tag(for: request.tagId)
         )
     }
@@ -120,18 +136,26 @@ struct StubEventRepository: EventRepository, TagRepository {
         recurrenceId: Int64,
         request: UpdateRecurrenceOccurrenceRequestDTO
     ) async throws -> EventResponseDTO {
-        EventResponseDTO(
+        let startAt = try request.startAt
+            ?? CalendarDateService.localDate(from: request.startDate ?? "")
+        let endAt = try request.endAt
+            ?? CalendarDateService.localDate(from: request.endDate ?? "")
+        let isAllDay = request.startDate != nil
+        return EventResponseDTO(
             id: nil,
             title: "반복 일정",
             description: nil,
-            startAt: request.startAt,
-            endAt: request.endAt,
+            startAt: startAt,
+            endAt: endAt,
+            allDay: isAllDay,
+            startDate: request.startDate,
+            endDate: request.endDate,
             recurrenceId: recurrenceId,
             isRecurrenceOccurrence: true,
             originStartAt: request.originStartAt,
             tag: Self.defaultTags[0],
-            createdAt: request.startAt,
-            updatedAt: request.endAt
+            createdAt: startAt,
+            updatedAt: endAt
         )
     }
 

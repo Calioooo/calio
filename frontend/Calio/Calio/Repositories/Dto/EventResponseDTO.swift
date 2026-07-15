@@ -20,6 +20,9 @@ struct EventResponseDTO: Decodable {
     let description: String?
     let startAt: Date
     let endAt: Date
+    let allDay: Bool
+    let startDate: String?
+    let endDate: String?
     let importantEvent: Bool
     let recurrenceId: Int64?
     let isRecurrenceOccurrence: Bool
@@ -34,6 +37,9 @@ struct EventResponseDTO: Decodable {
         description: String?,
         startAt: Date,
         endAt: Date,
+        allDay: Bool = false,
+        startDate: String? = nil,
+        endDate: String? = nil,
         importantEvent: Bool = false,
         recurrenceId: Int64? = nil,
         isRecurrenceOccurrence: Bool = false,
@@ -52,6 +58,9 @@ struct EventResponseDTO: Decodable {
         self.description = description
         self.startAt = startAt
         self.endAt = endAt
+        self.allDay = allDay
+        self.startDate = startDate
+        self.endDate = endDate
         self.importantEvent = importantEvent
         self.recurrenceId = recurrenceId
         self.isRecurrenceOccurrence = isRecurrenceOccurrence
@@ -67,6 +76,9 @@ struct EventResponseDTO: Decodable {
         case description
         case startAt
         case endAt
+        case allDay
+        case startDate
+        case endDate
         case importantEvent
         case recurrenceId
         case isRecurrenceOccurrence
@@ -84,6 +96,9 @@ struct EventResponseDTO: Decodable {
         description = try container.decodeIfPresent(String.self, forKey: .description)
         startAt = try container.decode(Date.self, forKey: .startAt)
         endAt = try container.decode(Date.self, forKey: .endAt)
+        allDay = try container.decodeIfPresent(Bool.self, forKey: .allDay) ?? false
+        startDate = try container.decodeIfPresent(String.self, forKey: .startDate)
+        endDate = try container.decodeIfPresent(String.self, forKey: .endDate)
         importantEvent = try container.decodeIfPresent(Bool.self, forKey: .importantEvent) ?? false
         recurrenceId = try container.decodeIfPresent(Int64.self, forKey: .recurrenceId)
         isRecurrenceOccurrence = try container.decodeIfPresent(Bool.self, forKey: .isRecurrenceOccurrence) ?? false

@@ -35,7 +35,7 @@ private struct CalendarEventCreationSheetModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .sheet(isPresented: $isPresented) {
-                CalendarEventCreationView(
+                CalendarEventCreationFlowView(
                     referenceDay: referenceDay,
                     initialDateRange: initialDateRange,
                     tags: viewModel.tags,

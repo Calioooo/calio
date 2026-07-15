@@ -42,6 +42,7 @@ struct Event: Identifiable {
     let description: String
     let startAt: Date
     let endAt: Date
+    let isAllDay: Bool
     let tag: CalendarTag
     let importantEvent: Bool
     let recurrenceId: Int64?
@@ -54,6 +55,7 @@ struct Event: Identifiable {
         description: String,
         startAt: Date,
         endAt: Date,
+        isAllDay: Bool = false,
         tag: CalendarTag = .fallback,
         importantEvent: Bool = false,
         recurrenceId: Int64? = nil,
@@ -65,6 +67,7 @@ struct Event: Identifiable {
         self.description = description
         self.startAt = startAt
         self.endAt = endAt
+        self.isAllDay = isAllDay
         self.tag = tag
         self.importantEvent = importantEvent
         self.recurrenceId = recurrenceId

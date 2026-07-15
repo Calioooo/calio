@@ -11,16 +11,13 @@ struct CalendarEventCreationView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var eventInput: EventInput
     @State private var recurrenceInput: RecurrenceInput
-    @State private var lastParsedTitle: String?
-    private let eventTextParser: LocalEventTextParser
-    private let parserReferenceDate: Date
-    private let calendar: Calendar
     
     let tags: [CalendarTag]
     let isSaving: Bool
     let isTagMutating: Bool
     let failureMessage: String?
     let tagMutationFailureMessage: String?
+    let onBack: (() -> Void)?
     let onSave: (CalendarEventCreationSubmitInput) async -> Bool
     let onResetTagMutation: () -> Void
     let onCreateCustomTag: (CustomTagInput) async -> Bool
@@ -28,60 +25,37 @@ struct CalendarEventCreationView: View {
     let onDeleteCustomTag: (CalendarTag) async -> Bool
     
     init(
-        referenceDay: DayKey,
+        referenceDay: DayKey = DayKey(date: Date()),
         initialDateRange: CalendarDateRange? = nil,
+        initialDraft: CalendarEventCreationDraft? = nil,
         tags: [CalendarTag] = [],
         calendar: Calendar = .current,
         isSaving: Bool = false,
         isTagMutating: Bool = false,
         failureMessage: String? = nil,
         tagMutationFailureMessage: String? = nil,
+        onBack: (() -> Void)? = nil,
         onSave: @escaping (CalendarEventCreationSubmitInput) async -> Bool = { _ in true },
         onResetTagMutation: @escaping () -> Void = {},
         onCreateCustomTag: @escaping (CustomTagInput) async -> Bool = { _ in false },
         onUpdateCustomTag: @escaping (CalendarTag, CustomTagInput) async -> Bool = { _, _ in false },
         onDeleteCustomTag: @escaping (CalendarTag) async -> Bool = { _ in false }
     ) {
-        let timeRange = CalendarEventCreationView.defaultTimeRange(
+        let draft = initialDraft ?? CalendarEventCreationDraft(
             referenceDay: referenceDay,
+            initialDateRange: initialDateRange,
+            tags: tags,
             calendar: calendar
         )
-        let initialTimeRange = CalendarEventCreationView.timeRange(
-            from: initialDateRange,
-            defaultTimeRange: timeRange,
-            calendar: calendar
-        )
-        let startAt = initialTimeRange.startAt
-        let endAt = initialTimeRange.endAt
-        let eventTextParser = LocalEventTextParser(calendar: calendar)
         
-        _eventInput = State(
-            initialValue: EventInput(
-                title: "",
-                startAt: startAt,
-                endAt: endAt,
-                description: "",
-                tag: CalendarEventCreationView.defaultTag(from: tags)
-            )
-        )
-        _recurrenceInput = State(
-            initialValue: RecurrenceInput(
-                isEnabled: false,
-                startDate: startAt,
-                endDate: endAt,
-                startTime: startAt,
-                endTime: endAt,
-                frequency: .daily
-            )
-        )
-        self.eventTextParser = eventTextParser
-        self.parserReferenceDate = startAt
-        self.calendar = calendar
+        _eventInput = State(initialValue: draft.eventInput)
+        _recurrenceInput = State(initialValue: draft.recurrenceInput)
         self.tags = tags
         self.isSaving = isSaving
         self.isTagMutating = isTagMutating
         self.failureMessage = failureMessage
         self.tagMutationFailureMessage = tagMutationFailureMessage
+        self.onBack = onBack
         self.onSave = onSave
         self.onResetTagMutation = onResetTagMutation
         self.onCreateCustomTag = onCreateCustomTag
@@ -100,7 +74,6 @@ struct CalendarEventCreationView: View {
                     isTagMutating: isTagMutating,
                     tagMutationFailureMessage: tagMutationFailureMessage,
                     onRecurrenceEnabled: resetRecurrenceFieldsFromSingleEventTime,
-                    onTitleChanged: applyParsedTitleIfNeeded,
                     onResetTagMutation: onResetTagMutation,
                     onCreateCustomTag: onCreateCustomTag,
                     onUpdateCustomTag: onUpdateCustomTag,
@@ -113,8 +86,18 @@ struct CalendarEventCreationView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("취소") {
-                        dismiss()
+                    Button {
+                        if let onBack {
+                            onBack()
+                        } else {
+                            dismiss()
+                        }
+                    } label: {
+                        if onBack != nil {
+                            Label("빠른 입력", systemImage: "chevron.left")
+                        } else {
+                            Text("취소")
+                        }
                     }
                 }
                 
@@ -147,47 +130,12 @@ struct CalendarEventCreationView: View {
     }
     
     private var canSave: Bool {
-        CalendarEventFormRules.canSave(
-            title: eventInput.title,
-            startAt: eventInput.startAt,
-            endAt: eventInput.endAt,
-            isRecurrenceEnabled: recurrenceInput.isEnabled,
-            recurrenceStartDate: recurrenceInput.startDate,
-            recurrenceEndDate: recurrenceInput.endDate,
-            recurrenceStartTime: recurrenceInput.startTime,
-            recurrenceEndTime: recurrenceInput.endTime
-        )
+        currentDraft.canSave
     }
     
     private func save() {
-        let eventCreateInput = EventCreateInput(
-            title: eventInput.title.trimmingCharacters(in: .whitespacesAndNewlines),
-            description: eventInput.description,
-            startAt: eventInput.startAt,
-            endAt: eventInput.endAt,
-            tagId: eventInput.tag?.id
-        )
-        let submitInput: CalendarEventCreationSubmitInput
-
-        if recurrenceInput.isEnabled {
-            submitInput = .recurring(
-                RecurrenceEventCreateInput(
-                    title: eventCreateInput.title,
-                    description: eventCreateInput.description,
-                    recurrenceStartDate: recurrenceInput.startDate,
-                    recurrenceEndDate: recurrenceInput.endDate,
-                    recurrenceStartTime: recurrenceInput.startTime,
-                    recurrenceEndTime: recurrenceInput.endTime,
-                    recurrenceFrequency: recurrenceInput.frequency,
-                    tagId: eventInput.tag?.id
-                )
-            )
-        } else {
-            submitInput = .single(eventCreateInput)
-        }
-
         Task {
-            let didSave = await onSave(submitInput)
+            let didSave = await onSave(currentDraft.submitInput)
 
             if didSave {
                 dismiss()
@@ -195,94 +143,21 @@ struct CalendarEventCreationView: View {
         }
     }
 
-    private func applyParsedTitleIfNeeded(_ title: String) {
-        guard title != lastParsedTitle,
-              let parseResult = eventTextParser.parse(title, referenceDate: parserReferenceDate) else {
-            return
-        }
-
-        lastParsedTitle = title
-
-        if let startAt = parseResult.startAt {
-            eventInput.startAt = startAt
-            eventInput.endAt = parseResult.endAt ?? startAt.addingTimeInterval(3600)
-        }
-
-        if let recurrenceFrequency = parseResult.recurrenceFrequency {
-            recurrenceInput.isEnabled = true
-            recurrenceInput.frequency = recurrenceFrequency
-            recurrenceInput.startDate = eventInput.startAt
-            recurrenceInput.startTime = eventInput.startAt
-            recurrenceInput.endTime = eventInput.endAt
-
-            if recurrenceInput.endDate < recurrenceInput.startDate {
-                recurrenceInput.endDate = recurrenceInput.startDate
-            }
-
-            if recurrenceInput.endDate == recurrenceInput.startDate,
-               let defaultEndDate = calendar.date(byAdding: .year, value: 1, to: recurrenceInput.startDate) {
-                recurrenceInput.endDate = defaultEndDate
-            }
-        }
+    private var currentDraft: CalendarEventCreationDraft {
+        CalendarEventCreationDraft(
+            eventInput: eventInput,
+            recurrenceInput: recurrenceInput
+        )
     }
 
     nonisolated static func defaultTimeRange(
         referenceDay: DayKey,
         calendar: Calendar
     ) -> (startAt: Date, endAt: Date) {
-        let date = referenceDay.toDate(calendar: calendar)
-        let startAt = calendar.date(
-            bySettingHour: 9,
-            minute: 0,
-            second: 0,
-            of: date
-        ) ?? date
-        let endAt = calendar.date(
-            byAdding: .hour,
-            value: 1,
-            to: startAt
-        ) ?? startAt
-
-        return (startAt, endAt)
-    }
-
-    nonisolated private static func timeRange(
-        from dateRange: CalendarDateRange?,
-        defaultTimeRange: (startAt: Date, endAt: Date),
-        calendar: Calendar
-    ) -> (startAt: Date, endAt: Date) {
-        guard let dateRange else {
-            return defaultTimeRange
-        }
-
-        return (
-            startAt: date(
-                for: dateRange.startDay,
-                usingTimeFrom: defaultTimeRange.startAt,
-                calendar: calendar
-            ),
-            endAt: date(
-                for: dateRange.endDay,
-                usingTimeFrom: defaultTimeRange.endAt,
-                calendar: calendar
-            )
+        CalendarEventCreationDraft.defaultTimeRange(
+            referenceDay: referenceDay,
+            calendar: calendar
         )
-    }
-
-    nonisolated private static func date(
-        for day: DayKey,
-        usingTimeFrom timeSource: Date,
-        calendar: Calendar
-    ) -> Date {
-        let date = day.toDate(calendar: calendar)
-        let timeComponents = calendar.dateComponents([.hour, .minute, .second], from: timeSource)
-
-        return calendar.date(
-            bySettingHour: timeComponents.hour ?? 0,
-            minute: timeComponents.minute ?? 0,
-            second: timeComponents.second ?? 0,
-            of: date
-        ) ?? date
     }
 
     private func resetRecurrenceFieldsFromSingleEventTime() {
@@ -291,10 +166,6 @@ struct CalendarEventCreationView: View {
         recurrenceInput.startTime = eventInput.startAt
         recurrenceInput.endTime = eventInput.endAt
         recurrenceInput.frequency = .daily
-    }
-
-    private static func defaultTag(from tags: [CalendarTag]) -> CalendarTag {
-        tags.first { $0.title == "기타" } ?? tags.first ?? .fallback
     }
 }
 
