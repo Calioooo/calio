@@ -11,16 +11,22 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.calio.calendar.account.domain.Account;
+import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.event.repository.EventRepository;
+import com.calio.calendar.recurrence.domain.RecurrenceEvent;
+import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
 import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
-import com.calio.calendar.tag.repository.TagRepository;
-import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
-import com.calio.calendar.tag.domain.Tag;
-import com.calio.calendar.tag.domain.TagType;
+import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.security.AuthenticatedAccountMockMvcTestConfig;
 import com.calio.calendar.security.WithAuthenticatedAccount;
+import com.calio.calendar.tag.domain.Tag;
+import com.calio.calendar.tag.domain.TagType;
+import com.calio.calendar.tag.repository.TagRepository;
 import java.nio.charset.StandardCharsets;
-import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -56,30 +62,44 @@ class RecurrenceEventControllerTest {
     private EventRepository eventRepository;
 
     @Autowired
-    private RecurrenceEventOverrideRepository recurrenceEventOverrideRepository;
+    private RecurrenceEventRepository recurrenceEventRepository;
+
+    @Autowired
+    private RecurrenceEventOverrideRepository overrideRepository;
+
+    @Autowired
+    private AccountRepository accountRepository;
 
     @Autowired
     private TagRepository tagRepository;
 
-    private Long currentAccountId;
+    private Long accountId;
 
     @BeforeEach
     void setUpDefaultTag() {
-        currentAccountId = currentAccountReference().getId();
+        accountId = currentAccountReference().getId();
         tagRepository.findFirstByTagTypeAndTitleAndAccountIsNullOrderByIdAsc(TagType.DEFAULT, "기타")
                 .orElseGet(() -> tagRepository.save(new Tag(TagType.DEFAULT, "기타", "#64748B")));
     }
 
     @Test
-    @DisplayName("반복 일정 생성은 rule만 저장하고 GET /api/events에서 가상 occurrence를 반환한다")
-    void givenRecurrenceRule_whenCreateAndListEvents_thenReturnsVirtualOccurrencesWithoutEventRows()
-            throws Exception {
+    @DisplayName("timed master는 timezone과 RFC line을 왕복하고 occurrence를 Event row 없이 전개한다")
+    void givenTimedMaster_whenCreateDetailAndList_thenReturnsCanonicalContract() throws Exception {
         // given, when
-        long recurrenceId = createRecurrenceEvent("Daily standup", "2026-08-01", "2026-08-03", "DAILY");
+        long recurrenceId = createTimedRecurrence("Daily", "2026-08-01", "Asia/Seoul");
 
         // then
-        assertThat(eventRepository.findByRecurrenceIdAndAccount_IdOrderByStartAtAsc(recurrenceId, currentAccountId))
+        assertThat(eventRepository.findByRecurrenceIdAndAccount_IdOrderByStartAtAsc(recurrenceId, accountId))
                 .isEmpty();
+        mockMvc.perform(get("/api/recurrence-events/{id}", recurrenceId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("Daily"))
+                .andExpect(jsonPath("$.allDay").value(false))
+                .andExpect(jsonPath("$.startDate").value("2026-08-01"))
+                .andExpect(jsonPath("$.startTime").value("09:00:00"))
+                .andExpect(jsonPath("$.timeZone").value("Asia/Seoul"))
+                .andExpect(jsonPath("$.recurrence[0]").value("RRULE:FREQ=DAILY;COUNT=3"))
+                .andExpect(jsonPath("$.tag.title").value("기타"));
 
         mockMvc.perform(get("/api/events")
                         .param("from", "2026-08-01T00:00:00Z")
@@ -87,392 +107,297 @@ class RecurrenceEventControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(3)))
                 .andExpect(jsonPath("$[0].id").doesNotExist())
-                .andExpect(jsonPath("$[0].title").value("Daily standup"))
-                .andExpect(jsonPath("$[0].startAt").value("2026-08-01T09:00:00Z"))
-                .andExpect(jsonPath("$[0].endAt").value("2026-08-01T10:00:00Z"))
+                .andExpect(jsonPath("$[0].startAt").value("2026-08-01T00:00:00Z"))
+                .andExpect(jsonPath("$[0].allDay").value(false))
                 .andExpect(jsonPath("$[0].recurrenceId").value(recurrenceId))
-                .andExpect(jsonPath("$[0].originStartAt").value("2026-08-01T09:00:00Z"))
                 .andExpect(jsonPath("$[0].isRecurrenceOccurrence").value(true))
-                .andExpect(jsonPath("$[1].originStartAt").value("2026-08-02T09:00:00Z"))
-                .andExpect(jsonPath("$[2].originStartAt").value("2026-08-03T09:00:00Z"));
+                .andExpect(jsonPath("$[2].originStartAt").value("2026-08-03T00:00:00Z"));
     }
 
     @Test
-    @DisplayName("GET /api/events는 일반 일정과 가상 recurrence occurrence를 표시 시간 기준으로 병합 정렬한다")
-    void givenNormalAndRecurrenceEvents_whenListEvents_thenMergesByDisplayTime() throws Exception {
+    @DisplayName("all-day master는 exclusive 날짜 범위를 UTC midnight occurrence로 반환한다")
+    void givenAllDayMaster_whenList_thenReturnsExclusiveUtcMidnightRange() throws Exception {
         // given
-        long normalEventId = createEvent("Normal", "2026-09-01T08:30:00Z", "2026-09-01T09:30:00Z");
-        long recurrenceId = createRecurrenceEvent("Daily", "2026-09-01", "2026-09-01", "DAILY");
-
-        // when, then
-        mockMvc.perform(get("/api/events")
-                        .param("from", "2026-09-01T08:00:00Z")
-                        .param("to", "2026-09-01T11:00:00Z"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(2)))
-                .andExpect(jsonPath("$[0].id").value(normalEventId))
-                .andExpect(jsonPath("$[0].originStartAt").doesNotExist())
-                .andExpect(jsonPath("$[0].isRecurrenceOccurrence").value(false))
-                .andExpect(jsonPath("$[1].id").doesNotExist())
-                .andExpect(jsonPath("$[1].recurrenceId").value(recurrenceId))
-                .andExpect(jsonPath("$[1].originStartAt").value("2026-09-01T09:00:00Z"));
-    }
-
-    @Test
-    @DisplayName("단일 occurrence PATCH는 originStartAt 기준 modified override를 만들고 이동된 표시 시간으로 조회된다")
-    void givenPatchOccurrence_whenListEvents_thenSuppressesBaseAndReturnsMovedOverride() throws Exception {
-        // given
-        long recurrenceId = createRecurrenceEvent("Move target", "2026-12-01", "2026-12-02", "DAILY");
-
-        // when
-        mockMvc.perform(patch("/api/recurrence-events/{recurrenceId}/occurrences", recurrenceId)
+        MvcResult result = mockMvc.perform(post("/api/recurrence-events")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "originStartAt": "2026-12-01T09:00:00Z",
-                                  "startAt": "2026-12-10T12:00:00Z",
-                                  "endAt": "2026-12-10T13:00:00Z"
+                                  "title": "Offsite",
+                                  "allDay": true,
+                                  "startDate": "2026-09-01",
+                                  "endDate": "2026-09-03",
+                                  "startTime": null,
+                                  "endTime": null,
+                                  "timeZone": null,
+                                  "recurrence": ["RRULE:FREQ=DAILY;COUNT=2"]
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.allDay").value(true))
+                .andExpect(jsonPath("$.startTime").doesNotExist())
+                .andReturn();
+        long recurrenceId = readResponse(result).get("recurrenceId").asLong();
+
+        // when, then
+        mockMvc.perform(get("/api/events")
+                        .param("from", "2026-09-01T00:00:00Z")
+                        .param("to", "2026-09-05T00:00:00Z"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$[0].allDay").value(true))
+                .andExpect(jsonPath("$[0].startAt").value("2026-09-01T00:00:00Z"))
+                .andExpect(jsonPath("$[0].endAt").value("2026-09-03T00:00:00Z"))
+                .andExpect(jsonPath("$[1].recurrenceId").value(recurrenceId));
+    }
+
+    @Test
+    @DisplayName("active override는 null description을 포함한 snapshot 전체로 원본을 대체하고 이동 후 범위로 조회된다")
+    void givenMovedOverride_whenList_thenUsesFinalSnapshotOverlap() throws Exception {
+        // given
+        long recurrenceId = createTimedRecurrence("Master", "2026-10-01", "UTC");
+        mockMvc.perform(patch("/api/recurrence-events/{id}/occurrences", recurrenceId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "originStartAt": "2026-10-01T09:00:00Z",
+                                  "title": "Moved",
+                                  "description": null,
+                                  "startAt": "2026-11-01T12:00:00Z",
+                                  "endAt": "2026-11-01T13:00:00Z"
                                 }
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").doesNotExist())
-                .andExpect(jsonPath("$.recurrenceId").value(recurrenceId))
-                .andExpect(jsonPath("$.originStartAt").value("2026-12-01T09:00:00Z"))
-                .andExpect(jsonPath("$.startAt").value("2026-12-10T12:00:00Z"))
-                .andExpect(jsonPath("$.endAt").value("2026-12-10T13:00:00Z"));
-
-        // then
-        assertThat(recurrenceEventOverrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(
-                recurrenceId,
-                Instant.parse("2026-12-01T09:00:00Z")
-        ))
-                .hasValueSatisfying(override -> {
-                    assertThat(override.getOverrideStartAt()).isEqualTo(Instant.parse("2026-12-10T12:00:00Z"));
-                    assertThat(override.getOverrideEndAt()).isEqualTo(Instant.parse("2026-12-10T13:00:00Z"));
-                    assertThat(override.getDeletedAt()).isNull();
-                });
-
-        mockMvc.perform(get("/api/events")
-                        .param("from", "2026-12-01T00:00:00Z")
-                        .param("to", "2026-12-03T00:00:00Z"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(1)))
-                .andExpect(jsonPath("$[0].originStartAt").value("2026-12-02T09:00:00Z"));
-
-        mockMvc.perform(get("/api/events")
-                        .param("from", "2026-12-10T00:00:00Z")
-                        .param("to", "2026-12-11T00:00:00Z"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(1)))
-                .andExpect(jsonPath("$[0].originStartAt").value("2026-12-01T09:00:00Z"))
-                .andExpect(jsonPath("$[0].startAt").value("2026-12-10T12:00:00Z"));
-    }
-
-    @Test
-    @DisplayName("단일 occurrence DELETE는 deletion override를 만들고 반복 호출해도 204를 반환한다")
-    void givenDeleteOccurrenceTwice_whenListEvents_thenSuppressesOccurrenceIdempotently() throws Exception {
-        // given
-        long recurrenceId = createRecurrenceEvent("Delete target", "2027-01-01", "2027-01-02", "DAILY");
-
-        // when, then
-        deleteOccurrence(recurrenceId, "2027-01-01T09:00:00Z");
-        deleteOccurrence(recurrenceId, "2027-01-01T09:00:00Z");
-
-        RecurrenceEventOverride override = recurrenceEventOverrideRepository
-                .findByRecurrenceEvent_IdAndOriginStartAt(recurrenceId, Instant.parse("2027-01-01T09:00:00Z"))
-                .orElseThrow();
-        assertThat(override.getDeletedAt()).isNotNull();
-        assertThat(override.getOverrideStartAt()).isNull();
-        assertThat(override.getOverrideEndAt()).isNull();
-
-        mockMvc.perform(get("/api/events")
-                        .param("from", "2027-01-01T00:00:00Z")
-                        .param("to", "2027-01-03T00:00:00Z"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(1)))
-                .andExpect(jsonPath("$[0].originStartAt").value("2027-01-02T09:00:00Z"));
-    }
-
-    @Test
-    @DisplayName("마지막 overnight occurrence는 조회, 수정, 삭제 대상이 된다")
-    void givenLastOvernightOccurrence_whenListPatchAndDelete_thenUsesOvernightEndBoundary()
-            throws Exception {
-        // given
-        long recurrenceId = createRecurrenceEvent(
-                "Overnight target",
-                "2027-08-01",
-                "2027-08-03",
-                "23:00:00",
-                "01:00:00",
-                "DAILY"
-        );
+                .andExpect(jsonPath("$.title").value("Moved"))
+                .andExpect(jsonPath("$.description").doesNotExist())
+                .andExpect(jsonPath("$.originStartAt").value("2026-10-01T09:00:00Z"));
 
         // when, then
         mockMvc.perform(get("/api/events")
-                        .param("from", "2027-08-04T00:30:00Z")
-                        .param("to", "2027-08-04T00:45:00Z"))
+                        .param("from", "2026-11-01T00:00:00Z")
+                        .param("to", "2026-11-02T00:00:00Z"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(1)))
-                .andExpect(jsonPath("$[0].originStartAt").value("2027-08-03T23:00:00Z"))
-                .andExpect(jsonPath("$[0].startAt").value("2027-08-03T23:00:00Z"))
-                .andExpect(jsonPath("$[0].endAt").value("2027-08-04T01:00:00Z"));
+                .andExpect(jsonPath("$[0].title").value("Moved"))
+                .andExpect(jsonPath("$[0].startAt").value("2026-11-01T12:00:00Z"));
 
-        patchOccurrence(
-                recurrenceId,
-                "2027-08-03T23:00:00Z",
-                "2027-08-05T02:00:00Z",
-                "2027-08-05T03:00:00Z"
-        );
         mockMvc.perform(get("/api/events")
-                        .param("from", "2027-08-05T02:30:00Z")
-                        .param("to", "2027-08-05T02:45:00Z"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(1)))
-                .andExpect(jsonPath("$[0].originStartAt").value("2027-08-03T23:00:00Z"))
-                .andExpect(jsonPath("$[0].startAt").value("2027-08-05T02:00:00Z"));
-
-        deleteOccurrence(recurrenceId, "2027-08-03T23:00:00Z");
-        mockMvc.perform(get("/api/events")
-                        .param("from", "2027-08-05T02:30:00Z")
-                        .param("to", "2027-08-05T02:45:00Z"))
+                        .param("from", "2026-10-01T00:00:00Z")
+                        .param("to", "2026-10-02T00:00:00Z"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(0)));
     }
 
     @Test
-    @DisplayName("반복 일정 전체 PUT은 rule을 갱신하고 해당 recurrence override를 hard-delete한다")
-    void givenWholeRecurrencePut_whenOverridesExist_thenUpdatesRuleAndDeletesOverrides() throws Exception {
+    @DisplayName("DELETE override는 nullable snapshot 삭제 상태로 저장되고 전체 master 수정은 override를 제거한다")
+    void givenDeletedOverride_whenReplaceMaster_thenClearsOverrideState() throws Exception {
         // given
-        long recurrenceId = createRecurrenceEvent("Whole update", "2027-02-01", "2027-02-02", "DAILY");
-        patchOccurrence(recurrenceId, "2027-02-01T09:00:00Z", "2027-02-10T09:00:00Z", "2027-02-10T10:00:00Z");
-        assertThat(recurrenceEventOverrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(
+        long recurrenceId = createTimedRecurrence("Master", "2026-12-01", "UTC");
+        mockMvc.perform(delete("/api/recurrence-events/{id}/occurrences", recurrenceId)
+                        .param("originStartAt", "2026-12-01T09:00:00Z"))
+                .andExpect(status().isNoContent());
+        assertThat(overrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(
                 recurrenceId,
-                Instant.parse("2027-02-01T09:00:00Z")
-        )).isPresent();
+                java.time.Instant.parse("2026-12-01T09:00:00Z")
+        )).hasValueSatisfying(override -> {
+            assertThat(override.isDeleted()).isTrue();
+            assertThat(override.getOverrideTitle()).isNull();
+            assertThat(override.getOverrideStartAt()).isNull();
+        });
 
         // when
-        mockMvc.perform(put("/api/recurrence-events/{recurrenceId}", recurrenceId)
+        mockMvc.perform(put("/api/recurrence-events/{id}", recurrenceId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(timedRequest("Replaced", "2026-12-02", "UTC")))
+                .andExpect(status().isOk());
+
+        // then
+        assertThat(overrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(
+                recurrenceId,
+                java.time.Instant.parse("2026-12-01T09:00:00Z")
+        )).isEmpty();
+    }
+
+    @Test
+    @DisplayName("같은 originStartAt의 PATCH와 DELETE는 한 override row에서 active와 deleted 상태를 전환한다")
+    void givenSameOccurrence_whenPatchAndDeleteRepeatedly_thenTransitionsSingleOverrideState() throws Exception {
+        // given
+        long recurrenceId = createTimedRecurrence("State", "2027-01-01", "UTC");
+        String originStartAt = "2027-01-01T09:00:00Z";
+        mockMvc.perform(delete("/api/recurrence-events/{id}/occurrences", recurrenceId)
+                        .param("originStartAt", originStartAt))
+                .andExpect(status().isNoContent());
+
+        // when
+        mockMvc.perform(patch("/api/recurrence-events/{id}/occurrences", recurrenceId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "title": "Updated whole",
+                                  "originStartAt": "2027-01-01T09:00:00Z",
+                                  "title": "Restored",
                                   "description": null,
-                                  "startDate": "2027-02-03",
-                                  "endDate": "2027-02-10",
-                                  "startTime": "11:00:00",
-                                  "endTime": "12:00:00",
-                                  "recurrenceFrequency": "WEEKLY"
+                                  "startAt": "2027-01-02T12:00:00Z",
+                                  "endAt": "2027-01-02T13:00:00Z"
                                 }
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.recurrenceTitle").value("Updated whole"))
-                .andExpect(jsonPath("$.recurrenceDescription").doesNotExist())
-                .andExpect(jsonPath("$.recurrenceStartDate").value("2027-02-03"))
-                .andExpect(jsonPath("$.recurrenceEndDate").value("2027-02-10"))
-                .andExpect(jsonPath("$.recurrenceStartTime").value("11:00:00"))
-                .andExpect(jsonPath("$.recurrenceEndTime").value("12:00:00"))
-                .andExpect(jsonPath("$.recurrenceFrequency").value("WEEKLY"));
+                .andExpect(jsonPath("$.title").value("Restored"));
 
         // then
-        assertThat(recurrenceEventOverrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(
-                recurrenceId,
-                Instant.parse("2027-02-01T09:00:00Z")
-        )).isEmpty();
-        assertThat(eventRepository.findByRecurrenceIdAndAccount_IdOrderByStartAtAsc(recurrenceId, currentAccountId))
-                .isEmpty();
+        java.time.Instant origin = java.time.Instant.parse(originStartAt);
+        assertThat(overrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(recurrenceId, origin))
+                .hasValueSatisfying(override -> {
+                    assertThat(override.isDeleted()).isFalse();
+                    assertThat(override.getOverrideTitle()).isEqualTo("Restored");
+                    assertThat(override.getOverrideDescription()).isNull();
+                });
+
+        mockMvc.perform(delete("/api/recurrence-events/{id}/occurrences", recurrenceId)
+                        .param("originStartAt", originStartAt))
+                .andExpect(status().isNoContent());
+        assertThat(overrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(recurrenceId, origin))
+                .hasValueSatisfying(override -> {
+                    assertThat(override.isDeleted()).isTrue();
+                    assertThat(override.getOverrideTitle()).isNull();
+                });
     }
 
     @Test
-    @DisplayName("반복 일정 전체 PUT은 날짜와 시각 범위가 유효하지 않으면 ProblemDetail title를 반환한다")
-    void givenInvalidWholeRecurrencePutRanges_whenPutRecurrenceEvent_thenReturnsContractErrorCodes()
-            throws Exception {
+    @DisplayName("engine이 생성하지 않는 originStartAt의 PATCH는 RECURRENCE_OCCURRENCE_NOT_FOUND를 반환한다")
+    void givenUnknownOriginStartAt_whenPatchOccurrence_thenReturnsOccurrenceNotFound() throws Exception {
         // given
-        long recurrenceId = createRecurrenceEvent("Invalid whole update", "2027-02-01", "2027-02-02", "DAILY");
+        long recurrenceId = createTimedRecurrence("Origin", "2027-02-01", "UTC");
 
         // when, then
-        mockMvc.perform(put("/api/recurrence-events/{recurrenceId}", recurrenceId)
+        mockMvc.perform(patch("/api/recurrence-events/{id}/occurrences", recurrenceId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "title": "Invalid date",
-                                  "startDate": "2027-02-10",
-                                  "endDate": "2027-02-03",
-                                  "startTime": "11:00:00",
-                                  "endTime": "12:00:00",
-                                  "recurrenceFrequency": "WEEKLY"
-                                }
-                                """))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.title").value("INVALID_RECURRENCE_DATE_RANGE"));
-
-        mockMvc.perform(put("/api/recurrence-events/{recurrenceId}", recurrenceId)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "title": "Invalid time",
-                                  "startDate": "2027-02-03",
-                                  "endDate": "2027-02-10",
-                                  "startTime": "12:00:00",
-                                  "endTime": "12:00:00",
-                                  "recurrenceFrequency": "WEEKLY"
-                                }
-                                """))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.title").value("INVALID_RECURRENCE_TIME_RANGE"));
-    }
-
-    @Test
-    @DisplayName("단일 occurrence PATCH는 잘못된 시간 범위와 생성 불가능한 originStartAt을 ProblemDetail title로 반환한다")
-    void givenInvalidOccurrencePatch_whenPatch_thenReturnsContractErrorCodes() throws Exception {
-        // given
-        long recurrenceId = createRecurrenceEvent("Invalid patch", "2027-03-01", "2027-03-01", "DAILY");
-
-        // when, then
-        mockMvc.perform(patch("/api/recurrence-events/{recurrenceId}/occurrences", recurrenceId)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "originStartAt": "2027-03-01T09:00:00Z",
-                                  "startAt": "2027-03-01T10:00:00Z",
-                                  "endAt": "2027-03-01T10:00:00Z"
-                                }
-                                """))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.title").value("INVALID_TIME_RANGE"));
-
-        mockMvc.perform(patch("/api/recurrence-events/{recurrenceId}/occurrences", recurrenceId)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "originStartAt": "2027-03-02T09:00:00Z",
-                                  "startAt": "2027-03-02T10:00:00Z",
-                                  "endAt": "2027-03-02T11:00:00Z"
+                                  "originStartAt": "2027-02-01T09:00:01Z",
+                                  "title": "Unknown",
+                                  "description": null,
+                                  "startAt": "2027-02-01T12:00:00Z",
+                                  "endAt": "2027-02-01T13:00:00Z"
                                 }
                                 """))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.title").value("RECURRENCE_OCCURRENCE_NOT_FOUND"));
+    }
 
-        mockMvc.perform(patch("/api/recurrence-events/{recurrenceId}/occurrences", 999999L)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "originStartAt": "2027-03-01T09:00:00Z",
-                                  "startAt": "2027-03-01T10:00:00Z",
-                                  "endAt": "2027-03-01T11:00:00Z"
-                                }
-                                """))
+    @Test
+    @DisplayName("다른 account의 recurrence master는 RECURRENCE_EVENT_NOT_FOUND로 격리한다")
+    void givenOtherAccountMaster_whenGet_thenReturnsRecurrenceNotFound() throws Exception {
+        // given
+        Account otherAccount = accountRepository.save(new Account());
+        Tag defaultTag = tagRepository
+                .findFirstByTagTypeAndTitleAndAccountIsNullOrderByIdAsc(TagType.DEFAULT, "기타")
+                .orElseThrow();
+        RecurrenceEvent otherMaster = recurrenceEventRepository.save(new RecurrenceEvent(
+                "Other",
+                null,
+                RecurrenceSchedule.create(
+                        false,
+                        LocalDate.parse("2027-03-01"),
+                        LocalDate.parse("2027-03-01"),
+                        LocalTime.parse("09:00"),
+                        LocalTime.parse("10:00"),
+                        "UTC"
+                ),
+                List.of("RRULE:FREQ=DAILY;COUNT=2"),
+                defaultTag,
+                otherAccount
+        ));
+
+        // when, then
+        mockMvc.perform(get("/api/recurrence-events/{id}", otherMaster.getId()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.title").value("RECURRENCE_EVENT_NOT_FOUND"));
     }
 
     @Test
-    @DisplayName("deleted override 대상 PATCH는 occurrence를 복원하지 않고 RECURRENCE_OCCURRENCE_NOT_FOUND를 반환한다")
-    void givenDeletedOverride_whenPatchOccurrence_thenReturnsOccurrenceNotFound() throws Exception {
+    @DisplayName("다른 account의 custom tag로 recurrence master를 생성하면 TAG_NOT_FOUND를 반환한다")
+    void givenOtherAccountTag_whenCreate_thenReturnsTagNotFound() throws Exception {
         // given
-        long recurrenceId = createRecurrenceEvent("Deleted target", "2027-04-01", "2027-04-01", "DAILY");
-        deleteOccurrence(recurrenceId, "2027-04-01T09:00:00Z");
+        Account otherAccount = accountRepository.save(new Account());
+        Tag otherTag = tagRepository.save(new Tag(TagType.CUSTOM, "Other", "#123456", otherAccount));
 
         // when, then
-        mockMvc.perform(patch("/api/recurrence-events/{recurrenceId}/occurrences", recurrenceId)
+        mockMvc.perform(post("/api/recurrence-events")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "originStartAt": "2027-04-01T09:00:00Z",
-                                  "startAt": "2027-04-01T11:00:00Z",
-                                  "endAt": "2027-04-01T12:00:00Z"
-                                }
-                                """))
+                        .content(timedRequest("Owned", "2027-04-01", "UTC")
+                                .replace(
+                                        "\"recurrence\": [\"RRULE:FREQ=DAILY;COUNT=3\"]",
+                                        "\"recurrence\": [\"RRULE:FREQ=DAILY;COUNT=3\"],"
+                                                + System.lineSeparator()
+                                                + "  \"tagId\": " + otherTag.getId()
+                                )))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.title").value("RECURRENCE_OCCURRENCE_NOT_FOUND"));
+                .andExpect(jsonPath("$.title").value("TAG_NOT_FOUND"));
     }
 
     @Test
-    @DisplayName("GET /api/events는 from이 to보다 늦으면 INVALID_TIME_RANGE를 반환한다")
-    void givenInvalidListRange_whenListEvents_thenReturnsInvalidTimeRange() throws Exception {
-        mockMvc.perform(get("/api/events")
-                        .param("from", "2027-05-02T00:00:00Z")
-                        .param("to", "2027-05-01T00:00:00Z"))
+    @DisplayName("schedule, timezone, RFC line 오류는 각각 안정적인 ProblemDetail errorCode로 응답한다")
+    void givenInvalidDefinitions_whenCreate_thenMapsContractErrors() throws Exception {
+        mockMvc.perform(post("/api/recurrence-events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(timedRequest("Bad zone", "2026-08-01", "Mars/Olympus")))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.title").value("INVALID_TIME_RANGE"));
-    }
+                .andExpect(jsonPath("$.title").value("INVALID_TIME_ZONE"));
 
-    private long createEvent(String title, String startAt, String endAt) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/events")
+        mockMvc.perform(post("/api/recurrence-events")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "title": "%s",
-                                  "startAt": "%s",
-                                  "endAt": "%s"
+                                  "title": "Bad schedule",
+                                  "allDay": true,
+                                  "startDate": "2026-08-01",
+                                  "endDate": "2026-08-01",
+                                  "recurrence": ["RRULE:FREQ=DAILY"]
                                 }
-                                """.formatted(title, startAt, endAt)))
-                .andExpect(status().isCreated())
-                .andReturn();
-        return readResponse(result).get("id").asLong();
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("INVALID_RECURRENCE_SCHEDULE"));
+
+        mockMvc.perform(post("/api/recurrence-events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(timedRequest("Bad rule", "2026-08-01", "UTC")
+                                .replace("RRULE:FREQ=DAILY;COUNT=3", "VEVENT:BAD")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("INVALID_RECURRENCE_RULE"));
+
+        mockMvc.perform(post("/api/recurrence-events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(timedRequest("Empty rule", "2026-08-01", "UTC")
+                                .replace(
+                                        "\"recurrence\": [\"RRULE:FREQ=DAILY;COUNT=3\"]",
+                                        "\"recurrence\": []"
+                                )))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("INVALID_RECURRENCE_RULE"));
     }
 
-    private long createRecurrenceEvent(String title, String startDate, String endDate, String frequency)
-            throws Exception {
-        return createRecurrenceEvent(title, startDate, endDate, "09:00:00", "10:00:00", frequency);
-    }
-
-    private long createRecurrenceEvent(
-            String title,
-            String startDate,
-            String endDate,
-            String startTime,
-            String endTime,
-            String frequency
-    ) throws Exception {
+    private long createTimedRecurrence(String title, String date, String timeZone) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/recurrence-events")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(recurrenceRequest(title, startDate, endDate, startTime, endTime, frequency)))
+                        .content(timedRequest(title, date, timeZone)))
                 .andExpect(status().isCreated())
                 .andReturn();
         return readResponse(result).get("recurrenceId").asLong();
     }
 
-    private String recurrenceRequest(
-            String title,
-            String startDate,
-            String endDate,
-            String startTime,
-            String endTime,
-            String frequency
-    ) {
+    private String timedRequest(String title, String date, String timeZone) {
         return """
                 {
-                  "recurrenceTitle": "%s",
-                  "recurrenceDescription": "memo",
-                  "recurrenceStartDate": "%s",
-                  "recurrenceEndDate": "%s",
-                  "recurrenceStartTime": "%s",
-                  "recurrenceEndTime": "%s",
-                  "recurrenceFrequency": "%s"
+                  "title": "%s",
+                  "description": "memo",
+                  "allDay": false,
+                  "startDate": "%s",
+                  "endDate": "%s",
+                  "startTime": "09:00:00",
+                  "endTime": "10:00:00",
+                  "timeZone": "%s",
+                  "recurrence": ["RRULE:FREQ=DAILY;COUNT=3"]
                 }
-                """.formatted(title, startDate, endDate, startTime, endTime, frequency);
-    }
-
-    private void patchOccurrence(Long recurrenceId, String originStartAt, String startAt, String endAt)
-            throws Exception {
-        mockMvc.perform(patch("/api/recurrence-events/{recurrenceId}/occurrences", recurrenceId)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "originStartAt": "%s",
-                                  "startAt": "%s",
-                                  "endAt": "%s"
-                                }
-                                """.formatted(originStartAt, startAt, endAt)))
-                .andExpect(status().isOk());
-    }
-
-    private void deleteOccurrence(Long recurrenceId, String originStartAt) throws Exception {
-        MvcResult result = mockMvc.perform(delete("/api/recurrence-events/{recurrenceId}/occurrences", recurrenceId)
-                        .param("originStartAt", originStartAt))
-                .andExpect(status().isNoContent())
-                .andReturn();
-        assertThat(result.getResponse().getContentAsString(StandardCharsets.UTF_8)).isEmpty();
+                """.formatted(title, date, date, timeZone);
     }
 
     private JsonNode readResponse(MvcResult result) throws Exception {

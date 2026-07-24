@@ -90,6 +90,7 @@ class EventControllerTest {
                 .andExpect(jsonPath("$.description").value("Weekly planning"))
                 .andExpect(jsonPath("$.startAt").value("2026-06-01T00:00:00Z"))
                 .andExpect(jsonPath("$.endAt").value("2026-06-01T01:00:00Z"))
+                .andExpect(jsonPath("$.allDay").value(false))
                 .andExpect(jsonPath("$.importantEvent").value(false))
                 .andExpect(jsonPath("$.tag.title").value("기타"))
                 .andExpect(jsonPath("$.tag.colorCode").value("#64748B"))

@@ -5,8 +5,6 @@ import com.calio.calendar.common.domain.BaseEntity;
 import com.calio.calendar.tag.domain.Tag;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -15,9 +13,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.Instant;
-import java.time.LocalDate;
-import java.time.LocalTime;
-import java.time.ZoneOffset;
+import java.util.List;
 
 @Entity
 @Table(name = "recurrence_events")
@@ -33,21 +29,20 @@ public class RecurrenceEvent extends BaseEntity {
     @Column
     private String recurrenceDescription;
 
-    @Column(nullable = false)
-    private LocalDate recurrenceStartDate;
+    @Column(name = "all_day", nullable = false)
+    private boolean allDay;
 
-    @Column(nullable = false)
-    private LocalDate recurrenceEndDate;
+    @Column(name = "start_at", nullable = false)
+    private Instant startAt;
 
-    @Column(nullable = false)
-    private LocalTime recurrenceStartTime;
+    @Column(name = "end_at", nullable = false)
+    private Instant endAt;
 
-    @Column(nullable = false)
-    private LocalTime recurrenceEndTime;
+    @Column(name = "time_zone")
+    private String timeZone;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private RecurrenceFrequency recurrenceFrequency;
+    @Column(name = "recurrence_lines", nullable = false, columnDefinition = "TEXT")
+    private String recurrenceLines;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "account_id", nullable = false)
@@ -61,47 +56,39 @@ public class RecurrenceEvent extends BaseEntity {
     }
 
     public RecurrenceEvent(
-            String recurrenceTitle,
-            String recurrenceDescription,
-            LocalDate recurrenceStartDate,
-            LocalDate recurrenceEndDate,
-            LocalTime recurrenceStartTime,
-            LocalTime recurrenceEndTime,
-            RecurrenceFrequency recurrenceFrequency,
+            String title,
+            String description,
+            RecurrenceSchedule schedule,
+            List<String> recurrenceLines,
             Tag tag,
             Account account
     ) {
-        this.recurrenceTitle = recurrenceTitle;
-        this.recurrenceDescription = recurrenceDescription;
-        this.recurrenceStartDate = recurrenceStartDate;
-        this.recurrenceEndDate = recurrenceEndDate;
-        this.recurrenceStartTime = recurrenceStartTime;
-        this.recurrenceEndTime = recurrenceEndTime;
-        this.recurrenceFrequency = recurrenceFrequency;
+        this.recurrenceTitle = title;
+        this.recurrenceDescription = description;
+        replaceSchedule(schedule, recurrenceLines);
         this.tag = tag;
         this.account = account;
     }
 
     public void update(
-            String recurrenceTitle,
-            String recurrenceDescription,
-            LocalDate recurrenceStartDate,
-            LocalDate recurrenceEndDate,
-            LocalTime recurrenceStartTime,
-            LocalTime recurrenceEndTime,
-            RecurrenceFrequency recurrenceFrequency
+            String title,
+            String description,
+            RecurrenceSchedule schedule,
+            List<String> recurrenceLines,
+            Tag tag
     ) {
-        this.recurrenceTitle = recurrenceTitle;
-        this.recurrenceDescription = recurrenceDescription;
-        this.recurrenceStartDate = recurrenceStartDate;
-        this.recurrenceEndDate = recurrenceEndDate;
-        this.recurrenceStartTime = recurrenceStartTime;
-        this.recurrenceEndTime = recurrenceEndTime;
-        this.recurrenceFrequency = recurrenceFrequency;
+        this.recurrenceTitle = title;
+        this.recurrenceDescription = description;
+        replaceSchedule(schedule, recurrenceLines);
+        this.tag = tag;
     }
 
-    public void changeTag(Tag tag) {
-        this.tag = tag;
+    private void replaceSchedule(RecurrenceSchedule schedule, List<String> lines) {
+        this.allDay = schedule.allDay();
+        this.startAt = schedule.startAt();
+        this.endAt = schedule.endAt();
+        this.timeZone = schedule.timeZone();
+        this.recurrenceLines = RecurrenceLinesJson.encode(lines);
     }
 
     public Long getId() {
@@ -116,31 +103,24 @@ public class RecurrenceEvent extends BaseEntity {
         return recurrenceDescription;
     }
 
-    public LocalDate getRecurrenceStartDate() {
-        return recurrenceStartDate;
+    public boolean isAllDay() {
+        return allDay;
     }
 
-    public LocalDate getRecurrenceEndDate() {
-        return recurrenceEndDate;
+    public Instant getStartAt() {
+        return startAt;
     }
 
-    public LocalTime getRecurrenceStartTime() {
-        return recurrenceStartTime;
+    public Instant getEndAt() {
+        return endAt;
     }
 
-    public LocalTime getRecurrenceEndTime() {
-        return recurrenceEndTime;
+    public String getTimeZone() {
+        return timeZone;
     }
 
-    public RecurrenceFrequency getRecurrenceFrequency() {
-        return recurrenceFrequency;
-    }
-
-    public Instant getRecurrenceEndAt() {
-        LocalDate endDate = recurrenceStartTime.isBefore(recurrenceEndTime)
-                ? recurrenceEndDate
-                : recurrenceEndDate.plusDays(1);
-        return endDate.atTime(recurrenceEndTime).toInstant(ZoneOffset.UTC);
+    public List<String> getRecurrenceLines() {
+        return RecurrenceLinesJson.decode(recurrenceLines);
     }
 
     public Tag getTag() {

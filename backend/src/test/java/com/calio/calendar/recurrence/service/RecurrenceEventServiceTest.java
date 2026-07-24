@@ -1,37 +1,31 @@
 package com.calio.calendar.recurrence.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import com.calio.calendar.recurrence.controller.dto.CreateRecurrenceEventRequest;
+import com.calio.calendar.account.domain.Account;
+import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.event.controller.dto.EventResponse;
+import com.calio.calendar.event.repository.EventRepository;
+import com.calio.calendar.recurrence.controller.dto.CreateRecurrenceEventRequest;
 import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceEventRequest;
 import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceOccurrenceRequest;
-import com.calio.calendar.common.error.CalioException;
-import com.calio.calendar.common.error.ErrorCode;
-import com.calio.calendar.account.repository.AccountRepository;
-import com.calio.calendar.event.repository.EventRepository;
-import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
-import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
-import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
-import com.calio.calendar.recurrence.domain.RecurrenceFrequency;
+import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
+import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
+import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.domain.TagType;
+import com.calio.calendar.tag.service.TagService;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.List;
 import java.util.Optional;
-
-import com.calio.calendar.tag.service.TagService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -39,7 +33,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.dao.DuplicateKeyException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -60,56 +53,60 @@ class RecurrenceEventServiceTest {
     @Mock
     private TagService tagService;
 
+    @Mock
+    private Rfc5545RecurrenceEngine recurrenceEngine;
+
     @InjectMocks
     private RecurrenceEventService recurrenceEventService;
 
     @Test
-    @DisplayName("반복 일정 생성은 RecurrenceEvent rule만 저장하고 occurrence Event row를 만들지 않는다")
-    void givenCreateRequest_whenCreateRecurrenceEvent_thenDoesNotMaterializeOccurrenceEvents() {
+    @DisplayName("반복 일정 생성은 정규화된 RFC line과 canonical schedule만 저장하고 Event row를 만들지 않는다")
+    void givenTimedRequest_whenCreate_thenStoresValidatedMasterWithoutMaterializingEvents() {
         // given
         Tag tag = tag();
+        List<String> normalized = List.of("RRULE:FREQ=DAILY;COUNT=3");
         when(tagService.getTagOrDefault(1L, null)).thenReturn(tag);
-        when(recurrenceEventRepository.save(any(RecurrenceEvent.class)))
-                .thenAnswer(invocation -> {
-                    RecurrenceEvent recurrenceEvent = invocation.getArgument(0);
-                    ReflectionTestUtils.setField(recurrenceEvent, "id", 10L);
-                    return recurrenceEvent;
-                });
-        CreateRecurrenceEventRequest request = new CreateRecurrenceEventRequest(
-                "Rule",
-                "memo",
-                LocalDate.parse("2027-01-01"),
-                LocalDate.parse("2027-01-02"),
-                LocalTime.parse("09:00:00"),
-                LocalTime.parse("10:00:00"),
-                RecurrenceFrequency.DAILY,
-                null
-        );
+        when(recurrenceEngine.validate(any(RecurrenceSchedule.class), any())).thenReturn(normalized);
+        when(recurrenceEventRepository.save(any(RecurrenceEvent.class))).thenAnswer(invocation -> {
+            RecurrenceEvent recurrenceEvent = invocation.getArgument(0);
+            ReflectionTestUtils.setField(recurrenceEvent, "id", 10L);
+            return recurrenceEvent;
+        });
+        CreateRecurrenceEventRequest request = timedCreateRequest();
 
         // when
         recurrenceEventService.createRecurrenceEvent(1L, request);
 
         // then
-        verify(recurrenceEventRepository).save(any(RecurrenceEvent.class));
+        ArgumentCaptor<RecurrenceEvent> captor = ArgumentCaptor.forClass(RecurrenceEvent.class);
+        verify(recurrenceEventRepository).save(captor.capture());
+        assertThat(captor.getValue().getStartAt()).isEqualTo(Instant.parse("2027-01-01T00:00:00Z"));
+        assertThat(captor.getValue().getTimeZone()).isEqualTo("Asia/Seoul");
+        assertThat(captor.getValue().getRecurrenceLines()).containsExactlyElementsOf(normalized);
         verify(eventRepository, never()).saveAll(any());
     }
 
     @Test
-    @DisplayName("반복 일정 전체 수정은 rule을 갱신하고 해당 recurrence override를 hard-delete한다")
-    void givenUpdateRequest_whenUpdateRecurrenceEvent_thenDeletesOverridesWithoutRebuildingEvents() {
+    @DisplayName("전체 수정은 새 정의 검증 후 master snapshot을 교체하고 기존 override를 제거한다")
+    void givenValidUpdate_whenUpdate_thenReplacesMasterAndDeletesOverrides() {
         // given
-        RecurrenceEvent recurrenceEvent = recurrenceEvent("Original", "2027-02-01", "2027-02-02");
-        Tag fallbackTag = tag();
-        when(recurrenceEventRepository.findByIdAndAccount_Id(10L, 1L)).thenReturn(Optional.of(recurrenceEvent));
-        when(tagService.getTagOrDefault(1L, null)).thenReturn(fallbackTag);
+        RecurrenceEvent recurrenceEvent = recurrenceEvent();
+        Tag tag = tag();
+        List<String> normalized = List.of("RRULE:FREQ=WEEKLY;COUNT=2");
+        when(recurrenceEventRepository.findByIdAndAccountIdForUpdate(10L, 1L))
+                .thenReturn(Optional.of(recurrenceEvent));
+        when(tagService.getTagOrDefault(1L, null)).thenReturn(tag);
+        when(recurrenceEngine.validate(any(RecurrenceSchedule.class), any())).thenReturn(normalized);
         UpdateRecurrenceEventRequest request = new UpdateRecurrenceEventRequest(
                 "Updated",
                 null,
+                true,
+                LocalDate.parse("2027-02-01"),
                 LocalDate.parse("2027-02-03"),
-                LocalDate.parse("2027-02-10"),
-                LocalTime.parse("11:00:00"),
-                LocalTime.parse("12:00:00"),
-                RecurrenceFrequency.WEEKLY,
+                null,
+                null,
+                null,
+                normalized,
                 null
         );
 
@@ -118,168 +115,73 @@ class RecurrenceEventServiceTest {
 
         // then
         assertThat(recurrenceEvent.getRecurrenceTitle()).isEqualTo("Updated");
-        assertThat(recurrenceEvent.getRecurrenceStartDate()).isEqualTo(LocalDate.parse("2027-02-03"));
-        assertThat(recurrenceEvent.getRecurrenceEndDate()).isEqualTo(LocalDate.parse("2027-02-10"));
-        assertThat(recurrenceEvent.getRecurrenceStartTime()).isEqualTo(LocalTime.parse("11:00:00"));
-        assertThat(recurrenceEvent.getRecurrenceEndTime()).isEqualTo(LocalTime.parse("12:00:00"));
-        assertThat(recurrenceEvent.getRecurrenceFrequency()).isEqualTo(RecurrenceFrequency.WEEKLY);
-        assertThat(recurrenceEvent.getTag()).isSameAs(fallbackTag);
+        assertThat(recurrenceEvent.isAllDay()).isTrue();
+        assertThat(recurrenceEvent.getTimeZone()).isNull();
         verify(recurrenceEventOverrideRepository).deleteByRecurrenceEvent_Id(10L);
-        verify(eventRepository, never()).saveAll(any());
-        verify(eventRepository, never()).deleteAll(any(Iterable.class));
     }
 
     @Test
-    @DisplayName("단일 occurrence PATCH는 recurrenceId와 originStartAt으로 modified override를 생성하고 가상 EventResponse를 반환한다")
-    void givenValidOccurrencePatch_whenUpdateRecurrenceOccurrence_thenCreatesModifiedOverride() {
+    @DisplayName("occurrence PATCH는 title과 null description을 포함한 완전한 snapshot을 저장한다")
+    void givenOccurrencePatch_whenUpdate_thenStoresCompleteSnapshot() {
         // given
-        RecurrenceEvent recurrenceEvent = recurrenceEvent("Rule", "2027-03-01", "2027-03-02");
-        Instant originStartAt = Instant.parse("2027-03-01T09:00:00Z");
-        Instant movedStartAt = Instant.parse("2027-03-10T12:00:00Z");
-        Instant movedEndAt = Instant.parse("2027-03-10T13:00:00Z");
-        when(recurrenceEventRepository.findByIdAndAccount_Id(10L, 1L)).thenReturn(Optional.of(recurrenceEvent));
+        RecurrenceEvent recurrenceEvent = recurrenceEvent();
+        Instant originStartAt = recurrenceEvent.getStartAt();
+        when(recurrenceEventRepository.findByIdAndAccountIdForUpdate(10L, 1L))
+                .thenReturn(Optional.of(recurrenceEvent));
+        when(recurrenceEngine.containsOrigin(any(), any(), any())).thenReturn(true);
         when(recurrenceEventOverrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(10L, originStartAt))
                 .thenReturn(Optional.empty());
-        when(recurrenceEventOverrideRepository.save(any(RecurrenceEventOverride.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
-
+        when(recurrenceEventOverrideRepository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
         UpdateRecurrenceOccurrenceRequest request = new UpdateRecurrenceOccurrenceRequest(
                 originStartAt,
-                movedStartAt,
-                movedEndAt
+                "Final title",
+                null,
+                Instant.parse("2027-01-03T02:00:00Z"),
+                Instant.parse("2027-01-03T03:00:00Z")
         );
 
         // when
         EventResponse response = recurrenceEventService.updateRecurrenceOccurrence(1L, 10L, request);
 
         // then
-        ArgumentCaptor<RecurrenceEventOverride> overrideCaptor =
-                ArgumentCaptor.forClass(RecurrenceEventOverride.class);
-        verify(recurrenceEventOverrideRepository).save(overrideCaptor.capture());
-        assertThat(overrideCaptor.getValue().getRecurrenceEvent()).isSameAs(recurrenceEvent);
-        assertThat(overrideCaptor.getValue().getOriginStartAt()).isEqualTo(originStartAt);
-        assertThat(response.id()).isNull();
-        assertThat(response.recurrenceId()).isEqualTo(10L);
+        ArgumentCaptor<RecurrenceEventOverride> captor = ArgumentCaptor.forClass(RecurrenceEventOverride.class);
+        verify(recurrenceEventOverrideRepository).saveAndFlush(captor.capture());
+        assertThat(captor.getValue().getOverrideTitle()).isEqualTo("Final title");
+        assertThat(captor.getValue().getOverrideDescription()).isNull();
+        assertThat(captor.getValue().getOverrideTimeZone()).isEqualTo("Asia/Seoul");
+        assertThat(response.title()).isEqualTo("Final title");
+        assertThat(response.description()).isNull();
         assertThat(response.originStartAt()).isEqualTo(originStartAt);
-        assertThat(response.startAt()).isEqualTo(movedStartAt);
-        assertThat(response.endAt()).isEqualTo(movedEndAt);
     }
 
-    @Test
-    @DisplayName("deleted override 대상 PATCH는 occurrence를 복원하지 않고 RECURRENCE_OCCURRENCE_NOT_FOUND를 던진다")
-    void givenDeletedOverride_whenUpdateRecurrenceOccurrence_thenThrowsOccurrenceNotFound() {
-        // given
-        RecurrenceEvent recurrenceEvent = recurrenceEvent("Rule", "2027-04-01", "2027-04-01");
-        Instant originStartAt = Instant.parse("2027-04-01T09:00:00Z");
-        RecurrenceEventOverride deletedOverride = RecurrenceEventOverride.deleted(
-                recurrenceEvent,
-                originStartAt,
-                Instant.parse("2027-04-01T11:00:00Z")
-        );
-        when(recurrenceEventRepository.findByIdAndAccount_Id(10L, 1L)).thenReturn(Optional.of(recurrenceEvent));
-        when(recurrenceEventOverrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(10L, originStartAt))
-                .thenReturn(Optional.of(deletedOverride));
-
-        UpdateRecurrenceOccurrenceRequest request = new UpdateRecurrenceOccurrenceRequest(
-                originStartAt,
-                Instant.parse("2027-04-01T12:00:00Z"),
-                Instant.parse("2027-04-01T13:00:00Z")
-        );
-
-        // when, then
-        assertThatThrownBy(() -> recurrenceEventService.updateRecurrenceOccurrence(1L, 10L, request))
-                .isInstanceOfSatisfying(CalioException.class, exception ->
-                        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.RECURRENCE_OCCURRENCE_NOT_FOUND)
-                );
-    }
-
-    @Test
-    @DisplayName("단일 occurrence DELETE는 modified override를 deletion override 상태로 전환한다")
-    void givenModifiedOverride_whenDeleteRecurrenceOccurrence_thenConvertsToDeletedOverride() {
-        // given
-        RecurrenceEvent recurrenceEvent = recurrenceEvent("Rule", "2027-05-01", "2027-05-01");
-        Instant originStartAt = Instant.parse("2027-05-01T09:00:00Z");
-        RecurrenceEventOverride override = RecurrenceEventOverride.modified(
-                recurrenceEvent,
-                originStartAt,
-                Instant.parse("2027-05-02T09:00:00Z"),
-                Instant.parse("2027-05-02T10:00:00Z")
-        );
-        when(recurrenceEventRepository.findByIdAndAccount_Id(10L, 1L)).thenReturn(Optional.of(recurrenceEvent));
-        when(recurrenceEventOverrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(10L, originStartAt))
-                .thenReturn(Optional.of(override));
-
-        // when
-        recurrenceEventService.deleteRecurrenceOccurrence(1L, 10L, originStartAt);
-
-        // then
-        assertThat(override.getDeletedAt()).isNotNull();
-        assertThat(override.getOverrideStartAt()).isNull();
-        assertThat(override.getOverrideEndAt()).isNull();
-        verify(recurrenceEventOverrideRepository).flush();
-    }
-
-    @Test
-    @DisplayName("단일 occurrence DELETE의 override 생성 경합은 unique constraint 충돌 후 기존 override를 삭제 상태로 전환한다")
-    void givenDuplicateDeleteOverrideRace_whenDeleteRecurrenceOccurrence_thenMarksExistingOverrideDeleted() {
-        // given
-        RecurrenceEvent recurrenceEvent = recurrenceEvent("Rule", "2027-05-11", "2027-05-11");
-        Instant originStartAt = Instant.parse("2027-05-11T09:00:00Z");
-        RecurrenceEventOverride existingOverride = RecurrenceEventOverride.modified(
-                recurrenceEvent,
-                originStartAt,
-                Instant.parse("2027-05-12T09:00:00Z"),
-                Instant.parse("2027-05-12T10:00:00Z")
-        );
-        when(recurrenceEventRepository.findByIdAndAccount_Id(10L, 1L)).thenReturn(Optional.of(recurrenceEvent));
-        when(recurrenceEventOverrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(10L, originStartAt))
-                .thenReturn(Optional.empty())
-                .thenReturn(Optional.of(existingOverride));
-        when(recurrenceEventOverrideRepository.save(any(RecurrenceEventOverride.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
-        doThrow(new DuplicateKeyException("duplicate recurrence origin"))
-                .doNothing()
-                .when(recurrenceEventOverrideRepository)
-                .flush();
-
-        // when
-        recurrenceEventService.deleteRecurrenceOccurrence(1L, 10L, originStartAt);
-
-        // then
-        assertThat(existingOverride.getDeletedAt()).isNotNull();
-        assertThat(existingOverride.getOverrideStartAt()).isNull();
-        assertThat(existingOverride.getOverrideEndAt()).isNull();
-        verify(recurrenceEventOverrideRepository).save(any(RecurrenceEventOverride.class));
-        verify(recurrenceEventOverrideRepository, times(2)).flush();
-    }
-
-    @Test
-    @DisplayName("존재하지 않는 recurrenceId의 단일 occurrence DELETE는 override repository를 호출하지 않는다")
-    void givenMissingRecurrenceId_whenDeleteRecurrenceOccurrence_thenThrowsRecurrenceEventNotFound() {
-        // given
-        when(recurrenceEventRepository.findByIdAndAccount_Id(10L, 1L)).thenReturn(Optional.empty());
-
-        // when, then
-        assertThatThrownBy(() -> recurrenceEventService.deleteRecurrenceOccurrence(
-                1L,
-                10L,
-                Instant.parse("2027-06-01T09:00:00Z")
-        ))
-                .isInstanceOfSatisfying(CalioException.class, exception ->
-                        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.RECURRENCE_EVENT_NOT_FOUND)
-                );
-        verifyNoInteractions(recurrenceEventOverrideRepository);
-    }
-
-    private RecurrenceEvent recurrenceEvent(String title, String startDate, String endDate) {
-        RecurrenceEvent recurrenceEvent = new RecurrenceEvent(
-                title,
+    private CreateRecurrenceEventRequest timedCreateRequest() {
+        return new CreateRecurrenceEventRequest(
+                "Rule",
                 "memo",
-                LocalDate.parse(startDate),
-                LocalDate.parse(endDate),
+                false,
+                LocalDate.parse("2027-01-01"),
+                LocalDate.parse("2027-01-01"),
                 LocalTime.parse("09:00:00"),
                 LocalTime.parse("10:00:00"),
-                RecurrenceFrequency.DAILY,
+                "Asia/Seoul",
+                List.of("RRULE:FREQ=DAILY;COUNT=3"),
+                null
+        );
+    }
+
+    private RecurrenceEvent recurrenceEvent() {
+        RecurrenceEvent recurrenceEvent = new RecurrenceEvent(
+                "Rule",
+                "memo",
+                RecurrenceSchedule.create(
+                        false,
+                        LocalDate.parse("2027-01-01"),
+                        LocalDate.parse("2027-01-01"),
+                        LocalTime.parse("09:00:00"),
+                        LocalTime.parse("10:00:00"),
+                        "Asia/Seoul"
+                ),
+                List.of("RRULE:FREQ=DAILY;COUNT=3"),
                 tag(),
                 account()
         );

@@ -2,10 +2,11 @@ package com.calio.calendar.recurrence.repository;
 
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.tag.domain.Tag;
-import java.time.LocalDate;
+import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -17,14 +18,21 @@ public interface RecurrenceEventRepository extends JpaRepository<RecurrenceEvent
     @Query("""
             select recurrenceEvent
             from RecurrenceEvent recurrenceEvent
+            join fetch recurrenceEvent.tag
             where recurrenceEvent.account.id = :accountId
-              and recurrenceEvent.recurrenceStartDate <= :toDate
-              and recurrenceEvent.recurrenceEndDate >= :fromDate
             """)
-    List<RecurrenceEvent> findRecurrenceEvents(
-            @Param("accountId") Long accountId,
-            @Param("fromDate") LocalDate fromDate,
-            @Param("toDate") LocalDate toDate
+    List<RecurrenceEvent> findRecurrenceEvents(@Param("accountId") Long accountId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select recurrenceEvent
+            from RecurrenceEvent recurrenceEvent
+            where recurrenceEvent.id = :recurrenceId
+              and recurrenceEvent.account.id = :accountId
+            """)
+    Optional<RecurrenceEvent> findByIdAndAccountIdForUpdate(
+            @Param("recurrenceId") Long recurrenceId,
+            @Param("accountId") Long accountId
     );
 
     @Modifying(flushAutomatically = true)

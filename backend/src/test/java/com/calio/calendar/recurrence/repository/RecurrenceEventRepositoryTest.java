@@ -5,13 +5,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
-import com.calio.calendar.recurrence.domain.RecurrenceFrequency;
+import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.domain.TagType;
+import com.calio.calendar.tag.repository.TagRepository;
 import java.time.LocalDate;
 import java.time.LocalTime;
-
-import com.calio.calendar.tag.repository.TagRepository;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,33 +36,33 @@ class RecurrenceEventRepositoryTest {
     private TagRepository tagRepository;
 
     @Test
-    @DisplayName("후보 rule 조회는 전날 밤에 시작해 요청일 새벽에 겹치는 overnight rule을 배제하지 않는다")
-    void givenOvernightRuleStartingPreviousDay_whenFindEligibleRules_thenIncludesCandidate() {
+    @DisplayName("account recurrence 조회는 종료일 없는 무기한 RFC master도 후보에서 배제하지 않는다")
+    void givenUnboundedRule_whenFindRecurrenceEvents_thenIncludesMaster() {
         // given
         Account account = accountRepository.save(new Account());
         Tag tag = tagRepository.save(new Tag(TagType.DEFAULT, "기타", "#64748B"));
-        RecurrenceEvent overnightRule = recurrenceEventRepository.save(new RecurrenceEvent(
-                "Overnight",
+        RecurrenceEvent master = recurrenceEventRepository.save(new RecurrenceEvent(
+                "Unbounded",
                 null,
-                LocalDate.parse("2027-07-01"),
-                LocalDate.parse("2027-07-01"),
-                LocalTime.parse("23:00:00"),
-                LocalTime.parse("01:00:00"),
-                RecurrenceFrequency.DAILY,
+                RecurrenceSchedule.create(
+                        false,
+                        LocalDate.parse("2020-01-01"),
+                        LocalDate.parse("2020-01-01"),
+                        LocalTime.parse("09:00"),
+                        LocalTime.parse("10:00"),
+                        "UTC"
+                ),
+                List.of("RRULE:FREQ=DAILY"),
                 tag,
                 account
         ));
 
         // when
-        var candidates = recurrenceEventRepository.findRecurrenceEvents(
-                account.getId(),
-                LocalDate.parse("2027-07-01"),
-                LocalDate.parse("2027-07-02")
-        );
+        List<RecurrenceEvent> candidates = recurrenceEventRepository.findRecurrenceEvents(account.getId());
 
         // then
         assertThat(candidates)
                 .extracting(RecurrenceEvent::getId)
-                .contains(overnightRule.getId());
+                .contains(master.getId());
     }
 }
