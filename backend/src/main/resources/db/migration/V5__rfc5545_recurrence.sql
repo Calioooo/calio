@@ -2,8 +2,6 @@
 -- emptied before this migration. There is intentionally no legacy frequency backfill.
 
 ALTER TABLE recurrence_events ADD COLUMN all_day BOOLEAN NOT NULL;
-ALTER TABLE recurrence_events ADD COLUMN start_at DATETIME(6) NOT NULL;
-ALTER TABLE recurrence_events ADD COLUMN end_at DATETIME(6) NOT NULL;
 ALTER TABLE recurrence_events ADD COLUMN time_zone VARCHAR(255);
 ALTER TABLE recurrence_events ADD COLUMN recurrence_lines TEXT NOT NULL;
 ALTER TABLE recurrence_events MODIFY COLUMN recurrence_start_time TIME(6) NULL;

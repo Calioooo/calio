@@ -12,7 +12,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
@@ -33,12 +32,6 @@ public class RecurrenceEvent extends BaseEntity {
 
     @Column(name = "all_day", nullable = false)
     private boolean allDay;
-
-    @Column(name = "start_at", nullable = false)
-    private Instant startAt;
-
-    @Column(name = "end_at", nullable = false)
-    private Instant endAt;
 
     @Column(name = "time_zone")
     private String timeZone;
@@ -99,8 +92,6 @@ public class RecurrenceEvent extends BaseEntity {
 
     private void replaceSchedule(RecurrenceSchedule schedule, List<String> lines) {
         this.allDay = schedule.allDay();
-        this.startAt = schedule.startAt();
-        this.endAt = schedule.endAt();
         this.timeZone = schedule.timeZone();
         this.startDate = schedule.startDate();
         this.endDate = schedule.endDate();
@@ -123,14 +114,6 @@ public class RecurrenceEvent extends BaseEntity {
 
     public boolean isAllDay() {
         return allDay;
-    }
-
-    public Instant getStartAt() {
-        return startAt;
-    }
-
-    public Instant getEndAt() {
-        return endAt;
     }
 
     public String getTimeZone() {

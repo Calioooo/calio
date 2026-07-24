@@ -2,7 +2,6 @@ package com.calio.calendar.recurrence.domain;
 
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -18,8 +17,6 @@ public record RecurrenceSchedule(
         LocalDate endDate,
         LocalTime startTime,
         LocalTime endTime,
-        Instant startAt,
-        Instant endAt,
         boolean allDay,
         String timeZone
 ) {
@@ -46,8 +43,6 @@ public record RecurrenceSchedule(
                 recurrenceEvent.getEndDate(),
                 recurrenceEvent.getStartTime(),
                 recurrenceEvent.getEndTime(),
-                recurrenceEvent.getStartAt(),
-                recurrenceEvent.getEndAt(),
                 recurrenceEvent.isAllDay(),
                 recurrenceEvent.getTimeZone()
         );
@@ -74,8 +69,6 @@ public record RecurrenceSchedule(
                 endDate,
                 null,
                 null,
-                startDate.atStartOfDay().toInstant(ZoneOffset.UTC),
-                endDate.atStartOfDay().toInstant(ZoneOffset.UTC),
                 true,
                 null
         );
@@ -96,19 +89,14 @@ public record RecurrenceSchedule(
             throw new CalioException(ErrorCode.INVALID_RECURRENCE_SCHEDULE);
         }
         ZoneId zoneId = parseIanaTimeZone(timeZone);
-        Instant startAt = resolveFirstScheduleTime(startDate.atTime(startTime), zoneId);
+        validateExistingScheduleTime(startDate.atTime(startTime), zoneId);
         LocalDate firstEndDate = endTime.isAfter(startTime) ? startDate : startDate.plusDays(1);
-        Instant endAt = resolveFirstScheduleTime(firstEndDate.atTime(endTime), zoneId);
-        if (!startAt.isBefore(endAt)) {
-            throw new CalioException(ErrorCode.INVALID_RECURRENCE_SCHEDULE);
-        }
+        validateExistingScheduleTime(firstEndDate.atTime(endTime), zoneId);
         return new RecurrenceSchedule(
                 startDate,
                 endDate,
                 startTime,
                 endTime,
-                startAt,
-                endAt,
                 false,
                 timeZone
         );
@@ -127,12 +115,11 @@ public record RecurrenceSchedule(
         return TimeZoneRegistry.getGlobalZoneId(timeZone);
     }
 
-    private static Instant resolveFirstScheduleTime(LocalDateTime localDateTime, ZoneId zoneId) {
+    private static void validateExistingScheduleTime(LocalDateTime localDateTime, ZoneId zoneId) {
         ZoneRules rules = zoneId.getRules();
         List<ZoneOffset> offsets = rules.getValidOffsets(localDateTime);
         if (offsets.isEmpty()) {
             throw new CalioException(ErrorCode.INVALID_RECURRENCE_SCHEDULE);
         }
-        return localDateTime.toInstant(offsets.getFirst());
     }
 }

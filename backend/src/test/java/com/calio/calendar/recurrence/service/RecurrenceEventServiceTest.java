@@ -80,9 +80,10 @@ class RecurrenceEventServiceTest {
         // then
         ArgumentCaptor<RecurrenceEvent> captor = ArgumentCaptor.forClass(RecurrenceEvent.class);
         verify(recurrenceEventRepository).save(captor.capture());
-        assertThat(captor.getValue().getStartAt()).isEqualTo(Instant.parse("2027-01-01T00:00:00Z"));
-        assertThat(captor.getValue().getEndAt()).isEqualTo(Instant.parse("2027-01-01T01:00:00Z"));
+        assertThat(captor.getValue().getStartDate()).isEqualTo(LocalDate.parse("2027-01-01"));
         assertThat(captor.getValue().getEndDate()).isEqualTo(LocalDate.parse("2027-01-31"));
+        assertThat(captor.getValue().getStartTime()).isEqualTo(LocalTime.parse("09:00:00"));
+        assertThat(captor.getValue().getEndTime()).isEqualTo(LocalTime.parse("10:00:00"));
         assertThat(captor.getValue().getTimeZone()).isEqualTo("Asia/Seoul");
         assertThat(captor.getValue().getRecurrenceLines()).containsExactlyElementsOf(normalized);
         verify(eventRepository, never()).saveAll(any());
@@ -127,7 +128,7 @@ class RecurrenceEventServiceTest {
     void givenOccurrencePatch_whenUpdate_thenStoresCompleteSnapshot() {
         // given
         RecurrenceEvent recurrenceEvent = recurrenceEvent();
-        Instant originStartAt = recurrenceEvent.getStartAt();
+        Instant originStartAt = Instant.parse("2027-01-01T00:00:00Z");
         when(recurrenceEventRepository.findByIdAndAccountIdForUpdate(10L, 1L))
                 .thenReturn(Optional.of(recurrenceEvent));
         when(recurrenceEngine.containsOrigin(any(), any(), any())).thenReturn(true);
