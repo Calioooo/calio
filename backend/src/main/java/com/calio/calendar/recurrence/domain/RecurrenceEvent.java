@@ -4,6 +4,7 @@ import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.common.domain.BaseEntity;
 import com.calio.calendar.tag.domain.Tag;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -49,7 +50,8 @@ public class RecurrenceEvent extends BaseEntity {
     private LocalTime endTime;
 
     @Column(name = "recurrence_rule", nullable = false, columnDefinition = "TEXT")
-    private String recurrenceRule;
+    @Convert(converter = RecurrenceRuleJsonConverter.class)
+    private List<String> recurrenceRules = List.of();
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "account_id", nullable = false)
@@ -97,7 +99,7 @@ public class RecurrenceEvent extends BaseEntity {
         this.endDate = schedule.endDate();
         this.startTime = schedule.startTime();
         this.endTime = schedule.endTime();
-        this.recurrenceRule = RecurrenceRuleJson.encode(recurrenceRules);
+        this.recurrenceRules = List.copyOf(recurrenceRules);
     }
 
     public Long getId() {
@@ -137,7 +139,7 @@ public class RecurrenceEvent extends BaseEntity {
     }
 
     public List<String> getRecurrenceRules() {
-        return RecurrenceRuleJson.decode(recurrenceRule);
+        return recurrenceRules;
     }
 
     public Tag getTag() {

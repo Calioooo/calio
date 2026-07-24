@@ -9,6 +9,7 @@ import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.domain.TagType;
 import com.calio.calendar.tag.repository.TagRepository;
+import jakarta.persistence.EntityManager;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
@@ -35,13 +36,16 @@ class RecurrenceEventRepositoryTest {
     @Autowired
     private TagRepository tagRepository;
 
+    @Autowired
+    private EntityManager entityManager;
+
     @Test
     @DisplayName("account recurrence 조회는 종료일 없는 무기한 RFC master도 후보에서 배제하지 않는다")
     void givenUnboundedRule_whenFindRecurrenceEvents_thenIncludesMaster() {
         // given
         Account account = accountRepository.save(new Account());
         Tag tag = tagRepository.save(new Tag(TagType.DEFAULT, "기타", "#64748B"));
-        RecurrenceEvent master = recurrenceEventRepository.save(new RecurrenceEvent(
+        RecurrenceEvent master = recurrenceEventRepository.saveAndFlush(new RecurrenceEvent(
                 "Unbounded",
                 null,
                 RecurrenceSchedule.create(
@@ -56,6 +60,7 @@ class RecurrenceEventRepositoryTest {
                 tag,
                 account
         ));
+        entityManager.clear();
 
         // when
         List<RecurrenceEvent> candidates = recurrenceEventRepository.findRecurrenceEvents(account.getId());
@@ -64,5 +69,7 @@ class RecurrenceEventRepositoryTest {
         assertThat(candidates)
                 .extracting(RecurrenceEvent::getId)
                 .contains(master.getId());
+        assertThat(candidates.getFirst().getRecurrenceRules())
+                .containsExactly("RRULE:FREQ=DAILY");
     }
 }
