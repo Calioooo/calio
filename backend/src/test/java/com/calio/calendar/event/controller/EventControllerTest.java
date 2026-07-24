@@ -679,6 +679,19 @@ class EventControllerTest {
     }
 
     @Test
+    @DisplayName("일정 조회 범위가 366일을 초과하면 요청을 거부한다")
+    void givenEventQueryRangeOverLimit_whenListEvents_thenReturnsRangeTooLarge() throws Exception {
+        // when
+        mockMvc.perform(get("/api/events")
+                        .param("from", "2026-01-01T00:00:00Z")
+                        .param("to", "2027-01-03T00:00:00Z"))
+                // then
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("EVENT_QUERY_RANGE_TOO_LARGE"))
+                .andExpect(jsonPath("$.detail").isString());
+    }
+
+    @Test
     @DisplayName("중요 일정 상태 변경 후에도 조회 결과는 startAt 기준으로 정렬된다")
     void givenChangedImportantEvent_whenListEvents_thenReturnsStoredImportantEventStateSortedByStartAt()
             throws Exception {

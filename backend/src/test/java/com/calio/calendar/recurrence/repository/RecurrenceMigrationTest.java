@@ -58,6 +58,8 @@ class RecurrenceMigrationTest {
             assertThat(isNullable(connection, "RECURRENCE_EVENT_OVERRIDES", "OVERRIDE_DESCRIPTION")).isTrue();
             assertThat(isNullable(connection, "RECURRENCE_EVENT_OVERRIDES", "OVERRIDE_ALL_DAY")).isTrue();
             assertThat(isNullable(connection, "RECURRENCE_EVENT_OVERRIDES", "OVERRIDE_TIME_ZONE")).isTrue();
+            assertThat(indexNames(connection, "RECURRENCE_EVENTS"))
+                    .contains("IDX_RECURRENCE_EVENTS_ACCOUNT_PERIOD");
         }
     }
 
@@ -78,5 +80,16 @@ class RecurrenceMigrationTest {
             assertThat(resultSet.next()).isTrue();
             return resultSet.getInt("NULLABLE") == DatabaseMetaData.columnNullable;
         }
+    }
+
+    private Set<String> indexNames(Connection connection, String tableName) throws Exception {
+        DatabaseMetaData metadata = connection.getMetaData();
+        Set<String> indexes = new HashSet<>();
+        try (ResultSet resultSet = metadata.getIndexInfo(null, null, tableName, false, false)) {
+            while (resultSet.next()) {
+                indexes.add(resultSet.getString("INDEX_NAME"));
+            }
+        }
+        return indexes;
     }
 }

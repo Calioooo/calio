@@ -19,7 +19,10 @@ import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.recurrence.service.Rfc5545RecurrenceEngine;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.service.TagService;
+import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -33,6 +36,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class EventService {
+
+    private static final Duration MAX_EVENT_QUERY_RANGE = Duration.ofDays(366);
+    private static final long RECURRENCE_QUERY_DATE_PADDING_DAYS = 1;
 
     private final EventRepository eventRepository;
     private final RecurrenceEventRepository recurrenceEventRepository;
@@ -109,11 +115,25 @@ public class EventService {
     private List<EventResponse> listRecurrenceOccurrences(Long accountId, Instant from, Instant to) {
         List<EventResponse> responses = new ArrayList<>();
         Set<OccurrenceKey> responseKeys = new HashSet<>();
-        for (RecurrenceEvent recurrenceEvent : recurrenceEventRepository.findRecurrenceEvents(accountId)) {
+        RecurrenceCandidateRange candidateRange = recurrenceCandidateRange(from, to);
+        List<RecurrenceEvent> recurrenceEvents = recurrenceEventRepository.findOverlappingRecurrenceEvents(
+                accountId,
+                candidateRange.fromDate(),
+                candidateRange.toDate()
+        );
+        for (RecurrenceEvent recurrenceEvent : recurrenceEvents) {
             addExpandedOccurrences(recurrenceEvent, from, to, responseKeys, responses);
         }
         addMovedInOverrides(accountId, from, to, responseKeys, responses);
         return responses;
+    }
+
+    private RecurrenceCandidateRange recurrenceCandidateRange(Instant from, Instant to) {
+        LocalDate fromDate = from.atOffset(ZoneOffset.UTC).toLocalDate()
+                .minusDays(RECURRENCE_QUERY_DATE_PADDING_DAYS);
+        LocalDate toDate = to.atOffset(ZoneOffset.UTC).toLocalDate()
+                .plusDays(RECURRENCE_QUERY_DATE_PADDING_DAYS);
+        return new RecurrenceCandidateRange(fromDate, toDate);
     }
 
     private void addExpandedOccurrences(
@@ -203,6 +223,12 @@ public class EventService {
         if (!from.isBefore(to)) {
             throw new CalioException(ErrorCode.INVALID_TIME_RANGE);
         }
+        if (Duration.between(from, to).compareTo(MAX_EVENT_QUERY_RANGE) > 0) {
+            throw new CalioException(ErrorCode.EVENT_QUERY_RANGE_TOO_LARGE);
+        }
+    }
+
+    private record RecurrenceCandidateRange(LocalDate fromDate, LocalDate toDate) {
     }
 
     private record OccurrenceKey(Long recurrenceId, Instant originStartAt) {

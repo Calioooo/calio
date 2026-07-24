@@ -63,7 +63,11 @@ class RecurrenceEventRepositoryTest {
         entityManager.clear();
 
         // when
-        List<RecurrenceEvent> candidates = recurrenceEventRepository.findRecurrenceEvents(account.getId());
+        List<RecurrenceEvent> candidates = recurrenceEventRepository.findOverlappingRecurrenceEvents(
+                account.getId(),
+                LocalDate.parse("2020-01-01"),
+                LocalDate.parse("2020-01-02")
+        );
 
         // then
         assertThat(candidates)
@@ -71,5 +75,53 @@ class RecurrenceEventRepositoryTest {
                 .contains(master.getId());
         assertThat(candidates.getFirst().getRecurrenceRules())
                 .containsExactly("RRULE:FREQ=DAILY");
+    }
+
+    @Test
+    @DisplayName("반복 기간이 조회 기간과 겹치는 master만 조회한다")
+    void givenRecurrenceEventsAcrossDateRange_whenFindOverlapping_thenReturnsOnlyCandidates() {
+        // given
+        Account account = accountRepository.save(new Account());
+        Tag tag = tagRepository.save(new Tag(TagType.DEFAULT, "기타", "#64748B"));
+        saveRecurrenceEvent(account, tag, "Before", "2026-01-01", "2026-01-31");
+        RecurrenceEvent overlapping = saveRecurrenceEvent(account, tag, "Overlapping", "2026-02-01", "2026-02-28");
+        saveRecurrenceEvent(account, tag, "After", "2026-03-01", "2026-03-31");
+        entityManager.clear();
+
+        // when
+        List<RecurrenceEvent> candidates = recurrenceEventRepository.findOverlappingRecurrenceEvents(
+                account.getId(),
+                LocalDate.parse("2026-02-10"),
+                LocalDate.parse("2026-02-20")
+        );
+
+        // then
+        assertThat(candidates)
+                .extracting(RecurrenceEvent::getId)
+                .containsExactly(overlapping.getId());
+    }
+
+    private RecurrenceEvent saveRecurrenceEvent(
+            Account account,
+            Tag tag,
+            String title,
+            String startDate,
+            String endDate
+    ) {
+        return recurrenceEventRepository.save(new RecurrenceEvent(
+                title,
+                null,
+                RecurrenceSchedule.create(
+                        false,
+                        LocalDate.parse(startDate),
+                        LocalDate.parse(endDate),
+                        LocalTime.parse("09:00"),
+                        LocalTime.parse("10:00"),
+                        "UTC"
+                ),
+                List.of("RRULE:FREQ=DAILY"),
+                tag,
+                account
+        ));
     }
 }

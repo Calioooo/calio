@@ -19,6 +19,32 @@ class Ical4jRecurrenceEngineTest {
     private final Ical4jRecurrenceEngine recurrenceEngine = new Ical4jRecurrenceEngine();
 
     @Test
+    @DisplayName("조회 범위가 넓어도 반복 적용 기간 안에서만 occurrence를 확장한다")
+    void givenWideQueryRange_whenExpand_thenLimitsExpansionToApplicationPeriod() {
+        // given
+        RecurrenceSchedule schedule = timedSchedule(
+                "2026-07-20",
+                "2026-07-20",
+                "09:00",
+                "10:00",
+                "UTC"
+        );
+
+        // when
+        List<Instant> origins = recurrenceEngine.expand(
+                        schedule,
+                        List.of("RRULE:FREQ=DAILY"),
+                        Instant.parse("2000-01-01T00:00:00Z"),
+                        Instant.parse("2100-01-01T00:00:00Z")
+                ).stream()
+                .map(RecurrenceOccurrence::originStartAt)
+                .toList();
+
+        // then
+        assertThat(origins).containsExactly(Instant.parse("2026-07-20T09:00:00Z"));
+    }
+
+    @Test
     @DisplayName("단일 RRULE에서 EXDATE에 해당하는 occurrence를 제외한다")
     void givenRuleAndExdates_whenExpand_thenExcludesMatchingOccurrences() {
         // given

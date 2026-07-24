@@ -100,6 +100,9 @@ public class Ical4jRecurrenceEngine implements Rfc5545RecurrenceEngine {
     ) {
         RecurrenceAnchor anchor = recurrenceAnchor(schedule, definition);
         ExpansionWindow window = expansionWindow(schedule, from, to);
+        if (isEmpty(window)) {
+            return List.of();
+        }
         Set<Instant> excludedStarts = excludedStarts(schedule, definition);
         VEvent event = recurrenceEvent(definition, anchor);
 
@@ -234,18 +237,55 @@ public class Ical4jRecurrenceEngine implements Rfc5545RecurrenceEngine {
     }
 
     private ExpansionWindow expansionWindow(RecurrenceSchedule schedule, Instant from, Instant to) {
-        if (schedule.allDay()) {
-            long durationDays = schedule.endDate().toEpochDay() - schedule.startDate().toEpochDay();
-            LocalDate localFrom = from.atOffset(ZoneOffset.UTC).toLocalDate().minusDays(durationDays + 1);
-            LocalDate localTo = to.atOffset(ZoneOffset.UTC).toLocalDate().plusDays(2);
-            return new ExpansionWindow(localFrom, localTo);
-        }
+        return schedule.allDay()
+                ? allDayExpansionWindow(schedule, from, to)
+                : timedExpansionWindow(schedule, from, to);
+    }
 
-        LocalDateTime localFrom = from.atZone(schedule.zoneId()).toLocalDateTime()
+    private ExpansionWindow allDayExpansionWindow(RecurrenceSchedule schedule, Instant from, Instant to) {
+        long durationDays = schedule.endDate().toEpochDay() - schedule.startDate().toEpochDay();
+        LocalDate requestedFrom = from.atOffset(ZoneOffset.UTC).toLocalDate().minusDays(durationDays + 1);
+        LocalDate requestedTo = to.atOffset(ZoneOffset.UTC).toLocalDate().plusDays(2);
+        return new ExpansionWindow(
+                laterDate(requestedFrom, schedule.startDate()),
+                earlierDate(requestedTo, schedule.endDate().plusDays(1))
+        );
+    }
+
+    private ExpansionWindow timedExpansionWindow(RecurrenceSchedule schedule, Instant from, Instant to) {
+        LocalDateTime requestedFrom = from.atZone(schedule.zoneId()).toLocalDateTime()
                 .minus(timedOccurrenceDuration(schedule))
                 .minusDays(1);
-        LocalDateTime localTo = to.atZone(schedule.zoneId()).toLocalDateTime().plusDays(1);
-        return new ExpansionWindow(localFrom, localTo);
+        LocalDateTime requestedTo = to.atZone(schedule.zoneId()).toLocalDateTime().plusDays(1);
+        return new ExpansionWindow(
+                laterDateTime(requestedFrom, schedule.startDate().atStartOfDay()),
+                earlierDateTime(requestedTo, schedule.endDate().plusDays(1).atStartOfDay())
+        );
+    }
+
+    private LocalDate laterDate(LocalDate first, LocalDate second) {
+        return first.isAfter(second) ? first : second;
+    }
+
+    private LocalDate earlierDate(LocalDate first, LocalDate second) {
+        return first.isBefore(second) ? first : second;
+    }
+
+    private LocalDateTime laterDateTime(LocalDateTime first, LocalDateTime second) {
+        return first.isAfter(second) ? first : second;
+    }
+
+    private LocalDateTime earlierDateTime(LocalDateTime first, LocalDateTime second) {
+        return first.isBefore(second) ? first : second;
+    }
+
+    private boolean isEmpty(ExpansionWindow window) {
+        if (window.localFrom() instanceof LocalDate from && window.localTo() instanceof LocalDate to) {
+            return !from.isBefore(to);
+        }
+        LocalDateTime from = LocalDateTime.from(window.localFrom());
+        LocalDateTime to = LocalDateTime.from(window.localTo());
+        return !from.isBefore(to);
     }
 
     private Duration timedOccurrenceDuration(RecurrenceSchedule schedule) {
