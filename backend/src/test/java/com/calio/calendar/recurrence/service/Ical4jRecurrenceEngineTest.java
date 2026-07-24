@@ -266,6 +266,7 @@ class Ical4jRecurrenceEngineTest {
         // when, then
         assertInvalidRule(() -> recurrenceEngine.validate(schedule, List.of("RDATE;VALUE=DATE:20260721")));
         assertInvalidRule(() -> recurrenceEngine.validate(schedule, List.of("RRULE:FREQ=DAILY;BYEASTER=1")));
+        assertInvalidRule(() -> recurrenceEngine.validate(schedule, List.of("RRULE:FREQ=DAILY;FREQ=WEEKLY")));
     }
 
     @Test
