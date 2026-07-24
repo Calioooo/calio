@@ -54,8 +54,8 @@ public class Ical4jRecurrenceEngine implements Rfc5545RecurrenceEngine {
     private static final Set<String> DATE_PARAMETER_NAMES = Set.of(Parameter.VALUE, Parameter.TZID);
 
     @Override
-    public List<String> validate(RecurrenceSchedule schedule, List<String> recurrenceLines) {
-        RecurrenceDefinition definition = parseDefinition(schedule, recurrenceLines);
+    public List<String> validate(RecurrenceSchedule schedule, List<String> recurrenceRules) {
+        RecurrenceDefinition definition = parseDefinition(schedule, recurrenceRules);
         recurrenceAnchor(schedule, definition);
         return definition.normalizedLines();
     }
@@ -63,21 +63,21 @@ public class Ical4jRecurrenceEngine implements Rfc5545RecurrenceEngine {
     @Override
     public List<RecurrenceOccurrence> expand(
             RecurrenceSchedule schedule,
-            List<String> recurrenceLines,
+            List<String> recurrenceRules,
             Instant from,
             Instant to
     ) {
         if (!from.isBefore(to)) {
             throw new CalioException(ErrorCode.INVALID_RECURRENCE_SCHEDULE);
         }
-        RecurrenceDefinition definition = parseDefinition(schedule, recurrenceLines);
+        RecurrenceDefinition definition = parseDefinition(schedule, recurrenceRules);
         return expand(schedule, definition, from, to);
     }
 
     @Override
     public boolean containsOrigin(
             RecurrenceSchedule schedule,
-            List<String> recurrenceLines,
+            List<String> recurrenceRules,
             Instant originStartAt
     ) {
         if (originStartAt == null || originStartAt.isBefore(applicationStartAt(schedule))) {
@@ -85,7 +85,7 @@ public class Ical4jRecurrenceEngine implements Rfc5545RecurrenceEngine {
         }
         try {
             Instant to = originStartAt.plusNanos(1);
-            return expand(schedule, recurrenceLines, originStartAt, to).stream()
+            return expand(schedule, recurrenceRules, originStartAt, to).stream()
                     .anyMatch(occurrence -> occurrence.originStartAt().equals(originStartAt));
         } catch (DateTimeException exception) {
             return false;
@@ -321,27 +321,27 @@ public class Ical4jRecurrenceEngine implements Rfc5545RecurrenceEngine {
 
     private RecurrenceDefinition parseDefinition(
             RecurrenceSchedule schedule,
-            List<String> recurrenceLines
+            List<String> recurrenceRules
     ) {
-        if (recurrenceLines == null) {
+        if (recurrenceRules == null) {
             throw new CalioException(ErrorCode.INVALID_RECURRENCE_RULE);
         }
-        List<ContentLine> lines = recurrenceLines.stream()
+        List<ContentLine> rules = recurrenceRules.stream()
                 .map(this::parseContentLine)
                 .map(line -> validateLine(schedule, line))
                 .toList();
-        List<ContentLine> rules = lines.stream()
+        List<ContentLine> inclusionRules = rules.stream()
                 .filter(line -> line.property() instanceof RRule<?>)
                 .toList();
-        if (rules.size() != 1) {
+        if (inclusionRules.size() != 1) {
             throw new CalioException(ErrorCode.INVALID_RECURRENCE_RULE);
         }
-        List<ContentLine> exclusionDates = lines.stream()
+        List<ContentLine> exclusionDates = rules.stream()
                 .filter(line -> line.property() instanceof ExDate<?>)
                 .distinct()
                 .sorted(Comparator.comparing(ContentLine::normalized))
                 .toList();
-        return new RecurrenceDefinition(rules.getFirst(), exclusionDates);
+        return new RecurrenceDefinition(inclusionRules.getFirst(), exclusionDates);
     }
 
     private ContentLine parseContentLine(String rawLine) {

@@ -3,14 +3,14 @@ package com.calio.calendar.recurrence.domain;
 import java.util.ArrayList;
 import java.util.List;
 
-final class RecurrenceLinesJson {
+final class RecurrenceRuleJson {
 
-    private RecurrenceLinesJson() {
+    private RecurrenceRuleJson() {
     }
 
-    static String encode(List<String> lines) {
-        return lines.stream()
-                .map(RecurrenceLinesJson::quote)
+    static String encode(List<String> rules) {
+        return rules.stream()
+                .map(RecurrenceRuleJson::quote)
                 .reduce((left, right) -> left + "," + right)
                 .map(values -> "[" + values + "]")
                 .orElse("[]");
@@ -18,7 +18,7 @@ final class RecurrenceLinesJson {
 
     static List<String> decode(String json) {
         if (json == null || json.length() < 2 || json.charAt(0) != '[' || json.charAt(json.length() - 1) != ']') {
-            throw new IllegalStateException("Invalid recurrence_lines JSON.");
+            throw new IllegalStateException("Invalid recurrence_rule JSON.");
         }
         List<String> values = new ArrayList<>();
         int index = 1;
@@ -67,7 +67,7 @@ final class RecurrenceLinesJson {
 
     private static ParsedString parseString(String json, int index) {
         if (json.charAt(index) != '"') {
-            throw new IllegalStateException("Invalid recurrence_lines JSON.");
+            throw new IllegalStateException("Invalid recurrence_rule JSON.");
         }
         StringBuilder value = new StringBuilder();
         boolean escaped = false;
@@ -87,7 +87,7 @@ final class RecurrenceLinesJson {
             }
             value.append(character);
         }
-        throw new IllegalStateException("Invalid recurrence_lines JSON.");
+        throw new IllegalStateException("Invalid recurrence_rule JSON.");
     }
 
     private static char unescape(char character) {
@@ -99,7 +99,7 @@ final class RecurrenceLinesJson {
             case 'n' -> '\n';
             case 'r' -> '\r';
             case 't' -> '\t';
-            default -> throw new IllegalStateException("Invalid recurrence_lines JSON escape.");
+            default -> throw new IllegalStateException("Invalid recurrence_rule JSON escape.");
         };
     }
 

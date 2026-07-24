@@ -48,8 +48,8 @@ public class RecurrenceEvent extends BaseEntity {
     @Column(name = "recurrence_end_time")
     private LocalTime endTime;
 
-    @Column(name = "recurrence_lines", nullable = false, columnDefinition = "TEXT")
-    private String recurrenceLines;
+    @Column(name = "recurrence_rule", nullable = false, columnDefinition = "TEXT")
+    private String recurrenceRule;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "account_id", nullable = false)
@@ -66,13 +66,13 @@ public class RecurrenceEvent extends BaseEntity {
             String title,
             String description,
             RecurrenceSchedule schedule,
-            List<String> recurrenceLines,
+            List<String> recurrenceRules,
             Tag tag,
             Account account
     ) {
         this.recurrenceTitle = title;
         this.recurrenceDescription = description;
-        replaceSchedule(schedule, recurrenceLines);
+        replaceSchedule(schedule, recurrenceRules);
         this.tag = tag;
         this.account = account;
     }
@@ -81,23 +81,23 @@ public class RecurrenceEvent extends BaseEntity {
             String title,
             String description,
             RecurrenceSchedule schedule,
-            List<String> recurrenceLines,
+            List<String> recurrenceRules,
             Tag tag
     ) {
         this.recurrenceTitle = title;
         this.recurrenceDescription = description;
-        replaceSchedule(schedule, recurrenceLines);
+        replaceSchedule(schedule, recurrenceRules);
         this.tag = tag;
     }
 
-    private void replaceSchedule(RecurrenceSchedule schedule, List<String> lines) {
+    private void replaceSchedule(RecurrenceSchedule schedule, List<String> recurrenceRules) {
         this.allDay = schedule.allDay();
         this.timeZone = schedule.timeZone();
         this.startDate = schedule.startDate();
         this.endDate = schedule.endDate();
         this.startTime = schedule.startTime();
         this.endTime = schedule.endTime();
-        this.recurrenceLines = RecurrenceLinesJson.encode(lines);
+        this.recurrenceRule = RecurrenceRuleJson.encode(recurrenceRules);
     }
 
     public Long getId() {
@@ -136,8 +136,8 @@ public class RecurrenceEvent extends BaseEntity {
         return endTime;
     }
 
-    public List<String> getRecurrenceLines() {
-        return RecurrenceLinesJson.decode(recurrenceLines);
+    public List<String> getRecurrenceRules() {
+        return RecurrenceRuleJson.decode(recurrenceRule);
     }
 
     public Tag getTag() {

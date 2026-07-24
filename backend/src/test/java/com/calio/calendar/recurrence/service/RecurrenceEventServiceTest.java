@@ -85,7 +85,7 @@ class RecurrenceEventServiceTest {
         assertThat(captor.getValue().getStartTime()).isEqualTo(LocalTime.parse("09:00:00"));
         assertThat(captor.getValue().getEndTime()).isEqualTo(LocalTime.parse("10:00:00"));
         assertThat(captor.getValue().getTimeZone()).isEqualTo("Asia/Seoul");
-        assertThat(captor.getValue().getRecurrenceLines()).containsExactlyElementsOf(normalized);
+        assertThat(captor.getValue().getRecurrenceRules()).containsExactlyElementsOf(normalized);
         verify(eventRepository, never()).saveAll(any());
     }
 

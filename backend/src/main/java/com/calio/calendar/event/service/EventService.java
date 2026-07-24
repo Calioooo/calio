@@ -125,7 +125,7 @@ public class EventService {
     ) {
         List<RecurrenceOccurrence> occurrences = recurrenceEngine.expand(
                 RecurrenceSchedule.from(recurrenceEvent),
-                recurrenceEvent.getRecurrenceLines(),
+                recurrenceEvent.getRecurrenceRules(),
                 from,
                 to
         );

@@ -54,14 +54,14 @@ public class RecurrenceEventService {
     @Transactional
     public RecurrenceEventResponse createRecurrenceEvent(Long accountId, CreateRecurrenceEventRequest request) {
         RecurrenceSchedule schedule = createSchedule(request);
-        List<String> recurrenceLines = recurrenceEngine.validate(schedule, request.recurrence());
+        List<String> recurrenceRules = recurrenceEngine.validate(schedule, request.recurrence());
         Account account = accountRepository.getReferenceById(accountId);
         Tag tag = tagService.getTagOrDefault(accountId, request.tagId());
         RecurrenceEvent recurrenceEvent = recurrenceEventRepository.save(new RecurrenceEvent(
                 request.title(),
                 request.description(),
                 schedule,
-                recurrenceLines,
+                recurrenceRules,
                 tag,
                 account
         ));
@@ -80,10 +80,10 @@ public class RecurrenceEventService {
     ) {
         RecurrenceEvent recurrenceEvent = findRecurrenceEventForUpdate(accountId, recurrenceId);
         RecurrenceSchedule schedule = createSchedule(request);
-        List<String> recurrenceLines = recurrenceEngine.validate(schedule, request.recurrence());
+        List<String> recurrenceRules = recurrenceEngine.validate(schedule, request.recurrence());
         Tag tag = tagService.getTagOrDefault(accountId, request.tagId());
 
-        recurrenceEvent.update(request.title(), request.description(), schedule, recurrenceLines, tag);
+        recurrenceEvent.update(request.title(), request.description(), schedule, recurrenceRules, tag);
         recurrenceEventRepository.flush();
         recurrenceEventOverrideRepository.deleteByRecurrenceEvent_Id(recurrenceId);
         return RecurrenceEventResponse.from(recurrenceEvent);
@@ -178,7 +178,7 @@ public class RecurrenceEventService {
     private void validateOriginStartAt(RecurrenceEvent recurrenceEvent, Instant originStartAt) {
         boolean exists = recurrenceEngine.containsOrigin(
                 RecurrenceSchedule.from(recurrenceEvent),
-                recurrenceEvent.getRecurrenceLines(),
+                recurrenceEvent.getRecurrenceRules(),
                 originStartAt
         );
         if (!exists) {

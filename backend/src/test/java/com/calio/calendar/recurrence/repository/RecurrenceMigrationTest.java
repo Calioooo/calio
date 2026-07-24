@@ -33,7 +33,7 @@ class RecurrenceMigrationTest {
                     .contains(
                             "ALL_DAY",
                             "TIME_ZONE",
-                            "RECURRENCE_LINES",
+                            "RECURRENCE_RULE",
                             "RECURRENCE_START_DATE",
                             "RECURRENCE_END_DATE",
                             "RECURRENCE_START_TIME",
@@ -48,7 +48,7 @@ class RecurrenceMigrationTest {
                             "OVERRIDE_TIME_ZONE"
                     );
             assertThat(isNullable(connection, "RECURRENCE_EVENTS", "ALL_DAY")).isFalse();
-            assertThat(isNullable(connection, "RECURRENCE_EVENTS", "RECURRENCE_LINES")).isFalse();
+            assertThat(isNullable(connection, "RECURRENCE_EVENTS", "RECURRENCE_RULE")).isFalse();
             assertThat(isNullable(connection, "RECURRENCE_EVENTS", "TIME_ZONE")).isTrue();
             assertThat(isNullable(connection, "RECURRENCE_EVENTS", "RECURRENCE_START_DATE")).isFalse();
             assertThat(isNullable(connection, "RECURRENCE_EVENTS", "RECURRENCE_END_DATE")).isFalse();

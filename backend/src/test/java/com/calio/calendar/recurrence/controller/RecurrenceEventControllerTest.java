@@ -378,7 +378,7 @@ class RecurrenceEventControllerTest {
 
     @Test
     @DisplayName("RDATE, EXRULE, 복수 RRULE 입력은 INVALID_RECURRENCE_RULE로 응답한다")
-    void givenUnsupportedRecurrenceLines_whenCreate_thenRejectsContract() throws Exception {
+    void givenUnsupportedRecurrenceRules_whenCreate_thenRejectsContract() throws Exception {
         // given
         String request = timedRequest("Unsupported rule", "2026-08-01", "UTC");
         String recurrence = "\"recurrence\": [\"RRULE:FREQ=DAILY;COUNT=3\"]";

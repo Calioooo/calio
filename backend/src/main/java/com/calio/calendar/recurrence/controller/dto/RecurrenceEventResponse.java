@@ -36,7 +36,7 @@ public record RecurrenceEventResponse(
                 schedule.startTime(),
                 schedule.endTime(),
                 recurrenceEvent.getTimeZone(),
-                recurrenceEvent.getRecurrenceLines(),
+                recurrenceEvent.getRecurrenceRules(),
                 TagResponse.from(recurrenceEvent.getTag()),
                 recurrenceEvent.getCreatedAt(),
                 recurrenceEvent.getUpdatedAt()
