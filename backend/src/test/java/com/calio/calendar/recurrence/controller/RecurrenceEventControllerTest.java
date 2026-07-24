@@ -376,6 +376,28 @@ class RecurrenceEventControllerTest {
                 .andExpect(jsonPath("$.title").value("INVALID_RECURRENCE_RULE"));
     }
 
+    @Test
+    @DisplayName("RDATE, EXRULE, 복수 RRULE 입력은 INVALID_RECURRENCE_RULE로 응답한다")
+    void givenUnsupportedRecurrenceLines_whenCreate_thenRejectsContract() throws Exception {
+        // given
+        String request = timedRequest("Unsupported rule", "2026-08-01", "UTC");
+        String recurrence = "\"recurrence\": [\"RRULE:FREQ=DAILY;COUNT=3\"]";
+        List<String> unsupportedRecurrences = List.of(
+                "\"recurrence\": [\"RRULE:FREQ=DAILY;COUNT=3\", \"RDATE:20260802T090000Z\"]",
+                "\"recurrence\": [\"RRULE:FREQ=DAILY;COUNT=3\", \"EXRULE:FREQ=WEEKLY;BYDAY=SA\"]",
+                "\"recurrence\": [\"RRULE:FREQ=DAILY\", \"RRULE:FREQ=WEEKLY;BYDAY=MO\"]"
+        );
+
+        // when, then
+        for (String unsupportedRecurrence : unsupportedRecurrences) {
+            mockMvc.perform(post("/api/recurrence-events")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(request.replace(recurrence, unsupportedRecurrence)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.title").value("INVALID_RECURRENCE_RULE"));
+        }
+    }
+
     private long createTimedRecurrence(String title, String date, String timeZone) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/recurrence-events")
                         .contentType(MediaType.APPLICATION_JSON)

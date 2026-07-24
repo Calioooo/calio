@@ -19,15 +19,13 @@ class Ical4jRecurrenceEngineTest {
     private final Ical4jRecurrenceEngine recurrenceEngine = new Ical4jRecurrenceEngine();
 
     @Test
-    @DisplayName("DTSTART, RRULE, RDATE에서 EXDATE와 EXRULE을 제외하고 중복 제거 후 정렬한다")
-    void givenIncludeAndExcludeLines_whenExpand_thenAppliesRecurrenceSetSemantics() {
+    @DisplayName("단일 RRULE에서 EXDATE에 해당하는 occurrence를 제외한다")
+    void givenRuleAndExdates_whenExpand_thenExcludesMatchingOccurrences() {
         // given
         RecurrenceSchedule schedule = timedSchedule("2026-07-20", "09:00", "10:00", "UTC");
         List<String> recurrence = List.of(
-                "EXRULE:FREQ=DAILY;BYDAY=SA,SU",
-                "RDATE:20260722T090000Z,20260727T090000Z",
                 "RRULE:FREQ=DAILY;COUNT=8",
-                "EXDATE:20260723T090000Z"
+                "EXDATE:20260723T090000Z,20260725T090000Z,20260726T090000Z"
         );
 
         // when
@@ -137,8 +135,8 @@ class Ical4jRecurrenceEngineTest {
     }
 
     @Test
-    @DisplayName("UTC RDATE는 DST overlap에서도 Instant identity를 보존한다")
-    void givenUtcRdateDuringOverlap_whenExpand_thenPreservesInstantIdentity() {
+    @DisplayName("UTC EXDATE는 DST overlap에서도 정확한 Instant만 제외한다")
+    void givenUtcExdateDuringOverlap_whenExpand_thenMatchesExactInstant() {
         // given
         RecurrenceSchedule schedule = timedSchedule(
                 "2026-10-31",
@@ -151,8 +149,8 @@ class Ical4jRecurrenceEngineTest {
         List<Instant> origins = recurrenceEngine.expand(
                         schedule,
                         List.of(
-                                "RRULE:FREQ=DAILY;COUNT=2",
-                                "RDATE:20261101T063000Z"
+                                "RRULE:FREQ=DAILY;COUNT=3",
+                                "EXDATE:20261101T063000Z"
                         ),
                         Instant.parse("2026-10-31T00:00:00Z"),
                         Instant.parse("2026-11-03T00:00:00Z")
@@ -164,7 +162,7 @@ class Ical4jRecurrenceEngineTest {
         assertThat(origins).containsExactly(
                 Instant.parse("2026-10-31T05:30:00Z"),
                 Instant.parse("2026-11-01T05:30:00Z"),
-                Instant.parse("2026-11-01T06:30:00Z")
+                Instant.parse("2026-11-02T06:30:00Z")
         );
     }
 
@@ -182,7 +180,8 @@ class Ical4jRecurrenceEngineTest {
         );
 
         // then
-        assertThat(schedule.startAt()).isEqualTo(Instant.parse("2026-11-01T05:30:00Z"));
+        assertThat(schedule.startDate()).isEqualTo(LocalDate.parse("2026-11-01"));
+        assertThat(schedule.startTime()).isEqualTo(LocalTime.parse("01:30"));
     }
 
     @Test
@@ -207,7 +206,6 @@ class Ical4jRecurrenceEngineTest {
 
         // then
         assertThat(schedule.endDate()).isEqualTo(LocalDate.parse("2026-07-31"));
-        assertThat(schedule.endAt()).isEqualTo(Instant.parse("2026-07-20T10:00:00Z"));
         assertThat(occurrences)
                 .extracting(RecurrenceOccurrence::startAt, RecurrenceOccurrence::endAt)
                 .containsExactly(
@@ -223,7 +221,56 @@ class Ical4jRecurrenceEngineTest {
     }
 
     @Test
-    @DisplayName("timed recurrence는 endDate까지 시작하는 occurrence만 전개한다")
+    @DisplayName("timed recurrence expands from first matching occurrence after startDate")
+    void givenApplicationPeriodStartsBeforeRuleDay_whenExpand_thenStartsAtFirstMatchingOccurrence() {
+        // given
+        RecurrenceSchedule schedule = timedSchedule(
+                "2026-07-01",
+                "2026-07-31",
+                "09:00",
+                "10:00",
+                "UTC"
+        );
+
+        // when
+        List<Instant> origins = recurrenceEngine.expand(
+                        schedule,
+                        recurrenceEngine.validate(schedule, List.of("RRULE:FREQ=WEEKLY;BYDAY=TH;COUNT=3")),
+                        Instant.parse("2026-07-01T00:00:00Z"),
+                        Instant.parse("2026-07-31T23:59:59Z")
+                ).stream()
+                .map(RecurrenceOccurrence::originStartAt)
+                .toList();
+
+        // then
+        assertThat(origins).containsExactly(
+                Instant.parse("2026-07-02T09:00:00Z"),
+                Instant.parse("2026-07-09T09:00:00Z"),
+                Instant.parse("2026-07-16T09:00:00Z")
+        );
+    }
+
+    @Test
+    @DisplayName("적용 기간 안에 첫 occurrence가 없는 반복 규칙은 거부한다")
+    void givenNoMatchingOccurrenceInApplicationPeriod_whenValidate_thenRejectsRule() {
+        // given
+        RecurrenceSchedule schedule = timedSchedule(
+                "2026-07-01",
+                "2026-07-01",
+                "09:00",
+                "10:00",
+                "UTC"
+        );
+
+        // when, then
+        assertInvalidRule(() -> recurrenceEngine.validate(
+                schedule,
+                List.of("RRULE:FREQ=WEEKLY;BYDAY=TH;COUNT=3")
+        ));
+    }
+
+    @Test
+    @DisplayName("timed recurrence expands only occurrences starting by endDate")
     void givenTimedApplicationPeriod_whenRuleContinues_thenStopsAtEndDate() {
         // given
         RecurrenceSchedule schedule = timedSchedule(
@@ -268,8 +315,8 @@ class Ical4jRecurrenceEngineTest {
     }
 
     @Test
-    @DisplayName("all-day recurrence의 DATE-TIME RDATE는 INVALID_RECURRENCE_RULE로 거부한다")
-    void givenDateTimeRdateForAllDay_whenValidate_thenRejectsValueType() {
+    @DisplayName("지원하지 않는 RDATE와 EXRULE은 거부한다")
+    void givenUnsupportedRecurrenceLine_whenValidate_thenRejectsRule() {
         // given
         RecurrenceSchedule schedule = RecurrenceSchedule.create(
                 true,
@@ -281,18 +328,19 @@ class Ical4jRecurrenceEngineTest {
         );
 
         // when, then
-        assertThatThrownBy(() -> recurrenceEngine.validate(
+        assertInvalidRule(() -> recurrenceEngine.validate(
                 schedule,
-                List.of("RDATE:20260721T000000Z")
-        )).isInstanceOfSatisfying(CalioException.class, exception ->
-                assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.INVALID_RECURRENCE_RULE)
-        );
-        assertInvalidRule(() -> recurrenceEngine.validate(schedule, List.of("RDATE:20260721")));
+                List.of("RRULE:FREQ=DAILY", "RDATE;VALUE=DATE:20260721")
+        ));
+        assertInvalidRule(() -> recurrenceEngine.validate(
+                schedule,
+                List.of("RRULE:FREQ=DAILY", "EXRULE:FREQ=WEEKLY;BYDAY=SA,SU")
+        ));
     }
 
     @Test
-    @DisplayName("all-day RDATE와 EXDATE는 VALUE=DATE 집합으로 전개한다")
-    void givenAllDayDateValues_whenExpand_thenAppliesDateSetSemantics() {
+    @DisplayName("all-day EXDATE는 VALUE=DATE occurrence를 제외한다")
+    void givenAllDayExdate_whenExpand_thenExcludesDateOccurrence() {
         // given
         RecurrenceSchedule schedule = RecurrenceSchedule.create(
                 true,
@@ -308,7 +356,6 @@ class Ical4jRecurrenceEngineTest {
                         schedule,
                         List.of(
                                 "RRULE:FREQ=DAILY;COUNT=3",
-                                "RDATE;VALUE=DATE:20260722",
                                 "EXDATE;VALUE=DATE:20260721"
                         ),
                         Instant.parse("2026-07-20T00:00:00Z"),
@@ -325,28 +372,38 @@ class Ical4jRecurrenceEngineTest {
     }
 
     @Test
-    @DisplayName("timed recurrence의 DATE RDATE와 RFC 5545 외 rule part는 INVALID_RECURRENCE_RULE로 거부한다")
+    @DisplayName("잘못된 EXDATE 타입과 RFC 5545 외 rule part는 거부한다")
     void givenInvalidTimedValueTypeOrExtension_whenValidate_thenRejectsRule() {
         // given
         RecurrenceSchedule schedule = timedSchedule("2026-07-20", "09:00", "10:00", "UTC");
 
         // when, then
-        assertInvalidRule(() -> recurrenceEngine.validate(schedule, List.of("RDATE;VALUE=DATE:20260721")));
+        assertInvalidRule(() -> recurrenceEngine.validate(
+                schedule,
+                List.of("RRULE:FREQ=DAILY", "EXDATE;VALUE=DATE:20260721")
+        ));
         assertInvalidRule(() -> recurrenceEngine.validate(schedule, List.of("RRULE:FREQ=DAILY;BYEASTER=1")));
         assertInvalidRule(() -> recurrenceEngine.validate(schedule, List.of("RRULE:FREQ=DAILY;FREQ=WEEKLY")));
+        assertInvalidRule(() -> recurrenceEngine.validate(
+                schedule,
+                List.of("RRULE:FREQ=DAILY", "RRULE:FREQ=WEEKLY;BYDAY=MO")
+        ));
     }
 
     @Test
-    @DisplayName("DTSTART를 EXDATE로 제거하거나 inclusion line이 없으면 INVALID_RECURRENCE_RULE로 거부한다")
+    @DisplayName("definition with no inclusion line is rejected")
     void givenDefinitionWithoutFirstOccurrence_whenValidate_thenRejectsRule() {
         // given
         RecurrenceSchedule schedule = timedSchedule("2026-07-20", "09:00", "10:00", "UTC");
 
         // when, then
-        assertInvalidRule(() -> recurrenceEngine.validate(schedule, List.of(
+        assertThat(recurrenceEngine.validate(schedule, List.of(
                 "RRULE:FREQ=DAILY;COUNT=3",
                 "EXDATE:20260720T090000Z"
-        )));
+        ))).containsExactly(
+                "RRULE:FREQ=DAILY;COUNT=3",
+                "EXDATE:20260720T090000Z"
+        );
         assertInvalidRule(() -> recurrenceEngine.validate(schedule, List.of("EXDATE:20260721T090000Z")));
         assertInvalidRule(() -> recurrenceEngine.validate(schedule, List.of()));
     }
@@ -412,7 +469,6 @@ class Ical4jRecurrenceEngineTest {
 
         // then
         assertThat(origins).containsExactly(
-                Instant.parse("2024-02-28T09:00:00Z"),
                 Instant.parse("2024-02-28T11:00:00Z"),
                 Instant.parse("2024-02-29T11:00:00Z"),
                 Instant.parse("2024-03-01T11:00:00Z")
@@ -420,7 +476,7 @@ class Ical4jRecurrenceEngineTest {
     }
 
     @Test
-    @DisplayName("content line은 속성·parameter 순서로 정규화되고 중복 line은 set으로 축약된다")
+    @DisplayName("RRULE과 EXDATE를 정규화하고 중복 EXDATE를 제거한다")
     void givenUnorderedDuplicateLines_whenValidate_thenReturnsDeterministicCanonicalLines() {
         // given
         RecurrenceSchedule schedule = timedSchedule("2026-07-20", "09:00", "10:00", "UTC");
@@ -429,7 +485,7 @@ class Ical4jRecurrenceEngineTest {
         List<String> normalized = recurrenceEngine.validate(schedule, List.of(
                 "EXDATE;value=date-time;tzid=UTC:20260721T090000",
                 "rrule:freq=daily;count=3",
-                "RRULE:FREQ=DAILY;COUNT=3"
+                "EXDATE;value=date-time;tzid=UTC:20260721T090000"
         ));
 
         // then
