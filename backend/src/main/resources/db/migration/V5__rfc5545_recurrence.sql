@@ -6,10 +6,8 @@ ALTER TABLE recurrence_events ADD COLUMN start_at DATETIME(6) NOT NULL;
 ALTER TABLE recurrence_events ADD COLUMN end_at DATETIME(6) NOT NULL;
 ALTER TABLE recurrence_events ADD COLUMN time_zone VARCHAR(255);
 ALTER TABLE recurrence_events ADD COLUMN recurrence_lines TEXT NOT NULL;
-ALTER TABLE recurrence_events DROP COLUMN recurrence_start_date;
-ALTER TABLE recurrence_events DROP COLUMN recurrence_end_date;
-ALTER TABLE recurrence_events DROP COLUMN recurrence_start_time;
-ALTER TABLE recurrence_events DROP COLUMN recurrence_end_time;
+ALTER TABLE recurrence_events MODIFY COLUMN recurrence_start_time TIME(6) NULL;
+ALTER TABLE recurrence_events MODIFY COLUMN recurrence_end_time TIME(6) NULL;
 ALTER TABLE recurrence_events DROP COLUMN recurrence_frequency;
 
 ALTER TABLE recurrence_event_overrides ADD COLUMN override_title VARCHAR(255);

@@ -30,14 +30,18 @@ class RecurrenceMigrationTest {
         // then
         try (Connection connection = DriverManager.getConnection(url, "sa", "")) {
             assertThat(columnNames(connection, "RECURRENCE_EVENTS"))
-                    .contains("ALL_DAY", "START_AT", "END_AT", "TIME_ZONE", "RECURRENCE_LINES")
-                    .doesNotContain(
+                    .contains(
+                            "ALL_DAY",
+                            "START_AT",
+                            "END_AT",
+                            "TIME_ZONE",
+                            "RECURRENCE_LINES",
                             "RECURRENCE_START_DATE",
                             "RECURRENCE_END_DATE",
                             "RECURRENCE_START_TIME",
-                            "RECURRENCE_END_TIME",
-                            "RECURRENCE_FREQUENCY"
-                    );
+                            "RECURRENCE_END_TIME"
+                    )
+                    .doesNotContain("RECURRENCE_FREQUENCY");
             assertThat(columnNames(connection, "RECURRENCE_EVENT_OVERRIDES"))
                     .contains(
                             "OVERRIDE_TITLE",
@@ -50,6 +54,10 @@ class RecurrenceMigrationTest {
             assertThat(isNullable(connection, "RECURRENCE_EVENTS", "END_AT")).isFalse();
             assertThat(isNullable(connection, "RECURRENCE_EVENTS", "RECURRENCE_LINES")).isFalse();
             assertThat(isNullable(connection, "RECURRENCE_EVENTS", "TIME_ZONE")).isTrue();
+            assertThat(isNullable(connection, "RECURRENCE_EVENTS", "RECURRENCE_START_DATE")).isFalse();
+            assertThat(isNullable(connection, "RECURRENCE_EVENTS", "RECURRENCE_END_DATE")).isFalse();
+            assertThat(isNullable(connection, "RECURRENCE_EVENTS", "RECURRENCE_START_TIME")).isTrue();
+            assertThat(isNullable(connection, "RECURRENCE_EVENTS", "RECURRENCE_END_TIME")).isTrue();
             assertThat(isNullable(connection, "RECURRENCE_EVENT_OVERRIDES", "OVERRIDE_TITLE")).isTrue();
             assertThat(isNullable(connection, "RECURRENCE_EVENT_OVERRIDES", "OVERRIDE_DESCRIPTION")).isTrue();
             assertThat(isNullable(connection, "RECURRENCE_EVENT_OVERRIDES", "OVERRIDE_ALL_DAY")).isTrue();

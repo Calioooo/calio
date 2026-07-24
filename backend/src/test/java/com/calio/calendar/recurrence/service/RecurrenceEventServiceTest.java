@@ -81,6 +81,8 @@ class RecurrenceEventServiceTest {
         ArgumentCaptor<RecurrenceEvent> captor = ArgumentCaptor.forClass(RecurrenceEvent.class);
         verify(recurrenceEventRepository).save(captor.capture());
         assertThat(captor.getValue().getStartAt()).isEqualTo(Instant.parse("2027-01-01T00:00:00Z"));
+        assertThat(captor.getValue().getEndAt()).isEqualTo(Instant.parse("2027-01-01T01:00:00Z"));
+        assertThat(captor.getValue().getEndDate()).isEqualTo(LocalDate.parse("2027-01-31"));
         assertThat(captor.getValue().getTimeZone()).isEqualTo("Asia/Seoul");
         assertThat(captor.getValue().getRecurrenceLines()).containsExactlyElementsOf(normalized);
         verify(eventRepository, never()).saveAll(any());
@@ -160,7 +162,7 @@ class RecurrenceEventServiceTest {
                 "memo",
                 false,
                 LocalDate.parse("2027-01-01"),
-                LocalDate.parse("2027-01-01"),
+                LocalDate.parse("2027-01-31"),
                 LocalTime.parse("09:00:00"),
                 LocalTime.parse("10:00:00"),
                 "Asia/Seoul",

@@ -96,6 +96,7 @@ class RecurrenceEventControllerTest {
                 .andExpect(jsonPath("$.title").value("Daily"))
                 .andExpect(jsonPath("$.allDay").value(false))
                 .andExpect(jsonPath("$.startDate").value("2026-08-01"))
+                .andExpect(jsonPath("$.endDate").value("2026-08-03"))
                 .andExpect(jsonPath("$.startTime").value("09:00:00"))
                 .andExpect(jsonPath("$.timeZone").value("Asia/Seoul"))
                 .andExpect(jsonPath("$.recurrence[0]").value("RRULE:FREQ=DAILY;COUNT=3"))
@@ -385,6 +386,7 @@ class RecurrenceEventControllerTest {
     }
 
     private String timedRequest(String title, String date, String timeZone) {
+        String endDate = LocalDate.parse(date).plusDays(2).toString();
         return """
                 {
                   "title": "%s",
@@ -397,7 +399,7 @@ class RecurrenceEventControllerTest {
                   "timeZone": "%s",
                   "recurrence": ["RRULE:FREQ=DAILY;COUNT=3"]
                 }
-                """.formatted(title, date, date, timeZone);
+                """.formatted(title, date, endDate, timeZone);
     }
 
     private JsonNode readResponse(MvcResult result) throws Exception {

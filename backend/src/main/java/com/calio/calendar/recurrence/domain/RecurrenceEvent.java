@@ -13,6 +13,8 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 
 @Entity
@@ -40,6 +42,18 @@ public class RecurrenceEvent extends BaseEntity {
 
     @Column(name = "time_zone")
     private String timeZone;
+
+    @Column(name = "recurrence_start_date", nullable = false)
+    private LocalDate startDate;
+
+    @Column(name = "recurrence_end_date", nullable = false)
+    private LocalDate endDate;
+
+    @Column(name = "recurrence_start_time")
+    private LocalTime startTime;
+
+    @Column(name = "recurrence_end_time")
+    private LocalTime endTime;
 
     @Column(name = "recurrence_lines", nullable = false, columnDefinition = "TEXT")
     private String recurrenceLines;
@@ -88,6 +102,10 @@ public class RecurrenceEvent extends BaseEntity {
         this.startAt = schedule.startAt();
         this.endAt = schedule.endAt();
         this.timeZone = schedule.timeZone();
+        this.startDate = schedule.startDate();
+        this.endDate = schedule.endDate();
+        this.startTime = schedule.startTime();
+        this.endTime = schedule.endTime();
         this.recurrenceLines = RecurrenceLinesJson.encode(lines);
     }
 
@@ -117,6 +135,22 @@ public class RecurrenceEvent extends BaseEntity {
 
     public String getTimeZone() {
         return timeZone;
+    }
+
+    public LocalDate getStartDate() {
+        return startDate;
+    }
+
+    public LocalDate getEndDate() {
+        return endDate;
+    }
+
+    public LocalTime getStartTime() {
+        return startTime;
+    }
+
+    public LocalTime getEndTime() {
+        return endTime;
     }
 
     public List<String> getRecurrenceLines() {

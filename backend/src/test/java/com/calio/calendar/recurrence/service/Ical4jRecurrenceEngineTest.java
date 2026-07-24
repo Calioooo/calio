@@ -186,6 +186,73 @@ class Ical4jRecurrenceEngineTest {
     }
 
     @Test
+    @DisplayName("timed 반복 기간의 endDate는 첫 occurrence duration에 포함하지 않는다")
+    void givenTimedApplicationPeriod_whenExpand_thenUsesOccurrenceTimesForDuration() {
+        // given
+        RecurrenceSchedule schedule = timedSchedule(
+                "2026-07-20",
+                "2026-07-31",
+                "09:00",
+                "10:00",
+                "UTC"
+        );
+
+        // when
+        List<RecurrenceOccurrence> occurrences = recurrenceEngine.expand(
+                schedule,
+                List.of("RRULE:FREQ=DAILY;COUNT=2"),
+                Instant.parse("2026-07-20T00:00:00Z"),
+                Instant.parse("2026-07-23T00:00:00Z")
+        );
+
+        // then
+        assertThat(schedule.endDate()).isEqualTo(LocalDate.parse("2026-07-31"));
+        assertThat(schedule.endAt()).isEqualTo(Instant.parse("2026-07-20T10:00:00Z"));
+        assertThat(occurrences)
+                .extracting(RecurrenceOccurrence::startAt, RecurrenceOccurrence::endAt)
+                .containsExactly(
+                        org.assertj.core.groups.Tuple.tuple(
+                                Instant.parse("2026-07-20T09:00:00Z"),
+                                Instant.parse("2026-07-20T10:00:00Z")
+                        ),
+                        org.assertj.core.groups.Tuple.tuple(
+                                Instant.parse("2026-07-21T09:00:00Z"),
+                                Instant.parse("2026-07-21T10:00:00Z")
+                        )
+                );
+    }
+
+    @Test
+    @DisplayName("timed recurrence는 endDate까지 시작하는 occurrence만 전개한다")
+    void givenTimedApplicationPeriod_whenRuleContinues_thenStopsAtEndDate() {
+        // given
+        RecurrenceSchedule schedule = timedSchedule(
+                "2026-07-20",
+                "2026-07-22",
+                "09:00",
+                "10:00",
+                "UTC"
+        );
+
+        // when
+        List<Instant> origins = recurrenceEngine.expand(
+                        schedule,
+                        List.of("RRULE:FREQ=DAILY"),
+                        Instant.parse("2026-07-20T00:00:00Z"),
+                        Instant.parse("2026-07-25T00:00:00Z")
+                ).stream()
+                .map(RecurrenceOccurrence::originStartAt)
+                .toList();
+
+        // then
+        assertThat(origins).containsExactly(
+                Instant.parse("2026-07-20T09:00:00Z"),
+                Instant.parse("2026-07-21T09:00:00Z"),
+                Instant.parse("2026-07-22T09:00:00Z")
+        );
+    }
+
+    @Test
     @DisplayName("DST gap의 첫 schedule은 INVALID_RECURRENCE_SCHEDULE로 거부한다")
     void givenGapSchedule_whenCreate_thenRejectsSchedule() {
         assertThatThrownBy(() -> RecurrenceSchedule.create(
@@ -385,10 +452,27 @@ class Ical4jRecurrenceEngineTest {
             String endTime,
             String timeZone
     ) {
+        LocalDate startDate = LocalDate.parse(date);
+        return timedSchedule(
+                date,
+                startDate.plusYears(10).toString(),
+                startTime,
+                endTime,
+                timeZone
+        );
+    }
+
+    private RecurrenceSchedule timedSchedule(
+            String startDate,
+            String endDate,
+            String startTime,
+            String endTime,
+            String timeZone
+    ) {
         return RecurrenceSchedule.create(
                 false,
-                LocalDate.parse(date),
-                LocalDate.parse(date),
+                LocalDate.parse(startDate),
+                LocalDate.parse(endDate),
                 LocalTime.parse(startTime),
                 LocalTime.parse(endTime),
                 timeZone

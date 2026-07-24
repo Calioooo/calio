@@ -8,14 +8,16 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
-import java.time.ZonedDateTime;
 import java.time.zone.ZoneRules;
 import java.util.List;
 import java.util.Set;
-import net.fortuna.ical4j.model.TemporalAdapter;
 import net.fortuna.ical4j.model.TimeZoneRegistry;
 
 public record RecurrenceSchedule(
+        LocalDate startDate,
+        LocalDate endDate,
+        LocalTime startTime,
+        LocalTime endTime,
         Instant startAt,
         Instant endAt,
         boolean allDay,
@@ -40,6 +42,10 @@ public record RecurrenceSchedule(
 
     public static RecurrenceSchedule from(RecurrenceEvent recurrenceEvent) {
         return new RecurrenceSchedule(
+                recurrenceEvent.getStartDate(),
+                recurrenceEvent.getEndDate(),
+                recurrenceEvent.getStartTime(),
+                recurrenceEvent.getEndTime(),
                 recurrenceEvent.getStartAt(),
                 recurrenceEvent.getEndAt(),
                 recurrenceEvent.isAllDay(),
@@ -47,32 +53,8 @@ public record RecurrenceSchedule(
         );
     }
 
-    public LocalDate startDate() {
-        return allDay
-                ? startAt.atOffset(ZoneOffset.UTC).toLocalDate()
-                : toLocalTime(startAt).toLocalDate();
-    }
-
-    public LocalDate endDate() {
-        return allDay
-                ? endAt.atOffset(ZoneOffset.UTC).toLocalDate()
-                : toLocalTime(endAt).toLocalDate();
-    }
-
-    public LocalTime startTime() {
-        return allDay ? null : toLocalTime(startAt).toLocalTime();
-    }
-
-    public LocalTime endTime() {
-        return allDay ? null : toLocalTime(endAt).toLocalTime();
-    }
-
     public ZoneId zoneId() {
         return allDay ? ZoneOffset.UTC : TimeZoneRegistry.getGlobalZoneId(timeZone);
-    }
-
-    private ZonedDateTime toLocalTime(Instant instant) {
-        return TemporalAdapter.toLocalTime(instant, zoneId());
     }
 
     private static RecurrenceSchedule createAllDay(
@@ -88,6 +70,10 @@ public record RecurrenceSchedule(
             throw new CalioException(ErrorCode.INVALID_RECURRENCE_SCHEDULE);
         }
         return new RecurrenceSchedule(
+                startDate,
+                endDate,
+                null,
+                null,
                 startDate.atStartOfDay().toInstant(ZoneOffset.UTC),
                 endDate.atStartOfDay().toInstant(ZoneOffset.UTC),
                 true,
@@ -106,13 +92,26 @@ public record RecurrenceSchedule(
         if (startTime == null || endTime == null || timeZone == null || timeZone.isBlank()) {
             throw new CalioException(ErrorCode.INVALID_RECURRENCE_SCHEDULE);
         }
+        if (startDate.isAfter(endDate) || startTime.equals(endTime)) {
+            throw new CalioException(ErrorCode.INVALID_RECURRENCE_SCHEDULE);
+        }
         ZoneId zoneId = parseIanaTimeZone(timeZone);
         Instant startAt = resolveFirstScheduleTime(startDate.atTime(startTime), zoneId);
-        Instant endAt = resolveFirstScheduleTime(endDate.atTime(endTime), zoneId);
+        LocalDate firstEndDate = endTime.isAfter(startTime) ? startDate : startDate.plusDays(1);
+        Instant endAt = resolveFirstScheduleTime(firstEndDate.atTime(endTime), zoneId);
         if (!startAt.isBefore(endAt)) {
             throw new CalioException(ErrorCode.INVALID_RECURRENCE_SCHEDULE);
         }
-        return new RecurrenceSchedule(startAt, endAt, false, timeZone);
+        return new RecurrenceSchedule(
+                startDate,
+                endDate,
+                startTime,
+                endTime,
+                startAt,
+                endAt,
+                false,
+                timeZone
+        );
     }
 
     private static void requireDates(LocalDate startDate, LocalDate endDate) {
