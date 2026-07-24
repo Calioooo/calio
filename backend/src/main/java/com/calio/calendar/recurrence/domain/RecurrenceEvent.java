@@ -4,9 +4,8 @@ import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.common.domain.BaseEntity;
 import com.calio.calendar.tag.domain.Tag;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -14,10 +13,9 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.time.ZoneOffset;
+import java.util.List;
 
 @Entity
 @Table(name = "recurrence_events")
@@ -33,21 +31,27 @@ public class RecurrenceEvent extends BaseEntity {
     @Column
     private String recurrenceDescription;
 
-    @Column(nullable = false)
-    private LocalDate recurrenceStartDate;
+    @Column(name = "all_day", nullable = false)
+    private boolean allDay;
 
-    @Column(nullable = false)
-    private LocalDate recurrenceEndDate;
+    @Column(name = "time_zone")
+    private String timeZone;
 
-    @Column(nullable = false)
-    private LocalTime recurrenceStartTime;
+    @Column(name = "recurrence_start_date", nullable = false)
+    private LocalDate startDate;
 
-    @Column(nullable = false)
-    private LocalTime recurrenceEndTime;
+    @Column(name = "recurrence_end_date", nullable = false)
+    private LocalDate endDate;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private RecurrenceFrequency recurrenceFrequency;
+    @Column(name = "recurrence_start_time")
+    private LocalTime startTime;
+
+    @Column(name = "recurrence_end_time")
+    private LocalTime endTime;
+
+    @Column(name = "recurrence_rule", nullable = false, columnDefinition = "TEXT")
+    @Convert(converter = RecurrenceRuleJsonConverter.class)
+    private List<String> recurrenceRules = List.of();
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "account_id", nullable = false)
@@ -61,47 +65,41 @@ public class RecurrenceEvent extends BaseEntity {
     }
 
     public RecurrenceEvent(
-            String recurrenceTitle,
-            String recurrenceDescription,
-            LocalDate recurrenceStartDate,
-            LocalDate recurrenceEndDate,
-            LocalTime recurrenceStartTime,
-            LocalTime recurrenceEndTime,
-            RecurrenceFrequency recurrenceFrequency,
+            String title,
+            String description,
+            RecurrenceSchedule schedule,
+            List<String> recurrenceRules,
             Tag tag,
             Account account
     ) {
-        this.recurrenceTitle = recurrenceTitle;
-        this.recurrenceDescription = recurrenceDescription;
-        this.recurrenceStartDate = recurrenceStartDate;
-        this.recurrenceEndDate = recurrenceEndDate;
-        this.recurrenceStartTime = recurrenceStartTime;
-        this.recurrenceEndTime = recurrenceEndTime;
-        this.recurrenceFrequency = recurrenceFrequency;
+        this.recurrenceTitle = title;
+        this.recurrenceDescription = description;
+        replaceSchedule(schedule, recurrenceRules);
         this.tag = tag;
         this.account = account;
     }
 
     public void update(
-            String recurrenceTitle,
-            String recurrenceDescription,
-            LocalDate recurrenceStartDate,
-            LocalDate recurrenceEndDate,
-            LocalTime recurrenceStartTime,
-            LocalTime recurrenceEndTime,
-            RecurrenceFrequency recurrenceFrequency
+            String title,
+            String description,
+            RecurrenceSchedule schedule,
+            List<String> recurrenceRules,
+            Tag tag
     ) {
-        this.recurrenceTitle = recurrenceTitle;
-        this.recurrenceDescription = recurrenceDescription;
-        this.recurrenceStartDate = recurrenceStartDate;
-        this.recurrenceEndDate = recurrenceEndDate;
-        this.recurrenceStartTime = recurrenceStartTime;
-        this.recurrenceEndTime = recurrenceEndTime;
-        this.recurrenceFrequency = recurrenceFrequency;
+        this.recurrenceTitle = title;
+        this.recurrenceDescription = description;
+        replaceSchedule(schedule, recurrenceRules);
+        this.tag = tag;
     }
 
-    public void changeTag(Tag tag) {
-        this.tag = tag;
+    private void replaceSchedule(RecurrenceSchedule schedule, List<String> recurrenceRules) {
+        this.allDay = schedule.allDay();
+        this.timeZone = schedule.timeZone();
+        this.startDate = schedule.startDate();
+        this.endDate = schedule.endDate();
+        this.startTime = schedule.startTime();
+        this.endTime = schedule.endTime();
+        this.recurrenceRules = List.copyOf(recurrenceRules);
     }
 
     public Long getId() {
@@ -116,31 +114,32 @@ public class RecurrenceEvent extends BaseEntity {
         return recurrenceDescription;
     }
 
-    public LocalDate getRecurrenceStartDate() {
-        return recurrenceStartDate;
+    public boolean isAllDay() {
+        return allDay;
     }
 
-    public LocalDate getRecurrenceEndDate() {
-        return recurrenceEndDate;
+    public String getTimeZone() {
+        return timeZone;
     }
 
-    public LocalTime getRecurrenceStartTime() {
-        return recurrenceStartTime;
+    public LocalDate getStartDate() {
+        return startDate;
     }
 
-    public LocalTime getRecurrenceEndTime() {
-        return recurrenceEndTime;
+    public LocalDate getEndDate() {
+        return endDate;
     }
 
-    public RecurrenceFrequency getRecurrenceFrequency() {
-        return recurrenceFrequency;
+    public LocalTime getStartTime() {
+        return startTime;
     }
 
-    public Instant getRecurrenceEndAt() {
-        LocalDate endDate = recurrenceStartTime.isBefore(recurrenceEndTime)
-                ? recurrenceEndDate
-                : recurrenceEndDate.plusDays(1);
-        return endDate.atTime(recurrenceEndTime).toInstant(ZoneOffset.UTC);
+    public LocalTime getEndTime() {
+        return endTime;
+    }
+
+    public List<String> getRecurrenceRules() {
+        return recurrenceRules;
     }
 
     public Tag getTag() {

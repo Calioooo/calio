@@ -1,34 +1,45 @@
 package com.calio.calendar.recurrence.controller.dto;
 
-import com.calio.calendar.tag.controller.dto.TagResponse;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
-import com.calio.calendar.recurrence.domain.RecurrenceFrequency;
+import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
+import com.calio.calendar.tag.controller.dto.TagResponse;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.List;
 
 public record RecurrenceEventResponse(
         Long recurrenceId,
-        String recurrenceTitle,
-        String recurrenceDescription,
-        LocalDate recurrenceStartDate,
-        LocalDate recurrenceEndDate,
-        LocalTime recurrenceStartTime,
-        LocalTime recurrenceEndTime,
-        RecurrenceFrequency recurrenceFrequency,
-        TagResponse tag
+        String title,
+        String description,
+        boolean allDay,
+        LocalDate startDate,
+        LocalDate endDate,
+        LocalTime startTime,
+        LocalTime endTime,
+        String timeZone,
+        List<String> recurrence,
+        TagResponse tag,
+        Instant createdAt,
+        Instant updatedAt
 ) {
 
     public static RecurrenceEventResponse from(RecurrenceEvent recurrenceEvent) {
+        RecurrenceSchedule schedule = RecurrenceSchedule.from(recurrenceEvent);
         return new RecurrenceEventResponse(
                 recurrenceEvent.getId(),
                 recurrenceEvent.getRecurrenceTitle(),
                 recurrenceEvent.getRecurrenceDescription(),
-                recurrenceEvent.getRecurrenceStartDate(),
-                recurrenceEvent.getRecurrenceEndDate(),
-                recurrenceEvent.getRecurrenceStartTime(),
-                recurrenceEvent.getRecurrenceEndTime(),
-                recurrenceEvent.getRecurrenceFrequency(),
-                TagResponse.from(recurrenceEvent.getTag())
+                recurrenceEvent.isAllDay(),
+                schedule.startDate(),
+                schedule.endDate(),
+                schedule.startTime(),
+                schedule.endTime(),
+                recurrenceEvent.getTimeZone(),
+                recurrenceEvent.getRecurrenceRules(),
+                TagResponse.from(recurrenceEvent.getTag()),
+                recurrenceEvent.getCreatedAt(),
+                recurrenceEvent.getUpdatedAt()
         );
     }
 }

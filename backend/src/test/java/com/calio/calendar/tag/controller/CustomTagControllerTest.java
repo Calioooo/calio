@@ -14,7 +14,7 @@ import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.tag.repository.TagRepository;
 import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
-import com.calio.calendar.recurrence.domain.RecurrenceFrequency;
+import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.domain.TagType;
 import com.calio.calendar.security.AuthenticatedAccountMockMvcTestConfig;
@@ -240,11 +240,15 @@ class CustomTagControllerTest {
         return new RecurrenceEvent(
                 "반복",
                 null,
-                LocalDate.parse("2026-07-01"),
-                LocalDate.parse("2026-07-02"),
-                LocalTime.parse("09:00:00"),
-                LocalTime.parse("10:00:00"),
-                RecurrenceFrequency.DAILY,
+                RecurrenceSchedule.create(
+                        false,
+                        LocalDate.parse("2026-07-01"),
+                        LocalDate.parse("2026-07-01"),
+                        LocalTime.parse("09:00:00"),
+                        LocalTime.parse("10:00:00"),
+                        "UTC"
+                ),
+                java.util.List.of("RRULE:FREQ=DAILY;COUNT=2"),
                 tag,
                 currentAccountReference()
         );

@@ -34,11 +34,23 @@ public class RecurrenceEventOverride extends BaseEntity {
     @Column(name = "origin_start_at", nullable = false)
     private Instant originStartAt;
 
+    @Column(name = "override_title")
+    private String overrideTitle;
+
+    @Column(name = "override_description")
+    private String overrideDescription;
+
     @Column(name = "override_start_at")
     private Instant overrideStartAt;
 
     @Column(name = "override_end_at")
     private Instant overrideEndAt;
+
+    @Column(name = "override_all_day")
+    private Boolean overrideAllDay;
+
+    @Column(name = "override_time_zone")
+    private String overrideTimeZone;
 
     @Column(name = "deleted_at")
     private Instant deletedAt;
@@ -46,27 +58,22 @@ public class RecurrenceEventOverride extends BaseEntity {
     protected RecurrenceEventOverride() {
     }
 
-    private RecurrenceEventOverride(
-            RecurrenceEvent recurrenceEvent,
-            Instant originStartAt,
-            Instant overrideStartAt,
-            Instant overrideEndAt,
-            Instant deletedAt
-    ) {
+    private RecurrenceEventOverride(RecurrenceEvent recurrenceEvent, Instant originStartAt) {
         this.recurrenceEvent = recurrenceEvent;
         this.originStartAt = originStartAt;
-        this.overrideStartAt = overrideStartAt;
-        this.overrideEndAt = overrideEndAt;
-        this.deletedAt = deletedAt;
     }
 
-    public static RecurrenceEventOverride modified(
+    public static RecurrenceEventOverride active(
             RecurrenceEvent recurrenceEvent,
             Instant originStartAt,
-            Instant overrideStartAt,
-            Instant overrideEndAt
+            String title,
+            String description,
+            Instant startAt,
+            Instant endAt
     ) {
-        return new RecurrenceEventOverride(recurrenceEvent, originStartAt, overrideStartAt, overrideEndAt, null);
+        RecurrenceEventOverride override = new RecurrenceEventOverride(recurrenceEvent, originStartAt);
+        override.activate(title, description, startAt, endAt);
+        return override;
     }
 
     public static RecurrenceEventOverride deleted(
@@ -74,18 +81,28 @@ public class RecurrenceEventOverride extends BaseEntity {
             Instant originStartAt,
             Instant deletedAt
     ) {
-        return new RecurrenceEventOverride(recurrenceEvent, originStartAt, null, null, deletedAt);
+        RecurrenceEventOverride override = new RecurrenceEventOverride(recurrenceEvent, originStartAt);
+        override.markDeleted(deletedAt);
+        return override;
     }
 
-    public void changeModifiedTime(Instant overrideStartAt, Instant overrideEndAt) {
-        this.overrideStartAt = overrideStartAt;
-        this.overrideEndAt = overrideEndAt;
+    public void activate(String title, String description, Instant startAt, Instant endAt) {
+        this.overrideTitle = title;
+        this.overrideDescription = description;
+        this.overrideStartAt = startAt;
+        this.overrideEndAt = endAt;
+        this.overrideAllDay = recurrenceEvent.isAllDay();
+        this.overrideTimeZone = recurrenceEvent.getTimeZone();
         this.deletedAt = null;
     }
 
     public void markDeleted(Instant deletedAt) {
+        this.overrideTitle = null;
+        this.overrideDescription = null;
         this.overrideStartAt = null;
         this.overrideEndAt = null;
+        this.overrideAllDay = null;
+        this.overrideTimeZone = null;
         this.deletedAt = deletedAt;
     }
 
@@ -105,12 +122,28 @@ public class RecurrenceEventOverride extends BaseEntity {
         return originStartAt;
     }
 
+    public String getOverrideTitle() {
+        return overrideTitle;
+    }
+
+    public String getOverrideDescription() {
+        return overrideDescription;
+    }
+
     public Instant getOverrideStartAt() {
         return overrideStartAt;
     }
 
     public Instant getOverrideEndAt() {
         return overrideEndAt;
+    }
+
+    public boolean isOverrideAllDay() {
+        return Boolean.TRUE.equals(overrideAllDay);
+    }
+
+    public String getOverrideTimeZone() {
+        return overrideTimeZone;
     }
 
     public Instant getDeletedAt() {

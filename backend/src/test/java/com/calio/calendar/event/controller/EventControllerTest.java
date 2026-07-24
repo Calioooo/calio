@@ -90,6 +90,7 @@ class EventControllerTest {
                 .andExpect(jsonPath("$.description").value("Weekly planning"))
                 .andExpect(jsonPath("$.startAt").value("2026-06-01T00:00:00Z"))
                 .andExpect(jsonPath("$.endAt").value("2026-06-01T01:00:00Z"))
+                .andExpect(jsonPath("$.allDay").value(false))
                 .andExpect(jsonPath("$.importantEvent").value(false))
                 .andExpect(jsonPath("$.tag.title").value("기타"))
                 .andExpect(jsonPath("$.tag.colorCode").value("#64748B"))
@@ -675,6 +676,19 @@ class EventControllerTest {
                 .andExpect(jsonPath("$[0].id").value(overlappingBeforeId))
                 .andExpect(jsonPath("$[1].id").value(lowerBoundaryId))
                 .andExpect(jsonPath("$[2].id").value(middleId));
+    }
+
+    @Test
+    @DisplayName("일정 조회 범위가 366일을 초과하면 요청을 거부한다")
+    void givenEventQueryRangeOverLimit_whenListEvents_thenReturnsRangeTooLarge() throws Exception {
+        // when
+        mockMvc.perform(get("/api/events")
+                        .param("from", "2026-01-01T00:00:00Z")
+                        .param("to", "2027-01-03T00:00:00Z"))
+                // then
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("EVENT_QUERY_RANGE_TOO_LARGE"))
+                .andExpect(jsonPath("$.detail").isString());
     }
 
     @Test

@@ -19,9 +19,10 @@ public enum ErrorCode {
     INVALID_TAG_COLOR_CODE(HttpStatus.BAD_REQUEST, "Invalid tag color code."),
     RECURRENCE_UPDATE_TIME_RANGE_INVALID(HttpStatus.BAD_REQUEST, "Recurrence update time range invalid."),
     INVALID_TIME_RANGE(HttpStatus.BAD_REQUEST, "Invalid time range."),
-    INVALID_RECURRENCE_DATE_RANGE(HttpStatus.BAD_REQUEST, "Invalid recurrence date range."),
-    INVALID_RECURRENCE_TIME_RANGE(HttpStatus.BAD_REQUEST, "Invalid recurrence time range."),
-    INVALID_RECURRENCE_FREQUENCY(HttpStatus.BAD_REQUEST, "Invalid recurrence frequency."),
+    EVENT_QUERY_RANGE_TOO_LARGE(HttpStatus.BAD_REQUEST, "Event query range is too large."),
+    INVALID_RECURRENCE_SCHEDULE(HttpStatus.BAD_REQUEST, "Invalid recurrence schedule."),
+    INVALID_TIME_ZONE(HttpStatus.BAD_REQUEST, "Invalid time zone."),
+    INVALID_RECURRENCE_RULE(HttpStatus.BAD_REQUEST, "Invalid recurrence rule."),
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "Validation failed."),
     GOOGLE_CALENDAR_AUTHORIZATION_CODE_REQUIRED(
             HttpStatus.BAD_REQUEST,
