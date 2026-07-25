@@ -34,12 +34,17 @@ class RecurrenceMigrationTest {
                             "ALL_DAY",
                             "TIME_ZONE",
                             "RECURRENCE_RULE",
+                            "FIRST_OCCURRENCE_START_AT",
+                            "FIRST_OCCURRENCE_END_AT"
+                    )
+                    .doesNotContain(
+                            "RECURRENCE_FREQUENCY",
+                            "RECURRENCE_LINES",
                             "RECURRENCE_START_DATE",
                             "RECURRENCE_END_DATE",
                             "RECURRENCE_START_TIME",
                             "RECURRENCE_END_TIME"
-                    )
-                    .doesNotContain("RECURRENCE_FREQUENCY");
+                    );
             assertThat(columnNames(connection, "RECURRENCE_EVENT_OVERRIDES"))
                     .contains(
                             "OVERRIDE_TITLE",
@@ -50,16 +55,15 @@ class RecurrenceMigrationTest {
             assertThat(isNullable(connection, "RECURRENCE_EVENTS", "ALL_DAY")).isFalse();
             assertThat(isNullable(connection, "RECURRENCE_EVENTS", "RECURRENCE_RULE")).isFalse();
             assertThat(isNullable(connection, "RECURRENCE_EVENTS", "TIME_ZONE")).isTrue();
-            assertThat(isNullable(connection, "RECURRENCE_EVENTS", "RECURRENCE_START_DATE")).isFalse();
-            assertThat(isNullable(connection, "RECURRENCE_EVENTS", "RECURRENCE_END_DATE")).isFalse();
-            assertThat(isNullable(connection, "RECURRENCE_EVENTS", "RECURRENCE_START_TIME")).isTrue();
-            assertThat(isNullable(connection, "RECURRENCE_EVENTS", "RECURRENCE_END_TIME")).isTrue();
+            assertThat(isNullable(connection, "RECURRENCE_EVENTS", "FIRST_OCCURRENCE_START_AT")).isFalse();
+            assertThat(isNullable(connection, "RECURRENCE_EVENTS", "FIRST_OCCURRENCE_END_AT")).isFalse();
             assertThat(isNullable(connection, "RECURRENCE_EVENT_OVERRIDES", "OVERRIDE_TITLE")).isTrue();
             assertThat(isNullable(connection, "RECURRENCE_EVENT_OVERRIDES", "OVERRIDE_DESCRIPTION")).isTrue();
             assertThat(isNullable(connection, "RECURRENCE_EVENT_OVERRIDES", "OVERRIDE_ALL_DAY")).isTrue();
             assertThat(isNullable(connection, "RECURRENCE_EVENT_OVERRIDES", "OVERRIDE_TIME_ZONE")).isTrue();
             assertThat(indexNames(connection, "RECURRENCE_EVENTS"))
-                    .contains("IDX_RECURRENCE_EVENTS_ACCOUNT_PERIOD");
+                    .contains("IDX_RECURRENCE_EVENTS_ACCOUNT_FIRST_OCCURRENCE")
+                    .doesNotContain("IDX_RECURRENCE_EVENTS_ACCOUNT_PERIOD");
         }
     }
 

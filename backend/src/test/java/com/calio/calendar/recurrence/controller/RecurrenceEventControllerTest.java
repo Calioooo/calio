@@ -24,8 +24,11 @@ import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.domain.TagType;
 import com.calio.calendar.tag.repository.TagRepository;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalTime;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -95,9 +98,8 @@ class RecurrenceEventControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.title").value("Daily"))
                 .andExpect(jsonPath("$.allDay").value(false))
-                .andExpect(jsonPath("$.startDate").value("2026-08-01"))
-                .andExpect(jsonPath("$.endDate").value("2026-08-03"))
-                .andExpect(jsonPath("$.startTime").value("09:00:00"))
+                .andExpect(jsonPath("$.firstOccurrenceStartAt").value("2026-08-01T00:00:00Z"))
+                .andExpect(jsonPath("$.firstOccurrenceEndAt").value("2026-08-01T01:00:00Z"))
                 .andExpect(jsonPath("$.timeZone").value("Asia/Seoul"))
                 .andExpect(jsonPath("$.recurrence[0]").value("RRULE:FREQ=DAILY;COUNT=3"))
                 .andExpect(jsonPath("$.tag.title").value("기타"));
@@ -125,17 +127,16 @@ class RecurrenceEventControllerTest {
                                 {
                                   "title": "Offsite",
                                   "allDay": true,
-                                  "startDate": "2026-09-01",
-                                  "endDate": "2026-09-03",
-                                  "startTime": null,
-                                  "endTime": null,
+                                  "firstOccurrenceStartAt": "2026-09-01T00:00:00Z",
+                                  "firstOccurrenceEndAt": "2026-09-03T00:00:00Z",
                                   "timeZone": null,
                                   "recurrence": ["RRULE:FREQ=DAILY;COUNT=2"]
                                 }
                                 """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.allDay").value(true))
-                .andExpect(jsonPath("$.startTime").doesNotExist())
+                .andExpect(jsonPath("$.firstOccurrenceStartAt").value("2026-09-01T00:00:00Z"))
+                .andExpect(jsonPath("$.firstOccurrenceEndAt").value("2026-09-03T00:00:00Z"))
                 .andReturn();
         long recurrenceId = readResponse(result).get("recurrenceId").asLong();
 
@@ -152,7 +153,7 @@ class RecurrenceEventControllerTest {
     }
 
     @Test
-    @DisplayName("all-day 반복은 첫 occurrence의 endDate 이후에도 RRULE에 따라 조회된다")
+    @DisplayName("all-day 반복은 첫 occurrence 종료 이후에도 RRULE에 따라 조회된다")
     void givenAllDayCountRule_whenListAfterFirstOccurrenceEnd_thenReturnsOccurrence() throws Exception {
         // given
         MvcResult result = mockMvc.perform(post("/api/recurrence-events")
@@ -161,10 +162,8 @@ class RecurrenceEventControllerTest {
                                 {
                                   "title": "Daily all-day",
                                   "allDay": true,
-                                  "startDate": "2026-09-01",
-                                  "endDate": "2026-09-02",
-                                  "startTime": null,
-                                  "endTime": null,
+                                  "firstOccurrenceStartAt": "2026-09-01T00:00:00Z",
+                                  "firstOccurrenceEndAt": "2026-09-02T00:00:00Z",
                                   "timeZone": null,
                                   "recurrence": ["RRULE:FREQ=DAILY;COUNT=10"]
                                 }
@@ -194,10 +193,8 @@ class RecurrenceEventControllerTest {
                                 {
                                   "title": "Dense",
                                   "allDay": false,
-                                  "startDate": "2026-09-01",
-                                  "endDate": "2026-09-01",
-                                  "startTime": "09:00:00",
-                                  "endTime": "10:00:00",
+                                  "firstOccurrenceStartAt": "2026-09-01T09:00:00Z",
+                                  "firstOccurrenceEndAt": "2026-09-01T10:00:00Z",
                                   "timeZone": "UTC",
                                   "recurrence": ["RRULE:FREQ=SECONDLY"]
                                 }
@@ -359,10 +356,8 @@ class RecurrenceEventControllerTest {
                 null,
                 RecurrenceSchedule.create(
                         false,
-                        LocalDate.parse("2027-03-01"),
-                        LocalDate.parse("2027-03-01"),
-                        LocalTime.parse("09:00"),
-                        LocalTime.parse("10:00"),
+                        java.time.Instant.parse("2027-03-01T09:00:00Z"),
+                        java.time.Instant.parse("2027-03-01T10:00:00Z"),
                         "UTC"
                 ),
                 List.of("RRULE:FREQ=DAILY;COUNT=2"),
@@ -412,8 +407,8 @@ class RecurrenceEventControllerTest {
                                 {
                                   "title": "Bad schedule",
                                   "allDay": true,
-                                  "startDate": "2026-08-01",
-                                  "endDate": "2026-08-01",
+                                  "firstOccurrenceStartAt": "2026-08-01T00:00:00Z",
+                                  "firstOccurrenceEndAt": "2026-08-01T00:00:00Z",
                                   "recurrence": ["RRULE:FREQ=DAILY"]
                                 }
                                 """))
@@ -439,25 +434,26 @@ class RecurrenceEventControllerTest {
     }
 
     @Test
-    @DisplayName("RDATE, EXRULE, 복수 RRULE 입력은 INVALID_RECURRENCE_RULE로 응답한다")
-    void givenUnsupportedRecurrenceRules_whenCreate_thenRejectsContract() throws Exception {
+    @DisplayName("RDATE, EXDATE, EXRULE, 복수 RRULE 입력을 하나의 recurrence set으로 저장한다")
+    void givenMultipleRecurrenceRules_whenCreate_thenAcceptsContract() throws Exception {
         // given
-        String request = timedRequest("Unsupported rule", "2026-08-01", "UTC");
+        String request = timedRequest("Multiple rules", "2026-08-01", "UTC");
         String recurrence = "\"recurrence\": [\"RRULE:FREQ=DAILY;COUNT=3\"]";
-        List<String> unsupportedRecurrences = List.of(
-                "\"recurrence\": [\"RRULE:FREQ=DAILY;COUNT=3\", \"RDATE:20260802T090000Z\"]",
-                "\"recurrence\": [\"RRULE:FREQ=DAILY;COUNT=3\", \"EXRULE:FREQ=WEEKLY;BYDAY=SA\"]",
-                "\"recurrence\": [\"RRULE:FREQ=DAILY\", \"RRULE:FREQ=WEEKLY;BYDAY=MO\"]"
-        );
+        String multipleLines = """
+                "recurrence": [
+                    "RRULE:FREQ=DAILY;COUNT=3",
+                    "RRULE:FREQ=WEEKLY;COUNT=2;BYDAY=MO",
+                    "RDATE:20260805T090000Z",
+                    "EXDATE:20260802T090000Z",
+                    "EXRULE:FREQ=WEEKLY;COUNT=2;BYDAY=TU"
+                  ]""";
 
         // when, then
-        for (String unsupportedRecurrence : unsupportedRecurrences) {
-            mockMvc.perform(post("/api/recurrence-events")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(request.replace(recurrence, unsupportedRecurrence)))
-                    .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.title").value("INVALID_RECURRENCE_RULE"));
-        }
+        mockMvc.perform(post("/api/recurrence-events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request.replace(recurrence, multipleLines)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.recurrence", hasSize(5)));
     }
 
     private long createTimedRecurrence(String title, String date, String timeZone) throws Exception {
@@ -470,20 +466,26 @@ class RecurrenceEventControllerTest {
     }
 
     private String timedRequest(String title, String date, String timeZone) {
-        String endDate = LocalDate.parse(date).plusDays(2).toString();
+        ZoneId scheduleZone;
+        try {
+            scheduleZone = ZoneId.of(timeZone);
+        } catch (java.time.DateTimeException exception) {
+            scheduleZone = ZoneOffset.UTC;
+        }
+        LocalDateTime localStart = LocalDate.parse(date).atTime(9, 0);
+        Instant startAt = localStart.atZone(scheduleZone).toInstant();
+        Instant endAt = localStart.plusHours(1).atZone(scheduleZone).toInstant();
         return """
                 {
                   "title": "%s",
                   "description": "memo",
                   "allDay": false,
-                  "startDate": "%s",
-                  "endDate": "%s",
-                  "startTime": "09:00:00",
-                  "endTime": "10:00:00",
+                  "firstOccurrenceStartAt": "%s",
+                  "firstOccurrenceEndAt": "%s",
                   "timeZone": "%s",
                   "recurrence": ["RRULE:FREQ=DAILY;COUNT=3"]
                 }
-                """.formatted(title, date, endDate, timeZone);
+                """.formatted(title, startAt, endAt, timeZone);
     }
 
     private JsonNode readResponse(MvcResult result) throws Exception {

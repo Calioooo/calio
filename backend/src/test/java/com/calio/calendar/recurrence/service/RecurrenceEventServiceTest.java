@@ -22,8 +22,6 @@ import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.domain.TagType;
 import com.calio.calendar.tag.service.TagService;
 import java.time.Instant;
-import java.time.LocalDate;
-import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
@@ -80,10 +78,10 @@ class RecurrenceEventServiceTest {
         // then
         ArgumentCaptor<RecurrenceEvent> captor = ArgumentCaptor.forClass(RecurrenceEvent.class);
         verify(recurrenceEventRepository).save(captor.capture());
-        assertThat(captor.getValue().getStartDate()).isEqualTo(LocalDate.parse("2027-01-01"));
-        assertThat(captor.getValue().getEndDate()).isEqualTo(LocalDate.parse("2027-01-31"));
-        assertThat(captor.getValue().getStartTime()).isEqualTo(LocalTime.parse("09:00:00"));
-        assertThat(captor.getValue().getEndTime()).isEqualTo(LocalTime.parse("10:00:00"));
+        assertThat(captor.getValue().getFirstOccurrenceStartAt())
+                .isEqualTo(Instant.parse("2027-01-01T00:00:00Z"));
+        assertThat(captor.getValue().getFirstOccurrenceEndAt())
+                .isEqualTo(Instant.parse("2027-01-01T01:00:00Z"));
         assertThat(captor.getValue().getTimeZone()).isEqualTo("Asia/Seoul");
         assertThat(captor.getValue().getRecurrenceRules()).containsExactlyElementsOf(normalized);
         verify(eventRepository, never()).saveAll(any());
@@ -104,10 +102,8 @@ class RecurrenceEventServiceTest {
                 "Updated",
                 null,
                 true,
-                LocalDate.parse("2027-02-01"),
-                LocalDate.parse("2027-02-03"),
-                null,
-                null,
+                Instant.parse("2027-02-01T00:00:00Z"),
+                Instant.parse("2027-02-03T00:00:00Z"),
                 null,
                 normalized,
                 null
@@ -162,10 +158,8 @@ class RecurrenceEventServiceTest {
                 "Rule",
                 "memo",
                 false,
-                LocalDate.parse("2027-01-01"),
-                LocalDate.parse("2027-01-31"),
-                LocalTime.parse("09:00:00"),
-                LocalTime.parse("10:00:00"),
+                Instant.parse("2027-01-01T00:00:00Z"),
+                Instant.parse("2027-01-01T01:00:00Z"),
                 "Asia/Seoul",
                 List.of("RRULE:FREQ=DAILY;COUNT=3"),
                 null
@@ -178,10 +172,8 @@ class RecurrenceEventServiceTest {
                 "memo",
                 RecurrenceSchedule.create(
                         false,
-                        LocalDate.parse("2027-01-01"),
-                        LocalDate.parse("2027-01-01"),
-                        LocalTime.parse("09:00:00"),
-                        LocalTime.parse("10:00:00"),
+                        Instant.parse("2027-01-01T00:00:00Z"),
+                        Instant.parse("2027-01-01T01:00:00Z"),
                         "Asia/Seoul"
                 ),
                 List.of("RRULE:FREQ=DAILY;COUNT=3"),

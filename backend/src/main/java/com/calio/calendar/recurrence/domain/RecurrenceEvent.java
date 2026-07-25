@@ -13,8 +13,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import java.time.LocalDate;
-import java.time.LocalTime;
+import java.time.Instant;
 import java.util.List;
 
 @Entity
@@ -37,17 +36,11 @@ public class RecurrenceEvent extends BaseEntity {
     @Column(name = "time_zone")
     private String timeZone;
 
-    @Column(name = "recurrence_start_date", nullable = false)
-    private LocalDate startDate;
+    @Column(name = "first_occurrence_start_at", nullable = false)
+    private Instant firstOccurrenceStartAt;
 
-    @Column(name = "recurrence_end_date", nullable = false)
-    private LocalDate endDate;
-
-    @Column(name = "recurrence_start_time")
-    private LocalTime startTime;
-
-    @Column(name = "recurrence_end_time")
-    private LocalTime endTime;
+    @Column(name = "first_occurrence_end_at", nullable = false)
+    private Instant firstOccurrenceEndAt;
 
     @Column(name = "recurrence_rule", nullable = false, columnDefinition = "TEXT")
     @Convert(converter = RecurrenceRuleJsonConverter.class)
@@ -95,10 +88,8 @@ public class RecurrenceEvent extends BaseEntity {
     private void replaceSchedule(RecurrenceSchedule schedule, List<String> recurrenceRules) {
         this.allDay = schedule.allDay();
         this.timeZone = schedule.timeZone();
-        this.startDate = schedule.startDate();
-        this.endDate = schedule.endDate();
-        this.startTime = schedule.startTime();
-        this.endTime = schedule.endTime();
+        this.firstOccurrenceStartAt = schedule.firstOccurrenceStartAt();
+        this.firstOccurrenceEndAt = schedule.firstOccurrenceEndAt();
         this.recurrenceRules = List.copyOf(recurrenceRules);
     }
 
@@ -122,20 +113,12 @@ public class RecurrenceEvent extends BaseEntity {
         return timeZone;
     }
 
-    public LocalDate getStartDate() {
-        return startDate;
+    public Instant getFirstOccurrenceStartAt() {
+        return firstOccurrenceStartAt;
     }
 
-    public LocalDate getEndDate() {
-        return endDate;
-    }
-
-    public LocalTime getStartTime() {
-        return startTime;
-    }
-
-    public LocalTime getEndTime() {
-        return endTime;
+    public Instant getFirstOccurrenceEndAt() {
+        return firstOccurrenceEndAt;
     }
 
     public List<String> getRecurrenceRules() {

@@ -242,10 +242,8 @@ class CustomTagControllerTest {
                 null,
                 RecurrenceSchedule.create(
                         false,
-                        LocalDate.parse("2026-07-01"),
-                        LocalDate.parse("2026-07-01"),
-                        LocalTime.parse("09:00:00"),
-                        LocalTime.parse("10:00:00"),
+                        Instant.parse("2026-07-01T09:00:00Z"),
+                        Instant.parse("2026-07-01T10:00:00Z"),
                         "UTC"
                 ),
                 java.util.List.of("RRULE:FREQ=DAILY;COUNT=2"),

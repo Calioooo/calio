@@ -3,7 +3,7 @@ package com.calio.calendar.recurrence.repository;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.tag.domain.Tag;
 import jakarta.persistence.LockModeType;
-import java.time.LocalDate;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -21,13 +21,11 @@ public interface RecurrenceEventRepository extends JpaRepository<RecurrenceEvent
             from RecurrenceEvent recurrenceEvent
             join fetch recurrenceEvent.tag
             where recurrenceEvent.account.id = :accountId
-              and recurrenceEvent.startDate <= :toDate
-              and (recurrenceEvent.allDay = true or recurrenceEvent.endDate >= :fromDate)
+              and recurrenceEvent.firstOccurrenceStartAt < :to
             """)
-    List<RecurrenceEvent> findOverlappingRecurrenceEvents(
+    List<RecurrenceEvent> findCandidatesStartedBefore(
             @Param("accountId") Long accountId,
-            @Param("fromDate") LocalDate fromDate,
-            @Param("toDate") LocalDate toDate
+            @Param("to") Instant to
     );
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

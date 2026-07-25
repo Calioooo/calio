@@ -7,7 +7,6 @@ import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
 import java.io.IOException;
 import java.io.StringReader;
 import java.time.DateTimeException;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -18,6 +17,7 @@ import java.time.ZonedDateTime;
 import java.time.temporal.Temporal;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -35,6 +35,8 @@ import net.fortuna.ical4j.model.parameter.TzId;
 import net.fortuna.ical4j.model.parameter.Value;
 import net.fortuna.ical4j.model.property.DateListProperty;
 import net.fortuna.ical4j.model.property.ExDate;
+import net.fortuna.ical4j.model.property.ExRule;
+import net.fortuna.ical4j.model.property.RDate;
 import net.fortuna.ical4j.model.property.RRule;
 import net.fortuna.ical4j.validate.ValidationException;
 import org.springframework.stereotype.Component;
@@ -55,9 +57,7 @@ public class Ical4jRecurrenceEngine implements Rfc5545RecurrenceEngine {
 
     @Override
     public List<String> validate(RecurrenceSchedule schedule, List<String> recurrenceRules) {
-        RecurrenceDefinition definition = parseDefinition(schedule, recurrenceRules);
-        recurrenceAnchor(schedule, definition);
-        return definition.normalizedLines();
+        return parseDefinition(schedule, recurrenceRules).normalizedRules();
     }
 
     @Override
@@ -71,7 +71,28 @@ public class Ical4jRecurrenceEngine implements Rfc5545RecurrenceEngine {
             throw new CalioException(ErrorCode.INVALID_RECURRENCE_SCHEDULE);
         }
         RecurrenceDefinition definition = parseDefinition(schedule, recurrenceRules);
-        return expand(schedule, definition, from, to);
+        ExpansionWindow window = expansionWindow(schedule, from, to);
+        if (isEmpty(window)) {
+            return List.of();
+        }
+
+        CandidateLimit candidateLimit = new CandidateLimit();
+        Set<Instant> includedStarts = new LinkedHashSet<>();
+        addCandidate(includedStarts, schedule.firstOccurrenceStartAt(), candidateLimit);
+        addRuleCandidates(schedule, definition.inclusionRules(), window, includedStarts, candidateLimit);
+        addDateCandidates(schedule, definition.inclusionDates(), includedStarts, candidateLimit);
+
+        Set<Instant> excludedStarts = new HashSet<>();
+        addRuleCandidates(schedule, definition.exclusionRules(), window, excludedStarts, candidateLimit);
+        addDateCandidates(schedule, definition.exclusionDates(), excludedStarts, candidateLimit);
+
+        includedStarts.removeAll(excludedStarts);
+        return includedStarts.stream()
+                .map(startAt -> toOccurrence(schedule, startAt))
+                .flatMap(Optional::stream)
+                .filter(occurrence -> overlaps(occurrence.startAt(), occurrence.endAt(), from, to))
+                .sorted(Comparator.comparing(RecurrenceOccurrence::originStartAt))
+                .toList();
     }
 
     @Override
@@ -80,123 +101,97 @@ public class Ical4jRecurrenceEngine implements Rfc5545RecurrenceEngine {
             List<String> recurrenceRules,
             Instant originStartAt
     ) {
-        if (originStartAt == null || originStartAt.isBefore(applicationStartAt(schedule))) {
+        if (originStartAt == null || originStartAt.isBefore(schedule.firstOccurrenceStartAt())) {
             return false;
         }
         try {
-            Instant to = originStartAt.plusNanos(1);
-            return expand(schedule, recurrenceRules, originStartAt, to).stream()
+            return expand(schedule, recurrenceRules, originStartAt, originStartAt.plusNanos(1)).stream()
                     .anyMatch(occurrence -> occurrence.originStartAt().equals(originStartAt));
         } catch (DateTimeException exception) {
             return false;
         }
     }
 
-    private List<RecurrenceOccurrence> expand(
+    private void addRuleCandidates(
             RecurrenceSchedule schedule,
-            RecurrenceDefinition definition,
-            Instant from,
-            Instant to
+            List<ContentLine> rules,
+            ExpansionWindow window,
+            Set<Instant> target,
+            CandidateLimit candidateLimit
     ) {
-        RecurrenceAnchor anchor = recurrenceAnchor(schedule, definition);
-        ExpansionWindow window = expansionWindow(schedule, from, to);
-        if (isEmpty(window)) {
-            return List.of();
+        for (ContentLine rule : rules) {
+            ExpansionWindow generationWindow = boundedByUntil(schedule, rule, window);
+            if (isEmpty(generationWindow)) {
+                continue;
+            }
+            List<Temporal> candidates = recurrenceRuleForGeneration(schedule, rule)
+                    .getDatesAsStream(
+                            scheduleSeed(schedule),
+                            generationWindow.localFrom(),
+                            generationWindow.localTo(),
+                            MAX_OCCURRENCES_PER_EXPANSION + 1
+                    )
+                    .toList();
+            if (candidates.size() > MAX_OCCURRENCES_PER_EXPANSION) {
+                throw new CalioException(ErrorCode.RECURRENCE_OCCURRENCE_LIMIT_EXCEEDED);
+            }
+            candidates.stream()
+                    .filter(candidate -> startsOnOrBeforeUntil(schedule, rule, candidate))
+                    .map(candidate -> occurrenceStart(schedule, candidate))
+                    .flatMap(Optional::stream)
+                    .forEach(candidate -> addCandidate(target, candidate, candidateLimit));
         }
-        Set<Instant> excludedStarts = excludedStarts(schedule, definition);
-
-        return recurrenceStarts(schedule, definition, anchor, window).stream()
-                .map(start -> toOccurrence(schedule, start))
-                .flatMap(Optional::stream)
-                .filter(occurrence -> startsWithinApplicationPeriod(schedule, occurrence.originStartAt()))
-                .filter(occurrence -> !excludedStarts.contains(occurrence.originStartAt()))
-                .filter(occurrence -> overlaps(occurrence.startAt(), occurrence.endAt(), from, to))
-                .sorted(Comparator.comparing(RecurrenceOccurrence::originStartAt))
-                .toList();
     }
 
-    private List<Temporal> recurrenceStarts(
+    private void addDateCandidates(
             RecurrenceSchedule schedule,
-            RecurrenceDefinition definition,
-            RecurrenceAnchor anchor,
-            ExpansionWindow window
+            List<ContentLine> dateLines,
+            Set<Instant> target,
+            CandidateLimit candidateLimit
     ) {
-        ExpansionWindow generationWindow = boundedByUntil(schedule, definition.rule(), window);
-        if (isEmpty(generationWindow)) {
-            return List.of();
-        }
-        List<Temporal> starts = recurrenceRuleForGeneration(schedule, definition.rule())
-                .getDatesAsStream(
-                        anchor.start(),
-                        generationWindow.localFrom(),
-                        generationWindow.localTo(),
-                        MAX_OCCURRENCES_PER_EXPANSION + 1
-                )
-                .toList();
-        if (starts.size() > MAX_OCCURRENCES_PER_EXPANSION) {
-            throw new CalioException(ErrorCode.RECURRENCE_OCCURRENCE_LIMIT_EXCEEDED);
-        }
-        return starts.stream()
-                .filter(start -> startsOnOrBeforeUntil(schedule, definition.rule(), start))
-                .toList();
-    }
-
-    private Set<Instant> excludedStarts(
-            RecurrenceSchedule schedule,
-            RecurrenceDefinition definition
-    ) {
-        return definition.exclusionDates().stream()
+        dateLines.stream()
                 .flatMap(line -> dateValues(line).stream())
                 .map(candidate -> occurrenceStart(schedule, candidate))
                 .flatMap(Optional::stream)
-                .collect(Collectors.toSet());
+                .forEach(candidate -> addCandidate(target, candidate, candidateLimit));
     }
 
-    private boolean startsWithinApplicationPeriod(RecurrenceSchedule schedule, Instant occurrenceStartAt) {
-        if (schedule.allDay()) {
-            return true;
+    private void addCandidate(Set<Instant> target, Instant candidate, CandidateLimit candidateLimit) {
+        candidateLimit.track(candidate);
+        target.add(candidate);
+    }
+
+    private Optional<RecurrenceOccurrence> toOccurrence(RecurrenceSchedule schedule, Instant startAt) {
+        if (startAt.equals(schedule.firstOccurrenceStartAt())) {
+            return Optional.of(new RecurrenceOccurrence(
+                    startAt,
+                    startAt,
+                    schedule.firstOccurrenceEndAt()
+            ));
         }
-        LocalDate occurrenceDate = occurrenceStartAt.atZone(schedule.zoneId()).toLocalDate();
-        return !occurrenceDate.isBefore(schedule.startDate())
-                && !occurrenceDate.isAfter(schedule.endDate());
+        Optional<Instant> endAt = schedule.allDay()
+                ? Optional.of(startAt.plusSeconds(schedule.allDayDurationDays() * 86_400))
+                : resolveTimedOccurrenceEnd(schedule, startAt);
+        return endAt
+                .filter(startAt::isBefore)
+                .map(end -> new RecurrenceOccurrence(startAt, startAt, end));
     }
 
-    private Optional<RecurrenceOccurrence> toOccurrence(RecurrenceSchedule schedule, Temporal occurrenceStart) {
-        Optional<Instant> startAt = occurrenceStart(schedule, occurrenceStart);
-        if (startAt.isEmpty()) {
+    private Optional<Instant> resolveTimedOccurrenceEnd(RecurrenceSchedule schedule, Instant startAt) {
+        ZoneId zoneId = schedule.zoneId();
+        LocalDateTime localEnd = startAt.atZone(zoneId)
+                .toLocalDateTime()
+                .plus(schedule.timedWallClockDuration());
+        List<ZoneOffset> offsets = zoneId.getRules().getValidOffsets(localEnd);
+        if (offsets.isEmpty()) {
             return Optional.empty();
         }
-        Optional<Instant> endAt = occurrenceEndAt(
-                schedule,
-                occurrenceEnd(schedule, occurrenceStart),
-                startAt.get(),
-                explicitInstant(occurrenceStart).isPresent()
-        );
-        if (endAt.isEmpty() || !startAt.get().isBefore(endAt.get())) {
-            return Optional.empty();
-        }
-        return Optional.of(new RecurrenceOccurrence(startAt.get(), startAt.get(), endAt.get()));
-    }
-
-    private Optional<Instant> occurrenceEndAt(
-            RecurrenceSchedule schedule,
-            Temporal end,
-            Instant startAt,
-            boolean hasExplicitStartInstant
-    ) {
-        if (schedule.allDay()) {
-            return Optional.of(LocalDate.from(end).atStartOfDay().toInstant(ZoneOffset.UTC));
-        }
-        Optional<Instant> explicitEndAt = explicitInstant(end);
-        if (explicitEndAt.isPresent()) {
-            return explicitEndAt;
-        }
-        return resolveOccurrenceEnd(
-                toMasterLocalDateTime(schedule, end),
-                schedule.zoneId(),
-                startAt,
-                hasExplicitStartInstant
-        );
+        ZoneOffset startOffset = zoneId.getRules().getOffset(startAt);
+        ZoneOffset endOffset = offsets.stream()
+                .filter(startOffset::equals)
+                .findFirst()
+                .orElse(offsets.getFirst());
+        return Optional.of(localEnd.toInstant(endOffset));
     }
 
     private Optional<Instant> occurrenceStart(RecurrenceSchedule schedule, Temporal temporal) {
@@ -225,74 +220,36 @@ public class Ical4jRecurrenceEngine implements Rfc5545RecurrenceEngine {
         return Optional.of(localDateTime.toInstant(offsets.getFirst()));
     }
 
-    private Optional<Instant> resolveOccurrenceEnd(
-            LocalDateTime endDateTime,
-            ZoneId zoneId,
-            Instant startAt,
-            boolean hasExplicitInstant
-    ) {
-        List<ZoneOffset> offsets = zoneId.getRules().getValidOffsets(endDateTime);
-        if (offsets.isEmpty()) {
-            return Optional.empty();
-        }
-        if (!hasExplicitInstant) {
-            return Optional.of(endDateTime.toInstant(offsets.getFirst()));
-        }
-        ZoneOffset startOffset = zoneId.getRules().getOffset(startAt);
-        ZoneOffset endOffset = offsets.stream()
-                .filter(startOffset::equals)
-                .findFirst()
-                .orElse(offsets.getFirst());
-        return Optional.of(endDateTime.toInstant(endOffset));
-    }
-
     private Temporal scheduleSeed(RecurrenceSchedule schedule) {
         return schedule.allDay()
-                ? schedule.startDate()
-                : schedule.startDate().atTime(schedule.startTime());
-    }
-
-    private Temporal occurrenceEnd(RecurrenceSchedule schedule, Temporal occurrenceStart) {
-        if (schedule.allDay()) {
-            long durationDays = schedule.endDate().toEpochDay() - schedule.startDate().toEpochDay();
-            return LocalDate.from(occurrenceStart).plusDays(durationDays);
-        }
-        return toMasterLocalDateTime(schedule, occurrenceStart).plus(timedOccurrenceDuration(schedule));
+                ? schedule.firstOccurrenceDate()
+                : schedule.firstOccurrenceLocalStart();
     }
 
     private ExpansionWindow expansionWindow(RecurrenceSchedule schedule, Instant from, Instant to) {
-        return schedule.allDay()
-                ? allDayExpansionWindow(schedule, from, to)
-                : timedExpansionWindow(schedule, from, to);
-    }
-
-    private ExpansionWindow allDayExpansionWindow(RecurrenceSchedule schedule, Instant from, Instant to) {
-        long durationDays = schedule.endDate().toEpochDay() - schedule.startDate().toEpochDay();
-        LocalDate requestedFrom = from.atOffset(ZoneOffset.UTC).toLocalDate().minusDays(durationDays + 1);
-        LocalDate requestedTo = to.atOffset(ZoneOffset.UTC).toLocalDate().plusDays(2);
-        return new ExpansionWindow(
-                laterDate(requestedFrom, schedule.startDate()),
-                requestedTo
-        );
-    }
-
-    private ExpansionWindow timedExpansionWindow(RecurrenceSchedule schedule, Instant from, Instant to) {
-        LocalDateTime requestedFrom = from.atZone(schedule.zoneId()).toLocalDateTime()
-                .minus(timedOccurrenceDuration(schedule))
+        if (schedule.allDay()) {
+            LocalDate requestedFrom = from.atOffset(ZoneOffset.UTC)
+                    .toLocalDate()
+                    .minusDays(schedule.allDayDurationDays() + 1);
+            LocalDate requestedTo = to.atOffset(ZoneOffset.UTC).toLocalDate().plusDays(2);
+            return new ExpansionWindow(
+                    laterDate(requestedFrom, schedule.firstOccurrenceDate()),
+                    requestedTo
+            );
+        }
+        LocalDateTime requestedFrom = from.atZone(schedule.zoneId())
+                .toLocalDateTime()
+                .minus(schedule.timedWallClockDuration())
                 .minusDays(1);
         LocalDateTime requestedTo = to.atZone(schedule.zoneId()).toLocalDateTime().plusDays(1);
         return new ExpansionWindow(
-                laterDateTime(requestedFrom, schedule.startDate().atStartOfDay()),
-                earlierDateTime(requestedTo, schedule.endDate().plusDays(1).atStartOfDay())
+                laterDateTime(requestedFrom, schedule.firstOccurrenceLocalStart()),
+                requestedTo
         );
     }
 
     private LocalDate laterDate(LocalDate first, LocalDate second) {
         return first.isAfter(second) ? first : second;
-    }
-
-    private LocalDate earlierDate(LocalDate first, LocalDate second) {
-        return first.isBefore(second) ? first : second;
     }
 
     private LocalDateTime laterDateTime(LocalDateTime first, LocalDateTime second) {
@@ -307,79 +264,7 @@ public class Ical4jRecurrenceEngine implements Rfc5545RecurrenceEngine {
         if (window.localFrom() instanceof LocalDate from && window.localTo() instanceof LocalDate to) {
             return !from.isBefore(to);
         }
-        LocalDateTime from = LocalDateTime.from(window.localFrom());
-        LocalDateTime to = LocalDateTime.from(window.localTo());
-        return !from.isBefore(to);
-    }
-
-    private Duration timedOccurrenceDuration(RecurrenceSchedule schedule) {
-        LocalDate occurrenceEndDate = schedule.endTime().isAfter(schedule.startTime())
-                ? schedule.startDate()
-                : schedule.startDate().plusDays(1);
-        return Duration.between(
-                schedule.startDate().atTime(schedule.startTime()),
-                occurrenceEndDate.atTime(schedule.endTime())
-        );
-    }
-
-    private RecurrenceAnchor recurrenceAnchor(
-            RecurrenceSchedule schedule,
-            RecurrenceDefinition definition
-    ) {
-        Temporal seed = scheduleSeed(schedule);
-        if (schedule.allDay()) {
-            return new RecurrenceAnchor(seed);
-        }
-        Temporal firstStart = firstOccurrence(
-                schedule,
-                definition.rule(),
-                seed,
-                timedApplicationWindow(schedule)
-        );
-        return new RecurrenceAnchor(firstStart);
-    }
-
-    private Temporal firstOccurrence(
-            RecurrenceSchedule schedule,
-            ContentLine line,
-            Temporal seed,
-            ExpansionWindow applicationWindow
-    ) {
-        try {
-            ExpansionWindow generationWindow = boundedByUntil(schedule, line, applicationWindow);
-            return recurrenceRuleForGeneration(schedule, line)
-                    .getDatesAsStream(
-                            seed,
-                            generationWindow.localFrom(),
-                            generationWindow.localTo(),
-                            -1
-                    )
-                    .filter(candidate -> startsOnOrBeforeUntil(schedule, line, candidate))
-                    .map(candidate -> validOccurrenceStart(schedule, candidate))
-                    .flatMap(Optional::stream)
-                    .map(candidate -> masterTemporal(schedule, candidate))
-                    .findFirst()
-                    .orElseThrow(() -> new CalioException(ErrorCode.INVALID_RECURRENCE_RULE));
-        } catch (CalioException exception) {
-            throw exception;
-        } catch (RuntimeException exception) {
-            throw new CalioException(ErrorCode.INVALID_RECURRENCE_RULE, exception);
-        }
-    }
-
-    private Optional<Temporal> validOccurrenceStart(
-            RecurrenceSchedule schedule,
-            Temporal temporal
-    ) {
-        return occurrenceStart(schedule, temporal)
-                .filter(startAt -> startsWithinApplicationPeriod(schedule, startAt))
-                .map(startAt -> temporal);
-    }
-
-    private Temporal masterTemporal(RecurrenceSchedule schedule, Temporal temporal) {
-        return schedule.allDay()
-                ? LocalDate.from(temporal)
-                : toMasterLocalDateTime(schedule, temporal);
+        return !LocalDateTime.from(window.localFrom()).isBefore(LocalDateTime.from(window.localTo()));
     }
 
     private ExpansionWindow boundedByUntil(
@@ -394,7 +279,7 @@ public class Ical4jRecurrenceEngine implements Rfc5545RecurrenceEngine {
         LocalDateTime localUntil = Instant.from(until).atZone(schedule.zoneId()).toLocalDateTime();
         return new ExpansionWindow(
                 window.localFrom(),
-                earlierDateTime(LocalDateTime.from(window.localTo()), localUntil)
+                earlierDateTime(LocalDateTime.from(window.localTo()), localUntil.plusNanos(1))
         );
     }
 
@@ -409,7 +294,7 @@ public class Ical4jRecurrenceEngine implements Rfc5545RecurrenceEngine {
         String valueWithoutUntil = Stream.of(rule.toString().split(";"))
                 .filter(part -> !part.startsWith("UNTIL="))
                 .collect(Collectors.joining(";"));
-        return new RRule<Temporal>(valueWithoutUntil).getRecur();
+        return new Recur<>(valueWithoutUntil);
     }
 
     private boolean startsOnOrBeforeUntil(
@@ -429,13 +314,6 @@ public class Ical4jRecurrenceEngine implements Rfc5545RecurrenceEngine {
                 .orElse(false);
     }
 
-    private ExpansionWindow timedApplicationWindow(RecurrenceSchedule schedule) {
-        return new ExpansionWindow(
-                schedule.startDate().atStartOfDay(),
-                schedule.endDate().plusDays(1).atStartOfDay()
-        );
-    }
-
     private RecurrenceDefinition parseDefinition(
             RecurrenceSchedule schedule,
             List<String> recurrenceRules
@@ -446,19 +324,84 @@ public class Ical4jRecurrenceEngine implements Rfc5545RecurrenceEngine {
         List<ContentLine> rules = recurrenceRules.stream()
                 .map(this::parseContentLine)
                 .map(line -> validateLine(schedule, line))
+                .distinct()
+                .sorted(Comparator
+                        .comparingInt(this::propertyOrder)
+                        .thenComparing(ContentLine::normalized))
                 .toList();
-        List<ContentLine> inclusionRules = rules.stream()
-                .filter(line -> line.property() instanceof RRule<?>)
-                .toList();
-        if (inclusionRules.size() != 1) {
+        List<ContentLine> inclusionRules = propertiesOfType(rules, RRule.class);
+        List<ContentLine> inclusionDates = propertiesOfType(rules, RDate.class);
+        List<ContentLine> exclusionRules = propertiesOfType(rules, ExRule.class);
+        List<ContentLine> exclusionDates = propertiesOfType(rules, ExDate.class);
+        if (inclusionRules.isEmpty() && inclusionDates.isEmpty()) {
             throw new CalioException(ErrorCode.INVALID_RECURRENCE_RULE);
         }
-        List<ContentLine> exclusionDates = rules.stream()
-                .filter(line -> line.property() instanceof ExDate<?>)
-                .distinct()
-                .sorted(Comparator.comparing(ContentLine::normalized))
+        RecurrenceDefinition definition = new RecurrenceDefinition(
+                inclusionRules,
+                inclusionDates,
+                exclusionRules,
+                exclusionDates,
+                rules.stream().map(ContentLine::normalized).toList()
+        );
+        validateFirstOccurrence(schedule, definition);
+        return definition;
+    }
+
+    private List<ContentLine> propertiesOfType(List<ContentLine> lines, Class<?> propertyType) {
+        return lines.stream()
+                .filter(line -> propertyType.isInstance(line.property()))
                 .toList();
-        return new RecurrenceDefinition(inclusionRules.getFirst(), exclusionDates);
+    }
+
+    private int propertyOrder(ContentLine line) {
+        if (line.property() instanceof RRule<?>) {
+            return 0;
+        }
+        if (line.property() instanceof RDate<?>) {
+            return 1;
+        }
+        if (line.property() instanceof ExDate<?>) {
+            return 2;
+        }
+        return 3;
+    }
+
+    private void validateFirstOccurrence(
+            RecurrenceSchedule schedule,
+            RecurrenceDefinition definition
+    ) {
+        boolean hasEarlierInclusionDate = definition.inclusionDates().stream()
+                .flatMap(line -> dateValues(line).stream())
+                .map(candidate -> occurrenceStart(schedule, candidate))
+                .flatMap(Optional::stream)
+                .anyMatch(candidate -> candidate.isBefore(schedule.firstOccurrenceStartAt()));
+        boolean excludedByDate = definition.exclusionDates().stream()
+                .flatMap(line -> dateValues(line).stream())
+                .map(candidate -> occurrenceStart(schedule, candidate))
+                .flatMap(Optional::stream)
+                .anyMatch(schedule.firstOccurrenceStartAt()::equals);
+        boolean excludedByRule = definition.exclusionRules().stream()
+                .anyMatch(line -> ruleContainsFirstOccurrence(schedule, line));
+        if (hasEarlierInclusionDate || excludedByDate || excludedByRule) {
+            throw new CalioException(ErrorCode.INVALID_RECURRENCE_RULE);
+        }
+    }
+
+    private boolean ruleContainsFirstOccurrence(RecurrenceSchedule schedule, ContentLine line) {
+        Temporal seed = scheduleSeed(schedule);
+        Temporal to = schedule.allDay()
+                ? LocalDate.from(seed).plusDays(1)
+                : LocalDateTime.from(seed).plusNanos(1);
+        try {
+            return recurrenceRuleForGeneration(schedule, line)
+                    .getDatesAsStream(seed, seed, to, 2)
+                    .filter(candidate -> startsOnOrBeforeUntil(schedule, line, candidate))
+                    .map(candidate -> occurrenceStart(schedule, candidate))
+                    .flatMap(Optional::stream)
+                    .anyMatch(schedule.firstOccurrenceStartAt()::equals);
+        } catch (RuntimeException exception) {
+            throw new CalioException(ErrorCode.INVALID_RECURRENCE_RULE, exception);
+        }
     }
 
     private ContentLine parseContentLine(String rawLine) {
@@ -491,14 +434,17 @@ public class Ical4jRecurrenceEngine implements Rfc5545RecurrenceEngine {
             throw new CalioException(ErrorCode.INVALID_RECURRENCE_RULE);
         }
         Property property = properties.getFirst();
-        if (property instanceof RRule<?> || property instanceof ExDate<?>) {
+        if (property instanceof RRule<?>
+                || property instanceof RDate<?>
+                || property instanceof ExDate<?>
+                || property instanceof ExRule<?>) {
             return property;
         }
         throw new CalioException(ErrorCode.INVALID_RECURRENCE_RULE);
     }
 
     private void validateRulePartCount(String rawLine, Property property) {
-        if (!(property instanceof RRule<?>)) {
+        if (!(property instanceof RRule<?>) && !(property instanceof ExRule<?>)) {
             return;
         }
         long inputPartCount = rawLine.chars().filter(character -> character == '=').count();
@@ -511,7 +457,7 @@ public class Ical4jRecurrenceEngine implements Rfc5545RecurrenceEngine {
     private ContentLine validateLine(RecurrenceSchedule schedule, ContentLine line) {
         validateProperty(line.property());
         validateParameters(line);
-        if (line.property() instanceof RRule<?>) {
+        if (line.property() instanceof RRule<?> || line.property() instanceof ExRule<?>) {
             validateRuleValueType(schedule, line);
         } else {
             validateDateValueType(schedule, line);
@@ -531,7 +477,7 @@ public class Ical4jRecurrenceEngine implements Rfc5545RecurrenceEngine {
 
     private void validateParameters(ContentLine line) {
         List<Parameter> parameters = line.property().getParameterList().getAll();
-        if (line.property() instanceof RRule<?>) {
+        if (line.property() instanceof RRule<?> || line.property() instanceof ExRule<?>) {
             if (!parameters.isEmpty()) {
                 throw new CalioException(ErrorCode.INVALID_RECURRENCE_RULE);
             }
@@ -618,6 +564,9 @@ public class Ical4jRecurrenceEngine implements Rfc5545RecurrenceEngine {
         if (line.property() instanceof RRule<?> rule) {
             return (Recur<Temporal>) rule.getRecur();
         }
+        if (line.property() instanceof ExRule<?> rule) {
+            return (Recur<Temporal>) rule.getRecur();
+        }
         throw new CalioException(ErrorCode.INVALID_RECURRENCE_RULE);
     }
 
@@ -646,14 +595,6 @@ public class Ical4jRecurrenceEngine implements Rfc5545RecurrenceEngine {
         return LocalDateTime.from(temporal);
     }
 
-    private Instant applicationStartAt(RecurrenceSchedule schedule) {
-        if (schedule.allDay()) {
-            return schedule.startDate().atStartOfDay().toInstant(ZoneOffset.UTC);
-        }
-        return resolveGeneratedTime(schedule.startDate().atTime(schedule.startTime()), schedule.zoneId())
-                .orElseThrow(() -> new CalioException(ErrorCode.INVALID_RECURRENCE_SCHEDULE));
-    }
-
     private String normalize(Property property) {
         String normalizedParameters = property.getParameterList().getAll().stream()
                 .sorted(Comparator.comparing(Parameter::getName))
@@ -666,27 +607,30 @@ public class Ical4jRecurrenceEngine implements Rfc5545RecurrenceEngine {
         return startAt.isBefore(to) && endAt.isAfter(from);
     }
 
-    private record ContentLine(
-            Property property,
-            String normalized
-    ) {
+    private record ContentLine(Property property, String normalized) {
     }
 
     private record RecurrenceDefinition(
-            ContentLine rule,
-            List<ContentLine> exclusionDates
+            List<ContentLine> inclusionRules,
+            List<ContentLine> inclusionDates,
+            List<ContentLine> exclusionRules,
+            List<ContentLine> exclusionDates,
+            List<String> normalizedRules
     ) {
-
-        private List<String> normalizedLines() {
-            return Stream.concat(Stream.of(rule), exclusionDates.stream())
-                    .map(ContentLine::normalized)
-                    .toList();
-        }
     }
 
     private record ExpansionWindow(Temporal localFrom, Temporal localTo) {
     }
 
-    private record RecurrenceAnchor(Temporal start) {
+    private static final class CandidateLimit {
+
+        private final Set<Instant> candidates = new HashSet<>();
+
+        private void track(Instant candidate) {
+            candidates.add(candidate);
+            if (candidates.size() > MAX_OCCURRENCES_PER_EXPANSION) {
+                throw new CalioException(ErrorCode.RECURRENCE_OCCURRENCE_LIMIT_EXCEEDED);
+            }
+        }
     }
 }

@@ -139,10 +139,8 @@ public class RecurrenceEventService {
     private RecurrenceSchedule createSchedule(CreateRecurrenceEventRequest request) {
         return RecurrenceSchedule.create(
                 request.allDay(),
-                request.startDate(),
-                request.endDate(),
-                request.startTime(),
-                request.endTime(),
+                request.firstOccurrenceStartAt(),
+                request.firstOccurrenceEndAt(),
                 request.timeZone()
         );
     }
@@ -150,10 +148,8 @@ public class RecurrenceEventService {
     private RecurrenceSchedule createSchedule(UpdateRecurrenceEventRequest request) {
         return RecurrenceSchedule.create(
                 request.allDay(),
-                request.startDate(),
-                request.endDate(),
-                request.startTime(),
-                request.endTime(),
+                request.firstOccurrenceStartAt(),
+                request.firstOccurrenceEndAt(),
                 request.timeZone()
         );
     }
