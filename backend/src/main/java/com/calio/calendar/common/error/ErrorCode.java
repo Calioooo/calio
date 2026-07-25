@@ -19,6 +19,7 @@ public enum ErrorCode {
     INVALID_TAG_COLOR_CODE(HttpStatus.BAD_REQUEST, "Invalid tag color code."),
     RECURRENCE_UPDATE_TIME_RANGE_INVALID(HttpStatus.BAD_REQUEST, "Recurrence update time range invalid."),
     INVALID_TIME_RANGE(HttpStatus.BAD_REQUEST, "Invalid time range."),
+    INVALID_ALL_DAY_SCHEDULE(HttpStatus.BAD_REQUEST, "Invalid all-day event schedule."),
     EVENT_QUERY_RANGE_TOO_LARGE(HttpStatus.BAD_REQUEST, "Event query range is too large."),
     INVALID_RECURRENCE_SCHEDULE(HttpStatus.BAD_REQUEST, "Invalid recurrence schedule."),
     INVALID_TIME_ZONE(HttpStatus.BAD_REQUEST, "Invalid time zone."),
@@ -48,6 +49,25 @@ public enum ErrorCode {
     GOOGLE_CALENDAR_INTEGRATION_SAVE_FAILED(
             HttpStatus.INTERNAL_SERVER_ERROR,
             "Google Calendar integration save failed."
+    ),
+    GOOGLE_CALENDAR_NOT_CONNECTED(HttpStatus.CONFLICT, "Google Calendar is not connected."),
+    GOOGLE_CALENDAR_RECONNECT_REQUIRED(
+            HttpStatus.CONFLICT,
+            "Google Calendar reconnection is required."
+    ),
+    GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID(
+            HttpStatus.BAD_GATEWAY,
+            "Google Calendar event response is invalid."
+    ),
+    GOOGLE_CALENDAR_SYNC_FAILED(HttpStatus.BAD_GATEWAY, "Google Calendar sync failed."),
+    GOOGLE_CALENDAR_SYNC_TOKEN_MISSING(
+            HttpStatus.BAD_GATEWAY,
+            "Google Calendar sync token is missing."
+    ),
+    GOOGLE_CALENDAR_SYNC_CONFLICT(HttpStatus.CONFLICT, "Google Calendar sync is already running."),
+    EXTERNAL_EVENT_MUTATION_NOT_SUPPORTED(
+            HttpStatus.CONFLICT,
+            "External event mutation is not supported."
     ),
 
     EXTERNAL_API_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "External API is temporarily unavailable."),

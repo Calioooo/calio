@@ -196,7 +196,8 @@ class NationalHolidayControllerTest {
                                 {
                                   "title": "%s",
                                   "startAt": "%s",
-                                  "endAt": "%s"
+                                  "endAt": "%s",
+                                  "allDay": false
                                 }
                                 """.formatted(title, startAt, endAt)))
                 .andExpect(status().isCreated());

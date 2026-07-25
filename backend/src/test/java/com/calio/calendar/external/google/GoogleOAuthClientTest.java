@@ -14,6 +14,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.external.google.dto.GoogleTokenResponse;
+import com.calio.calendar.external.google.dto.GoogleAccessTokenRefreshResponse;
 import com.calio.calendar.external.google.dto.GoogleUserInfoResponse;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -150,6 +151,44 @@ class GoogleOAuthClientTest {
         assertThatThrownBy(() -> client.revokeToken("refresh-token"))
                 .isInstanceOfSatisfying(CalioException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.GOOGLE_TOKEN_REVOKE_FAILED));
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("access-token refresh는 refresh_token grant를 보내고 새 refresh token을 요구하지 않는다")
+    void givenRefreshToken_whenRefreshAccessToken_thenUsesRefreshGrantContract() {
+        // given
+        RestClient.Builder restClientBuilder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
+        GoogleOAuthClient client = new GoogleOAuthClient(
+                properties(),
+                objectMapper,
+                restClientBuilder.build()
+        );
+        server.expect(requestTo("https://oauth.example.test/token"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_FORM_URLENCODED))
+                .andExpect(content().string(allOf(
+                        containsString("refresh_token=refresh-token"),
+                        containsString("client_id=client-id"),
+                        containsString("client_secret=client-secret"),
+                        containsString("grant_type=refresh_token")
+                )))
+                .andRespond(withSuccess("""
+                        {
+                          "access_token": "new-access-token",
+                          "expires_in": 3600,
+                          "token_type": "Bearer"
+                        }
+                        """, MediaType.APPLICATION_JSON));
+
+        // when
+        GoogleAccessTokenRefreshResponse response =
+                client.refreshAccessToken("refresh-token");
+
+        // then
+        assertThat(response.accessToken()).isEqualTo("new-access-token");
+        assertThat(response.expiresIn()).isEqualTo(3600);
         server.verify();
     }
 

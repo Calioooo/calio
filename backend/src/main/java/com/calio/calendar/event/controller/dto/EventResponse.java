@@ -30,7 +30,7 @@ public record EventResponse(
                 event.getDescription(),
                 event.getStartAt(),
                 event.getEndAt(),
-                false,
+                event.isAllDay(),
                 event.importantEvent(),
                 event.getRecurrenceId().orElse(null),
                 event.isRecurrenceOccurrence(),

@@ -14,6 +14,10 @@ public interface EventRepository extends JpaRepository<Event, Long> {
 
     Optional<Event> findByIdAndAccount_Id(Long id, Long accountId);
 
+    @Modifying(flushAutomatically = true)
+    @Query("delete from Event event where event.id in :eventIds")
+    int deleteAllByIds(@Param("eventIds") List<Long> eventIds);
+
     @Query("""
             select event
             from Event event

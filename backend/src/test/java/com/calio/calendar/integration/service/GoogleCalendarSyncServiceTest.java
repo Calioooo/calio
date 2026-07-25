@@ -1,0 +1,271 @@
+package com.calio.calendar.integration.service;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import com.calio.calendar.common.error.CalioException;
+import com.calio.calendar.common.error.ErrorCode;
+import com.calio.calendar.external.google.GoogleCalendarEventsClient;
+import com.calio.calendar.external.google.GoogleCalendarSyncTokenExpiredException;
+import com.calio.calendar.external.google.GoogleOAuthProperties;
+import com.calio.calendar.external.google.dto.GoogleCalendarEventPage;
+import com.calio.calendar.integration.controller.dto.GoogleCalendarSyncResponse;
+import com.calio.calendar.integration.domain.GoogleCalendarSyncMode;
+import com.calio.calendar.integration.service.GoogleCalendarSyncLeaseService.SyncLease;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Deque;
+import java.util.List;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.web.client.RestClient;
+import tools.jackson.databind.ObjectMapper;
+
+class GoogleCalendarSyncServiceTest {
+
+    @Test
+    @DisplayName("INCREMENTAL 410은 동일 lease에서 provider data를 reset하고 FULL로 완료한다")
+    void givenExpiredIncrementalCursor_whenSync_thenResetsAndReturnsFullMode() {
+        // given
+        FakeLeaseService leaseService = new FakeLeaseService("saved-cursor");
+        FakeProviderDataService providerDataService = new FakeProviderDataService();
+        FakeEventsClient eventsClient = new FakeEventsClient(
+                new GoogleCalendarSyncTokenExpiredException(),
+                terminalPage("full-cursor")
+        );
+        FakePagePersistenceService pagePersistenceService =
+                new FakePagePersistenceService();
+        GoogleCalendarSyncService service = service(
+                leaseService,
+                providerDataService,
+                eventsClient,
+                pagePersistenceService
+        );
+
+        // when
+        GoogleCalendarSyncResponse response = service.sync(10L);
+
+        // then
+        assertThat(response.mode()).isEqualTo(GoogleCalendarSyncMode.FULL);
+        assertThat(eventsClient.requestedModes)
+                .containsExactly(
+                        GoogleCalendarSyncMode.INCREMENTAL,
+                        GoogleCalendarSyncMode.FULL
+                );
+        assertThat(providerDataService.resetCount).isOne();
+        assertThat(providerDataService.cleanupFullFailureCount).isZero();
+        assertThat(pagePersistenceService.finalizeCount).isOne();
+    }
+
+    @Test
+    @DisplayName("FULL 실패는 partial provider data를 정리하고 현재 run lease를 해제한다")
+    void givenFullSyncFailure_whenSync_thenCleansPartialProviderData() {
+        // given
+        FakeProviderDataService providerDataService = new FakeProviderDataService();
+        GoogleCalendarSyncService service = service(
+                new FakeLeaseService(null),
+                providerDataService,
+                new FakeEventsClient(new CalioException(ErrorCode.GOOGLE_CALENDAR_SYNC_FAILED)),
+                new FakePagePersistenceService()
+        );
+
+        // when, then
+        assertThatThrownBy(() -> service.sync(10L))
+                .isInstanceOfSatisfying(CalioException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.GOOGLE_CALENDAR_SYNC_FAILED));
+        assertThat(providerDataService.resetCount).isOne();
+        assertThat(providerDataService.cleanupFullFailureCount).isOne();
+        assertThat(providerDataService.releaseCount).isZero();
+    }
+
+    @Test
+    @DisplayName("INCREMENTAL 실패는 전체 cleanup 없이 기존 cursor와 앞선 page 결과를 유지한다")
+    void givenIncrementalFailure_whenSync_thenOnlyReleasesOwnedLease() {
+        // given
+        FakeProviderDataService providerDataService = new FakeProviderDataService();
+        GoogleCalendarSyncService service = service(
+                new FakeLeaseService("saved-cursor"),
+                providerDataService,
+                new FakeEventsClient(new CalioException(ErrorCode.GOOGLE_CALENDAR_SYNC_FAILED)),
+                new FakePagePersistenceService()
+        );
+
+        // when, then
+        assertThatThrownBy(() -> service.sync(10L))
+                .isInstanceOf(CalioException.class);
+        assertThat(providerDataService.resetCount).isZero();
+        assertThat(providerDataService.cleanupFullFailureCount).isZero();
+        assertThat(providerDataService.releaseCount).isOne();
+    }
+
+    @Test
+    @DisplayName("multi-page INCREMENTAL은 중간 page를 반영하고 마지막 page에서 finalize한다")
+    void givenMultipleIncrementalPages_whenSync_thenPersistsAndFinalizesByPage() {
+        // given
+        FakeEventsClient eventsClient = new FakeEventsClient(
+                pageWithNextPage("page-2"),
+                terminalPage("next-cursor")
+        );
+        FakePagePersistenceService pagePersistenceService =
+                new FakePagePersistenceService();
+        GoogleCalendarSyncService service = service(
+                new FakeLeaseService("saved-cursor"),
+                new FakeProviderDataService(),
+                eventsClient,
+                pagePersistenceService
+        );
+
+        // when
+        GoogleCalendarSyncResponse response = service.sync(10L);
+
+        // then
+        assertThat(response.mode()).isEqualTo(GoogleCalendarSyncMode.INCREMENTAL);
+        assertThat(eventsClient.requestedPageTokens).containsExactly(null, "page-2");
+        assertThat(pagePersistenceService.persistCount).isOne();
+        assertThat(pagePersistenceService.finalizeCount).isOne();
+    }
+
+    private GoogleCalendarSyncService service(
+            FakeLeaseService leaseService,
+            FakeProviderDataService providerDataService,
+            FakeEventsClient eventsClient,
+            FakePagePersistenceService pagePersistenceService
+    ) {
+        return new GoogleCalendarSyncService(
+                leaseService,
+                providerDataService,
+                new FakeAccessTokenService(),
+                eventsClient,
+                pagePersistenceService
+        );
+    }
+
+    private GoogleCalendarEventPage pageWithNextPage(String nextPageToken) {
+        return new GoogleCalendarEventPage(List.of(), nextPageToken, null, "UTC");
+    }
+
+    private GoogleCalendarEventPage terminalPage(String nextSyncToken) {
+        return new GoogleCalendarEventPage(List.of(), null, nextSyncToken, "UTC");
+    }
+
+    private static final class FakeLeaseService extends GoogleCalendarSyncLeaseService {
+
+        private final String nextSyncToken;
+
+        private FakeLeaseService(String nextSyncToken) {
+            super(null);
+            this.nextSyncToken = nextSyncToken;
+        }
+
+        @Override
+        public SyncLease acquire(Long accountId, String runId) {
+            return new SyncLease(20L, accountId, nextSyncToken, runId);
+        }
+    }
+
+    private static final class FakeProviderDataService
+            extends GoogleCalendarProviderDataService {
+
+        private int resetCount;
+        private int cleanupFullFailureCount;
+        private int releaseCount;
+
+        private FakeProviderDataService() {
+            super(null, null, null);
+        }
+
+        @Override
+        public boolean resetUnderLease(Long integrationId, String runId) {
+            resetCount++;
+            return true;
+        }
+
+        @Override
+        public void cleanupFullFailureAndRelease(Long integrationId, String runId) {
+            cleanupFullFailureCount++;
+        }
+
+        @Override
+        public void releaseOwnedLease(Long integrationId, String runId) {
+            releaseCount++;
+        }
+    }
+
+    private static final class FakeAccessTokenService
+            extends GoogleCalendarAccessTokenService {
+
+        private FakeAccessTokenService() {
+            super(null, null, null, null);
+        }
+
+        @Override
+        public String getAccessToken(Long integrationId) {
+            return "access-token";
+        }
+    }
+
+    private static final class FakeEventsClient extends GoogleCalendarEventsClient {
+
+        private final Deque<Object> results = new ArrayDeque<>();
+        private final List<GoogleCalendarSyncMode> requestedModes = new ArrayList<>();
+        private final List<String> requestedPageTokens = new ArrayList<>();
+
+        private FakeEventsClient(Object... results) {
+            super(
+                    new GoogleOAuthProperties(),
+                    null,
+                    new ObjectMapper(),
+                    RestClient.builder()
+            );
+            this.results.addAll(List.of(results));
+        }
+
+        @Override
+        public GoogleCalendarEventPage listEvents(
+                Long integrationId,
+                GoogleCalendarSyncMode mode,
+                String syncToken,
+                String pageToken
+        ) {
+            requestedModes.add(mode);
+            requestedPageTokens.add(pageToken);
+            Object result = results.removeFirst();
+            if (result instanceof RuntimeException exception) {
+                throw exception;
+            }
+            return (GoogleCalendarEventPage) result;
+        }
+    }
+
+    private static final class FakePagePersistenceService
+            extends GoogleCalendarEventPagePersistenceService {
+
+        private int persistCount;
+        private int finalizeCount;
+
+        private FakePagePersistenceService() {
+            super(null, null, null, null, null);
+        }
+
+        @Override
+        public void persistPage(
+                Long integrationId,
+                Long accountId,
+                String runId,
+                GoogleCalendarEventPage page
+        ) {
+            persistCount++;
+        }
+
+        @Override
+        public void persistLastPageAndFinalize(
+                Long integrationId,
+                Long accountId,
+                String runId,
+                GoogleCalendarEventPage page
+        ) {
+            finalizeCount++;
+        }
+    }
+}

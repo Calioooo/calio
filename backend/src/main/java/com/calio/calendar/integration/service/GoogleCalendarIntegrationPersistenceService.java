@@ -10,11 +10,14 @@ import org.springframework.transaction.annotation.Transactional;
 public class GoogleCalendarIntegrationPersistenceService {
 
     private final GoogleCalendarIntegrationRepository googleCalendarIntegrationRepository;
+    private final GoogleCalendarProviderDataService providerDataService;
 
     public GoogleCalendarIntegrationPersistenceService(
-            GoogleCalendarIntegrationRepository googleCalendarIntegrationRepository
+            GoogleCalendarIntegrationRepository googleCalendarIntegrationRepository,
+            GoogleCalendarProviderDataService providerDataService
     ) {
         this.googleCalendarIntegrationRepository = googleCalendarIntegrationRepository;
+        this.providerDataService = providerDataService;
     }
 
     @Transactional
@@ -27,7 +30,7 @@ public class GoogleCalendarIntegrationPersistenceService {
             Instant accessTokenExpiresAt,
             Instant connectedAt
     ) {
-        return googleCalendarIntegrationRepository.findByAccountId(accountId)
+        return googleCalendarIntegrationRepository.findByAccountIdForUpdate(accountId)
                 .map(integration -> replace(
                         integration,
                         googleSubject,
@@ -57,6 +60,7 @@ public class GoogleCalendarIntegrationPersistenceService {
             Instant accessTokenExpiresAt,
             Instant connectedAt
     ) {
+        providerDataService.deleteProviderData(integration.getId());
         integration.replace(
                 googleSubject,
                 googleEmail,
@@ -75,6 +79,10 @@ public class GoogleCalendarIntegrationPersistenceService {
 
     @Transactional
     public void deleteByAccountId(Long accountId) {
-        googleCalendarIntegrationRepository.deleteByAccountId(accountId);
+        googleCalendarIntegrationRepository.findByAccountIdForUpdate(accountId)
+                .ifPresent(integration -> {
+                    providerDataService.deleteProviderData(integration.getId());
+                    googleCalendarIntegrationRepository.delete(integration);
+                });
     }
 }

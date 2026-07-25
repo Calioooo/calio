@@ -62,6 +62,64 @@ class GoogleCalendarIntegrationRepositoryTest {
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
+    @Test
+    @Transactional
+    @DisplayName("active lease가 있으면 다른 run의 획득과 해제가 차단된다")
+    void givenActiveLease_whenDifferentRunAcquiresOrReleases_thenPreservesOwner() {
+        // given
+        Account account = accountRepository.saveAndFlush(new Account());
+        GoogleCalendarIntegration integration = googleCalendarIntegrationRepository.saveAndFlush(
+                integration(account.getId(), "google-subject")
+        );
+
+        // when, then
+        assertThat(googleCalendarIntegrationRepository.acquireSyncLease(
+                account.getId(),
+                "first-run"
+        )).isOne();
+        assertThat(googleCalendarIntegrationRepository.acquireSyncLease(
+                account.getId(),
+                "second-run"
+        )).isZero();
+        assertThat(googleCalendarIntegrationRepository.releaseSyncLease(
+                integration.getId(),
+                "second-run"
+        )).isZero();
+        assertThat(googleCalendarIntegrationRepository.releaseSyncLease(
+                integration.getId(),
+                "first-run"
+        )).isOne();
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("access token refresh 저장은 기존 encrypted refresh token을 유지한다")
+    void givenRefreshedAccessToken_whenUpdateToken_thenPreservesRefreshToken() {
+        // given
+        Account account = accountRepository.saveAndFlush(new Account());
+        GoogleCalendarIntegration integration = googleCalendarIntegrationRepository.saveAndFlush(
+                integration(account.getId(), "google-subject")
+        );
+
+        // when
+        int updated = googleCalendarIntegrationRepository.updateAccessToken(
+                integration.getId(),
+                "encrypted-refresh-token",
+                "new-encrypted-access-token",
+                Instant.parse("2026-07-14T14:00:00Z")
+        );
+
+        // then
+        assertThat(updated).isOne();
+        GoogleCalendarIntegration refreshed = googleCalendarIntegrationRepository
+                .findById(integration.getId())
+                .orElseThrow();
+        assertThat(refreshed.getEncryptedRefreshToken()).isEqualTo("encrypted-refresh-token");
+        assertThat(refreshed.getEncryptedAccessToken()).isEqualTo("new-encrypted-access-token");
+        assertThat(refreshed.getAccessTokenExpiresAt())
+                .isEqualTo(Instant.parse("2026-07-14T14:00:00Z"));
+    }
+
     private GoogleCalendarIntegration integration(Long accountId, String googleSubject) {
         return new GoogleCalendarIntegration(
                 accountId,

@@ -3,6 +3,7 @@ package com.calio.calendar.external.google;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.external.google.dto.GoogleTokenResponse;
+import com.calio.calendar.external.google.dto.GoogleAccessTokenRefreshResponse;
 import com.calio.calendar.external.google.dto.GoogleUserInfoResponse;
 import java.time.Duration;
 import org.slf4j.Logger;
@@ -29,6 +30,7 @@ public class GoogleOAuthClient {
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
     private static final Duration READ_TIMEOUT = Duration.ofSeconds(15);
     private static final String AUTHORIZATION_CODE_GRANT = "authorization_code";
+    private static final String REFRESH_TOKEN_GRANT = "refresh_token";
     private static final String INVALID_TOKEN_ERROR = "invalid_token";
 
     private final GoogleOAuthProperties properties;
@@ -95,6 +97,37 @@ public class GoogleOAuthClient {
         }
     }
 
+    public GoogleAccessTokenRefreshResponse refreshAccessToken(String refreshToken) {
+        try {
+            String responseBody = restClient.post()
+                    .uri(properties.getTokenUrl())
+                    .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                    .body(accessTokenRefreshForm(refreshToken))
+                    .retrieve()
+                    .body(String.class);
+            return GoogleAccessTokenRefreshResponse.fromJson(responseBody, objectMapper);
+        } catch (CalioException exception) {
+            logGoogleApiFailure("accessTokenRefresh", exception.getErrorCode(), exception);
+            throw exception;
+        } catch (JacksonException exception) {
+            logGoogleApiFailure(
+                    "accessTokenRefresh",
+                    ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED,
+                    exception
+            );
+            throw new CalioException(ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED, exception);
+        } catch (RestClientResponseException exception) {
+            ErrorCode errorCode = permanentRefreshFailure(exception)
+                    ? ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED
+                    : ErrorCode.GOOGLE_CALENDAR_SYNC_FAILED;
+            logGoogleApiFailure("accessTokenRefresh", errorCode, exception);
+            throw new CalioException(errorCode, exception);
+        } catch (RestClientException exception) {
+            logGoogleApiFailure("accessTokenRefresh", ErrorCode.GOOGLE_CALENDAR_SYNC_FAILED, exception);
+            throw new CalioException(ErrorCode.GOOGLE_CALENDAR_SYNC_FAILED, exception);
+        }
+    }
+
     public boolean revokeToken(String token) {
         try {
             restClient.post()
@@ -158,6 +191,20 @@ public class GoogleOAuthClient {
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
         form.add("token", token);
         return form;
+    }
+
+    private MultiValueMap<String, String> accessTokenRefreshForm(String refreshToken) {
+        MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+        form.add("refresh_token", refreshToken);
+        form.add("client_id", properties.getClientId());
+        form.add("client_secret", properties.getClientSecret());
+        form.add("grant_type", REFRESH_TOKEN_GRANT);
+        return form;
+    }
+
+    private boolean permanentRefreshFailure(RestClientResponseException exception) {
+        int status = exception.getStatusCode().value();
+        return status == 400 || status == 401;
     }
 
     private boolean isInvalidTokenRevokeResponse(RestClientResponseException exception) {

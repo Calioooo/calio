@@ -45,12 +45,11 @@ public class GlobalExceptionHandler {
     ) {
         ErrorCode errorCode = ErrorCode.VALIDATION_FAILED;
         log.debug(
-                "API validation failed. errorCode={} accountId={} method={} path={} message={}",
+                "API validation failed. errorCode={} accountId={} method={} path={}",
                 errorCode.name(),
                 currentAccountId(),
                 request.getMethod(),
-                request.getRequestURI(),
-                exception.getMessage()
+                request.getRequestURI()
         );
         return toResponse(errorCode, errorCode.getDefaultMessage());
     }

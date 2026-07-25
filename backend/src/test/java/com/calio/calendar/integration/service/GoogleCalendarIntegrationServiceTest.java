@@ -218,7 +218,7 @@ class GoogleCalendarIntegrationServiceTest {
         private GoogleCalendarIntegration integration;
 
         FakePersistenceService() {
-            super(null);
+            super(null, null);
         }
 
         @Override
