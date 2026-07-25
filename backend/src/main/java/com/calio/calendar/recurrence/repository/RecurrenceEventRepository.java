@@ -22,7 +22,7 @@ public interface RecurrenceEventRepository extends JpaRepository<RecurrenceEvent
             join fetch recurrenceEvent.tag
             where recurrenceEvent.account.id = :accountId
               and recurrenceEvent.startDate <= :toDate
-              and recurrenceEvent.endDate >= :fromDate
+              and (recurrenceEvent.allDay = true or recurrenceEvent.endDate >= :fromDate)
             """)
     List<RecurrenceEvent> findOverlappingRecurrenceEvents(
             @Param("accountId") Long accountId,

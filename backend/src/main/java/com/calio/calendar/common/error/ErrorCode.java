@@ -23,6 +23,10 @@ public enum ErrorCode {
     INVALID_RECURRENCE_SCHEDULE(HttpStatus.BAD_REQUEST, "Invalid recurrence schedule."),
     INVALID_TIME_ZONE(HttpStatus.BAD_REQUEST, "Invalid time zone."),
     INVALID_RECURRENCE_RULE(HttpStatus.BAD_REQUEST, "Invalid recurrence rule."),
+    RECURRENCE_OCCURRENCE_LIMIT_EXCEEDED(
+            HttpStatus.BAD_REQUEST,
+            "Recurrence occurrence limit exceeded."
+    ),
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "Validation failed."),
     GOOGLE_CALENDAR_AUTHORIZATION_CODE_REQUIRED(
             HttpStatus.BAD_REQUEST,

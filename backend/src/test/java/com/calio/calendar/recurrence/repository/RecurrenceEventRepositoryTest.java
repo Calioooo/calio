@@ -101,6 +101,42 @@ class RecurrenceEventRepositoryTest {
                 .containsExactly(overlapping.getId());
     }
 
+    @Test
+    @DisplayName("all-day endDate가 조회일보다 앞서도 RRULE 후보에서 제외하지 않는다")
+    void givenAllDaySeriesExtendingPastOccurrenceEnd_whenFindCandidates_thenIncludesMaster() {
+        // given
+        Account account = accountRepository.save(new Account());
+        Tag tag = tagRepository.save(new Tag(TagType.DEFAULT, "기타", "#64748B"));
+        RecurrenceEvent master = recurrenceEventRepository.saveAndFlush(new RecurrenceEvent(
+                "All-day series",
+                null,
+                RecurrenceSchedule.create(
+                        true,
+                        LocalDate.parse("2026-09-01"),
+                        LocalDate.parse("2026-09-02"),
+                        null,
+                        null,
+                        null
+                ),
+                List.of("RRULE:FREQ=DAILY;COUNT=10"),
+                tag,
+                account
+        ));
+        entityManager.clear();
+
+        // when
+        List<RecurrenceEvent> candidates = recurrenceEventRepository.findOverlappingRecurrenceEvents(
+                account.getId(),
+                LocalDate.parse("2026-09-05"),
+                LocalDate.parse("2026-09-05")
+        );
+
+        // then
+        assertThat(candidates)
+                .extracting(RecurrenceEvent::getId)
+                .containsExactly(master.getId());
+    }
+
     private RecurrenceEvent saveRecurrenceEvent(
             Account account,
             Tag tag,

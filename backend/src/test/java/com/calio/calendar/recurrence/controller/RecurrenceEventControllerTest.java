@@ -152,6 +152,68 @@ class RecurrenceEventControllerTest {
     }
 
     @Test
+    @DisplayName("all-day 반복은 첫 occurrence의 endDate 이후에도 RRULE에 따라 조회된다")
+    void givenAllDayCountRule_whenListAfterFirstOccurrenceEnd_thenReturnsOccurrence() throws Exception {
+        // given
+        MvcResult result = mockMvc.perform(post("/api/recurrence-events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Daily all-day",
+                                  "allDay": true,
+                                  "startDate": "2026-09-01",
+                                  "endDate": "2026-09-02",
+                                  "startTime": null,
+                                  "endTime": null,
+                                  "timeZone": null,
+                                  "recurrence": ["RRULE:FREQ=DAILY;COUNT=10"]
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn();
+        long recurrenceId = readResponse(result).get("recurrenceId").asLong();
+
+        // when, then
+        mockMvc.perform(get("/api/events")
+                        .param("from", "2026-09-05T00:00:00Z")
+                        .param("to", "2026-09-06T00:00:00Z"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].recurrenceId").value(recurrenceId))
+                .andExpect(jsonPath("$[0].startAt").value("2026-09-05T00:00:00Z"))
+                .andExpect(jsonPath("$[0].endAt").value("2026-09-06T00:00:00Z"));
+    }
+
+    @Test
+    @DisplayName("반복 조회가 occurrence 상한을 초과하면 안정적인 errorCode로 응답한다")
+    void givenDenseRule_whenListEvents_thenReturnsOccurrenceLimitExceeded() throws Exception {
+        // given
+        mockMvc.perform(post("/api/recurrence-events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Dense",
+                                  "allDay": false,
+                                  "startDate": "2026-09-01",
+                                  "endDate": "2026-09-01",
+                                  "startTime": "09:00:00",
+                                  "endTime": "10:00:00",
+                                  "timeZone": "UTC",
+                                  "recurrence": ["RRULE:FREQ=SECONDLY"]
+                                }
+                                """))
+                .andExpect(status().isCreated());
+
+        // when, then
+        mockMvc.perform(get("/api/events")
+                        .param("from", "2026-09-01T09:00:00Z")
+                        .param("to", "2026-09-01T13:00:00Z"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("RECURRENCE_OCCURRENCE_LIMIT_EXCEEDED"))
+                .andExpect(jsonPath("$.detail").isString());
+    }
+
+    @Test
     @DisplayName("active override는 null description을 포함한 snapshot 전체로 원본을 대체하고 이동 후 범위로 조회된다")
     void givenMovedOverride_whenList_thenUsesFinalSnapshotOverlap() throws Exception {
         // given

@@ -502,6 +502,200 @@ class Ical4jRecurrenceEngineTest {
     }
 
     @Test
+    @DisplayName("한 번의 확장에서 occurrence 상한을 초과하면 명시적인 오류로 중단한다")
+    void givenDenseRule_whenExpand_thenRejectsOccurrenceLimitExceeded() {
+        // given
+        RecurrenceSchedule schedule = timedSchedule("2026-07-20", "09:00", "10:00", "UTC");
+
+        // when, then
+        assertThatThrownBy(() -> recurrenceEngine.expand(
+                schedule,
+                List.of("RRULE:FREQ=SECONDLY"),
+                Instant.parse("2026-07-20T09:00:00Z"),
+                Instant.parse("2026-07-20T13:00:00Z")
+        )).isInstanceOfSatisfying(CalioException.class, exception ->
+                assertThat(exception.getErrorCode())
+                        .isEqualTo(ErrorCode.RECURRENCE_OCCURRENCE_LIMIT_EXCEEDED)
+        );
+    }
+
+    @Test
+    @DisplayName("양수 offset 일정은 UTC UNTIL과 같은 instant의 occurrence를 포함한다")
+    void givenPositiveOffsetAndUtcUntil_whenExpand_thenIncludesOccurrenceAtCutoffInstant() {
+        // given
+        RecurrenceSchedule schedule = timedSchedule(
+                "2026-01-01",
+                "2026-01-05",
+                "09:00",
+                "10:00",
+                "Asia/Seoul"
+        );
+
+        // when
+        List<Instant> origins = recurrenceEngine.expand(
+                        schedule,
+                        List.of("RRULE:FREQ=DAILY;UNTIL=20260102T000000Z"),
+                        Instant.parse("2025-12-31T00:00:00Z"),
+                        Instant.parse("2026-01-03T00:00:00Z")
+                ).stream()
+                .map(RecurrenceOccurrence::originStartAt)
+                .toList();
+
+        // then
+        assertThat(origins).containsExactly(
+                Instant.parse("2026-01-01T00:00:00Z"),
+                Instant.parse("2026-01-02T00:00:00Z")
+        );
+    }
+
+    @Test
+    @DisplayName("음수 offset 일정은 UTC UNTIL 이후 instant의 occurrence를 제외한다")
+    void givenNegativeOffsetAndUtcUntil_whenExpand_thenExcludesOccurrenceAfterCutoffInstant() {
+        // given
+        RecurrenceSchedule schedule = timedSchedule(
+                "2026-01-01",
+                "2026-01-05",
+                "09:00",
+                "10:00",
+                "America/New_York"
+        );
+
+        // when
+        List<Instant> origins = recurrenceEngine.expand(
+                        schedule,
+                        List.of("RRULE:FREQ=DAILY;UNTIL=20260102T120000Z"),
+                        Instant.parse("2026-01-01T00:00:00Z"),
+                        Instant.parse("2026-01-03T23:59:59Z")
+                ).stream()
+                .map(RecurrenceOccurrence::originStartAt)
+                .toList();
+
+        // then
+        assertThat(origins).containsExactly(Instant.parse("2026-01-01T14:00:00Z"));
+    }
+
+    @Test
+    @DisplayName("all-day endDate는 occurrence 기간만 결정하고 RRULE 시리즈를 자르지 않는다")
+    void givenAllDayDurationAndCountRule_whenExpandLaterRange_thenReturnsLaterOccurrence() {
+        // given
+        RecurrenceSchedule schedule = RecurrenceSchedule.create(
+                true,
+                LocalDate.parse("2026-09-01"),
+                LocalDate.parse("2026-09-02"),
+                null,
+                null,
+                null
+        );
+
+        // when
+        List<RecurrenceOccurrence> occurrences = recurrenceEngine.expand(
+                schedule,
+                List.of("RRULE:FREQ=DAILY;COUNT=10"),
+                Instant.parse("2026-09-05T00:00:00Z"),
+                Instant.parse("2026-09-06T00:00:00Z")
+        );
+
+        // then
+        assertThat(occurrences)
+                .extracting(RecurrenceOccurrence::startAt, RecurrenceOccurrence::endAt)
+                .containsExactly(org.assertj.core.groups.Tuple.tuple(
+                        Instant.parse("2026-09-05T00:00:00Z"),
+                        Instant.parse("2026-09-06T00:00:00Z")
+                ));
+    }
+
+    @Test
+    @DisplayName("all-day 첫 occurrence는 occurrence endDate 이후라도 RRULE에서 찾는다")
+    void givenAllDayRuleStartingAfterOccurrenceEnd_whenValidateAndExpand_thenUsesRuleStart() {
+        // given
+        RecurrenceSchedule schedule = RecurrenceSchedule.create(
+                true,
+                LocalDate.parse("2026-09-01"),
+                LocalDate.parse("2026-09-02"),
+                null,
+                null,
+                null
+        );
+        List<String> recurrence = List.of("RRULE:FREQ=WEEKLY;BYDAY=FR;COUNT=2");
+
+        // when
+        List<String> normalized = recurrenceEngine.validate(schedule, recurrence);
+        List<Instant> origins = recurrenceEngine.expand(
+                        schedule,
+                        normalized,
+                        Instant.parse("2026-09-01T00:00:00Z"),
+                        Instant.parse("2026-09-12T00:00:00Z")
+                ).stream()
+                .map(RecurrenceOccurrence::originStartAt)
+                .toList();
+
+        // then
+        assertThat(origins).containsExactly(
+                Instant.parse("2026-09-04T00:00:00Z"),
+                Instant.parse("2026-09-11T00:00:00Z")
+        );
+    }
+
+    @Test
+    @DisplayName("1,000개가 넘는 빈 frequency period 뒤의 occurrence도 계속 생성한다")
+    void givenFilteredMinutelyRule_whenExpandAcrossDays_thenDoesNotStopAtEmptyPeriodLimit() {
+        // given
+        RecurrenceSchedule schedule = timedSchedule(
+                "2026-07-20",
+                "2026-07-22",
+                "09:00",
+                "10:00",
+                "UTC"
+        );
+
+        // when
+        List<Instant> origins = recurrenceEngine.expand(
+                        schedule,
+                        List.of("RRULE:FREQ=MINUTELY;BYHOUR=9;BYMINUTE=0;COUNT=3"),
+                        Instant.parse("2026-07-20T00:00:00Z"),
+                        Instant.parse("2026-07-23T00:00:00Z")
+                ).stream()
+                .map(RecurrenceOccurrence::originStartAt)
+                .toList();
+
+        // then
+        assertThat(origins).containsExactly(
+                Instant.parse("2026-07-20T09:00:00Z"),
+                Instant.parse("2026-07-21T09:00:00Z"),
+                Instant.parse("2026-07-22T09:00:00Z")
+        );
+    }
+
+    @Test
+    @DisplayName("all-day 첫 occurrence가 400년 이후라도 유효한 RRULE로 처리한다")
+    void givenAllDayIntervalBeyondFourHundredYears_whenValidateAndExpand_thenFindsOccurrence() {
+        // given
+        RecurrenceSchedule schedule = RecurrenceSchedule.create(
+                true,
+                LocalDate.parse("2026-12-31"),
+                LocalDate.parse("2027-01-01"),
+                null,
+                null,
+                null
+        );
+        List<String> recurrence = List.of("RRULE:FREQ=YEARLY;INTERVAL=500;BYMONTH=1");
+
+        // when
+        List<String> normalized = recurrenceEngine.validate(schedule, recurrence);
+        List<RecurrenceOccurrence> occurrences = recurrenceEngine.expand(
+                schedule,
+                normalized,
+                Instant.parse("2526-01-01T00:00:00Z"),
+                Instant.parse("2526-02-01T00:00:00Z")
+        );
+
+        // then
+        assertThat(occurrences).hasSize(1);
+        assertThat(occurrences.getFirst().startAt())
+                .isEqualTo(Instant.parse("2526-01-31T00:00:00Z"));
+    }
+
+    @Test
     @DisplayName("RRULE과 EXDATE를 정규화하고 중복 EXDATE를 제거한다")
     void givenUnorderedDuplicateLines_whenValidate_thenReturnsDeterministicCanonicalLines() {
         // given
