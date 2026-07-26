@@ -192,6 +192,83 @@ class GoogleOAuthClientTest {
         server.verify();
     }
 
+    @Test
+    @DisplayName("token 응답 역직렬화 실패는 GOOGLE_TOKEN_RESPONSE_INVALID로 매핑한다")
+    void givenMalformedTokenResponse_whenExchangeToken_thenReturnsInvalidTokenResponse() {
+        // given
+        RestClient.Builder restClientBuilder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
+        GoogleOAuthClient client = new GoogleOAuthClient(
+                properties(),
+                objectMapper,
+                restClientBuilder.build()
+        );
+        server.expect(requestTo("https://oauth.example.test/token"))
+                .andRespond(withSuccess("{", MediaType.APPLICATION_JSON));
+
+        // when, then
+        assertThatThrownBy(() -> client.exchangeAuthorizationCode("auth-code"))
+                .isInstanceOfSatisfying(CalioException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.GOOGLE_TOKEN_RESPONSE_INVALID));
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("UserInfo 생성자 검증 실패는 GOOGLE_USER_INFO_INVALID로 매핑한다")
+    void givenUnverifiedUserInfo_whenFetchUserInfo_thenReturnsInvalidUserInfo() {
+        // given
+        RestClient.Builder restClientBuilder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
+        GoogleOAuthClient client = new GoogleOAuthClient(
+                properties(),
+                objectMapper,
+                restClientBuilder.build()
+        );
+        server.expect(requestTo("https://oauth.example.test/userinfo"))
+                .andRespond(withSuccess("""
+                        {
+                          "sub": "google-subject",
+                          "email": "user@example.com",
+                          "email_verified": false
+                        }
+                        """, MediaType.APPLICATION_JSON));
+
+        // when, then
+        assertThatThrownBy(() -> client.fetchUserInfo("access-token"))
+                .isInstanceOfSatisfying(CalioException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.GOOGLE_USER_INFO_INVALID));
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("refresh 응답 생성자 검증 실패는 GOOGLE_CALENDAR_RECONNECT_REQUIRED로 매핑한다")
+    void givenInvalidRefreshResponse_whenRefreshAccessToken_thenRequiresReconnect() {
+        // given
+        RestClient.Builder restClientBuilder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
+        GoogleOAuthClient client = new GoogleOAuthClient(
+                properties(),
+                objectMapper,
+                restClientBuilder.build()
+        );
+        server.expect(requestTo("https://oauth.example.test/token"))
+                .andRespond(withSuccess("""
+                        {
+                          "access_token": "new-access-token",
+                          "expires_in": 3600
+                        }
+                        """, MediaType.APPLICATION_JSON));
+
+        // when, then
+        assertThatThrownBy(() -> client.refreshAccessToken("refresh-token"))
+                .isInstanceOfSatisfying(CalioException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED));
+        server.verify();
+    }
+
     private GoogleOAuthProperties properties() {
         GoogleOAuthProperties properties = new GoogleOAuthProperties();
         properties.setTokenUrl("https://oauth.example.test/token");
