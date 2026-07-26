@@ -94,11 +94,6 @@ public class GoogleCalendarIntegration extends BaseEntity {
         clearSyncState();
     }
 
-    public void refreshAccessToken(String encryptedAccessToken, Instant accessTokenExpiresAt) {
-        this.encryptedAccessToken = encryptedAccessToken;
-        this.accessTokenExpiresAt = accessTokenExpiresAt;
-    }
-
     public void clearSyncState() {
         this.nextSyncToken = null;
         this.activeSyncRunId = null;

@@ -31,8 +31,8 @@ class GoogleCalendarIntegrationRepositoryTest {
 
     @Test
     @Transactional
-    @DisplayName("Google Calendar integration은 accountId 기준으로 조회, 존재 확인, 삭제된다")
-    void givenIntegration_whenFindExistsAndDeleteByAccountId_thenUsesAccountIdContract() {
+    @DisplayName("Google Calendar integration은 accountId 기준으로 조회되고 존재 여부를 확인할 수 있다")
+    void givenIntegration_whenFindAndCheckExists_thenUsesAccountIdContract() {
         // given
         Account account = accountRepository.saveAndFlush(new Account());
         GoogleCalendarIntegration integration = googleCalendarIntegrationRepository.saveAndFlush(
@@ -44,9 +44,6 @@ class GoogleCalendarIntegrationRepositoryTest {
                 .map(GoogleCalendarIntegration::getId)
                 .contains(integration.getId());
         assertThat(googleCalendarIntegrationRepository.existsByAccountId(account.getId())).isTrue();
-
-        googleCalendarIntegrationRepository.deleteByAccountId(account.getId());
-        assertThat(googleCalendarIntegrationRepository.existsByAccountId(account.getId())).isFalse();
     }
 
     @Test

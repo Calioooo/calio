@@ -25,9 +25,6 @@ public interface GoogleCalendarIntegrationRepository extends JpaRepository<Googl
     boolean existsByAccountId(Long accountId);
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
-    void deleteByAccountId(Long accountId);
-
-    @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(value = """
             UPDATE google_calendar_integrations
             SET active_sync_run_id = :runId,
