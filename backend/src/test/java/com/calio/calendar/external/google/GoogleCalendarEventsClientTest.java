@@ -23,6 +23,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 import tools.jackson.databind.ObjectMapper;
 
 class GoogleCalendarEventsClientTest {
@@ -116,6 +117,30 @@ class GoogleCalendarEventsClientTest {
                 "cursor",
                 null
         )).isInstanceOf(GoogleCalendarUnauthorizedException.class);
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("Events API 410은 원본 HTTP 실패를 보존한 sync token 만료 예외로 분류한다")
+    void givenGoneResponse_whenListEvents_thenReturnsSyncTokenExpired() {
+        // given
+        RestClient.Builder restClientBuilder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
+        GoogleCalendarEventsClient client = client(restClientBuilder);
+        server.expect(requestTo(containsString("syncToken=expired-cursor")))
+                .andRespond(withStatus(HttpStatus.GONE));
+
+        // when, then
+        assertThatThrownBy(() -> client.listEvents(
+                "current-token",
+                GoogleCalendarSyncMode.INCREMENTAL,
+                "expired-cursor",
+                null
+        )).isInstanceOfSatisfying(
+                GoogleCalendarSyncTokenExpiredException.class,
+                exception -> assertThat(exception.getCause())
+                        .isInstanceOf(RestClientResponseException.class)
+        );
         server.verify();
     }
 
