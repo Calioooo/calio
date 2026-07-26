@@ -10,6 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -210,7 +211,8 @@ public class GoogleOAuthClient {
 
     private boolean permanentRefreshFailure(RestClientResponseException exception) {
         int status = exception.getStatusCode().value();
-        return status == 400 || status == 401;
+        return status == HttpStatus.BAD_REQUEST.value()
+                || status == HttpStatus.UNAUTHORIZED.value();
     }
 
     private boolean isDeserializationFailure(RestClientException exception) {

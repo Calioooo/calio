@@ -18,6 +18,8 @@ import com.calio.calendar.external.google.dto.GoogleAccessTokenRefreshResponse;
 import com.calio.calendar.external.google.dto.GoogleUserInfoResponse;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -189,6 +191,34 @@ class GoogleOAuthClientTest {
         // then
         assertThat(response.accessToken()).isEqualTo("new-access-token");
         assertThat(response.expiresIn()).isEqualTo(3600);
+        server.verify();
+    }
+
+    @ParameterizedTest(name = "HTTP {0} refresh 실패는 Google Calendar 재연결을 요구한다")
+    @DisplayName("access-token refresh의 HTTP 400/401 실패는 Google Calendar 재연결을 요구한다")
+    @EnumSource(
+            value = HttpStatus.class,
+            names = {"BAD_REQUEST", "UNAUTHORIZED"}
+    )
+    void givenPermanentRefreshFailure_whenRefreshAccessToken_thenRequiresReconnect(
+            HttpStatus status
+    ) {
+        // given
+        RestClient.Builder restClientBuilder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
+        GoogleOAuthClient client = new GoogleOAuthClient(
+                properties(),
+                objectMapper,
+                restClientBuilder.build()
+        );
+        server.expect(requestTo("https://oauth.example.test/token"))
+                .andRespond(withStatus(status));
+
+        // when, then
+        assertThatThrownBy(() -> client.refreshAccessToken("refresh-token"))
+                .isInstanceOfSatisfying(CalioException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED));
         server.verify();
     }
 
