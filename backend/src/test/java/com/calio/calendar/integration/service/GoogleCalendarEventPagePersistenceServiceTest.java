@@ -12,6 +12,7 @@ import com.calio.calendar.event.repository.EventRepository;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventItem;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventPage;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventTime;
+import com.calio.calendar.integration.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.repository.GoogleCalendarEventMappingRepository;
 import com.calio.calendar.integration.repository.GoogleCalendarIntegrationRepository;
@@ -109,6 +110,36 @@ class GoogleCalendarEventPagePersistenceServiceTest {
         assertThat(finalized.getNextSyncToken()).isEqualTo("cursor-2");
         assertThat(finalized.getActiveSyncRunId()).isNull();
         assertThat(finalized.getSyncLeaseExpiresAt()).isNull();
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("Google이 허용하는 최대 1024자 event id를 손실 없이 저장한다")
+    void givenMaximumLengthExternalEventId_whenPersistPage_thenStoresCompleteId() {
+        // given
+        Account account = accountRepository.saveAndFlush(new Account());
+        tagRepository.saveAndFlush(new Tag(TagType.DEFAULT, "기타", "#64748B"));
+        GoogleCalendarIntegration integration = integrationRepository.saveAndFlush(
+                integration(account.getId())
+        );
+        String externalEventId = "a".repeat(1024);
+        acquireLease(account.getId(), "maximum-id-run");
+
+        // when
+        pagePersistenceService.persistLastPageAndFinalize(
+                integration.getId(),
+                account.getId(),
+                "maximum-id-run",
+                page(timedItem(externalEventId, "Maximum ID"), "cursor-1")
+        );
+
+        // then
+        assertThat(mappingRepository.findAllByExternalIdentity(
+                integration.getId(),
+                GoogleCalendarEventMapping.PRIMARY_CALENDAR_KEY,
+                List.of(externalEventId)
+        )).singleElement().satisfies(mapping ->
+                assertThat(mapping.getExternalEventId()).isEqualTo(externalEventId));
     }
 
     @Test

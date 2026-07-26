@@ -39,7 +39,8 @@ CREATE TABLE google_calendar_event_mappings (
     integration_id BIGINT NOT NULL,
     event_id BIGINT NOT NULL,
     calendar_key VARCHAR(32) NOT NULL,
-    external_event_id VARCHAR(512) NOT NULL,
+    external_event_id VARCHAR(1024)
+        CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
     provider_etag VARCHAR(255),
     provider_updated_at DATETIME(6),
     created_at DATETIME(6) NOT NULL,
