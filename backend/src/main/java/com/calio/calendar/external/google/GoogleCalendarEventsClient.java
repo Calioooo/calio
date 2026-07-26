@@ -5,6 +5,7 @@ import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventPage;
 import com.calio.calendar.integration.domain.GoogleCalendarSyncMode;
 import com.calio.calendar.integration.service.GoogleCalendarAccessTokenService;
+import java.net.URI;
 import java.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -110,7 +111,7 @@ public class GoogleCalendarEventsClient {
         return GoogleCalendarEventPage.fromJson(responseBody, objectMapper);
     }
 
-    private java.net.URI eventsUri(
+    private URI eventsUri(
             GoogleCalendarSyncMode mode,
             String syncToken,
             String pageToken
