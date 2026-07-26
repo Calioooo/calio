@@ -229,12 +229,12 @@ class GoogleCalendarIntegrationControllerTest {
                 GoogleOAuthProperties properties,
                 ObjectMapper objectMapper
         ) {
-            super(properties, null, objectMapper, RestClient.builder());
+            super(properties, objectMapper, RestClient.builder());
         }
 
         @Override
         public GoogleCalendarEventPage listEvents(
-                Long integrationId,
+                String accessToken,
                 GoogleCalendarSyncMode mode,
                 String syncToken,
                 String pageToken

@@ -7,6 +7,7 @@ import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.external.google.GoogleCalendarEventsClient;
 import com.calio.calendar.external.google.GoogleCalendarSyncTokenExpiredException;
+import com.calio.calendar.external.google.GoogleCalendarUnauthorizedException;
 import com.calio.calendar.external.google.GoogleOAuthProperties;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventPage;
 import com.calio.calendar.integration.controller.dto.GoogleCalendarSyncResponse;
@@ -55,6 +56,58 @@ class GoogleCalendarSyncServiceTest {
         assertThat(providerDataService.resetCount).isOne();
         assertThat(providerDataService.cleanupFullFailureCount).isZero();
         assertThat(pagePersistenceService.finalizeCount).isOne();
+    }
+
+    @Test
+    @DisplayName("Events API 401은 access token을 강제 갱신하고 동일 page를 한 번 재시도한다")
+    void givenUnauthorizedResponse_whenSync_thenRefreshesAndRetriesOnce() {
+        // given
+        FakeAccessTokenService accessTokenService = new FakeAccessTokenService();
+        FakeEventsClient eventsClient = new FakeEventsClient(
+                new GoogleCalendarUnauthorizedException(new RuntimeException()),
+                terminalPage("full-cursor")
+        );
+        GoogleCalendarSyncService service = service(
+                new FakeLeaseService(null),
+                new FakeProviderDataService(),
+                accessTokenService,
+                eventsClient,
+                new FakePagePersistenceService()
+        );
+
+        // when
+        GoogleCalendarSyncResponse response = service.sync(10L);
+
+        // then
+        assertThat(response.mode()).isEqualTo(GoogleCalendarSyncMode.FULL);
+        assertThat(accessTokenService.forceRefreshCount).isOne();
+        assertThat(eventsClient.requestedAccessTokens)
+                .containsExactly("access-token", "refreshed-access-token");
+    }
+
+    @Test
+    @DisplayName("Events API가 재시도에도 401이면 reconnect required로 종료하고 FULL partial data를 정리한다")
+    void givenRepeatedUnauthorizedResponses_whenSync_thenRequiresReconnect() {
+        // given
+        FakeProviderDataService providerDataService = new FakeProviderDataService();
+        FakeAccessTokenService accessTokenService = new FakeAccessTokenService();
+        GoogleCalendarUnauthorizedException unauthorized =
+                new GoogleCalendarUnauthorizedException(new RuntimeException());
+        GoogleCalendarSyncService service = service(
+                new FakeLeaseService(null),
+                providerDataService,
+                accessTokenService,
+                new FakeEventsClient(unauthorized, unauthorized),
+                new FakePagePersistenceService()
+        );
+
+        // when, then
+        assertThatThrownBy(() -> service.sync(10L))
+                .isInstanceOfSatisfying(CalioException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED));
+        assertThat(accessTokenService.forceRefreshCount).isOne();
+        assertThat(providerDataService.cleanupFullFailureCount).isOne();
     }
 
     @Test
@@ -132,10 +185,26 @@ class GoogleCalendarSyncServiceTest {
             FakeEventsClient eventsClient,
             FakePagePersistenceService pagePersistenceService
     ) {
-        return new GoogleCalendarSyncService(
+        return service(
                 leaseService,
                 providerDataService,
                 new FakeAccessTokenService(),
+                eventsClient,
+                pagePersistenceService
+        );
+    }
+
+    private GoogleCalendarSyncService service(
+            FakeLeaseService leaseService,
+            FakeProviderDataService providerDataService,
+            FakeAccessTokenService accessTokenService,
+            FakeEventsClient eventsClient,
+            FakePagePersistenceService pagePersistenceService
+    ) {
+        return new GoogleCalendarSyncService(
+                leaseService,
+                providerDataService,
+                accessTokenService,
                 eventsClient,
                 pagePersistenceService
         );
@@ -195,6 +264,8 @@ class GoogleCalendarSyncServiceTest {
     private static final class FakeAccessTokenService
             extends GoogleCalendarAccessTokenService {
 
+        private int forceRefreshCount;
+
         private FakeAccessTokenService() {
             super(null, null, null, null);
         }
@@ -203,6 +274,12 @@ class GoogleCalendarSyncServiceTest {
         public String getAccessToken(Long integrationId) {
             return "access-token";
         }
+
+        @Override
+        public String forceRefresh(Long integrationId) {
+            forceRefreshCount++;
+            return "refreshed-access-token";
+        }
     }
 
     private static final class FakeEventsClient extends GoogleCalendarEventsClient {
@@ -210,11 +287,11 @@ class GoogleCalendarSyncServiceTest {
         private final Deque<Object> results = new ArrayDeque<>();
         private final List<GoogleCalendarSyncMode> requestedModes = new ArrayList<>();
         private final List<String> requestedPageTokens = new ArrayList<>();
+        private final List<String> requestedAccessTokens = new ArrayList<>();
 
         private FakeEventsClient(Object... results) {
             super(
                     new GoogleOAuthProperties(),
-                    null,
                     new ObjectMapper(),
                     RestClient.builder()
             );
@@ -223,11 +300,12 @@ class GoogleCalendarSyncServiceTest {
 
         @Override
         public GoogleCalendarEventPage listEvents(
-                Long integrationId,
+                String accessToken,
                 GoogleCalendarSyncMode mode,
                 String syncToken,
                 String pageToken
         ) {
+            requestedAccessTokens.add(accessToken);
             requestedModes.add(mode);
             requestedPageTokens.add(pageToken);
             Object result = results.removeFirst();

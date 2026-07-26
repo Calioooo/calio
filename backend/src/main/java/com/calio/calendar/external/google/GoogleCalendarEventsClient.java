@@ -4,7 +4,6 @@ import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventPage;
 import com.calio.calendar.integration.domain.GoogleCalendarSyncMode;
-import com.calio.calendar.integration.service.GoogleCalendarAccessTokenService;
 import java.net.URI;
 import java.time.Duration;
 import org.slf4j.Logger;
@@ -13,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -33,20 +33,17 @@ public class GoogleCalendarEventsClient {
     private static final String INSUFFICIENT_PERMISSIONS_REASON = "insufficientPermissions";
 
     private final GoogleOAuthProperties properties;
-    private final GoogleCalendarAccessTokenService accessTokenService;
     private final ObjectMapper objectMapper;
     private final RestClient restClient;
 
     @Autowired
     public GoogleCalendarEventsClient(
             GoogleOAuthProperties properties,
-            GoogleCalendarAccessTokenService accessTokenService,
             ObjectMapper objectMapper,
             RestClient.Builder restClientBuilder
     ) {
         this(
                 properties,
-                accessTokenService,
                 objectMapper,
                 createRestClient(restClientBuilder)
         );
@@ -54,45 +51,31 @@ public class GoogleCalendarEventsClient {
 
     GoogleCalendarEventsClient(
             GoogleOAuthProperties properties,
-            GoogleCalendarAccessTokenService accessTokenService,
             ObjectMapper objectMapper,
             RestClient restClient
     ) {
         this.properties = properties;
-        this.accessTokenService = accessTokenService;
         this.objectMapper = objectMapper;
         this.restClient = restClient;
     }
 
     public GoogleCalendarEventPage listEvents(
-            Long integrationId,
+            String accessToken,
             GoogleCalendarSyncMode mode,
             String syncToken,
             String pageToken
     ) {
         validateQueryContract(mode, syncToken, pageToken);
-        String accessToken = accessTokenService.getAccessToken(integrationId);
         try {
             return requestPage(accessToken, mode, syncToken, pageToken);
         } catch (RestClientResponseException exception) {
-            if (exception.getStatusCode().value() != HttpStatus.UNAUTHORIZED.value()) {
-                throw translateResponseFailure(exception);
-            }
-            String refreshedAccessToken = accessTokenService.forceRefresh(integrationId);
-            try {
-                return requestPage(refreshedAccessToken, mode, syncToken, pageToken);
-            } catch (RestClientResponseException retryException) {
-                throw translateResponseFailure(retryException);
-            } catch (JacksonException retryException) {
-                throw invalidResponse(retryException);
-            } catch (RestClientException retryException) {
-                throw syncFailed(retryException);
-            }
+            throw translateResponseFailure(exception);
         } catch (CalioException exception) {
             throw exception;
-        } catch (JacksonException exception) {
-            throw invalidResponse(exception);
         } catch (RestClientException exception) {
+            if (isDeserializationFailure(exception)) {
+                throw invalidResponse(exception);
+            }
             throw syncFailed(exception);
         }
     }
@@ -102,13 +85,16 @@ public class GoogleCalendarEventsClient {
             GoogleCalendarSyncMode mode,
             String syncToken,
             String pageToken
-    ) throws JacksonException {
-        String responseBody = restClient.get()
+    ) {
+        GoogleCalendarEventPage response = restClient.get()
                 .uri(eventsUri(mode, syncToken, pageToken))
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                 .retrieve()
-                .body(String.class);
-        return GoogleCalendarEventPage.fromJson(responseBody, objectMapper);
+                .body(GoogleCalendarEventPage.class);
+        if (response == null) {
+            throw new CalioException(ErrorCode.GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID);
+        }
+        return response;
     }
 
     private URI eventsUri(
@@ -133,11 +119,13 @@ public class GoogleCalendarEventsClient {
 
     private RuntimeException translateResponseFailure(RestClientResponseException exception) {
         int status = exception.getStatusCode().value();
+        if (status == HttpStatus.UNAUTHORIZED.value()) {
+            return new GoogleCalendarUnauthorizedException(exception);
+        }
         if (status == HttpStatus.GONE.value()) {
-            logFailure(ErrorCode.GOOGLE_CALENDAR_SYNC_FAILED, status, exception);
             return new GoogleCalendarSyncTokenExpiredException();
         }
-        if (status == HttpStatus.UNAUTHORIZED.value() || isScopeFailure(exception)) {
+        if (isScopeFailure(exception)) {
             logFailure(ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED, status, exception);
             return new CalioException(ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED, exception);
         }
@@ -192,6 +180,10 @@ public class GoogleCalendarEventsClient {
 
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
+    }
+
+    private boolean isDeserializationFailure(RestClientException exception) {
+        return exception.contains(HttpMessageNotReadableException.class);
     }
 
     private void logFailure(

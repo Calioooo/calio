@@ -15,7 +15,6 @@ import com.calio.calendar.external.google.dto.GoogleCalendarEventPage;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.integration.domain.GoogleCalendarSyncMode;
-import com.calio.calendar.integration.service.GoogleCalendarAccessTokenService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
@@ -34,8 +33,7 @@ class GoogleCalendarEventsClientTest {
         // given
         RestClient.Builder restClientBuilder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
-        FakeAccessTokenService tokenService = new FakeAccessTokenService();
-        GoogleCalendarEventsClient client = client(tokenService, restClientBuilder);
+        GoogleCalendarEventsClient client = client(restClientBuilder);
         server.expect(requestTo(allOf(
                         containsString("singleEvents=false"),
                         containsString("showDeleted=true"),
@@ -54,7 +52,7 @@ class GoogleCalendarEventsClientTest {
 
         // when
         GoogleCalendarEventPage page = client.listEvents(
-                1L,
+                "current-token",
                 GoogleCalendarSyncMode.FULL,
                 null,
                 null
@@ -66,28 +64,58 @@ class GoogleCalendarEventsClientTest {
     }
 
     @Test
-    @DisplayName("Events API 401은 강제 refresh 후 동일 요청을 한 번 재시도한다")
-    void givenUnauthorizedResponse_whenListEvents_thenRefreshesAndRetriesOnce() {
+    @DisplayName("Events API 응답의 일정 형식이 잘못되면 invalid response로 변환한다")
+    void givenMalformedEventResponse_whenListEvents_thenReturnsInvalidResponse() {
         // given
         RestClient.Builder restClientBuilder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
-        FakeAccessTokenService tokenService = new FakeAccessTokenService();
-        GoogleCalendarEventsClient client = client(tokenService, restClientBuilder);
-        server.expect(requestTo(containsString("syncToken=cursor")))
-                .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer current-token"))
-                .andRespond(withStatus(HttpStatus.UNAUTHORIZED));
-        server.expect(requestTo(containsString("syncToken=cursor")))
-                .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer refreshed-token"))
+        GoogleCalendarEventsClient client = client(restClientBuilder);
+        server.expect(requestTo(containsString("singleEvents=false")))
                 .andRespond(withSuccess(
-                        "{\"items\":[],\"nextSyncToken\":\"next-token\"}",
+                        """
+                                {
+                                  "items": [
+                                    {
+                                      "id": "event-1",
+                                      "status": "confirmed"
+                                    }
+                                  ],
+                                  "nextSyncToken": "next-token"
+                                }
+                                """,
                         MediaType.APPLICATION_JSON
                 ));
 
-        // when
-        client.listEvents(1L, GoogleCalendarSyncMode.INCREMENTAL, "cursor", null);
+        // when, then
+        assertThatThrownBy(() -> client.listEvents(
+                "current-token",
+                GoogleCalendarSyncMode.FULL,
+                null,
+                null
+        )).isInstanceOfSatisfying(CalioException.class, exception ->
+                assertThat(exception.getErrorCode())
+                        .isEqualTo(ErrorCode.GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID));
+        server.verify();
+    }
 
-        // then
-        assertThat(tokenService.forceRefreshCount).isOne();
+    @Test
+    @DisplayName("Events API 401은 token 갱신을 수행하지 않고 호출자에게 전달한다")
+    void givenUnauthorizedResponse_whenListEvents_thenPropagatesUnauthorized() {
+        // given
+        RestClient.Builder restClientBuilder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
+        GoogleCalendarEventsClient client = client(restClientBuilder);
+        server.expect(requestTo(containsString("syncToken=cursor")))
+                .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer current-token"))
+                .andRespond(withStatus(HttpStatus.UNAUTHORIZED));
+
+        // when, then
+        assertThatThrownBy(() -> client.listEvents(
+                "current-token",
+                GoogleCalendarSyncMode.INCREMENTAL,
+                "cursor",
+                null
+        )).isInstanceOf(GoogleCalendarUnauthorizedException.class);
         server.verify();
     }
 
@@ -96,19 +124,17 @@ class GoogleCalendarEventsClientTest {
     void givenIncrementalModeWithoutCursor_whenListEvents_thenRejectsClosedQueryContract() {
         // given
         RestClient.Builder restClientBuilder = RestClient.builder();
-        FakeAccessTokenService tokenService = new FakeAccessTokenService();
-        GoogleCalendarEventsClient client = client(tokenService, restClientBuilder);
+        GoogleCalendarEventsClient client = client(restClientBuilder);
 
         // when, then
         assertThatThrownBy(() -> client.listEvents(
-                1L,
+                "current-token",
                 GoogleCalendarSyncMode.INCREMENTAL,
                 null,
                 null
         )).isInstanceOfSatisfying(CalioException.class, exception ->
                 assertThat(exception.getErrorCode())
                         .isEqualTo(ErrorCode.GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID));
-        assertThat(tokenService.getAccessTokenCount).isZero();
     }
 
     @Test
@@ -117,10 +143,7 @@ class GoogleCalendarEventsClientTest {
         // given
         RestClient.Builder restClientBuilder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
-        GoogleCalendarEventsClient client = client(
-                new FakeAccessTokenService(),
-                restClientBuilder
-        );
+        GoogleCalendarEventsClient client = client(restClientBuilder);
         server.expect(requestTo(containsString("singleEvents=false")))
                 .andRespond(withStatus(HttpStatus.FORBIDDEN)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -136,7 +159,7 @@ class GoogleCalendarEventsClientTest {
 
         // when, then
         assertThatThrownBy(() -> client.listEvents(
-                1L,
+                "current-token",
                 GoogleCalendarSyncMode.FULL,
                 null,
                 null
@@ -152,10 +175,7 @@ class GoogleCalendarEventsClientTest {
         // given
         RestClient.Builder restClientBuilder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
-        GoogleCalendarEventsClient client = client(
-                new FakeAccessTokenService(),
-                restClientBuilder
-        );
+        GoogleCalendarEventsClient client = client(restClientBuilder);
         server.expect(requestTo(containsString("singleEvents=false")))
                 .andRespond(withStatus(HttpStatus.FORBIDDEN)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -171,7 +191,7 @@ class GoogleCalendarEventsClientTest {
 
         // when, then
         assertThatThrownBy(() -> client.listEvents(
-                1L,
+                "current-token",
                 GoogleCalendarSyncMode.FULL,
                 null,
                 null
@@ -181,39 +201,13 @@ class GoogleCalendarEventsClientTest {
         server.verify();
     }
 
-    private GoogleCalendarEventsClient client(
-            FakeAccessTokenService tokenService,
-            RestClient.Builder restClientBuilder
-    ) {
+    private GoogleCalendarEventsClient client(RestClient.Builder restClientBuilder) {
         GoogleOAuthProperties properties = new GoogleOAuthProperties();
         properties.setCalendarEventsUrl("https://calendar.example.test/events");
         return new GoogleCalendarEventsClient(
                 properties,
-                tokenService,
                 new ObjectMapper(),
                 restClientBuilder.build()
         );
-    }
-
-    private static class FakeAccessTokenService extends GoogleCalendarAccessTokenService {
-
-        private int getAccessTokenCount;
-        private int forceRefreshCount;
-
-        FakeAccessTokenService() {
-            super(null, null, null, null);
-        }
-
-        @Override
-        public String getAccessToken(Long integrationId) {
-            getAccessTokenCount++;
-            return "current-token";
-        }
-
-        @Override
-        public String forceRefresh(Long integrationId) {
-            forceRefreshCount++;
-            return "refreshed-token";
-        }
     }
 }
