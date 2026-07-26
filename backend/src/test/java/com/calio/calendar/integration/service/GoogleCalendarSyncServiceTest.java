@@ -2,6 +2,7 @@ package com.calio.calendar.integration.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
@@ -133,6 +134,30 @@ class GoogleCalendarSyncServiceTest {
     }
 
     @Test
+    @DisplayName("FULL cleanup 실패는 원본 sync 실패를 유지하고 cleanup 실패를 suppressed로 남긴다")
+    void givenFullSyncAndCleanupFailures_whenSync_thenPreservesOriginalFailure() {
+        // given
+        CalioException syncFailure =
+                new CalioException(ErrorCode.GOOGLE_CALENDAR_SYNC_FAILED);
+        RuntimeException cleanupFailure = new RuntimeException("cleanup failed");
+        FakeProviderDataService providerDataService = new FakeProviderDataService();
+        providerDataService.cleanupFailure = cleanupFailure;
+        GoogleCalendarSyncService service = service(
+                new FakeLeaseService(null),
+                providerDataService,
+                new FakeEventsClient(syncFailure),
+                new FakePagePersistenceService()
+        );
+
+        // when
+        Throwable thrown = catchThrowable(() -> service.sync(10L));
+
+        // then
+        assertThat(thrown).isSameAs(syncFailure);
+        assertThat(thrown.getSuppressed()).containsExactly(cleanupFailure);
+    }
+
+    @Test
     @DisplayName("INCREMENTAL 실패는 전체 cleanup 없이 기존 cursor와 앞선 page 결과를 유지한다")
     void givenIncrementalFailure_whenSync_thenOnlyReleasesOwnedLease() {
         // given
@@ -150,6 +175,30 @@ class GoogleCalendarSyncServiceTest {
         assertThat(providerDataService.resetCount).isZero();
         assertThat(providerDataService.cleanupFullFailureCount).isZero();
         assertThat(providerDataService.releaseCount).isOne();
+    }
+
+    @Test
+    @DisplayName("INCREMENTAL lease 해제 실패는 원본 sync 실패를 유지하고 해제 실패를 suppressed로 남긴다")
+    void givenIncrementalAndLeaseReleaseFailures_whenSync_thenPreservesOriginalFailure() {
+        // given
+        CalioException syncFailure =
+                new CalioException(ErrorCode.GOOGLE_CALENDAR_SYNC_FAILED);
+        RuntimeException releaseFailure = new RuntimeException("release failed");
+        FakeProviderDataService providerDataService = new FakeProviderDataService();
+        providerDataService.releaseFailure = releaseFailure;
+        GoogleCalendarSyncService service = service(
+                new FakeLeaseService("saved-cursor"),
+                providerDataService,
+                new FakeEventsClient(syncFailure),
+                new FakePagePersistenceService()
+        );
+
+        // when
+        Throwable thrown = catchThrowable(() -> service.sync(10L));
+
+        // then
+        assertThat(thrown).isSameAs(syncFailure);
+        assertThat(thrown.getSuppressed()).containsExactly(releaseFailure);
     }
 
     @Test
@@ -239,6 +288,8 @@ class GoogleCalendarSyncServiceTest {
         private int resetCount;
         private int cleanupFullFailureCount;
         private int releaseCount;
+        private RuntimeException cleanupFailure;
+        private RuntimeException releaseFailure;
 
         private FakeProviderDataService() {
             super(null, null, null);
@@ -253,11 +304,17 @@ class GoogleCalendarSyncServiceTest {
         @Override
         public void cleanupFullFailureAndRelease(Long integrationId, String runId) {
             cleanupFullFailureCount++;
+            if (cleanupFailure != null) {
+                throw cleanupFailure;
+            }
         }
 
         @Override
         public void releaseOwnedLease(Long integrationId, String runId) {
             releaseCount++;
+            if (releaseFailure != null) {
+                throw releaseFailure;
+            }
         }
     }
 

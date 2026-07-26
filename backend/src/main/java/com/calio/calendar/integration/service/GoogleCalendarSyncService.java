@@ -43,8 +43,7 @@ public class GoogleCalendarSyncService {
         try {
             accessToken = accessTokenService.getAccessToken(lease.integrationId());
         } catch (RuntimeException exception) {
-            providerDataService.releaseOwnedLease(lease.integrationId(), lease.runId());
-            throw exception;
+            throw releaseOwnedLeasePreservingFailure(lease, exception);
         }
 
         GoogleCalendarSyncMode completedMode = modeFor(lease.nextSyncToken())
@@ -61,19 +60,18 @@ public class GoogleCalendarSyncService {
         try {
             resetProviderData(lease);
         } catch (RuntimeException exception) {
-            providerDataService.releaseOwnedLease(lease.integrationId(), lease.runId());
-            throw exception;
+            throw releaseOwnedLeasePreservingFailure(lease, exception);
         }
 
         try {
             synchronizePages(lease, GoogleCalendarSyncMode.FULL, accessToken);
             return GoogleCalendarSyncMode.FULL;
         } catch (GoogleCalendarSyncTokenExpiredException exception) {
-            cleanupFullFailure(lease);
-            throw new CalioException(ErrorCode.GOOGLE_CALENDAR_SYNC_FAILED, exception);
+            CalioException failure =
+                    new CalioException(ErrorCode.GOOGLE_CALENDAR_SYNC_FAILED, exception);
+            throw cleanupFullFailurePreservingFailure(lease, failure);
         } catch (RuntimeException exception) {
-            cleanupFullFailure(lease);
-            throw exception;
+            throw cleanupFullFailurePreservingFailure(lease, exception);
         }
     }
 
@@ -87,8 +85,7 @@ public class GoogleCalendarSyncService {
         } catch (GoogleCalendarSyncTokenExpiredException exception) {
             return synchronizeFull(lease, accessToken);
         } catch (RuntimeException exception) {
-            providerDataService.releaseOwnedLease(lease.integrationId(), lease.runId());
-            throw exception;
+            throw releaseOwnedLeasePreservingFailure(lease, exception);
         }
     }
 
@@ -199,6 +196,38 @@ public class GoogleCalendarSyncService {
                 lease.integrationId(),
                 lease.runId()
         );
+    }
+
+    private RuntimeException cleanupFullFailurePreservingFailure(
+            SyncLease lease,
+            RuntimeException failure
+    ) {
+        return preserveFailure(failure, () -> cleanupFullFailure(lease));
+    }
+
+    private RuntimeException releaseOwnedLeasePreservingFailure(
+            SyncLease lease,
+            RuntimeException failure
+    ) {
+        return preserveFailure(
+                failure,
+                () -> providerDataService.releaseOwnedLease(
+                        lease.integrationId(),
+                        lease.runId()
+                )
+        );
+    }
+
+    private RuntimeException preserveFailure(
+            RuntimeException failure,
+            Runnable cleanup
+    ) {
+        try {
+            cleanup.run();
+        } catch (RuntimeException cleanupException) {
+            failure.addSuppressed(cleanupException);
+        }
+        return failure;
     }
 
     private GoogleCalendarSyncMode modeFor(String nextSyncToken) {
