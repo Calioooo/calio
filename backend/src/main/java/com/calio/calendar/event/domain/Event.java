@@ -101,16 +101,6 @@ public class Event extends BaseEntity {
         changeTag(tag);
     }
 
-    public void replaceGoogleSchedule(
-            String title,
-            String description,
-            Instant startAt,
-            Instant endAt,
-            boolean allDay
-    ) {
-        replace(title, description, startAt, endAt, allDay);
-    }
-
     public void changeImportantEvent(boolean importantEvent) {
         this.importantEvent = importantEvent;
     }
