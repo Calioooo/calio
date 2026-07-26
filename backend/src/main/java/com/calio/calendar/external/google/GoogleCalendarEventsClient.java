@@ -123,7 +123,7 @@ public class GoogleCalendarEventsClient {
             return new GoogleCalendarUnauthorizedException(exception);
         }
         if (status == HttpStatus.GONE.value()) {
-            return new GoogleCalendarSyncTokenExpiredException();
+            return new GoogleCalendarSyncTokenExpiredException(exception);
         }
         if (isScopeFailure(exception)) {
             logFailure(ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED, status, exception);
