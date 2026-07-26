@@ -19,7 +19,13 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
-import java.util.Optional;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -57,9 +63,7 @@ public class GoogleCalendarEventPagePersistenceService {
     ) {
         extendLeaseOrThrow(integrationId, runId);
         GoogleCalendarIntegration integration = integrationRepository.getReferenceById(integrationId);
-        for (GoogleCalendarEventItem item : page.items()) {
-            applyItem(integration, accountId, item);
-        }
+        persistItems(integration, accountId, page.items());
     }
 
     @Transactional
@@ -74,9 +78,7 @@ public class GoogleCalendarEventPagePersistenceService {
             throw new CalioException(ErrorCode.GOOGLE_CALENDAR_SYNC_TOKEN_MISSING);
         }
         GoogleCalendarIntegration integration = integrationRepository.getReferenceById(integrationId);
-        for (GoogleCalendarEventItem item : page.items()) {
-            applyItem(integration, accountId, item);
-        }
+        persistItems(integration, accountId, page.items());
         if (integrationRepository.finalizeSync(integrationId, runId, page.nextSyncToken()) != 1) {
             throw new CalioException(ErrorCode.GOOGLE_CALENDAR_SYNC_CONFLICT);
         }
@@ -88,26 +90,91 @@ public class GoogleCalendarEventPagePersistenceService {
         }
     }
 
-    private void applyItem(
+    private void persistItems(
             GoogleCalendarIntegration integration,
             Long accountId,
-            GoogleCalendarEventItem item
+            List<GoogleCalendarEventItem> items
     ) {
-        Optional<GoogleCalendarEventMapping> existingMapping = mappingRepository
-                .findByIntegration_IdAndCalendarKeyAndExternalEventId(
-                        integration.getId(),
+        Map<String, GoogleCalendarEventMapping> existingMappings =
+                findExistingMappings(integration.getId(), items);
+        boolean requiresNewEvent = items.stream()
+                .anyMatch(item -> requiresNewEvent(item, existingMappings));
+        Account account = requiresNewEvent ? accountRepository.getReferenceById(accountId) : null;
+        Tag fallbackTag = requiresNewEvent ? tagService.getTagOrDefault(accountId, null) : null;
+        List<GoogleCalendarEventMapping> mappingsToDelete = new ArrayList<>();
+        List<Event> eventsToDelete = new ArrayList<>();
+
+        for (GoogleCalendarEventItem item : items) {
+            applyItem(
+                    integration,
+                    item,
+                    existingMappings.get(item.id()),
+                    account,
+                    fallbackTag,
+                    mappingsToDelete,
+                    eventsToDelete
+            );
+        }
+        deleteMappingsAndEvents(mappingsToDelete, eventsToDelete);
+    }
+
+    private Map<String, GoogleCalendarEventMapping> findExistingMappings(
+            Long integrationId,
+            List<GoogleCalendarEventItem> items
+    ) {
+        Set<String> externalEventIds = new HashSet<>();
+        for (GoogleCalendarEventItem item : items) {
+            if (!externalEventIds.add(item.id())) {
+                throw invalidResponse(null);
+            }
+        }
+        if (externalEventIds.isEmpty()) {
+            return Map.of();
+        }
+        return mappingRepository
+                .findAllByExternalIdentity(
+                        integrationId,
                         GoogleCalendarEventMapping.PRIMARY_CALENDAR_KEY,
-                        item.id()
-                );
+                        externalEventIds
+                )
+                .stream()
+                .collect(Collectors.toMap(
+                        GoogleCalendarEventMapping::getExternalEventId,
+                        Function.identity()
+                ));
+    }
+
+    private boolean requiresNewEvent(
+            GoogleCalendarEventItem item,
+            Map<String, GoogleCalendarEventMapping> existingMappings
+    ) {
+        return !item.isCancelled()
+                && !item.isRecurring()
+                && !existingMappings.containsKey(item.id());
+    }
+
+    private void applyItem(
+            GoogleCalendarIntegration integration,
+            GoogleCalendarEventItem item,
+            GoogleCalendarEventMapping existingMapping,
+            Account account,
+            Tag fallbackTag,
+            List<GoogleCalendarEventMapping> mappingsToDelete,
+            List<Event> eventsToDelete
+    ) {
         if (item.isCancelled() || item.isRecurring()) {
-            existingMapping.ifPresent(this::deleteMappingAndEvent);
+            if (existingMapping != null) {
+                mappingsToDelete.add(existingMapping);
+                eventsToDelete.add(existingMapping.getEvent());
+            }
             return;
         }
         CanonicalSchedule schedule = canonicalSchedule(item);
-        existingMapping.ifPresentOrElse(
-                mapping -> updateMappedEvent(mapping, item, schedule),
-                () -> createMappedEvent(integration, accountId, item, schedule)
-        );
+        if (existingMapping != null) {
+            updateMappedEvent(existingMapping, item, schedule);
+            return;
+        }
+        createMappedEvent(integration, account, fallbackTag, item, schedule);
     }
 
     private void updateMappedEvent(
@@ -115,7 +182,7 @@ public class GoogleCalendarEventPagePersistenceService {
             GoogleCalendarEventItem item,
             CanonicalSchedule schedule
     ) {
-        mapping.getEvent().replaceGoogleSchedule(
+        mapping.getEvent().replace(
                 canonicalTitle(item.summary()),
                 item.description(),
                 schedule.startAt(),
@@ -127,12 +194,11 @@ public class GoogleCalendarEventPagePersistenceService {
 
     private void createMappedEvent(
             GoogleCalendarIntegration integration,
-            Long accountId,
+            Account account,
+            Tag fallbackTag,
             GoogleCalendarEventItem item,
             CanonicalSchedule schedule
     ) {
-        Account account = accountRepository.getReferenceById(accountId);
-        Tag fallbackTag = tagService.getTagOrDefault(accountId, null);
         Event event = eventRepository.save(new Event(
                 canonicalTitle(item.summary()),
                 item.description(),
@@ -152,11 +218,16 @@ public class GoogleCalendarEventPagePersistenceService {
         ));
     }
 
-    private void deleteMappingAndEvent(GoogleCalendarEventMapping mapping) {
-        Event event = mapping.getEvent();
-        mappingRepository.delete(mapping);
+    private void deleteMappingsAndEvents(
+            List<GoogleCalendarEventMapping> mappings,
+            List<Event> events
+    ) {
+        if (mappings.isEmpty()) {
+            return;
+        }
+        mappingRepository.deleteAll(mappings);
         mappingRepository.flush();
-        eventRepository.delete(event);
+        eventRepository.deleteAll(events);
     }
 
     private CanonicalSchedule canonicalSchedule(GoogleCalendarEventItem item) {

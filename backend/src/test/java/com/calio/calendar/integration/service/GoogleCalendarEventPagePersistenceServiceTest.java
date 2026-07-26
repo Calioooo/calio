@@ -1,9 +1,12 @@
 package com.calio.calendar.integration.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
+import com.calio.calendar.common.error.CalioException;
+import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.event.repository.EventRepository;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventItem;
@@ -103,6 +106,37 @@ class GoogleCalendarEventPagePersistenceServiceTest {
         assertThat(finalized.getNextSyncToken()).isEqualTo("cursor-2");
         assertThat(finalized.getActiveSyncRunId()).isNull();
         assertThat(finalized.getSyncLeaseExpiresAt()).isNull();
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("동일 page에 external event id가 중복되면 partial 저장 없이 invalid response로 거부한다")
+    void givenDuplicateExternalEventIds_whenPersistPage_thenRejectsResponse() {
+        // given
+        Account account = accountRepository.saveAndFlush(new Account());
+        tagRepository.saveAndFlush(new Tag(TagType.DEFAULT, "기타", "#64748B"));
+        GoogleCalendarIntegration integration = integrationRepository.saveAndFlush(
+                integration(account.getId())
+        );
+        acquireLease(account.getId(), "duplicate-run");
+        GoogleCalendarEventItem item = timedItem("external-1", "Event");
+        GoogleCalendarEventPage page = new GoogleCalendarEventPage(
+                List.of(item, item),
+                null,
+                "cursor-1",
+                "UTC"
+        );
+
+        // when, then
+        assertThatThrownBy(() -> pagePersistenceService.persistLastPageAndFinalize(
+                integration.getId(),
+                account.getId(),
+                "duplicate-run",
+                page
+        )).isInstanceOfSatisfying(CalioException.class, exception ->
+                assertThat(exception.getErrorCode())
+                        .isEqualTo(ErrorCode.GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID));
+        assertThat(mappingRepository.findEventIdsByIntegrationId(integration.getId())).isEmpty();
     }
 
     @Test
