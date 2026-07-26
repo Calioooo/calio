@@ -22,6 +22,9 @@ import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
@@ -106,6 +109,90 @@ class GoogleCalendarEventPagePersistenceServiceTest {
         assertThat(finalized.getNextSyncToken()).isEqualTo("cursor-2");
         assertThat(finalized.getActiveSyncRunId()).isNull();
         assertThat(finalized.getSyncLeaseExpiresAt()).isNull();
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("lease를 소유하지 않은 run은 page를 저장할 수 없다")
+    void givenDifferentRunId_whenPersistPage_thenReturnsSyncConflict() {
+        // given
+        Account account = accountRepository.saveAndFlush(new Account());
+        GoogleCalendarIntegration integration = integrationRepository.saveAndFlush(
+                integration(account.getId())
+        );
+        acquireLease(account.getId(), "lease-owner");
+
+        // when, then
+        assertThatThrownBy(() -> pagePersistenceService.persistPage(
+                integration.getId(),
+                account.getId(),
+                "different-run",
+                new GoogleCalendarEventPage(List.of(), "next-page", null, "UTC")
+        )).isInstanceOfSatisfying(CalioException.class, exception ->
+                assertThat(exception.getErrorCode())
+                        .isEqualTo(ErrorCode.GOOGLE_CALENDAR_SYNC_CONFLICT));
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"", " "})
+    @Transactional
+    @DisplayName("마지막 page에 유효한 nextSyncToken이 없으면 sync를 완료할 수 없다")
+    void givenMissingNextSyncToken_whenPersistLastPage_thenReturnsTokenMissing(
+            String nextSyncToken
+    ) {
+        // given
+        Account account = accountRepository.saveAndFlush(new Account());
+        GoogleCalendarIntegration integration = integrationRepository.saveAndFlush(
+                integration(account.getId())
+        );
+        acquireLease(account.getId(), "token-run");
+
+        // when, then
+        assertThatThrownBy(() -> pagePersistenceService.persistLastPageAndFinalize(
+                integration.getId(),
+                account.getId(),
+                "token-run",
+                new GoogleCalendarEventPage(List.of(), null, nextSyncToken, "UTC")
+        )).isInstanceOfSatisfying(CalioException.class, exception ->
+                assertThat(exception.getErrorCode())
+                        .isEqualTo(ErrorCode.GOOGLE_CALENDAR_SYNC_TOKEN_MISSING));
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("Google 일정의 시작 시각이 종료 시각보다 빠르지 않으면 저장하지 않는다")
+    void givenInvalidGoogleEventRange_whenPersistPage_thenRejectsResponse() {
+        // given
+        Account account = accountRepository.saveAndFlush(new Account());
+        tagRepository.saveAndFlush(new Tag(TagType.DEFAULT, "기타", "#64748B"));
+        GoogleCalendarIntegration integration = integrationRepository.saveAndFlush(
+                integration(account.getId())
+        );
+        acquireLease(account.getId(), "invalid-range-run");
+        GoogleCalendarEventItem item = new GoogleCalendarEventItem(
+                "external-invalid-range",
+                "confirmed",
+                null,
+                null,
+                "Invalid range",
+                null,
+                List.of(),
+                null,
+                new GoogleCalendarEventTime(null, "2026-07-01T10:00:00Z", "UTC"),
+                new GoogleCalendarEventTime(null, "2026-07-01T10:00:00Z", "UTC")
+        );
+
+        // when, then
+        assertThatThrownBy(() -> pagePersistenceService.persistLastPageAndFinalize(
+                integration.getId(),
+                account.getId(),
+                "invalid-range-run",
+                page(item, "cursor-1")
+        )).isInstanceOfSatisfying(CalioException.class, exception ->
+                assertThat(exception.getErrorCode())
+                        .isEqualTo(ErrorCode.GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID));
+        assertThat(mappingRepository.findEventIdsByIntegrationId(integration.getId())).isEmpty();
     }
 
     @Test

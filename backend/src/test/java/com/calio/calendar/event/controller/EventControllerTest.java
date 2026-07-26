@@ -654,6 +654,32 @@ class EventControllerTest {
     }
 
     @Test
+    @DisplayName("사용자는 종일 일정 여부 없이 일정을 수정할 수 없다")
+    void givenMissingAllDay_whenUpdateEvent_thenReturnsValidationFailed() throws Exception {
+        // given
+        long eventId = createEvent(
+                "Editable",
+                "2026-06-06T00:00:00Z",
+                "2026-06-06T01:00:00Z"
+        );
+
+        // when, then
+        mockMvc.perform(put("/api/events/{eventId}", eventId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Updated",
+                                  "startAt": "2026-06-06T02:00:00Z",
+                                  "endAt": "2026-06-06T03:00:00Z"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.detail").isString())
+                .andExpect(jsonPath("$.*", hasSize(6)));
+    }
+
+    @Test
     @DisplayName("사용자는 시작 시각이 종료 시각보다 빠르지 않게 일정을 수정할 수 없다")
     void givenStartAtIsNotEarlierThanEndAt_whenUpdateEvent_thenReturnsInvalidTimeRange() throws Exception {
         // given

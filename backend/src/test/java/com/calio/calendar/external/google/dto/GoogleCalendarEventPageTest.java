@@ -66,6 +66,28 @@ class GoogleCalendarEventPageTest {
     }
 
     @Test
+    @DisplayName("all-day 시작과 timed 종료가 섞인 Google 일정은 invalid response다")
+    void givenMixedScheduleTypes_whenParse_thenRejectsResponse() {
+        // when, then
+        assertThatThrownBy(() -> objectMapper.readValue(
+                """
+                        {
+                          "nextSyncToken": "next-token",
+                          "items": [
+                            {
+                              "id": "mixed",
+                              "status": "confirmed",
+                              "start": {"date": "2026-07-01"},
+                              "end": {"dateTime": "2026-07-02T00:00:00Z"}
+                            }
+                          ]
+                        }
+                        """,
+                GoogleCalendarEventPage.class
+        )).isInstanceOf(JacksonException.class);
+    }
+
+    @Test
     @DisplayName("nextPageToken과 nextSyncToken을 함께 반환한 page는 invalid response다")
     void givenConflictingPaginationTokens_whenParse_thenRejectsResponse() {
         // when, then
