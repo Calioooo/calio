@@ -22,6 +22,7 @@ class RecurrenceMigrationTest {
         Flyway flyway = Flyway.configure()
                 .dataSource(url, "sa", "")
                 .locations("classpath:db/migration")
+                .target("8")
                 .load();
 
         // when

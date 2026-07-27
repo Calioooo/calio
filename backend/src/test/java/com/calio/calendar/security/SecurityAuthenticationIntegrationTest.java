@@ -73,8 +73,8 @@ class SecurityAuthenticationIntegrationTest {
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.title").value("AUTH_TOKEN_INVALID"))
                 .andExpect(jsonPath("$.detail").value("Authentication token is invalid."))
-                .andExpect(jsonPath("$.instance").value("/api/security-test/authenticated-account"))
-                .andExpect(jsonPath("$.*", hasSize(6)));
+                .andExpect(jsonPath("$.errorCode").value("AUTH_TOKEN_INVALID"))
+                .andExpect(jsonPath("$.*", hasSize(5)));
     }
 
     @Test
@@ -96,8 +96,8 @@ class SecurityAuthenticationIntegrationTest {
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.title").value("AUTH_TOKEN_REVOKED"))
                 .andExpect(jsonPath("$.detail").value("Authentication token is revoked."))
-                .andExpect(jsonPath("$.instance").value("/api/security-test/authenticated-account"))
-                .andExpect(jsonPath("$.*", hasSize(6)));
+                .andExpect(jsonPath("$.errorCode").value("AUTH_TOKEN_REVOKED"))
+                .andExpect(jsonPath("$.*", hasSize(5)));
     }
 
     @Test
@@ -128,8 +128,8 @@ class SecurityAuthenticationIntegrationTest {
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.title").value("AUTH_TOKEN_REQUIRED"))
                 .andExpect(jsonPath("$.detail").value("Authentication token is required."))
-                .andExpect(jsonPath("$.instance").value("/api/tasks"))
-                .andExpect(jsonPath("$.*", hasSize(6)));
+                .andExpect(jsonPath("$.errorCode").value("AUTH_TOKEN_REQUIRED"))
+                .andExpect(jsonPath("$.*", hasSize(5)));
     }
 
     @Test

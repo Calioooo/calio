@@ -5,7 +5,6 @@ import com.calio.calendar.common.error.ErrorCode;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.net.URI;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
@@ -36,7 +35,6 @@ public class AuthenticationErrorResponseWriter {
         response.setStatus(errorCode.getStatus().value());
         response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
         ProblemDetail problemDetail = ErrorProblemDetail.from(errorCode, errorCode.getDefaultMessage());
-        problemDetail.setInstance(URI.create(request.getRequestURI()));
         response.getWriter().write(objectMapper.writeValueAsString(problemDetail));
     }
 }
