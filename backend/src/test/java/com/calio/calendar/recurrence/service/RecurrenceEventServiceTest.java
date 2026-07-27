@@ -1,6 +1,7 @@
 package com.calio.calendar.recurrence.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -8,6 +9,8 @@ import static org.mockito.Mockito.when;
 
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
+import com.calio.calendar.common.error.CalioException;
+import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.event.controller.dto.EventResponse;
 import com.calio.calendar.event.repository.EventRepository;
 import com.calio.calendar.recurrence.controller.dto.CreateRecurrenceEventRequest;
@@ -88,8 +91,8 @@ class RecurrenceEventServiceTest {
     }
 
     @Test
-    @DisplayName("전체 수정은 새 정의 검증 후 master snapshot을 교체하고 기존 override를 제거한다")
-    void givenValidUpdate_whenUpdate_thenReplacesMasterAndDeletesOverrides() {
+    @DisplayName("전체 수정은 새 정의 검증 후 master snapshot만 교체하고 기존 child 상태를 보존한다")
+    void givenValidUpdate_whenUpdate_thenReplacesOnlyMaster() {
         // given
         RecurrenceEvent recurrenceEvent = recurrenceEvent();
         Tag tag = tag();
@@ -116,7 +119,8 @@ class RecurrenceEventServiceTest {
         assertThat(recurrenceEvent.getRecurrenceTitle()).isEqualTo("Updated");
         assertThat(recurrenceEvent.isAllDay()).isTrue();
         assertThat(recurrenceEvent.getTimeZone()).isNull();
-        verify(recurrenceEventOverrideRepository).deleteByRecurrenceEvent_Id(10L);
+        verify(recurrenceEventOverrideRepository, never()).deleteByRecurrenceEvent_Id(any());
+        verify(eventRepository, never()).deleteAll(any());
     }
 
     @Test
@@ -151,6 +155,111 @@ class RecurrenceEventServiceTest {
         assertThat(response.title()).isEqualTo("Final title");
         assertThat(response.description()).isNull();
         assertThat(response.originStartAt()).isEqualTo(originStartAt);
+    }
+
+    @Test
+    @DisplayName("현재 rule에서 사라진 deleted override PATCH는 같은 identity를 현재 master 형식으로 복원한다")
+    void givenDeletedOrphanOverride_whenPatch_thenRestoresExactRowWithCurrentMasterScheduleType() {
+        // given
+        RecurrenceEvent recurrenceEvent = recurrenceEvent();
+        Instant originStartAt = Instant.parse("2027-01-01T00:00:00Z");
+        RecurrenceEventOverride existingOverride = RecurrenceEventOverride.active(
+                recurrenceEvent,
+                originStartAt,
+                "Old title",
+                "old memo",
+                Instant.parse("2027-01-02T02:00:00Z"),
+                Instant.parse("2027-01-02T03:00:00Z")
+        );
+        existingOverride.markDeleted(Instant.parse("2027-01-05T00:00:00Z"));
+        recurrenceEvent.update(
+                "All day master",
+                null,
+                RecurrenceSchedule.create(
+                        true,
+                        Instant.parse("2027-02-01T00:00:00Z"),
+                        Instant.parse("2027-02-02T00:00:00Z"),
+                        null
+                ),
+                List.of("RRULE:FREQ=WEEKLY;COUNT=2"),
+                tag()
+        );
+        when(recurrenceEventRepository.findByIdAndAccountIdForUpdate(10L, 1L))
+                .thenReturn(Optional.of(recurrenceEvent));
+        when(recurrenceEventOverrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(10L, originStartAt))
+                .thenReturn(Optional.of(existingOverride));
+        when(recurrenceEventOverrideRepository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        UpdateRecurrenceOccurrenceRequest request = new UpdateRecurrenceOccurrenceRequest(
+                originStartAt,
+                "Restored",
+                null,
+                Instant.parse("2027-03-01T00:00:00Z"),
+                Instant.parse("2027-03-03T00:00:00Z")
+        );
+
+        // when
+        recurrenceEventService.updateRecurrenceOccurrence(1L, 10L, request);
+
+        // then
+        verify(recurrenceEngine, never()).containsOrigin(any(), any(), any());
+        verify(recurrenceEventOverrideRepository).saveAndFlush(existingOverride);
+        assertThat(existingOverride.getOriginStartAt()).isEqualTo(originStartAt);
+        assertThat(existingOverride.getOverrideTitle()).isEqualTo("Restored");
+        assertThat(existingOverride.getOverrideStartAt()).isEqualTo(request.startAt());
+        assertThat(existingOverride.getOverrideEndAt()).isEqualTo(request.endAt());
+        assertThat(existingOverride.isOverrideAllDay()).isTrue();
+        assertThat(existingOverride.getOverrideTimeZone()).isNull();
+        assertThat(existingOverride.getDeletedAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("현재 rule에서 사라진 active override DELETE는 같은 identity를 삭제 상태로 전환한다")
+    void givenActiveOrphanOverride_whenDelete_thenMarksExactRowDeleted() {
+        // given
+        RecurrenceEvent recurrenceEvent = recurrenceEvent();
+        Instant originStartAt = Instant.parse("2027-01-01T00:00:00Z");
+        RecurrenceEventOverride existingOverride = RecurrenceEventOverride.active(
+                recurrenceEvent,
+                originStartAt,
+                "Override",
+                null,
+                Instant.parse("2027-01-02T02:00:00Z"),
+                Instant.parse("2027-01-02T03:00:00Z")
+        );
+        when(recurrenceEventRepository.findByIdAndAccountIdForUpdate(10L, 1L))
+                .thenReturn(Optional.of(recurrenceEvent));
+        when(recurrenceEventOverrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(10L, originStartAt))
+                .thenReturn(Optional.of(existingOverride));
+
+        // when
+        recurrenceEventService.deleteRecurrenceOccurrence(1L, 10L, originStartAt);
+
+        // then
+        verify(recurrenceEngine, never()).containsOrigin(any(), any(), any());
+        verify(recurrenceEventOverrideRepository).saveAndFlush(existingOverride);
+        assertThat(existingOverride.getOriginStartAt()).isEqualTo(originStartAt);
+        assertThat(existingOverride.isDeleted()).isTrue();
+        assertThat(existingOverride.getDeletedAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("현재 rule과 exact override에 없는 origin은 상태를 만들지 않고 거절한다")
+    void givenUnknownOriginWithoutOverride_whenDelete_thenRejectsWithoutStateChange() {
+        // given
+        RecurrenceEvent recurrenceEvent = recurrenceEvent();
+        Instant originStartAt = Instant.parse("2027-01-01T00:00:01Z");
+        when(recurrenceEventRepository.findByIdAndAccountIdForUpdate(10L, 1L))
+                .thenReturn(Optional.of(recurrenceEvent));
+        when(recurrenceEventOverrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(10L, originStartAt))
+                .thenReturn(Optional.empty());
+        when(recurrenceEngine.containsOrigin(any(), any(), any())).thenReturn(false);
+
+        // when, then
+        assertThatThrownBy(() -> recurrenceEventService.deleteRecurrenceOccurrence(1L, 10L, originStartAt))
+                .isInstanceOf(CalioException.class)
+                .extracting(exception -> ((CalioException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.RECURRENCE_OCCURRENCE_NOT_FOUND);
+        verify(recurrenceEventOverrideRepository, never()).saveAndFlush(any());
     }
 
     private CreateRecurrenceEventRequest timedCreateRequest() {
