@@ -3,6 +3,7 @@ package com.calio.calendar.recurrence.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -12,6 +13,7 @@ import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.event.controller.dto.EventResponse;
+import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.event.repository.EventRepository;
 import com.calio.calendar.recurrence.controller.dto.CreateRecurrenceEventRequest;
 import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceEventRequest;
@@ -32,6 +34,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -121,6 +124,34 @@ class RecurrenceEventServiceTest {
         assertThat(recurrenceEvent.getTimeZone()).isNull();
         verify(recurrenceEventOverrideRepository, never()).deleteByRecurrenceEvent_Id(any());
         verify(eventRepository, never()).deleteAll(any());
+    }
+
+    @Test
+    @DisplayName("전체 recurrence 삭제는 override와 account legacy Event를 master보다 먼저 제거한다")
+    void givenRecurrenceChildren_whenDeleteMaster_thenDeletesChildrenBeforeMaster() {
+        // given
+        RecurrenceEvent recurrenceEvent = recurrenceEvent();
+        List<Event> legacyEvents = List.of();
+        when(recurrenceEventRepository.findByIdAndAccountIdForUpdate(10L, 1L))
+                .thenReturn(Optional.of(recurrenceEvent));
+        when(eventRepository.findByRecurrenceIdAndAccount_IdOrderByStartAtAsc(10L, 1L))
+                .thenReturn(legacyEvents);
+
+        // when
+        recurrenceEventService.deleteRecurrenceEvent(1L, 10L);
+
+        // then
+        InOrder deletionOrder = inOrder(
+                recurrenceEventRepository,
+                recurrenceEventOverrideRepository,
+                eventRepository
+        );
+        deletionOrder.verify(recurrenceEventRepository).findByIdAndAccountIdForUpdate(10L, 1L);
+        deletionOrder.verify(recurrenceEventOverrideRepository).deleteByRecurrenceEvent_Id(10L);
+        deletionOrder.verify(eventRepository)
+                .findByRecurrenceIdAndAccount_IdOrderByStartAtAsc(10L, 1L);
+        deletionOrder.verify(eventRepository).deleteAll(legacyEvents);
+        deletionOrder.verify(recurrenceEventRepository).delete(recurrenceEvent);
     }
 
     @Test

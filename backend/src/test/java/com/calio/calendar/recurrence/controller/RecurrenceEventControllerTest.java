@@ -250,6 +250,60 @@ class RecurrenceEventControllerTest {
     }
 
     @Test
+    @DisplayName("새 virtual occurrence와 orphan active override는 final start 순서로 exact once 조회된다")
+    void givenVirtualOccurrencesAndOrphanOverride_whenList_thenReturnsExactOnceInStartOrder() throws Exception {
+        // given
+        long recurrenceId = createTimedRecurrence("Original rule", "2029-08-01", "UTC");
+        Instant orphanOrigin = Instant.parse("2029-08-01T09:00:00Z");
+        mockMvc.perform(patch("/api/recurrence-events/{id}/occurrences", recurrenceId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "originStartAt": "2029-08-01T09:00:00Z",
+                                  "title": "Orphan override",
+                                  "description": null,
+                                  "startAt": "2029-08-10T11:00:00Z",
+                                  "endAt": "2029-08-10T12:00:00Z"
+                                }
+                                """))
+                .andExpect(status().isOk());
+        mockMvc.perform(put("/api/recurrence-events/{id}", recurrenceId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(timedRequest("Current rule", "2029-08-10", "UTC")))
+                .andExpect(status().isOk());
+
+        // when
+        MvcResult result = mockMvc.perform(get("/api/events")
+                        .param("from", "2029-08-10T00:00:00Z")
+                        .param("to", "2029-08-12T00:00:00Z"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(3)))
+                .andExpect(jsonPath("$[0].startAt").value("2029-08-10T09:00:00Z"))
+                .andExpect(jsonPath("$[0].originStartAt").value("2029-08-10T09:00:00Z"))
+                .andExpect(jsonPath("$[1].startAt").value("2029-08-10T11:00:00Z"))
+                .andExpect(jsonPath("$[1].originStartAt").value(orphanOrigin.toString()))
+                .andExpect(jsonPath("$[2].startAt").value("2029-08-11T09:00:00Z"))
+                .andReturn();
+
+        // then
+        JsonNode events = readResponse(result);
+        int orphanMatches = 0;
+        for (JsonNode event : events) {
+            if (orphanOrigin.toString().equals(event.get("originStartAt").asText())) {
+                orphanMatches++;
+            }
+        }
+        assertThat(orphanMatches).isEqualTo(1);
+        mockMvc.perform(get("/api/events")
+                        .param("from", "2029-08-10T09:00:00Z")
+                        .param("to", "2029-08-11T09:00:00Z"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$[0].startAt").value("2029-08-10T09:00:00Z"))
+                .andExpect(jsonPath("$[1].startAt").value("2029-08-10T11:00:00Z"));
+    }
+
+    @Test
     @DisplayName("전체 master 수정은 active와 deleted override 및 legacy Event를 보존하고 orphan 조회를 유지한다")
     void givenActiveAndDeletedOverrides_whenReplaceMaster_thenPreservesChildStateAndOrphanQuery() throws Exception {
         // given
@@ -598,7 +652,7 @@ class RecurrenceEventControllerTest {
     }
 
     @Test
-    @DisplayName("전체 recurrence 삭제는 active와 deleted override 및 account legacy Event를 먼저 정리한다")
+    @DisplayName("전체 recurrence 삭제는 active와 deleted override, account legacy Event, master를 모두 제거한다")
     void givenRecurrenceChildren_whenDeleteMaster_thenRemovesAllChildrenAndMaster() throws Exception {
         // given
         long recurrenceId = createTimedRecurrence("Delete all", "2027-05-01", "UTC");
