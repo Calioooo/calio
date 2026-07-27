@@ -133,6 +133,20 @@ class SecurityAuthenticationIntegrationTest {
     }
 
     @Test
+    @DisplayName("Group Space API는 Authorization header가 없으면 AUTH_TOKEN_REQUIRED를 반환한다")
+    void givenNoAuthorizationHeader_whenRequestGroupSpaceApi_thenReturnsRequiredTokenError()
+            throws Exception {
+        // when, then
+        mockMvc.perform(get("/api/group-spaces"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.title").value("AUTH_TOKEN_REQUIRED"))
+                .andExpect(jsonPath("$.detail").value("Authentication token is required."))
+                .andExpect(jsonPath("$.instance").value("/api/group-spaces"))
+                .andExpect(jsonPath("$.*", hasSize(6)));
+    }
+
+    @Test
     @DisplayName("명시된 public API는 Authorization header 없이도 인증 요구 응답으로 바뀌지 않는다")
     void givenNoAuthorizationHeader_whenRequestPublicApis_thenDoesNotRequireAuthentication()
             throws Exception {

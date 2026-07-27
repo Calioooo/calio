@@ -15,6 +15,9 @@ public enum ErrorCode {
             "Completed task title update is not allowed."
     ),
     TAG_NOT_FOUND(HttpStatus.NOT_FOUND, "Tag not found."),
+    GROUP_SPACE_NOT_FOUND(HttpStatus.NOT_FOUND, "Group space not found."),
+    GROUP_OWNER_REQUIRED(HttpStatus.FORBIDDEN, "Group owner permission is required."),
+    GROUP_MEMBER_NICKNAME_CONFLICT(HttpStatus.CONFLICT, "Group member nickname already exists."),
     DEFAULT_TAG_NOT_FOUND(HttpStatus.INTERNAL_SERVER_ERROR, "Default tag not found."),
     INVALID_TAG_COLOR_CODE(HttpStatus.BAD_REQUEST, "Invalid tag color code."),
     RECURRENCE_UPDATE_TIME_RANGE_INVALID(HttpStatus.BAD_REQUEST, "Recurrence update time range invalid."),

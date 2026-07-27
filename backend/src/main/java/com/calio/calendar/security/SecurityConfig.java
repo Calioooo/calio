@@ -48,6 +48,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/custom-tags").authenticated()
                         .requestMatchers("/api/custom-tags/**").authenticated()
                         .requestMatchers("/api/integrations/**").authenticated()
+                        .requestMatchers("/api/group-spaces").authenticated()
+                        .requestMatchers("/api/group-spaces/**").authenticated()
                         .anyRequest().denyAll()
                 )
                 .exceptionHandling(exception -> exception.authenticationEntryPoint(
