@@ -6,6 +6,29 @@ public enum ErrorCode {
     AUTH_TOKEN_REQUIRED(HttpStatus.UNAUTHORIZED, "Authentication token is required."),
     AUTH_TOKEN_INVALID(HttpStatus.UNAUTHORIZED, "Authentication token is invalid."),
     AUTH_TOKEN_REVOKED(HttpStatus.UNAUTHORIZED, "Authentication token is revoked."),
+    GROUP_OWNER_REQUIRED(HttpStatus.FORBIDDEN, "Group owner permission is required."),
+    GROUP_SPACE_NOT_FOUND(HttpStatus.NOT_FOUND, "Group space not found."),
+    GROUP_MEMBER_NOT_FOUND(HttpStatus.NOT_FOUND, "Group member not found."),
+    GROUP_INVITATION_NOT_FOUND(HttpStatus.NOT_FOUND, "Group invitation not found."),
+    GROUP_INVITATION_EXPIRED(HttpStatus.GONE, "Group invitation has expired."),
+    GROUP_MEMBER_NICKNAME_CONFLICT(
+            HttpStatus.CONFLICT,
+            "Nickname is already in use in this group."
+    ),
+    GROUP_MEMBER_REJOIN_INVITATION_REQUIRED(
+            HttpStatus.CONFLICT,
+            "A new invitation issued after leaving or removal is required."
+    ),
+    GROUP_OWNER_TRANSFER_REQUIRED(
+            HttpStatus.CONFLICT,
+            "Owner transfer is required before leaving the group."
+    ),
+    GROUP_OWNER_TRANSFER_INVALID(HttpStatus.CONFLICT, "Owner transfer target is invalid."),
+    GROUP_OWNER_CANNOT_BE_REMOVED(HttpStatus.CONFLICT, "The group owner cannot be removed."),
+    GROUP_INVITATION_GENERATION_FAILED(
+            HttpStatus.INTERNAL_SERVER_ERROR,
+            "Group invitation generation failed."
+    ),
     EVENT_NOT_FOUND(HttpStatus.NOT_FOUND, "Event not found."),
     RECURRENCE_EVENT_NOT_FOUND(HttpStatus.NOT_FOUND, "Recurrence event not found."),
     RECURRENCE_OCCURRENCE_NOT_FOUND(HttpStatus.NOT_FOUND, "Recurrence occurrence not found."),

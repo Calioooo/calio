@@ -37,6 +37,10 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST, "/api/auth/guest").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/group-invitations/preview").permitAll()
+                        .requestMatchers("/api/group-invitations/accept").authenticated()
+                        .requestMatchers("/api/group-spaces").authenticated()
+                        .requestMatchers("/api/group-spaces/**").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/national-holidays").permitAll()
                         .requestMatchers("/api/events").authenticated()
                         .requestMatchers("/api/events/**").authenticated()

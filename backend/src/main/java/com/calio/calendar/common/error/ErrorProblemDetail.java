@@ -1,31 +1,44 @@
 package com.calio.calendar.common.error;
 
-import java.net.URI;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ProblemDetail;
+public sealed interface ErrorProblemDetail
+        permits ErrorProblemDetail.ClientError, ErrorProblemDetail.ServerError {
 
-public final class ErrorProblemDetail {
+    String type();
 
-    private ErrorProblemDetail() {
-    }
+    String title();
 
-    public static ProblemDetail from(ErrorCode errorCode, String detail) {
+    int status();
+
+    static ErrorProblemDetail from(ErrorCode errorCode, String detail) {
         if (errorCode.getStatus().is5xxServerError()) {
-            return fromServerError(errorCode.getStatus());
+            return new ServerError(
+                    "about:blank",
+                    errorCode.getStatus().getReasonPhrase(),
+                    errorCode.getStatus().value()
+            );
         }
-
-        ProblemDetail problemDetail = ProblemDetail.forStatus(errorCode.getStatus());
-        problemDetail.setType(URI.create("about:blank"));
-        problemDetail.setTitle(errorCode.name());
-        problemDetail.setDetail(detail);
-        problemDetail.setProperty("errorCode", errorCode.name());
-        return problemDetail;
+        return new ClientError(
+                "about:blank",
+                errorCode.name(),
+                errorCode.getStatus().value(),
+                detail,
+                errorCode.name()
+        );
     }
 
-    private static ProblemDetail fromServerError(HttpStatus status) {
-        ProblemDetail problemDetail = ProblemDetail.forStatus(status);
-        problemDetail.setType(URI.create("about:blank"));
-        problemDetail.setTitle(status.getReasonPhrase());
-        return problemDetail;
+    record ClientError(
+            String type,
+            String title,
+            int status,
+            String detail,
+            String errorCode
+    ) implements ErrorProblemDetail {
+    }
+
+    record ServerError(
+            String type,
+            String title,
+            int status
+    ) implements ErrorProblemDetail {
     }
 }

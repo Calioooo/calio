@@ -128,7 +128,7 @@ class NationalHolidayControllerTest {
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.title").value("INVALID_TIME_RANGE"))
                 .andExpect(jsonPath("$.detail").value("Invalid time range."))
-                .andExpect(jsonPath("$.*", hasSize(6)));
+                .andExpect(jsonPath("$.*", hasSize(5)));
     }
 
     @Test
@@ -140,14 +140,14 @@ class NationalHolidayControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"))
                 .andExpect(jsonPath("$.detail").value("Validation failed."))
-                .andExpect(jsonPath("$.*", hasSize(6)));
+                .andExpect(jsonPath("$.*", hasSize(5)));
 
         mockMvc.perform(get("/api/national-holidays")
                         .param("from", "2026-05-05"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"))
                 .andExpect(jsonPath("$.detail").value("Validation failed."))
-                .andExpect(jsonPath("$.*", hasSize(6)));
+                .andExpect(jsonPath("$.*", hasSize(5)));
     }
 
     @Test
@@ -161,7 +161,7 @@ class NationalHolidayControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"))
                 .andExpect(jsonPath("$.detail").value("Validation failed."))
-                .andExpect(jsonPath("$.*", hasSize(6)));
+                .andExpect(jsonPath("$.*", hasSize(5)));
     }
 
     @Test

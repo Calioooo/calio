@@ -35,3 +35,7 @@ external:
 security:
   token-encryption:
     google-refresh-token-key: ${GOOGLE_TOKEN_ENCRYPTION_KEY}
+
+group-space:
+  invitation:
+    base-url: ${GROUP_SPACE_INVITATION_BASE_URL:https://calio.app/invite}

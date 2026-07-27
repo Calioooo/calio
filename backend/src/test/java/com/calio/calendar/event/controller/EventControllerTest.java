@@ -377,7 +377,7 @@ class EventControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"))
                 .andExpect(jsonPath("$.detail").isString())
-                .andExpect(jsonPath("$.*", hasSize(6)));
+                .andExpect(jsonPath("$.*", hasSize(5)));
     }
 
     @Test
@@ -399,7 +399,7 @@ class EventControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"))
                 .andExpect(jsonPath("$.detail").isString())
-                .andExpect(jsonPath("$.*", hasSize(6)));
+                .andExpect(jsonPath("$.*", hasSize(5)));
     }
 
     @Test
@@ -414,7 +414,7 @@ class EventControllerTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.title").value("EVENT_NOT_FOUND"))
                 .andExpect(jsonPath("$.detail").isString())
-                .andExpect(jsonPath("$.*", hasSize(6)));
+                .andExpect(jsonPath("$.*", hasSize(5)));
     }
 
     @Test
@@ -504,7 +504,7 @@ class EventControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"))
                 .andExpect(jsonPath("$.detail").isString())
-                .andExpect(jsonPath("$.*", hasSize(6)));
+                .andExpect(jsonPath("$.*", hasSize(5)));
     }
 
     @Test
@@ -525,7 +525,7 @@ class EventControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"))
                 .andExpect(jsonPath("$.detail").isString())
-                .andExpect(jsonPath("$.*", hasSize(6)));
+                .andExpect(jsonPath("$.*", hasSize(5)));
 
         mockMvc.perform(put("/api/events/{eventId}", eventId)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -538,7 +538,7 @@ class EventControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"))
                 .andExpect(jsonPath("$.detail").isString())
-                .andExpect(jsonPath("$.*", hasSize(6)));
+                .andExpect(jsonPath("$.*", hasSize(5)));
     }
 
     @Test
@@ -562,7 +562,7 @@ class EventControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.title").value("INVALID_TIME_RANGE"))
                 .andExpect(jsonPath("$.detail").isString())
-                .andExpect(jsonPath("$.*", hasSize(6)));
+                .andExpect(jsonPath("$.*", hasSize(5)));
     }
 
     @Test
@@ -586,7 +586,7 @@ class EventControllerTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.title").value("EVENT_NOT_FOUND"))
                 .andExpect(jsonPath("$.detail").isString())
-                .andExpect(jsonPath("$.*", hasSize(6)));
+                .andExpect(jsonPath("$.*", hasSize(5)));
     }
 
     @Test
@@ -646,13 +646,13 @@ class EventControllerTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.title").value("EVENT_NOT_FOUND"))
                 .andExpect(jsonPath("$.detail").isString())
-                .andExpect(jsonPath("$.*", hasSize(6)));
+                .andExpect(jsonPath("$.*", hasSize(5)));
 
         mockMvc.perform(delete("/api/events/{eventId}", eventId))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.title").value("EVENT_NOT_FOUND"))
                 .andExpect(jsonPath("$.detail").isString())
-                .andExpect(jsonPath("$.*", hasSize(6)));
+                .andExpect(jsonPath("$.*", hasSize(5)));
     }
 
     @Test

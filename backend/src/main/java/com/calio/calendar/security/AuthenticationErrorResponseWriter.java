@@ -5,11 +5,9 @@ import com.calio.calendar.common.error.ErrorCode;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.net.URI;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
-import org.springframework.http.ProblemDetail;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
@@ -27,16 +25,15 @@ public class AuthenticationErrorResponseWriter {
     public void write(HttpServletRequest request, HttpServletResponse response, ErrorCode errorCode)
             throws IOException {
         log.warn(
-                "Authentication failed. status={} errorCode={} method={} path={}",
+                "Authentication failed. status={} errorCode={} method={}",
                 errorCode.getStatus().value(),
                 errorCode.name(),
-                request.getMethod(),
-                request.getRequestURI()
+                request.getMethod()
         );
         response.setStatus(errorCode.getStatus().value());
         response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
-        ProblemDetail problemDetail = ErrorProblemDetail.from(errorCode, errorCode.getDefaultMessage());
-        problemDetail.setInstance(URI.create(request.getRequestURI()));
+        ErrorProblemDetail problemDetail =
+                ErrorProblemDetail.from(errorCode, errorCode.getDefaultMessage());
         response.getWriter().write(objectMapper.writeValueAsString(problemDetail));
     }
 }

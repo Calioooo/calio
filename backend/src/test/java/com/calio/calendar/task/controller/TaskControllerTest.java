@@ -100,7 +100,7 @@ class TaskControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"))
                 .andExpect(jsonPath("$.detail").isString())
-                .andExpect(jsonPath("$.*", hasSize(6)));
+                .andExpect(jsonPath("$.*", hasSize(5)));
     }
 
     @Test
@@ -118,7 +118,7 @@ class TaskControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"))
                 .andExpect(jsonPath("$.detail").isString())
-                .andExpect(jsonPath("$.*", hasSize(6)));
+                .andExpect(jsonPath("$.*", hasSize(5)));
     }
 
     @Test
@@ -136,7 +136,7 @@ class TaskControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"))
                 .andExpect(jsonPath("$.detail").isString())
-                .andExpect(jsonPath("$.*", hasSize(6)));
+                .andExpect(jsonPath("$.*", hasSize(5)));
     }
 
     @Test
@@ -210,7 +210,7 @@ class TaskControllerTest {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.title").value("COMPLETED_TASK_TITLE_UPDATE_NOT_ALLOWED"))
                 .andExpect(jsonPath("$.detail").value("Completed task title update is not allowed."))
-                .andExpect(jsonPath("$.*", hasSize(6)));
+                .andExpect(jsonPath("$.*", hasSize(5)));
 
         Task persistedTask = taskRepository.findById(task.getTaskId()).orElseThrow();
         assertThat(persistedTask.getTaskTitle()).isEqualTo("Completed task");
@@ -249,7 +249,7 @@ class TaskControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"))
                 .andExpect(jsonPath("$.detail").value("Validation failed."))
-                .andExpect(jsonPath("$.*", hasSize(6)));
+                .andExpect(jsonPath("$.*", hasSize(5)));
     }
 
     @Test
@@ -270,7 +270,7 @@ class TaskControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"))
                 .andExpect(jsonPath("$.detail").value("Validation failed."))
-                .andExpect(jsonPath("$.*", hasSize(6)));
+                .andExpect(jsonPath("$.*", hasSize(5)));
     }
 
     @Test
@@ -291,7 +291,7 @@ class TaskControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"))
                 .andExpect(jsonPath("$.detail").value("Validation failed."))
-                .andExpect(jsonPath("$.*", hasSize(6)));
+                .andExpect(jsonPath("$.*", hasSize(5)));
     }
 
     @Test
@@ -307,7 +307,7 @@ class TaskControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"))
                 .andExpect(jsonPath("$.detail").value("Validation failed."))
-                .andExpect(jsonPath("$.*", hasSize(6)));
+                .andExpect(jsonPath("$.*", hasSize(5)));
     }
 
     @Test
@@ -324,7 +324,7 @@ class TaskControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"))
                 .andExpect(jsonPath("$.detail").value("Validation failed."))
-                .andExpect(jsonPath("$.*", hasSize(6)));
+                .andExpect(jsonPath("$.*", hasSize(5)));
     }
 
     @Test
@@ -342,7 +342,7 @@ class TaskControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"))
                 .andExpect(jsonPath("$.detail").value("Validation failed."))
-                .andExpect(jsonPath("$.*", hasSize(6)));
+                .andExpect(jsonPath("$.*", hasSize(5)));
     }
 
     @Test
