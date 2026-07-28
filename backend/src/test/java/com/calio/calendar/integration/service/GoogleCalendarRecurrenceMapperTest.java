@@ -170,6 +170,26 @@ class GoogleCalendarRecurrenceMapperTest {
     }
 
     @Test
+    @DisplayName("recurrence event와 override identity가 혼합된 provider item은 invalid response다")
+    void givenMixedRecurrenceEventAndOverride_whenMapOverride_thenReturnsProviderInvalidResponse() {
+        // given
+        GoogleCalendarEventItem item = item(
+                "recurrence-override-id",
+                "confirmed",
+                "Invalid mixed item",
+                null,
+                List.of("RRULE:FREQ=DAILY"),
+                "recurrence-event-id",
+                timed("2026-07-21T09:00:00+09:00", null),
+                timed("2026-07-21T10:00:00+09:00", "Asia/Seoul"),
+                timed("2026-07-21T11:00:00+09:00", "Asia/Seoul")
+        );
+
+        // when, then
+        assertInvalidResponse(() -> mapper.mapRecurrenceOverride(item));
+    }
+
+    @Test
     @DisplayName("recurrence override의 parent ID 또는 originalStartTime 누락은 invalid response다")
     void givenMissingRecurrenceOverrideIdentity_whenMap_thenReturnsProviderInvalidResponse() {
         GoogleCalendarEventTime start = timed(

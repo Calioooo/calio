@@ -120,7 +120,8 @@ public class GoogleCalendarRecurrenceMapper {
         boolean isInvalid = item == null
                 || !hasText(item.id())
                 || !hasText(item.recurringEventId())
-                || item.originalStartTime() == null;
+                || item.originalStartTime() == null
+                || item.isRecurrenceEvent();
         if (isInvalid) {
             throw invalidResponse();
         }
