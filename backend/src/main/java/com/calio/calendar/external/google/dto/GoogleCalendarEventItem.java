@@ -63,14 +63,14 @@ public record GoogleCalendarEventItem(
     }
 
     public boolean isRecurring() {
-        return isRecurrenceMaster() || isRecurrenceOccurrence();
+        return isRecurrenceEvent() || isRecurrenceOverride();
     }
 
-    public boolean isRecurrenceMaster() {
+    public boolean isRecurrenceEvent() {
         return !recurrence.isEmpty();
     }
 
-    public boolean isRecurrenceOccurrence() {
+    public boolean isRecurrenceOverride() {
         return hasText(recurringEventId);
     }
 

@@ -27,12 +27,12 @@ public class GoogleCalendarRecurrenceMapper {
         this.recurrenceEngine = recurrenceEngine;
     }
 
-    public MasterResult mapMaster(GoogleCalendarEventItem item) {
-        requireMaster(item);
+    public RecurrenceEventResult mapRecurrenceEvent(GoogleCalendarEventItem item) {
+        requireRecurrenceEvent(item);
         NormalizedEventSchedule schedule = timeNormalizer.normalizeSchedule(item.start(), item.end());
         RecurrenceSchedule recurrenceSchedule = recurrenceSchedule(schedule);
         List<String> recurrenceRules = validateRecurrence(recurrenceSchedule, item.recurrence());
-        return new MasterResult(
+        return new RecurrenceEventResult(
                 item.id(),
                 item.etag(),
                 item.updatedAt(),
@@ -43,11 +43,11 @@ public class GoogleCalendarRecurrenceMapper {
         );
     }
 
-    public ExceptionResult mapException(GoogleCalendarEventItem item) {
-        requireExceptionIdentity(item);
+    public RecurrenceOverrideResult mapRecurrenceOverride(GoogleCalendarEventItem item) {
+        requireRecurrenceOverrideIdentity(item);
         Instant originStartAt = timeNormalizer.normalize(item.originalStartTime()).instant();
         if (item.isCancelled()) {
-            return new CancelledExceptionResult(
+            return new CancelledRecurrenceOverrideResult(
                     item.id(),
                     item.recurringEventId(),
                     originStartAt,
@@ -56,7 +56,7 @@ public class GoogleCalendarRecurrenceMapper {
             );
         }
         NormalizedEventSchedule schedule = timeNormalizer.normalizeSchedule(item.start(), item.end());
-        return new ActiveExceptionResult(
+        return new ActiveRecurrenceOverrideResult(
                 item.id(),
                 item.recurringEventId(),
                 originStartAt,
@@ -106,17 +106,17 @@ public class GoogleCalendarRecurrenceMapper {
         return exception;
     }
 
-    private void requireMaster(GoogleCalendarEventItem item) {
+    private void requireRecurrenceEvent(GoogleCalendarEventItem item) {
         boolean isInvalid = item == null
                 || item.isCancelled()
-                || !item.isRecurrenceMaster()
-                || item.isRecurrenceOccurrence();
+                || !item.isRecurrenceEvent()
+                || item.isRecurrenceOverride();
         if (isInvalid) {
             throw invalidResponse();
         }
     }
 
-    private void requireExceptionIdentity(GoogleCalendarEventItem item) {
+    private void requireRecurrenceOverrideIdentity(GoogleCalendarEventItem item) {
         boolean isInvalid = item == null
                 || !hasText(item.id())
                 || !hasText(item.recurringEventId())
@@ -138,7 +138,7 @@ public class GoogleCalendarRecurrenceMapper {
         return new CalioException(ErrorCode.GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID);
     }
 
-    public record MasterResult(
+    public record RecurrenceEventResult(
             String externalEventId,
             String providerEtag,
             Instant providerUpdatedAt,
@@ -148,13 +148,13 @@ public class GoogleCalendarRecurrenceMapper {
             List<String> recurrenceRules
     ) {
 
-        public MasterResult {
+        public RecurrenceEventResult {
             recurrenceRules = List.copyOf(recurrenceRules);
         }
     }
 
-    public sealed interface ExceptionResult
-            permits ActiveExceptionResult, CancelledExceptionResult {
+    public sealed interface RecurrenceOverrideResult
+            permits ActiveRecurrenceOverrideResult, CancelledRecurrenceOverrideResult {
 
         String externalEventId();
 
@@ -167,7 +167,7 @@ public class GoogleCalendarRecurrenceMapper {
         Instant providerUpdatedAt();
     }
 
-    public record ActiveExceptionResult(
+    public record ActiveRecurrenceOverrideResult(
             String externalEventId,
             String parentExternalEventId,
             Instant originStartAt,
@@ -176,15 +176,15 @@ public class GoogleCalendarRecurrenceMapper {
             String title,
             String description,
             NormalizedEventSchedule schedule
-    ) implements ExceptionResult {
+    ) implements RecurrenceOverrideResult {
     }
 
-    public record CancelledExceptionResult(
+    public record CancelledRecurrenceOverrideResult(
             String externalEventId,
             String parentExternalEventId,
             Instant originStartAt,
             String providerEtag,
             Instant providerUpdatedAt
-    ) implements ExceptionResult {
+    ) implements RecurrenceOverrideResult {
     }
 }

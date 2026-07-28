@@ -13,7 +13,7 @@ class GoogleCalendarEventPageTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
-    @DisplayName("Google page는 일반, recurring master, exception, cancelled item을 구분한다")
+    @DisplayName("Google page는 일반, recurrence event, recurrence override, cancelled item을 구분한다")
     void givenProviderItems_whenParse_thenClassifiesItemsWithoutExpandingRecurrence()
             throws Exception {
         // when
@@ -31,16 +31,16 @@ class GoogleCalendarEventPageTest {
                               "end": {"dateTime": "2026-07-01T10:00:00+09:00"}
                             },
                             {
-                              "id": "master",
+                              "id": "recurrence-event",
                               "status": "confirmed",
                               "recurrence": ["RRULE:FREQ=DAILY"],
                               "start": {"dateTime": "2026-07-01T09:00:00+09:00"},
                               "end": {"dateTime": "2026-07-01T10:00:00+09:00"}
                             },
                             {
-                              "id": "exception",
+                              "id": "recurrence-override",
                               "status": "confirmed",
-                              "recurringEventId": "master",
+                              "recurringEventId": "recurrence-event",
                               "originalStartTime": {
                                 "dateTime": "2026-07-02T09:00:00+09:00",
                                 "timeZone": "Asia/Seoul"
@@ -61,10 +61,10 @@ class GoogleCalendarEventPageTest {
         // then
         assertThat(page.items()).hasSize(4);
         assertThat(page.items().get(0).isRecurring()).isFalse();
-        assertThat(page.items().get(1).isRecurrenceMaster()).isTrue();
-        assertThat(page.items().get(1).isRecurrenceOccurrence()).isFalse();
-        assertThat(page.items().get(2).isRecurrenceMaster()).isFalse();
-        assertThat(page.items().get(2).isRecurrenceOccurrence()).isTrue();
+        assertThat(page.items().get(1).isRecurrenceEvent()).isTrue();
+        assertThat(page.items().get(1).isRecurrenceOverride()).isFalse();
+        assertThat(page.items().get(2).isRecurrenceEvent()).isFalse();
+        assertThat(page.items().get(2).isRecurrenceOverride()).isTrue();
         assertThat(page.items().get(2).originalStartTime().timeZone()).isEqualTo("Asia/Seoul");
         assertThat(page.items().get(3).isCancelled()).isTrue();
         assertThat(page.nextSyncToken()).isEqualTo("next-token");

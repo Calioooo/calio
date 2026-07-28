@@ -8,9 +8,9 @@ import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.external.google.GoogleCalendarEventTimeNormalizer;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventItem;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventTime;
-import com.calio.calendar.integration.service.GoogleCalendarRecurrenceMapper.ActiveExceptionResult;
-import com.calio.calendar.integration.service.GoogleCalendarRecurrenceMapper.CancelledExceptionResult;
-import com.calio.calendar.integration.service.GoogleCalendarRecurrenceMapper.MasterResult;
+import com.calio.calendar.integration.service.GoogleCalendarRecurrenceMapper.ActiveRecurrenceOverrideResult;
+import com.calio.calendar.integration.service.GoogleCalendarRecurrenceMapper.CancelledRecurrenceOverrideResult;
+import com.calio.calendar.integration.service.GoogleCalendarRecurrenceMapper.RecurrenceEventResult;
 import com.calio.calendar.recurrence.service.Ical4jRecurrenceEngine;
 import java.time.Instant;
 import java.util.List;
@@ -25,11 +25,11 @@ class GoogleCalendarRecurrenceMapperTest {
     );
 
     @Test
-    @DisplayName("recurring master는 canonical title, schedule과 engine-normalized recurrence를 만든다")
-    void givenRecurringMaster_whenMap_thenReturnsPersistenceIndependentCanonicalInput() {
+    @DisplayName("recurrence event는 canonical title, schedule과 engine-normalized recurrence를 만든다")
+    void givenRecurrenceEvent_whenMap_thenReturnsPersistenceIndependentCanonicalInput() {
         // given
         GoogleCalendarEventItem item = item(
-                "master-id",
+                "recurrence-event-id",
                 "confirmed",
                 " ",
                 "description",
@@ -44,10 +44,10 @@ class GoogleCalendarRecurrenceMapperTest {
         );
 
         // when
-        MasterResult result = mapper.mapMaster(item);
+        RecurrenceEventResult result = mapper.mapRecurrenceEvent(item);
 
         // then
-        assertThat(result.externalEventId()).isEqualTo("master-id");
+        assertThat(result.externalEventId()).isEqualTo("recurrence-event-id");
         assertThat(result.title()).isEqualTo("(제목 없음)");
         assertThat(result.description()).isEqualTo("description");
         assertThat(result.schedule().startAt()).isEqualTo(Instant.parse("2026-07-20T00:00:00Z"));
@@ -58,23 +58,24 @@ class GoogleCalendarRecurrenceMapperTest {
     }
 
     @Test
-    @DisplayName("active exception은 original identity와 cross-type final snapshot을 독립 계산한다")
-    void givenAllDayOriginAndTimedFinal_whenMapException_thenPreservesBothShapes() {
+    @DisplayName("active recurrence override는 original identity와 cross-type final snapshot을 독립 계산한다")
+    void givenAllDayOriginAndTimedFinal_whenMapRecurrenceOverride_thenPreservesBothShapes() {
         // given
         GoogleCalendarEventItem item = item(
-                "exception-id",
+                "recurrence-override-id",
                 "confirmed",
                 null,
                 null,
                 List.of(),
-                "master-id",
+                "recurrence-event-id",
                 new GoogleCalendarEventTime("2026-07-21", null, "ignored/provider-zone"),
                 timed("2026-07-21T15:00:00+09:00", "Asia/Seoul"),
                 timed("2026-07-21T16:00:00+09:00", "Asia/Seoul")
         );
 
         // when
-        ActiveExceptionResult result = (ActiveExceptionResult) mapper.mapException(item);
+        ActiveRecurrenceOverrideResult result =
+                (ActiveRecurrenceOverrideResult) mapper.mapRecurrenceOverride(item);
 
         // then
         assertThat(result.originStartAt()).isEqualTo(Instant.parse("2026-07-21T00:00:00Z"));
@@ -85,36 +86,37 @@ class GoogleCalendarRecurrenceMapperTest {
     }
 
     @Test
-    @DisplayName("cancelled minimum exception은 identity만으로 mapping result를 만든다")
-    void givenCancelledMinimumException_whenMapException_thenDoesNotRequireFinalSchedule() {
+    @DisplayName("cancelled minimum recurrence override는 identity만으로 mapping result를 만든다")
+    void givenCancelledMinimumRecurrenceOverride_whenMap_thenDoesNotRequireFinalSchedule() {
         // given
         GoogleCalendarEventItem item = item(
-                "exception-id",
+                "recurrence-override-id",
                 "cancelled",
                 null,
                 null,
                 List.of(),
-                "master-id",
+                "recurrence-event-id",
                 timed("2026-07-21T09:00:00+09:00", null),
                 null,
                 null
         );
 
         // when
-        CancelledExceptionResult result = (CancelledExceptionResult) mapper.mapException(item);
+        CancelledRecurrenceOverrideResult result =
+                (CancelledRecurrenceOverrideResult) mapper.mapRecurrenceOverride(item);
 
         // then
-        assertThat(result.externalEventId()).isEqualTo("exception-id");
-        assertThat(result.parentExternalEventId()).isEqualTo("master-id");
+        assertThat(result.externalEventId()).isEqualTo("recurrence-override-id");
+        assertThat(result.parentExternalEventId()).isEqualTo("recurrence-event-id");
         assertThat(result.originStartAt()).isEqualTo(Instant.parse("2026-07-21T00:00:00Z"));
     }
 
     @Test
     @DisplayName("provider recurrence validation 실패는 Google invalid response로 변환한다")
-    void givenInvalidProviderRecurrence_whenMapMaster_thenTranslatesOnlyKnownFailure() {
+    void givenInvalidProviderRecurrence_whenMapRecurrenceEvent_thenTranslatesOnlyKnownFailure() {
         // given
         GoogleCalendarEventItem item = item(
-                "master-id",
+                "recurrence-event-id",
                 "confirmed",
                 "Title",
                 null,
@@ -126,7 +128,7 @@ class GoogleCalendarRecurrenceMapperTest {
         );
 
         // when, then
-        assertThatThrownBy(() -> mapper.mapMaster(item))
+        assertThatThrownBy(() -> mapper.mapRecurrenceEvent(item))
                 .isInstanceOfSatisfying(CalioException.class, exception ->
                         assertThat(exception.getErrorCode())
                                 .isEqualTo(ErrorCode.GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID));

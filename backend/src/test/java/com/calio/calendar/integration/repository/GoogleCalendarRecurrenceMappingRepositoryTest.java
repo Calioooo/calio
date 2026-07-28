@@ -76,14 +76,14 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
                         Instant.parse("2026-07-21T02:00:00Z")
                 )
         );
-        String externalMasterId = "m".repeat(1024);
-        String externalExceptionId = "e".repeat(1024);
+        String externalRecurrenceEventId = "m".repeat(1024);
+        String externalRecurrenceOverrideId = "e".repeat(1024);
         String etag = "t".repeat(1024);
         GoogleCalendarRecurrenceEventMapping eventMapping = eventMappingRepository.saveAndFlush(
                 new GoogleCalendarRecurrenceEventMapping(
                         integration,
                         recurrenceEvent,
-                        externalMasterId,
+                        externalRecurrenceEventId,
                         etag,
                         null
                 )
@@ -93,7 +93,7 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
                         new GoogleCalendarRecurrenceOverrideMapping(
                                 eventMapping,
                                 recurrenceOverride,
-                                externalExceptionId,
+                                externalRecurrenceOverrideId,
                                 etag,
                                 null
                         )
@@ -102,19 +102,19 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
         // when, then
         assertThat(eventMappingRepository.findByRecurrenceEvent_Id(recurrenceEvent.getId()))
                 .map(GoogleCalendarRecurrenceEventMapping::getExternalEventId)
-                .contains(externalMasterId);
+                .contains(externalRecurrenceEventId);
         assertThat(eventMappingRepository
                 .findByIntegration_IdAndCalendarKeyAndExternalEventId(
                         integration.getId(),
                         GoogleCalendarRecurrenceEventMapping.PRIMARY_CALENDAR_KEY,
-                        externalMasterId
+                        externalRecurrenceEventId
                 ))
                 .map(GoogleCalendarRecurrenceEventMapping::getProviderEtag)
                 .contains(etag);
         assertThat(overrideMappingRepository.findAllByExternalIdentity(
                 integration.getId(),
                 GoogleCalendarRecurrenceEventMapping.PRIMARY_CALENDAR_KEY,
-                externalExceptionId
+                externalRecurrenceOverrideId
         )).extracting(GoogleCalendarRecurrenceOverrideMapping::getId)
                 .containsExactly(overrideMapping.getId());
         assertThat(overrideMapping.getProviderEtag()).isEqualTo(etag);
