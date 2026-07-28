@@ -130,6 +130,50 @@ class GoogleCalendarEventTimeNormalizerTest {
         ));
     }
 
+    @Test
+    @DisplayName("date와 dateTime이 모두 없으면 invalid response다")
+    void givenEmptyTimeUnion_whenNormalize_thenReturnsProviderInvalidResponse() {
+        assertInvalidResponse(() -> normalizer.normalize(
+                new GoogleCalendarEventTime(null, null, null)
+        ));
+    }
+
+    @Test
+    @DisplayName("offsetless timed 값에 timezone이 없으면 invalid response다")
+    void givenOffsetlessTimedValueWithoutTimeZone_whenNormalize_thenReturnsProviderInvalidResponse() {
+        assertInvalidResponse(() -> normalizer.normalize(
+                new GoogleCalendarEventTime(null, "2026-07-20T09:00:00", null)
+        ));
+    }
+
+    @Test
+    @DisplayName("유효하지 않은 IANA timezone은 invalid response다")
+    void givenInvalidIanaTimeZone_whenNormalize_thenReturnsProviderInvalidResponse() {
+        assertInvalidResponse(() -> normalizer.normalize(
+                new GoogleCalendarEventTime(
+                        null,
+                        "2026-07-20T09:00:00",
+                        "Invalid/TimeZone"
+                )
+        ));
+    }
+
+    @Test
+    @DisplayName("endAt이 startAt과 같거나 이전이면 invalid response다")
+    void givenNonIncreasingSchedule_whenNormalizeSchedule_thenReturnsProviderInvalidResponse() {
+        GoogleCalendarEventTime start =
+                new GoogleCalendarEventTime("2026-07-20", null, null);
+
+        assertInvalidResponse(() -> normalizer.normalizeSchedule(
+                start,
+                new GoogleCalendarEventTime("2026-07-20", null, null)
+        ));
+        assertInvalidResponse(() -> normalizer.normalizeSchedule(
+                start,
+                new GoogleCalendarEventTime("2026-07-19", null, null)
+        ));
+    }
+
     private void assertInvalidResponse(Runnable action) {
         assertThatThrownBy(action::run)
                 .isInstanceOfSatisfying(CalioException.class, exception ->

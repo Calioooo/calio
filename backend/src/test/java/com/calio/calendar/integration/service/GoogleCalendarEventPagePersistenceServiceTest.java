@@ -16,6 +16,10 @@ import com.calio.calendar.integration.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.repository.GoogleCalendarEventMappingRepository;
 import com.calio.calendar.integration.repository.GoogleCalendarIntegrationRepository;
+import com.calio.calendar.integration.repository.GoogleCalendarRecurrenceEventMappingRepository;
+import com.calio.calendar.integration.repository.GoogleCalendarRecurrenceOverrideMappingRepository;
+import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
+import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.domain.TagType;
 import com.calio.calendar.tag.repository.TagRepository;
@@ -47,6 +51,18 @@ class GoogleCalendarEventPagePersistenceServiceTest {
 
     @Autowired
     private GoogleCalendarEventMappingRepository mappingRepository;
+
+    @Autowired
+    private GoogleCalendarRecurrenceEventMappingRepository recurrenceEventMappingRepository;
+
+    @Autowired
+    private GoogleCalendarRecurrenceOverrideMappingRepository recurrenceOverrideMappingRepository;
+
+    @Autowired
+    private RecurrenceEventRepository recurrenceEventRepository;
+
+    @Autowired
+    private RecurrenceEventOverrideRepository recurrenceEventOverrideRepository;
 
     @Autowired
     private EventRepository eventRepository;
@@ -123,6 +139,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
                 integration(account.getId())
         );
         String externalEventId = "a".repeat(1024);
+        String providerEtag = "e".repeat(1024);
         acquireLease(account.getId(), "maximum-id-run");
 
         // when
@@ -130,7 +147,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
                 integration.getId(),
                 account.getId(),
                 "maximum-id-run",
-                page(timedItem(externalEventId, "Maximum ID"), "cursor-1")
+                page(timedItem(externalEventId, "Maximum ID", providerEtag), "cursor-1")
         );
 
         // then
@@ -138,8 +155,10 @@ class GoogleCalendarEventPagePersistenceServiceTest {
                 integration.getId(),
                 GoogleCalendarEventMapping.PRIMARY_CALENDAR_KEY,
                 List.of(externalEventId)
-        )).singleElement().satisfies(mapping ->
-                assertThat(mapping.getExternalEventId()).isEqualTo(externalEventId));
+        )).singleElement().satisfies(mapping -> {
+            assertThat(mapping.getExternalEventId()).isEqualTo(externalEventId);
+            assertThat(mapping.getProviderEtag()).isEqualTo(providerEtag);
+        });
     }
 
     @Test
@@ -307,6 +326,71 @@ class GoogleCalendarEventPagePersistenceServiceTest {
 
     @Test
     @Transactional
+    @DisplayName("기존 sync는 recurrence event와 override를 skip하고 foundation row를 생성하지 않는다")
+    void givenRecurringItems_whenPersistPage_thenKeepsRecurrenceFoundationInert() {
+        // given
+        Account account = accountRepository.saveAndFlush(new Account());
+        GoogleCalendarIntegration integration = integrationRepository.saveAndFlush(
+                integration(account.getId())
+        );
+        GoogleCalendarEventItem recurrenceEventItem = new GoogleCalendarEventItem(
+                "recurrence-event-id",
+                "confirmed",
+                null,
+                null,
+                "Daily",
+                null,
+                List.of("RRULE:FREQ=DAILY"),
+                null,
+                null,
+                timedStart(),
+                timedEnd()
+        );
+        GoogleCalendarEventItem recurrenceOverrideItem = new GoogleCalendarEventItem(
+                "recurrence-override-id",
+                "confirmed",
+                null,
+                null,
+                "Moved",
+                null,
+                List.of(),
+                "recurrence-event-id",
+                timedStart(),
+                new GoogleCalendarEventTime(
+                        null,
+                        "2026-07-02T09:00:00Z",
+                        "UTC"
+                ),
+                new GoogleCalendarEventTime(
+                        null,
+                        "2026-07-02T10:00:00Z",
+                        "UTC"
+                )
+        );
+        acquireLease(account.getId(), "inert-run");
+
+        // when
+        pagePersistenceService.persistLastPageAndFinalize(
+                integration.getId(),
+                account.getId(),
+                "inert-run",
+                new GoogleCalendarEventPage(
+                        List.of(recurrenceEventItem, recurrenceOverrideItem),
+                        null,
+                        "cursor-1",
+                        "UTC"
+                )
+        );
+
+        // then
+        assertThat(recurrenceEventRepository.count()).isZero();
+        assertThat(recurrenceEventOverrideRepository.count()).isZero();
+        assertThat(recurrenceEventMappingRepository.count()).isZero();
+        assertThat(recurrenceOverrideMappingRepository.count()).isZero();
+    }
+
+    @Test
+    @Transactional
     @DisplayName("blank title의 all-day import는 canonical title을 사용하고 cancelled delta로 hard delete된다")
     void givenBlankAllDayItemThenCancellation_whenPersistPages_thenImportsAndHardDeletesIdempotently() {
         // given
@@ -364,10 +448,18 @@ class GoogleCalendarEventPagePersistenceServiceTest {
     }
 
     private GoogleCalendarEventItem timedItem(String id, String summary) {
+        return timedItem(id, summary, "\"etag-1\"");
+    }
+
+    private GoogleCalendarEventItem timedItem(
+            String id,
+            String summary,
+            String providerEtag
+    ) {
         return new GoogleCalendarEventItem(
                 id,
                 "confirmed",
-                "\"etag-1\"",
+                providerEtag,
                 Instant.parse("2026-07-01T00:00:00Z"),
                 summary,
                 "Description",

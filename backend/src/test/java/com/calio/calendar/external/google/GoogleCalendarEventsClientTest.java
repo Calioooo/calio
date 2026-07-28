@@ -15,6 +15,7 @@ import com.calio.calendar.external.google.dto.GoogleCalendarEventPage;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.integration.domain.GoogleCalendarSyncMode;
+import java.io.IOException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
@@ -329,6 +330,44 @@ class GoogleCalendarEventsClientTest {
                 .isInstanceOfSatisfying(CalioException.class, exception ->
                         assertThat(exception.getErrorCode())
                                 .isEqualTo(ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED));
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("parent 단건 조회의 rate-limit 응답은 기존 sync failed 경계를 재사용한다")
+    void givenRateLimitParentLookup_whenGetEvent_thenReturnsSyncFailed() {
+        // given
+        RestClient.Builder restClientBuilder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
+        GoogleCalendarEventsClient client = client(restClientBuilder);
+        server.expect(requestTo(containsString("/events/master-id")))
+                .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS));
+
+        // when, then
+        assertThatThrownBy(() -> client.getEvent("current-token", "master-id"))
+                .isInstanceOfSatisfying(CalioException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.GOOGLE_CALENDAR_SYNC_FAILED));
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("parent 단건 조회의 network failure는 기존 sync failed 경계를 재사용한다")
+    void givenNetworkFailureParentLookup_whenGetEvent_thenReturnsSyncFailed() {
+        // given
+        RestClient.Builder restClientBuilder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
+        GoogleCalendarEventsClient client = client(restClientBuilder);
+        server.expect(requestTo(containsString("/events/master-id")))
+                .andRespond(request -> {
+                    throw new IOException("network failure");
+                });
+
+        // when, then
+        assertThatThrownBy(() -> client.getEvent("current-token", "master-id"))
+                .isInstanceOfSatisfying(CalioException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.GOOGLE_CALENDAR_SYNC_FAILED));
         server.verify();
     }
 

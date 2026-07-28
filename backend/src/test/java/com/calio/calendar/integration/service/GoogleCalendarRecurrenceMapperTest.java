@@ -12,6 +12,9 @@ import com.calio.calendar.integration.service.GoogleCalendarRecurrenceMapper.Act
 import com.calio.calendar.integration.service.GoogleCalendarRecurrenceMapper.CancelledRecurrenceOverrideResult;
 import com.calio.calendar.integration.service.GoogleCalendarRecurrenceMapper.RecurrenceEventResult;
 import com.calio.calendar.recurrence.service.Ical4jRecurrenceEngine;
+import com.calio.calendar.recurrence.service.Rfc5545RecurrenceEngine;
+import com.calio.calendar.recurrence.domain.RecurrenceOccurrence;
+import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -35,6 +38,8 @@ class GoogleCalendarRecurrenceMapperTest {
                 "description",
                 List.of(
                         "EXDATE;TZID=Asia/Seoul:20260722T090000",
+                        "RDATE;TZID=Asia/Seoul:20260725T090000",
+                        "EXRULE:FREQ=WEEKLY;BYDAY=TU",
                         "RRULE:FREQ=DAILY;COUNT=3"
                 ),
                 null,
@@ -53,7 +58,9 @@ class GoogleCalendarRecurrenceMapperTest {
         assertThat(result.schedule().startAt()).isEqualTo(Instant.parse("2026-07-20T00:00:00Z"));
         assertThat(result.recurrenceRules()).containsExactly(
                 "RRULE:FREQ=DAILY;COUNT=3",
-                "EXDATE;TZID=Asia/Seoul:20260722T090000"
+                "RDATE;TZID=Asia/Seoul:20260725T090000",
+                "EXDATE;TZID=Asia/Seoul:20260722T090000",
+                "EXRULE:FREQ=WEEKLY;BYDAY=TU"
         );
     }
 
@@ -83,6 +90,34 @@ class GoogleCalendarRecurrenceMapperTest {
         assertThat(result.description()).isNull();
         assertThat(result.schedule().allDay()).isFalse();
         assertThat(result.schedule().startAt()).isEqualTo(Instant.parse("2026-07-21T06:00:00Z"));
+    }
+
+    @Test
+    @DisplayName("timed origin과 all-day final schedule을 독립적으로 정규화한다")
+    void givenTimedOriginAndAllDayFinal_whenMapRecurrenceOverride_thenPreservesBothShapes() {
+        // given
+        GoogleCalendarEventItem item = item(
+                "recurrence-override-id",
+                "confirmed",
+                "All-day override",
+                null,
+                List.of(),
+                "recurrence-event-id",
+                timed("2026-07-21T09:00:00+09:00", null),
+                new GoogleCalendarEventTime("2026-07-22", null, "ignored/provider-zone"),
+                new GoogleCalendarEventTime("2026-07-24", null, "ignored/provider-zone")
+        );
+
+        // when
+        ActiveRecurrenceOverrideResult result =
+                (ActiveRecurrenceOverrideResult) mapper.mapRecurrenceOverride(item);
+
+        // then
+        assertThat(result.originStartAt()).isEqualTo(Instant.parse("2026-07-21T00:00:00Z"));
+        assertThat(result.schedule().allDay()).isTrue();
+        assertThat(result.schedule().timeZone()).isNull();
+        assertThat(result.schedule().startAt()).isEqualTo(Instant.parse("2026-07-22T00:00:00Z"));
+        assertThat(result.schedule().endAt()).isEqualTo(Instant.parse("2026-07-24T00:00:00Z"));
     }
 
     @Test
@@ -134,6 +169,69 @@ class GoogleCalendarRecurrenceMapperTest {
                                 .isEqualTo(ErrorCode.GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID));
     }
 
+    @Test
+    @DisplayName("recurrence override의 parent ID 또는 originalStartTime 누락은 invalid response다")
+    void givenMissingRecurrenceOverrideIdentity_whenMap_thenReturnsProviderInvalidResponse() {
+        GoogleCalendarEventTime start = timed(
+                "2026-07-21T10:00:00+09:00",
+                "Asia/Seoul"
+        );
+        GoogleCalendarEventTime end = timed(
+                "2026-07-21T11:00:00+09:00",
+                "Asia/Seoul"
+        );
+        GoogleCalendarEventItem missingParent = item(
+                "recurrence-override-id",
+                "confirmed",
+                "Override",
+                null,
+                List.of(),
+                null,
+                timed("2026-07-21T09:00:00+09:00", null),
+                start,
+                end
+        );
+        GoogleCalendarEventItem missingOriginalStartTime = item(
+                "recurrence-override-id",
+                "confirmed",
+                "Override",
+                null,
+                List.of(),
+                "recurrence-event-id",
+                null,
+                start,
+                end
+        );
+
+        assertInvalidResponse(() -> mapper.mapRecurrenceOverride(missingParent));
+        assertInvalidResponse(() -> mapper.mapRecurrenceOverride(missingOriginalStartTime));
+    }
+
+    @Test
+    @DisplayName("예상하지 못한 recurrence engine 오류는 Google invalid response로 변환하지 않는다")
+    void givenUnexpectedEngineFailure_whenMapRecurrenceEvent_thenPropagatesOriginalFailure() {
+        // given
+        IllegalStateException failure = new IllegalStateException("unexpected engine failure");
+        GoogleCalendarRecurrenceMapper failingMapper = new GoogleCalendarRecurrenceMapper(
+                new GoogleCalendarEventTimeNormalizer(),
+                failingEngine(failure)
+        );
+        GoogleCalendarEventItem item = item(
+                "recurrence-event-id",
+                "confirmed",
+                "Title",
+                null,
+                List.of("RRULE:FREQ=DAILY"),
+                null,
+                null,
+                timed("2026-07-20T09:00:00+09:00", "Asia/Seoul"),
+                timed("2026-07-20T10:00:00+09:00", "Asia/Seoul")
+        );
+
+        // when, then
+        assertThatThrownBy(() -> failingMapper.mapRecurrenceEvent(item)).isSameAs(failure);
+    }
+
     private GoogleCalendarEventItem item(
             String id,
             String status,
@@ -162,5 +260,43 @@ class GoogleCalendarRecurrenceMapperTest {
 
     private GoogleCalendarEventTime timed(String dateTime, String timeZone) {
         return new GoogleCalendarEventTime(null, dateTime, timeZone);
+    }
+
+    private void assertInvalidResponse(Runnable action) {
+        assertThatThrownBy(action::run)
+                .isInstanceOfSatisfying(CalioException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID));
+    }
+
+    private Rfc5545RecurrenceEngine failingEngine(RuntimeException failure) {
+        return new Rfc5545RecurrenceEngine() {
+            @Override
+            public List<String> validate(
+                    RecurrenceSchedule schedule,
+                    List<String> recurrenceRules
+            ) {
+                throw failure;
+            }
+
+            @Override
+            public List<RecurrenceOccurrence> expand(
+                    RecurrenceSchedule schedule,
+                    List<String> recurrenceRules,
+                    Instant from,
+                    Instant to
+            ) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public boolean containsOrigin(
+                    RecurrenceSchedule schedule,
+                    List<String> recurrenceRules,
+                    Instant originStartAt
+            ) {
+                throw new UnsupportedOperationException();
+            }
+        };
     }
 }
