@@ -257,16 +257,13 @@ class GoogleCalendarEventsClientTest {
                 ));
 
         // when
-        GoogleCalendarEventLookupResult result = client.getEvent(
+        var result = client.getEvent(
                 "current-token",
                 "master/segment?opaque"
         );
 
         // then
-        assertThat(result).isInstanceOfSatisfying(
-                GoogleCalendarEventLookupResult.Found.class,
-                found -> assertThat(found.event().id()).isEqualTo("master/segment?opaque")
-        );
+        assertThat(result).map(event -> event.id()).contains("master/segment?opaque");
         server.verify();
     }
 
@@ -281,13 +278,13 @@ class GoogleCalendarEventsClientTest {
                 .andRespond(withStatus(HttpStatus.NOT_FOUND));
 
         // when
-        GoogleCalendarEventLookupResult result = client.getEvent(
+        var result = client.getEvent(
                 "current-token",
                 "missing-parent"
         );
 
         // then
-        assertThat(result).isInstanceOf(GoogleCalendarEventLookupResult.NotFound.class);
+        assertThat(result).isEmpty();
         server.verify();
     }
 

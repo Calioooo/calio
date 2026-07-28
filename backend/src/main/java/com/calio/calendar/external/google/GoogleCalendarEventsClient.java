@@ -7,6 +7,7 @@ import com.calio.calendar.external.google.dto.GoogleCalendarEventPage;
 import com.calio.calendar.integration.domain.GoogleCalendarSyncMode;
 import java.net.URI;
 import java.time.Duration;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -83,7 +84,7 @@ public class GoogleCalendarEventsClient {
         }
     }
 
-    public GoogleCalendarEventLookupResult getEvent(
+    public Optional<GoogleCalendarEventItem> getEvent(
             String accessToken,
             String externalEventId
     ) {
@@ -92,10 +93,10 @@ public class GoogleCalendarEventsClient {
         }
         try {
             GoogleCalendarEventItem response = requestEvent(accessToken, externalEventId);
-            return new GoogleCalendarEventLookupResult.Found(response);
+            return Optional.of(response);
         } catch (RestClientResponseException exception) {
             if (exception.getStatusCode().value() == HttpStatus.NOT_FOUND.value()) {
-                return new GoogleCalendarEventLookupResult.NotFound();
+                return Optional.empty();
             }
             throw translateEventResponseFailure(exception);
         } catch (CalioException exception) {
