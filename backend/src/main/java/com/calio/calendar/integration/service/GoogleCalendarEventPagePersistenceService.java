@@ -6,19 +6,16 @@ import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.event.repository.EventRepository;
+import com.calio.calendar.external.google.GoogleCalendarEventTimeNormalizer;
+import com.calio.calendar.external.google.GoogleCalendarEventTimeNormalizer.NormalizedEventSchedule;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventItem;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventPage;
-import com.calio.calendar.external.google.dto.GoogleCalendarEventTime;
 import com.calio.calendar.integration.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.repository.GoogleCalendarEventMappingRepository;
 import com.calio.calendar.integration.repository.GoogleCalendarIntegrationRepository;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.service.TagService;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.ZoneOffset;
-import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -39,19 +36,22 @@ public class GoogleCalendarEventPagePersistenceService {
     private final EventRepository eventRepository;
     private final AccountRepository accountRepository;
     private final TagService tagService;
+    private final GoogleCalendarEventTimeNormalizer timeNormalizer;
 
     public GoogleCalendarEventPagePersistenceService(
             GoogleCalendarIntegrationRepository integrationRepository,
             GoogleCalendarEventMappingRepository mappingRepository,
             EventRepository eventRepository,
             AccountRepository accountRepository,
-            TagService tagService
+            TagService tagService,
+            GoogleCalendarEventTimeNormalizer timeNormalizer
     ) {
         this.integrationRepository = integrationRepository;
         this.mappingRepository = mappingRepository;
         this.eventRepository = eventRepository;
         this.accountRepository = accountRepository;
         this.tagService = tagService;
+        this.timeNormalizer = timeNormalizer;
     }
 
     @Transactional
@@ -63,7 +63,7 @@ public class GoogleCalendarEventPagePersistenceService {
     ) {
         extendLeaseOrThrow(integrationId, runId);
         GoogleCalendarIntegration integration = integrationRepository.getReferenceById(integrationId);
-        persistItems(integration, accountId, page.items());
+        persistItems(integration, accountId, page.items(), page.timeZone());
     }
 
     @Transactional
@@ -78,7 +78,7 @@ public class GoogleCalendarEventPagePersistenceService {
             throw new CalioException(ErrorCode.GOOGLE_CALENDAR_SYNC_TOKEN_MISSING);
         }
         GoogleCalendarIntegration integration = integrationRepository.getReferenceById(integrationId);
-        persistItems(integration, accountId, page.items());
+        persistItems(integration, accountId, page.items(), page.timeZone());
         if (integrationRepository.finalizeSync(integrationId, runId, page.nextSyncToken()) != 1) {
             throw new CalioException(ErrorCode.GOOGLE_CALENDAR_SYNC_CONFLICT);
         }
@@ -93,7 +93,8 @@ public class GoogleCalendarEventPagePersistenceService {
     private void persistItems(
             GoogleCalendarIntegration integration,
             Long accountId,
-            List<GoogleCalendarEventItem> items
+            List<GoogleCalendarEventItem> items,
+            String pageTimeZone
     ) {
         Map<String, GoogleCalendarEventMapping> existingMappings =
                 findExistingMappings(integration.getId(), items);
@@ -112,7 +113,8 @@ public class GoogleCalendarEventPagePersistenceService {
                     account,
                     fallbackTag,
                     mappingsToDelete,
-                    eventsToDelete
+                    eventsToDelete,
+                    pageTimeZone
             );
         }
         deleteMappingsAndEvents(mappingsToDelete, eventsToDelete);
@@ -160,7 +162,8 @@ public class GoogleCalendarEventPagePersistenceService {
             Account account,
             Tag fallbackTag,
             List<GoogleCalendarEventMapping> mappingsToDelete,
-            List<Event> eventsToDelete
+            List<Event> eventsToDelete,
+            String pageTimeZone
     ) {
         if (item.isCancelled() || item.isRecurring()) {
             if (existingMapping != null) {
@@ -169,7 +172,8 @@ public class GoogleCalendarEventPagePersistenceService {
             }
             return;
         }
-        CanonicalSchedule schedule = canonicalSchedule(item);
+        NormalizedEventSchedule schedule =
+                timeNormalizer.normalizeSchedule(item.start(), item.end(), pageTimeZone);
         if (existingMapping != null) {
             updateMappedEvent(existingMapping, item, schedule);
             return;
@@ -180,14 +184,15 @@ public class GoogleCalendarEventPagePersistenceService {
     private void updateMappedEvent(
             GoogleCalendarEventMapping mapping,
             GoogleCalendarEventItem item,
-            CanonicalSchedule schedule
+            NormalizedEventSchedule schedule
     ) {
         mapping.getEvent().replace(
                 canonicalTitle(item.summary()),
                 item.description(),
                 schedule.startAt(),
                 schedule.endAt(),
-                schedule.allDay()
+                schedule.allDay(),
+                schedule.timeZone()
         );
         mapping.updateProviderVersion(item.etag(), item.updatedAt());
     }
@@ -197,7 +202,7 @@ public class GoogleCalendarEventPagePersistenceService {
             Account account,
             Tag fallbackTag,
             GoogleCalendarEventItem item,
-            CanonicalSchedule schedule
+            NormalizedEventSchedule schedule
     ) {
         Event event = eventRepository.save(new Event(
                 canonicalTitle(item.summary()),
@@ -205,6 +210,7 @@ public class GoogleCalendarEventPagePersistenceService {
                 schedule.startAt(),
                 schedule.endAt(),
                 schedule.allDay(),
+                schedule.timeZone(),
                 null,
                 fallbackTag,
                 account
@@ -230,38 +236,6 @@ public class GoogleCalendarEventPagePersistenceService {
         eventRepository.deleteAll(events);
     }
 
-    private CanonicalSchedule canonicalSchedule(GoogleCalendarEventItem item) {
-        GoogleCalendarEventTime start = item.start();
-        GoogleCalendarEventTime end = item.end();
-        try {
-            if (start.isAllDay() && end.isAllDay()) {
-                Instant startAt = atUtcMidnight(start.date());
-                Instant endAt = atUtcMidnight(end.date());
-                validateRange(startAt, endAt);
-                return new CanonicalSchedule(startAt, endAt, true);
-            }
-            if (start.isTimed() && end.isTimed()) {
-                Instant startAt = Instant.parse(start.dateTime());
-                Instant endAt = Instant.parse(end.dateTime());
-                validateRange(startAt, endAt);
-                return new CanonicalSchedule(startAt, endAt, false);
-            }
-        } catch (DateTimeParseException exception) {
-            throw invalidResponse(exception);
-        }
-        throw invalidResponse(null);
-    }
-
-    private Instant atUtcMidnight(String date) {
-        return LocalDate.parse(date).atStartOfDay(ZoneOffset.UTC).toInstant();
-    }
-
-    private void validateRange(Instant startAt, Instant endAt) {
-        if (!startAt.isBefore(endAt)) {
-            throw invalidResponse(null);
-        }
-    }
-
     private String canonicalTitle(String summary) {
         return summary == null || summary.isBlank() ? UNTITLED_EVENT_TITLE : summary;
     }
@@ -272,10 +246,4 @@ public class GoogleCalendarEventPagePersistenceService {
                 : new CalioException(ErrorCode.GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID, cause);
     }
 
-    private record CanonicalSchedule(
-            Instant startAt,
-            Instant endAt,
-            boolean allDay
-    ) {
-    }
 }

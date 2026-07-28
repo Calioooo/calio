@@ -117,6 +117,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
         Event updatedImport = eventRepository.findById(internalEventId).orElseThrow();
         assertThat(updatedImport.getTitle()).isEqualTo("Changed");
         assertThat(updatedImport.isAllDay()).isTrue();
+        assertThat(updatedImport.getTimeZone()).isNull();
         assertThat(updatedImport.importantEvent()).isTrue();
         assertThat(updatedImport.getTag().getId()).isEqualTo(fallbackTag.getId());
         assertThat(mappingRepository.findEventIdsByIntegrationId(integration.getId()))
@@ -126,6 +127,55 @@ class GoogleCalendarEventPagePersistenceServiceTest {
         assertThat(finalized.getNextSyncToken()).isEqualTo("cursor-2");
         assertThat(finalized.getActiveSyncRunId()).isNull();
         assertThat(finalized.getSyncLeaseExpiresAt()).isNull();
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("normal Event는 page timezone fallback으로 정규화한 schedule과 timezone을 저장한다")
+    void givenOffsetlessTimedItemAndPageZone_whenPersistPage_thenStoresCanonicalSchedule() {
+        // given
+        Account account = accountRepository.saveAndFlush(new Account());
+        tagRepository.saveAndFlush(new Tag(TagType.DEFAULT, "기타", "#64748B"));
+        GoogleCalendarIntegration integration = integrationRepository.saveAndFlush(
+                integration(account.getId())
+        );
+        GoogleCalendarEventItem item = new GoogleCalendarEventItem(
+                "page-zone-event",
+                "confirmed",
+                null,
+                null,
+                "Page zone",
+                null,
+                List.of(),
+                null,
+                new GoogleCalendarEventTime(null, "2026-07-01T09:00:00", null),
+                new GoogleCalendarEventTime(null, "2026-07-01T10:00:00", null)
+        );
+        acquireLease(account.getId(), "page-zone-run");
+
+        // when
+        pagePersistenceService.persistLastPageAndFinalize(
+                integration.getId(),
+                account.getId(),
+                "page-zone-run",
+                new GoogleCalendarEventPage(
+                        List.of(item),
+                        null,
+                        "cursor-1",
+                        "Asia/Seoul"
+                )
+        );
+
+        // then
+        Event imported = eventRepository.findNormalEvents(
+                account.getId(),
+                Instant.parse("2026-07-01T00:00:00Z"),
+                Instant.parse("2026-07-01T01:00:00Z")
+        ).getFirst();
+        assertThat(imported.getStartAt()).isEqualTo(Instant.parse("2026-07-01T00:00:00Z"));
+        assertThat(imported.getEndAt()).isEqualTo(Instant.parse("2026-07-01T01:00:00Z"));
+        assertThat(imported.isAllDay()).isFalse();
+        assertThat(imported.getTimeZone()).isEqualTo("Asia/Seoul");
     }
 
     @Test

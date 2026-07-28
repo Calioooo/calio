@@ -136,6 +136,26 @@ class GoogleCalendarSyncMigrationTest {
         }
     }
 
+    @Test
+    @DisplayName("V10 empty schema upgrade는 nullable VARCHAR(255) events.time_zone만 추가한다")
+    void givenV10EmptySchema_whenMigrateToV11_thenAddsNullableEventTimeZone()
+            throws Exception {
+        // given
+        String url = "jdbc:h2:mem:event-time-zone-upgrade;MODE=MySQL;DB_CLOSE_DELAY=-1";
+        migrateTo(url, MigrationVersion.fromVersion("10"));
+
+        // when
+        migrateTo(url, MigrationVersion.fromVersion("11"));
+
+        // then
+        try (Connection connection = DriverManager.getConnection(url, "sa", "")) {
+            assertThat(columnNames(connection, "EVENTS")).contains("TIME_ZONE");
+            assertThat(columnSize(connection, "EVENTS", "TIME_ZONE")).isEqualTo(255);
+            assertThat(isNullable(connection, "EVENTS", "TIME_ZONE")).isTrue();
+            assertThat(columnDefault(connection, "EVENTS", "TIME_ZONE")).isNull();
+        }
+    }
+
     private void migrateTo(String url, MigrationVersion target) {
         Flyway.configure()
                 .dataSource(url, "sa", "")

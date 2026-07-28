@@ -120,6 +120,7 @@ class GoogleCalendarIntegrationPersistenceServiceTest {
                 Instant.parse("2026-07-01T00:00:00Z"),
                 Instant.parse("2026-07-01T01:00:00Z"),
                 false,
+                "UTC",
                 null,
                 fallbackTag,
                 account

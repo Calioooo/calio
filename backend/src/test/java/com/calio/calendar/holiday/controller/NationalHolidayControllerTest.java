@@ -197,7 +197,8 @@ class NationalHolidayControllerTest {
                                   "title": "%s",
                                   "startAt": "%s",
                                   "endAt": "%s",
-                                  "allDay": false
+                                  "allDay": false,
+                                  "timeZone": "UTC"
                                 }
                                 """.formatted(title, startAt, endAt)))
                 .andExpect(status().isCreated());

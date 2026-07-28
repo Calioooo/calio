@@ -380,7 +380,7 @@ class GoogleCalendarSyncServiceTest {
         private int finalizeCount;
 
         private FakePagePersistenceService() {
-            super(null, null, null, null, null);
+            super(null, null, null, null, null, null);
         }
 
         @Override

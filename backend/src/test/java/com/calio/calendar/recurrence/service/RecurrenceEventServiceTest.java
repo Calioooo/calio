@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
+import com.calio.calendar.common.domain.CanonicalSchedule;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.event.controller.dto.EventResponse;
@@ -171,7 +172,9 @@ class RecurrenceEventServiceTest {
                 "Final title",
                 null,
                 Instant.parse("2027-01-03T02:00:00Z"),
-                Instant.parse("2027-01-03T03:00:00Z")
+                Instant.parse("2027-01-03T03:00:00Z"),
+                false,
+                "Asia/Seoul"
         );
 
         // when
@@ -199,8 +202,12 @@ class RecurrenceEventServiceTest {
                 originStartAt,
                 "Old title",
                 "old memo",
-                Instant.parse("2027-01-02T02:00:00Z"),
-                Instant.parse("2027-01-02T03:00:00Z")
+                CanonicalSchedule.recurrenceOverride(
+                        Instant.parse("2027-01-02T02:00:00Z"),
+                        Instant.parse("2027-01-02T03:00:00Z"),
+                        false,
+                        "Asia/Seoul"
+                )
         );
         existingOverride.markDeleted(Instant.parse("2027-01-05T00:00:00Z"));
         recurrenceEvent.update(
@@ -225,7 +232,9 @@ class RecurrenceEventServiceTest {
                 "Restored",
                 null,
                 Instant.parse("2027-03-01T00:00:00Z"),
-                Instant.parse("2027-03-03T00:00:00Z")
+                Instant.parse("2027-03-03T00:00:00Z"),
+                true,
+                null
         );
 
         // when
@@ -254,8 +263,12 @@ class RecurrenceEventServiceTest {
                 originStartAt,
                 "Override",
                 null,
-                Instant.parse("2027-01-02T02:00:00Z"),
-                Instant.parse("2027-01-02T03:00:00Z")
+                CanonicalSchedule.recurrenceOverride(
+                        Instant.parse("2027-01-02T02:00:00Z"),
+                        Instant.parse("2027-01-02T03:00:00Z"),
+                        false,
+                        "Asia/Seoul"
+                )
         );
         when(recurrenceEventRepository.findByIdAndAccountIdForUpdate(10L, 1L))
                 .thenReturn(Optional.of(recurrenceEvent));

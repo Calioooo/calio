@@ -90,6 +90,71 @@ class GoogleCalendarEventTimeNormalizerTest {
     }
 
     @Test
+    @DisplayName("normal Event는 boundary explicit timezone을 우선하고 없으면 page timezone을 사용한다")
+    void givenExplicitAndMissingBoundaryZones_whenNormalizePageSchedule_thenResolvesSingleZone() {
+        // when
+        NormalizedEventSchedule result = normalizer.normalizeSchedule(
+                new GoogleCalendarEventTime(
+                        null,
+                        "2026-07-20T09:00:00+09:00",
+                        "Asia/Seoul"
+                ),
+                new GoogleCalendarEventTime(
+                        null,
+                        "2026-07-20T10:00:00+09:00",
+                        null
+                ),
+                "Asia/Seoul"
+        );
+
+        // then
+        assertThat(result.startAt()).isEqualTo(Instant.parse("2026-07-20T00:00:00Z"));
+        assertThat(result.endAt()).isEqualTo(Instant.parse("2026-07-20T01:00:00Z"));
+        assertThat(result.timeZone()).isEqualTo("Asia/Seoul");
+    }
+
+    @Test
+    @DisplayName("page fallback으로 해석한 offsetless overlap은 earlier offset을 선택한다")
+    void givenOffsetlessOverlapAndPageZone_whenNormalizePageSchedule_thenUsesEarlierOffset() {
+        // when
+        NormalizedEventSchedule result = normalizer.normalizeSchedule(
+                new GoogleCalendarEventTime(null, "2026-11-01T01:30:00", null),
+                new GoogleCalendarEventTime(null, "2026-11-01T02:30:00", null),
+                "America/New_York"
+        );
+
+        // then
+        assertThat(result.startAt()).isEqualTo(Instant.parse("2026-11-01T05:30:00Z"));
+        assertThat(result.endAt()).isEqualTo(Instant.parse("2026-11-01T07:30:00Z"));
+        assertThat(result.timeZone()).isEqualTo("America/New_York");
+    }
+
+    @Test
+    @DisplayName("page timezone fallback도 zone mismatch, invalid zone, offset mismatch를 거부한다")
+    void givenInvalidPageTimeZoneResolution_whenNormalizePageSchedule_thenRejectsProviderResponse() {
+        GoogleCalendarEventTime explicitUtc =
+                new GoogleCalendarEventTime(null, "2026-07-20T09:00:00Z", "UTC");
+        GoogleCalendarEventTime fallbackBoundary =
+                new GoogleCalendarEventTime(null, "2026-07-20T10:00:00+09:00", null);
+
+        assertInvalidResponse(() -> normalizer.normalizeSchedule(
+                explicitUtc,
+                fallbackBoundary,
+                "Asia/Seoul"
+        ));
+        assertInvalidResponse(() -> normalizer.normalizeSchedule(
+                new GoogleCalendarEventTime(null, "2026-07-20T09:00:00", null),
+                new GoogleCalendarEventTime(null, "2026-07-20T10:00:00", null),
+                "Invalid/Zone"
+        ));
+        assertInvalidResponse(() -> normalizer.normalizeSchedule(
+                new GoogleCalendarEventTime(null, "2026-07-20T09:00:00Z", null),
+                new GoogleCalendarEventTime(null, "2026-07-20T10:00:00Z", null),
+                "Asia/Seoul"
+        ));
+    }
+
+    @Test
     @DisplayName("all-day exclusive end는 start와 별도로 같은 UTC identity 규칙을 적용한다")
     void givenAllDayRange_whenNormalizeSchedule_thenPreservesExclusiveEnd() {
         // when
@@ -143,6 +208,9 @@ class GoogleCalendarEventTimeNormalizerTest {
     void givenOffsetlessTimedValueWithoutTimeZone_whenNormalize_thenReturnsProviderInvalidResponse() {
         assertInvalidResponse(() -> normalizer.normalize(
                 new GoogleCalendarEventTime(null, "2026-07-20T09:00:00", null)
+        ));
+        assertInvalidResponse(() -> normalizer.normalize(
+                new GoogleCalendarEventTime(null, "2026-07-20T09:00:00Z", null)
         ));
     }
 

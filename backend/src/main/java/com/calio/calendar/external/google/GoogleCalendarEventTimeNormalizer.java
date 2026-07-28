@@ -22,6 +22,14 @@ public class GoogleCalendarEventTimeNormalizer {
     private static final Set<String> IANA_TIME_ZONES = ZoneId.getAvailableZoneIds();
 
     public NormalizedEventTime normalize(GoogleCalendarEventTime eventTime) {
+        return normalize(eventTime, null, false);
+    }
+
+    private NormalizedEventTime normalize(
+            GoogleCalendarEventTime eventTime,
+            String fallbackTimeZone,
+            boolean allowsFallback
+    ) {
         if (eventTime == null || !hasExactlyOneTimeValue(eventTime)) {
             throw invalidResponse(null);
         }
@@ -29,7 +37,7 @@ public class GoogleCalendarEventTimeNormalizer {
             if (hasText(eventTime.date())) {
                 return normalizeAllDay(eventTime.date());
             }
-            return normalizeTimed(eventTime);
+            return normalizeTimed(eventTime, fallbackTimeZone, allowsFallback);
         } catch (DateTimeException exception) {
             throw invalidResponse(exception);
         }
@@ -39,8 +47,25 @@ public class GoogleCalendarEventTimeNormalizer {
             GoogleCalendarEventTime start,
             GoogleCalendarEventTime end
     ) {
-        NormalizedEventTime normalizedStart = normalize(start);
-        NormalizedEventTime normalizedEnd = normalize(end);
+        return normalizeSchedule(start, end, null, false);
+    }
+
+    public NormalizedEventSchedule normalizeSchedule(
+            GoogleCalendarEventTime start,
+            GoogleCalendarEventTime end,
+            String fallbackTimeZone
+    ) {
+        return normalizeSchedule(start, end, fallbackTimeZone, true);
+    }
+
+    private NormalizedEventSchedule normalizeSchedule(
+            GoogleCalendarEventTime start,
+            GoogleCalendarEventTime end,
+            String fallbackTimeZone,
+            boolean allowsFallback
+    ) {
+        NormalizedEventTime normalizedStart = normalize(start, fallbackTimeZone, allowsFallback);
+        NormalizedEventTime normalizedEnd = normalize(end, fallbackTimeZone, allowsFallback);
         validateScheduleShape(normalizedStart, normalizedEnd);
         if (!normalizedStart.instant().isBefore(normalizedEnd.instant())) {
             throw invalidResponse(null);
@@ -60,47 +85,61 @@ public class GoogleCalendarEventTimeNormalizer {
         return new NormalizedEventTime(instant, true, null);
     }
 
-    private NormalizedEventTime normalizeTimed(GoogleCalendarEventTime eventTime) {
-        ZoneId zoneId = eventTime.timeZone() == null
-                ? null
-                : parseIanaTimeZone(eventTime.timeZone());
+    private NormalizedEventTime normalizeTimed(
+            GoogleCalendarEventTime eventTime,
+            String fallbackTimeZone,
+            boolean allowsFallback
+    ) {
+        ResolvedTimeZone resolvedTimeZone =
+                resolveTimeZone(eventTime.timeZone(), fallbackTimeZone, allowsFallback);
         try {
             OffsetDateTime offsetDateTime = OffsetDateTime.parse(
                     eventTime.dateTime(),
                     DateTimeFormatter.ISO_DATE_TIME
             );
-            validateSuppliedOffset(offsetDateTime, zoneId);
+            validateSuppliedOffset(offsetDateTime, resolvedTimeZone.zoneId());
             return new NormalizedEventTime(
                     offsetDateTime.toInstant(),
                     false,
-                    eventTime.timeZone()
+                    resolvedTimeZone.id()
             );
         } catch (java.time.format.DateTimeParseException ignored) {
-            return normalizeOffsetless(eventTime.dateTime(), eventTime.timeZone(), zoneId);
+            return normalizeOffsetless(eventTime.dateTime(), resolvedTimeZone);
         }
     }
 
     private NormalizedEventTime normalizeOffsetless(
             String dateTime,
-            String timeZone,
-            ZoneId zoneId
+            ResolvedTimeZone resolvedTimeZone
     ) {
-        if (zoneId == null) {
-            throw invalidResponse(null);
-        }
         LocalDateTime localDateTime = LocalDateTime.parse(
                 dateTime,
                 DateTimeFormatter.ISO_LOCAL_DATE_TIME
         );
-        List<ZoneOffset> validOffsets = zoneId.getRules().getValidOffsets(localDateTime);
+        List<ZoneOffset> validOffsets =
+                resolvedTimeZone.zoneId().getRules().getValidOffsets(localDateTime);
         if (validOffsets.isEmpty()) {
             throw invalidResponse(null);
         }
         return new NormalizedEventTime(
                 localDateTime.toInstant(validOffsets.getFirst()),
                 false,
-                timeZone
+                resolvedTimeZone.id()
         );
+    }
+
+    private ResolvedTimeZone resolveTimeZone(
+            String explicitTimeZone,
+            String fallbackTimeZone,
+            boolean allowsFallback
+    ) {
+        if (explicitTimeZone != null) {
+            return new ResolvedTimeZone(explicitTimeZone, parseIanaTimeZone(explicitTimeZone));
+        }
+        if (!allowsFallback || fallbackTimeZone == null) {
+            throw invalidResponse(null);
+        }
+        return new ResolvedTimeZone(fallbackTimeZone, parseIanaTimeZone(fallbackTimeZone));
     }
 
     private ZoneId parseIanaTimeZone(String timeZone) {
@@ -111,9 +150,6 @@ public class GoogleCalendarEventTimeNormalizer {
     }
 
     private void validateSuppliedOffset(OffsetDateTime dateTime, ZoneId zoneId) {
-        if (zoneId == null) {
-            return;
-        }
         ZoneRules zoneRules = zoneId.getRules();
         if (!zoneRules.getValidOffsets(dateTime.toLocalDateTime()).contains(dateTime.getOffset())) {
             throw invalidResponse(null);
@@ -162,5 +198,8 @@ public class GoogleCalendarEventTimeNormalizer {
             boolean allDay,
             String timeZone
     ) {
+    }
+
+    private record ResolvedTimeZone(String id, ZoneId zoneId) {
     }
 }

@@ -2,6 +2,7 @@ package com.calio.calendar.recurrence.service;
 
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
+import com.calio.calendar.common.domain.CanonicalSchedule;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.event.controller.dto.EventResponse;
@@ -18,8 +19,6 @@ import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.service.TagService;
 import java.time.Instant;
-import java.time.LocalTime;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
@@ -96,21 +95,25 @@ public class RecurrenceEventService {
             UpdateRecurrenceOccurrenceRequest request
     ) {
         RecurrenceEvent recurrenceEvent = findRecurrenceEventForUpdate(accountId, recurrenceId);
-        validateOverrideSchedule(recurrenceEvent, request.startAt(), request.endAt());
+        CanonicalSchedule schedule = CanonicalSchedule.recurrenceOverride(
+                request.startAt(),
+                request.endAt(),
+                request.allDay(),
+                request.timeZone()
+        );
         Optional<RecurrenceEventOverride> existingOverride =
                 findOverrideOrRejectIneligible(recurrenceEvent, request.originStartAt());
         RecurrenceEventOverride override;
         if (existingOverride.isPresent()) {
             override = existingOverride.get();
-            override.activate(request.title(), request.description(), request.startAt(), request.endAt());
+            override.activate(request.title(), request.description(), schedule);
         } else {
             override = RecurrenceEventOverride.active(
                     recurrenceEvent,
                     request.originStartAt(),
                     request.title(),
                     request.description(),
-                    request.startAt(),
-                    request.endAt()
+                    schedule
             );
         }
         recurrenceEventOverrideRepository.saveAndFlush(override);
@@ -159,23 +162,6 @@ public class RecurrenceEventService {
                 request.firstOccurrenceEndAt(),
                 request.timeZone()
         );
-    }
-
-    private void validateOverrideSchedule(RecurrenceEvent recurrenceEvent, Instant startAt, Instant endAt) {
-        if (!startAt.isBefore(endAt)) {
-            throw new CalioException(ErrorCode.INVALID_RECURRENCE_SCHEDULE);
-        }
-        if (!recurrenceEvent.isAllDay()) {
-            return;
-        }
-        boolean usesUtcMidnight = isUtcMidnight(startAt) && isUtcMidnight(endAt);
-        if (!usesUtcMidnight) {
-            throw new CalioException(ErrorCode.INVALID_RECURRENCE_SCHEDULE);
-        }
-    }
-
-    private boolean isUtcMidnight(Instant instant) {
-        return instant.atOffset(ZoneOffset.UTC).toLocalTime().equals(LocalTime.MIDNIGHT);
     }
 
     private Optional<RecurrenceEventOverride> findOverrideOrRejectIneligible(

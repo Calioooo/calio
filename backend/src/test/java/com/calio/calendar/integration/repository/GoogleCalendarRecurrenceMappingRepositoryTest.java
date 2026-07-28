@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
+import com.calio.calendar.common.domain.CanonicalSchedule;
 import com.calio.calendar.integration.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.domain.GoogleCalendarRecurrenceEventMapping;
 import com.calio.calendar.integration.domain.GoogleCalendarRecurrenceOverrideMapping;
@@ -74,8 +75,12 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
                         Instant.parse("2026-07-21T00:00:00Z"),
                         "Moved",
                         null,
-                        Instant.parse("2026-07-21T01:00:00Z"),
-                        Instant.parse("2026-07-21T02:00:00Z")
+                        CanonicalSchedule.recurrenceOverride(
+                                Instant.parse("2026-07-21T01:00:00Z"),
+                                Instant.parse("2026-07-21T02:00:00Z"),
+                                false,
+                                "UTC"
+                        )
                 )
         );
         String externalRecurrenceEventId = "m".repeat(1024);
@@ -376,8 +381,12 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
                         Instant.parse(originStartAt),
                         "Moved",
                         null,
-                        Instant.parse(originStartAt).plusSeconds(3600),
-                        Instant.parse(originStartAt).plusSeconds(7200)
+                        CanonicalSchedule.recurrenceOverride(
+                                Instant.parse(originStartAt).plusSeconds(3600),
+                                Instant.parse(originStartAt).plusSeconds(7200),
+                                false,
+                                "UTC"
+                        )
                 )
         );
     }
