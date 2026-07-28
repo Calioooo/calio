@@ -41,6 +41,10 @@ class GoogleCalendarEventPageTest {
                               "id": "exception",
                               "status": "confirmed",
                               "recurringEventId": "master",
+                              "originalStartTime": {
+                                "dateTime": "2026-07-02T09:00:00+09:00",
+                                "timeZone": "Asia/Seoul"
+                              },
                               "start": {"dateTime": "2026-07-02T09:00:00+09:00"},
                               "end": {"dateTime": "2026-07-02T10:00:00+09:00"}
                             },
@@ -61,6 +65,7 @@ class GoogleCalendarEventPageTest {
         assertThat(page.items().get(1).isRecurrenceOccurrence()).isFalse();
         assertThat(page.items().get(2).isRecurrenceMaster()).isFalse();
         assertThat(page.items().get(2).isRecurrenceOccurrence()).isTrue();
+        assertThat(page.items().get(2).originalStartTime().timeZone()).isEqualTo("Asia/Seoul");
         assertThat(page.items().get(3).isCancelled()).isTrue();
         assertThat(page.nextSyncToken()).isEqualTo("next-token");
     }

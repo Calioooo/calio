@@ -1,7 +1,7 @@
 package com.calio.calendar.integration.domain;
 
 import com.calio.calendar.common.domain.BaseEntity;
-import com.calio.calendar.event.domain.Event;
+import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -17,19 +17,19 @@ import java.time.Instant;
 
 @Entity
 @Table(
-        name = "google_calendar_event_mappings",
+        name = "google_calendar_recurrence_event_mappings",
         uniqueConstraints = {
                 @UniqueConstraint(
-                        name = "uk_google_calendar_mapping_external_identity",
+                        name = "uk_google_calendar_recurrence_event_external",
                         columnNames = {"integration_id", "calendar_key", "external_event_id"}
                 ),
                 @UniqueConstraint(
-                        name = "uk_google_calendar_mapping_event_id",
-                        columnNames = "event_id"
+                        name = "uk_google_calendar_recurrence_event_canonical",
+                        columnNames = "recurrence_event_id"
                 )
         }
 )
-public class GoogleCalendarEventMapping extends BaseEntity {
+public class GoogleCalendarRecurrenceEventMapping extends BaseEntity {
 
     public static final String PRIMARY_CALENDAR_KEY = "primary";
 
@@ -42,8 +42,8 @@ public class GoogleCalendarEventMapping extends BaseEntity {
     private GoogleCalendarIntegration integration;
 
     @OneToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "event_id", nullable = false)
-    private Event event;
+    @JoinColumn(name = "recurrence_event_id", nullable = false)
+    private RecurrenceEvent recurrenceEvent;
 
     @Column(name = "calendar_key", nullable = false, length = 32)
     private String calendarKey;
@@ -57,24 +57,20 @@ public class GoogleCalendarEventMapping extends BaseEntity {
     @Column(name = "provider_updated_at")
     private Instant providerUpdatedAt;
 
-    protected GoogleCalendarEventMapping() {
+    protected GoogleCalendarRecurrenceEventMapping() {
     }
 
-    public GoogleCalendarEventMapping(
+    public GoogleCalendarRecurrenceEventMapping(
             GoogleCalendarIntegration integration,
-            Event event,
+            RecurrenceEvent recurrenceEvent,
             String externalEventId,
             String providerEtag,
             Instant providerUpdatedAt
     ) {
         this.integration = integration;
-        this.event = event;
+        this.recurrenceEvent = recurrenceEvent;
         this.calendarKey = PRIMARY_CALENDAR_KEY;
         this.externalEventId = externalEventId;
-        updateProviderVersion(providerEtag, providerUpdatedAt);
-    }
-
-    public void updateProviderVersion(String providerEtag, Instant providerUpdatedAt) {
         this.providerEtag = providerEtag;
         this.providerUpdatedAt = providerUpdatedAt;
     }
@@ -87,8 +83,8 @@ public class GoogleCalendarEventMapping extends BaseEntity {
         return integration;
     }
 
-    public Event getEvent() {
-        return event;
+    public RecurrenceEvent getRecurrenceEvent() {
+        return recurrenceEvent;
     }
 
     public String getCalendarKey() {

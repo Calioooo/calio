@@ -62,6 +62,80 @@ class GoogleCalendarSyncMigrationTest {
         }
     }
 
+    @Test
+    @DisplayName("V10 upgrade는 기존 provider/cursor/canonical data를 보존하고 recurrence mapping schema를 추가한다")
+    void givenV9Data_whenMigrateToV10_thenAddsRecurrenceFoundationWithoutChangingData()
+            throws Exception {
+        // given
+        String url = "jdbc:h2:mem:google-calendar-recurrence-upgrade;MODE=MySQL;DB_CLOSE_DELAY=-1";
+        migrateTo(url, MigrationVersion.fromVersion("8"));
+        insertLegacyEventAndIntegration(url);
+        migrateTo(url, MigrationVersion.fromVersion("9"));
+        insertV9ProviderAndRecurrenceData(url);
+
+        // when
+        migrateTo(url, MigrationVersion.fromVersion("10"));
+
+        // then
+        try (Connection connection = DriverManager.getConnection(url, "sa", "")) {
+            assertThat(columnSize(
+                    connection,
+                    "GOOGLE_CALENDAR_EVENT_MAPPINGS",
+                    "PROVIDER_ETAG"
+            )).isEqualTo(1024);
+            assertThat(singleString(
+                    connection,
+                    "SELECT provider_etag FROM google_calendar_event_mappings WHERE id = 900"
+            )).isEqualTo("existing-etag");
+            assertThat(singleString(
+                    connection,
+                    "SELECT next_sync_token FROM google_calendar_integrations WHERE id = 900"
+            )).isEqualTo("existing-cursor");
+            assertThat(singleString(
+                    connection,
+                    "SELECT recurrence_title FROM recurrence_events WHERE id = 901"
+            )).isEqualTo("Existing recurrence");
+            assertThat(columnNames(
+                    connection,
+                    "GOOGLE_CALENDAR_RECURRENCE_EVENT_MAPPINGS"
+            )).contains(
+                    "INTEGRATION_ID",
+                    "RECURRENCE_EVENT_ID",
+                    "CALENDAR_KEY",
+                    "EXTERNAL_EVENT_ID",
+                    "PROVIDER_ETAG",
+                    "PROVIDER_UPDATED_AT"
+            );
+            assertThat(columnNames(
+                    connection,
+                    "GOOGLE_CALENDAR_RECURRENCE_OVERRIDE_MAPPINGS"
+            )).doesNotContain("INTEGRATION_ID", "CALENDAR_KEY", "ORIGIN_START_AT");
+        }
+    }
+
+    @Test
+    @DisplayName("clean migration은 V10 recurrence provider mapping table을 생성한다")
+    void givenEmptyDatabase_whenMigrateToV10_thenCreatesRecurrenceMappingTables()
+            throws Exception {
+        // given
+        String url = "jdbc:h2:mem:google-calendar-recurrence-clean;MODE=MySQL;DB_CLOSE_DELAY=-1";
+
+        // when
+        migrateTo(url, MigrationVersion.fromVersion("10"));
+
+        // then
+        try (Connection connection = DriverManager.getConnection(url, "sa", "")) {
+            assertThat(columnNames(
+                    connection,
+                    "GOOGLE_CALENDAR_RECURRENCE_EVENT_MAPPINGS"
+            )).isNotEmpty();
+            assertThat(columnNames(
+                    connection,
+                    "GOOGLE_CALENDAR_RECURRENCE_OVERRIDE_MAPPINGS"
+            )).isNotEmpty();
+        }
+    }
+
     private void migrateTo(String url, MigrationVersion target) {
         Flyway.configure()
                 .dataSource(url, "sa", "")
@@ -98,6 +172,41 @@ class GoogleCalendarSyncMigrationTest {
                         900, 900, 'subject', 'user@example.com',
                         'encrypted-refresh', 'encrypted-access',
                         '2026-07-01 01:00:00', '2026-07-01 00:00:00',
+                        CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+                    )
+                    """);
+        }
+    }
+
+    private void insertV9ProviderAndRecurrenceData(String url) throws Exception {
+        try (Connection connection = DriverManager.getConnection(url, "sa", "");
+             Statement statement = connection.createStatement()) {
+            statement.executeUpdate("""
+                    UPDATE google_calendar_integrations
+                    SET next_sync_token = 'existing-cursor'
+                    WHERE id = 900
+                    """);
+            statement.executeUpdate("""
+                    INSERT INTO google_calendar_event_mappings (
+                        id, integration_id, event_id, calendar_key, external_event_id,
+                        provider_etag, provider_updated_at, created_at, updated_at
+                    )
+                    VALUES (
+                        900, 900, 900, 'primary', 'existing-event',
+                        'existing-etag', '2026-07-01 00:00:00',
+                        CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+                    )
+                    """);
+            statement.executeUpdate("""
+                    INSERT INTO recurrence_events (
+                        id, recurrence_title, recurrence_description, all_day, time_zone,
+                        first_occurrence_start_at, first_occurrence_end_at, recurrence_rule,
+                        account_id, tag_id, created_at, updated_at
+                    )
+                    VALUES (
+                        901, 'Existing recurrence', NULL, TRUE, NULL,
+                        '2026-07-20 00:00:00', '2026-07-21 00:00:00',
+                        '["RRULE:FREQ=DAILY"]', 900, 1,
                         CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
                     )
                     """);
@@ -146,6 +255,26 @@ class GoogleCalendarSyncMigrationTest {
                 .getColumns(null, null, tableName, columnName)) {
             assertThat(resultSet.next()).isTrue();
             return resultSet.getString("COLUMN_DEF");
+        }
+    }
+
+    private int columnSize(
+            Connection connection,
+            String tableName,
+            String columnName
+    ) throws Exception {
+        try (ResultSet resultSet = connection.getMetaData()
+                .getColumns(null, null, tableName, columnName)) {
+            assertThat(resultSet.next()).isTrue();
+            return resultSet.getInt("COLUMN_SIZE");
+        }
+    }
+
+    private String singleString(Connection connection, String query) throws Exception {
+        try (Statement statement = connection.createStatement();
+             ResultSet resultSet = statement.executeQuery(query)) {
+            assertThat(resultSet.next()).isTrue();
+            return resultSet.getString(1);
         }
     }
 
