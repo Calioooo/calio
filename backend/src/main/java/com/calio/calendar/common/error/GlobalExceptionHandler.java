@@ -1,6 +1,5 @@
 package com.calio.calendar.common.error;
 
-import com.calio.calendar.security.AuthenticatedAccount;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
@@ -9,8 +8,6 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -45,12 +42,9 @@ public class GlobalExceptionHandler {
     ) {
         ErrorCode errorCode = ErrorCode.VALIDATION_FAILED;
         log.debug(
-                "API validation failed. errorCode={} accountId={} method={} path={} message={}",
+                "API validation failed. errorCode={} method={}",
                 errorCode.name(),
-                currentAccountId(),
-                request.getMethod(),
-                request.getRequestURI(),
-                exception.getMessage()
+                request.getMethod()
         );
         return toResponse(errorCode, errorCode.getDefaultMessage());
     }
@@ -62,12 +56,10 @@ public class GlobalExceptionHandler {
     ) {
         ErrorCode errorCode = ErrorCode.INTERNAL_SERVER_ERROR;
         log.error(
-                "Unhandled API exception. status={} errorCode={} accountId={} method={} path={}",
+                "Unhandled API exception. status={} errorCode={} method={}",
                 errorCode.getStatus().value(),
                 errorCode.name(),
-                currentAccountId(),
-                request.getMethod(),
-                request.getRequestURI()
+                request.getMethod()
         );
         return toResponse(errorCode, errorCode.getDefaultMessage());
     }
@@ -86,38 +78,19 @@ public class GlobalExceptionHandler {
     ) {
         if (errorCode.getStatus().is5xxServerError()) {
             log.error(
-                    "API error. status={} errorCode={} accountId={} method={} path={}",
+                    "API error. status={} errorCode={} method={}",
                     errorCode.getStatus().value(),
                     errorCode.name(),
-                    currentAccountId(),
-                    request.getMethod(),
-                    request.getRequestURI()
+                    request.getMethod()
             );
             return;
         }
 
         log.warn(
-                "API error. status={} errorCode={} accountId={} method={} path={} message={}",
+                "API error. status={} errorCode={} method={}",
                 errorCode.getStatus().value(),
                 errorCode.name(),
-                currentAccountId(),
-                request.getMethod(),
-                request.getRequestURI(),
-                exception.getMessage()
+                request.getMethod()
         );
-    }
-
-    private Long currentAccountId() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null) {
-            return null;
-        }
-
-        Object principal = authentication.getPrincipal();
-        if (principal instanceof AuthenticatedAccount(Long accountId)) {
-            return accountId;
-        }
-
-        return null;
     }
 }

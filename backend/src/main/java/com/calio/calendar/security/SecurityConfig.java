@@ -38,6 +38,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST, "/api/auth/guest").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/national-holidays").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/group-invitations/preview").permitAll()
                         .requestMatchers("/api/events").authenticated()
                         .requestMatchers("/api/events/**").authenticated()
                         .requestMatchers("/api/recurrence-events").authenticated()

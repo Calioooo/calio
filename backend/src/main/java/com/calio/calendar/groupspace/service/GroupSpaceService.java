@@ -99,6 +99,7 @@ public class GroupSpaceService {
         GroupMember membership = findActiveMembership(groupSpaceId, accountId);
         requireOwner(groupSpace, membership);
 
+        groupMemberRepository.findAllByGroupSpaceIdForUpdateOrderById(groupSpaceId);
         deletionCleanups.forEach(cleanup -> cleanup.deleteByGroupSpaceId(groupSpaceId));
         groupMemberRepository.deleteAllByGroupSpaceId(groupSpaceId);
         groupSpaceRepository.delete(groupSpace);

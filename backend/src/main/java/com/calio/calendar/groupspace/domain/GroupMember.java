@@ -1,6 +1,8 @@
 package com.calio.calendar.groupspace.domain;
 
 import com.calio.calendar.common.domain.BaseEntity;
+import com.calio.calendar.common.error.CalioException;
+import com.calio.calendar.common.error.ErrorCode;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -69,5 +71,12 @@ public class GroupMember extends BaseEntity {
         return groupSpace.getOwnerAccountId().equals(accountId)
                 ? GroupMemberRole.OWNER
                 : GroupMemberRole.MEMBER;
+    }
+
+    public void deactivate(GroupMemberStatus inactiveStatus) {
+        if (inactiveStatus == null || inactiveStatus == GroupMemberStatus.ACTIVE) {
+            throw new CalioException(ErrorCode.VALIDATION_FAILED);
+        }
+        this.status = inactiveStatus;
     }
 }

@@ -27,16 +27,22 @@ public class AuthenticationErrorResponseWriter {
     public void write(HttpServletRequest request, HttpServletResponse response, ErrorCode errorCode)
             throws IOException {
         log.warn(
-                "Authentication failed. status={} errorCode={} method={} path={}",
+                "Authentication failed. status={} errorCode={} method={}",
                 errorCode.getStatus().value(),
                 errorCode.name(),
-                request.getMethod(),
-                request.getRequestURI()
+                request.getMethod()
         );
         response.setStatus(errorCode.getStatus().value());
         response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
         ProblemDetail problemDetail = ErrorProblemDetail.from(errorCode, errorCode.getDefaultMessage());
-        problemDetail.setInstance(URI.create(request.getRequestURI()));
+        if (!isGroupInvitationRequest(request)) {
+            problemDetail.setInstance(URI.create(request.getRequestURI()));
+        }
         response.getWriter().write(objectMapper.writeValueAsString(problemDetail));
+    }
+
+    private boolean isGroupInvitationRequest(HttpServletRequest request) {
+        String path = request.getRequestURI();
+        return path.startsWith("/api/group-spaces/") && path.contains("/invitations");
     }
 }
