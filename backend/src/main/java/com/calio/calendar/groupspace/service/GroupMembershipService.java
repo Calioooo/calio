@@ -77,7 +77,7 @@ public class GroupMembershipService {
                     GroupJoinResult.JOINED,
                     groupSpace,
                     membership,
-                    lockedMembers.size() + 1
+                    activeCount(lockedMembers) + 1
             );
         }
         if (membership.getStatus() == GroupMemberStatus.ACTIVE) {
