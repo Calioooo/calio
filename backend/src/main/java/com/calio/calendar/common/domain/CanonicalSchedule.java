@@ -2,11 +2,10 @@ package com.calio.calendar.common.domain;
 
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
+import com.calio.calendar.common.time.IanaTimeZones;
 import java.time.Instant;
 import java.time.LocalTime;
-import java.time.ZoneId;
 import java.time.ZoneOffset;
-import java.util.Set;
 
 public record CanonicalSchedule(
         Instant startAt,
@@ -14,8 +13,6 @@ public record CanonicalSchedule(
         boolean allDay,
         String timeZone
 ) {
-
-    private static final Set<String> IANA_TIME_ZONES = ZoneId.getAvailableZoneIds();
 
     public static CanonicalSchedule event(
             Instant startAt,
@@ -80,7 +77,7 @@ public record CanonicalSchedule(
     }
 
     private static void validateTimeZone(String timeZone) {
-        if (timeZone == null || timeZone.isBlank() || !IANA_TIME_ZONES.contains(timeZone)) {
+        if (timeZone == null || timeZone.isBlank() || !IanaTimeZones.contains(timeZone)) {
             throw new CalioException(ErrorCode.INVALID_TIME_ZONE);
         }
     }

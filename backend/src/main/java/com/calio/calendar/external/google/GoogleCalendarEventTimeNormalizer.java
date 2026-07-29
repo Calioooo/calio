@@ -2,6 +2,7 @@ package com.calio.calendar.external.google;
 
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
+import com.calio.calendar.common.time.IanaTimeZones;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventTime;
 import java.time.DateTimeException;
 import java.time.Instant;
@@ -13,13 +14,10 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.zone.ZoneRules;
 import java.util.List;
-import java.util.Set;
 import org.springframework.stereotype.Component;
 
 @Component
 public class GoogleCalendarEventTimeNormalizer {
-
-    private static final Set<String> IANA_TIME_ZONES = ZoneId.getAvailableZoneIds();
 
     public NormalizedEventTime normalize(GoogleCalendarEventTime eventTime) {
         return normalize(eventTime, null, false);
@@ -143,7 +141,7 @@ public class GoogleCalendarEventTimeNormalizer {
     }
 
     private ZoneId parseIanaTimeZone(String timeZone) {
-        if (!IANA_TIME_ZONES.contains(timeZone)) {
+        if (!IanaTimeZones.contains(timeZone)) {
             throw invalidResponse(null);
         }
         return ZoneId.of(timeZone);
