@@ -10,7 +10,6 @@ import com.calio.calendar.groupspace.controller.dto.AcceptGroupInvitationRequest
 import com.calio.calendar.groupspace.controller.dto.AcceptGroupInvitationResponse;
 import com.calio.calendar.groupspace.controller.dto.GroupInvitationAcceptCredentialType;
 import com.calio.calendar.groupspace.controller.dto.GroupMemberListResponse;
-import com.calio.calendar.groupspace.controller.dto.GroupMemberProjection;
 import com.calio.calendar.groupspace.controller.dto.TransferGroupOwnerResponse;
 import com.calio.calendar.groupspace.domain.GroupJoinResult;
 import com.calio.calendar.groupspace.domain.GroupMember;
@@ -105,13 +104,12 @@ public class GroupMembershipService {
         GroupSpace groupSpace = groupSpaceRepository.findById(groupSpaceId)
                 .orElseThrow(GroupMembershipService::groupSpaceNotFound);
         requireActiveMembership(groupSpaceId, accountId);
-        List<GroupMemberProjection> members = groupMemberRepository
+        List<GroupMember> activeMembers = groupMemberRepository
                 .findAllByGroupSpaceIdAndStatus(groupSpaceId, GroupMemberStatus.ACTIVE)
                 .stream()
                 .sorted(memberOrder(groupSpace))
-                .map(member -> GroupMemberProjection.from(member, groupSpace))
                 .toList();
-        return new GroupMemberListResponse(members);
+        return GroupMemberListResponse.from(activeMembers, groupSpace);
     }
 
     @Transactional
@@ -131,10 +129,7 @@ public class GroupMembershipService {
         }
 
         groupSpace.transferOwnershipTo(target.getAccountId());
-        return new TransferGroupOwnerResponse(
-                GroupMemberProjection.from(actor, groupSpace),
-                GroupMemberProjection.from(target, groupSpace)
-        );
+        return TransferGroupOwnerResponse.from(groupSpace, actor, target);
     }
 
     @Transactional
