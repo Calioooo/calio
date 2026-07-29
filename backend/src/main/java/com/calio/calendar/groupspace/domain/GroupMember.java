@@ -1,5 +1,6 @@
 package com.calio.calendar.groupspace.domain;
 
+import com.calio.calendar.common.domain.BaseEntity;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import jakarta.persistence.Column;
@@ -18,7 +19,7 @@ import java.time.temporal.ChronoUnit;
 
 @Entity
 @Table(name = "group_members")
-public class GroupMember {
+public class GroupMember extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -39,9 +40,6 @@ public class GroupMember {
     @Column(nullable = false, length = 9)
     private String nickname;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private Instant createdAt;
-
     @Column(name = "status_changed_at", nullable = false)
     private Instant statusChangedAt;
 
@@ -53,8 +51,7 @@ public class GroupMember {
         this.accountId = accountId;
         this.status = GroupMemberStatus.ACTIVE;
         this.nickname = nickname;
-        this.createdAt = normalize(now);
-        this.statusChangedAt = this.createdAt;
+        this.statusChangedAt = normalize(now);
     }
 
     public Long getId() {
@@ -75,10 +72,6 @@ public class GroupMember {
 
     public String getNickname() {
         return nickname;
-    }
-
-    public Instant getCreatedAt() {
-        return createdAt;
     }
 
     public Instant getStatusChangedAt() {

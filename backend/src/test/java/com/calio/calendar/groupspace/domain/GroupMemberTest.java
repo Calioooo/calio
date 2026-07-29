@@ -2,6 +2,7 @@ package com.calio.calendar.groupspace.domain;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.calio.calendar.common.domain.BaseEntity;
 import jakarta.persistence.Id;
 import java.time.Instant;
 import org.junit.jupiter.api.DisplayName;
@@ -17,8 +18,8 @@ class GroupMemberTest {
     }
 
     @Test
-    @DisplayName("재가입은 기존 행의 생성 시각을 보존하고 상태 변경 시각과 nickname만 갱신한다")
-    void reactivationPreservesCreatedAtAndUpdatesLifecycleFields() {
+    @DisplayName("재가입은 BaseEntity timestamp와 독립적으로 상태 변경 시각과 nickname을 갱신한다")
+    void reactivationUpdatesLifecycleFields() {
         // given
         Instant joinedAt = Instant.parse("2026-07-29T08:00:00.123456789Z");
         GroupMember member = new GroupMember(
@@ -27,7 +28,12 @@ class GroupMemberTest {
                 "before",
                 joinedAt
         );
-        member.deactivate(GroupMemberStatus.LEFT, joinedAt.plusSeconds(1));
+        Instant initialStatusChangedAt = member.getStatusChangedAt();
+        Instant leftAt = joinedAt.plusSeconds(1);
+        member.deactivate(GroupMemberStatus.LEFT, leftAt);
+
+        assertThat(member.getStatusChangedAt()).isEqualTo(Instant.parse("2026-07-29T08:00:01.123456Z"));
+        assertThat(member.getStatusChangedAt()).isNotEqualTo(initialStatusChangedAt);
 
         // when
         member.reactivate("after", joinedAt.plusSeconds(2));
@@ -35,7 +41,7 @@ class GroupMemberTest {
         // then
         assertThat(member.getStatus()).isEqualTo(GroupMemberStatus.ACTIVE);
         assertThat(member.getNickname()).isEqualTo("after");
-        assertThat(member.getCreatedAt()).isEqualTo(Instant.parse("2026-07-29T08:00:00.123456Z"));
         assertThat(member.getStatusChangedAt()).isEqualTo(Instant.parse("2026-07-29T08:00:02.123456Z"));
+        assertThat(GroupMember.class.getSuperclass()).isEqualTo(BaseEntity.class);
     }
 }

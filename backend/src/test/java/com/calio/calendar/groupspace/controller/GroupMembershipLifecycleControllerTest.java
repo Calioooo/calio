@@ -175,21 +175,24 @@ class GroupMembershipLifecycleControllerTest {
     }
 
     @Test
-    @DisplayName("기존 Group Membership 응답은 updatedAt과 statusChangedAt을 함께 제공한다")
-    void groupMembershipResponseKeepsLegacyAndLifecycleTimestamps() throws Exception {
+    @DisplayName("Group Membership 응답은 BaseEntity와 lifecycle timestamp를 독립적으로 제공한다")
+    void groupMembershipResponseIncludesIndependentTimestamps() throws Exception {
         // given
         GroupFixture fixture = createGroupFixture();
 
         // when, then
         MvcResult result = mockMvc.perform(get("/api/group-spaces/{groupSpaceId}", fixture.groupSpace().getId()))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.myMembership.createdAt").isString())
                 .andExpect(jsonPath("$.myMembership.updatedAt").isString())
                 .andExpect(jsonPath("$.myMembership.statusChangedAt").isString())
                 .andReturn();
         JsonNode membership = objectMapper.readTree(result.getResponse().getContentAsByteArray())
                 .get("myMembership");
-        assertThat(membership.get("updatedAt").asString())
-                .isEqualTo(membership.get("statusChangedAt").asString());
+        assertThat(membership.get("updatedAt").isTextual()).isTrue();
+        assertThat(membership.get("statusChangedAt").isTextual()).isTrue();
+        assertThat(Instant.parse(membership.get("statusChangedAt").asString()))
+                .isEqualTo(MEMBER_CREATED_AT);
     }
 
     @Test

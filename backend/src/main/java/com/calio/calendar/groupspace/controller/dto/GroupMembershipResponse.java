@@ -18,7 +18,7 @@ public record GroupMembershipResponse(
                 member.getNickname(),
                 member.roleIn(groupSpace),
                 member.getCreatedAt(),
-                member.getStatusChangedAt(),
+                member.getUpdatedAt(),
                 member.getStatusChangedAt()
         );
     }
