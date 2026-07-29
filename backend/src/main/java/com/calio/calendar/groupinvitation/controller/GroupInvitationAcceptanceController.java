@@ -30,9 +30,15 @@ public class GroupInvitationAcceptanceController {
             @Valid @RequestBody AcceptGroupInvitationRequest request
     ) {
         AcceptGroupInvitationResponse response = groupMembershipService.accept(account.accountId(), request);
-        if (response.joinResult() != GroupJoinResult.JOINED) {
-            return ResponseEntity.ok(response);
-        }
+        return switch (response.joinResult()) {
+            case JOINED -> createdResponse(response);
+            case ALREADY_MEMBER, REJOINED -> ResponseEntity.ok(response);
+        };
+    }
+
+    private ResponseEntity<AcceptGroupInvitationResponse> createdResponse(
+            AcceptGroupInvitationResponse response
+    ) {
         URI location = URI.create("/api/group-spaces/" + response.groupSpace().id());
         return ResponseEntity.created(location).body(response);
     }
