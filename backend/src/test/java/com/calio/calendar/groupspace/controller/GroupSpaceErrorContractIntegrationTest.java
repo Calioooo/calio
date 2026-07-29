@@ -24,7 +24,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
-import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Pattern;
 
 @SpringBootTest(properties = {
         "spring.datasource.url=jdbc:h2:mem:group-space-error-contract-test;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE",
@@ -58,9 +58,9 @@ class GroupSpaceErrorContractIntegrationTest {
     @DisplayName("Group Space validation 오류는 공통 ErrorProblemDetail 계약으로 처리된다")
     void validationExceptionUsesGlobalProblemDetailContract() throws Exception {
         expectProblemDetail(
-                mockMvc.perform(get("/api/group-spaces/error-contract/validation/-1")),
+                mockMvc.perform(get("/api/group-spaces/error-contract/validation/invalid")),
                 ErrorCode.VALIDATION_FAILED,
-                "/api/group-spaces/error-contract/validation/-1"
+                "/api/group-spaces/error-contract/validation/invalid"
         );
     }
 
@@ -110,8 +110,8 @@ class GroupSpaceErrorContractIntegrationTest {
             throw new CalioException(ErrorCode.GROUP_SPACE_NOT_FOUND);
         }
 
-        @GetMapping("/api/group-spaces/error-contract/validation/{groupSpaceId}")
-        void validateGroupSpaceId(@PathVariable("groupSpaceId") @Positive Long groupSpaceId) {
+        @GetMapping("/api/group-spaces/error-contract/validation/{value}")
+        void validateValue(@PathVariable("value") @Pattern(regexp = "valid") String value) {
         }
 
         @GetMapping("/api/group-spaces/error-contract/unexpected")

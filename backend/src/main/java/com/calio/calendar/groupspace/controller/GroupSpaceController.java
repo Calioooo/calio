@@ -7,7 +7,6 @@ import com.calio.calendar.groupspace.controller.dto.UpdateGroupSpaceRequest;
 import com.calio.calendar.groupspace.service.GroupSpaceService;
 import com.calio.calendar.security.AuthenticatedAccount;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Positive;
 import java.net.URI;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -52,7 +51,7 @@ public class GroupSpaceController {
     @GetMapping("/{groupSpaceId}")
     public GroupSpaceDetailResponse get(
             @AuthenticationPrincipal AuthenticatedAccount account,
-            @PathVariable("groupSpaceId") @Positive Long groupSpaceId
+            @PathVariable("groupSpaceId") Long groupSpaceId
     ) {
         return groupSpaceService.get(account.accountId(), groupSpaceId);
     }
@@ -60,7 +59,7 @@ public class GroupSpaceController {
     @PatchMapping("/{groupSpaceId}")
     public GroupSpaceDetailResponse update(
             @AuthenticationPrincipal AuthenticatedAccount account,
-            @PathVariable("groupSpaceId") @Positive Long groupSpaceId,
+            @PathVariable("groupSpaceId") Long groupSpaceId,
             @Valid @RequestBody UpdateGroupSpaceRequest request
     ) {
         return groupSpaceService.update(account.accountId(), groupSpaceId, request);
@@ -69,7 +68,7 @@ public class GroupSpaceController {
     @DeleteMapping("/{groupSpaceId}")
     public ResponseEntity<Void> delete(
             @AuthenticationPrincipal AuthenticatedAccount account,
-            @PathVariable("groupSpaceId") @Positive Long groupSpaceId
+            @PathVariable("groupSpaceId") Long groupSpaceId
     ) {
         groupSpaceService.delete(account.accountId(), groupSpaceId);
         return ResponseEntity.noContent().build();
