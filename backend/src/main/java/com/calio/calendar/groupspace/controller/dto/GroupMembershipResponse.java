@@ -9,7 +9,8 @@ public record GroupMembershipResponse(
         String nickname,
         GroupMemberRole role,
         Instant createdAt,
-        Instant updatedAt
+        Instant updatedAt,
+        Instant statusChangedAt
 ) {
 
     public static GroupMembershipResponse from(GroupMember member, GroupSpace groupSpace) {
@@ -17,7 +18,8 @@ public record GroupMembershipResponse(
                 member.getNickname(),
                 member.roleIn(groupSpace),
                 member.getCreatedAt(),
-                member.getUpdatedAt()
+                member.getStatusChangedAt(),
+                member.getStatusChangedAt()
         );
     }
 }

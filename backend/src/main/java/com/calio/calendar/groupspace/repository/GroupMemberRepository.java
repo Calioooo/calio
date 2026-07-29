@@ -19,9 +19,9 @@ public interface GroupMemberRepository extends JpaRepository<GroupMember, Long> 
             join fetch member.groupSpace groupSpace
             where member.accountId = :accountId
               and member.status = :status
-            order by member.updatedAt desc, groupSpace.id desc
+            order by member.statusChangedAt desc, groupSpace.id desc
             """)
-    List<GroupMember> findByAccountIdAndStatusOrderByUpdatedAtDesc(
+    List<GroupMember> findByAccountIdAndStatusOrderByStatusChangedAtDesc(
             @Param("accountId") Long accountId,
             @Param("status") GroupMemberStatus status
     );
@@ -76,6 +76,17 @@ public interface GroupMemberRepository extends JpaRepository<GroupMember, Long> 
     );
 
     int countByGroupSpace_IdAndStatus(Long groupSpaceId, GroupMemberStatus status);
+
+    @Query("""
+            select member
+            from GroupMember member
+            where member.groupSpace.id = :groupSpaceId
+              and member.status = :status
+            """)
+    List<GroupMember> findAllByGroupSpaceIdAndStatus(
+            @Param("groupSpaceId") Long groupSpaceId,
+            @Param("status") GroupMemberStatus status
+    );
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("delete from GroupMember member where member.groupSpace.id = :groupSpaceId")

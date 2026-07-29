@@ -8,6 +8,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 
 @Entity
@@ -47,7 +48,7 @@ public class GroupInvitation extends BaseEntity {
         this.createdByMemberId = createdByMemberId;
         this.linkTokenHash = Arrays.copyOf(linkTokenHash, linkTokenHash.length);
         this.inviteCodeHash = Arrays.copyOf(inviteCodeHash, inviteCodeHash.length);
-        this.expiresAt = expiresAt;
+        this.expiresAt = normalize(expiresAt);
     }
 
     public Long getId() {
@@ -75,6 +76,10 @@ public class GroupInvitation extends BaseEntity {
     }
 
     public boolean isExpiredAt(Instant now) {
-        return !now.isBefore(expiresAt);
+        return !normalize(now).isBefore(expiresAt);
+    }
+
+    private static Instant normalize(Instant instant) {
+        return instant.truncatedTo(ChronoUnit.MICROS);
     }
 }

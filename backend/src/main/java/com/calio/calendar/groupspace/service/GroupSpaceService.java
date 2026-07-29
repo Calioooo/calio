@@ -16,7 +16,9 @@ import com.calio.calendar.groupspace.repository.GroupMemberRepository;
 import com.calio.calendar.groupspace.repository.GroupSpaceRepository;
 import java.util.List;
 import java.util.Locale;
+import java.time.Clock;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,17 +31,40 @@ public class GroupSpaceService {
     private final GroupMemberRepository groupMemberRepository;
     private final AccountRepository accountRepository;
     private final List<GroupSpaceDeletionCleanup> deletionCleanups;
+    private final GroupScheduleShareCleanupPort groupScheduleShareCleanupPort;
+    private final Clock clock;
 
+    @Autowired
     public GroupSpaceService(
             GroupSpaceRepository groupSpaceRepository,
             GroupMemberRepository groupMemberRepository,
             AccountRepository accountRepository,
-            List<GroupSpaceDeletionCleanup> deletionCleanups
+            List<GroupSpaceDeletionCleanup> deletionCleanups,
+            GroupScheduleShareCleanupPort groupScheduleShareCleanupPort,
+            Clock clock
     ) {
         this.groupSpaceRepository = groupSpaceRepository;
         this.groupMemberRepository = groupMemberRepository;
         this.accountRepository = accountRepository;
         this.deletionCleanups = List.copyOf(deletionCleanups);
+        this.groupScheduleShareCleanupPort = groupScheduleShareCleanupPort;
+        this.clock = clock;
+    }
+
+    GroupSpaceService(
+            GroupSpaceRepository groupSpaceRepository,
+            GroupMemberRepository groupMemberRepository,
+            AccountRepository accountRepository,
+            List<GroupSpaceDeletionCleanup> deletionCleanups
+    ) {
+        this(
+                groupSpaceRepository,
+                groupMemberRepository,
+                accountRepository,
+                deletionCleanups,
+                new NoOpGroupScheduleShareCleanupAdapter(),
+                Clock.systemUTC()
+        );
     }
 
     @Transactional
@@ -59,7 +84,7 @@ public class GroupSpaceService {
     @Transactional(readOnly = true)
     public GroupSpaceListResponse list(Long accountId) {
         List<GroupSpaceSummaryResponse> groupSpaces = groupMemberRepository
-                .findByAccountIdAndStatusOrderByUpdatedAtDesc(accountId, GroupMemberStatus.ACTIVE)
+                .findByAccountIdAndStatusOrderByStatusChangedAtDesc(accountId, GroupMemberStatus.ACTIVE)
                 .stream()
                 .map(this::toSummary)
                 .toList();
@@ -100,6 +125,7 @@ public class GroupSpaceService {
         requireOwner(groupSpace, membership);
 
         groupMemberRepository.findAllByGroupSpaceIdForUpdateOrderById(groupSpaceId);
+        groupScheduleShareCleanupPort.cleanupGroupShares(groupSpaceId);
         deletionCleanups.forEach(cleanup -> cleanup.deleteByGroupSpaceId(groupSpaceId));
         groupMemberRepository.deleteAllByGroupSpaceId(groupSpaceId);
         groupSpaceRepository.delete(groupSpace);
@@ -112,7 +138,7 @@ public class GroupSpaceService {
     ) {
         try {
             return groupMemberRepository.saveAndFlush(
-                    new GroupMember(groupSpace, accountId, nickname)
+                    new GroupMember(groupSpace, accountId, nickname, clock.instant())
             );
         } catch (DataIntegrityViolationException exception) {
             if (containsConstraint(exception, ACTIVE_NICKNAME_CONSTRAINT)) {
