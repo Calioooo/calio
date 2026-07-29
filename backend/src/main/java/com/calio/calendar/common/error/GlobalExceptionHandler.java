@@ -59,7 +59,8 @@ public class GlobalExceptionHandler {
                 "Unhandled API exception. status={} errorCode={} method={}",
                 errorCode.getStatus().value(),
                 errorCode.name(),
-                request.getMethod()
+                request.getMethod(),
+                exception
         );
         return toResponse(errorCode, errorCode.getDefaultMessage());
     }
@@ -81,7 +82,8 @@ public class GlobalExceptionHandler {
                     "API error. status={} errorCode={} method={}",
                     errorCode.getStatus().value(),
                     errorCode.name(),
-                    request.getMethod()
+                    request.getMethod(),
+                    exception
             );
             return;
         }

@@ -35,16 +35,7 @@ public class AuthenticationErrorResponseWriter {
         response.setStatus(errorCode.getStatus().value());
         response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
         ProblemDetail problemDetail = ErrorProblemDetail.from(errorCode, errorCode.getDefaultMessage());
-        if (!isLifecycleRequest(request)) {
-            problemDetail.setInstance(URI.create(request.getRequestURI()));
-        }
+        problemDetail.setInstance(URI.create(request.getRequestURI()));
         response.getWriter().write(objectMapper.writeValueAsString(problemDetail));
-    }
-
-    private boolean isLifecycleRequest(HttpServletRequest request) {
-        String path = request.getRequestURI();
-        return path.equals("/api/group-invitations/accept")
-                || (path.startsWith("/api/group-spaces/") && path.contains("/members"))
-                || (path.startsWith("/api/group-spaces/") && path.endsWith("/owner-transfer"));
     }
 }

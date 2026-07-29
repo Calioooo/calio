@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
@@ -134,8 +135,13 @@ class GroupSpaceControllerTest {
         // when, then
         mockMvc.perform(get("/api/group-spaces/{groupSpaceId}", groupSpace.getId()))
                 .andExpect(status().isNotFound())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type").value("about:blank"))
                 .andExpect(jsonPath("$.title").value("GROUP_SPACE_NOT_FOUND"))
+                .andExpect(jsonPath("$.status").value(404))
                 .andExpect(jsonPath("$.detail").value("Group space not found."))
+                .andExpect(jsonPath("$.instance").value("/api/group-spaces/" + groupSpace.getId()))
+                .andExpect(jsonPath("$.errorCode").value("GROUP_SPACE_NOT_FOUND"))
                 .andExpect(jsonPath("$.*", hasSize(6)));
     }
 
