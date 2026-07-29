@@ -11,7 +11,6 @@ import com.calio.calendar.groupspace.controller.dto.AcceptGroupInvitationRespons
 import com.calio.calendar.groupspace.controller.dto.GroupInvitationAcceptCredentialType;
 import com.calio.calendar.groupspace.controller.dto.GroupMemberListResponse;
 import com.calio.calendar.groupspace.controller.dto.GroupMemberProjection;
-import com.calio.calendar.groupspace.controller.dto.GroupSpaceJoinResponse;
 import com.calio.calendar.groupspace.controller.dto.TransferGroupOwnerResponse;
 import com.calio.calendar.groupspace.domain.GroupJoinResult;
 import com.calio.calendar.groupspace.domain.GroupMember;
@@ -75,15 +74,30 @@ public class GroupMembershipService {
         String nickname = GroupSpaceFields.normalizeNickname(request.nickname());
         if (membership == null) {
             membership = createMembership(groupSpace, accountId, nickname);
-            return response(GroupJoinResult.JOINED, groupSpace, membership, lockedMembers.size() + 1);
+            return AcceptGroupInvitationResponse.from(
+                    GroupJoinResult.JOINED,
+                    groupSpace,
+                    membership,
+                    lockedMembers.size() + 1
+            );
         }
         if (membership.getStatus() == GroupMemberStatus.ACTIVE) {
-            return response(GroupJoinResult.ALREADY_MEMBER, groupSpace, membership, activeCount(lockedMembers));
+            return AcceptGroupInvitationResponse.from(
+                    GroupJoinResult.ALREADY_MEMBER,
+                    groupSpace,
+                    membership,
+                    activeCount(lockedMembers)
+            );
         }
         requireFreshInvitation(invitation, membership);
         membership.reactivate(nickname, clock.instant());
         flushForNicknameConflict();
-        return response(GroupJoinResult.REJOINED, groupSpace, membership, activeCount(lockedMembers) + 1);
+        return AcceptGroupInvitationResponse.from(
+                GroupJoinResult.REJOINED,
+                groupSpace,
+                membership,
+                activeCount(lockedMembers) + 1
+        );
     }
 
     @Transactional(readOnly = true)
@@ -230,20 +244,6 @@ public class GroupMembershipService {
             return new CalioException(ErrorCode.GROUP_MEMBER_NICKNAME_CONFLICT);
         }
         return exception;
-    }
-
-    private AcceptGroupInvitationResponse response(
-            GroupJoinResult joinResult,
-            GroupSpace groupSpace,
-            GroupMember membership,
-            int memberCount
-    ) {
-        GroupMemberProjection projection = GroupMemberProjection.from(membership, groupSpace);
-        return new AcceptGroupInvitationResponse(
-                joinResult,
-                GroupSpaceJoinResponse.from(groupSpace, membership, memberCount),
-                projection
-        );
     }
 
     private void deactivateMember(
