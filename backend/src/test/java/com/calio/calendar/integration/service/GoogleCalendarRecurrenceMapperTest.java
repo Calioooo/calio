@@ -103,7 +103,7 @@ class GoogleCalendarRecurrenceMapperTest {
                 null,
                 List.of(),
                 "recurrence-event-id",
-                timed("2026-07-21T09:00:00+09:00", "Asia/Seoul"),
+                timed("2026-07-21T09:00:00+09:00", null),
                 new GoogleCalendarEventTime("2026-07-22", null, "ignored/provider-zone"),
                 new GoogleCalendarEventTime("2026-07-24", null, "ignored/provider-zone")
         );
@@ -131,7 +131,7 @@ class GoogleCalendarRecurrenceMapperTest {
                 null,
                 List.of(),
                 "recurrence-event-id",
-                timed("2026-07-21T09:00:00+09:00", "Asia/Seoul"),
+                timed("2026-07-21T09:00:00+09:00", null),
                 null,
                 null
         );

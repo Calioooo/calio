@@ -204,13 +204,24 @@ class GoogleCalendarEventTimeNormalizerTest {
     }
 
     @Test
+    @DisplayName("offset이 있는 timed 값은 timezone 없이 supplied offset으로 정규화한다")
+    void givenOffsetTimedValueWithoutTimeZone_whenNormalize_thenUsesSuppliedOffset() {
+        // when
+        NormalizedEventTime result = normalizer.normalize(
+                new GoogleCalendarEventTime(null, "2026-07-20T09:00:00Z", null)
+        );
+
+        // then
+        assertThat(result.instant()).isEqualTo(Instant.parse("2026-07-20T09:00:00Z"));
+        assertThat(result.allDay()).isFalse();
+        assertThat(result.timeZone()).isNull();
+    }
+
+    @Test
     @DisplayName("offsetless timed 값에 timezone이 없으면 invalid response다")
     void givenOffsetlessTimedValueWithoutTimeZone_whenNormalize_thenReturnsProviderInvalidResponse() {
         assertInvalidResponse(() -> normalizer.normalize(
                 new GoogleCalendarEventTime(null, "2026-07-20T09:00:00", null)
-        ));
-        assertInvalidResponse(() -> normalizer.normalize(
-                new GoogleCalendarEventTime(null, "2026-07-20T09:00:00Z", null)
         ));
     }
 

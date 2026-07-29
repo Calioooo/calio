@@ -88,20 +88,27 @@ public class GoogleCalendarEventTimeNormalizer {
             String fallbackTimeZone,
             boolean allowsFallback
     ) {
-        ResolvedTimeZone resolvedTimeZone =
-                resolveTimeZone(eventTime.timeZone(), fallbackTimeZone, allowsFallback);
         try {
             OffsetDateTime offsetDateTime = OffsetDateTime.parse(
                     eventTime.dateTime(),
                     DateTimeFormatter.ISO_DATE_TIME
             );
-            validateSuppliedOffset(offsetDateTime, resolvedTimeZone.zoneId());
+            ResolvedTimeZone resolvedTimeZone =
+                    resolveTimeZone(eventTime.timeZone(), fallbackTimeZone, allowsFallback);
+            if (resolvedTimeZone != null) {
+                validateSuppliedOffset(offsetDateTime, resolvedTimeZone.zoneId());
+            }
             return new NormalizedEventTime(
                     offsetDateTime.toInstant(),
                     false,
-                    resolvedTimeZone.id()
+                    resolvedTimeZone == null ? null : resolvedTimeZone.id()
             );
         } catch (java.time.format.DateTimeParseException ignored) {
+            ResolvedTimeZone resolvedTimeZone =
+                    resolveTimeZone(eventTime.timeZone(), fallbackTimeZone, allowsFallback);
+            if (resolvedTimeZone == null) {
+                throw invalidResponse(null);
+            }
             return normalizeOffsetless(eventTime.dateTime(), resolvedTimeZone);
         }
     }
@@ -134,10 +141,10 @@ public class GoogleCalendarEventTimeNormalizer {
         if (explicitTimeZone != null) {
             return new ResolvedTimeZone(explicitTimeZone, parseIanaTimeZone(explicitTimeZone));
         }
-        if (!allowsFallback || fallbackTimeZone == null) {
-            throw invalidResponse(null);
+        if (allowsFallback && fallbackTimeZone != null) {
+            return new ResolvedTimeZone(fallbackTimeZone, parseIanaTimeZone(fallbackTimeZone));
         }
-        return new ResolvedTimeZone(fallbackTimeZone, parseIanaTimeZone(fallbackTimeZone));
+        return null;
     }
 
     private ZoneId parseIanaTimeZone(String timeZone) {
