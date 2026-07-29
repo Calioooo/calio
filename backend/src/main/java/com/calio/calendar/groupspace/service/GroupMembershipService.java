@@ -23,15 +23,12 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Locale;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class GroupMembershipService {
-
-    private static final String ACTIVE_NICKNAME_CONSTRAINT = "uk_group_member_active_nickname";
 
     private final GroupSpaceRepository groupSpaceRepository;
     private final GroupMemberRepository groupMemberRepository;
@@ -73,6 +70,7 @@ public class GroupMembershipService {
         GroupMember membership = findMembership(lockedMembers, accountId);
         String nickname = GroupSpaceFields.normalizeNickname(request.nickname());
         if (membership == null) {
+            requireAvailableNickname(groupSpace.getId(), nickname, null);
             membership = createMembership(groupSpace, accountId, nickname, now);
             return AcceptGroupInvitationResponse.from(
                     GroupJoinResult.JOINED,
@@ -90,6 +88,7 @@ public class GroupMembershipService {
             );
         }
         requireFreshInvitation(invitation, membership);
+        requireAvailableNickname(groupSpace.getId(), nickname, membership.getId());
         membership.reactivate(nickname, now);
         flushForNicknameConflict();
         return AcceptGroupInvitationResponse.from(
@@ -243,10 +242,16 @@ public class GroupMembershipService {
     }
 
     private RuntimeException mapNicknameConflict(DataIntegrityViolationException exception) {
-        if (containsConstraint(exception, ACTIVE_NICKNAME_CONSTRAINT)) {
+        if (groupMemberRepository.isActiveNicknameConstraintViolation(exception)) {
             return new CalioException(ErrorCode.GROUP_MEMBER_NICKNAME_CONFLICT);
         }
         return exception;
+    }
+
+    private void requireAvailableNickname(Long groupSpaceId, String nickname, Long excludedMemberId) {
+        if (groupMemberRepository.hasActiveNicknameConflict(groupSpaceId, nickname, excludedMemberId)) {
+            throw new CalioException(ErrorCode.GROUP_MEMBER_NICKNAME_CONFLICT);
+        }
     }
 
     private void deactivateMember(
@@ -331,18 +336,6 @@ public class GroupMembershipService {
         if (!member.roleIn(groupSpace).isOwner()) {
             throw new CalioException(ErrorCode.GROUP_OWNER_REQUIRED);
         }
-    }
-
-    private boolean containsConstraint(Throwable throwable, String constraintName) {
-        Throwable current = throwable;
-        while (current != null) {
-            String message = current.getMessage();
-            if (message != null && message.toLowerCase(Locale.ROOT).contains(constraintName)) {
-                return true;
-            }
-            current = current.getCause();
-        }
-        return false;
     }
 
     private static Instant normalize(Instant instant) {
