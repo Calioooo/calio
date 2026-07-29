@@ -3,6 +3,7 @@ package com.calio.calendar.groupspace.controller;
 import static com.calio.calendar.security.TestAccountSupport.currentAccountId;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -54,6 +55,8 @@ import tools.jackson.databind.ObjectMapper;
 class GroupMembershipLifecycleControllerTest {
 
     private static final String LINK_TOKEN = "A".repeat(43);
+    private static final String SECOND_LINK_TOKEN = "B".repeat(43);
+    private static final String REJOIN_LINK_TOKEN = "C".repeat(43);
 
     @Autowired
     private MockMvc mockMvc;
@@ -138,6 +141,34 @@ class GroupMembershipLifecycleControllerTest {
     }
 
     @Test
+    @DisplayName("재가입한 Group Space는 statusChangedAt 기준 목록의 첫 항목으로 정렬된다")
+    void rejoinedGroupSpaceIsListedFirstByStatusChangedAt() throws Exception {
+        // given
+        GroupFixture groupA = createGroupFixture();
+        GroupFixture groupB = createGroupFixture();
+        createInvitation(groupA.groupSpace(), groupA.ownerMember(), LINK_TOKEN);
+        createInvitation(groupB.groupSpace(), groupB.ownerMember(), SECOND_LINK_TOKEN);
+        String joinerToken = createAuthenticatedToken();
+        accept(joinerToken, LINK_TOKEN, "joiner").andExpect(status().isCreated());
+        accept(joinerToken, SECOND_LINK_TOKEN, "joiner").andExpect(status().isCreated());
+
+        // when
+        mockMvc.perform(delete("/api/group-spaces/{groupSpaceId}/members/me", groupA.groupSpace().getId())
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + joinerToken))
+                .andExpect(status().isNoContent());
+        createInvitation(groupA.groupSpace(), groupA.ownerMember(), REJOIN_LINK_TOKEN);
+        accept(joinerToken, REJOIN_LINK_TOKEN, "rejoined")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.joinResult").value("REJOINED"));
+
+        // then
+        mockMvc.perform(get("/api/group-spaces")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + joinerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.groupSpaces[0].groupSpaceId").value(groupA.groupSpace().getId()));
+    }
+
+    @Test
     @DisplayName("기존 Group Membership 응답은 updatedAt과 statusChangedAt을 함께 제공한다")
     void groupMembershipResponseKeepsLegacyAndLifecycleTimestamps() throws Exception {
         // given
@@ -200,6 +231,14 @@ class GroupMembershipLifecycleControllerTest {
             String accessToken,
             String nickname
     ) throws Exception {
+        return accept(accessToken, LINK_TOKEN, nickname);
+    }
+
+    private org.springframework.test.web.servlet.ResultActions accept(
+            String accessToken,
+            String linkToken,
+            String nickname
+    ) throws Exception {
         return mockMvc.perform(post("/api/group-invitations/accept")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -209,7 +248,7 @@ class GroupMembershipLifecycleControllerTest {
                           "credential": "%s",
                           "nickname": "%s"
                         }
-                        """.formatted(LINK_TOKEN, nickname)));
+                        """.formatted(linkToken, nickname)));
     }
 
     private String createAuthenticatedToken() {
@@ -233,13 +272,27 @@ class GroupMembershipLifecycleControllerTest {
     }
 
     private void createInvitation(GroupSpace groupSpace, GroupMember ownerMember) {
+        createInvitation(groupSpace, ownerMember, LINK_TOKEN);
+    }
+
+    private void createInvitation(
+            GroupSpace groupSpace,
+            GroupMember ownerMember,
+            String linkToken
+    ) {
         groupInvitationRepository.saveAndFlush(new GroupInvitation(
                 groupSpace.getId(),
                 ownerMember.getId(),
-                credentialService.hashValidated(InvitationCredentialType.LINK_TOKEN, LINK_TOKEN),
-                new byte[32],
+                credentialService.hashValidated(InvitationCredentialType.LINK_TOKEN, linkToken),
+                inviteCodeHash(linkToken),
                 Instant.now().plusSeconds(3600)
         ));
+    }
+
+    private byte[] inviteCodeHash(String linkToken) {
+        byte[] hash = new byte[32];
+        hash[0] = (byte) linkToken.charAt(0);
+        return hash;
     }
 
     private record GroupFixture(GroupSpace groupSpace, GroupMember ownerMember) {
