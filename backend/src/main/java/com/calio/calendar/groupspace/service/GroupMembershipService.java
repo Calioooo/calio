@@ -213,7 +213,7 @@ public class GroupMembershipService {
     ) {
         try {
             return groupMemberRepository.saveAndFlush(
-                    new GroupMember(groupSpace, accountId, nickname, normalize(clock.instant()))
+                    new GroupMember(groupSpace, accountId, nickname, clock.instant())
             );
         } catch (DataIntegrityViolationException exception) {
             throw mapNicknameConflict(exception);
