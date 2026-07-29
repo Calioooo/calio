@@ -21,6 +21,7 @@ import com.calio.calendar.groupspace.repository.GroupMemberRepository;
 import com.calio.calendar.groupspace.repository.GroupSpaceRepository;
 import com.calio.calendar.security.AuthenticatedAccountMockMvcTestConfig;
 import com.calio.calendar.security.WithAuthenticatedAccount;
+import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -130,7 +131,9 @@ class GroupSpaceControllerTest {
         GroupSpace groupSpace = groupSpaceRepository.saveAndFlush(
                 new GroupSpace(anotherAccount.getId(), "Hidden", null)
         );
-        groupMemberRepository.saveAndFlush(new GroupMember(groupSpace, anotherAccount.getId(), "owner"));
+        groupMemberRepository.saveAndFlush(
+                new GroupMember(groupSpace, anotherAccount.getId(), "owner", Instant.now())
+        );
 
         // when, then
         mockMvc.perform(get("/api/group-spaces/{groupSpaceId}", groupSpace.getId()))
@@ -230,8 +233,12 @@ class GroupSpaceControllerTest {
         GroupSpace groupSpace = groupSpaceRepository.saveAndFlush(
                 new GroupSpace(owner.getId(), "Shared", null)
         );
-        groupMemberRepository.saveAndFlush(new GroupMember(groupSpace, owner.getId(), "owner"));
-        groupMemberRepository.saveAndFlush(new GroupMember(groupSpace, currentAccountId(), "member"));
+        groupMemberRepository.saveAndFlush(
+                new GroupMember(groupSpace, owner.getId(), "owner", Instant.now())
+        );
+        groupMemberRepository.saveAndFlush(
+                new GroupMember(groupSpace, currentAccountId(), "member", Instant.now())
+        );
 
         // when, then
         mockMvc.perform(patch("/api/group-spaces/{groupSpaceId}", groupSpace.getId())

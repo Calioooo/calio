@@ -8,6 +8,7 @@ import com.calio.calendar.groupspace.repository.GroupMemberRepository;
 import com.calio.calendar.groupspace.repository.GroupSpaceRepository;
 import java.util.List;
 import java.time.Clock;
+import java.time.Instant;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,8 +47,9 @@ public class GroupMemberLifecycleService {
                 .filter(candidate -> candidate.getStatus() == GroupMemberStatus.ACTIVE)
                 .orElseThrow(GroupMemberLifecycleService::groupSpaceNotFound);
 
+        Instant now = clock.instant();
         deactivationCleanups.forEach(cleanup -> cleanup.deleteByMemberId(member.getId()));
-        member.deactivate(inactiveStatus, clock.instant());
+        member.deactivate(inactiveStatus, now);
     }
 
     private static CalioException groupSpaceNotFound() {

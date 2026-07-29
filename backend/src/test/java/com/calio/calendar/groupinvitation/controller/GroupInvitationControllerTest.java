@@ -237,7 +237,7 @@ class GroupInvitationControllerTest {
         var groupSpace = groupSpaceRepository.findById(groupSpaceId).orElseThrow();
         Account otherAccount = accountRepository.saveAndFlush(new Account());
         GroupMember otherIssuer = memberRepository.saveAndFlush(
-                new GroupMember(groupSpace, otherAccount.getId(), "other")
+                new GroupMember(groupSpace, otherAccount.getId(), "other", NOW)
         );
         GroupInvitation invitation = invitationRepository.saveAndFlush(
                 new GroupInvitation(
@@ -316,7 +316,7 @@ class GroupInvitationControllerTest {
         var groupSpace = groupSpaceRepository.findById(groupSpaceId).orElseThrow();
         Account otherAccount = accountRepository.saveAndFlush(new Account());
         GroupMember issuer = memberRepository.saveAndFlush(
-                new GroupMember(groupSpace, otherAccount.getId(), "departing")
+                new GroupMember(groupSpace, otherAccount.getId(), "departing", NOW)
         );
         invitationRepository.saveAndFlush(
                 new GroupInvitation(

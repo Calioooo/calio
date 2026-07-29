@@ -30,6 +30,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 })
 class GroupMembershipServiceTest {
 
+    private static final Instant MEMBER_CREATED_AT = Instant.parse("2026-07-30T00:00:00Z");
+
     @Autowired
     private GroupMembershipService groupMembershipService;
 
@@ -130,10 +132,10 @@ class GroupMembershipServiceTest {
                 new GroupSpace(ownerAccount.getId(), "Shared", null)
         );
         GroupMember ownerMember = groupMemberRepository.saveAndFlush(
-                new GroupMember(groupSpace, ownerAccount.getId(), "owner")
+                new GroupMember(groupSpace, ownerAccount.getId(), "owner", MEMBER_CREATED_AT)
         );
         GroupMember targetMember = groupMemberRepository.saveAndFlush(
-                new GroupMember(groupSpace, targetAccount.getId(), "target")
+                new GroupMember(groupSpace, targetAccount.getId(), "target", MEMBER_CREATED_AT)
         );
         return new GroupFixture(ownerAccount, targetAccount, groupSpace, ownerMember, targetMember);
     }

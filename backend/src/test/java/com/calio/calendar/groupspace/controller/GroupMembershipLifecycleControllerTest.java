@@ -57,6 +57,7 @@ class GroupMembershipLifecycleControllerTest {
     private static final String LINK_TOKEN = "A".repeat(43);
     private static final String SECOND_LINK_TOKEN = "B".repeat(43);
     private static final String REJOIN_LINK_TOKEN = "C".repeat(43);
+    private static final Instant MEMBER_CREATED_AT = Instant.parse("2026-07-30T00:00:00Z");
 
     @Autowired
     private MockMvc mockMvc;
@@ -128,7 +129,12 @@ class GroupMembershipLifecycleControllerTest {
         GroupFixture fixture = createGroupFixture();
         Account departedAccount = accountRepository.saveAndFlush(new Account());
         GroupMember departedMember = groupMemberRepository.saveAndFlush(
-                new GroupMember(fixture.groupSpace(), departedAccount.getId(), "departed")
+                new GroupMember(
+                        fixture.groupSpace(),
+                        departedAccount.getId(),
+                        "departed",
+                        MEMBER_CREATED_AT
+                )
         );
         departedMember.deactivate(GroupMemberStatus.LEFT, Instant.now());
         groupMemberRepository.saveAndFlush(departedMember);
@@ -195,7 +201,7 @@ class GroupMembershipLifecycleControllerTest {
                 new GroupSpace(anotherOwner.getId(), "Hidden", null)
         );
         groupMemberRepository.saveAndFlush(
-                new GroupMember(hiddenGroup, anotherOwner.getId(), "owner")
+                new GroupMember(hiddenGroup, anotherOwner.getId(), "owner", MEMBER_CREATED_AT)
         );
 
         // when, then
@@ -266,7 +272,7 @@ class GroupMembershipLifecycleControllerTest {
                 new GroupSpace(ownerAccountId, "Shared", null)
         );
         GroupMember ownerMember = groupMemberRepository.saveAndFlush(
-                new GroupMember(groupSpace, ownerAccountId, "owner")
+                new GroupMember(groupSpace, ownerAccountId, "owner", MEMBER_CREATED_AT)
         );
         return new GroupFixture(groupSpace, ownerMember);
     }

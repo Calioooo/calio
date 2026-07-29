@@ -17,6 +17,7 @@ import com.calio.calendar.groupspace.repository.GroupSpaceRepository;
 import java.util.List;
 import java.util.Locale;
 import java.time.Clock;
+import java.time.Instant;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -73,11 +74,12 @@ public class GroupSpaceService {
         String name = GroupSpaceFields.normalizeName(request.name());
         String nickname = GroupSpaceFields.normalizeNickname(request.nickname());
         String emoji = GroupSpaceFields.canonicalizeEmoji(request.emoji());
+        Instant now = clock.instant();
 
         GroupSpace groupSpace = groupSpaceRepository.saveAndFlush(
                 new GroupSpace(accountId, name, emoji)
         );
-        GroupMember membership = saveOwnerMembership(groupSpace, accountId, nickname);
+        GroupMember membership = saveOwnerMembership(groupSpace, accountId, nickname, now);
         return GroupSpaceDetailResponse.from(groupSpace, membership, 1);
     }
 
@@ -134,11 +136,12 @@ public class GroupSpaceService {
     private GroupMember saveOwnerMembership(
             GroupSpace groupSpace,
             Long accountId,
-            String nickname
+            String nickname,
+            Instant now
     ) {
         try {
             return groupMemberRepository.saveAndFlush(
-                    new GroupMember(groupSpace, accountId, nickname, clock.instant())
+                    new GroupMember(groupSpace, accountId, nickname, now)
             );
         } catch (DataIntegrityViolationException exception) {
             if (containsConstraint(exception, ACTIVE_NICKNAME_CONSTRAINT)) {

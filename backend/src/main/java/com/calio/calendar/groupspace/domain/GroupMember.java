@@ -48,10 +48,6 @@ public class GroupMember {
     protected GroupMember() {
     }
 
-    public GroupMember(GroupSpace groupSpace, Long accountId, String nickname) {
-        this(groupSpace, accountId, nickname, Instant.now());
-    }
-
     public GroupMember(GroupSpace groupSpace, Long accountId, String nickname, Instant now) {
         this.groupSpace = groupSpace;
         this.accountId = accountId;

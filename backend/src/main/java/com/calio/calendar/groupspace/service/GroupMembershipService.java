@@ -67,12 +67,13 @@ public class GroupMembershipService {
         List<GroupMember> lockedMembers =
                 groupMemberRepository.findAllByGroupSpaceIdForUpdateOrderById(groupSpace.getId());
         GroupInvitation invitation = lockInvitation(locatedInvitation.getId(), request, credentialHash);
-        validateInvitation(invitation, lockedMembers);
+        Instant now = clock.instant();
+        validateInvitation(invitation, lockedMembers, now);
 
         GroupMember membership = findMembership(lockedMembers, accountId);
         String nickname = GroupSpaceFields.normalizeNickname(request.nickname());
         if (membership == null) {
-            membership = createMembership(groupSpace, accountId, nickname);
+            membership = createMembership(groupSpace, accountId, nickname, now);
             return AcceptGroupInvitationResponse.from(
                     GroupJoinResult.JOINED,
                     groupSpace,
@@ -89,7 +90,7 @@ public class GroupMembershipService {
             );
         }
         requireFreshInvitation(invitation, membership);
-        membership.reactivate(nickname, clock.instant());
+        membership.reactivate(nickname, now);
         flushForNicknameConflict();
         return AcceptGroupInvitationResponse.from(
                 GroupJoinResult.REJOINED,
@@ -137,6 +138,7 @@ public class GroupMembershipService {
         GroupSpace groupSpace = lockGroupSpace(groupSpaceId, false);
         List<GroupMember> lockedMembers = lockMembers(groupSpaceId);
         GroupMember actor = requireActiveMembership(lockedMembers, accountId);
+        Instant now = clock.instant();
         if (actor.roleIn(groupSpace).isOwner() && activeCount(lockedMembers) > 1) {
             throw new CalioException(ErrorCode.GROUP_OWNER_TRANSFER_REQUIRED);
         }
@@ -144,7 +146,7 @@ public class GroupMembershipService {
             deleteSoleOwnerGroup(groupSpace, lockedMembers);
             return;
         }
-        deactivateMember(groupSpaceId, actor, GroupMemberStatus.LEFT);
+        deactivateMember(groupSpaceId, actor, GroupMemberStatus.LEFT, now);
     }
 
     @Transactional
@@ -152,13 +154,14 @@ public class GroupMembershipService {
         GroupSpace groupSpace = lockGroupSpace(groupSpaceId, false);
         List<GroupMember> lockedMembers = lockMembers(groupSpaceId);
         GroupMember actor = requireActiveMembership(lockedMembers, accountId);
+        Instant now = clock.instant();
         requireOwner(groupSpace, actor);
         GroupMember target = findActiveMember(lockedMembers, targetMemberId)
                 .orElseThrow(() -> new CalioException(ErrorCode.GROUP_MEMBER_NOT_FOUND));
         if (target.roleIn(groupSpace).isOwner()) {
             throw new CalioException(ErrorCode.GROUP_OWNER_CANNOT_BE_REMOVED);
         }
-        deactivateMember(groupSpaceId, target, GroupMemberStatus.REMOVED);
+        deactivateMember(groupSpaceId, target, GroupMemberStatus.REMOVED, now);
     }
 
     private byte[] credentialHash(AcceptGroupInvitationRequest request) {
@@ -193,8 +196,12 @@ public class GroupMembershipService {
                 .orElseThrow(GroupMembershipService::invitationNotFound);
     }
 
-    private void validateInvitation(GroupInvitation invitation, List<GroupMember> lockedMembers) {
-        if (invitation.isExpiredAt(normalize(clock.instant()))) {
+    private void validateInvitation(
+            GroupInvitation invitation,
+            List<GroupMember> lockedMembers,
+            Instant now
+    ) {
+        if (invitation.isExpiredAt(now)) {
             throw new CalioException(ErrorCode.GROUP_INVITATION_EXPIRED);
         }
         boolean issuerIsActive = lockedMembers.stream().anyMatch(member ->
@@ -209,11 +216,12 @@ public class GroupMembershipService {
     private GroupMember createMembership(
             GroupSpace groupSpace,
             Long accountId,
-            String nickname
+            String nickname,
+            Instant now
     ) {
         try {
             return groupMemberRepository.saveAndFlush(
-                    new GroupMember(groupSpace, accountId, nickname, clock.instant())
+                    new GroupMember(groupSpace, accountId, nickname, now)
             );
         } catch (DataIntegrityViolationException exception) {
             throw mapNicknameConflict(exception);
@@ -244,11 +252,12 @@ public class GroupMembershipService {
     private void deactivateMember(
             Long groupSpaceId,
             GroupMember member,
-            GroupMemberStatus inactiveStatus
+            GroupMemberStatus inactiveStatus,
+            Instant now
     ) {
         groupScheduleShareCleanupPort.cleanupMemberShares(groupSpaceId, member.getId());
         deleteIssuerInvitations(member.getId());
-        member.deactivate(inactiveStatus, clock.instant());
+        member.deactivate(inactiveStatus, now);
     }
 
     private void deleteSoleOwnerGroup(GroupSpace groupSpace, List<GroupMember> lockedMembers) {
