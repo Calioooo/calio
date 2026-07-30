@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
@@ -20,6 +21,7 @@ import com.calio.calendar.groupspace.repository.GroupMemberRepository;
 import com.calio.calendar.groupspace.repository.GroupSpaceRepository;
 import com.calio.calendar.security.AuthenticatedAccountMockMvcTestConfig;
 import com.calio.calendar.security.WithAuthenticatedAccount;
+import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -129,13 +131,20 @@ class GroupSpaceControllerTest {
         GroupSpace groupSpace = groupSpaceRepository.saveAndFlush(
                 new GroupSpace(anotherAccount.getId(), "Hidden", null)
         );
-        groupMemberRepository.saveAndFlush(new GroupMember(groupSpace, anotherAccount.getId(), "owner"));
+        groupMemberRepository.saveAndFlush(
+                new GroupMember(groupSpace, anotherAccount.getId(), "owner", Instant.now())
+        );
 
         // when, then
         mockMvc.perform(get("/api/group-spaces/{groupSpaceId}", groupSpace.getId()))
                 .andExpect(status().isNotFound())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type").value("about:blank"))
                 .andExpect(jsonPath("$.title").value("GROUP_SPACE_NOT_FOUND"))
+                .andExpect(jsonPath("$.status").value(404))
                 .andExpect(jsonPath("$.detail").value("Group space not found."))
+                .andExpect(jsonPath("$.instance").value("/api/group-spaces/" + groupSpace.getId()))
+                .andExpect(jsonPath("$.errorCode").value("GROUP_SPACE_NOT_FOUND"))
                 .andExpect(jsonPath("$.*", hasSize(6)));
     }
 
@@ -224,8 +233,12 @@ class GroupSpaceControllerTest {
         GroupSpace groupSpace = groupSpaceRepository.saveAndFlush(
                 new GroupSpace(owner.getId(), "Shared", null)
         );
-        groupMemberRepository.saveAndFlush(new GroupMember(groupSpace, owner.getId(), "owner"));
-        groupMemberRepository.saveAndFlush(new GroupMember(groupSpace, currentAccountId(), "member"));
+        groupMemberRepository.saveAndFlush(
+                new GroupMember(groupSpace, owner.getId(), "owner", Instant.now())
+        );
+        groupMemberRepository.saveAndFlush(
+                new GroupMember(groupSpace, currentAccountId(), "member", Instant.now())
+        );
 
         // when, then
         mockMvc.perform(patch("/api/group-spaces/{groupSpaceId}", groupSpace.getId())

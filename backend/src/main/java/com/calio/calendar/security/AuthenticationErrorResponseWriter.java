@@ -35,14 +35,7 @@ public class AuthenticationErrorResponseWriter {
         response.setStatus(errorCode.getStatus().value());
         response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
         ProblemDetail problemDetail = ErrorProblemDetail.from(errorCode, errorCode.getDefaultMessage());
-        if (!isGroupInvitationRequest(request)) {
-            problemDetail.setInstance(URI.create(request.getRequestURI()));
-        }
+        problemDetail.setInstance(URI.create(request.getRequestURI()));
         response.getWriter().write(objectMapper.writeValueAsString(problemDetail));
-    }
-
-    private boolean isGroupInvitationRequest(HttpServletRequest request) {
-        String path = request.getRequestURI();
-        return path.startsWith("/api/group-spaces/") && path.contains("/invitations");
     }
 }

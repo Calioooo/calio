@@ -4,7 +4,6 @@ import com.calio.calendar.groupinvitation.controller.dto.GroupInvitationListResp
 import com.calio.calendar.groupinvitation.controller.dto.IssueGroupInvitationResponse;
 import com.calio.calendar.groupinvitation.service.GroupInvitationService;
 import com.calio.calendar.security.AuthenticatedAccount;
-import jakarta.validation.constraints.Positive;
 import java.net.URI;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -30,7 +29,7 @@ public class GroupInvitationController {
     @PostMapping
     public ResponseEntity<IssueGroupInvitationResponse> issue(
             @AuthenticationPrincipal AuthenticatedAccount account,
-            @PathVariable("groupSpaceId") @Positive Long groupSpaceId
+            @PathVariable("groupSpaceId") Long groupSpaceId
     ) {
         IssueGroupInvitationResponse response =
                 groupInvitationService.issue(account.accountId(), groupSpaceId);
@@ -44,7 +43,7 @@ public class GroupInvitationController {
     @GetMapping
     public GroupInvitationListResponse list(
             @AuthenticationPrincipal AuthenticatedAccount account,
-            @PathVariable("groupSpaceId") @Positive Long groupSpaceId
+            @PathVariable("groupSpaceId") Long groupSpaceId
     ) {
         return groupInvitationService.list(account.accountId(), groupSpaceId);
     }
@@ -52,8 +51,8 @@ public class GroupInvitationController {
     @DeleteMapping("/{invitationId}")
     public ResponseEntity<Void> revoke(
             @AuthenticationPrincipal AuthenticatedAccount account,
-            @PathVariable("groupSpaceId") @Positive Long groupSpaceId,
-            @PathVariable("invitationId") @Positive Long invitationId
+            @PathVariable("groupSpaceId") Long groupSpaceId,
+            @PathVariable("invitationId") Long invitationId
     ) {
         groupInvitationService.revoke(account.accountId(), groupSpaceId, invitationId);
         return ResponseEntity.noContent().build();

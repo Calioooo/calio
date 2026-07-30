@@ -54,4 +54,8 @@ public class GroupSpace extends BaseEntity {
         this.name = name;
         this.emoji = emoji;
     }
+
+    public void transferOwnershipTo(Long accountId) {
+        this.ownerAccountId = accountId;
+    }
 }

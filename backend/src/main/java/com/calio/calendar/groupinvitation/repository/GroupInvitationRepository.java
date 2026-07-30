@@ -18,6 +18,20 @@ public interface GroupInvitationRepository extends JpaRepository<GroupInvitation
 
     Optional<GroupInvitation> findByInviteCodeHash(byte[] inviteCodeHash);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select invitation
+            from GroupInvitation invitation
+            where invitation.id = :invitationId
+              and ((:credentialType = 'LINK_TOKEN' and invitation.linkTokenHash = :credentialHash)
+                   or (:credentialType = 'INVITE_CODE' and invitation.inviteCodeHash = :credentialHash))
+            """)
+    Optional<GroupInvitation> findByIdAndCredentialHashForUpdate(
+            @Param("invitationId") Long invitationId,
+            @Param("credentialType") String credentialType,
+            @Param("credentialHash") byte[] credentialHash
+    );
+
     @Query("""
             select invitation.id as invitationId, invitation.expiresAt as expiresAt
             from GroupInvitation invitation
