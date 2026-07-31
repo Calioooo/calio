@@ -13,7 +13,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.calio.calendar.account.domain.Account;
+import com.calio.calendar.account.domain.AccountAuthToken;
+import com.calio.calendar.account.repository.AccountAuthTokenRepository;
 import com.calio.calendar.account.repository.AccountRepository;
+import com.calio.calendar.auth.service.AccessTokenEncoder;
 import com.calio.calendar.groupinvitation.domain.GroupInvitation;
 import com.calio.calendar.groupinvitation.domain.InvitationCredentialType;
 import com.calio.calendar.groupinvitation.repository.GroupInvitationRepository;
@@ -42,6 +45,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -87,6 +91,12 @@ class GroupInvitationControllerTest {
     private AccountRepository accountRepository;
 
     @Autowired
+    private AccountAuthTokenRepository accountAuthTokenRepository;
+
+    @Autowired
+    private AccessTokenEncoder accessTokenEncoder;
+
+    @Autowired
     private InvitationCredentialService credentialService;
 
     @Autowired
@@ -97,6 +107,7 @@ class GroupInvitationControllerTest {
 
     @BeforeEach
     void setUp() {
+        accountAuthTokenRepository.deleteAll();
         invitationRepository.deleteAll();
         memberRepository.deleteAll();
         groupSpaceRepository.deleteAll();
@@ -165,17 +176,11 @@ class GroupInvitationControllerTest {
     }
 
     @Test
-    @DisplayName("preview는 public POST이며 최소 group projection과 no-store를 반환한다")
+    @DisplayName("사용자는 인증 토큰 없이 그룹 초대 정보를 미리 볼 수 있다")
     void previewIsPublicAndNotCacheable() throws Exception {
         // given
         long groupSpaceId = createGroup();
-        JsonNode issued = read(mockMvc.perform(post(
-                        "/api/group-spaces/{groupSpaceId}/invitations",
-                        groupSpaceId
-                ))
-                .andExpect(status().isCreated())
-                .andReturn());
-        String inviteCode = issued.get("inviteCode").asString();
+        String inviteCode = issueInviteCode(groupSpaceId);
 
         // when, then
         mockMvc.perform(post("/api/group-invitations/preview")
@@ -189,6 +194,48 @@ class GroupInvitationControllerTest {
                 .andExpect(jsonPath("$.memberCount").value(1))
                 .andExpect(jsonPath("$.expiresAt").value("2026-07-29T08:00:00Z"))
                 .andExpect(jsonPath("$.*", hasSize(4)));
+    }
+
+    @Test
+    @DisplayName("사용자는 잘못된 인증 토큰이 있어도 그룹 초대 정보를 미리 볼 수 있다")
+    void previewAllowsInvalidAuthenticationToken() throws Exception {
+        // given
+        long groupSpaceId = createGroup();
+        String inviteCode = issueInviteCode(groupSpaceId);
+
+        // when, then
+        mockMvc.perform(post("/api/group-invitations/preview")
+                        .with(anonymous())
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer invalid-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(previewBody("CODE", inviteCode)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Invitation group"));
+    }
+
+    @Test
+    @DisplayName("사용자는 해지된 인증 토큰이 있어도 그룹 초대 정보를 미리 볼 수 있다")
+    void previewAllowsRevokedAuthenticationToken() throws Exception {
+        // given
+        long groupSpaceId = createGroup();
+        String inviteCode = issueInviteCode(groupSpaceId);
+        String rawToken = "revoked-preview-token";
+        Account account = accountRepository.saveAndFlush(new Account());
+        AccountAuthToken authToken = new AccountAuthToken(
+                account,
+                accessTokenEncoder.hash(rawToken)
+        );
+        authToken.revoke(NOW.minusSeconds(1));
+        accountAuthTokenRepository.saveAndFlush(authToken);
+
+        // when, then
+        mockMvc.perform(post("/api/group-invitations/preview")
+                        .with(anonymous())
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + rawToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(previewBody("CODE", inviteCode)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Invitation group"));
     }
 
     @Test
@@ -368,6 +415,16 @@ class GroupInvitationControllerTest {
         } catch (Exception exception) {
             throw new AssertionError("Invitation setup failed.", exception);
         }
+    }
+
+    private String issueInviteCode(long groupSpaceId) throws Exception {
+        JsonNode issued = read(mockMvc.perform(post(
+                        "/api/group-spaces/{groupSpaceId}/invitations",
+                        groupSpaceId
+                ))
+                .andExpect(status().isCreated())
+                .andReturn());
+        return issued.get("inviteCode").asString();
     }
 
     private String previewBody(String credentialType, String credential) {
