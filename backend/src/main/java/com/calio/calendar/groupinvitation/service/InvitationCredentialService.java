@@ -117,7 +117,10 @@ public class InvitationCredentialService {
 
         String normalized = credential
                 .toUpperCase(Locale.ROOT)
-                .replace("-", "");
+                .replace("-", "")
+                .replace('O', '0')
+                .replace('I', '1')
+                .replace('L', '1');
         if (!INVITE_CODE_PATTERN.matcher(normalized).matches()) {
             throw validationFailed();
         }

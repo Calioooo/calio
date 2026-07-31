@@ -54,6 +54,41 @@ class InvitationCredentialServiceTest {
     }
 
     @Test
+    @DisplayName("CODE는 혼동하기 쉬운 O와 I/L을 각각 0과 1로 정규화한다")
+    void normalizesAmbiguousCrockfordCharacters() {
+        // given
+        InvitationCredentialService service = service("https://calio.app/invite");
+
+        // when
+        byte[] ambiguous = service.hashValidated(
+                InvitationCredentialType.CODE,
+                "OIOL-ABCD-EFGH-JKMN"
+        );
+        byte[] canonical = service.hashValidated(
+                InvitationCredentialType.CODE,
+                "0101-ABCD-EFGH-JKMN"
+        );
+
+        // then
+        assertThat(ambiguous).containsExactly(canonical);
+    }
+
+    @Test
+    @DisplayName("CODE는 Crockford Base32에서 지원하지 않는 U 문자를 거부한다")
+    void rejectsUnsupportedCrockfordCharacter() {
+        // given
+        InvitationCredentialService service = service("https://calio.app/invite");
+
+        // when, then
+        assertThatThrownBy(() -> service.hashValidated(
+                InvitationCredentialType.CODE,
+                "0123-ABCD-EFGH-UKMN"
+        )).isInstanceOfSatisfying(CalioException.class, exception ->
+                assertThat(exception.getErrorCode().name()).isEqualTo("VALIDATION_FAILED")
+        );
+    }
+
+    @Test
     @DisplayName("credential 형식 오류는 원문 없이 VALIDATION_FAILED로 변환한다")
     void rejectsInvalidCredentialWithoutEchoingIt() {
         // given
