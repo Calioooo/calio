@@ -8,7 +8,6 @@ import java.util.Optional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
-import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -83,14 +82,6 @@ public interface GroupInvitationRepository extends JpaRepository<GroupInvitation
     List<GroupInvitation> findAllByCreatedByMemberIdForUpdateOrderById(
             @Param("memberId") Long memberId
     );
-
-    @Modifying(flushAutomatically = true)
-    @Query("delete from GroupInvitation invitation where invitation.createdByMemberId = :memberId")
-    int deleteAllByCreatedByMemberId(@Param("memberId") Long memberId);
-
-    @Modifying(flushAutomatically = true)
-    @Query("delete from GroupInvitation invitation where invitation.groupSpaceId = :groupSpaceId")
-    int deleteAllByGroupSpaceId(@Param("groupSpaceId") Long groupSpaceId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
