@@ -27,10 +27,11 @@ public class AuthenticationErrorResponseWriter {
     public void write(HttpServletRequest request, HttpServletResponse response, ErrorCode errorCode)
             throws IOException {
         log.warn(
-                "Authentication failed. status={} errorCode={} method={}",
+                "Authentication failed. status={} errorCode={} method={} path={}",
                 errorCode.getStatus().value(),
                 errorCode.name(),
-                request.getMethod()
+                request.getMethod(),
+                request.getRequestURI()
         );
         response.setStatus(errorCode.getStatus().value());
         response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
