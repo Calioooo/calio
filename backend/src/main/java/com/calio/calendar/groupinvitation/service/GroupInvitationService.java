@@ -118,11 +118,10 @@ public class GroupInvitationService {
                         expiresAt
                 )
         );
-        return new IssueGroupInvitationResponse(
-                invitation.getId(),
+        return IssueGroupInvitationResponse.from(
+                invitation,
                 credentialService.inviteUrl(credentials.linkToken()),
-                credentials.inviteCode(),
-                expiresAt
+                credentials.inviteCode()
         );
     }
 

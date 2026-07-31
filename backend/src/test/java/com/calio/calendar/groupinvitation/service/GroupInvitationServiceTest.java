@@ -90,6 +90,7 @@ class GroupInvitationServiceTest {
         when(credentialService.generatePair()).thenReturn(first, second, third);
         GroupInvitation saved = mock(GroupInvitation.class);
         when(saved.getId()).thenReturn(99L);
+        when(saved.getExpiresAt()).thenReturn(Instant.parse("2026-07-29T08:00:00Z"));
         when(invitationRepository.saveAndFlush(any(GroupInvitation.class)))
                 .thenThrow(new DataIntegrityViolationException("collision"))
                 .thenThrow(new DataIntegrityViolationException("collision"))
