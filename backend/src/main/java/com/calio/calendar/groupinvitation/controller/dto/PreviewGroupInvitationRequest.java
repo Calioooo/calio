@@ -7,8 +7,8 @@ import jakarta.validation.constraints.NotNull;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record PreviewGroupInvitationRequest(
-        @NotNull InvitationCredentialType credentialType,
-        @NotBlank String credential
+        @NotNull(message = "초대 인증 유형은 필수입니다.") InvitationCredentialType credentialType,
+        @NotBlank(message = "초대 인증 정보는 공백일 수 없습니다.") String credential
 ) {
 
     @Override
