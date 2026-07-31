@@ -9,6 +9,8 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "group-invitation")
 public class GroupInvitationProperties {
 
+    private static final int MAX_CLEANUP_BATCHES_PER_RUN = 1000;
+
     private String baseUrl = "https://calio.app/invite";
     private Duration ttl = Duration.ofHours(24);
     private Duration cleanupFixedDelay = Duration.ofHours(1);
@@ -72,7 +74,8 @@ public class GroupInvitationProperties {
                 || !isPositive(expiredRetention)
                 || cleanupBatchSize < 1
                 || cleanupBatchSize > 1000
-                || cleanupMaxBatchesPerRun < 1) {
+                || cleanupMaxBatchesPerRun < 1
+                || cleanupMaxBatchesPerRun > MAX_CLEANUP_BATCHES_PER_RUN) {
             throw new IllegalStateException("Invalid group invitation configuration.");
         }
     }
