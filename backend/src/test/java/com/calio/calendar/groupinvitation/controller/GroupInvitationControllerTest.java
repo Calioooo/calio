@@ -20,15 +20,15 @@ import com.calio.calendar.auth.service.AccessTokenEncoder;
 import com.calio.calendar.groupinvitation.domain.GroupInvitation;
 import com.calio.calendar.groupinvitation.domain.InvitationCredentialType;
 import com.calio.calendar.groupinvitation.repository.GroupInvitationRepository;
-import com.calio.calendar.groupinvitation.service.GroupInvitationCleanupService;
+import com.calio.calendar.groupinvitation.service.GroupInvitationService;
 import com.calio.calendar.groupinvitation.service.InvitationCredentialService;
 import com.calio.calendar.groupspace.controller.dto.CreateGroupSpaceRequest;
 import com.calio.calendar.groupspace.domain.GroupMember;
 import com.calio.calendar.groupspace.domain.GroupMemberStatus;
 import com.calio.calendar.groupspace.repository.GroupMemberRepository;
 import com.calio.calendar.groupspace.repository.GroupSpaceRepository;
+import com.calio.calendar.groupspace.service.GroupMembershipService;
 import com.calio.calendar.groupspace.service.GroupSpaceService;
-import com.calio.calendar.groupspace.service.GroupMemberLifecycleService;
 import com.calio.calendar.security.AuthenticatedAccountMockMvcTestConfig;
 import com.calio.calendar.security.WithAuthenticatedAccount;
 import java.time.Clock;
@@ -100,10 +100,10 @@ class GroupInvitationControllerTest {
     private InvitationCredentialService credentialService;
 
     @Autowired
-    private GroupInvitationCleanupService cleanupService;
+    private GroupInvitationService invitationService;
 
     @Autowired
-    private GroupMemberLifecycleService memberLifecycleService;
+    private GroupMembershipService groupMembershipService;
 
     @BeforeEach
     void setUp() {
@@ -345,7 +345,7 @@ class GroupInvitationControllerTest {
                 .andExpect(jsonPath("$.errorCode").value("GROUP_INVITATION_EXPIRED"));
 
         // when
-        cleanupService.deleteBatch(NOW.minus(Duration.ofHours(24)));
+        invitationService.deleteExpiredBatch(NOW.minus(Duration.ofHours(24)));
 
         // then
         assertThat(invitationRepository.existsById(invitation.getId())).isFalse();
@@ -378,11 +378,7 @@ class GroupInvitationControllerTest {
         );
 
         // when
-        memberLifecycleService.deactivate(
-                groupSpaceId,
-                issuer.getId(),
-                GroupMemberStatus.LEFT
-        );
+        groupMembershipService.leave(otherAccount.getId(), groupSpaceId);
 
         // then
         assertThat(invitationRepository.count()).isZero();

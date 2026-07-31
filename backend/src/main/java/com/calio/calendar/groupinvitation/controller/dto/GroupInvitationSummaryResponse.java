@@ -1,6 +1,6 @@
 package com.calio.calendar.groupinvitation.controller.dto;
 
-import com.calio.calendar.groupinvitation.repository.InvitationSummaryProjection;
+import com.calio.calendar.groupinvitation.domain.GroupInvitation;
 import java.time.Instant;
 
 public record GroupInvitationSummaryResponse(
@@ -8,9 +8,9 @@ public record GroupInvitationSummaryResponse(
         Instant expiresAt
 ) {
 
-    public static GroupInvitationSummaryResponse from(InvitationSummaryProjection invitation) {
+    public static GroupInvitationSummaryResponse from(GroupInvitation invitation) {
         return new GroupInvitationSummaryResponse(
-                invitation.getInvitationId(),
+                invitation.getId(),
                 invitation.getExpiresAt()
         );
     }

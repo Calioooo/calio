@@ -14,12 +14,15 @@ import com.calio.calendar.groupspace.repository.GroupMemberRepository;
 import com.calio.calendar.groupspace.repository.GroupSpaceRepository;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -78,7 +81,7 @@ public class GroupInvitationService {
         GroupMember member = findActiveMember(groupSpaceId, accountId);
         Instant now = clock.instant();
         var invitations = invitationRepository
-                .findActiveSummaries(groupSpaceId, member.getId(), now)
+                .findActiveInvitations(groupSpaceId, member.getId(), now)
                 .stream()
                 .map(GroupInvitationSummaryResponse::from)
                 .toList();
@@ -99,6 +102,16 @@ public class GroupInvitationService {
                 .orElseThrow(GroupInvitationService::invitationNotFound);
         invitationRepository.delete(invitation);
         invitationRepository.flush();
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public int deleteExpiredBatch(Instant cutoff) {
+        List<GroupInvitation> invitations = invitationRepository.findCleanupBatch(
+                cutoff,
+                PageRequest.of(0, properties.getCleanupBatchSize())
+        );
+        invitationRepository.deleteAllInBatch(invitations);
+        return invitations.size();
     }
 
     private IssueGroupInvitationResponse issueOnce(

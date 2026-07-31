@@ -32,14 +32,14 @@ public interface GroupInvitationRepository extends JpaRepository<GroupInvitation
     );
 
     @Query("""
-            select invitation.id as invitationId, invitation.expiresAt as expiresAt
+            select invitation
             from GroupInvitation invitation
             where invitation.groupSpaceId = :groupSpaceId
               and invitation.createdByMemberId = :createdByMemberId
               and invitation.expiresAt > :now
             order by invitation.expiresAt desc, invitation.id desc
             """)
-    List<InvitationSummaryProjection> findActiveSummaries(
+    List<GroupInvitation> findActiveInvitations(
             @Param("groupSpaceId") Long groupSpaceId,
             @Param("createdByMemberId") Long createdByMemberId,
             @Param("now") Instant now

@@ -65,18 +65,6 @@ public interface GroupMemberRepository extends JpaRepository<GroupMember, Long> 
             @Param("groupSpaceId") Long groupSpaceId
     );
 
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("""
-            select member
-            from GroupMember member
-            where member.groupSpace.id = :groupSpaceId
-              and member.id = :memberId
-            """)
-    Optional<GroupMember> findByGroupSpaceIdAndIdForUpdate(
-            @Param("groupSpaceId") Long groupSpaceId,
-            @Param("memberId") Long memberId
-    );
-
     int countByGroupSpace_IdAndStatus(Long groupSpaceId, GroupMemberStatus status);
 
     @Query("""

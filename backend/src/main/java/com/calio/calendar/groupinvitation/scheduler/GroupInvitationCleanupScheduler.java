@@ -1,7 +1,7 @@
 package com.calio.calendar.groupinvitation.scheduler;
 
 import com.calio.calendar.groupinvitation.config.GroupInvitationProperties;
-import com.calio.calendar.groupinvitation.service.GroupInvitationCleanupService;
+import com.calio.calendar.groupinvitation.service.GroupInvitationService;
 import java.time.Clock;
 import java.time.Instant;
 import org.slf4j.Logger;
@@ -14,16 +14,16 @@ public class GroupInvitationCleanupScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(GroupInvitationCleanupScheduler.class);
 
-    private final GroupInvitationCleanupService cleanupService;
+    private final GroupInvitationService invitationService;
     private final GroupInvitationProperties properties;
     private final Clock clock;
 
     public GroupInvitationCleanupScheduler(
-            GroupInvitationCleanupService cleanupService,
+            GroupInvitationService invitationService,
             GroupInvitationProperties properties,
             Clock clock
     ) {
-        this.cleanupService = cleanupService;
+        this.invitationService = invitationService;
         this.properties = properties;
         this.clock = clock;
     }
@@ -42,7 +42,7 @@ public class GroupInvitationCleanupScheduler {
     private int deleteBatches(Instant cutoff) {
         int totalDeleted = 0;
         for (int batch = 0; batch < properties.getCleanupMaxBatchesPerRun(); batch++) {
-            int deleted = cleanupService.deleteBatch(cutoff);
+            int deleted = invitationService.deleteExpiredBatch(cutoff);
             totalDeleted += deleted;
             if (deleted < properties.getCleanupBatchSize()) {
                 break;
