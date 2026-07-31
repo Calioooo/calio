@@ -12,12 +12,18 @@ import com.calio.calendar.event.repository.EventRepository;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventItem;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventPage;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventTime;
+import com.calio.calendar.external.google.GoogleCalendarEventTimeNormalizer.NormalizedEventSchedule;
 import com.calio.calendar.integration.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.repository.GoogleCalendarEventMappingRepository;
 import com.calio.calendar.integration.repository.GoogleCalendarIntegrationRepository;
 import com.calio.calendar.integration.repository.GoogleCalendarRecurrenceEventMappingRepository;
 import com.calio.calendar.integration.repository.GoogleCalendarRecurrenceOverrideMappingRepository;
+import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.RecurrenceMasterUpsert;
+import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.RecurrenceOverrideUpsert;
+import com.calio.calendar.integration.service.GoogleCalendarRecurrenceMapper.ActiveRecurrenceOverrideResult;
+import com.calio.calendar.integration.service.GoogleCalendarRecurrenceMapper.CancelledRecurrenceOverrideResult;
+import com.calio.calendar.integration.service.GoogleCalendarRecurrenceMapper.RecurrenceEventResult;
 import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.tag.domain.Tag;
@@ -437,6 +443,94 @@ class GoogleCalendarEventPagePersistenceServiceTest {
         assertThat(recurrenceEventOverrideRepository.count()).isZero();
         assertThat(recurrenceEventMappingRepository.count()).isZero();
         assertThat(recurrenceOverrideMappingRepository.count()).isZero();
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("normalized master와 active/cancelled exception replay는 한 canonical aggregate로 수렴한다")
+    void givenNormalizedRecurrenceReplay_whenPersistPages_thenUpsertsCanonicalAggregate() {
+        // given
+        Account account = accountRepository.saveAndFlush(new Account());
+        Tag defaultTag = tagRepository.saveAndFlush(new Tag(TagType.DEFAULT, "기타", "#64748B"));
+        GoogleCalendarIntegration integration = integrationRepository.saveAndFlush(
+                integration(account.getId())
+        );
+        acquireLease(account.getId(), "recurrence-run");
+        NormalizedEventSchedule masterSchedule = new NormalizedEventSchedule(
+                Instant.parse("2026-07-01T09:00:00Z"),
+                Instant.parse("2026-07-01T10:00:00Z"),
+                false,
+                "UTC"
+        );
+        RecurrenceEventResult master = new RecurrenceEventResult(
+                "master-1", null, null, "Daily", null,
+                masterSchedule, List.of("RRULE:FREQ=DAILY")
+        );
+        ActiveRecurrenceOverrideResult active = new ActiveRecurrenceOverrideResult(
+                "exception-1",
+                "master-1",
+                Instant.parse("2026-07-02T09:00:00Z"),
+                null,
+                null,
+                "Moved",
+                "Final snapshot",
+                new NormalizedEventSchedule(
+                        Instant.parse("2026-07-02T11:00:00Z"),
+                        Instant.parse("2026-07-02T12:00:00Z"),
+                        false,
+                        "UTC"
+                )
+        );
+        pagePersistenceService.persistNormalizedPage(
+                integration.getId(),
+                account.getId(),
+                "recurrence-run",
+                new GoogleCalendarNormalizedPage(
+                        List.of(new RecurrenceMasterUpsert(master), new RecurrenceOverrideUpsert(active)),
+                        null,
+                        "cursor"
+                )
+        );
+
+        // when
+        CancelledRecurrenceOverrideResult cancelled = new CancelledRecurrenceOverrideResult(
+                "exception-1",
+                "master-1",
+                Instant.parse("2026-07-02T09:00:00Z"),
+                null,
+                Instant.parse("2026-07-02T08:00:00Z")
+        );
+        RecurrenceEventResult updatedMaster = new RecurrenceEventResult(
+                "master-1", "etag-2", null, "Changed", "Provider description",
+                masterSchedule, List.of("RRULE:FREQ=WEEKLY")
+        );
+        pagePersistenceService.persistNormalizedPage(
+                integration.getId(),
+                account.getId(),
+                "recurrence-run",
+                new GoogleCalendarNormalizedPage(
+                        List.of(
+                                new RecurrenceMasterUpsert(updatedMaster),
+                                new RecurrenceOverrideUpsert(cancelled)
+                        ),
+                        null,
+                        "cursor"
+                )
+        );
+
+        // then
+        assertThat(recurrenceEventRepository.findAll()).singleElement().satisfies(recurrence -> {
+            assertThat(recurrence.getRecurrenceTitle()).isEqualTo("Changed");
+            assertThat(recurrence.getTag().getId()).isEqualTo(defaultTag.getId());
+            assertThat(recurrence.getRecurrenceRules()).containsExactly("RRULE:FREQ=WEEKLY");
+        });
+        assertThat(recurrenceEventOverrideRepository.findAll()).singleElement().satisfies(override -> {
+            assertThat(override.getOriginStartAt())
+                    .isEqualTo(Instant.parse("2026-07-02T09:00:00Z"));
+            assertThat(override.isDeleted()).isTrue();
+        });
+        assertThat(recurrenceEventMappingRepository.count()).isOne();
+        assertThat(recurrenceOverrideMappingRepository.count()).isOne();
     }
 
     @Test

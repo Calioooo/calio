@@ -114,6 +114,10 @@ public class RecurrenceEventOverride extends BaseEntity {
         return recurrenceEvent;
     }
 
+    public Long getOverrideId() {
+        return overrideId;
+    }
+
     public Long getRecurrenceId() {
         return recurrenceEvent.getId();
     }

@@ -18,6 +18,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.client.RestClient;
@@ -26,8 +27,8 @@ import tools.jackson.databind.ObjectMapper;
 class GoogleCalendarSyncServiceTest {
 
     @Test
-    @DisplayName("INCREMENTAL 410은 동일 lease에서 provider data를 reset하고 FULL로 완료한다")
-    void givenExpiredIncrementalCursor_whenSync_thenResetsAndReturnsFullMode() {
+    @DisplayName("INCREMENTAL 410은 provider data를 pre-clean하지 않고 동일 lease에서 FULL로 완료한다")
+    void givenExpiredIncrementalCursor_whenSync_thenRetriesInPlaceAndReturnsFullMode() {
         // given
         FakeLeaseService leaseService = new FakeLeaseService("saved-cursor");
         FakeProviderDataService providerDataService = new FakeProviderDataService();
@@ -54,7 +55,7 @@ class GoogleCalendarSyncServiceTest {
                         GoogleCalendarSyncMode.INCREMENTAL,
                         GoogleCalendarSyncMode.FULL
                 );
-        assertThat(providerDataService.resetCount).isOne();
+        assertThat(providerDataService.resetCount).isZero();
         assertThat(providerDataService.cleanupFullFailureCount).isZero();
         assertThat(pagePersistenceService.finalizeCount).isOne();
     }
@@ -87,7 +88,7 @@ class GoogleCalendarSyncServiceTest {
     }
 
     @Test
-    @DisplayName("Events API가 재시도에도 401이면 reconnect required로 종료하고 FULL partial data를 정리한다")
+    @DisplayName("Events API가 재시도에도 401이면 partial data cleanup 없이 reconnect required로 종료한다")
     void givenRepeatedUnauthorizedResponses_whenSync_thenRequiresReconnect() {
         // given
         FakeProviderDataService providerDataService = new FakeProviderDataService();
@@ -108,12 +109,13 @@ class GoogleCalendarSyncServiceTest {
                         assertThat(exception.getErrorCode())
                                 .isEqualTo(ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED));
         assertThat(accessTokenService.forceRefreshCount).isOne();
-        assertThat(providerDataService.cleanupFullFailureCount).isOne();
+        assertThat(providerDataService.cleanupFullFailureCount).isZero();
+        assertThat(providerDataService.releaseCount).isOne();
     }
 
     @Test
-    @DisplayName("FULL 실패는 partial provider data를 정리하고 현재 run lease를 해제한다")
-    void givenFullSyncFailure_whenSync_thenCleansPartialProviderData() {
+    @DisplayName("FULL 실패는 partial provider data를 보존하고 현재 run lease만 해제한다")
+    void givenFullSyncFailure_whenSync_thenPreservesPartialProviderData() {
         // given
         FakeProviderDataService providerDataService = new FakeProviderDataService();
         GoogleCalendarSyncService service = service(
@@ -128,20 +130,20 @@ class GoogleCalendarSyncServiceTest {
                 .isInstanceOfSatisfying(CalioException.class, exception ->
                         assertThat(exception.getErrorCode())
                                 .isEqualTo(ErrorCode.GOOGLE_CALENDAR_SYNC_FAILED));
-        assertThat(providerDataService.resetCount).isOne();
-        assertThat(providerDataService.cleanupFullFailureCount).isOne();
-        assertThat(providerDataService.releaseCount).isZero();
+        assertThat(providerDataService.resetCount).isZero();
+        assertThat(providerDataService.cleanupFullFailureCount).isZero();
+        assertThat(providerDataService.releaseCount).isOne();
     }
 
     @Test
-    @DisplayName("FULL cleanup 실패는 원본 sync 실패를 유지하고 cleanup 실패를 suppressed로 남긴다")
-    void givenFullSyncAndCleanupFailures_whenSync_thenPreservesOriginalFailure() {
+    @DisplayName("FULL lease 해제 실패는 원본 sync 실패를 유지하고 해제 실패를 suppressed로 남긴다")
+    void givenFullSyncAndLeaseReleaseFailures_whenSync_thenPreservesOriginalFailure() {
         // given
         CalioException syncFailure =
                 new CalioException(ErrorCode.GOOGLE_CALENDAR_SYNC_FAILED);
-        RuntimeException cleanupFailure = new RuntimeException("cleanup failed");
+        RuntimeException releaseFailure = new RuntimeException("release failed");
         FakeProviderDataService providerDataService = new FakeProviderDataService();
-        providerDataService.cleanupFailure = cleanupFailure;
+        providerDataService.releaseFailure = releaseFailure;
         GoogleCalendarSyncService service = service(
                 new FakeLeaseService(null),
                 providerDataService,
@@ -154,7 +156,7 @@ class GoogleCalendarSyncServiceTest {
 
         // then
         assertThat(thrown).isSameAs(syncFailure);
-        assertThat(thrown.getSuppressed()).containsExactly(cleanupFailure);
+        assertThat(thrown.getSuppressed()).containsExactly(releaseFailure);
     }
 
     @Test
@@ -228,6 +230,33 @@ class GoogleCalendarSyncServiceTest {
         assertThat(pagePersistenceService.finalizeCount).isOne();
     }
 
+    @Test
+    @DisplayName("activation FULL은 page별 commit 후 별도 final transaction에서 cleanup과 cursor를 완료한다")
+    void givenActivationFullPages_whenSync_thenPersistsPagesBeforeFinalReconciliation() {
+        // given
+        FakeProviderDataService providerDataService = new FakeProviderDataService();
+        FakePagePersistenceService pagePersistenceService = new FakePagePersistenceService();
+        GoogleCalendarSyncService service = new GoogleCalendarSyncService(
+                new FakeLeaseService(null),
+                providerDataService,
+                new FakeAccessTokenService(),
+                new FakeEventsClient(pageWithNextPage("page-2"), terminalPage("next-cursor")),
+                pagePersistenceService,
+                new FakePageNormalizer()
+        );
+
+        // when
+        GoogleCalendarSyncResponse response = service.sync(10L);
+
+        // then
+        assertThat(response.mode()).isEqualTo(GoogleCalendarSyncMode.FULL);
+        assertThat(pagePersistenceService.normalizedPersistCount).isEqualTo(2);
+        assertThat(pagePersistenceService.finalizeCount).isZero();
+        assertThat(providerDataService.finalizeCount).isOne();
+        assertThat(providerDataService.finalizedAsFullInventory).isTrue();
+        assertThat(providerDataService.finalizedCursor).isEqualTo("next-cursor");
+    }
+
     private GoogleCalendarSyncService service(
             FakeLeaseService leaseService,
             FakeProviderDataService providerDataService,
@@ -288,6 +317,9 @@ class GoogleCalendarSyncServiceTest {
         private int resetCount;
         private int cleanupFullFailureCount;
         private int releaseCount;
+        private int finalizeCount;
+        private boolean finalizedAsFullInventory;
+        private String finalizedCursor;
         private RuntimeException cleanupFailure;
         private RuntimeException releaseFailure;
 
@@ -315,6 +347,21 @@ class GoogleCalendarSyncServiceTest {
             if (releaseFailure != null) {
                 throw releaseFailure;
             }
+        }
+
+        @Override
+        public void finalizeReconciliation(
+                Long integrationId,
+                String runId,
+                boolean fullInventory,
+                Set<String> seenGeneralIds,
+                Set<String> seenMasterIds,
+                Set<GoogleCalendarSyncRunContext.OverrideIdentity> seenOverrideIds,
+                String nextSyncToken
+        ) {
+            finalizeCount++;
+            finalizedAsFullInventory = fullInventory;
+            finalizedCursor = nextSyncToken;
         }
     }
 
@@ -378,6 +425,7 @@ class GoogleCalendarSyncServiceTest {
 
         private int persistCount;
         private int finalizeCount;
+        private int normalizedPersistCount;
 
         private FakePagePersistenceService() {
             super(null, null, null, null, null, null);
@@ -401,6 +449,36 @@ class GoogleCalendarSyncServiceTest {
                 GoogleCalendarEventPage page
         ) {
             finalizeCount++;
+        }
+
+        @Override
+        public void persistNormalizedPage(
+                Long integrationId,
+                Long accountId,
+                String runId,
+                GoogleCalendarNormalizedPage page
+        ) {
+            normalizedPersistCount++;
+        }
+    }
+
+    private static final class FakePageNormalizer extends GoogleCalendarPageNormalizer {
+
+        private FakePageNormalizer() {
+            super(null, null, null, null, null, null);
+        }
+
+        @Override
+        public GoogleCalendarNormalizedPage normalize(
+                Long integrationId,
+                GoogleCalendarEventPage page,
+                GoogleCalendarSyncRunContext context
+        ) {
+            return new GoogleCalendarNormalizedPage(
+                    List.of(),
+                    page.nextPageToken(),
+                    page.nextSyncToken()
+            );
         }
     }
 }

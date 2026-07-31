@@ -1,8 +1,12 @@
 package com.calio.calendar.integration.repository;
 
 import com.calio.calendar.integration.domain.GoogleCalendarRecurrenceEventMapping;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface GoogleCalendarRecurrenceEventMappingRepository
         extends JpaRepository<GoogleCalendarRecurrenceEventMapping, Long> {
@@ -14,5 +18,30 @@ public interface GoogleCalendarRecurrenceEventMappingRepository
             Long integrationId,
             String calendarKey,
             String externalEventId
+    );
+
+    @Query("""
+            select mapping
+            from GoogleCalendarRecurrenceEventMapping mapping
+            join fetch mapping.recurrenceEvent recurrenceEvent
+            join fetch recurrenceEvent.tag
+            where mapping.integration.id = :integrationId
+              and mapping.calendarKey = :calendarKey
+              and mapping.externalEventId in :externalEventIds
+            """)
+    List<GoogleCalendarRecurrenceEventMapping> findAllByExternalIdentity(
+            @Param("integrationId") Long integrationId,
+            @Param("calendarKey") String calendarKey,
+            @Param("externalEventIds") Collection<String> externalEventIds
+    );
+
+    @Query("""
+            select mapping
+            from GoogleCalendarRecurrenceEventMapping mapping
+            join fetch mapping.recurrenceEvent
+            where mapping.integration.id = :integrationId
+            """)
+    List<GoogleCalendarRecurrenceEventMapping> findAllByIntegrationId(
+            @Param("integrationId") Long integrationId
     );
 }

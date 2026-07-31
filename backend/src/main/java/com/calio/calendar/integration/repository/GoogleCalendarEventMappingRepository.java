@@ -34,6 +34,16 @@ public interface GoogleCalendarEventMappingRepository
             """)
     List<Long> findEventIdsByIntegrationId(@Param("integrationId") Long integrationId);
 
+    @Query("""
+            select mapping
+            from GoogleCalendarEventMapping mapping
+            join fetch mapping.event
+            where mapping.integration.id = :integrationId
+            """)
+    List<GoogleCalendarEventMapping> findAllByIntegrationId(
+            @Param("integrationId") Long integrationId
+    );
+
     @Modifying(flushAutomatically = true)
     @Query("""
             delete from GoogleCalendarEventMapping mapping
