@@ -114,6 +114,13 @@ public class GroupInvitationService {
         return invitations.size();
     }
 
+    @Transactional
+    public void deleteAllByGroupSpaceId(Long groupSpaceId) {
+        List<GroupInvitation> invitations =
+                invitationRepository.findAllByGroupSpaceIdForUpdateOrderById(groupSpaceId);
+        invitationRepository.deleteAllInBatch(invitations);
+    }
+
     private IssueGroupInvitationResponse issueOnce(
             Long accountId,
             Long groupSpaceId,

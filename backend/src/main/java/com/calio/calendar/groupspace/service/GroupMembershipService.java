@@ -5,6 +5,7 @@ import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.groupinvitation.domain.GroupInvitation;
 import com.calio.calendar.groupinvitation.domain.InvitationCredentialType;
 import com.calio.calendar.groupinvitation.repository.GroupInvitationRepository;
+import com.calio.calendar.groupinvitation.service.GroupInvitationService;
 import com.calio.calendar.groupinvitation.service.InvitationCredentialService;
 import com.calio.calendar.groupspace.controller.dto.AcceptGroupInvitationRequest;
 import com.calio.calendar.groupspace.controller.dto.AcceptGroupInvitationResponse;
@@ -33,26 +34,26 @@ public class GroupMembershipService {
     private final GroupSpaceRepository groupSpaceRepository;
     private final GroupMemberRepository groupMemberRepository;
     private final GroupInvitationRepository groupInvitationRepository;
+    private final GroupInvitationService invitationService;
     private final InvitationCredentialService credentialService;
     private final GroupScheduleShareCleanupPort groupScheduleShareCleanupPort;
-    private final List<GroupSpaceDeletionCleanup> groupDeletionCleanups;
     private final Clock clock;
 
     public GroupMembershipService(
             GroupSpaceRepository groupSpaceRepository,
             GroupMemberRepository groupMemberRepository,
             GroupInvitationRepository groupInvitationRepository,
+            GroupInvitationService invitationService,
             InvitationCredentialService credentialService,
             GroupScheduleShareCleanupPort groupScheduleShareCleanupPort,
-            List<GroupSpaceDeletionCleanup> groupDeletionCleanups,
             Clock clock
     ) {
         this.groupSpaceRepository = groupSpaceRepository;
         this.groupMemberRepository = groupMemberRepository;
         this.groupInvitationRepository = groupInvitationRepository;
+        this.invitationService = invitationService;
         this.credentialService = credentialService;
         this.groupScheduleShareCleanupPort = groupScheduleShareCleanupPort;
-        this.groupDeletionCleanups = List.copyOf(groupDeletionCleanups);
         this.clock = clock;
     }
 
@@ -142,7 +143,7 @@ public class GroupMembershipService {
             throw new CalioException(ErrorCode.GROUP_OWNER_TRANSFER_REQUIRED);
         }
         if (actor.roleIn(groupSpace).isOwner()) {
-            deleteSoleOwnerGroup(groupSpace, lockedMembers);
+            deleteSoleOwnerGroup(groupSpace);
             return;
         }
         deactivateMember(groupSpaceId, actor, GroupMemberStatus.LEFT, now);
@@ -265,10 +266,10 @@ public class GroupMembershipService {
         member.deactivate(inactiveStatus, now);
     }
 
-    private void deleteSoleOwnerGroup(GroupSpace groupSpace, List<GroupMember> lockedMembers) {
+    private void deleteSoleOwnerGroup(GroupSpace groupSpace) {
         groupScheduleShareCleanupPort.cleanupGroupShares(groupSpace.getId());
-        groupDeletionCleanups.forEach(cleanup -> cleanup.deleteByGroupSpaceId(groupSpace.getId()));
-        groupMemberRepository.deleteAllInBatch(lockedMembers);
+        invitationService.deleteAllByGroupSpaceId(groupSpace.getId());
+        groupMemberRepository.deleteAllByGroupSpaceId(groupSpace.getId());
         groupSpaceRepository.delete(groupSpace);
     }
 

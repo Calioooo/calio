@@ -279,6 +279,23 @@ class GroupInvitationControllerTest {
     }
 
     @Test
+    @DisplayName("유일한 OWNER 탈퇴는 invitation과 membership, Group Space를 함께 hard-delete한다")
+    void soleOwnerLeaveRemovesInvitationsBeforeGroup() {
+        // given
+        Long actorAccountId = currentAccountId();
+        long groupSpaceId = createGroup();
+        groupInvitationIssue(groupSpaceId);
+
+        // when
+        groupMembershipService.leave(actorAccountId, groupSpaceId);
+
+        // then
+        assertThat(invitationRepository.count()).isZero();
+        assertThat(memberRepository.count()).isZero();
+        assertThat(groupSpaceRepository.existsById(groupSpaceId)).isFalse();
+    }
+
+    @Test
     @DisplayName("OWNER도 다른 issuer의 invitation을 조회하거나 폐기할 수 없다")
     void ownerCannotAccessAnotherIssuersInvitation() throws Exception {
         // given
