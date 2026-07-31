@@ -247,7 +247,8 @@ class GroupInvitationControllerTest {
                         .content(previewBody("UNKNOWN", "secret")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"))
-                .andExpect(jsonPath("$.*", hasSize(5)));
+                .andExpect(jsonPath("$.instance").value("/api/group-invitations/preview"))
+                .andExpect(jsonPath("$.*", hasSize(6)));
 
         mockMvc.perform(post("/api/group-invitations/preview")
                         .with(anonymous())
@@ -256,7 +257,8 @@ class GroupInvitationControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"))
                 .andExpect(jsonPath("$.detail").value("Validation failed."))
-                .andExpect(jsonPath("$.*", hasSize(5)));
+                .andExpect(jsonPath("$.instance").value("/api/group-invitations/preview"))
+                .andExpect(jsonPath("$.*", hasSize(6)));
     }
 
     @Test
