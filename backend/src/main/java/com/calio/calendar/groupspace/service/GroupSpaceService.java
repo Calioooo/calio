@@ -94,12 +94,8 @@ public class GroupSpaceService {
         GroupMember membership = findActiveMembership(groupSpaceId, accountId);
         requireOwner(groupSpace, membership);
 
-        String name = request.isNamePresent()
-                ? GroupSpaceFields.normalizeName(request.getName())
-                : groupSpace.getName();
-        String emoji = request.isEmojiPresent()
-                ? GroupSpaceFields.canonicalizeEmoji(request.getEmoji())
-                : groupSpace.getEmoji();
+        String name = GroupSpaceFields.normalizeName(request.name());
+        String emoji = GroupSpaceFields.canonicalizeEmoji(request.emoji());
         groupSpace.update(name, emoji);
         groupSpaceRepository.flush();
         return GroupSpaceDetailResponse.from(groupSpace, membership, activeMemberCount(groupSpaceId));

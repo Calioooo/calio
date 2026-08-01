@@ -149,8 +149,8 @@ class GroupSpaceControllerTest {
     }
 
     @Test
-    @DisplayName("PATCH는 omitted name을 유지하고 explicit null emoji를 제거한다")
-    void patchDistinguishesOmittedNameAndExplicitNullEmoji() throws Exception {
+    @DisplayName("PATCH는 필수 name을 수정하고 explicit null emoji를 제거한다")
+    void patchUpdatesRequiredNameAndClearsExplicitNullEmoji() throws Exception {
         // given
         long groupSpaceId = createGroup("Original", "owner", "👩🏽‍💻");
 
@@ -159,17 +159,39 @@ class GroupSpaceControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
+                                  "name": "Renamed",
                                   "emoji": null
                                 }
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(header().doesNotExist("Location"))
-                .andExpect(jsonPath("$.name").value("Original"))
+                .andExpect(jsonPath("$.name").value("Renamed"))
                 .andExpect(jsonPath("$.emoji").value(nullValue()));
 
         GroupSpace persisted = groupSpaceRepository.findById(groupSpaceId).orElseThrow();
-        assertThat(persisted.getName()).isEqualTo("Original");
+        assertThat(persisted.getName()).isEqualTo("Renamed");
         assertThat(persisted.getEmoji()).isNull();
+    }
+
+    @Test
+    @DisplayName("PATCH에서 emoji를 생략하면 null로 갱신한다")
+    void patchTreatsOmittedEmojiAsNull() throws Exception {
+        // given
+        long groupSpaceId = createGroup("Original", "owner", "😀");
+
+        // when, then
+        mockMvc.perform(patch("/api/group-spaces/{groupSpaceId}", groupSpaceId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "name": "Renamed"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Renamed"))
+                .andExpect(jsonPath("$.emoji").value(nullValue()));
+
+        assertThat(groupSpaceRepository.findById(groupSpaceId).orElseThrow().getEmoji()).isNull();
     }
 
     @Test
@@ -183,6 +205,7 @@ class GroupSpaceControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
+                                  "name": "Original",
                                   "emoji": ""
                                 }
                                 """))
@@ -202,7 +225,10 @@ class GroupSpaceControllerTest {
         // when
         mockMvc.perform(patch("/api/group-spaces/{groupSpaceId}", groupSpaceId)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(java.util.Map.of("emoji", opaqueEmoji))))
+                        .content(objectMapper.writeValueAsString(java.util.Map.of(
+                                "name", "Original",
+                                "emoji", opaqueEmoji
+                        ))))
                 // then
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.emoji").value(opaqueEmoji));
@@ -212,8 +238,8 @@ class GroupSpaceControllerTest {
     }
 
     @Test
-    @DisplayName("PATCH는 field가 하나도 없으면 VALIDATION_FAILED를 반환한다")
-    void patchRequiresAtLeastOneField() throws Exception {
+    @DisplayName("PATCH는 name을 생략하면 VALIDATION_FAILED를 반환한다")
+    void patchRequiresName() throws Exception {
         // given
         long groupSpaceId = createGroup("Original", "owner");
 
