@@ -195,8 +195,8 @@ class GroupSpaceControllerTest {
     }
 
     @Test
-    @DisplayName("PATCH는 explicit empty string emoji를 null로 저장한다")
-    void patchCanonicalizesEmptyEmojiToNull() throws Exception {
+    @DisplayName("PATCH는 클라이언트가 전달한 empty string emoji를 그대로 저장한다")
+    void patchPreservesEmptyEmoji() throws Exception {
         // given
         long groupSpaceId = createGroup("Original", "owner", "😀");
 
@@ -210,9 +210,9 @@ class GroupSpaceControllerTest {
                                 }
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.emoji").value(nullValue()));
+                .andExpect(jsonPath("$.emoji").value(""));
 
-        assertThat(groupSpaceRepository.findById(groupSpaceId).orElseThrow().getEmoji()).isNull();
+        assertThat(groupSpaceRepository.findById(groupSpaceId).orElseThrow().getEmoji()).isEmpty();
     }
 
     @Test
@@ -292,21 +292,6 @@ class GroupSpaceControllerTest {
 
         assertThat(groupSpaceRepository.existsById(groupSpaceId)).isFalse();
         assertThat(groupMemberRepository.count()).isZero();
-    }
-
-    @Test
-    @DisplayName("64 Unicode code point를 초과한 emoji는 VALIDATION_FAILED를 반환한다")
-    void oversizedEmojiIsRejected() throws Exception {
-        // when, then
-        mockMvc.perform(post("/api/group-spaces")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(java.util.Map.of(
-                                "name", "Emoji boundary",
-                                "emoji", "😀".repeat(65),
-                                "nickname", "owner"
-                        ))))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"));
     }
 
     private long createGroup(String name, String nickname) throws Exception {

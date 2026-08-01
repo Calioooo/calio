@@ -58,7 +58,7 @@ public class GroupSpaceService {
         ensureAccountExists(accountId);
         String name = GroupSpaceFields.normalizeName(request.name());
         String nickname = GroupSpaceFields.normalizeNickname(request.nickname());
-        String emoji = GroupSpaceFields.canonicalizeEmoji(request.emoji());
+        String emoji = request.emoji();
         Instant now = clock.instant();
 
         GroupSpace groupSpace = groupSpaceRepository.saveAndFlush(
@@ -95,7 +95,7 @@ public class GroupSpaceService {
         requireOwner(groupSpace, membership);
 
         String name = GroupSpaceFields.normalizeName(request.name());
-        String emoji = GroupSpaceFields.canonicalizeEmoji(request.emoji());
+        String emoji = request.emoji();
         groupSpace.update(name, emoji);
         groupSpaceRepository.flush();
         return GroupSpaceDetailResponse.from(groupSpace, membership, activeMemberCount(groupSpaceId));
