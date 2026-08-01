@@ -146,16 +146,24 @@ public class GoogleCalendarEventPagePersistenceService {
                 : null;
 
         for (NormalizedItem item : items) {
-            if (item instanceof GeneralUpsert general) {
-                upsertGeneral(integration, general, mappings, account, defaultTag);
-            } else if (item instanceof GeneralCancellation cancellation) {
-                deleteGeneral(cancellation.externalEventId(), mappings);
-            } else if (item instanceof RecurrenceMasterUpsert master) {
-                upsertMaster(integration, master.result(), mappings, account, defaultTag);
-            } else if (item instanceof RecurrenceMasterCancellation cancellation) {
-                deleteMaster(cancellation.externalEventId(), mappings);
-            } else if (item instanceof RecurrenceOverrideUpsert override) {
-                upsertOverride(override.result(), mappings);
+            switch (item) {
+                case GeneralUpsert general ->
+                        upsertGeneral(integration, general, mappings, account, defaultTag);
+                case GeneralCancellation cancellation ->
+                        deleteGeneral(cancellation.externalEventId(), mappings);
+                case RecurrenceMasterUpsert master -> upsertMaster(
+                        integration,
+                        master.result(),
+                        mappings,
+                        account,
+                        defaultTag
+                );
+                case RecurrenceMasterCancellation cancellation -> deleteMaster(
+                        cancellation.externalEventId(),
+                        mappings
+                );
+                case RecurrenceOverrideUpsert override ->
+                        upsertOverride(override.result(), mappings);
             }
         }
     }
