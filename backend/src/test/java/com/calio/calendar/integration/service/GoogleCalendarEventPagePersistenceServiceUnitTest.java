@@ -16,6 +16,10 @@ import com.calio.calendar.external.google.dto.GoogleCalendarEventTime;
 import com.calio.calendar.integration.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.repository.GoogleCalendarEventMappingRepository;
 import com.calio.calendar.integration.repository.GoogleCalendarIntegrationRepository;
+import com.calio.calendar.integration.repository.GoogleCalendarRecurrenceEventMappingRepository;
+import com.calio.calendar.integration.repository.GoogleCalendarRecurrenceOverrideMappingRepository;
+import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
+import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.service.TagService;
 import java.time.Instant;
@@ -38,6 +42,14 @@ class GoogleCalendarEventPagePersistenceServiceUnitTest {
     private final GoogleCalendarEventTimeNormalizer timeNormalizer = mock(
             GoogleCalendarEventTimeNormalizer.class
     );
+    private final GoogleCalendarRecurrenceEventMappingRepository recurrenceMappingRepository =
+            mock(GoogleCalendarRecurrenceEventMappingRepository.class);
+    private final GoogleCalendarRecurrenceOverrideMappingRepository overrideMappingRepository =
+            mock(GoogleCalendarRecurrenceOverrideMappingRepository.class);
+    private final RecurrenceEventRepository recurrenceEventRepository =
+            mock(RecurrenceEventRepository.class);
+    private final RecurrenceEventOverrideRepository overrideRepository =
+            mock(RecurrenceEventOverrideRepository.class);
     private GoogleCalendarEventPagePersistenceService service;
 
     @BeforeEach
@@ -48,7 +60,11 @@ class GoogleCalendarEventPagePersistenceServiceUnitTest {
                 eventRepository,
                 accountRepository,
                 tagService,
-                timeNormalizer
+                timeNormalizer,
+                recurrenceMappingRepository,
+                overrideMappingRepository,
+                recurrenceEventRepository,
+                overrideRepository
         );
         GoogleCalendarIntegration integration = mock(GoogleCalendarIntegration.class);
         when(integration.getId()).thenReturn(10L);

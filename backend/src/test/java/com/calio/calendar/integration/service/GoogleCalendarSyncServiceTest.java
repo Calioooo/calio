@@ -3,9 +3,12 @@ package com.calio.calendar.integration.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.catchThrowable;
+import static org.mockito.Mockito.mock;
 
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
+import com.calio.calendar.account.repository.AccountRepository;
+import com.calio.calendar.event.repository.EventRepository;
 import com.calio.calendar.external.google.GoogleCalendarEventsClient;
 import com.calio.calendar.external.google.GoogleCalendarSyncTokenExpiredException;
 import com.calio.calendar.external.google.GoogleCalendarUnauthorizedException;
@@ -13,7 +16,15 @@ import com.calio.calendar.external.google.GoogleOAuthProperties;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventPage;
 import com.calio.calendar.integration.controller.dto.GoogleCalendarSyncResponse;
 import com.calio.calendar.integration.domain.GoogleCalendarSyncMode;
+import com.calio.calendar.integration.repository.GoogleCalendarEventMappingRepository;
+import com.calio.calendar.integration.repository.GoogleCalendarIntegrationRepository;
+import com.calio.calendar.integration.repository.GoogleCalendarRecurrenceEventMappingRepository;
+import com.calio.calendar.integration.repository.GoogleCalendarRecurrenceOverrideMappingRepository;
+import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
+import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.integration.service.GoogleCalendarSyncLeaseService.SyncLease;
+import com.calio.calendar.tag.service.TagService;
+import com.calio.calendar.external.google.GoogleCalendarEventTimeNormalizer;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -428,7 +439,18 @@ class GoogleCalendarSyncServiceTest {
         private int normalizedPersistCount;
 
         private FakePagePersistenceService() {
-            super(null, null, null, null, null, null);
+            super(
+                    mock(GoogleCalendarIntegrationRepository.class),
+                    mock(GoogleCalendarEventMappingRepository.class),
+                    mock(EventRepository.class),
+                    mock(AccountRepository.class),
+                    mock(TagService.class),
+                    mock(GoogleCalendarEventTimeNormalizer.class),
+                    mock(GoogleCalendarRecurrenceEventMappingRepository.class),
+                    mock(GoogleCalendarRecurrenceOverrideMappingRepository.class),
+                    mock(RecurrenceEventRepository.class),
+                    mock(RecurrenceEventOverrideRepository.class)
+            );
         }
 
         @Override

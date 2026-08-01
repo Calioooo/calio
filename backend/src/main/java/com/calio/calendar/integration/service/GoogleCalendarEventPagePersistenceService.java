@@ -44,7 +44,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -64,7 +63,6 @@ public class GoogleCalendarEventPagePersistenceService {
     private final RecurrenceEventRepository recurrenceEventRepository;
     private final RecurrenceEventOverrideRepository overrideRepository;
 
-    @Autowired
     public GoogleCalendarEventPagePersistenceService(
             GoogleCalendarIntegrationRepository integrationRepository,
             GoogleCalendarEventMappingRepository eventMappingRepository,
@@ -87,28 +85,6 @@ public class GoogleCalendarEventPagePersistenceService {
         this.overrideMappingRepository = overrideMappingRepository;
         this.recurrenceEventRepository = recurrenceEventRepository;
         this.overrideRepository = overrideRepository;
-    }
-
-    GoogleCalendarEventPagePersistenceService(
-            GoogleCalendarIntegrationRepository integrationRepository,
-            GoogleCalendarEventMappingRepository eventMappingRepository,
-            EventRepository eventRepository,
-            AccountRepository accountRepository,
-            TagService tagService,
-            GoogleCalendarEventTimeNormalizer timeNormalizer
-    ) {
-        this(
-                integrationRepository,
-                eventMappingRepository,
-                eventRepository,
-                accountRepository,
-                tagService,
-                timeNormalizer,
-                null,
-                null,
-                null,
-                null
-        );
     }
 
     @Transactional
