@@ -7,10 +7,7 @@ import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.event.repository.EventRepository;
-import com.calio.calendar.external.google.GoogleCalendarEventTimeNormalizer;
 import com.calio.calendar.external.google.GoogleCalendarEventTimeNormalizer.NormalizedEventSchedule;
-import com.calio.calendar.external.google.dto.GoogleCalendarEventItem;
-import com.calio.calendar.external.google.dto.GoogleCalendarEventPage;
 import com.calio.calendar.integration.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.domain.GoogleCalendarRecurrenceEventMapping;
@@ -38,7 +35,6 @@ import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.service.TagService;
 import java.time.Instant;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -50,14 +46,11 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class GoogleCalendarEventPagePersistenceService {
 
-    private static final String UNTITLED_EVENT_TITLE = "(제목 없음)";
-
     private final GoogleCalendarIntegrationRepository integrationRepository;
     private final GoogleCalendarEventMappingRepository eventMappingRepository;
     private final EventRepository eventRepository;
     private final AccountRepository accountRepository;
     private final TagService tagService;
-    private final GoogleCalendarEventTimeNormalizer timeNormalizer;
     private final GoogleCalendarRecurrenceEventMappingRepository recurrenceMappingRepository;
     private final GoogleCalendarRecurrenceOverrideMappingRepository overrideMappingRepository;
     private final RecurrenceEventRepository recurrenceEventRepository;
@@ -69,7 +62,6 @@ public class GoogleCalendarEventPagePersistenceService {
             EventRepository eventRepository,
             AccountRepository accountRepository,
             TagService tagService,
-            GoogleCalendarEventTimeNormalizer timeNormalizer,
             GoogleCalendarRecurrenceEventMappingRepository recurrenceMappingRepository,
             GoogleCalendarRecurrenceOverrideMappingRepository overrideMappingRepository,
             RecurrenceEventRepository recurrenceEventRepository,
@@ -80,7 +72,6 @@ public class GoogleCalendarEventPagePersistenceService {
         this.eventRepository = eventRepository;
         this.accountRepository = accountRepository;
         this.tagService = tagService;
-        this.timeNormalizer = timeNormalizer;
         this.recurrenceMappingRepository = recurrenceMappingRepository;
         this.overrideMappingRepository = overrideMappingRepository;
         this.recurrenceEventRepository = recurrenceEventRepository;
@@ -97,37 +88,6 @@ public class GoogleCalendarEventPagePersistenceService {
         extendLeaseOrThrow(integrationId, runId);
         GoogleCalendarIntegration integration = integrationRepository.getReferenceById(integrationId);
         persistNormalizedItems(integration, accountId, page.items());
-    }
-
-    /**
-     * Legacy direct entry point kept for focused tests. Production sync normalizes before calling
-     * {@link #persistNormalizedPage(Long, Long, String, GoogleCalendarNormalizedPage)}.
-     */
-    @Transactional
-    public void persistPage(Long integrationId, Long accountId, String runId, GoogleCalendarEventPage page) {
-        extendLeaseOrThrow(integrationId, runId);
-        persistLegacyGeneralItems(
-                integrationRepository.getReferenceById(integrationId),
-                accountId,
-                page.items(),
-                page.timeZone()
-        );
-    }
-
-    @Transactional
-    public void persistLastPageAndFinalize(
-            Long integrationId,
-            Long accountId,
-            String runId,
-            GoogleCalendarEventPage page
-    ) {
-        persistPage(integrationId, accountId, runId, page);
-        if (!hasText(page.nextSyncToken())) {
-            throw new CalioException(ErrorCode.GOOGLE_CALENDAR_SYNC_TOKEN_MISSING);
-        }
-        if (integrationRepository.finalizeSync(integrationId, runId, page.nextSyncToken()) != 1) {
-            throw new CalioException(ErrorCode.GOOGLE_CALENDAR_SYNC_CONFLICT);
-        }
     }
 
     private void persistNormalizedItems(
@@ -553,81 +513,6 @@ public class GoogleCalendarEventPagePersistenceService {
         if (integrationRepository.extendSyncLease(integrationId, runId) != 1) {
             throw new CalioException(ErrorCode.GOOGLE_CALENDAR_SYNC_CONFLICT);
         }
-    }
-
-    private void persistLegacyGeneralItems(
-            GoogleCalendarIntegration integration,
-            Long accountId,
-            List<GoogleCalendarEventItem> items,
-            String pageTimeZone
-    ) {
-        Set<String> itemIds = new HashSet<>();
-        for (GoogleCalendarEventItem item : items) {
-            if (!itemIds.add(item.id())) {
-                throw new CalioException(ErrorCode.GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID);
-            }
-        }
-        Map<String, GoogleCalendarEventMapping> mappings = itemIds.isEmpty()
-                ? new HashMap<>()
-                : eventMappingRepository.findAllByExternalIdentity(
-                        integration.getId(),
-                        GoogleCalendarEventMapping.PRIMARY_CALENDAR_KEY,
-                        itemIds
-                ).stream().collect(Collectors.toMap(
-                        GoogleCalendarEventMapping::getExternalEventId,
-                        Function.identity(),
-                        (left, right) -> left,
-                        HashMap::new
-                ));
-        boolean createsEvent = items.stream().anyMatch(item ->
-                !item.isCancelled() && !item.isRecurring() && !mappings.containsKey(item.id()));
-        Account account = createsEvent ? accountRepository.getReferenceById(accountId) : null;
-        Tag defaultTag = createsEvent ? tagService.getTagOrDefault(accountId, null) : null;
-        for (GoogleCalendarEventItem item : items) {
-            GoogleCalendarEventMapping existing = mappings.get(item.id());
-            if (item.isCancelled() || item.isRecurring()) {
-                if (existing != null) {
-                    eventMappingRepository.delete(existing);
-                    eventMappingRepository.flush();
-                    eventRepository.delete(existing.getEvent());
-                }
-                continue;
-            }
-            NormalizedEventSchedule schedule = timeNormalizer.normalizeSchedule(
-                    item.start(), item.end(), pageTimeZone);
-            GeneralUpsert normalized = new GeneralUpsert(
-                    item.id(), item.etag(), item.updatedAt(), canonicalTitle(item.summary()),
-                    item.description(), schedule);
-            if (existing != null) {
-                replaceEvent(existing.getEvent(), normalized);
-                existing.updateProviderVersion(item.etag(), item.updatedAt());
-            } else {
-                upsertLegacyGeneral(integration, normalized, account, defaultTag);
-            }
-        }
-    }
-
-    private void upsertLegacyGeneral(
-            GoogleCalendarIntegration integration,
-            GeneralUpsert item,
-            Account account,
-            Tag defaultTag
-    ) {
-        Event event = eventRepository.save(new Event(
-                item.title(), item.description(), item.schedule().startAt(),
-                item.schedule().endAt(), item.schedule().allDay(), item.schedule().timeZone(),
-                null, defaultTag, account));
-        eventMappingRepository.save(new GoogleCalendarEventMapping(
-                integration, event, item.externalEventId(), item.providerEtag(),
-                item.providerUpdatedAt()));
-    }
-
-    private String canonicalTitle(String summary) {
-        return summary == null || summary.isBlank() ? UNTITLED_EVENT_TITLE : summary;
-    }
-
-    private boolean hasText(String value) {
-        return value != null && !value.isBlank();
     }
 
     private record PageMappings(

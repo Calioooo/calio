@@ -53,6 +53,12 @@ class GoogleCalendarEventPagePersistenceServiceTest {
     private GoogleCalendarEventPagePersistenceService pagePersistenceService;
 
     @Autowired
+    private GoogleCalendarPageNormalizer pageNormalizer;
+
+    @Autowired
+    private GoogleCalendarProviderDataService providerDataService;
+
+    @Autowired
     private GoogleCalendarIntegrationRepository integrationRepository;
 
     @Autowired
@@ -95,7 +101,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
         );
 
         acquireLease(account.getId(), "first-run");
-        pagePersistenceService.persistLastPageAndFinalize(
+        persistProviderPage(
                 integration.getId(),
                 account.getId(),
                 "first-run",
@@ -112,7 +118,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
 
         // when
         acquireLease(account.getId(), "second-run");
-        pagePersistenceService.persistLastPageAndFinalize(
+        persistProviderPage(
                 integration.getId(),
                 account.getId(),
                 "second-run",
@@ -160,7 +166,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
         acquireLease(account.getId(), "page-zone-run");
 
         // when
-        pagePersistenceService.persistLastPageAndFinalize(
+        persistProviderPage(
                 integration.getId(),
                 account.getId(),
                 "page-zone-run",
@@ -199,7 +205,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
         acquireLease(account.getId(), "maximum-id-run");
 
         // when
-        pagePersistenceService.persistLastPageAndFinalize(
+        persistProviderPage(
                 integration.getId(),
                 account.getId(),
                 "maximum-id-run",
@@ -229,7 +235,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
         acquireLease(account.getId(), "lease-owner");
 
         // when, then
-        assertThatThrownBy(() -> pagePersistenceService.persistPage(
+        assertThatThrownBy(() -> persistProviderPage(
                 integration.getId(),
                 account.getId(),
                 "different-run",
@@ -255,7 +261,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
         acquireLease(account.getId(), "token-run");
 
         // when, then
-        assertThatThrownBy(() -> pagePersistenceService.persistLastPageAndFinalize(
+        assertThatThrownBy(() -> persistProviderPage(
                 integration.getId(),
                 account.getId(),
                 "token-run",
@@ -290,7 +296,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
         );
 
         // when, then
-        assertThatThrownBy(() -> pagePersistenceService.persistLastPageAndFinalize(
+        assertThatThrownBy(() -> persistProviderPage(
                 integration.getId(),
                 account.getId(),
                 "invalid-range-run",
@@ -321,7 +327,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
         );
 
         // when, then
-        assertThatThrownBy(() -> pagePersistenceService.persistLastPageAndFinalize(
+        assertThatThrownBy(() -> persistProviderPage(
                 integration.getId(),
                 account.getId(),
                 "duplicate-run",
@@ -343,7 +349,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
                 integration(account.getId())
         );
         acquireLease(account.getId(), "first-run");
-        pagePersistenceService.persistLastPageAndFinalize(
+        persistProviderPage(
                 integration.getId(),
                 account.getId(),
                 "first-run",
@@ -364,7 +370,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
                 timedStart(),
                 timedEnd()
         );
-        pagePersistenceService.persistLastPageAndFinalize(
+        persistProviderPage(
                 integration.getId(),
                 account.getId(),
                 "second-run",
@@ -378,71 +384,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
                 Instant.parse("2026-07-01T00:00:00Z"),
                 Instant.parse("2026-07-02T00:00:00Z")
         )).isEmpty();
-    }
-
-    @Test
-    @Transactional
-    @DisplayName("기존 sync는 recurrence event와 override를 skip하고 foundation row를 생성하지 않는다")
-    void givenRecurringItems_whenPersistPage_thenKeepsRecurrenceFoundationInert() {
-        // given
-        Account account = accountRepository.saveAndFlush(new Account());
-        GoogleCalendarIntegration integration = integrationRepository.saveAndFlush(
-                integration(account.getId())
-        );
-        GoogleCalendarEventItem recurrenceEventItem = new GoogleCalendarEventItem(
-                "recurrence-event-id",
-                "confirmed",
-                null,
-                null,
-                "Daily",
-                null,
-                List.of("RRULE:FREQ=DAILY"),
-                null,
-                null,
-                timedStart(),
-                timedEnd()
-        );
-        GoogleCalendarEventItem recurrenceOverrideItem = new GoogleCalendarEventItem(
-                "recurrence-override-id",
-                "confirmed",
-                null,
-                null,
-                "Moved",
-                null,
-                List.of(),
-                "recurrence-event-id",
-                timedStart(),
-                new GoogleCalendarEventTime(
-                        null,
-                        "2026-07-02T09:00:00Z",
-                        "UTC"
-                ),
-                new GoogleCalendarEventTime(
-                        null,
-                        "2026-07-02T10:00:00Z",
-                        "UTC"
-                )
-        );
-        acquireLease(account.getId(), "inert-run");
-
-        // when
-        pagePersistenceService.persistLastPageAndFinalize(
-                integration.getId(),
-                account.getId(),
-                "inert-run",
-                new GoogleCalendarEventPage(
-                        List.of(recurrenceEventItem, recurrenceOverrideItem),
-                        null,
-                        "cursor-1",
-                        "UTC"
-                )
-        );
-
-        // then
-        assertThat(recurrenceEventRepository.count()).isZero();
-        assertThat(recurrenceEventOverrideRepository.count()).isZero();
-        assertThat(recurrenceEventMappingRepository.count()).isZero();
-        assertThat(recurrenceOverrideMappingRepository.count()).isZero();
+        assertThat(recurrenceEventRepository.count()).isOne();
     }
 
     @Test
@@ -544,7 +486,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
                 integration(account.getId())
         );
         acquireLease(account.getId(), "first-run");
-        pagePersistenceService.persistLastPageAndFinalize(
+        persistProviderPage(
                 integration.getId(),
                 account.getId(),
                 "first-run",
@@ -561,14 +503,14 @@ class GoogleCalendarEventPagePersistenceServiceTest {
 
         // when
         acquireLease(account.getId(), "second-run");
-        pagePersistenceService.persistLastPageAndFinalize(
+        persistProviderPage(
                 integration.getId(),
                 account.getId(),
                 "second-run",
                 page(cancelledItem("external-blank"), "cursor-2")
         );
         acquireLease(account.getId(), "third-run");
-        pagePersistenceService.persistLastPageAndFinalize(
+        persistProviderPage(
                 integration.getId(),
                 account.getId(),
                 "third-run",
@@ -582,6 +524,38 @@ class GoogleCalendarEventPagePersistenceServiceTest {
 
     private void acquireLease(Long accountId, String runId) {
         assertThat(integrationRepository.acquireSyncLease(accountId, runId)).isOne();
+    }
+
+    private void persistProviderPage(
+            Long integrationId,
+            Long accountId,
+            String runId,
+            GoogleCalendarEventPage page
+    ) {
+        GoogleCalendarSyncRunContext context = new GoogleCalendarSyncRunContext("access-token");
+        GoogleCalendarNormalizedPage normalizedPage = pageNormalizer.normalize(
+                integrationId,
+                page,
+                context
+        );
+        pagePersistenceService.persistNormalizedPage(
+                integrationId,
+                accountId,
+                runId,
+                normalizedPage
+        );
+        if (page.hasNextPage()) {
+            return;
+        }
+        providerDataService.finalizeReconciliation(
+                integrationId,
+                runId,
+                false,
+                context.seenGeneralEventIds(),
+                context.seenRecurrenceMasterIds(),
+                context.seenRecurrenceOverrideIds(),
+                page.nextSyncToken()
+        );
     }
 
     private GoogleCalendarEventPage page(

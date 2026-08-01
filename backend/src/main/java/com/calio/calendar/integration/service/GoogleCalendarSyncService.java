@@ -12,7 +12,6 @@ import com.calio.calendar.integration.service.GoogleCalendarSyncLeaseService.Syn
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -25,7 +24,6 @@ public class GoogleCalendarSyncService {
     private final GoogleCalendarEventPagePersistenceService pagePersistenceService;
     private final GoogleCalendarPageNormalizer pageNormalizer;
 
-    @Autowired
     public GoogleCalendarSyncService(
             GoogleCalendarSyncLeaseService leaseService,
             GoogleCalendarProviderDataService providerDataService,
@@ -40,23 +38,6 @@ public class GoogleCalendarSyncService {
         this.eventsClient = eventsClient;
         this.pagePersistenceService = pagePersistenceService;
         this.pageNormalizer = pageNormalizer;
-    }
-
-    GoogleCalendarSyncService(
-            GoogleCalendarSyncLeaseService leaseService,
-            GoogleCalendarProviderDataService providerDataService,
-            GoogleCalendarAccessTokenService accessTokenService,
-            GoogleCalendarEventsClient eventsClient,
-            GoogleCalendarEventPagePersistenceService pagePersistenceService
-    ) {
-        this(
-                leaseService,
-                providerDataService,
-                accessTokenService,
-                eventsClient,
-                pagePersistenceService,
-                null
-        );
     }
 
     public GoogleCalendarSyncResponse sync(Long accountId) {
@@ -106,35 +87,29 @@ public class GoogleCalendarSyncService {
         Set<String> seenPageTokens = new HashSet<>();
         do {
             GoogleCalendarEventPage page = requestPage(lease, mode, pageToken, context);
-            if (pageNormalizer == null) {
-                persistLegacyPage(lease, page);
-            } else {
-                GoogleCalendarNormalizedPage normalizedPage = pageNormalizer.normalize(
-                        lease.integrationId(),
-                        page,
-                        context
-                );
-                pagePersistenceService.persistNormalizedPage(
-                        lease.integrationId(),
-                        lease.accountId(),
-                        lease.runId(),
-                        normalizedPage
-                );
-            }
+            GoogleCalendarNormalizedPage normalizedPage = pageNormalizer.normalize(
+                    lease.integrationId(),
+                    page,
+                    context
+            );
+            pagePersistenceService.persistNormalizedPage(
+                    lease.integrationId(),
+                    lease.accountId(),
+                    lease.runId(),
+                    normalizedPage
+            );
             nextSyncToken = page.nextSyncToken();
             pageToken = nextPageToken(page, seenPageTokens);
         } while (pageToken != null);
-        if (pageNormalizer != null) {
-            providerDataService.finalizeReconciliation(
-                    lease.integrationId(),
-                    lease.runId(),
-                    mode == GoogleCalendarSyncMode.FULL,
-                    context.seenGeneralEventIds(),
-                    context.seenRecurrenceMasterIds(),
-                    context.seenRecurrenceOverrideIds(),
-                    nextSyncToken
-            );
-        }
+        providerDataService.finalizeReconciliation(
+                lease.integrationId(),
+                lease.runId(),
+                mode == GoogleCalendarSyncMode.FULL,
+                context.seenGeneralEventIds(),
+                context.seenRecurrenceMasterIds(),
+                context.seenRecurrenceOverrideIds(),
+                nextSyncToken
+        );
     }
 
     private GoogleCalendarEventPage requestPage(
@@ -171,16 +146,6 @@ public class GoogleCalendarSyncService {
                 mode == GoogleCalendarSyncMode.INCREMENTAL ? lease.nextSyncToken() : null,
                 pageToken
         );
-    }
-
-    private void persistLegacyPage(SyncLease lease, GoogleCalendarEventPage page) {
-        if (page.hasNextPage()) {
-            pagePersistenceService.persistPage(
-                    lease.integrationId(), lease.accountId(), lease.runId(), page);
-            return;
-        }
-        pagePersistenceService.persistLastPageAndFinalize(
-                lease.integrationId(), lease.accountId(), lease.runId(), page);
     }
 
     private String nextPageToken(GoogleCalendarEventPage page, Set<String> seenPageTokens) {

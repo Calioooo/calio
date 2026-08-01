@@ -24,7 +24,6 @@ import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepositor
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.integration.service.GoogleCalendarSyncLeaseService.SyncLease;
 import com.calio.calendar.tag.service.TagService;
-import com.calio.calendar.external.google.GoogleCalendarEventTimeNormalizer;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -68,7 +67,8 @@ class GoogleCalendarSyncServiceTest {
                 );
         assertThat(providerDataService.resetCount).isZero();
         assertThat(providerDataService.cleanupFullFailureCount).isZero();
-        assertThat(pagePersistenceService.finalizeCount).isOne();
+        assertThat(pagePersistenceService.normalizedPersistCount).isOne();
+        assertThat(providerDataService.finalizeCount).isOne();
     }
 
     @Test
@@ -237,8 +237,7 @@ class GoogleCalendarSyncServiceTest {
         // then
         assertThat(response.mode()).isEqualTo(GoogleCalendarSyncMode.INCREMENTAL);
         assertThat(eventsClient.requestedPageTokens).containsExactly(null, "page-2");
-        assertThat(pagePersistenceService.persistCount).isOne();
-        assertThat(pagePersistenceService.finalizeCount).isOne();
+        assertThat(pagePersistenceService.normalizedPersistCount).isEqualTo(2);
     }
 
     @Test
@@ -262,7 +261,6 @@ class GoogleCalendarSyncServiceTest {
         // then
         assertThat(response.mode()).isEqualTo(GoogleCalendarSyncMode.FULL);
         assertThat(pagePersistenceService.normalizedPersistCount).isEqualTo(2);
-        assertThat(pagePersistenceService.finalizeCount).isZero();
         assertThat(providerDataService.finalizeCount).isOne();
         assertThat(providerDataService.finalizedAsFullInventory).isTrue();
         assertThat(providerDataService.finalizedCursor).isEqualTo("next-cursor");
@@ -295,7 +293,8 @@ class GoogleCalendarSyncServiceTest {
                 providerDataService,
                 accessTokenService,
                 eventsClient,
-                pagePersistenceService
+                pagePersistenceService,
+                new FakePageNormalizer()
         );
     }
 
@@ -434,8 +433,6 @@ class GoogleCalendarSyncServiceTest {
     private static final class FakePagePersistenceService
             extends GoogleCalendarEventPagePersistenceService {
 
-        private int persistCount;
-        private int finalizeCount;
         private int normalizedPersistCount;
 
         private FakePagePersistenceService() {
@@ -445,32 +442,11 @@ class GoogleCalendarSyncServiceTest {
                     mock(EventRepository.class),
                     mock(AccountRepository.class),
                     mock(TagService.class),
-                    mock(GoogleCalendarEventTimeNormalizer.class),
                     mock(GoogleCalendarRecurrenceEventMappingRepository.class),
                     mock(GoogleCalendarRecurrenceOverrideMappingRepository.class),
                     mock(RecurrenceEventRepository.class),
                     mock(RecurrenceEventOverrideRepository.class)
             );
-        }
-
-        @Override
-        public void persistPage(
-                Long integrationId,
-                Long accountId,
-                String runId,
-                GoogleCalendarEventPage page
-        ) {
-            persistCount++;
-        }
-
-        @Override
-        public void persistLastPageAndFinalize(
-                Long integrationId,
-                Long accountId,
-                String runId,
-                GoogleCalendarEventPage page
-        ) {
-            finalizeCount++;
         }
 
         @Override
