@@ -44,13 +44,14 @@ class GroupSpaceServiceConstraintTest {
     }
 
     @Test
-    @DisplayName("ACTIVE nickname constraint 충돌만 GROUP_MEMBER_NICKNAME_CONFLICT로 변환한다")
+    @DisplayName("ACTIVE nickname constraint 충돌은 원인을 보존한 GROUP_MEMBER_NICKNAME_CONFLICT로 변환한다")
     void activeNicknameConstraintIsMappedToStableErrorCode() {
         // given
+        DataIntegrityViolationException integrityViolation = new DataIntegrityViolationException(
+                "Duplicate entry for key 'uk_group_member_active_nickname'"
+        );
         when(groupMemberRepository.saveAndFlush(any()))
-                .thenThrow(new DataIntegrityViolationException(
-                        "Duplicate entry for key 'uk_group_member_active_nickname'"
-                ));
+                .thenThrow(integrityViolation);
 
         // when, then
         assertThatThrownBy(() -> groupSpaceService.create(
@@ -58,6 +59,7 @@ class GroupSpaceServiceConstraintTest {
                 new CreateGroupSpaceRequest("Group", null, "owner")
         ))
                 .isInstanceOf(CalioException.class)
+                .hasCause(integrityViolation)
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.GROUP_MEMBER_NICKNAME_CONFLICT);
     }

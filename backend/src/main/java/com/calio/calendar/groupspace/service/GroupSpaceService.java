@@ -130,7 +130,7 @@ public class GroupSpaceService {
             );
         } catch (DataIntegrityViolationException exception) {
             if (containsConstraint(exception, ACTIVE_NICKNAME_CONSTRAINT)) {
-                throw new CalioException(ErrorCode.GROUP_MEMBER_NICKNAME_CONFLICT);
+                throw new CalioException(ErrorCode.GROUP_MEMBER_NICKNAME_CONFLICT, exception);
             }
             throw exception;
         }
