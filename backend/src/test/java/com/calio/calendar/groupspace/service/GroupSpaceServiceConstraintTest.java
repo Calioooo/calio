@@ -8,11 +8,12 @@ import static org.mockito.Mockito.when;
 import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
+import com.calio.calendar.groupinvitation.service.GroupInvitationService;
 import com.calio.calendar.groupspace.controller.dto.CreateGroupSpaceRequest;
 import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.repository.GroupMemberRepository;
 import com.calio.calendar.groupspace.repository.GroupSpaceRepository;
-import java.util.List;
+import java.time.Clock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -32,7 +33,9 @@ class GroupSpaceServiceConstraintTest {
                 groupSpaceRepository,
                 groupMemberRepository,
                 accountRepository,
-                List.of()
+                mock(GroupInvitationService.class),
+                new NoOpGroupScheduleShareCleanupAdapter(),
+                Clock.systemUTC()
         );
 
         when(accountRepository.existsById(1L)).thenReturn(true);

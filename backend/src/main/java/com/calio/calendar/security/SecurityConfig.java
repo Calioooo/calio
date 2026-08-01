@@ -38,6 +38,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST, "/api/auth/guest").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/national-holidays").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/group-invitations/preview").permitAll()
                         .requestMatchers("/api/events").authenticated()
                         .requestMatchers("/api/events/**").authenticated()
                         .requestMatchers("/api/recurrence-events").authenticated()
@@ -50,6 +51,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/integrations/**").authenticated()
                         .requestMatchers("/api/group-spaces").authenticated()
                         .requestMatchers("/api/group-spaces/**").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/group-invitations/accept").authenticated()
                         .anyRequest().denyAll()
                 )
                 .exceptionHandling(exception -> exception.authenticationEntryPoint(

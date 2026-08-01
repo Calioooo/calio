@@ -2,9 +2,13 @@ package com.calio.calendar.groupspace.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.reset;
 
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
+import com.calio.calendar.groupinvitation.service.GroupInvitationService;
 import com.calio.calendar.groupspace.controller.dto.CreateGroupSpaceRequest;
 import com.calio.calendar.groupspace.repository.GroupMemberRepository;
 import com.calio.calendar.groupspace.repository.GroupSpaceRepository;
@@ -16,6 +20,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
 
 @SpringBootTest(properties = {
         "spring.datasource.url=jdbc:h2:mem:group-space-service-test;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE",
@@ -24,7 +29,7 @@ import org.springframework.context.annotation.Import;
         "spring.datasource.password=",
         "spring.jpa.hibernate.ddl-auto=create-drop"
 })
-@Import(GroupSpaceServiceTest.CleanupTestConfig.class)
+@Import(GroupSpaceServiceTest.InvitationServiceTestConfig.class)
 class GroupSpaceServiceTest {
 
     @Autowired
@@ -40,13 +45,13 @@ class GroupSpaceServiceTest {
     private AccountRepository accountRepository;
 
     @Autowired
-    private ControllableCleanup cleanup;
+    private GroupInvitationService invitationService;
 
     private Account account;
 
     @BeforeEach
     void setUp() {
-        cleanup.setFailureEnabled(false);
+        reset(invitationService);
         groupMemberRepository.deleteAll();
         groupSpaceRepository.deleteAll();
         account = accountRepository.saveAndFlush(new Account());
@@ -80,7 +85,9 @@ class GroupSpaceServiceTest {
                 account.getId(),
                 new CreateGroupSpaceRequest("Rollback", null, "owner")
         );
-        cleanup.setFailureEnabled(true);
+        doThrow(new IllegalStateException("simulated cleanup failure"))
+                .when(invitationService)
+                .deleteAllByGroupSpaceId(created.groupSpaceId());
 
         // when, then
         assertThatThrownBy(() -> groupSpaceService.delete(account.getId(), created.groupSpaceId()))
@@ -107,27 +114,12 @@ class GroupSpaceServiceTest {
     }
 
     @TestConfiguration
-    static class CleanupTestConfig {
+    static class InvitationServiceTestConfig {
 
         @Bean
-        ControllableCleanup controllableCleanup() {
-            return new ControllableCleanup();
-        }
-    }
-
-    static final class ControllableCleanup implements GroupSpaceDeletionCleanup {
-
-        private boolean failureEnabled;
-
-        void setFailureEnabled(boolean failureEnabled) {
-            this.failureEnabled = failureEnabled;
-        }
-
-        @Override
-        public void deleteByGroupSpaceId(Long groupSpaceId) {
-            if (failureEnabled) {
-                throw new IllegalStateException("simulated cleanup failure");
-            }
+        @Primary
+        GroupInvitationService groupInvitationService() {
+            return mock(GroupInvitationService.class);
         }
     }
 }

@@ -3,6 +3,7 @@ package com.calio.calendar.groupspace.service;
 import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
+import com.calio.calendar.groupinvitation.service.GroupInvitationService;
 import com.calio.calendar.groupspace.controller.dto.CreateGroupSpaceRequest;
 import com.calio.calendar.groupspace.controller.dto.GroupSpaceDetailResponse;
 import com.calio.calendar.groupspace.controller.dto.GroupSpaceListResponse;
@@ -16,7 +17,10 @@ import com.calio.calendar.groupspace.repository.GroupMemberRepository;
 import com.calio.calendar.groupspace.repository.GroupSpaceRepository;
 import java.util.List;
 import java.util.Locale;
+import java.time.Clock;
+import java.time.Instant;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,18 +32,25 @@ public class GroupSpaceService {
     private final GroupSpaceRepository groupSpaceRepository;
     private final GroupMemberRepository groupMemberRepository;
     private final AccountRepository accountRepository;
-    private final List<GroupSpaceDeletionCleanup> deletionCleanups;
+    private final GroupInvitationService invitationService;
+    private final GroupScheduleShareCleanupPort groupScheduleShareCleanupPort;
+    private final Clock clock;
 
+    @Autowired
     public GroupSpaceService(
             GroupSpaceRepository groupSpaceRepository,
             GroupMemberRepository groupMemberRepository,
             AccountRepository accountRepository,
-            List<GroupSpaceDeletionCleanup> deletionCleanups
+            GroupInvitationService invitationService,
+            GroupScheduleShareCleanupPort groupScheduleShareCleanupPort,
+            Clock clock
     ) {
         this.groupSpaceRepository = groupSpaceRepository;
         this.groupMemberRepository = groupMemberRepository;
         this.accountRepository = accountRepository;
-        this.deletionCleanups = List.copyOf(deletionCleanups);
+        this.invitationService = invitationService;
+        this.groupScheduleShareCleanupPort = groupScheduleShareCleanupPort;
+        this.clock = clock;
     }
 
     @Transactional
@@ -48,18 +59,19 @@ public class GroupSpaceService {
         String name = GroupSpaceFields.normalizeName(request.name());
         String nickname = GroupSpaceFields.normalizeNickname(request.nickname());
         String emoji = GroupSpaceFields.canonicalizeEmoji(request.emoji());
+        Instant now = clock.instant();
 
         GroupSpace groupSpace = groupSpaceRepository.saveAndFlush(
                 new GroupSpace(accountId, name, emoji)
         );
-        GroupMember membership = saveOwnerMembership(groupSpace, accountId, nickname);
+        GroupMember membership = saveOwnerMembership(groupSpace, accountId, nickname, now);
         return GroupSpaceDetailResponse.from(groupSpace, membership, 1);
     }
 
     @Transactional(readOnly = true)
     public GroupSpaceListResponse list(Long accountId) {
         List<GroupSpaceSummaryResponse> groupSpaces = groupMemberRepository
-                .findByAccountIdAndStatusOrderByUpdatedAtDesc(accountId, GroupMemberStatus.ACTIVE)
+                .findByAccountIdAndStatusOrderByStatusChangedAtDesc(accountId, GroupMemberStatus.ACTIVE)
                 .stream()
                 .map(this::toSummary)
                 .toList();
@@ -99,7 +111,9 @@ public class GroupSpaceService {
         GroupMember membership = findActiveMembership(groupSpaceId, accountId);
         requireOwner(groupSpace, membership);
 
-        deletionCleanups.forEach(cleanup -> cleanup.deleteByGroupSpaceId(groupSpaceId));
+        groupMemberRepository.findAllByGroupSpaceIdForUpdateOrderById(groupSpaceId);
+        groupScheduleShareCleanupPort.cleanupGroupShares(groupSpaceId);
+        invitationService.deleteAllByGroupSpaceId(groupSpaceId);
         groupMemberRepository.deleteAllByGroupSpaceId(groupSpaceId);
         groupSpaceRepository.delete(groupSpace);
     }
@@ -107,11 +121,12 @@ public class GroupSpaceService {
     private GroupMember saveOwnerMembership(
             GroupSpace groupSpace,
             Long accountId,
-            String nickname
+            String nickname,
+            Instant now
     ) {
         try {
             return groupMemberRepository.saveAndFlush(
-                    new GroupMember(groupSpace, accountId, nickname)
+                    new GroupMember(groupSpace, accountId, nickname, now)
             );
         } catch (DataIntegrityViolationException exception) {
             if (containsConstraint(exception, ACTIVE_NICKNAME_CONSTRAINT)) {
