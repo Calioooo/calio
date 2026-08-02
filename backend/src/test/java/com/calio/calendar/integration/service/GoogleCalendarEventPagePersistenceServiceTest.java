@@ -28,7 +28,9 @@ import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.domain.TagType;
 import com.calio.calendar.tag.repository.TagRepository;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -556,6 +558,117 @@ class GoogleCalendarEventPagePersistenceServiceTest {
         assertThat(recurrenceOverrideMappingRepository.count()).isZero();
         assertThat(recurrenceEventRepository.count()).isZero();
         assertThat(recurrenceEventOverrideRepository.count()).isZero();
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("FULL reconciliation은 unseen provider aggregate를 batch로 삭제하고 sync를 완료한다")
+    void givenUnseenProviderData_whenFinalizeFullSync_thenDeletesInBatches() {
+        // given
+        Account account = accountRepository.saveAndFlush(new Account());
+        Tag defaultTag = tagRepository.saveAndFlush(
+                new Tag(TagType.DEFAULT, "기타", "#64748B")
+        );
+        GoogleCalendarIntegration integration = integrationRepository.saveAndFlush(
+                integration(account.getId())
+        );
+        acquireLease(account.getId(), "full-reconciliation-run");
+        NormalizedEventSchedule eventSchedule = new NormalizedEventSchedule(
+                Instant.parse("2026-07-01T09:00:00Z"),
+                Instant.parse("2026-07-01T10:00:00Z"),
+                false,
+                "UTC"
+        );
+        List<Event> events = new ArrayList<>();
+        for (int index = 0; index <= 500; index++) {
+            events.add(new Event(
+                    "Event " + index,
+                    null,
+                    eventSchedule.startAt(),
+                    eventSchedule.endAt(),
+                    false,
+                    "UTC",
+                    null,
+                    defaultTag,
+                    account
+            ));
+        }
+        eventRepository.saveAllAndFlush(events);
+        List<GoogleCalendarEventMapping> mappings = new ArrayList<>();
+        for (int index = 0; index < events.size(); index++) {
+            mappings.add(new GoogleCalendarEventMapping(
+                    integration,
+                    events.get(index),
+                    "event-" + index,
+                    null,
+                    null
+            ));
+        }
+        mappingRepository.saveAllAndFlush(mappings);
+        RecurrenceEventUpsert recurrenceEvent = new RecurrenceEventUpsert(
+                "recurrence-event-1",
+                null,
+                null,
+                "Daily",
+                null,
+                eventSchedule,
+                List.of("RRULE:FREQ=DAILY")
+        );
+        ActiveRecurrenceEventOverrideUpsert override =
+                new ActiveRecurrenceEventOverrideUpsert(
+                        "override-1",
+                        "recurrence-event-1",
+                        Instant.parse("2026-07-02T09:00:00Z"),
+                        null,
+                        null,
+                        "Moved",
+                        null,
+                        new NormalizedEventSchedule(
+                                Instant.parse("2026-07-02T11:00:00Z"),
+                                Instant.parse("2026-07-02T12:00:00Z"),
+                                false,
+                                "UTC"
+                        )
+                );
+        pagePersistenceService.persistNormalizedPage(
+                integration.getId(),
+                account.getId(),
+                "full-reconciliation-run",
+                new GoogleCalendarNormalizedPage(
+                        List.of(
+                                recurrenceEvent,
+                                override
+                        ),
+                        null,
+                        "next-sync-token"
+                )
+        );
+
+        // when
+        providerDataService.finalizeReconciliation(
+                integration.getId(),
+                "full-reconciliation-run",
+                true,
+                Set.of(),
+                Set.of(),
+                Set.of(),
+                "next-sync-token"
+        );
+
+        // then
+        assertThat(mappingRepository.count()).isZero();
+        assertThat(recurrenceEventMappingRepository.count()).isZero();
+        assertThat(recurrenceOverrideMappingRepository.count()).isZero();
+        assertThat(eventRepository.count()).isZero();
+        assertThat(recurrenceEventRepository.count()).isZero();
+        assertThat(recurrenceEventOverrideRepository.count()).isZero();
+        assertThat(integrationRepository.findById(integration.getId()))
+                .get()
+                .satisfies(completed -> {
+                    assertThat(completed.getNextSyncToken()).isEqualTo("next-sync-token");
+                    assertThat(completed.getActiveSyncRunId()).isNull();
+                    assertThat(completed.getSyncLeaseExpiresAt()).isNull();
+                });
     }
 
     @Test

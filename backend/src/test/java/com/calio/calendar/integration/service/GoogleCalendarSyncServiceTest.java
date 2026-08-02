@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.web.client.RestClient;
 import tools.jackson.databind.ObjectMapper;
 
@@ -324,7 +325,17 @@ class GoogleCalendarSyncServiceTest {
         private RuntimeException releaseFailure;
 
         private FakeProviderDataService() {
-            super(null, null, null, null, null, null, null);
+            super(
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    mock(PlatformTransactionManager.class)
+            );
         }
 
         @Override

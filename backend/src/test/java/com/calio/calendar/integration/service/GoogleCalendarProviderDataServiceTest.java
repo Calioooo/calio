@@ -1,0 +1,118 @@
+package com.calio.calendar.integration.service;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import com.calio.calendar.event.domain.Event;
+import com.calio.calendar.event.repository.EventRepository;
+import com.calio.calendar.integration.domain.GoogleCalendarEventMapping;
+import com.calio.calendar.integration.repository.GoogleCalendarEventMappingRepository;
+import com.calio.calendar.integration.repository.GoogleCalendarIntegrationRepository;
+import com.calio.calendar.integration.repository.GoogleCalendarRecurrenceEventMappingRepository;
+import com.calio.calendar.integration.repository.GoogleCalendarRecurrenceOverrideMappingRepository;
+import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
+import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
+import java.util.List;
+import java.util.Set;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.data.domain.Pageable;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionStatus;
+
+class GoogleCalendarProviderDataServiceTest {
+
+    @Test
+    @DisplayName("FULL reconciliation은 mapping을 batch 조회하고 각 batch transaction에서 lease를 갱신한다")
+    void givenUnseenMappings_whenFinalizeFullSync_thenDeletesByBatchAndRenewsLease() {
+        // given
+        GoogleCalendarIntegrationRepository integrationRepository =
+                mock(GoogleCalendarIntegrationRepository.class);
+        GoogleCalendarEventMappingRepository eventMappingRepository =
+                mock(GoogleCalendarEventMappingRepository.class);
+        EventRepository eventRepository = mock(EventRepository.class);
+        GoogleCalendarRecurrenceEventMappingRepository recurrenceMappingRepository =
+                mock(GoogleCalendarRecurrenceEventMappingRepository.class);
+        GoogleCalendarRecurrenceOverrideMappingRepository overrideMappingRepository =
+                mock(GoogleCalendarRecurrenceOverrideMappingRepository.class);
+        RecurrenceEventRepository recurrenceEventRepository =
+                mock(RecurrenceEventRepository.class);
+        RecurrenceEventOverrideRepository overrideRepository =
+                mock(RecurrenceEventOverrideRepository.class);
+        PlatformTransactionManager transactionManager =
+                mock(PlatformTransactionManager.class);
+        TransactionStatus transactionStatus = mock(TransactionStatus.class);
+        when(transactionManager.getTransaction(any())).thenReturn(transactionStatus);
+        when(integrationRepository.extendSyncLease(1L, "run-1")).thenReturn(1);
+        when(integrationRepository.finalizeSync(1L, "run-1", "next-token")).thenReturn(1);
+
+        GoogleCalendarEventMapping eventMapping = mock(GoogleCalendarEventMapping.class);
+        Event event = mock(Event.class);
+        when(eventMapping.getId()).thenReturn(10L);
+        when(eventMapping.getExternalEventId()).thenReturn("unseen-event");
+        when(eventMapping.getEvent()).thenReturn(event);
+        when(event.getId()).thenReturn(20L);
+        when(overrideMappingRepository
+                .findNextBatchWithRecurrenceEventMappingAndRecurrenceEventOverrideByIntegrationId(
+                        eq(1L),
+                        eq(0L),
+                        any(Pageable.class)
+                ))
+                .thenReturn(List.of());
+        when(eventMappingRepository.findNextBatchWithEventByIntegrationId(
+                eq(1L),
+                eq(0L),
+                any(Pageable.class)
+        )).thenReturn(List.of(eventMapping));
+        when(eventMappingRepository.findNextBatchWithEventByIntegrationId(
+                eq(1L),
+                eq(10L),
+                any(Pageable.class)
+        )).thenReturn(List.of());
+        when(recurrenceMappingRepository.findNextBatchWithRecurrenceEventByIntegrationId(
+                eq(1L),
+                eq(0L),
+                any(Pageable.class)
+        )).thenReturn(List.of());
+
+        GoogleCalendarProviderDataService service = new GoogleCalendarProviderDataService(
+                integrationRepository,
+                eventMappingRepository,
+                eventRepository,
+                recurrenceMappingRepository,
+                overrideMappingRepository,
+                recurrenceEventRepository,
+                overrideRepository,
+                null,
+                transactionManager
+        );
+
+        // when
+        service.finalizeReconciliation(
+                1L,
+                "run-1",
+                true,
+                Set.of(),
+                Set.of(),
+                Set.of(),
+                "next-token"
+        );
+
+        // then
+        verify(eventMappingRepository).deleteAllByIds(List.of(10L));
+        verify(eventRepository).deleteAllByIds(List.of(20L));
+        verify(eventMappingRepository, times(2)).findNextBatchWithEventByIntegrationId(
+                eq(1L),
+                any(Long.class),
+                argThat(page -> page.getPageSize() == 500)
+        );
+        verify(integrationRepository, times(5)).extendSyncLease(1L, "run-1");
+        verify(integrationRepository).finalizeSync(1L, "run-1", "next-token");
+        verify(transactionManager, times(5)).commit(transactionStatus);
+    }
+}
