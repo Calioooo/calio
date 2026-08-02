@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.event.repository.EventRepository;
 import com.calio.calendar.integration.domain.GoogleCalendarEventMapping;
+import com.calio.calendar.integration.domain.GoogleCalendarSyncMode;
 import com.calio.calendar.integration.repository.GoogleCalendarEventMappingRepository;
 import com.calio.calendar.integration.repository.GoogleCalendarIntegrationRepository;
 import com.calio.calendar.integration.repository.GoogleCalendarRecurrenceEventMappingRepository;
@@ -89,7 +90,7 @@ class GoogleCalendarProviderDataServiceTest {
         service.finalizeReconciliation(
                 1L,
                 "run-1",
-                true,
+                GoogleCalendarSyncMode.FULL,
                 Set.of(),
                 Set.of(),
                 Set.of(),

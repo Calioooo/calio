@@ -15,6 +15,7 @@ import com.calio.calendar.external.google.dto.GoogleCalendarEventTime;
 import com.calio.calendar.external.google.GoogleCalendarEventTimeNormalizer.NormalizedEventSchedule;
 import com.calio.calendar.integration.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.domain.GoogleCalendarIntegration;
+import com.calio.calendar.integration.domain.GoogleCalendarSyncMode;
 import com.calio.calendar.integration.repository.GoogleCalendarEventMappingRepository;
 import com.calio.calendar.integration.repository.GoogleCalendarIntegrationRepository;
 import com.calio.calendar.integration.repository.GoogleCalendarRecurrenceEventMappingRepository;
@@ -743,7 +744,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
         providerDataService.finalizeReconciliation(
                 integration.getId(),
                 "full-reconciliation-run",
-                true,
+                GoogleCalendarSyncMode.FULL,
                 Set.of(),
                 Set.of(),
                 Set.of(),
@@ -841,7 +842,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
         providerDataService.finalizeReconciliation(
                 integrationId,
                 runId,
-                false,
+                GoogleCalendarSyncMode.INCREMENTAL,
                 context.seenEventIds(),
                 context.seenRecurrenceEventIds(),
                 context.seenRecurrenceEventOverrideIds(),

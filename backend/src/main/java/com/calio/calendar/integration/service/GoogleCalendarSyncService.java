@@ -104,7 +104,7 @@ public class GoogleCalendarSyncService {
         providerDataService.finalizeReconciliation(
                 lease.integrationId(),
                 lease.runId(),
-                mode == GoogleCalendarSyncMode.FULL,
+                mode,
                 context.seenEventIds(),
                 context.seenRecurrenceEventIds(),
                 context.seenRecurrenceEventOverrideIds(),

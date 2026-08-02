@@ -7,6 +7,7 @@ import com.calio.calendar.event.repository.EventRepository;
 import com.calio.calendar.integration.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.domain.GoogleCalendarRecurrenceEventMapping;
 import com.calio.calendar.integration.domain.GoogleCalendarRecurrenceOverrideMapping;
+import com.calio.calendar.integration.domain.GoogleCalendarSyncMode;
 import com.calio.calendar.integration.repository.GoogleCalendarEventMappingRepository;
 import com.calio.calendar.integration.repository.GoogleCalendarIntegrationRepository;
 import com.calio.calendar.integration.repository.GoogleCalendarRecurrenceEventMappingRepository;
@@ -66,7 +67,7 @@ public class GoogleCalendarProviderDataService {
     public void finalizeReconciliation(
             Long integrationId,
             String runId,
-            boolean fullInventory,
+            GoogleCalendarSyncMode syncMode,
             Set<String> seenEventIds,
             Set<String> seenRecurrenceEventIds,
             Set<RecurrenceEventOverrideExternalKey> seenOverrideIds,
@@ -75,7 +76,7 @@ public class GoogleCalendarProviderDataService {
         if (!hasText(nextSyncToken)) {
             throw new CalioException(ErrorCode.GOOGLE_CALENDAR_SYNC_TOKEN_MISSING);
         }
-        if (fullInventory) {
+        if (syncMode == GoogleCalendarSyncMode.FULL) {
             deleteUnseenProviderData(
                     integrationId,
                     runId,

@@ -294,7 +294,7 @@ class GoogleCalendarSyncServiceTest {
         assertThat(response.mode()).isEqualTo(GoogleCalendarSyncMode.FULL);
         assertThat(pagePersistenceService.normalizedPersistCount).isEqualTo(2);
         assertThat(providerDataService.finalizeCount).isOne();
-        assertThat(providerDataService.finalizedAsFullInventory).isTrue();
+        assertThat(providerDataService.finalizedMode).isEqualTo(GoogleCalendarSyncMode.FULL);
         assertThat(providerDataService.finalizedCursor).isEqualTo("next-cursor");
         assertThat(providerDataService.finalizedSeenEventIds)
                 .containsExactlyInAnyOrder("event-1", "event-2");
@@ -389,7 +389,7 @@ class GoogleCalendarSyncServiceTest {
 
         private int releaseCount;
         private int finalizeCount;
-        private boolean finalizedAsFullInventory;
+        private GoogleCalendarSyncMode finalizedMode;
         private String finalizedCursor;
         private Set<String> finalizedSeenEventIds = Set.of();
         private Set<String> finalizedSeenRecurrenceEventIds = Set.of();
@@ -422,7 +422,7 @@ class GoogleCalendarSyncServiceTest {
         public void finalizeReconciliation(
                 Long integrationId,
                 String runId,
-                boolean fullInventory,
+                GoogleCalendarSyncMode syncMode,
                 Set<String> seenEventIds,
                 Set<String> seenRecurrenceEventIds,
                 Set<GoogleCalendarSyncRunContext.RecurrenceEventOverrideExternalKey>
@@ -430,7 +430,7 @@ class GoogleCalendarSyncServiceTest {
                 String nextSyncToken
         ) {
             finalizeCount++;
-            finalizedAsFullInventory = fullInventory;
+            finalizedMode = syncMode;
             finalizedCursor = nextSyncToken;
             finalizedSeenEventIds = Set.copyOf(seenEventIds);
             finalizedSeenRecurrenceEventIds = Set.copyOf(seenRecurrenceEventIds);
