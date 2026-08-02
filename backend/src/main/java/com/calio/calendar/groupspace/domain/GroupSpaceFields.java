@@ -8,6 +8,7 @@ import java.util.regex.Pattern;
 public final class GroupSpaceFields {
 
     private static final int MAX_NAME_CODE_POINTS = 30;
+    private static final int MAX_EMOJI_CODE_POINTS = 64;
     private static final Pattern NICKNAME_PATTERN = Pattern.compile("^[A-Za-z0-9가-힣]{1,9}$");
 
     private GroupSpaceFields() {
@@ -33,6 +34,16 @@ public final class GroupSpaceFields {
             throw validationFailed();
         }
         return normalized;
+    }
+
+    public static String canonicalizeEmoji(String value) {
+        if (value == null || value.isEmpty()) {
+            return null;
+        }
+        if (value.codePointCount(0, value.length()) > MAX_EMOJI_CODE_POINTS) {
+            throw validationFailed();
+        }
+        return value;
     }
 
     private static boolean isInvalidName(String value) {

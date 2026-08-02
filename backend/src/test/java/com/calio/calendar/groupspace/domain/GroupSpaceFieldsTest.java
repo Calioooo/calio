@@ -48,6 +48,27 @@ class GroupSpaceFieldsTest {
         assertValidationFailed(() -> GroupSpaceFields.normalizeNickname("가".repeat(10)));
     }
 
+    @Test
+    @DisplayName("non-empty emoji는 whitespace와 Unicode sequence를 포함한 원문을 보존한다")
+    void emojiIsOpaqueAndPreserved() {
+        assertThat(GroupSpaceFields.canonicalizeEmoji(" ")).isEqualTo(" ");
+        assertThat(GroupSpaceFields.canonicalizeEmoji("👩🏽‍💻")).isEqualTo("👩🏽‍💻");
+        assertThat(GroupSpaceFields.canonicalizeEmoji("e\u0301")).isEqualTo("e\u0301");
+        assertThat(GroupSpaceFields.canonicalizeEmoji("é")).isEqualTo("é");
+    }
+
+    @Test
+    @DisplayName("emoji는 null과 empty string을 null로 만들고 64 code point까지만 허용한다")
+    void emojiCanonicalizationUsesCodePointLength() {
+        String maximumLengthEmoji = "😀".repeat(64);
+
+        assertThat(GroupSpaceFields.canonicalizeEmoji(null)).isNull();
+        assertThat(GroupSpaceFields.canonicalizeEmoji("")).isNull();
+        assertThat(GroupSpaceFields.canonicalizeEmoji(maximumLengthEmoji))
+                .isEqualTo(maximumLengthEmoji);
+        assertValidationFailed(() -> GroupSpaceFields.canonicalizeEmoji("😀".repeat(65)));
+    }
+
     private void assertValidationFailed(Runnable action) {
         assertThatThrownBy(action::run)
                 .isInstanceOf(CalioException.class)
