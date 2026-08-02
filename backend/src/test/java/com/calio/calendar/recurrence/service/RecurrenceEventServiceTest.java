@@ -17,8 +17,6 @@ import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.event.controller.dto.EventResponse;
 import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.event.repository.EventRepository;
-import com.calio.calendar.integration.domain.GoogleCalendarRecurrenceEventMapping;
-import com.calio.calendar.integration.repository.GoogleCalendarRecurrenceEventMappingRepository;
 import com.calio.calendar.recurrence.controller.dto.CreateRecurrenceEventRequest;
 import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceEventRequest;
 import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceOccurrenceRequest;
@@ -64,30 +62,8 @@ class RecurrenceEventServiceTest {
     @Mock
     private Rfc5545RecurrenceEngine recurrenceEngine;
 
-    @Mock
-    private GoogleCalendarRecurrenceEventMappingRepository googleRecurrenceMappingRepository;
-
     @InjectMocks
     private RecurrenceEventService recurrenceEventService;
-
-    @Test
-    @DisplayName("Google provider master mutation은 outbound write 지원 전까지 차단한다")
-    void givenGoogleMappedRecurrence_whenDeleteMaster_thenRejectsExternalMutation() {
-        // given
-        RecurrenceEvent recurrenceEvent = recurrenceEvent();
-        when(recurrenceEventRepository.findByIdAndAccountIdForUpdate(10L, 1L))
-                .thenReturn(Optional.of(recurrenceEvent));
-        when(googleRecurrenceMappingRepository.findByRecurrenceEvent_Id(10L))
-                .thenReturn(Optional.of(mock(GoogleCalendarRecurrenceEventMapping.class)));
-
-        // when, then
-        assertThatThrownBy(() -> recurrenceEventService.deleteRecurrenceEvent(1L, 10L))
-                .isInstanceOfSatisfying(CalioException.class, exception ->
-                        assertThat(exception.getErrorCode())
-                                .isEqualTo(ErrorCode.EXTERNAL_EVENT_MUTATION_NOT_SUPPORTED));
-        verify(recurrenceEventOverrideRepository, never()).deleteByRecurrenceEvent_Id(any());
-        verify(recurrenceEventRepository, never()).delete(any());
-    }
 
     @Test
     @DisplayName("반복 일정 생성은 정규화된 RFC line과 canonical schedule만 저장하고 Event row를 만들지 않는다")

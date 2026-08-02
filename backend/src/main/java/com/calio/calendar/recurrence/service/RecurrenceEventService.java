@@ -7,7 +7,6 @@ import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.event.controller.dto.EventResponse;
 import com.calio.calendar.event.repository.EventRepository;
-import com.calio.calendar.integration.repository.GoogleCalendarRecurrenceEventMappingRepository;
 import com.calio.calendar.recurrence.controller.dto.CreateRecurrenceEventRequest;
 import com.calio.calendar.recurrence.controller.dto.RecurrenceEventResponse;
 import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceEventRequest;
@@ -35,7 +34,6 @@ public class RecurrenceEventService {
     private final AccountRepository accountRepository;
     private final TagService tagService;
     private final Rfc5545RecurrenceEngine recurrenceEngine;
-    private final GoogleCalendarRecurrenceEventMappingRepository googleRecurrenceMappingRepository;
 
     public RecurrenceEventService(
             RecurrenceEventRepository recurrenceEventRepository,
@@ -43,8 +41,7 @@ public class RecurrenceEventService {
             RecurrenceEventOverrideRepository recurrenceEventOverrideRepository,
             AccountRepository accountRepository,
             TagService tagService,
-            Rfc5545RecurrenceEngine recurrenceEngine,
-            GoogleCalendarRecurrenceEventMappingRepository googleRecurrenceMappingRepository
+            Rfc5545RecurrenceEngine recurrenceEngine
     ) {
         this.recurrenceEventRepository = recurrenceEventRepository;
         this.eventRepository = eventRepository;
@@ -52,7 +49,6 @@ public class RecurrenceEventService {
         this.accountRepository = accountRepository;
         this.tagService = tagService;
         this.recurrenceEngine = recurrenceEngine;
-        this.googleRecurrenceMappingRepository = googleRecurrenceMappingRepository;
     }
 
     @Transactional
@@ -83,7 +79,6 @@ public class RecurrenceEventService {
             UpdateRecurrenceEventRequest request
     ) {
         RecurrenceEvent recurrenceEvent = findRecurrenceEventForUpdate(accountId, recurrenceId);
-        rejectExternalRecurrenceMutation(recurrenceId);
         RecurrenceSchedule schedule = createSchedule(request);
         List<String> recurrenceRules = recurrenceEngine.validate(schedule, request.recurrence());
         Tag tag = tagService.getTagOrDefault(accountId, request.tagId());
@@ -100,7 +95,6 @@ public class RecurrenceEventService {
             UpdateRecurrenceOccurrenceRequest request
     ) {
         RecurrenceEvent recurrenceEvent = findRecurrenceEventForUpdate(accountId, recurrenceId);
-        rejectExternalRecurrenceMutation(recurrenceId);
         CanonicalSchedule schedule = CanonicalSchedule.recurrenceOverride(
                 request.startAt(),
                 request.endAt(),
@@ -129,7 +123,6 @@ public class RecurrenceEventService {
     @Transactional
     public void deleteRecurrenceEvent(Long accountId, Long recurrenceId) {
         RecurrenceEvent recurrenceEvent = findRecurrenceEventForUpdate(accountId, recurrenceId);
-        rejectExternalRecurrenceMutation(recurrenceId);
         recurrenceEventOverrideRepository.deleteByRecurrenceEvent_Id(recurrenceId);
         eventRepository.deleteAll(
                 eventRepository.findByRecurrenceIdAndAccount_IdOrderByStartAtAsc(recurrenceId, accountId)
@@ -140,7 +133,6 @@ public class RecurrenceEventService {
     @Transactional
     public void deleteRecurrenceOccurrence(Long accountId, Long recurrenceId, Instant originStartAt) {
         RecurrenceEvent recurrenceEvent = findRecurrenceEventForUpdate(accountId, recurrenceId);
-        rejectExternalRecurrenceMutation(recurrenceId);
         Optional<RecurrenceEventOverride> existingOverride =
                 findOverrideOrRejectIneligible(recurrenceEvent, originStartAt);
         Instant deletedAt = Instant.now();
@@ -200,11 +192,5 @@ public class RecurrenceEventService {
     private RecurrenceEvent findRecurrenceEventForUpdate(Long accountId, Long recurrenceId) {
         return recurrenceEventRepository.findByIdAndAccountIdForUpdate(recurrenceId, accountId)
                 .orElseThrow(() -> new CalioException(ErrorCode.RECURRENCE_EVENT_NOT_FOUND));
-    }
-
-    private void rejectExternalRecurrenceMutation(Long recurrenceId) {
-        if (googleRecurrenceMappingRepository.findByRecurrenceEvent_Id(recurrenceId).isPresent()) {
-            throw new CalioException(ErrorCode.EXTERNAL_EVENT_MUTATION_NOT_SUPPORTED);
-        }
     }
 }
