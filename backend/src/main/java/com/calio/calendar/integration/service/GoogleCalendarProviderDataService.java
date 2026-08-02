@@ -107,7 +107,7 @@ public class GoogleCalendarProviderDataService {
         deleteOverrides(unseenOverrides);
 
         List<GoogleCalendarEventMapping> unseenEventMappings =
-                eventMappingRepository.findAllByIntegrationId(integrationId).stream()
+                eventMappingRepository.findAllWithEventByIntegrationId(integrationId).stream()
                         .filter(mapping -> !seenEventIds.contains(mapping.getExternalEventId()))
                         .toList();
         deleteEventMappings(unseenEventMappings);
@@ -128,7 +128,9 @@ public class GoogleCalendarProviderDataService {
     }
 
     private void deleteAllEventProviderData(Long integrationId) {
-        deleteEventMappings(eventMappingRepository.findAllByIntegrationId(integrationId));
+        deleteEventMappings(
+                eventMappingRepository.findAllWithEventByIntegrationId(integrationId)
+        );
     }
 
     private void deleteOverrides(List<GoogleCalendarRecurrenceOverrideMapping> mappings) {

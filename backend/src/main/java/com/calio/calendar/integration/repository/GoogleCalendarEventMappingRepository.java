@@ -37,10 +37,19 @@ public interface GoogleCalendarEventMappingRepository
     @Query("""
             select mapping
             from GoogleCalendarEventMapping mapping
-            join fetch mapping.event
             where mapping.integration.id = :integrationId
             """)
     List<GoogleCalendarEventMapping> findAllByIntegrationId(
+            @Param("integrationId") Long integrationId
+    );
+
+    @EntityGraph(attributePaths = "event")
+    @Query("""
+            select mapping
+            from GoogleCalendarEventMapping mapping
+            where mapping.integration.id = :integrationId
+            """)
+    List<GoogleCalendarEventMapping> findAllWithEventByIntegrationId(
             @Param("integrationId") Long integrationId
     );
 }
