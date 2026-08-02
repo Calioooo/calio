@@ -168,7 +168,6 @@ class GroupInvitationControllerTest {
                 .andExpect(status().isNoContent());
 
         mockMvc.perform(post("/api/group-invitations/preview")
-                        .with(anonymous())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(previewBody("LINK_TOKEN", linkToken)))
                 .andExpect(status().isNotFound())
@@ -176,15 +175,14 @@ class GroupInvitationControllerTest {
     }
 
     @Test
-    @DisplayName("사용자는 인증 토큰 없이 그룹 초대 정보를 미리 볼 수 있다")
-    void previewIsPublicAndNotCacheable() throws Exception {
+    @DisplayName("인증된 사용자는 no-store 응답으로 그룹 초대 정보를 미리 볼 수 있다")
+    void authenticatedPreviewIsNotCacheable() throws Exception {
         // given
         long groupSpaceId = createGroup();
         String inviteCode = issueInviteCode(groupSpaceId);
 
         // when, then
         mockMvc.perform(post("/api/group-invitations/preview")
-                        .with(anonymous())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(previewBody("CODE", inviteCode)))
                 .andExpect(status().isOk())
@@ -197,28 +195,35 @@ class GroupInvitationControllerTest {
     }
 
     @Test
-    @DisplayName("사용자는 잘못된 인증 토큰이 있어도 그룹 초대 정보를 미리 볼 수 있다")
-    void previewAllowsInvalidAuthenticationToken() throws Exception {
-        // given
-        long groupSpaceId = createGroup();
-        String inviteCode = issueInviteCode(groupSpaceId);
+    @DisplayName("인증 토큰이 없으면 그룹 초대 preview를 거부한다")
+    void previewRequiresAuthenticationToken() throws Exception {
+        // when, then
+        mockMvc.perform(post("/api/group-invitations/preview")
+                        .with(anonymous())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(previewBody("CODE", "0000-0000-0000-0000")))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value("AUTH_TOKEN_REQUIRED"));
+    }
+
+    @Test
+    @DisplayName("잘못된 인증 토큰이면 그룹 초대 preview를 거부한다")
+    void previewRejectsInvalidAuthenticationToken() throws Exception {
 
         // when, then
         mockMvc.perform(post("/api/group-invitations/preview")
                         .with(anonymous())
                         .header(HttpHeaders.AUTHORIZATION, "Bearer invalid-token")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(previewBody("CODE", inviteCode)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.name").value("Invitation group"));
+                        .content(previewBody("CODE", "0000-0000-0000-0000")))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value("AUTH_TOKEN_INVALID"));
     }
 
     @Test
-    @DisplayName("사용자는 해지된 인증 토큰이 있어도 그룹 초대 정보를 미리 볼 수 있다")
-    void previewAllowsRevokedAuthenticationToken() throws Exception {
+    @DisplayName("해지된 인증 토큰이면 그룹 초대 preview를 거부한다")
+    void previewRejectsRevokedAuthenticationToken() throws Exception {
         // given
-        long groupSpaceId = createGroup();
-        String inviteCode = issueInviteCode(groupSpaceId);
         String rawToken = "revoked-preview-token";
         Account account = accountRepository.saveAndFlush(new Account());
         AccountAuthToken authToken = new AccountAuthToken(
@@ -233,16 +238,15 @@ class GroupInvitationControllerTest {
                         .with(anonymous())
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + rawToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(previewBody("CODE", inviteCode)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.name").value("Invitation group"));
+                        .content(previewBody("CODE", "0000-0000-0000-0000")))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value("AUTH_TOKEN_REVOKED"));
     }
 
     @Test
     @DisplayName("invalid credentialType과 credential 형식은 VALIDATION_FAILED로 통합한다")
     void invalidPreviewInputReturnsValidationFailed() throws Exception {
         mockMvc.perform(post("/api/group-invitations/preview")
-                        .with(anonymous())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(previewBody("UNKNOWN", "secret")))
                 .andExpect(status().isBadRequest())
@@ -251,7 +255,6 @@ class GroupInvitationControllerTest {
                 .andExpect(jsonPath("$.*", hasSize(6)));
 
         mockMvc.perform(post("/api/group-invitations/preview")
-                        .with(anonymous())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(previewBody("LINK_TOKEN", "secret")))
                 .andExpect(status().isBadRequest())
@@ -355,7 +358,6 @@ class GroupInvitationControllerTest {
         );
 
         mockMvc.perform(post("/api/group-invitations/preview")
-                        .with(anonymous())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(previewBody("LINK_TOKEN", linkToken)))
                 .andExpect(status().isGone())
@@ -367,7 +369,6 @@ class GroupInvitationControllerTest {
         // then
         assertThat(invitationRepository.existsById(invitation.getId())).isFalse();
         mockMvc.perform(post("/api/group-invitations/preview")
-                        .with(anonymous())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(previewBody("LINK_TOKEN", linkToken)))
                 .andExpect(status().isNotFound())
@@ -405,7 +406,6 @@ class GroupInvitationControllerTest {
 
     private void preview(String credential, String credentialType) throws Exception {
         mockMvc.perform(post("/api/group-invitations/preview")
-                        .with(anonymous())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(previewBody(credentialType, credential)))
                 .andExpect(status().isOk())

@@ -9,7 +9,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
@@ -19,8 +18,6 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public class BearerTokenAuthenticationFilter extends OncePerRequestFilter {
 
     private static final String BEARER_PREFIX = "Bearer ";
-    private static final String GROUP_INVITATION_PREVIEW_PATH =
-            "/api/group-invitations/preview";
 
     private final AccountTokenAuthenticationService accountTokenAuthenticationService;
     private final AuthenticationErrorResponseWriter errorResponseWriter;
@@ -66,19 +63,9 @@ public class BearerTokenAuthenticationFilter extends OncePerRequestFilter {
             return true;
         } catch (CalioException exception) {
             SecurityContextHolder.clearContext();
-            if (allowsAnonymousAuthenticationFailure(request)) {
-                return true;
-            }
             errorResponseWriter.write(request, response, exception.getErrorCode());
             return false;
         }
-    }
-
-    private boolean allowsAnonymousAuthenticationFailure(HttpServletRequest request) {
-        return HttpMethod.POST.matches(request.getMethod())
-                && request.getRequestURI().equals(
-                        request.getContextPath() + GROUP_INVITATION_PREVIEW_PATH
-                );
     }
 
     private String extractBearerToken(String authorizationHeader) {
