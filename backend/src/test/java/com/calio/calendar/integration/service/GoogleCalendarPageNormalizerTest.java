@@ -17,6 +17,7 @@ import com.calio.calendar.integration.domain.GoogleCalendarRecurrenceEventMappin
 import com.calio.calendar.integration.repository.GoogleCalendarEventMappingRepository;
 import com.calio.calendar.integration.repository.GoogleCalendarRecurrenceEventMappingRepository;
 import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.CancelledRecurrenceEventOverrideUpsert;
+import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.RecurrenceEventCancellation;
 import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.RecurrenceEventUpsert;
 import java.time.Instant;
 import java.util.List;
@@ -160,8 +161,64 @@ class GoogleCalendarPageNormalizerTest {
         );
     }
 
+    @Test
+    @DisplayName("같은 page의 recurrence-event cancellation은 관련 override 뒤에 정규화한다")
+    void givenCancellationBeforeOverride_whenNormalize_thenOrdersCancellationLast() {
+        // given
+        GoogleCalendarEventItem cancellation = cancelledItem("recurrence-event-1");
+        GoogleCalendarEventItem deletedOccurrence =
+                deletedRecurrenceOccurrence("override-1", "recurrence-event-1");
+        GoogleCalendarRecurrenceEventMapping recurrenceEventMapping =
+                mock(GoogleCalendarRecurrenceEventMapping.class);
+        when(recurrenceEventMapping.getExternalEventId()).thenReturn("recurrence-event-1");
+        when(recurrenceMappingRepository
+                .findAllWithRecurrenceEventAndTagByExternalIdentity(any(), any(), any()))
+                .thenReturn(List.of(recurrenceEventMapping));
+        var override = new CancelledRecurrenceEventOverrideUpsert(
+                "override-1",
+                "recurrence-event-1",
+                Instant.parse("2026-07-01T09:00:00Z"),
+                null,
+                null
+        );
+        when(recurrenceMapper.mapRecurrenceOverride(deletedOccurrence)).thenReturn(override);
+
+        // when
+        GoogleCalendarNormalizedPage page = normalizer.normalize(
+                10L,
+                page(List.of(cancellation, deletedOccurrence)),
+                new GoogleCalendarSyncRunContext("token")
+        );
+
+        // then
+        assertThat(page.items()).containsExactly(
+                override,
+                new RecurrenceEventCancellation("recurrence-event-1")
+        );
+    }
+
     private GoogleCalendarEventPage page(GoogleCalendarEventItem item) {
-        return new GoogleCalendarEventPage(List.of(item), null, "cursor", "UTC");
+        return page(List.of(item));
+    }
+
+    private GoogleCalendarEventPage page(List<GoogleCalendarEventItem> items) {
+        return new GoogleCalendarEventPage(items, null, "cursor", "UTC");
+    }
+
+    private GoogleCalendarEventItem cancelledItem(String id) {
+        return new GoogleCalendarEventItem(
+                id,
+                "cancelled",
+                null,
+                null,
+                null,
+                null,
+                List.of(),
+                null,
+                null,
+                null,
+                null
+        );
     }
 
     private GoogleCalendarEventItem deletedRecurrenceOccurrence(

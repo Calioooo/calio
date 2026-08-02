@@ -477,6 +477,89 @@ class GoogleCalendarEventPagePersistenceServiceTest {
 
     @Test
     @Transactional
+    @DisplayName("같은 page에서 override보다 먼저 온 recurrence-event cancellation도 aggregate를 삭제한다")
+    void givenCancellationBeforeOverride_whenPersistPage_thenDeletesRecurrenceAggregate() {
+        // given
+        Account account = accountRepository.saveAndFlush(new Account());
+        tagRepository.saveAndFlush(new Tag(TagType.DEFAULT, "기타", "#64748B"));
+        GoogleCalendarIntegration integration = integrationRepository.saveAndFlush(
+                integration(account.getId())
+        );
+        acquireLease(account.getId(), "recurrence-cancellation-run");
+        RecurrenceEventUpsert recurrenceEvent = new RecurrenceEventUpsert(
+                "recurrence-event-1",
+                null,
+                null,
+                "Daily",
+                null,
+                new NormalizedEventSchedule(
+                        Instant.parse("2026-07-01T09:00:00Z"),
+                        Instant.parse("2026-07-01T10:00:00Z"),
+                        false,
+                        "UTC"
+                ),
+                List.of("RRULE:FREQ=DAILY")
+        );
+        ActiveRecurrenceEventOverrideUpsert override =
+                new ActiveRecurrenceEventOverrideUpsert(
+                        "override-1",
+                        "recurrence-event-1",
+                        Instant.parse("2026-07-02T09:00:00Z"),
+                        null,
+                        null,
+                        "Moved",
+                        null,
+                        new NormalizedEventSchedule(
+                                Instant.parse("2026-07-02T11:00:00Z"),
+                                Instant.parse("2026-07-02T12:00:00Z"),
+                                false,
+                                "UTC"
+                        )
+                );
+        pagePersistenceService.persistNormalizedPage(
+                integration.getId(),
+                account.getId(),
+                "recurrence-cancellation-run",
+                new GoogleCalendarNormalizedPage(
+                        List.of(recurrenceEvent, override),
+                        null,
+                        "cursor-1"
+                )
+        );
+
+        // when
+        GoogleCalendarNormalizedPage normalizedPage = pageNormalizer.normalize(
+                integration.getId(),
+                new GoogleCalendarEventPage(
+                        List.of(
+                                cancelledItem("recurrence-event-1"),
+                                deletedRecurrenceOccurrence(
+                                        "override-1",
+                                        "recurrence-event-1"
+                                )
+                        ),
+                        null,
+                        "cursor-2",
+                        "UTC"
+                ),
+                new GoogleCalendarSyncRunContext("access-token")
+        );
+        pagePersistenceService.persistNormalizedPage(
+                integration.getId(),
+                account.getId(),
+                "recurrence-cancellation-run",
+                normalizedPage
+        );
+
+        // then
+        assertThat(recurrenceEventMappingRepository.count()).isZero();
+        assertThat(recurrenceOverrideMappingRepository.count()).isZero();
+        assertThat(recurrenceEventRepository.count()).isZero();
+        assertThat(recurrenceEventOverrideRepository.count()).isZero();
+    }
+
+    @Test
+    @Transactional
     @DisplayName("blank title의 all-day import는 canonical title을 사용하고 cancelled delta로 hard delete된다")
     void givenBlankAllDayItemThenCancellation_whenPersistPages_thenImportsAndHardDeletesIdempotently() {
         // given
@@ -613,6 +696,25 @@ class GoogleCalendarEventPagePersistenceServiceTest {
                 null,
                 List.of(),
                 null,
+                null,
+                null
+        );
+    }
+
+    private GoogleCalendarEventItem deletedRecurrenceOccurrence(
+            String id,
+            String recurrenceEventId
+    ) {
+        return new GoogleCalendarEventItem(
+                id,
+                "cancelled",
+                null,
+                Instant.parse("2026-07-02T08:00:00Z"),
+                null,
+                null,
+                List.of(),
+                recurrenceEventId,
+                new GoogleCalendarEventTime(null, "2026-07-02T09:00:00Z", "UTC"),
                 null,
                 null
         );

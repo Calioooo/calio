@@ -104,6 +104,10 @@ public class GoogleCalendarPageNormalizer {
                 .forEach(orderedItems::add);
         normalizedItems.stream()
                 .filter(item -> !(item instanceof RecurrenceEventUpsert))
+                .filter(item -> !(item instanceof RecurrenceEventCancellation))
+                .forEach(orderedItems::add);
+        normalizedItems.stream()
+                .filter(RecurrenceEventCancellation.class::isInstance)
                 .forEach(orderedItems::add);
         return new GoogleCalendarNormalizedPage(
                 orderedItems,
