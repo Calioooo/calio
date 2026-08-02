@@ -31,7 +31,6 @@ import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.web.client.RestClient;
 import tools.jackson.databind.ObjectMapper;
 
@@ -407,8 +406,7 @@ class GoogleCalendarSyncServiceTest {
                     null,
                     null,
                     null,
-                    null,
-                    mock(PlatformTransactionManager.class)
+                    null
             );
         }
 

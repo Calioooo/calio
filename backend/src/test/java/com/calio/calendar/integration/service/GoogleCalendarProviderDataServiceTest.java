@@ -22,13 +22,11 @@ import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.Pageable;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.TransactionStatus;
 
 class GoogleCalendarProviderDataServiceTest {
 
     @Test
-    @DisplayName("FULL reconciliation은 mapping을 batch 조회하고 각 batch transaction에서 lease를 갱신한다")
+    @DisplayName("FULL reconciliation은 mapping을 batch 조회하고 각 batch에서 lease를 갱신한다")
     void givenUnseenMappings_whenFinalizeFullSync_thenDeletesByBatchAndRenewsLease() {
         // given
         GoogleCalendarIntegrationRepository integrationRepository =
@@ -44,10 +42,6 @@ class GoogleCalendarProviderDataServiceTest {
                 mock(RecurrenceEventRepository.class);
         RecurrenceEventOverrideRepository overrideRepository =
                 mock(RecurrenceEventOverrideRepository.class);
-        PlatformTransactionManager transactionManager =
-                mock(PlatformTransactionManager.class);
-        TransactionStatus transactionStatus = mock(TransactionStatus.class);
-        when(transactionManager.getTransaction(any())).thenReturn(transactionStatus);
         when(integrationRepository.extendSyncLease(1L, "run-1")).thenReturn(1);
         when(integrationRepository.finalizeSync(1L, "run-1", "next-token")).thenReturn(1);
 
@@ -88,8 +82,7 @@ class GoogleCalendarProviderDataServiceTest {
                 overrideMappingRepository,
                 recurrenceEventRepository,
                 overrideRepository,
-                null,
-                transactionManager
+                null
         );
 
         // when
@@ -113,6 +106,5 @@ class GoogleCalendarProviderDataServiceTest {
         );
         verify(integrationRepository, times(5)).extendSyncLease(1L, "run-1");
         verify(integrationRepository).finalizeSync(1L, "run-1", "next-token");
-        verify(transactionManager, times(5)).commit(transactionStatus);
     }
 }

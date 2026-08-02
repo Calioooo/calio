@@ -19,9 +19,7 @@ import java.util.List;
 import java.util.Set;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 public class GoogleCalendarProviderDataService {
@@ -37,7 +35,6 @@ public class GoogleCalendarProviderDataService {
     private final RecurrenceEventRepository recurrenceEventRepository;
     private final RecurrenceEventOverrideRepository overrideRepository;
     private final GoogleCalendarEventPagePersistenceService pagePersistenceService;
-    private final TransactionTemplate transactionTemplate;
 
     public GoogleCalendarProviderDataService(
             GoogleCalendarIntegrationRepository integrationRepository,
@@ -47,8 +44,7 @@ public class GoogleCalendarProviderDataService {
             GoogleCalendarRecurrenceOverrideMappingRepository overrideMappingRepository,
             RecurrenceEventRepository recurrenceEventRepository,
             RecurrenceEventOverrideRepository overrideRepository,
-            GoogleCalendarEventPagePersistenceService pagePersistenceService,
-            PlatformTransactionManager transactionManager
+            GoogleCalendarEventPagePersistenceService pagePersistenceService
     ) {
         this.integrationRepository = integrationRepository;
         this.eventMappingRepository = eventMappingRepository;
@@ -58,7 +54,6 @@ public class GoogleCalendarProviderDataService {
         this.recurrenceEventRepository = recurrenceEventRepository;
         this.overrideRepository = overrideRepository;
         this.pagePersistenceService = pagePersistenceService;
-        this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
     @Transactional
@@ -67,6 +62,7 @@ public class GoogleCalendarProviderDataService {
         deleteAllEventProviderData(integrationId);
     }
 
+    @Transactional
     public void finalizeReconciliation(
             Long integrationId,
             String runId,
@@ -119,13 +115,12 @@ public class GoogleCalendarProviderDataService {
     ) {
         long afterId = FIRST_MAPPING_ID;
         while (true) {
-            long batchAfterId = afterId;
-            Long nextId = transactionTemplate.execute(status -> deleteNextOverrideBatch(
+            Long nextId = deleteNextOverrideBatch(
                     integrationId,
                     runId,
                     seenOverrideIds,
-                    batchAfterId
-            ));
+                    afterId
+            );
             if (nextId == null) {
                 return;
             }
@@ -175,13 +170,12 @@ public class GoogleCalendarProviderDataService {
     ) {
         long afterId = FIRST_MAPPING_ID;
         while (true) {
-            long batchAfterId = afterId;
-            Long nextId = transactionTemplate.execute(status -> deleteNextEventBatch(
+            Long nextId = deleteNextEventBatch(
                     integrationId,
                     runId,
                     seenEventIds,
-                    batchAfterId
-            ));
+                    afterId
+            );
             if (nextId == null) {
                 return;
             }
@@ -227,13 +221,12 @@ public class GoogleCalendarProviderDataService {
     ) {
         long afterId = FIRST_MAPPING_ID;
         while (true) {
-            long batchAfterId = afterId;
-            Long nextId = transactionTemplate.execute(status -> deleteNextRecurrenceEventBatch(
+            Long nextId = deleteNextRecurrenceEventBatch(
                     integrationId,
                     runId,
                     seenRecurrenceEventIds,
-                    batchAfterId
-            ));
+                    afterId
+            );
             if (nextId == null) {
                 return;
             }
@@ -278,12 +271,10 @@ public class GoogleCalendarProviderDataService {
     }
 
     private void finalizeSync(Long integrationId, String runId, String nextSyncToken) {
-        transactionTemplate.executeWithoutResult(status -> {
-            extendSyncLeaseOrThrow(integrationId, runId);
-            if (integrationRepository.finalizeSync(integrationId, runId, nextSyncToken) != 1) {
-                throw new CalioException(ErrorCode.GOOGLE_CALENDAR_SYNC_CONFLICT);
-            }
-        });
+        extendSyncLeaseOrThrow(integrationId, runId);
+        if (integrationRepository.finalizeSync(integrationId, runId, nextSyncToken) != 1) {
+            throw new CalioException(ErrorCode.GOOGLE_CALENDAR_SYNC_CONFLICT);
+        }
     }
 
     private void extendSyncLeaseOrThrow(Long integrationId, String runId) {
