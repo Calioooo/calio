@@ -94,7 +94,10 @@ public class GoogleCalendarProviderDataService {
             Set<RecurrenceEventOverrideExternalKey> seenOverrideIds
     ) {
         List<GoogleCalendarRecurrenceOverrideMapping> unseenOverrides =
-                overrideMappingRepository.findAllByIntegrationId(integrationId).stream()
+                overrideMappingRepository
+                        .findAllWithRecurrenceEventMappingAndRecurrenceEventOverrideByIntegrationId(
+                                integrationId
+                        ).stream()
                         .filter(mapping -> !seenOverrideIds.contains(
                                 new RecurrenceEventOverrideExternalKey(
                                         mapping.getRecurrenceEventMapping().getExternalEventId(),
@@ -109,14 +112,18 @@ public class GoogleCalendarProviderDataService {
                         .toList();
         deleteEventMappings(unseenEventMappings);
 
-        recurrenceMappingRepository.findAllByIntegrationId(integrationId).stream()
+        recurrenceMappingRepository.findAllWithRecurrenceEventByIntegrationId(integrationId)
+                .stream()
                 .filter(mapping -> !seenRecurrenceEventIds.contains(mapping.getExternalEventId()))
                 .forEach(pagePersistenceService::deleteRecurrenceEvent);
     }
 
     private void deleteAllRecurrenceProviderData(Long integrationId) {
-        deleteOverrides(overrideMappingRepository.findAllByIntegrationId(integrationId));
-        recurrenceMappingRepository.findAllByIntegrationId(integrationId)
+        deleteOverrides(overrideMappingRepository
+                .findAllWithRecurrenceEventMappingAndRecurrenceEventOverrideByIntegrationId(
+                        integrationId
+                ));
+        recurrenceMappingRepository.findAllWithRecurrenceEventByIntegrationId(integrationId)
                 .forEach(pagePersistenceService::deleteRecurrenceEvent);
     }
 

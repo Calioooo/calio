@@ -50,9 +50,10 @@ class GoogleCalendarPageNormalizerTest {
                 eventsClient,
                 accessTokenService
         );
-        when(eventMappingRepository.findAllByExternalIdentity(any(), any(), any()))
+        when(eventMappingRepository.findAllWithEventByExternalIdentity(any(), any(), any()))
                 .thenReturn(List.of());
-        when(recurrenceMappingRepository.findAllByExternalIdentity(any(), any(), any()))
+        when(recurrenceMappingRepository
+                .findAllWithRecurrenceEventAndTagByExternalIdentity(any(), any(), any()))
                 .thenReturn(List.of());
     }
 
@@ -65,7 +66,8 @@ class GoogleCalendarPageNormalizerTest {
         GoogleCalendarRecurrenceEventMapping recurrenceEventMapping =
                 mock(GoogleCalendarRecurrenceEventMapping.class);
         when(recurrenceEventMapping.getExternalEventId()).thenReturn("recurrence-event-1");
-        when(recurrenceMappingRepository.findAllByExternalIdentity(any(), any(), any()))
+        when(recurrenceMappingRepository
+                .findAllWithRecurrenceEventAndTagByExternalIdentity(any(), any(), any()))
                 .thenReturn(List.of(recurrenceEventMapping));
         var override = new CancelledRecurrenceEventOverrideUpsert(
                 "override-1",

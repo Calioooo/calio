@@ -4,6 +4,7 @@ import com.calio.calendar.integration.domain.GoogleCalendarRecurrenceEventMappin
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -20,28 +21,27 @@ public interface GoogleCalendarRecurrenceEventMappingRepository
             String externalEventId
     );
 
+    @EntityGraph(attributePaths = {"recurrenceEvent", "recurrenceEvent.tag"})
     @Query("""
             select mapping
             from GoogleCalendarRecurrenceEventMapping mapping
-            join fetch mapping.recurrenceEvent recurrenceEvent
-            join fetch recurrenceEvent.tag
             where mapping.integration.id = :integrationId
               and mapping.calendarKey = :calendarKey
               and mapping.externalEventId in :externalEventIds
             """)
-    List<GoogleCalendarRecurrenceEventMapping> findAllByExternalIdentity(
+    List<GoogleCalendarRecurrenceEventMapping> findAllWithRecurrenceEventAndTagByExternalIdentity(
             @Param("integrationId") Long integrationId,
             @Param("calendarKey") String calendarKey,
             @Param("externalEventIds") Collection<String> externalEventIds
     );
 
+    @EntityGraph(attributePaths = "recurrenceEvent")
     @Query("""
             select mapping
             from GoogleCalendarRecurrenceEventMapping mapping
-            join fetch mapping.recurrenceEvent
             where mapping.integration.id = :integrationId
             """)
-    List<GoogleCalendarRecurrenceEventMapping> findAllByIntegrationId(
+    List<GoogleCalendarRecurrenceEventMapping> findAllWithRecurrenceEventByIntegrationId(
             @Param("integrationId") Long integrationId
     );
 }

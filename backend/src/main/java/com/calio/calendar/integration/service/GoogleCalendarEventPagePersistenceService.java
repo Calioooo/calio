@@ -143,7 +143,7 @@ public class GoogleCalendarEventPagePersistenceService {
 
         Map<String, GoogleCalendarEventMapping> eventMappings = externalEventIds.isEmpty()
                 ? new HashMap<>()
-                : eventMappingRepository.findAllByExternalIdentity(
+                : eventMappingRepository.findAllWithEventByExternalIdentity(
                         integrationId,
                         GoogleCalendarEventMapping.PRIMARY_CALENDAR_KEY,
                         externalEventIds
@@ -156,7 +156,8 @@ public class GoogleCalendarEventPagePersistenceService {
         Map<String, GoogleCalendarRecurrenceEventMapping> recurrenceEventMappings =
                 recurrenceEventExternalIds.isEmpty()
                         ? new HashMap<>()
-                        : recurrenceMappingRepository.findAllByExternalIdentity(
+                        : recurrenceMappingRepository
+                                .findAllWithRecurrenceEventAndTagByExternalIdentity(
                                 integrationId,
                                 GoogleCalendarRecurrenceEventMapping.PRIMARY_CALENDAR_KEY,
                                 recurrenceEventExternalIds
@@ -194,7 +195,8 @@ public class GoogleCalendarEventPagePersistenceService {
         if (recurrenceEventMappingIds.isEmpty() || !containsRecurrenceEventOverrides) {
             return new HashMap<>();
         }
-        return overrideMappingRepository.findAllByRecurrenceEventMappingIds(
+        return overrideMappingRepository
+                .findAllWithRecurrenceEventMappingAndRecurrenceEventOverrideByRecurrenceEventMappingIds(
                         recurrenceEventMappingIds
                 )
                 .stream().collect(Collectors.toMap(
@@ -556,7 +558,8 @@ public class GoogleCalendarEventPagePersistenceService {
 
     void deleteRecurrenceEvent(GoogleCalendarRecurrenceEventMapping recurrenceEventMapping) {
         List<GoogleCalendarRecurrenceOverrideMapping> overrideMappings =
-                overrideMappingRepository.findAllByRecurrenceEventMappingIds(
+                overrideMappingRepository
+                        .findAllWithRecurrenceEventMappingAndRecurrenceEventOverrideByRecurrenceEventMappingIds(
                         Set.of(recurrenceEventMapping.getId())
                 );
         if (!overrideMappings.isEmpty()) {

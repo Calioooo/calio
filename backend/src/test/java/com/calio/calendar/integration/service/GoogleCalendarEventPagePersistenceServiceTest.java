@@ -211,7 +211,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
         );
 
         // then
-        assertThat(mappingRepository.findAllByExternalIdentity(
+        assertThat(mappingRepository.findAllWithEventByExternalIdentity(
                 integration.getId(),
                 GoogleCalendarEventMapping.PRIMARY_CALENDAR_KEY,
                 List.of(externalEventId)

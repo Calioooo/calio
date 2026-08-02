@@ -357,7 +357,7 @@ public class GoogleCalendarPageNormalizer {
         if (externalIds.isEmpty()) {
             return Map.of();
         }
-        return eventMappingRepository.findAllByExternalIdentity(
+        return eventMappingRepository.findAllWithEventByExternalIdentity(
                         integrationId,
                         GoogleCalendarEventMapping.PRIMARY_CALENDAR_KEY,
                         externalIds
@@ -375,7 +375,7 @@ public class GoogleCalendarPageNormalizer {
         if (externalIds.isEmpty()) {
             return Map.of();
         }
-        return recurrenceMappingRepository.findAllByExternalIdentity(
+        return recurrenceMappingRepository.findAllWithRecurrenceEventAndTagByExternalIdentity(
                         integrationId,
                         GoogleCalendarRecurrenceEventMapping.PRIMARY_CALENDAR_KEY,
                         externalIds

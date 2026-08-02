@@ -3,6 +3,7 @@ package com.calio.calendar.integration.repository;
 import com.calio.calendar.integration.domain.GoogleCalendarEventMapping;
 import java.util.Collection;
 import java.util.List;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -10,15 +11,15 @@ import org.springframework.data.repository.query.Param;
 public interface GoogleCalendarEventMappingRepository
         extends JpaRepository<GoogleCalendarEventMapping, Long> {
 
+    @EntityGraph(attributePaths = "event")
     @Query("""
             select mapping
             from GoogleCalendarEventMapping mapping
-            join fetch mapping.event
             where mapping.integration.id = :integrationId
               and mapping.calendarKey = :calendarKey
               and mapping.externalEventId in :externalEventIds
             """)
-    List<GoogleCalendarEventMapping> findAllByExternalIdentity(
+    List<GoogleCalendarEventMapping> findAllWithEventByExternalIdentity(
             @Param("integrationId") Long integrationId,
             @Param("calendarKey") String calendarKey,
             @Param("externalEventIds") Collection<String> externalEventIds

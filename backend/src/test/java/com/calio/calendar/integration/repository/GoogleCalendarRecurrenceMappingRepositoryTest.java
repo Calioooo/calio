@@ -118,7 +118,7 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
                 ))
                 .map(GoogleCalendarRecurrenceEventMapping::getProviderEtag)
                 .contains(etag);
-        assertThat(overrideMappingRepository.findAllByExternalIdentity(
+        assertThat(overrideMappingRepository.findAllWithRecurrenceEventMappingByExternalIdentity(
                 integration.getId(),
                 GoogleCalendarRecurrenceEventMapping.PRIMARY_CALENDAR_KEY,
                 externalRecurrenceOverrideId
