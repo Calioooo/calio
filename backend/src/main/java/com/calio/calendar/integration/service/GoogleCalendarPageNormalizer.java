@@ -122,45 +122,98 @@ public class GoogleCalendarPageNormalizer {
             Map<String, RecurrenceEventUpsert> fetchedRecurrenceEvents,
             GoogleCalendarSyncRunContext context
     ) {
-        if (isCancelledException(item)) {
-            if (!findOrFetchRecurrenceEvent(
+        if (item.isCancelled()) {
+            return normalizeCancelledItem(
                     integrationId,
-                    item.recurringEventId(),
+                    item,
+                    eventMappings,
                     recurrenceEventMappings,
                     pageRecurrenceEventIds,
                     fetchedRecurrenceEvents,
                     context
-            )) {
-                return null;
-            }
-            return recurrenceMapper.mapRecurrenceOverride(item);
-        }
-        if (item.isCancelled()) {
-            if (recurrenceEventMappings.containsKey(item.id())) {
-                return new RecurrenceEventCancellation(item.id());
-            }
-            if (eventMappings.containsKey(item.id())) {
-                return new EventCancellation(item.id());
-            }
-            return null;
+            );
         }
         validateActiveShape(item);
         if (item.isRecurrenceEvent()) {
             return recurrenceMapper.mapRecurrenceEvent(item);
         }
         if (item.isRecurrenceOverride()) {
-            if (!findOrFetchRecurrenceEvent(
+            return normalizeRecurrenceEventOverride(
                     integrationId,
-                    item.recurringEventId(),
+                    item,
                     recurrenceEventMappings,
                     pageRecurrenceEventIds,
                     fetchedRecurrenceEvents,
                     context
-            )) {
-                return null;
-            }
+            );
+        }
+        return normalizeEvent(item, pageTimeZone);
+    }
+
+    private NormalizedItem normalizeCancelledItem(
+            Long integrationId,
+            GoogleCalendarEventItem item,
+            Map<String, GoogleCalendarEventMapping> eventMappings,
+            Map<String, GoogleCalendarRecurrenceEventMapping> recurrenceEventMappings,
+            Set<String> pageRecurrenceEventIds,
+            Map<String, RecurrenceEventUpsert> fetchedRecurrenceEvents,
+            GoogleCalendarSyncRunContext context
+    ) {
+        if (isDeletedRecurrenceOccurrence(item)) {
+            return normalizeRecurrenceEventOverride(
+                    integrationId,
+                    item,
+                    recurrenceEventMappings,
+                    pageRecurrenceEventIds,
+                    fetchedRecurrenceEvents,
+                    context
+            );
+        }
+        if (recurrenceEventMappings.containsKey(item.id())) {
+            return new RecurrenceEventCancellation(item.id());
+        }
+        if (eventMappings.containsKey(item.id())) {
+            return new EventCancellation(item.id());
+        }
+        return null;
+    }
+
+    private RecurrenceEventOverrideUpsert normalizeRecurrenceEventOverride(
+            Long integrationId,
+            GoogleCalendarEventItem item,
+            Map<String, GoogleCalendarRecurrenceEventMapping> recurrenceEventMappings,
+            Set<String> pageRecurrenceEventIds,
+            Map<String, RecurrenceEventUpsert> fetchedRecurrenceEvents,
+            GoogleCalendarSyncRunContext context
+    ) {
+        String recurrenceEventExternalId = item.recurringEventId();
+        if (hasRecurrenceEvent(
+                recurrenceEventExternalId,
+                recurrenceEventMappings,
+                pageRecurrenceEventIds
+        )) {
             return recurrenceMapper.mapRecurrenceOverride(item);
         }
+
+        Optional<RecurrenceEventUpsert> recurrenceEvent = loadRecurrenceEvent(
+                integrationId,
+                recurrenceEventExternalId,
+                context
+        );
+        if (recurrenceEvent.isEmpty()) {
+            return null;
+        }
+        fetchedRecurrenceEvents.putIfAbsent(
+                recurrenceEventExternalId,
+                recurrenceEvent.get()
+        );
+        return recurrenceMapper.mapRecurrenceOverride(item);
+    }
+
+    private EventUpsert normalizeEvent(
+            GoogleCalendarEventItem item,
+            String pageTimeZone
+    ) {
         var schedule = timeNormalizer.normalizeSchedule(
                 item.start(),
                 item.end(),
@@ -176,29 +229,27 @@ public class GoogleCalendarPageNormalizer {
         );
     }
 
-    private boolean findOrFetchRecurrenceEvent(
-            Long integrationId,
+    private boolean hasRecurrenceEvent(
             String recurrenceEventExternalId,
             Map<String, GoogleCalendarRecurrenceEventMapping> recurrenceEventMappings,
-            Set<String> pageRecurrenceEventIds,
-            Map<String, RecurrenceEventUpsert> fetchedRecurrenceEvents,
+            Set<String> pageRecurrenceEventIds
+    ) {
+        return recurrenceEventMappings.containsKey(recurrenceEventExternalId)
+                || pageRecurrenceEventIds.contains(recurrenceEventExternalId);
+    }
+
+    private Optional<RecurrenceEventUpsert> loadRecurrenceEvent(
+            Long integrationId,
+            String recurrenceEventExternalId,
             GoogleCalendarSyncRunContext context
     ) {
-        if (recurrenceEventMappings.containsKey(recurrenceEventExternalId)
-                || pageRecurrenceEventIds.contains(recurrenceEventExternalId)) {
-            return true;
-        }
         RecurrenceEventLookup cached =
                 context.recurrenceEventLookup(recurrenceEventExternalId);
         if (cached instanceof FoundRecurrenceEvent found) {
-            fetchedRecurrenceEvents.putIfAbsent(
-                    recurrenceEventExternalId,
-                    found.recurrenceEvent()
-            );
-            return true;
+            return Optional.of(found.recurrenceEvent());
         }
         if (cached == MissingRecurrenceEvent.INSTANCE) {
-            return false;
+            return Optional.empty();
         }
         Optional<GoogleCalendarEventItem> response = requestRecurrenceEvent(
                 integrationId,
@@ -210,7 +261,7 @@ public class GoogleCalendarPageNormalizer {
                     recurrenceEventExternalId,
                     MissingRecurrenceEvent.INSTANCE
             );
-            return false;
+            return Optional.empty();
         }
         GoogleCalendarEventItem recurrenceEventResponse = response.get();
         validateRecurrenceEventResponse(recurrenceEventExternalId, recurrenceEventResponse);
@@ -220,8 +271,7 @@ public class GoogleCalendarPageNormalizer {
                 recurrenceEventExternalId,
                 new FoundRecurrenceEvent(recurrenceEvent)
         );
-        fetchedRecurrenceEvents.put(recurrenceEventExternalId, recurrenceEvent);
-        return true;
+        return Optional.of(recurrenceEvent);
     }
 
     private Optional<GoogleCalendarEventItem> requestRecurrenceEvent(
@@ -268,7 +318,7 @@ public class GoogleCalendarPageNormalizer {
         }
     }
 
-    private boolean isCancelledException(GoogleCalendarEventItem item) {
+    private boolean isDeletedRecurrenceOccurrence(GoogleCalendarEventItem item) {
         return item.isCancelled()
                 && hasText(item.recurringEventId())
                 && item.originalStartTime() != null;

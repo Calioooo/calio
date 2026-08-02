@@ -57,17 +57,18 @@ class GoogleCalendarPageNormalizerTest {
     }
 
     @Test
-    @DisplayName("minimum cancelled exception은 active schedule 검증 없이 recurrence override로 분류한다")
-    void givenMinimumCancelledException_whenNormalize_thenClassifiesBeforeActiveValidation() {
+    @DisplayName("삭제된 recurrence-occurrence는 active schedule 검증 없이 override로 분류한다")
+    void givenDeletedRecurrenceOccurrence_whenNormalize_thenClassifiesAsOverride() {
         // given
-        GoogleCalendarEventItem item = cancelledException("exception-1", "recurrence-event-1");
+        GoogleCalendarEventItem item =
+                deletedRecurrenceOccurrence("override-1", "recurrence-event-1");
         GoogleCalendarRecurrenceEventMapping recurrenceEventMapping =
                 mock(GoogleCalendarRecurrenceEventMapping.class);
         when(recurrenceEventMapping.getExternalEventId()).thenReturn("recurrence-event-1");
         when(recurrenceMappingRepository.findAllByExternalIdentity(any(), any(), any()))
                 .thenReturn(List.of(recurrenceEventMapping));
         var override = new CancelledRecurrenceEventOverrideUpsert(
-                "exception-1",
+                "override-1",
                 "recurrence-event-1",
                 Instant.parse("2026-07-01T09:00:00Z"),
                 null,
@@ -98,12 +99,12 @@ class GoogleCalendarPageNormalizerTest {
         // when
         GoogleCalendarNormalizedPage first = normalizer.normalize(
                 10L,
-                page(cancelledException("exception-1", "recurrence-event-1")),
+                page(deletedRecurrenceOccurrence("override-1", "recurrence-event-1")),
                 context
         );
         GoogleCalendarNormalizedPage second = normalizer.normalize(
                 10L,
-                page(cancelledException("exception-2", "recurrence-event-1")),
+                page(deletedRecurrenceOccurrence("override-2", "recurrence-event-1")),
                 context
         );
 
@@ -117,8 +118,8 @@ class GoogleCalendarPageNormalizerTest {
     @DisplayName("조회한 recurrence-event는 관련 override보다 먼저 정규화한다")
     void givenOverrideBeforeRecurrenceEvent_whenNormalize_thenOrdersRecurrenceEventFirst() {
         // given
-        GoogleCalendarEventItem exception =
-                cancelledException("exception-1", "recurrence-event-1");
+        GoogleCalendarEventItem deletedOccurrence =
+                deletedRecurrenceOccurrence("override-1", "recurrence-event-1");
         GoogleCalendarEventItem recurrenceEventResponse =
                 recurringEvent("recurrence-event-1");
         RecurrenceEventUpsert recurrenceEvent = new RecurrenceEventUpsert(
@@ -131,7 +132,7 @@ class GoogleCalendarPageNormalizerTest {
                 List.of("RRULE:FREQ=DAILY")
         );
         var override = new CancelledRecurrenceEventOverrideUpsert(
-                "exception-1",
+                "override-1",
                 "recurrence-event-1",
                 Instant.parse("2026-07-01T09:00:00Z"),
                 null,
@@ -141,12 +142,12 @@ class GoogleCalendarPageNormalizerTest {
                 .thenReturn(Optional.of(recurrenceEventResponse));
         when(recurrenceMapper.mapRecurrenceEvent(recurrenceEventResponse))
                 .thenReturn(recurrenceEvent);
-        when(recurrenceMapper.mapRecurrenceOverride(exception)).thenReturn(override);
+        when(recurrenceMapper.mapRecurrenceOverride(deletedOccurrence)).thenReturn(override);
 
         // when
         GoogleCalendarNormalizedPage page = normalizer.normalize(
                 10L,
-                page(exception),
+                page(deletedOccurrence),
                 new GoogleCalendarSyncRunContext("token")
         );
 
@@ -161,7 +162,10 @@ class GoogleCalendarPageNormalizerTest {
         return new GoogleCalendarEventPage(List.of(item), null, "cursor", "UTC");
     }
 
-    private GoogleCalendarEventItem cancelledException(String id, String recurrenceEventId) {
+    private GoogleCalendarEventItem deletedRecurrenceOccurrence(
+            String id,
+            String recurrenceEventId
+    ) {
         return new GoogleCalendarEventItem(
                 id,
                 "cancelled",
