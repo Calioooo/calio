@@ -405,16 +405,21 @@ class GoogleCalendarEventPagePersistenceServiceTest {
                 "UTC"
         );
         RecurrenceEventUpsert recurrenceEvent = new RecurrenceEventUpsert(
-                "recurrence-event-1", null, null, "Daily", null,
-                recurrenceSchedule, List.of("RRULE:FREQ=DAILY")
+                "recurrence-event-1",
+                "recurrence-etag-1",
+                Instant.parse("2026-07-01T08:00:00Z"),
+                "Daily",
+                null,
+                recurrenceSchedule,
+                List.of("RRULE:FREQ=DAILY")
         );
         ActiveRecurrenceEventOverrideUpsert activeOverride =
                 new ActiveRecurrenceEventOverrideUpsert(
                 "exception-1",
                 "recurrence-event-1",
                 Instant.parse("2026-07-02T09:00:00Z"),
-                null,
-                null,
+                "override-etag-1",
+                Instant.parse("2026-07-02T07:00:00Z"),
                 "Moved",
                 "Final snapshot",
                 new NormalizedEventSchedule(
@@ -441,12 +446,17 @@ class GoogleCalendarEventPagePersistenceServiceTest {
                 "exception-1",
                 "recurrence-event-1",
                 Instant.parse("2026-07-02T09:00:00Z"),
-                null,
+                "override-etag-2",
                 Instant.parse("2026-07-02T08:00:00Z")
         );
         RecurrenceEventUpsert updatedRecurrenceEvent = new RecurrenceEventUpsert(
-                "recurrence-event-1", "etag-2", null, "Changed", "Google description",
-                recurrenceSchedule, List.of("RRULE:FREQ=WEEKLY")
+                "recurrence-event-1",
+                "recurrence-etag-2",
+                Instant.parse("2026-07-03T08:00:00Z"),
+                "Changed",
+                "Google description",
+                recurrenceSchedule,
+                List.of("RRULE:FREQ=WEEKLY")
         );
         pagePersistenceService.persistNormalizedPage(
                 integration.getId(),
@@ -473,8 +483,20 @@ class GoogleCalendarEventPagePersistenceServiceTest {
                     .isEqualTo(Instant.parse("2026-07-02T09:00:00Z"));
             assertThat(override.isDeleted()).isTrue();
         });
-        assertThat(recurrenceEventMappingRepository.count()).isOne();
-        assertThat(recurrenceOverrideMappingRepository.count()).isOne();
+        assertThat(recurrenceEventMappingRepository.findAll())
+                .singleElement()
+                .satisfies(mapping -> {
+                    assertThat(mapping.getProviderEtag()).isEqualTo("recurrence-etag-2");
+                    assertThat(mapping.getProviderUpdatedAt())
+                            .isEqualTo(Instant.parse("2026-07-03T08:00:00Z"));
+                });
+        assertThat(recurrenceOverrideMappingRepository.findAll())
+                .singleElement()
+                .satisfies(mapping -> {
+                    assertThat(mapping.getProviderEtag()).isEqualTo("override-etag-2");
+                    assertThat(mapping.getProviderUpdatedAt())
+                            .isEqualTo(Instant.parse("2026-07-02T08:00:00Z"));
+                });
     }
 
     @Test

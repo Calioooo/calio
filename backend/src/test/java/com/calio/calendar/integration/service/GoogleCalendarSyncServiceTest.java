@@ -38,22 +38,38 @@ import tools.jackson.databind.ObjectMapper;
 class GoogleCalendarSyncServiceTest {
 
     @Test
-    @DisplayName("INCREMENTAL 410은 provider data를 pre-clean하지 않고 동일 lease에서 FULL로 완료한다")
+    @DisplayName("INCREMENTAL 410 이후 FULL 재시도는 앞선 INCREMENTAL seen identity를 제거한다")
     void givenExpiredIncrementalCursor_whenSync_thenRetriesInPlaceAndReturnsFullMode() {
         // given
         FakeLeaseService leaseService = new FakeLeaseService("saved-cursor");
         FakeProviderDataService providerDataService = new FakeProviderDataService();
         FakeEventsClient eventsClient = new FakeEventsClient(
+                pageWithNextPage("incremental-page-2"),
                 new GoogleCalendarSyncTokenExpiredException(),
                 terminalPage("full-cursor")
         );
         FakePagePersistenceService pagePersistenceService =
                 new FakePagePersistenceService();
-        GoogleCalendarSyncService service = service(
+        GoogleCalendarSyncService service = new GoogleCalendarSyncService(
                 leaseService,
                 providerDataService,
+                new FakeAccessTokenService(),
                 eventsClient,
-                pagePersistenceService
+                pagePersistenceService,
+                new FakePageNormalizer(
+                        identities(
+                                "incremental-event",
+                                "incremental-recurrence-event",
+                                "incremental-override",
+                                "incremental-recurrence-event"
+                        ),
+                        identities(
+                                "full-event",
+                                "full-recurrence-event",
+                                "full-override",
+                                "full-recurrence-event"
+                        )
+                )
         );
 
         // when
@@ -64,10 +80,20 @@ class GoogleCalendarSyncServiceTest {
         assertThat(eventsClient.requestedModes)
                 .containsExactly(
                         GoogleCalendarSyncMode.INCREMENTAL,
+                        GoogleCalendarSyncMode.INCREMENTAL,
                         GoogleCalendarSyncMode.FULL
                 );
-        assertThat(pagePersistenceService.normalizedPersistCount).isOne();
+        assertThat(pagePersistenceService.normalizedPersistCount).isEqualTo(2);
         assertThat(providerDataService.finalizeCount).isOne();
+        assertThat(providerDataService.finalizedSeenEventIds)
+                .containsExactly("full-event");
+        assertThat(providerDataService.finalizedSeenRecurrenceEventIds)
+                .containsExactly("full-recurrence-event");
+        assertThat(providerDataService.finalizedSeenOverrideIds)
+                .containsExactly(new GoogleCalendarSyncRunContext.RecurrenceEventOverrideExternalKey(
+                        "full-recurrence-event",
+                        "full-override"
+                ));
     }
 
     @Test
@@ -246,7 +272,20 @@ class GoogleCalendarSyncServiceTest {
                 new FakeAccessTokenService(),
                 new FakeEventsClient(pageWithNextPage("page-2"), terminalPage("next-cursor")),
                 pagePersistenceService,
-                new FakePageNormalizer()
+                new FakePageNormalizer(
+                        identities(
+                                "event-1",
+                                "recurrence-event-1",
+                                "override-1",
+                                "recurrence-event-1"
+                        ),
+                        identities(
+                                "event-2",
+                                "recurrence-event-2",
+                                "override-2",
+                                "recurrence-event-2"
+                        )
+                )
         );
 
         // when
@@ -258,6 +297,37 @@ class GoogleCalendarSyncServiceTest {
         assertThat(providerDataService.finalizeCount).isOne();
         assertThat(providerDataService.finalizedAsFullInventory).isTrue();
         assertThat(providerDataService.finalizedCursor).isEqualTo("next-cursor");
+        assertThat(providerDataService.finalizedSeenEventIds)
+                .containsExactlyInAnyOrder("event-1", "event-2");
+        assertThat(providerDataService.finalizedSeenRecurrenceEventIds)
+                .containsExactlyInAnyOrder("recurrence-event-1", "recurrence-event-2");
+        assertThat(providerDataService.finalizedSeenOverrideIds)
+                .containsExactlyInAnyOrder(
+                        new GoogleCalendarSyncRunContext.RecurrenceEventOverrideExternalKey(
+                                "recurrence-event-1",
+                                "override-1"
+                        ),
+                        new GoogleCalendarSyncRunContext.RecurrenceEventOverrideExternalKey(
+                                "recurrence-event-2",
+                                "override-2"
+                        )
+                );
+    }
+
+    private static NormalizedPageIdentities identities(
+            String eventId,
+            String recurrenceEventId,
+            String overrideId,
+            String overrideRecurrenceEventId
+    ) {
+        return new NormalizedPageIdentities(
+                Set.of(eventId),
+                Set.of(recurrenceEventId),
+                Set.of(new GoogleCalendarSyncRunContext.RecurrenceEventOverrideExternalKey(
+                        overrideRecurrenceEventId,
+                        overrideId
+                ))
+        );
     }
 
     private GoogleCalendarSyncService service(
@@ -322,6 +392,10 @@ class GoogleCalendarSyncServiceTest {
         private int finalizeCount;
         private boolean finalizedAsFullInventory;
         private String finalizedCursor;
+        private Set<String> finalizedSeenEventIds = Set.of();
+        private Set<String> finalizedSeenRecurrenceEventIds = Set.of();
+        private Set<GoogleCalendarSyncRunContext.RecurrenceEventOverrideExternalKey>
+                finalizedSeenOverrideIds = Set.of();
         private RuntimeException releaseFailure;
 
         private FakeProviderDataService() {
@@ -360,6 +434,9 @@ class GoogleCalendarSyncServiceTest {
             finalizeCount++;
             finalizedAsFullInventory = fullInventory;
             finalizedCursor = nextSyncToken;
+            finalizedSeenEventIds = Set.copyOf(seenEventIds);
+            finalizedSeenRecurrenceEventIds = Set.copyOf(seenRecurrenceEventIds);
+            finalizedSeenOverrideIds = Set.copyOf(seenOverrideIds);
         }
     }
 
@@ -450,8 +527,11 @@ class GoogleCalendarSyncServiceTest {
 
     private static final class FakePageNormalizer extends GoogleCalendarPageNormalizer {
 
-        private FakePageNormalizer() {
+        private final Deque<NormalizedPageIdentities> identities = new ArrayDeque<>();
+
+        private FakePageNormalizer(NormalizedPageIdentities... identities) {
             super(null, null, null, null, null, null);
+            this.identities.addAll(List.of(identities));
         }
 
         @Override
@@ -460,11 +540,28 @@ class GoogleCalendarSyncServiceTest {
                 GoogleCalendarEventPage page,
                 GoogleCalendarSyncRunContext context
         ) {
+            if (!identities.isEmpty()) {
+                NormalizedPageIdentities pageIdentities = identities.removeFirst();
+                pageIdentities.eventIds().forEach(context::seeEvent);
+                pageIdentities.recurrenceEventIds().forEach(context::seeRecurrenceEvent);
+                pageIdentities.overrideIds().forEach(identity ->
+                        context.seeRecurrenceEventOverride(
+                                identity.recurrenceEventExternalId(),
+                                identity.overrideExternalEventId()
+                        ));
+            }
             return new GoogleCalendarNormalizedPage(
                     List.of(),
                     page.nextPageToken(),
                     page.nextSyncToken()
             );
         }
+    }
+
+    private record NormalizedPageIdentities(
+            Set<String> eventIds,
+            Set<String> recurrenceEventIds,
+            Set<GoogleCalendarSyncRunContext.RecurrenceEventOverrideExternalKey> overrideIds
+    ) {
     }
 }
