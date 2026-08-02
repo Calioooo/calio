@@ -364,9 +364,10 @@ class GoogleCalendarSyncServiceTest {
                 Long integrationId,
                 String runId,
                 boolean fullInventory,
-                Set<String> seenGeneralIds,
-                Set<String> seenMasterIds,
-                Set<GoogleCalendarSyncRunContext.OverrideIdentity> seenOverrideIds,
+                Set<String> seenEventIds,
+                Set<String> seenRecurrenceEventIds,
+                Set<GoogleCalendarSyncRunContext.RecurrenceEventOverrideExternalKey>
+                        seenOverrideIds,
                 String nextSyncToken
         ) {
             finalizeCount++;

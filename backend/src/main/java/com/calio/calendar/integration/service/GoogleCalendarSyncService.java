@@ -105,9 +105,9 @@ public class GoogleCalendarSyncService {
                 lease.integrationId(),
                 lease.runId(),
                 mode == GoogleCalendarSyncMode.FULL,
-                context.seenGeneralEventIds(),
-                context.seenRecurrenceMasterIds(),
-                context.seenRecurrenceOverrideIds(),
+                context.seenEventIds(),
+                context.seenRecurrenceEventIds(),
+                context.seenRecurrenceEventOverrideIds(),
                 nextSyncToken
         );
     }

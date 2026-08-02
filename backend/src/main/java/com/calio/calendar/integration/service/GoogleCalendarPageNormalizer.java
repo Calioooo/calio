@@ -11,16 +11,15 @@ import com.calio.calendar.integration.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.domain.GoogleCalendarRecurrenceEventMapping;
 import com.calio.calendar.integration.repository.GoogleCalendarEventMappingRepository;
 import com.calio.calendar.integration.repository.GoogleCalendarRecurrenceEventMappingRepository;
-import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.GeneralCancellation;
-import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.GeneralUpsert;
+import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.EventCancellation;
+import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.EventUpsert;
 import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.NormalizedItem;
-import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.RecurrenceMasterCancellation;
-import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.RecurrenceMasterUpsert;
-import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.RecurrenceOverrideUpsert;
-import com.calio.calendar.integration.service.GoogleCalendarRecurrenceMapper.RecurrenceEventResult;
-import com.calio.calendar.integration.service.GoogleCalendarSyncRunContext.MissingParent;
-import com.calio.calendar.integration.service.GoogleCalendarSyncRunContext.ParentOutcome;
-import com.calio.calendar.integration.service.GoogleCalendarSyncRunContext.ResolvedParent;
+import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.RecurrenceEventCancellation;
+import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.RecurrenceEventOverrideUpsert;
+import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.RecurrenceEventUpsert;
+import com.calio.calendar.integration.service.GoogleCalendarSyncRunContext.FoundRecurrenceEvent;
+import com.calio.calendar.integration.service.GoogleCalendarSyncRunContext.MissingRecurrenceEvent;
+import com.calio.calendar.integration.service.GoogleCalendarSyncRunContext.RecurrenceEventLookup;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -65,28 +64,29 @@ public class GoogleCalendarPageNormalizer {
             GoogleCalendarEventPage page,
             GoogleCalendarSyncRunContext context
     ) {
-        Set<String> itemIds = uniqueItemIds(page.items());
-        Set<String> parentIds = parentIds(page.items());
-        Set<String> masterLookupIds = new HashSet<>(itemIds);
-        masterLookupIds.addAll(parentIds);
+        Set<String> externalEventIds = uniqueExternalEventIds(page.items());
+        Set<String> recurrenceEventReferenceIds = recurrenceEventReferenceIds(page.items());
+        Set<String> recurrenceEventLookupIds = new HashSet<>(externalEventIds);
+        recurrenceEventLookupIds.addAll(recurrenceEventReferenceIds);
 
-        Map<String, GoogleCalendarEventMapping> generalMappings =
-                findGeneralMappings(integrationId, itemIds);
-        Map<String, GoogleCalendarRecurrenceEventMapping> masterMappings =
-                findMasterMappings(integrationId, masterLookupIds);
-        Set<String> pageMasterIds = activePageMasterIds(page.items());
+        Map<String, GoogleCalendarEventMapping> eventMappings =
+                findEventMappings(integrationId, externalEventIds);
+        Map<String, GoogleCalendarRecurrenceEventMapping> recurrenceEventMappings =
+                findRecurrenceEventMappings(integrationId, recurrenceEventLookupIds);
+        Set<String> pageRecurrenceEventIds = activePageRecurrenceEventIds(page.items());
 
-        LinkedHashMap<String, RecurrenceEventResult> fetchedParents = new LinkedHashMap<>();
+        LinkedHashMap<String, RecurrenceEventUpsert> fetchedRecurrenceEvents =
+                new LinkedHashMap<>();
         List<NormalizedItem> normalizedItems = new ArrayList<>();
         for (GoogleCalendarEventItem item : page.items()) {
             NormalizedItem normalized = normalizeItem(
                     integrationId,
                     item,
                     page.timeZone(),
-                    generalMappings,
-                    masterMappings,
-                    pageMasterIds,
-                    fetchedParents,
+                    eventMappings,
+                    recurrenceEventMappings,
+                    pageRecurrenceEventIds,
+                    fetchedRecurrenceEvents,
                     context
             );
             if (normalized != null) {
@@ -96,15 +96,14 @@ public class GoogleCalendarPageNormalizer {
         }
 
         List<NormalizedItem> orderedItems = new ArrayList<>();
-        fetchedParents.values().stream()
-                .peek(result -> context.seeMaster(result.externalEventId()))
-                .map(RecurrenceMasterUpsert::new)
+        fetchedRecurrenceEvents.values().stream()
+                .peek(item -> context.seeRecurrenceEvent(item.externalEventId()))
                 .forEach(orderedItems::add);
         normalizedItems.stream()
-                .filter(RecurrenceMasterUpsert.class::isInstance)
+                .filter(RecurrenceEventUpsert.class::isInstance)
                 .forEach(orderedItems::add);
         normalizedItems.stream()
-                .filter(item -> !(item instanceof RecurrenceMasterUpsert))
+                .filter(item -> !(item instanceof RecurrenceEventUpsert))
                 .forEach(orderedItems::add);
         return new GoogleCalendarNormalizedPage(
                 orderedItems,
@@ -117,115 +116,126 @@ public class GoogleCalendarPageNormalizer {
             Long integrationId,
             GoogleCalendarEventItem item,
             String pageTimeZone,
-            Map<String, GoogleCalendarEventMapping> generalMappings,
-            Map<String, GoogleCalendarRecurrenceEventMapping> masterMappings,
-            Set<String> pageMasterIds,
-            Map<String, RecurrenceEventResult> fetchedParents,
+            Map<String, GoogleCalendarEventMapping> eventMappings,
+            Map<String, GoogleCalendarRecurrenceEventMapping> recurrenceEventMappings,
+            Set<String> pageRecurrenceEventIds,
+            Map<String, RecurrenceEventUpsert> fetchedRecurrenceEvents,
             GoogleCalendarSyncRunContext context
     ) {
         if (isCancelledException(item)) {
-            if (!resolveParent(
+            if (!findOrFetchRecurrenceEvent(
                     integrationId,
                     item.recurringEventId(),
-                    masterMappings,
-                    pageMasterIds,
-                    fetchedParents,
+                    recurrenceEventMappings,
+                    pageRecurrenceEventIds,
+                    fetchedRecurrenceEvents,
                     context
             )) {
                 return null;
             }
-            return new RecurrenceOverrideUpsert(recurrenceMapper.mapRecurrenceOverride(item));
+            return recurrenceMapper.mapRecurrenceOverride(item);
         }
         if (item.isCancelled()) {
-            if (masterMappings.containsKey(item.id())) {
-                return new RecurrenceMasterCancellation(item.id());
+            if (recurrenceEventMappings.containsKey(item.id())) {
+                return new RecurrenceEventCancellation(item.id());
             }
-            if (generalMappings.containsKey(item.id())) {
-                return new GeneralCancellation(item.id());
+            if (eventMappings.containsKey(item.id())) {
+                return new EventCancellation(item.id());
             }
             return null;
         }
         validateActiveShape(item);
         if (item.isRecurrenceEvent()) {
-            return new RecurrenceMasterUpsert(recurrenceMapper.mapRecurrenceEvent(item));
+            return recurrenceMapper.mapRecurrenceEvent(item);
         }
         if (item.isRecurrenceOverride()) {
-            if (!resolveParent(
+            if (!findOrFetchRecurrenceEvent(
                     integrationId,
                     item.recurringEventId(),
-                    masterMappings,
-                    pageMasterIds,
-                    fetchedParents,
+                    recurrenceEventMappings,
+                    pageRecurrenceEventIds,
+                    fetchedRecurrenceEvents,
                     context
             )) {
                 return null;
             }
-            return new RecurrenceOverrideUpsert(recurrenceMapper.mapRecurrenceOverride(item));
+            return recurrenceMapper.mapRecurrenceOverride(item);
         }
         var schedule = timeNormalizer.normalizeSchedule(
                 item.start(),
                 item.end(),
                 pageTimeZone
         );
-        return new GeneralUpsert(
+        return new EventUpsert(
                 item.id(),
                 item.etag(),
                 item.updatedAt(),
-                canonicalTitle(item.summary()),
+                eventTitle(item.summary()),
                 item.description(),
                 schedule
         );
     }
 
-    private boolean resolveParent(
+    private boolean findOrFetchRecurrenceEvent(
             Long integrationId,
-            String externalMasterId,
-            Map<String, GoogleCalendarRecurrenceEventMapping> masterMappings,
-            Set<String> pageMasterIds,
-            Map<String, RecurrenceEventResult> fetchedParents,
+            String recurrenceEventExternalId,
+            Map<String, GoogleCalendarRecurrenceEventMapping> recurrenceEventMappings,
+            Set<String> pageRecurrenceEventIds,
+            Map<String, RecurrenceEventUpsert> fetchedRecurrenceEvents,
             GoogleCalendarSyncRunContext context
     ) {
-        if (masterMappings.containsKey(externalMasterId)
-                || pageMasterIds.contains(externalMasterId)) {
+        if (recurrenceEventMappings.containsKey(recurrenceEventExternalId)
+                || pageRecurrenceEventIds.contains(recurrenceEventExternalId)) {
             return true;
         }
-        ParentOutcome cached = context.parentOutcome(externalMasterId);
-        if (cached instanceof ResolvedParent resolvedParent) {
-            fetchedParents.putIfAbsent(externalMasterId, resolvedParent.result());
+        RecurrenceEventLookup cached =
+                context.recurrenceEventLookup(recurrenceEventExternalId);
+        if (cached instanceof FoundRecurrenceEvent found) {
+            fetchedRecurrenceEvents.putIfAbsent(
+                    recurrenceEventExternalId,
+                    found.recurrenceEvent()
+            );
             return true;
         }
-        if (cached == MissingParent.INSTANCE) {
+        if (cached == MissingRecurrenceEvent.INSTANCE) {
             return false;
         }
-        Optional<GoogleCalendarEventItem> response = requestParent(
+        Optional<GoogleCalendarEventItem> response = requestRecurrenceEvent(
                 integrationId,
-                externalMasterId,
+                recurrenceEventExternalId,
                 context
         );
         if (response.isEmpty()) {
-            context.rememberParent(externalMasterId, MissingParent.INSTANCE);
+            context.rememberRecurrenceEvent(
+                    recurrenceEventExternalId,
+                    MissingRecurrenceEvent.INSTANCE
+            );
             return false;
         }
-        GoogleCalendarEventItem parent = response.get();
-        validateParent(externalMasterId, parent);
-        RecurrenceEventResult result = recurrenceMapper.mapRecurrenceEvent(parent);
-        context.rememberParent(externalMasterId, new ResolvedParent(result));
-        fetchedParents.put(externalMasterId, result);
+        GoogleCalendarEventItem recurrenceEventResponse = response.get();
+        validateRecurrenceEventResponse(recurrenceEventExternalId, recurrenceEventResponse);
+        RecurrenceEventUpsert recurrenceEvent =
+                recurrenceMapper.mapRecurrenceEvent(recurrenceEventResponse);
+        context.rememberRecurrenceEvent(
+                recurrenceEventExternalId,
+                new FoundRecurrenceEvent(recurrenceEvent)
+        );
+        fetchedRecurrenceEvents.put(recurrenceEventExternalId, recurrenceEvent);
         return true;
     }
 
-    private Optional<GoogleCalendarEventItem> requestParent(
+    private Optional<GoogleCalendarEventItem> requestRecurrenceEvent(
             Long integrationId,
-            String externalMasterId,
+            String recurrenceEventExternalId,
             GoogleCalendarSyncRunContext context
     ) {
         try {
-            return eventsClient.getEvent(context.accessToken(), externalMasterId);
+            return eventsClient.getEvent(context.accessToken(), recurrenceEventExternalId);
         } catch (GoogleCalendarUnauthorizedException exception) {
             String refreshedToken = accessTokenService.forceRefresh(integrationId);
             context.replaceAccessToken(refreshedToken);
             try {
-                return eventsClient.getEvent(refreshedToken, externalMasterId);
+                return eventsClient.getEvent(refreshedToken, recurrenceEventExternalId);
             } catch (GoogleCalendarUnauthorizedException retryException) {
                 throw new CalioException(
                         ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED,
@@ -235,11 +245,14 @@ public class GoogleCalendarPageNormalizer {
         }
     }
 
-    private void validateParent(String requestedId, GoogleCalendarEventItem parent) {
-        boolean isInvalid = !requestedId.equals(parent.id())
-                || parent.isCancelled()
-                || !parent.isRecurrenceEvent()
-                || parent.isRecurrenceOverride();
+    private void validateRecurrenceEventResponse(
+            String requestedId,
+            GoogleCalendarEventItem recurrenceEvent
+    ) {
+        boolean isInvalid = !requestedId.equals(recurrenceEvent.id())
+                || recurrenceEvent.isCancelled()
+                || !recurrenceEvent.isRecurrenceEvent()
+                || recurrenceEvent.isRecurrenceOverride();
         if (isInvalid) {
             throw invalidResponse();
         }
@@ -261,24 +274,24 @@ public class GoogleCalendarPageNormalizer {
                 && item.originalStartTime() != null;
     }
 
-    private Set<String> uniqueItemIds(List<GoogleCalendarEventItem> items) {
-        Set<String> itemIds = new HashSet<>();
+    private Set<String> uniqueExternalEventIds(List<GoogleCalendarEventItem> items) {
+        Set<String> externalEventIds = new HashSet<>();
         for (GoogleCalendarEventItem item : items) {
-            if (!itemIds.add(item.id())) {
+            if (!externalEventIds.add(item.id())) {
                 throw invalidResponse();
             }
         }
-        return itemIds;
+        return externalEventIds;
     }
 
-    private Set<String> parentIds(List<GoogleCalendarEventItem> items) {
+    private Set<String> recurrenceEventReferenceIds(List<GoogleCalendarEventItem> items) {
         return items.stream()
                 .map(GoogleCalendarEventItem::recurringEventId)
                 .filter(this::hasText)
                 .collect(Collectors.toSet());
     }
 
-    private Set<String> activePageMasterIds(List<GoogleCalendarEventItem> items) {
+    private Set<String> activePageRecurrenceEventIds(List<GoogleCalendarEventItem> items) {
         return items.stream()
                 .filter(item -> !item.isCancelled())
                 .filter(GoogleCalendarEventItem::isRecurrenceEvent)
@@ -287,7 +300,7 @@ public class GoogleCalendarPageNormalizer {
                 .collect(Collectors.toSet());
     }
 
-    private Map<String, GoogleCalendarEventMapping> findGeneralMappings(
+    private Map<String, GoogleCalendarEventMapping> findEventMappings(
             Long integrationId,
             Set<String> externalIds
     ) {
@@ -305,7 +318,7 @@ public class GoogleCalendarPageNormalizer {
                 ));
     }
 
-    private Map<String, GoogleCalendarRecurrenceEventMapping> findMasterMappings(
+    private Map<String, GoogleCalendarRecurrenceEventMapping> findRecurrenceEventMappings(
             Long integrationId,
             Set<String> externalIds
     ) {
@@ -327,20 +340,19 @@ public class GoogleCalendarPageNormalizer {
             NormalizedItem item,
             GoogleCalendarSyncRunContext context
     ) {
-        if (item instanceof GeneralUpsert) {
-            context.seeGeneral(item.externalEventId());
-        } else if (item instanceof RecurrenceMasterUpsert) {
-            context.seeMaster(item.externalEventId());
-        } else if (item instanceof RecurrenceOverrideUpsert) {
-            RecurrenceOverrideUpsert override = (RecurrenceOverrideUpsert) item;
-            context.seeOverride(
-                    override.result().parentExternalEventId(),
+        if (item instanceof EventUpsert) {
+            context.seeEvent(item.externalEventId());
+        } else if (item instanceof RecurrenceEventUpsert) {
+            context.seeRecurrenceEvent(item.externalEventId());
+        } else if (item instanceof RecurrenceEventOverrideUpsert override) {
+            context.seeRecurrenceEventOverride(
+                    override.recurrenceEventExternalId(),
                     override.externalEventId()
             );
         }
     }
 
-    private String canonicalTitle(String summary) {
+    private String eventTitle(String summary) {
         return summary == null || summary.isBlank() ? UNTITLED_EVENT_TITLE : summary;
     }
 

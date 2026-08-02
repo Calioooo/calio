@@ -5,6 +5,10 @@ import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.external.google.GoogleCalendarEventTimeNormalizer;
 import com.calio.calendar.external.google.GoogleCalendarEventTimeNormalizer.NormalizedEventSchedule;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventItem;
+import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.ActiveRecurrenceEventOverrideUpsert;
+import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.CancelledRecurrenceEventOverrideUpsert;
+import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.RecurrenceEventOverrideUpsert;
+import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.RecurrenceEventUpsert;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
 import com.calio.calendar.recurrence.service.Rfc5545RecurrenceEngine;
 import java.time.Instant;
@@ -27,27 +31,27 @@ public class GoogleCalendarRecurrenceMapper {
         this.recurrenceEngine = recurrenceEngine;
     }
 
-    public RecurrenceEventResult mapRecurrenceEvent(GoogleCalendarEventItem item) {
-        requireRecurrenceEvent(item);
+    public RecurrenceEventUpsert mapRecurrenceEvent(GoogleCalendarEventItem item) {
+        validateRecurrenceEvent(item);
         NormalizedEventSchedule schedule = timeNormalizer.normalizeSchedule(item.start(), item.end());
-        RecurrenceSchedule recurrenceSchedule = recurrenceSchedule(schedule);
+        RecurrenceSchedule recurrenceSchedule = toRecurrenceSchedule(schedule);
         List<String> recurrenceRules = validateRecurrence(recurrenceSchedule, item.recurrence());
-        return new RecurrenceEventResult(
+        return new RecurrenceEventUpsert(
                 item.id(),
                 item.etag(),
                 item.updatedAt(),
-                canonicalTitle(item.summary()),
+                eventTitle(item.summary()),
                 item.description(),
                 schedule,
                 recurrenceRules
         );
     }
 
-    public RecurrenceOverrideResult mapRecurrenceOverride(GoogleCalendarEventItem item) {
-        requireRecurrenceOverrideIdentity(item);
+    public RecurrenceEventOverrideUpsert mapRecurrenceOverride(GoogleCalendarEventItem item) {
+        validateRecurrenceEventOverride(item);
         Instant originStartAt = timeNormalizer.normalize(item.originalStartTime()).instant();
         if (item.isCancelled()) {
-            return new CancelledRecurrenceOverrideResult(
+            return new CancelledRecurrenceEventOverrideUpsert(
                     item.id(),
                     item.recurringEventId(),
                     originStartAt,
@@ -56,19 +60,19 @@ public class GoogleCalendarRecurrenceMapper {
             );
         }
         NormalizedEventSchedule schedule = timeNormalizer.normalizeSchedule(item.start(), item.end());
-        return new ActiveRecurrenceOverrideResult(
+        return new ActiveRecurrenceEventOverrideUpsert(
                 item.id(),
                 item.recurringEventId(),
                 originStartAt,
                 item.etag(),
                 item.updatedAt(),
-                canonicalTitle(item.summary()),
+                eventTitle(item.summary()),
                 item.description(),
                 schedule
         );
     }
 
-    private RecurrenceSchedule recurrenceSchedule(NormalizedEventSchedule schedule) {
+    private RecurrenceSchedule toRecurrenceSchedule(NormalizedEventSchedule schedule) {
         try {
             return RecurrenceSchedule.create(
                     schedule.allDay(),
@@ -77,7 +81,7 @@ public class GoogleCalendarRecurrenceMapper {
                     schedule.timeZone()
             );
         } catch (CalioException exception) {
-            throw translateKnownProviderFailure(exception);
+            throw translateKnownGoogleCalendarFailure(exception);
         }
     }
 
@@ -88,11 +92,11 @@ public class GoogleCalendarRecurrenceMapper {
         try {
             return recurrenceEngine.validate(schedule, recurrenceRules);
         } catch (CalioException exception) {
-            throw translateKnownProviderFailure(exception);
+            throw translateKnownGoogleCalendarFailure(exception);
         }
     }
 
-    private RuntimeException translateKnownProviderFailure(CalioException exception) {
+    private RuntimeException translateKnownGoogleCalendarFailure(CalioException exception) {
         ErrorCode errorCode = exception.getErrorCode();
         if (errorCode == ErrorCode.INVALID_RECURRENCE_RULE
                 || errorCode == ErrorCode.INVALID_RECURRENCE_SCHEDULE
@@ -106,7 +110,7 @@ public class GoogleCalendarRecurrenceMapper {
         return exception;
     }
 
-    private void requireRecurrenceEvent(GoogleCalendarEventItem item) {
+    private void validateRecurrenceEvent(GoogleCalendarEventItem item) {
         boolean isInvalid = item == null
                 || item.isCancelled()
                 || !item.isRecurrenceEvent()
@@ -116,7 +120,7 @@ public class GoogleCalendarRecurrenceMapper {
         }
     }
 
-    private void requireRecurrenceOverrideIdentity(GoogleCalendarEventItem item) {
+    private void validateRecurrenceEventOverride(GoogleCalendarEventItem item) {
         boolean isInvalid = item == null
                 || !hasText(item.id())
                 || !hasText(item.recurringEventId())
@@ -127,7 +131,7 @@ public class GoogleCalendarRecurrenceMapper {
         }
     }
 
-    private String canonicalTitle(String summary) {
+    private String eventTitle(String summary) {
         return summary == null || summary.isBlank() ? UNTITLED_EVENT_TITLE : summary;
     }
 
@@ -139,53 +143,4 @@ public class GoogleCalendarRecurrenceMapper {
         return new CalioException(ErrorCode.GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID);
     }
 
-    public record RecurrenceEventResult(
-            String externalEventId,
-            String providerEtag,
-            Instant providerUpdatedAt,
-            String title,
-            String description,
-            NormalizedEventSchedule schedule,
-            List<String> recurrenceRules
-    ) {
-
-        public RecurrenceEventResult {
-            recurrenceRules = List.copyOf(recurrenceRules);
-        }
-    }
-
-    public sealed interface RecurrenceOverrideResult
-            permits ActiveRecurrenceOverrideResult, CancelledRecurrenceOverrideResult {
-
-        String externalEventId();
-
-        String parentExternalEventId();
-
-        Instant originStartAt();
-
-        String providerEtag();
-
-        Instant providerUpdatedAt();
-    }
-
-    public record ActiveRecurrenceOverrideResult(
-            String externalEventId,
-            String parentExternalEventId,
-            Instant originStartAt,
-            String providerEtag,
-            Instant providerUpdatedAt,
-            String title,
-            String description,
-            NormalizedEventSchedule schedule
-    ) implements RecurrenceOverrideResult {
-    }
-
-    public record CancelledRecurrenceOverrideResult(
-            String externalEventId,
-            String parentExternalEventId,
-            Instant originStartAt,
-            String providerEtag,
-            Instant providerUpdatedAt
-    ) implements RecurrenceOverrideResult {
-    }
 }

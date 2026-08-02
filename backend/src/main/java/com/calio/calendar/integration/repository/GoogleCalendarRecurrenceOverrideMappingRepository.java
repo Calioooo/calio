@@ -23,9 +23,9 @@ public interface GoogleCalendarRecurrenceOverrideMappingRepository
     @Query("""
             select overrideMapping
             from GoogleCalendarRecurrenceOverrideMapping overrideMapping
-            join fetch overrideMapping.recurrenceEventMapping parentMapping
-            where parentMapping.integration.id = :integrationId
-              and parentMapping.calendarKey = :calendarKey
+            join fetch overrideMapping.recurrenceEventMapping recurrenceEventMapping
+            where recurrenceEventMapping.integration.id = :integrationId
+              and recurrenceEventMapping.calendarKey = :calendarKey
               and overrideMapping.externalEventId = :externalEventId
             """)
     List<GoogleCalendarRecurrenceOverrideMapping> findAllByExternalIdentity(
@@ -37,33 +37,33 @@ public interface GoogleCalendarRecurrenceOverrideMappingRepository
     @Query("""
             select overrideMapping
             from GoogleCalendarRecurrenceOverrideMapping overrideMapping
-            join fetch overrideMapping.recurrenceEventMapping parentMapping
+            join fetch overrideMapping.recurrenceEventMapping recurrenceEventMapping
             join fetch overrideMapping.recurrenceEventOverride
-            where parentMapping.id in :parentMappingIds
+            where recurrenceEventMapping.id in :recurrenceEventMappingIds
               and overrideMapping.externalEventId in :externalEventIds
             """)
-    List<GoogleCalendarRecurrenceOverrideMapping> findAllByParentAndExternalIdentity(
-            @Param("parentMappingIds") Collection<Long> parentMappingIds,
+    List<GoogleCalendarRecurrenceOverrideMapping> findAllByRecurrenceEventAndExternalIdentity(
+            @Param("recurrenceEventMappingIds") Collection<Long> recurrenceEventMappingIds,
             @Param("externalEventIds") Collection<String> externalEventIds
     );
 
     @Query("""
             select overrideMapping
             from GoogleCalendarRecurrenceOverrideMapping overrideMapping
-            join fetch overrideMapping.recurrenceEventMapping parentMapping
+            join fetch overrideMapping.recurrenceEventMapping recurrenceEventMapping
             join fetch overrideMapping.recurrenceEventOverride
-            where parentMapping.id in :parentMappingIds
+            where recurrenceEventMapping.id in :recurrenceEventMappingIds
             """)
-    List<GoogleCalendarRecurrenceOverrideMapping> findAllByParentMappingIds(
-            @Param("parentMappingIds") Collection<Long> parentMappingIds
+    List<GoogleCalendarRecurrenceOverrideMapping> findAllByRecurrenceEventMappingIds(
+            @Param("recurrenceEventMappingIds") Collection<Long> recurrenceEventMappingIds
     );
 
     @Query("""
             select overrideMapping
             from GoogleCalendarRecurrenceOverrideMapping overrideMapping
-            join fetch overrideMapping.recurrenceEventMapping parentMapping
+            join fetch overrideMapping.recurrenceEventMapping recurrenceEventMapping
             join fetch overrideMapping.recurrenceEventOverride
-            where parentMapping.integration.id = :integrationId
+            where recurrenceEventMapping.integration.id = :integrationId
             """)
     List<GoogleCalendarRecurrenceOverrideMapping> findAllByIntegrationId(
             @Param("integrationId") Long integrationId

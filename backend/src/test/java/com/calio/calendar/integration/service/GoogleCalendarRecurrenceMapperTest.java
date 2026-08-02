@@ -8,9 +8,9 @@ import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.external.google.GoogleCalendarEventTimeNormalizer;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventItem;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventTime;
-import com.calio.calendar.integration.service.GoogleCalendarRecurrenceMapper.ActiveRecurrenceOverrideResult;
-import com.calio.calendar.integration.service.GoogleCalendarRecurrenceMapper.CancelledRecurrenceOverrideResult;
-import com.calio.calendar.integration.service.GoogleCalendarRecurrenceMapper.RecurrenceEventResult;
+import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.ActiveRecurrenceEventOverrideUpsert;
+import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.CancelledRecurrenceEventOverrideUpsert;
+import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.RecurrenceEventUpsert;
 import com.calio.calendar.recurrence.service.Ical4jRecurrenceEngine;
 import com.calio.calendar.recurrence.service.Rfc5545RecurrenceEngine;
 import com.calio.calendar.recurrence.domain.RecurrenceOccurrence;
@@ -49,14 +49,15 @@ class GoogleCalendarRecurrenceMapperTest {
         );
 
         // when
-        RecurrenceEventResult result = mapper.mapRecurrenceEvent(item);
+        RecurrenceEventUpsert recurrenceEvent = mapper.mapRecurrenceEvent(item);
 
         // then
-        assertThat(result.externalEventId()).isEqualTo("recurrence-event-id");
-        assertThat(result.title()).isEqualTo("(제목 없음)");
-        assertThat(result.description()).isEqualTo("description");
-        assertThat(result.schedule().startAt()).isEqualTo(Instant.parse("2026-07-20T00:00:00Z"));
-        assertThat(result.recurrenceRules()).containsExactly(
+        assertThat(recurrenceEvent.externalEventId()).isEqualTo("recurrence-event-id");
+        assertThat(recurrenceEvent.title()).isEqualTo("(제목 없음)");
+        assertThat(recurrenceEvent.description()).isEqualTo("description");
+        assertThat(recurrenceEvent.schedule().startAt())
+                .isEqualTo(Instant.parse("2026-07-20T00:00:00Z"));
+        assertThat(recurrenceEvent.recurrenceRules()).containsExactly(
                 "RRULE:FREQ=DAILY;COUNT=3",
                 "RDATE;TZID=Asia/Seoul:20260725T090000",
                 "EXDATE;TZID=Asia/Seoul:20260722T090000",
@@ -81,15 +82,16 @@ class GoogleCalendarRecurrenceMapperTest {
         );
 
         // when
-        ActiveRecurrenceOverrideResult result =
-                (ActiveRecurrenceOverrideResult) mapper.mapRecurrenceOverride(item);
+        ActiveRecurrenceEventOverrideUpsert override =
+                (ActiveRecurrenceEventOverrideUpsert) mapper.mapRecurrenceOverride(item);
 
         // then
-        assertThat(result.originStartAt()).isEqualTo(Instant.parse("2026-07-21T00:00:00Z"));
-        assertThat(result.title()).isEqualTo("(제목 없음)");
-        assertThat(result.description()).isNull();
-        assertThat(result.schedule().allDay()).isFalse();
-        assertThat(result.schedule().startAt()).isEqualTo(Instant.parse("2026-07-21T06:00:00Z"));
+        assertThat(override.originStartAt()).isEqualTo(Instant.parse("2026-07-21T00:00:00Z"));
+        assertThat(override.title()).isEqualTo("(제목 없음)");
+        assertThat(override.description()).isNull();
+        assertThat(override.schedule().allDay()).isFalse();
+        assertThat(override.schedule().startAt())
+                .isEqualTo(Instant.parse("2026-07-21T06:00:00Z"));
     }
 
     @Test
@@ -109,19 +111,21 @@ class GoogleCalendarRecurrenceMapperTest {
         );
 
         // when
-        ActiveRecurrenceOverrideResult result =
-                (ActiveRecurrenceOverrideResult) mapper.mapRecurrenceOverride(item);
+        ActiveRecurrenceEventOverrideUpsert override =
+                (ActiveRecurrenceEventOverrideUpsert) mapper.mapRecurrenceOverride(item);
 
         // then
-        assertThat(result.originStartAt()).isEqualTo(Instant.parse("2026-07-21T00:00:00Z"));
-        assertThat(result.schedule().allDay()).isTrue();
-        assertThat(result.schedule().timeZone()).isNull();
-        assertThat(result.schedule().startAt()).isEqualTo(Instant.parse("2026-07-22T00:00:00Z"));
-        assertThat(result.schedule().endAt()).isEqualTo(Instant.parse("2026-07-24T00:00:00Z"));
+        assertThat(override.originStartAt()).isEqualTo(Instant.parse("2026-07-21T00:00:00Z"));
+        assertThat(override.schedule().allDay()).isTrue();
+        assertThat(override.schedule().timeZone()).isNull();
+        assertThat(override.schedule().startAt())
+                .isEqualTo(Instant.parse("2026-07-22T00:00:00Z"));
+        assertThat(override.schedule().endAt())
+                .isEqualTo(Instant.parse("2026-07-24T00:00:00Z"));
     }
 
     @Test
-    @DisplayName("cancelled minimum recurrence override는 identity만으로 mapping result를 만든다")
+    @DisplayName("cancelled minimum recurrence override는 식별 정보만으로 정규화한다")
     void givenCancelledMinimumRecurrenceOverride_whenMap_thenDoesNotRequireFinalSchedule() {
         // given
         GoogleCalendarEventItem item = item(
@@ -137,13 +141,13 @@ class GoogleCalendarRecurrenceMapperTest {
         );
 
         // when
-        CancelledRecurrenceOverrideResult result =
-                (CancelledRecurrenceOverrideResult) mapper.mapRecurrenceOverride(item);
+        CancelledRecurrenceEventOverrideUpsert override =
+                (CancelledRecurrenceEventOverrideUpsert) mapper.mapRecurrenceOverride(item);
 
         // then
-        assertThat(result.externalEventId()).isEqualTo("recurrence-override-id");
-        assertThat(result.parentExternalEventId()).isEqualTo("recurrence-event-id");
-        assertThat(result.originStartAt()).isEqualTo(Instant.parse("2026-07-21T00:00:00Z"));
+        assertThat(override.externalEventId()).isEqualTo("recurrence-override-id");
+        assertThat(override.recurrenceEventExternalId()).isEqualTo("recurrence-event-id");
+        assertThat(override.originStartAt()).isEqualTo(Instant.parse("2026-07-21T00:00:00Z"));
     }
 
     @Test
@@ -190,7 +194,7 @@ class GoogleCalendarRecurrenceMapperTest {
     }
 
     @Test
-    @DisplayName("recurrence override의 parent ID 또는 originalStartTime 누락은 invalid response다")
+    @DisplayName("recurrence override의 recurrence-event ID 또는 originalStartTime 누락은 invalid response다")
     void givenMissingRecurrenceOverrideIdentity_whenMap_thenReturnsProviderInvalidResponse() {
         GoogleCalendarEventTime start = timed(
                 "2026-07-21T10:00:00+09:00",
@@ -200,7 +204,7 @@ class GoogleCalendarRecurrenceMapperTest {
                 "2026-07-21T11:00:00+09:00",
                 "Asia/Seoul"
         );
-        GoogleCalendarEventItem missingParent = item(
+        GoogleCalendarEventItem missingRecurrenceEventId = item(
                 "recurrence-override-id",
                 "confirmed",
                 "Override",
@@ -223,7 +227,7 @@ class GoogleCalendarRecurrenceMapperTest {
                 end
         );
 
-        assertInvalidResponse(() -> mapper.mapRecurrenceOverride(missingParent));
+        assertInvalidResponse(() -> mapper.mapRecurrenceOverride(missingRecurrenceEventId));
         assertInvalidResponse(() -> mapper.mapRecurrenceOverride(missingOriginalStartTime));
     }
 

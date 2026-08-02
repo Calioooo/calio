@@ -16,10 +16,8 @@ import com.calio.calendar.external.google.dto.GoogleCalendarEventTime;
 import com.calio.calendar.integration.domain.GoogleCalendarRecurrenceEventMapping;
 import com.calio.calendar.integration.repository.GoogleCalendarEventMappingRepository;
 import com.calio.calendar.integration.repository.GoogleCalendarRecurrenceEventMappingRepository;
-import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.RecurrenceMasterUpsert;
-import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.RecurrenceOverrideUpsert;
-import com.calio.calendar.integration.service.GoogleCalendarRecurrenceMapper.CancelledRecurrenceOverrideResult;
-import com.calio.calendar.integration.service.GoogleCalendarRecurrenceMapper.RecurrenceEventResult;
+import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.CancelledRecurrenceEventOverrideUpsert;
+import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.RecurrenceEventUpsert;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -59,23 +57,23 @@ class GoogleCalendarPageNormalizerTest {
     }
 
     @Test
-    @DisplayName("minimum cancelled exception은 active schedule 검증 없이 mapped parent override로 분류한다")
+    @DisplayName("minimum cancelled exception은 active schedule 검증 없이 recurrence override로 분류한다")
     void givenMinimumCancelledException_whenNormalize_thenClassifiesBeforeActiveValidation() {
         // given
-        GoogleCalendarEventItem item = cancelledException("exception-1", "master-1");
-        GoogleCalendarRecurrenceEventMapping parentMapping =
+        GoogleCalendarEventItem item = cancelledException("exception-1", "recurrence-event-1");
+        GoogleCalendarRecurrenceEventMapping recurrenceEventMapping =
                 mock(GoogleCalendarRecurrenceEventMapping.class);
-        when(parentMapping.getExternalEventId()).thenReturn("master-1");
+        when(recurrenceEventMapping.getExternalEventId()).thenReturn("recurrence-event-1");
         when(recurrenceMappingRepository.findAllByExternalIdentity(any(), any(), any()))
-                .thenReturn(List.of(parentMapping));
-        var result = new CancelledRecurrenceOverrideResult(
+                .thenReturn(List.of(recurrenceEventMapping));
+        var override = new CancelledRecurrenceEventOverrideUpsert(
                 "exception-1",
-                "master-1",
+                "recurrence-event-1",
                 Instant.parse("2026-07-01T09:00:00Z"),
                 null,
                 null
         );
-        when(recurrenceMapper.mapRecurrenceOverride(item)).thenReturn(result);
+        when(recurrenceMapper.mapRecurrenceOverride(item)).thenReturn(override);
 
         // when
         GoogleCalendarNormalizedPage page = normalizer.normalize(
@@ -85,43 +83,46 @@ class GoogleCalendarPageNormalizerTest {
         );
 
         // then
-        assertThat(page.items()).containsExactly(new RecurrenceOverrideUpsert(result));
+        assertThat(page.items()).containsExactly(override);
         verify(eventsClient, never()).getEvent(any(), any());
     }
 
     @Test
-    @DisplayName("explicit 404 parent outcome은 run 전체에 cache되어 dependent exceptions만 skip한다")
-    void givenMissingParentAcrossPages_whenNormalize_thenLooksUpParentOnceAndSkipsExceptions() {
+    @DisplayName("존재하지 않는 recurrence-event 조회는 run 전체에 cache되어 관련 override를 건너뛴다")
+    void givenMissingRecurrenceEvent_whenNormalize_thenLooksUpOnceAndSkipsOverrides() {
         // given
         GoogleCalendarSyncRunContext context = new GoogleCalendarSyncRunContext("token");
-        when(eventsClient.getEvent("token", "master-1")).thenReturn(Optional.empty());
+        when(eventsClient.getEvent("token", "recurrence-event-1"))
+                .thenReturn(Optional.empty());
 
         // when
         GoogleCalendarNormalizedPage first = normalizer.normalize(
                 10L,
-                page(cancelledException("exception-1", "master-1")),
+                page(cancelledException("exception-1", "recurrence-event-1")),
                 context
         );
         GoogleCalendarNormalizedPage second = normalizer.normalize(
                 10L,
-                page(cancelledException("exception-2", "master-1")),
+                page(cancelledException("exception-2", "recurrence-event-1")),
                 context
         );
 
         // then
         assertThat(first.items()).isEmpty();
         assertThat(second.items()).isEmpty();
-        verify(eventsClient).getEvent("token", "master-1");
+        verify(eventsClient).getEvent("token", "recurrence-event-1");
     }
 
     @Test
-    @DisplayName("lookup으로 확보한 active recurring parent는 dependent exception보다 먼저 정규화한다")
-    void givenExceptionBeforeMissingParent_whenNormalize_thenOrdersFetchedParentFirst() {
+    @DisplayName("조회한 recurrence-event는 관련 override보다 먼저 정규화한다")
+    void givenOverrideBeforeRecurrenceEvent_whenNormalize_thenOrdersRecurrenceEventFirst() {
         // given
-        GoogleCalendarEventItem exception = cancelledException("exception-1", "master-1");
-        GoogleCalendarEventItem parent = recurringMaster("master-1");
-        RecurrenceEventResult parentResult = new RecurrenceEventResult(
-                "master-1",
+        GoogleCalendarEventItem exception =
+                cancelledException("exception-1", "recurrence-event-1");
+        GoogleCalendarEventItem recurrenceEventResponse =
+                recurringEvent("recurrence-event-1");
+        RecurrenceEventUpsert recurrenceEvent = new RecurrenceEventUpsert(
+                "recurrence-event-1",
                 null,
                 null,
                 "Daily",
@@ -129,16 +130,18 @@ class GoogleCalendarPageNormalizerTest {
                 schedule(),
                 List.of("RRULE:FREQ=DAILY")
         );
-        var overrideResult = new CancelledRecurrenceOverrideResult(
+        var override = new CancelledRecurrenceEventOverrideUpsert(
                 "exception-1",
-                "master-1",
+                "recurrence-event-1",
                 Instant.parse("2026-07-01T09:00:00Z"),
                 null,
                 null
         );
-        when(eventsClient.getEvent("token", "master-1")).thenReturn(Optional.of(parent));
-        when(recurrenceMapper.mapRecurrenceEvent(parent)).thenReturn(parentResult);
-        when(recurrenceMapper.mapRecurrenceOverride(exception)).thenReturn(overrideResult);
+        when(eventsClient.getEvent("token", "recurrence-event-1"))
+                .thenReturn(Optional.of(recurrenceEventResponse));
+        when(recurrenceMapper.mapRecurrenceEvent(recurrenceEventResponse))
+                .thenReturn(recurrenceEvent);
+        when(recurrenceMapper.mapRecurrenceOverride(exception)).thenReturn(override);
 
         // when
         GoogleCalendarNormalizedPage page = normalizer.normalize(
@@ -149,8 +152,8 @@ class GoogleCalendarPageNormalizerTest {
 
         // then
         assertThat(page.items()).containsExactly(
-                new RecurrenceMasterUpsert(parentResult),
-                new RecurrenceOverrideUpsert(overrideResult)
+                recurrenceEvent,
+                override
         );
     }
 
@@ -158,7 +161,7 @@ class GoogleCalendarPageNormalizerTest {
         return new GoogleCalendarEventPage(List.of(item), null, "cursor", "UTC");
     }
 
-    private GoogleCalendarEventItem cancelledException(String id, String parentId) {
+    private GoogleCalendarEventItem cancelledException(String id, String recurrenceEventId) {
         return new GoogleCalendarEventItem(
                 id,
                 "cancelled",
@@ -167,14 +170,14 @@ class GoogleCalendarPageNormalizerTest {
                 null,
                 null,
                 List.of(),
-                parentId,
+                recurrenceEventId,
                 new GoogleCalendarEventTime(null, "2026-07-01T09:00:00Z", "UTC"),
                 null,
                 null
         );
     }
 
-    private GoogleCalendarEventItem recurringMaster(String id) {
+    private GoogleCalendarEventItem recurringEvent(String id) {
         return new GoogleCalendarEventItem(
                 id,
                 "confirmed",

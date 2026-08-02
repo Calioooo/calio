@@ -19,11 +19,9 @@ import com.calio.calendar.integration.repository.GoogleCalendarEventMappingRepos
 import com.calio.calendar.integration.repository.GoogleCalendarIntegrationRepository;
 import com.calio.calendar.integration.repository.GoogleCalendarRecurrenceEventMappingRepository;
 import com.calio.calendar.integration.repository.GoogleCalendarRecurrenceOverrideMappingRepository;
-import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.RecurrenceMasterUpsert;
-import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.RecurrenceOverrideUpsert;
-import com.calio.calendar.integration.service.GoogleCalendarRecurrenceMapper.ActiveRecurrenceOverrideResult;
-import com.calio.calendar.integration.service.GoogleCalendarRecurrenceMapper.CancelledRecurrenceOverrideResult;
-import com.calio.calendar.integration.service.GoogleCalendarRecurrenceMapper.RecurrenceEventResult;
+import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.ActiveRecurrenceEventOverrideUpsert;
+import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.CancelledRecurrenceEventOverrideUpsert;
+import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.RecurrenceEventUpsert;
 import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.tag.domain.Tag;
@@ -201,7 +199,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
                 integration(account.getId())
         );
         String externalEventId = "a".repeat(1024);
-        String providerEtag = "e".repeat(1024);
+        String googleEtag = "e".repeat(1024);
         acquireLease(account.getId(), "maximum-id-run");
 
         // when
@@ -209,7 +207,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
                 integration.getId(),
                 account.getId(),
                 "maximum-id-run",
-                page(timedItem(externalEventId, "Maximum ID", providerEtag), "cursor-1")
+                page(timedItem(externalEventId, "Maximum ID", googleEtag), "cursor-1")
         );
 
         // then
@@ -219,7 +217,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
                 List.of(externalEventId)
         )).singleElement().satisfies(mapping -> {
             assertThat(mapping.getExternalEventId()).isEqualTo(externalEventId);
-            assertThat(mapping.getProviderEtag()).isEqualTo(providerEtag);
+            assertThat(mapping.getProviderEtag()).isEqualTo(googleEtag);
         });
     }
 
@@ -389,7 +387,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
 
     @Test
     @Transactional
-    @DisplayName("normalized master와 active/cancelled exception replay는 한 canonical aggregate로 수렴한다")
+    @DisplayName("recurrence-event와 active/cancelled override 재처리는 하나의 aggregate로 수렴한다")
     void givenNormalizedRecurrenceReplay_whenPersistPages_thenUpsertsCanonicalAggregate() {
         // given
         Account account = accountRepository.saveAndFlush(new Account());
@@ -398,19 +396,20 @@ class GoogleCalendarEventPagePersistenceServiceTest {
                 integration(account.getId())
         );
         acquireLease(account.getId(), "recurrence-run");
-        NormalizedEventSchedule masterSchedule = new NormalizedEventSchedule(
+        NormalizedEventSchedule recurrenceSchedule = new NormalizedEventSchedule(
                 Instant.parse("2026-07-01T09:00:00Z"),
                 Instant.parse("2026-07-01T10:00:00Z"),
                 false,
                 "UTC"
         );
-        RecurrenceEventResult master = new RecurrenceEventResult(
-                "master-1", null, null, "Daily", null,
-                masterSchedule, List.of("RRULE:FREQ=DAILY")
+        RecurrenceEventUpsert recurrenceEvent = new RecurrenceEventUpsert(
+                "recurrence-event-1", null, null, "Daily", null,
+                recurrenceSchedule, List.of("RRULE:FREQ=DAILY")
         );
-        ActiveRecurrenceOverrideResult active = new ActiveRecurrenceOverrideResult(
+        ActiveRecurrenceEventOverrideUpsert activeOverride =
+                new ActiveRecurrenceEventOverrideUpsert(
                 "exception-1",
-                "master-1",
+                "recurrence-event-1",
                 Instant.parse("2026-07-02T09:00:00Z"),
                 null,
                 null,
@@ -428,23 +427,24 @@ class GoogleCalendarEventPagePersistenceServiceTest {
                 account.getId(),
                 "recurrence-run",
                 new GoogleCalendarNormalizedPage(
-                        List.of(new RecurrenceMasterUpsert(master), new RecurrenceOverrideUpsert(active)),
+                        List.of(recurrenceEvent, activeOverride),
                         null,
                         "cursor"
                 )
         );
 
         // when
-        CancelledRecurrenceOverrideResult cancelled = new CancelledRecurrenceOverrideResult(
+        CancelledRecurrenceEventOverrideUpsert cancelledOverride =
+                new CancelledRecurrenceEventOverrideUpsert(
                 "exception-1",
-                "master-1",
+                "recurrence-event-1",
                 Instant.parse("2026-07-02T09:00:00Z"),
                 null,
                 Instant.parse("2026-07-02T08:00:00Z")
         );
-        RecurrenceEventResult updatedMaster = new RecurrenceEventResult(
-                "master-1", "etag-2", null, "Changed", "Provider description",
-                masterSchedule, List.of("RRULE:FREQ=WEEKLY")
+        RecurrenceEventUpsert updatedRecurrenceEvent = new RecurrenceEventUpsert(
+                "recurrence-event-1", "etag-2", null, "Changed", "Google description",
+                recurrenceSchedule, List.of("RRULE:FREQ=WEEKLY")
         );
         pagePersistenceService.persistNormalizedPage(
                 integration.getId(),
@@ -452,8 +452,8 @@ class GoogleCalendarEventPagePersistenceServiceTest {
                 "recurrence-run",
                 new GoogleCalendarNormalizedPage(
                         List.of(
-                                new RecurrenceMasterUpsert(updatedMaster),
-                                new RecurrenceOverrideUpsert(cancelled)
+                                updatedRecurrenceEvent,
+                                cancelledOverride
                         ),
                         null,
                         "cursor"
@@ -551,9 +551,9 @@ class GoogleCalendarEventPagePersistenceServiceTest {
                 integrationId,
                 runId,
                 false,
-                context.seenGeneralEventIds(),
-                context.seenRecurrenceMasterIds(),
-                context.seenRecurrenceOverrideIds(),
+                context.seenEventIds(),
+                context.seenRecurrenceEventIds(),
+                context.seenRecurrenceEventOverrideIds(),
                 page.nextSyncToken()
         );
     }
@@ -572,12 +572,12 @@ class GoogleCalendarEventPagePersistenceServiceTest {
     private GoogleCalendarEventItem timedItem(
             String id,
             String summary,
-            String providerEtag
+            String googleEtag
     ) {
         return new GoogleCalendarEventItem(
                 id,
                 "confirmed",
-                providerEtag,
+                googleEtag,
                 Instant.parse("2026-07-01T00:00:00Z"),
                 summary,
                 "Description",

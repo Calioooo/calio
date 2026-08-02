@@ -16,16 +16,14 @@ import com.calio.calendar.integration.repository.GoogleCalendarEventMappingRepos
 import com.calio.calendar.integration.repository.GoogleCalendarIntegrationRepository;
 import com.calio.calendar.integration.repository.GoogleCalendarRecurrenceEventMappingRepository;
 import com.calio.calendar.integration.repository.GoogleCalendarRecurrenceOverrideMappingRepository;
-import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.GeneralCancellation;
-import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.GeneralUpsert;
+import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.ActiveRecurrenceEventOverrideUpsert;
+import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.CancelledRecurrenceEventOverrideUpsert;
+import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.EventCancellation;
+import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.EventUpsert;
 import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.NormalizedItem;
-import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.RecurrenceMasterCancellation;
-import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.RecurrenceMasterUpsert;
-import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.RecurrenceOverrideUpsert;
-import com.calio.calendar.integration.service.GoogleCalendarRecurrenceMapper.ActiveRecurrenceOverrideResult;
-import com.calio.calendar.integration.service.GoogleCalendarRecurrenceMapper.CancelledRecurrenceOverrideResult;
-import com.calio.calendar.integration.service.GoogleCalendarRecurrenceMapper.RecurrenceEventResult;
-import com.calio.calendar.integration.service.GoogleCalendarRecurrenceMapper.RecurrenceOverrideResult;
+import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.RecurrenceEventCancellation;
+import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.RecurrenceEventOverrideUpsert;
+import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.RecurrenceEventUpsert;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
@@ -85,105 +83,122 @@ public class GoogleCalendarEventPagePersistenceService {
             String runId,
             GoogleCalendarNormalizedPage page
     ) {
-        extendLeaseOrThrow(integrationId, runId);
+        extendSyncLeaseOrThrow(integrationId, runId);
         GoogleCalendarIntegration integration = integrationRepository.getReferenceById(integrationId);
-        persistNormalizedItems(integration, accountId, page.items());
+        applyEventChanges(integration, accountId, page.items());
     }
 
-    private void persistNormalizedItems(
+    private void applyEventChanges(
             GoogleCalendarIntegration integration,
             Long accountId,
             List<NormalizedItem> items
     ) {
-        PageMappings mappings = loadPageMappings(integration.getId(), items);
-        boolean requiresCanonicalCreate = items.stream().anyMatch(item ->
-                requiresCanonicalCreate(item, mappings));
-        Account account = requiresCanonicalCreate
+        ExistingMappingsAndOverrides existingRecords =
+                loadExistingMappingsAndOverrides(integration.getId(), items);
+        boolean isLocalCreationNeeded = items.stream().anyMatch(item ->
+                isLocalCreationNeeded(item, existingRecords));
+        Account account = isLocalCreationNeeded
                 ? accountRepository.getReferenceById(accountId)
                 : null;
-        Tag defaultTag = requiresCanonicalCreate
+        Tag defaultTag = isLocalCreationNeeded
                 ? tagService.getTagOrDefault(accountId, null)
                 : null;
 
         for (NormalizedItem item : items) {
             switch (item) {
-                case GeneralUpsert general ->
-                        upsertGeneral(integration, general, mappings, account, defaultTag);
-                case GeneralCancellation cancellation ->
-                        deleteGeneral(cancellation.externalEventId(), mappings);
-                case RecurrenceMasterUpsert master -> upsertMaster(
+                case EventUpsert event ->
+                        upsertEvent(integration, event, existingRecords, account, defaultTag);
+                case EventCancellation cancellation ->
+                        deleteEvent(cancellation.externalEventId(), existingRecords);
+                case RecurrenceEventUpsert recurrenceEvent -> upsertRecurrenceEvent(
                         integration,
-                        master.result(),
-                        mappings,
+                        recurrenceEvent,
+                        existingRecords,
                         account,
                         defaultTag
                 );
-                case RecurrenceMasterCancellation cancellation -> deleteMaster(
+                case RecurrenceEventCancellation cancellation -> deleteRecurrenceEventByExternalId(
                         cancellation.externalEventId(),
-                        mappings
+                        existingRecords
                 );
-                case RecurrenceOverrideUpsert override ->
-                        upsertOverride(override.result(), mappings);
+                case RecurrenceEventOverrideUpsert override ->
+                        upsertRecurrenceEventOverride(override, existingRecords);
             }
         }
     }
 
-    private PageMappings loadPageMappings(Long integrationId, List<NormalizedItem> items) {
-        Set<String> itemIds = items.stream()
+    private ExistingMappingsAndOverrides loadExistingMappingsAndOverrides(
+            Long integrationId,
+            List<NormalizedItem> items
+    ) {
+        Set<String> externalEventIds = items.stream()
                 .map(NormalizedItem::externalEventId)
                 .collect(Collectors.toSet());
-        Set<String> masterIds = items.stream()
-                .filter(RecurrenceOverrideUpsert.class::isInstance)
-                .map(RecurrenceOverrideUpsert.class::cast)
-                .map(item -> item.result().parentExternalEventId())
+        Set<String> recurrenceEventExternalIds = items.stream()
+                .filter(RecurrenceEventOverrideUpsert.class::isInstance)
+                .map(RecurrenceEventOverrideUpsert.class::cast)
+                .map(RecurrenceEventOverrideUpsert::recurrenceEventExternalId)
                 .collect(Collectors.toSet());
-        masterIds.addAll(itemIds);
+        recurrenceEventExternalIds.addAll(externalEventIds);
 
-        Map<String, GoogleCalendarEventMapping> generalMappings = itemIds.isEmpty()
+        Map<String, GoogleCalendarEventMapping> eventMappings = externalEventIds.isEmpty()
                 ? new HashMap<>()
                 : eventMappingRepository.findAllByExternalIdentity(
                         integrationId,
                         GoogleCalendarEventMapping.PRIMARY_CALENDAR_KEY,
-                        itemIds
+                        externalEventIds
                 ).stream().collect(Collectors.toMap(
                         GoogleCalendarEventMapping::getExternalEventId,
                         Function.identity(),
                         (left, right) -> left,
                         HashMap::new
                 ));
-        Map<String, GoogleCalendarRecurrenceEventMapping> masterMappings = masterIds.isEmpty()
-                ? new HashMap<>()
-                : recurrenceMappingRepository.findAllByExternalIdentity(
-                        integrationId,
-                        GoogleCalendarRecurrenceEventMapping.PRIMARY_CALENDAR_KEY,
-                        masterIds
-                ).stream().collect(Collectors.toMap(
-                        GoogleCalendarRecurrenceEventMapping::getExternalEventId,
-                        Function.identity(),
-                        (left, right) -> left,
-                        HashMap::new
-                ));
-        Map<OverrideProviderKey, GoogleCalendarRecurrenceOverrideMapping> overrideMappings =
-                loadOverrideMappings(masterMappings, items);
-        Map<OverrideCanonicalKey, RecurrenceEventOverride> overrides =
-                loadCanonicalOverrides(masterMappings, items);
-        return new PageMappings(generalMappings, masterMappings, overrideMappings, overrides);
+        Map<String, GoogleCalendarRecurrenceEventMapping> recurrenceEventMappings =
+                recurrenceEventExternalIds.isEmpty()
+                        ? new HashMap<>()
+                        : recurrenceMappingRepository.findAllByExternalIdentity(
+                                integrationId,
+                                GoogleCalendarRecurrenceEventMapping.PRIMARY_CALENDAR_KEY,
+                                recurrenceEventExternalIds
+                        ).stream().collect(Collectors.toMap(
+                                GoogleCalendarRecurrenceEventMapping::getExternalEventId,
+                                Function.identity(),
+                                (left, right) -> left,
+                                HashMap::new
+                        ));
+        Map<GoogleCalendarRecurrenceOverrideKey, GoogleCalendarRecurrenceOverrideMapping>
+                googleOverrideMappings = loadGoogleOverrideMappings(
+                        recurrenceEventMappings,
+                        items
+                );
+        Map<RecurrenceEventOverrideKey, RecurrenceEventOverride> recurrenceEventOverrides =
+                loadRecurrenceEventOverrides(recurrenceEventMappings, items);
+        return new ExistingMappingsAndOverrides(
+                eventMappings,
+                recurrenceEventMappings,
+                googleOverrideMappings,
+                recurrenceEventOverrides
+        );
     }
 
-    private Map<OverrideProviderKey, GoogleCalendarRecurrenceOverrideMapping> loadOverrideMappings(
-            Map<String, GoogleCalendarRecurrenceEventMapping> masterMappings,
-            List<NormalizedItem> items
-    ) {
-        Set<Long> parentMappingIds = masterMappings.values().stream()
+    private Map<GoogleCalendarRecurrenceOverrideKey, GoogleCalendarRecurrenceOverrideMapping>
+            loadGoogleOverrideMappings(
+                    Map<String, GoogleCalendarRecurrenceEventMapping> recurrenceEventMappings,
+                    List<NormalizedItem> items
+            ) {
+        Set<Long> recurrenceEventMappingIds = recurrenceEventMappings.values().stream()
                 .map(GoogleCalendarRecurrenceEventMapping::getId)
                 .collect(Collectors.toSet());
-        boolean hasOverrides = items.stream().anyMatch(RecurrenceOverrideUpsert.class::isInstance);
-        if (parentMappingIds.isEmpty() || !hasOverrides) {
+        boolean containsRecurrenceEventOverrides = items.stream()
+                .anyMatch(RecurrenceEventOverrideUpsert.class::isInstance);
+        if (recurrenceEventMappingIds.isEmpty() || !containsRecurrenceEventOverrides) {
             return new HashMap<>();
         }
-        return overrideMappingRepository.findAllByParentMappingIds(parentMappingIds)
+        return overrideMappingRepository.findAllByRecurrenceEventMappingIds(
+                        recurrenceEventMappingIds
+                )
                 .stream().collect(Collectors.toMap(
-                        mapping -> new OverrideProviderKey(
+                        mapping -> new GoogleCalendarRecurrenceOverrideKey(
                                 mapping.getRecurrenceEventMapping().getId(),
                                 mapping.getExternalEventId()
                         ),
@@ -193,62 +208,72 @@ public class GoogleCalendarEventPagePersistenceService {
                 ));
     }
 
-    private Map<OverrideCanonicalKey, RecurrenceEventOverride> loadCanonicalOverrides(
-            Map<String, GoogleCalendarRecurrenceEventMapping> masterMappings,
-            List<NormalizedItem> items
-    ) {
-        Map<OverrideCanonicalKey, RecurrenceEventOverride> overrides = new HashMap<>();
-        Map<String, List<RecurrenceOverrideResult>> byParent = items.stream()
-                .filter(RecurrenceOverrideUpsert.class::isInstance)
-                .map(RecurrenceOverrideUpsert.class::cast)
-                .map(RecurrenceOverrideUpsert::result)
-                .collect(Collectors.groupingBy(RecurrenceOverrideResult::parentExternalEventId));
-        byParent.forEach((parentExternalId, results) -> {
-            GoogleCalendarRecurrenceEventMapping parentMapping = masterMappings.get(parentExternalId);
-            if (parentMapping == null) {
+    private Map<RecurrenceEventOverrideKey, RecurrenceEventOverride>
+            loadRecurrenceEventOverrides(
+                    Map<String, GoogleCalendarRecurrenceEventMapping> recurrenceEventMappings,
+                    List<NormalizedItem> items
+            ) {
+        Map<RecurrenceEventOverrideKey, RecurrenceEventOverride> recurrenceEventOverrides =
+                new HashMap<>();
+        Map<String, List<RecurrenceEventOverrideUpsert>> overridesByRecurrenceEvent =
+                items.stream()
+                        .filter(RecurrenceEventOverrideUpsert.class::isInstance)
+                        .map(RecurrenceEventOverrideUpsert.class::cast)
+                        .collect(Collectors.groupingBy(
+                                RecurrenceEventOverrideUpsert::recurrenceEventExternalId
+                        ));
+        overridesByRecurrenceEvent.forEach((recurrenceEventExternalId, overrideItems) -> {
+            GoogleCalendarRecurrenceEventMapping recurrenceEventMapping =
+                    recurrenceEventMappings.get(recurrenceEventExternalId);
+            if (recurrenceEventMapping == null) {
                 return;
             }
-            Set<Instant> origins = results.stream()
-                    .map(RecurrenceOverrideResult::originStartAt)
+            Set<Instant> originStartTimes = overrideItems.stream()
+                    .map(RecurrenceEventOverrideUpsert::originStartAt)
                     .collect(Collectors.toSet());
             overrideRepository.findByRecurrenceEvent_IdAndOriginStartAtIn(
-                    parentMapping.getRecurrenceEvent().getId(),
-                    origins
-            ).forEach(override -> overrides.put(
-                    new OverrideCanonicalKey(
-                            override.getRecurrenceId(),
-                            override.getOriginStartAt()
+                    recurrenceEventMapping.getRecurrenceEvent().getId(),
+                    originStartTimes
+            ).forEach(recurrenceEventOverride -> recurrenceEventOverrides.put(
+                    new RecurrenceEventOverrideKey(
+                            recurrenceEventOverride.getRecurrenceId(),
+                            recurrenceEventOverride.getOriginStartAt()
                     ),
-                    override
+                    recurrenceEventOverride
             ));
         });
-        return overrides;
+        return recurrenceEventOverrides;
     }
 
-    private boolean requiresCanonicalCreate(NormalizedItem item, PageMappings mappings) {
-        if (item instanceof GeneralUpsert) {
-            return !mappings.generalMappings().containsKey(item.externalEventId());
+    private boolean isLocalCreationNeeded(
+            NormalizedItem item,
+            ExistingMappingsAndOverrides existingRecords
+    ) {
+        if (item instanceof EventUpsert) {
+            return !existingRecords.eventMappings().containsKey(item.externalEventId());
         }
-        if (item instanceof RecurrenceMasterUpsert) {
-            return !mappings.masterMappings().containsKey(item.externalEventId());
+        if (item instanceof RecurrenceEventUpsert) {
+            return !existingRecords.recurrenceEventMappings()
+                    .containsKey(item.externalEventId());
         }
         return false;
     }
 
-    private void upsertGeneral(
+    private void upsertEvent(
             GoogleCalendarIntegration integration,
-            GeneralUpsert item,
-            PageMappings mappings,
+            EventUpsert item,
+            ExistingMappingsAndOverrides existingRecords,
             Account account,
             Tag defaultTag
     ) {
-        if (mappings.masterMappings().containsKey(item.externalEventId())) {
-            deleteMaster(item.externalEventId(), mappings);
+        if (existingRecords.recurrenceEventMappings().containsKey(item.externalEventId())) {
+            deleteRecurrenceEventByExternalId(item.externalEventId(), existingRecords);
         }
-        GoogleCalendarEventMapping existing = mappings.generalMappings().get(item.externalEventId());
-        if (existing != null) {
-            replaceEvent(existing.getEvent(), item);
-            existing.updateProviderVersion(item.providerEtag(), item.providerUpdatedAt());
+        GoogleCalendarEventMapping existingMapping =
+                existingRecords.eventMappings().get(item.externalEventId());
+        if (existingMapping != null) {
+            updateEvent(existingMapping.getEvent(), item);
+            existingMapping.updateProviderVersion(item.googleEtag(), item.googleUpdatedAt());
             return;
         }
         Event event = eventRepository.save(new Event(
@@ -267,14 +292,14 @@ public class GoogleCalendarEventPagePersistenceService {
                         integration,
                         event,
                         item.externalEventId(),
-                        item.providerEtag(),
-                        item.providerUpdatedAt()
+                        item.googleEtag(),
+                        item.googleUpdatedAt()
                 )
         );
-        mappings.generalMappings().put(item.externalEventId(), mapping);
+        existingRecords.eventMappings().put(item.externalEventId(), mapping);
     }
 
-    private void replaceEvent(Event event, GeneralUpsert item) {
+    private void updateEvent(Event event, EventUpsert item) {
         event.replace(
                 item.title(),
                 item.description(),
@@ -285,34 +310,34 @@ public class GoogleCalendarEventPagePersistenceService {
         );
     }
 
-    private void upsertMaster(
+    private void upsertRecurrenceEvent(
             GoogleCalendarIntegration integration,
-            RecurrenceEventResult result,
-            PageMappings mappings,
+            RecurrenceEventUpsert item,
+            ExistingMappingsAndOverrides existingRecords,
             Account account,
             Tag defaultTag
     ) {
-        if (mappings.generalMappings().containsKey(result.externalEventId())) {
-            deleteGeneral(result.externalEventId(), mappings);
+        if (existingRecords.eventMappings().containsKey(item.externalEventId())) {
+            deleteEvent(item.externalEventId(), existingRecords);
         }
-        RecurrenceSchedule schedule = recurrenceSchedule(result.schedule());
-        GoogleCalendarRecurrenceEventMapping existing =
-                mappings.masterMappings().get(result.externalEventId());
-        if (existing != null) {
-            existing.getRecurrenceEvent().updateProviderContent(
-                    result.title(),
-                    result.description(),
+        RecurrenceSchedule schedule = toRecurrenceSchedule(item.schedule());
+        GoogleCalendarRecurrenceEventMapping existingMapping =
+                existingRecords.recurrenceEventMappings().get(item.externalEventId());
+        if (existingMapping != null) {
+            existingMapping.getRecurrenceEvent().updateProviderContent(
+                    item.title(),
+                    item.description(),
                     schedule,
-                    result.recurrenceRules()
+                    item.recurrenceRules()
             );
-            existing.updateProviderVersion(result.providerEtag(), result.providerUpdatedAt());
+            existingMapping.updateProviderVersion(item.googleEtag(), item.googleUpdatedAt());
             return;
         }
         RecurrenceEvent recurrenceEvent = recurrenceEventRepository.save(new RecurrenceEvent(
-                result.title(),
-                result.description(),
+                item.title(),
+                item.description(),
                 schedule,
-                result.recurrenceRules(),
+                item.recurrenceRules(),
                 defaultTag,
                 account
         ));
@@ -320,132 +345,165 @@ public class GoogleCalendarEventPagePersistenceService {
                 new GoogleCalendarRecurrenceEventMapping(
                         integration,
                         recurrenceEvent,
-                        result.externalEventId(),
-                        result.providerEtag(),
-                        result.providerUpdatedAt()
+                        item.externalEventId(),
+                        item.googleEtag(),
+                        item.googleUpdatedAt()
                 )
         );
-        mappings.masterMappings().put(result.externalEventId(), mapping);
+        existingRecords.recurrenceEventMappings().put(item.externalEventId(), mapping);
     }
 
-    private void upsertOverride(RecurrenceOverrideResult result, PageMappings mappings) {
-        GoogleCalendarRecurrenceEventMapping parent =
-                mappings.masterMappings().get(result.parentExternalEventId());
-        if (parent == null) {
+    private void upsertRecurrenceEventOverride(
+            RecurrenceEventOverrideUpsert item,
+            ExistingMappingsAndOverrides existingRecords
+    ) {
+        GoogleCalendarRecurrenceEventMapping recurrenceEventMapping =
+                existingRecords.recurrenceEventMappings()
+                        .get(item.recurrenceEventExternalId());
+        if (recurrenceEventMapping == null) {
             throw new CalioException(ErrorCode.GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID);
         }
-        OverrideProviderKey providerKey = new OverrideProviderKey(
-                parent.getId(),
-                result.externalEventId()
-        );
-        OverrideCanonicalKey canonicalKey = new OverrideCanonicalKey(
-                parent.getRecurrenceEvent().getId(),
-                result.originStartAt()
-        );
-        GoogleCalendarRecurrenceOverrideMapping providerMapping =
-                mappings.overrideMappings().get(providerKey);
-        RecurrenceEventOverride override = mappings.overrides().get(canonicalKey);
-        if (providerMapping != null) {
-            override = reconcileProviderIdentity(providerMapping, canonicalKey, override, mappings);
+        GoogleCalendarRecurrenceOverrideKey googleOverrideKey =
+                new GoogleCalendarRecurrenceOverrideKey(
+                        recurrenceEventMapping.getId(),
+                        item.externalEventId()
+                );
+        RecurrenceEventOverrideKey recurrenceEventOverrideKey =
+                new RecurrenceEventOverrideKey(
+                        recurrenceEventMapping.getRecurrenceEvent().getId(),
+                        item.originStartAt()
+                );
+        GoogleCalendarRecurrenceOverrideMapping googleOverrideMapping =
+                existingRecords.googleOverrideMappings().get(googleOverrideKey);
+        RecurrenceEventOverride recurrenceEventOverride =
+                existingRecords.recurrenceEventOverrides().get(recurrenceEventOverrideKey);
+        if (googleOverrideMapping != null) {
+            validateMappedRecurrenceOverrideKey(
+                    googleOverrideMapping,
+                    recurrenceEventOverrideKey
+            );
+            recurrenceEventOverride = googleOverrideMapping.getRecurrenceEventOverride();
         }
-        rejectConflictingProviderIdentity(providerMapping, override, result, mappings);
-        if (override == null) {
-            override = createOverride(parent.getRecurrenceEvent(), result);
-            overrideRepository.save(override);
-            mappings.overrides().put(canonicalKey, override);
+        throwIfOverrideMappedToDifferentGoogleEvent(
+                googleOverrideMapping,
+                recurrenceEventOverride,
+                item,
+                existingRecords
+        );
+        if (recurrenceEventOverride == null) {
+            recurrenceEventOverride = createRecurrenceEventOverride(
+                    recurrenceEventMapping.getRecurrenceEvent(),
+                    item
+            );
+            overrideRepository.save(recurrenceEventOverride);
+            existingRecords.recurrenceEventOverrides().put(
+                    recurrenceEventOverrideKey,
+                    recurrenceEventOverride
+            );
         } else {
-            applyOverride(override, result);
+            updateRecurrenceEventOverride(recurrenceEventOverride, item);
         }
-        if (providerMapping == null) {
-            providerMapping = overrideMappingRepository.save(new GoogleCalendarRecurrenceOverrideMapping(
-                    parent,
-                    override,
-                    result.externalEventId(),
-                    result.providerEtag(),
-                    result.providerUpdatedAt()
-            ));
-            mappings.overrideMappings().put(providerKey, providerMapping);
+        if (googleOverrideMapping == null) {
+            googleOverrideMapping = overrideMappingRepository.save(
+                    new GoogleCalendarRecurrenceOverrideMapping(
+                            recurrenceEventMapping,
+                            recurrenceEventOverride,
+                            item.externalEventId(),
+                            item.googleEtag(),
+                            item.googleUpdatedAt()
+                    ));
+            existingRecords.googleOverrideMappings().put(
+                    googleOverrideKey,
+                    googleOverrideMapping
+            );
         } else {
-            providerMapping.updateProviderVersion(result.providerEtag(), result.providerUpdatedAt());
+            googleOverrideMapping.updateProviderVersion(
+                    item.googleEtag(),
+                    item.googleUpdatedAt()
+            );
         }
     }
 
-    private RecurrenceEventOverride reconcileProviderIdentity(
-            GoogleCalendarRecurrenceOverrideMapping providerMapping,
-            OverrideCanonicalKey expectedIdentity,
-            RecurrenceEventOverride exactOverride,
-            PageMappings mappings
+    private void validateMappedRecurrenceOverrideKey(
+            GoogleCalendarRecurrenceOverrideMapping googleOverrideMapping,
+            RecurrenceEventOverrideKey expectedOverrideKey
     ) {
-        RecurrenceEventOverride mappedOverride = providerMapping.getRecurrenceEventOverride();
-        OverrideCanonicalKey mappedIdentity = new OverrideCanonicalKey(
-                mappedOverride.getRecurrenceId(),
-                mappedOverride.getOriginStartAt()
+        RecurrenceEventOverride mappedRecurrenceEventOverride =
+                googleOverrideMapping.getRecurrenceEventOverride();
+        RecurrenceEventOverrideKey mappedOverrideKey = new RecurrenceEventOverrideKey(
+                mappedRecurrenceEventOverride.getRecurrenceId(),
+                mappedRecurrenceEventOverride.getOriginStartAt()
         );
-        if (mappedIdentity.equals(expectedIdentity)) {
-            return mappedOverride;
+        if (!mappedOverrideKey.equals(expectedOverrideKey)) {
+            throw new CalioException(ErrorCode.GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID);
         }
-        throw new CalioException(ErrorCode.GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID);
     }
 
-    private void rejectConflictingProviderIdentity(
-            GoogleCalendarRecurrenceOverrideMapping providerMapping,
-            RecurrenceEventOverride override,
-            RecurrenceOverrideResult result,
-            PageMappings mappings
+    private void throwIfOverrideMappedToDifferentGoogleEvent(
+            GoogleCalendarRecurrenceOverrideMapping googleOverrideMapping,
+            RecurrenceEventOverride recurrenceEventOverride,
+            RecurrenceEventOverrideUpsert item,
+            ExistingMappingsAndOverrides existingRecords
     ) {
-        if (providerMapping != null || override == null || override.getOverrideId() == null) {
+        if (googleOverrideMapping != null
+                || recurrenceEventOverride == null
+                || recurrenceEventOverride.getOverrideId() == null) {
             return;
         }
-        boolean hasDifferentMapping = mappings.overrideMappings().values().stream()
-                .anyMatch(mapping -> mapping.getRecurrenceEventOverride().getOverrideId()
-                        .equals(override.getOverrideId())
-                        && !mapping.getExternalEventId().equals(result.externalEventId()));
-        if (hasDifferentMapping) {
+        boolean mappedToDifferentGoogleEvent =
+                existingRecords.googleOverrideMappings().values().stream()
+                        .anyMatch(mapping -> mapping.getRecurrenceEventOverride().getOverrideId()
+                                .equals(recurrenceEventOverride.getOverrideId())
+                                && !mapping.getExternalEventId().equals(item.externalEventId()));
+        if (mappedToDifferentGoogleEvent) {
             throw new CalioException(ErrorCode.GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID);
         }
     }
 
-    private RecurrenceEventOverride createOverride(
+    private RecurrenceEventOverride createRecurrenceEventOverride(
             RecurrenceEvent recurrenceEvent,
-            RecurrenceOverrideResult result
+            RecurrenceEventOverrideUpsert item
     ) {
-        if (result instanceof ActiveRecurrenceOverrideResult active) {
+        if (item instanceof ActiveRecurrenceEventOverrideUpsert active) {
             return RecurrenceEventOverride.active(
                     recurrenceEvent,
                     active.originStartAt(),
                     active.title(),
                     active.description(),
-                    canonicalOverrideSchedule(active.schedule())
+                    toOverrideSchedule(active.schedule())
             );
         }
-        CancelledRecurrenceOverrideResult cancelled =
-                (CancelledRecurrenceOverrideResult) result;
+        CancelledRecurrenceEventOverrideUpsert cancelled =
+                (CancelledRecurrenceEventOverrideUpsert) item;
         return RecurrenceEventOverride.deleted(
                 recurrenceEvent,
                 cancelled.originStartAt(),
-                deletionInstant(cancelled)
+                getOverrideDeletedAt(cancelled)
         );
     }
 
-    private void applyOverride(RecurrenceEventOverride override, RecurrenceOverrideResult result) {
-        if (result instanceof ActiveRecurrenceOverrideResult active) {
-            override.activate(
+    private void updateRecurrenceEventOverride(
+            RecurrenceEventOverride recurrenceEventOverride,
+            RecurrenceEventOverrideUpsert item
+    ) {
+        if (item instanceof ActiveRecurrenceEventOverrideUpsert active) {
+            recurrenceEventOverride.activate(
                     active.title(),
                     active.description(),
-                    canonicalOverrideSchedule(active.schedule())
+                    toOverrideSchedule(active.schedule())
             );
             return;
         }
-        override.markDeleted(deletionInstant(result));
+        recurrenceEventOverride.markDeleted(getOverrideDeletedAt(item));
     }
 
-    private Instant deletionInstant(RecurrenceOverrideResult result) {
-        return result.providerUpdatedAt() == null
-                ? result.originStartAt()
-                : result.providerUpdatedAt();
+    private Instant getOverrideDeletedAt(RecurrenceEventOverrideUpsert item) {
+        return item.googleUpdatedAt() == null
+                ? item.originStartAt()
+                : item.googleUpdatedAt();
     }
 
-    private CanonicalSchedule canonicalOverrideSchedule(NormalizedEventSchedule schedule) {
+    private CanonicalSchedule toOverrideSchedule(NormalizedEventSchedule schedule) {
         return CanonicalSchedule.recurrenceOverride(
                 schedule.startAt(),
                 schedule.endAt(),
@@ -454,7 +512,7 @@ public class GoogleCalendarEventPagePersistenceService {
         );
     }
 
-    private RecurrenceSchedule recurrenceSchedule(NormalizedEventSchedule schedule) {
+    private RecurrenceSchedule toRecurrenceSchedule(NormalizedEventSchedule schedule) {
         return RecurrenceSchedule.create(
                 schedule.allDay(),
                 schedule.startAt(),
@@ -463,69 +521,86 @@ public class GoogleCalendarEventPagePersistenceService {
         );
     }
 
-    private void deleteGeneral(String externalEventId, PageMappings mappings) {
-        GoogleCalendarEventMapping mapping = mappings.generalMappings().remove(externalEventId);
-        if (mapping == null) {
+    private void deleteEvent(
+            String externalEventId,
+            ExistingMappingsAndOverrides existingRecords
+    ) {
+        GoogleCalendarEventMapping eventMapping =
+                existingRecords.eventMappings().remove(externalEventId);
+        if (eventMapping == null) {
             return;
         }
-        Event event = mapping.getEvent();
-        eventMappingRepository.delete(mapping);
+        Event event = eventMapping.getEvent();
+        eventMappingRepository.delete(eventMapping);
         eventMappingRepository.flush();
         eventRepository.delete(event);
     }
 
-    private void deleteMaster(String externalEventId, PageMappings mappings) {
-        GoogleCalendarRecurrenceEventMapping mapping =
-                mappings.masterMappings().remove(externalEventId);
-        if (mapping == null) {
+    private void deleteRecurrenceEventByExternalId(
+            String externalEventId,
+            ExistingMappingsAndOverrides existingRecords
+    ) {
+        GoogleCalendarRecurrenceEventMapping recurrenceEventMapping =
+                existingRecords.recurrenceEventMappings().remove(externalEventId);
+        if (recurrenceEventMapping == null) {
             return;
         }
-        deleteMaster(mapping);
-        mappings.overrideMappings().entrySet().removeIf(entry ->
-                entry.getKey().parentMappingId().equals(mapping.getId()));
-        mappings.overrides().entrySet().removeIf(entry ->
-                entry.getKey().recurrenceEventId().equals(mapping.getRecurrenceEvent().getId()));
+        deleteRecurrenceEvent(recurrenceEventMapping);
+        existingRecords.googleOverrideMappings().entrySet().removeIf(entry ->
+                entry.getKey().recurrenceEventMappingId()
+                        .equals(recurrenceEventMapping.getId()));
+        existingRecords.recurrenceEventOverrides().entrySet().removeIf(entry ->
+                entry.getKey().recurrenceEventId()
+                        .equals(recurrenceEventMapping.getRecurrenceEvent().getId()));
     }
 
-    void deleteMaster(GoogleCalendarRecurrenceEventMapping mapping) {
+    void deleteRecurrenceEvent(GoogleCalendarRecurrenceEventMapping recurrenceEventMapping) {
         List<GoogleCalendarRecurrenceOverrideMapping> overrideMappings =
-                overrideMappingRepository.findAllByParentMappingIds(Set.of(mapping.getId()));
+                overrideMappingRepository.findAllByRecurrenceEventMappingIds(
+                        Set.of(recurrenceEventMapping.getId())
+                );
         if (!overrideMappings.isEmpty()) {
             overrideMappingRepository.deleteAll(overrideMappings);
             overrideMappingRepository.flush();
         }
-        overrideRepository.deleteByRecurrenceEvent_Id(mapping.getRecurrenceEvent().getId());
+        overrideRepository.deleteByRecurrenceEvent_Id(
+                recurrenceEventMapping.getRecurrenceEvent().getId()
+        );
         overrideRepository.flush();
-        recurrenceMappingRepository.delete(mapping);
+        recurrenceMappingRepository.delete(recurrenceEventMapping);
         recurrenceMappingRepository.flush();
         List<Event> occurrences = eventRepository.findByRecurrenceIdAndAccount_IdOrderByStartAtAsc(
-                mapping.getRecurrenceEvent().getId(),
-                mapping.getRecurrenceEvent().getAccount().getId()
+                recurrenceEventMapping.getRecurrenceEvent().getId(),
+                recurrenceEventMapping.getRecurrenceEvent().getAccount().getId()
         );
         if (!occurrences.isEmpty()) {
             eventRepository.deleteAll(occurrences);
             eventRepository.flush();
         }
-        recurrenceEventRepository.delete(mapping.getRecurrenceEvent());
+        recurrenceEventRepository.delete(recurrenceEventMapping.getRecurrenceEvent());
     }
 
-    private void extendLeaseOrThrow(Long integrationId, String runId) {
+    private void extendSyncLeaseOrThrow(Long integrationId, String runId) {
         if (integrationRepository.extendSyncLease(integrationId, runId) != 1) {
             throw new CalioException(ErrorCode.GOOGLE_CALENDAR_SYNC_CONFLICT);
         }
     }
 
-    private record PageMappings(
-            Map<String, GoogleCalendarEventMapping> generalMappings,
-            Map<String, GoogleCalendarRecurrenceEventMapping> masterMappings,
-            Map<OverrideProviderKey, GoogleCalendarRecurrenceOverrideMapping> overrideMappings,
-            Map<OverrideCanonicalKey, RecurrenceEventOverride> overrides
+    private record ExistingMappingsAndOverrides(
+            Map<String, GoogleCalendarEventMapping> eventMappings,
+            Map<String, GoogleCalendarRecurrenceEventMapping> recurrenceEventMappings,
+            Map<GoogleCalendarRecurrenceOverrideKey, GoogleCalendarRecurrenceOverrideMapping>
+                    googleOverrideMappings,
+            Map<RecurrenceEventOverrideKey, RecurrenceEventOverride> recurrenceEventOverrides
     ) {
     }
 
-    private record OverrideProviderKey(Long parentMappingId, String externalEventId) {
+    private record GoogleCalendarRecurrenceOverrideKey(
+            Long recurrenceEventMappingId,
+            String overrideExternalEventId
+    ) {
     }
 
-    private record OverrideCanonicalKey(Long recurrenceEventId, Instant originStartAt) {
+    private record RecurrenceEventOverrideKey(Long recurrenceEventId, Instant originStartAt) {
     }
 }

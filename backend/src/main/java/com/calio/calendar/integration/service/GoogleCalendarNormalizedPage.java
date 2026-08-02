@@ -1,8 +1,6 @@
 package com.calio.calendar.integration.service;
 
 import com.calio.calendar.external.google.GoogleCalendarEventTimeNormalizer.NormalizedEventSchedule;
-import com.calio.calendar.integration.service.GoogleCalendarRecurrenceMapper.RecurrenceEventResult;
-import com.calio.calendar.integration.service.GoogleCalendarRecurrenceMapper.RecurrenceOverrideResult;
 import java.time.Instant;
 import java.util.List;
 
@@ -20,44 +18,76 @@ public record GoogleCalendarNormalizedPage(
         return nextPageToken != null;
     }
 
-    public sealed interface NormalizedItem permits GeneralUpsert, GeneralCancellation,
-            RecurrenceMasterUpsert, RecurrenceMasterCancellation, RecurrenceOverrideUpsert {
+    public sealed interface NormalizedItem permits EventUpsert, EventCancellation,
+            RecurrenceEventUpsert, RecurrenceEventCancellation,
+            RecurrenceEventOverrideUpsert {
 
         String externalEventId();
     }
 
-    public record GeneralUpsert(
+    public record EventUpsert(
             String externalEventId,
-            String providerEtag,
-            Instant providerUpdatedAt,
+            String googleEtag,
+            Instant googleUpdatedAt,
             String title,
             String description,
             NormalizedEventSchedule schedule
     ) implements NormalizedItem {
     }
 
-    public record GeneralCancellation(String externalEventId) implements NormalizedItem {
+    public record EventCancellation(String externalEventId) implements NormalizedItem {
     }
 
-    public record RecurrenceMasterUpsert(RecurrenceEventResult result)
-            implements NormalizedItem {
+    public record RecurrenceEventUpsert(
+            String externalEventId,
+            String googleEtag,
+            Instant googleUpdatedAt,
+            String title,
+            String description,
+            NormalizedEventSchedule schedule,
+            List<String> recurrenceRules
+    ) implements NormalizedItem {
 
-        @Override
-        public String externalEventId() {
-            return result.externalEventId();
+        public RecurrenceEventUpsert {
+            recurrenceRules = List.copyOf(recurrenceRules);
         }
     }
 
-    public record RecurrenceMasterCancellation(String externalEventId)
+    public record RecurrenceEventCancellation(String externalEventId)
             implements NormalizedItem {
     }
 
-    public record RecurrenceOverrideUpsert(RecurrenceOverrideResult result)
-            implements NormalizedItem {
+    public sealed interface RecurrenceEventOverrideUpsert extends NormalizedItem
+            permits ActiveRecurrenceEventOverrideUpsert,
+            CancelledRecurrenceEventOverrideUpsert {
 
-        @Override
-        public String externalEventId() {
-            return result.externalEventId();
-        }
+        String recurrenceEventExternalId();
+
+        Instant originStartAt();
+
+        String googleEtag();
+
+        Instant googleUpdatedAt();
+    }
+
+    public record ActiveRecurrenceEventOverrideUpsert(
+            String externalEventId,
+            String recurrenceEventExternalId,
+            Instant originStartAt,
+            String googleEtag,
+            Instant googleUpdatedAt,
+            String title,
+            String description,
+            NormalizedEventSchedule schedule
+    ) implements RecurrenceEventOverrideUpsert {
+    }
+
+    public record CancelledRecurrenceEventOverrideUpsert(
+            String externalEventId,
+            String recurrenceEventExternalId,
+            Instant originStartAt,
+            String googleEtag,
+            Instant googleUpdatedAt
+    ) implements RecurrenceEventOverrideUpsert {
     }
 }
