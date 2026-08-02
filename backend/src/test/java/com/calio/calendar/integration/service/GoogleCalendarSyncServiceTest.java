@@ -65,8 +65,6 @@ class GoogleCalendarSyncServiceTest {
                         GoogleCalendarSyncMode.INCREMENTAL,
                         GoogleCalendarSyncMode.FULL
                 );
-        assertThat(providerDataService.resetCount).isZero();
-        assertThat(providerDataService.cleanupFullFailureCount).isZero();
         assertThat(pagePersistenceService.normalizedPersistCount).isOne();
         assertThat(providerDataService.finalizeCount).isOne();
     }
@@ -120,7 +118,6 @@ class GoogleCalendarSyncServiceTest {
                         assertThat(exception.getErrorCode())
                                 .isEqualTo(ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED));
         assertThat(accessTokenService.forceRefreshCount).isOne();
-        assertThat(providerDataService.cleanupFullFailureCount).isZero();
         assertThat(providerDataService.releaseCount).isOne();
     }
 
@@ -141,8 +138,6 @@ class GoogleCalendarSyncServiceTest {
                 .isInstanceOfSatisfying(CalioException.class, exception ->
                         assertThat(exception.getErrorCode())
                                 .isEqualTo(ErrorCode.GOOGLE_CALENDAR_SYNC_FAILED));
-        assertThat(providerDataService.resetCount).isZero();
-        assertThat(providerDataService.cleanupFullFailureCount).isZero();
         assertThat(providerDataService.releaseCount).isOne();
     }
 
@@ -185,8 +180,6 @@ class GoogleCalendarSyncServiceTest {
         // when, then
         assertThatThrownBy(() -> service.sync(10L))
                 .isInstanceOf(CalioException.class);
-        assertThat(providerDataService.resetCount).isZero();
-        assertThat(providerDataService.cleanupFullFailureCount).isZero();
         assertThat(providerDataService.releaseCount).isOne();
     }
 
@@ -324,31 +317,14 @@ class GoogleCalendarSyncServiceTest {
     private static final class FakeProviderDataService
             extends GoogleCalendarProviderDataService {
 
-        private int resetCount;
-        private int cleanupFullFailureCount;
         private int releaseCount;
         private int finalizeCount;
         private boolean finalizedAsFullInventory;
         private String finalizedCursor;
-        private RuntimeException cleanupFailure;
         private RuntimeException releaseFailure;
 
         private FakeProviderDataService() {
             super(null, null, null, null, null, null, null);
-        }
-
-        @Override
-        public boolean resetUnderLease(Long integrationId, String runId) {
-            resetCount++;
-            return true;
-        }
-
-        @Override
-        public void cleanupFullFailureAndRelease(Long integrationId, String runId) {
-            cleanupFullFailureCount++;
-            if (cleanupFailure != null) {
-                throw cleanupFailure;
-            }
         }
 
         @Override
