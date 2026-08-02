@@ -35,3 +35,11 @@ external:
 security:
   token-encryption:
     google-refresh-token-key: ${GOOGLE_TOKEN_ENCRYPTION_KEY}
+
+group-invitation:
+  base-url: ${GROUP_INVITE_BASE_URL:https://calio.app/invite}
+  ttl: PT24H
+  cleanup-fixed-delay: PT1H
+  expired-retention: PT24H
+  cleanup-batch-size: 1000
+  cleanup-max-batches-per-run: 100

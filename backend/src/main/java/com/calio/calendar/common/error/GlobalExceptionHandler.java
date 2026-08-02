@@ -67,7 +67,8 @@ public class GlobalExceptionHandler {
                 errorCode.name(),
                 currentAccountId(),
                 request.getMethod(),
-                request.getRequestURI()
+                request.getRequestURI(),
+                exception
         );
         return toResponse(errorCode, errorCode.getDefaultMessage());
     }
@@ -91,7 +92,8 @@ public class GlobalExceptionHandler {
                     errorCode.name(),
                     currentAccountId(),
                     request.getMethod(),
-                    request.getRequestURI()
+                    request.getRequestURI(),
+                    exception
             );
             return;
         }
