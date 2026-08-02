@@ -4,7 +4,6 @@ import com.calio.calendar.integration.domain.GoogleCalendarEventMapping;
 import java.util.Collection;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -43,11 +42,4 @@ public interface GoogleCalendarEventMappingRepository
     List<GoogleCalendarEventMapping> findAllByIntegrationId(
             @Param("integrationId") Long integrationId
     );
-
-    @Modifying(flushAutomatically = true)
-    @Query("""
-            delete from GoogleCalendarEventMapping mapping
-            where mapping.integration.id = :integrationId
-            """)
-    int deleteAllByIntegrationId(@Param("integrationId") Long integrationId);
 }

@@ -5,7 +5,6 @@ import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.event.repository.EventRepository;
 import com.calio.calendar.integration.domain.GoogleCalendarEventMapping;
-import com.calio.calendar.integration.domain.GoogleCalendarRecurrenceEventMapping;
 import com.calio.calendar.integration.domain.GoogleCalendarRecurrenceOverrideMapping;
 import com.calio.calendar.integration.repository.GoogleCalendarEventMappingRepository;
 import com.calio.calendar.integration.repository.GoogleCalendarIntegrationRepository;
@@ -81,19 +80,6 @@ public class GoogleCalendarProviderDataService {
         if (integrationRepository.finalizeSync(integrationId, runId, nextSyncToken) != 1) {
             throw new CalioException(ErrorCode.GOOGLE_CALENDAR_SYNC_CONFLICT);
         }
-    }
-
-    @Transactional
-    public boolean resetUnderLease(Long integrationId, String runId) {
-        if (integrationRepository.extendSyncLease(integrationId, runId) != 1) {
-            return false;
-        }
-        return integrationRepository.clearCursorUnderLease(integrationId, runId) == 1;
-    }
-
-    @Transactional
-    public void cleanupFullFailureAndRelease(Long integrationId, String runId) {
-        integrationRepository.releaseSyncLease(integrationId, runId);
     }
 
     @Transactional
