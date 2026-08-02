@@ -15,19 +15,15 @@ import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.domain.GroupSpaceFields;
 import com.calio.calendar.groupspace.repository.GroupMemberRepository;
 import com.calio.calendar.groupspace.repository.GroupSpaceRepository;
-import java.util.List;
-import java.util.Locale;
 import java.time.Clock;
 import java.time.Instant;
-import org.springframework.dao.DataIntegrityViolationException;
+import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class GroupSpaceService {
-
-    private static final String ACTIVE_NICKNAME_CONSTRAINT = "uk_group_member_active_nickname";
 
     private final GroupSpaceRepository groupSpaceRepository;
     private final GroupMemberRepository groupMemberRepository;
@@ -120,28 +116,9 @@ public class GroupSpaceService {
             String nickname,
             Instant now
     ) {
-        try {
-            return groupMemberRepository.saveAndFlush(
-                    new GroupMember(groupSpace, accountId, nickname, now)
-            );
-        } catch (DataIntegrityViolationException exception) {
-            if (containsConstraint(exception, ACTIVE_NICKNAME_CONSTRAINT)) {
-                throw new CalioException(ErrorCode.GROUP_MEMBER_NICKNAME_CONFLICT, exception);
-            }
-            throw exception;
-        }
-    }
-
-    private boolean containsConstraint(Throwable throwable, String constraintName) {
-        Throwable current = throwable;
-        while (current != null) {
-            String message = current.getMessage();
-            if (message != null && message.toLowerCase(Locale.ROOT).contains(constraintName)) {
-                return true;
-            }
-            current = current.getCause();
-        }
-        return false;
+        return groupMemberRepository.saveAndFlush(
+                new GroupMember(groupSpace, accountId, nickname, now)
+        );
     }
 
     private void ensureAccountExists(Long accountId) {

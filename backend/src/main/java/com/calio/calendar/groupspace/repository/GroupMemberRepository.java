@@ -4,14 +4,12 @@ import com.calio.calendar.groupspace.domain.GroupMember;
 import com.calio.calendar.groupspace.domain.GroupMemberStatus;
 import jakarta.persistence.LockModeType;
 import java.util.List;
-import java.util.Locale;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import org.springframework.dao.DataIntegrityViolationException;
 
 public interface GroupMemberRepository extends JpaRepository<GroupMember, Long> {
 
@@ -91,19 +89,6 @@ public interface GroupMemberRepository extends JpaRepository<GroupMember, Long> 
             @Param("nickname") String nickname,
             @Param("excludedMemberId") Long excludedMemberId
     );
-
-    default boolean isActiveNicknameConstraintViolation(DataIntegrityViolationException exception) {
-        Throwable current = exception;
-        while (current != null) {
-            String message = current.getMessage();
-            if (message != null && message.toLowerCase(Locale.ROOT)
-                    .contains("uk_group_member_active_nickname")) {
-                return true;
-            }
-            current = current.getCause();
-        }
-        return false;
-    }
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("delete from GroupMember member where member.groupSpace.id = :groupSpaceId")

@@ -24,7 +24,6 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
 import java.util.List;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -91,7 +90,6 @@ public class GroupMembershipService {
         requireFreshInvitation(invitation, membership);
         requireAvailableNickname(groupSpace.getId(), nickname, membership.getId());
         membership.reactivate(nickname, now);
-        flushForNicknameConflict();
         return AcceptGroupInvitationResponse.from(
                 GroupJoinResult.REJOINED,
                 groupSpace,
@@ -219,34 +217,15 @@ public class GroupMembershipService {
             String nickname,
             Instant now
     ) {
-        try {
-            return groupMemberRepository.saveAndFlush(
-                    new GroupMember(groupSpace, accountId, nickname, now)
-            );
-        } catch (DataIntegrityViolationException exception) {
-            throw mapNicknameConflict(exception);
-        }
+        return groupMemberRepository.saveAndFlush(
+                new GroupMember(groupSpace, accountId, nickname, now)
+        );
     }
 
     private void requireFreshInvitation(GroupInvitation invitation, GroupMember membership) {
         if (!normalize(invitation.getCreatedAt()).isAfter(membership.getStatusChangedAt())) {
             throw new CalioException(ErrorCode.GROUP_MEMBER_REJOIN_INVITATION_REQUIRED);
         }
-    }
-
-    private void flushForNicknameConflict() {
-        try {
-            groupMemberRepository.flush();
-        } catch (DataIntegrityViolationException exception) {
-            throw mapNicknameConflict(exception);
-        }
-    }
-
-    private RuntimeException mapNicknameConflict(DataIntegrityViolationException exception) {
-        if (groupMemberRepository.isActiveNicknameConstraintViolation(exception)) {
-            return new CalioException(ErrorCode.GROUP_MEMBER_NICKNAME_CONFLICT);
-        }
-        return exception;
     }
 
     private void requireAvailableNickname(Long groupSpaceId, String nickname, Long excludedMemberId) {

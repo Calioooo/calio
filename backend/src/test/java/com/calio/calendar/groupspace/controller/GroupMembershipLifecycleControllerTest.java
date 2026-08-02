@@ -123,6 +123,42 @@ class GroupMembershipLifecycleControllerTest {
     }
 
     @Test
+    @DisplayName("신규 가입 닉네임이 기존 ACTIVE 멤버와 중복되면 conflict를 반환한다")
+    void acceptRejectsActiveNicknameConflict() throws Exception {
+        // given
+        GroupFixture fixture = createGroupFixture();
+        createInvitation(fixture.groupSpace(), fixture.ownerMember());
+
+        // when, then
+        accept(createAuthenticatedToken(), "OWNER")
+                .andExpect(status().isConflict())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.title").value("GROUP_MEMBER_NICKNAME_CONFLICT"))
+                .andExpect(jsonPath("$.errorCode").value("GROUP_MEMBER_NICKNAME_CONFLICT"));
+    }
+
+    @Test
+    @DisplayName("재가입 닉네임이 기존 ACTIVE 멤버와 중복되면 conflict를 반환한다")
+    void rejoinRejectsActiveNicknameConflict() throws Exception {
+        // given
+        GroupFixture fixture = createGroupFixture();
+        createInvitation(fixture.groupSpace(), fixture.ownerMember());
+        String joinerToken = createAuthenticatedToken();
+        accept(joinerToken, "joiner").andExpect(status().isCreated());
+        mockMvc.perform(delete("/api/group-spaces/{groupSpaceId}/members/me", fixture.groupSpace().getId())
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + joinerToken))
+                .andExpect(status().isNoContent());
+        createInvitation(fixture.groupSpace(), fixture.ownerMember(), REJOIN_LINK_TOKEN);
+
+        // when, then
+        accept(joinerToken, REJOIN_LINK_TOKEN, "owner")
+                .andExpect(status().isConflict())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.title").value("GROUP_MEMBER_NICKNAME_CONFLICT"))
+                .andExpect(jsonPath("$.errorCode").value("GROUP_MEMBER_NICKNAME_CONFLICT"));
+    }
+
+    @Test
     @DisplayName("신규 가입 응답의 memberCount는 inactive membership 이력을 제외한다")
     void acceptMemberCountExcludesInactiveMembershipHistory() throws Exception {
         // given
