@@ -501,6 +501,79 @@ class GoogleCalendarEventPagePersistenceServiceTest {
 
     @Test
     @Transactional
+    @DisplayName("동일 override external ID가 다른 recurrence-event를 참조하면 저장하지 않는다")
+    void givenOverrideExternalIdMappedToDifferentRecurrenceEvent_whenPersistPage_thenRejectsResponse() {
+        // given
+        Account account = accountRepository.saveAndFlush(new Account());
+        tagRepository.saveAndFlush(new Tag(TagType.DEFAULT, "기타", "#64748B"));
+        GoogleCalendarIntegration integration = integrationRepository.saveAndFlush(
+                integration(account.getId())
+        );
+        acquireLease(account.getId(), "cross-parent-run");
+        NormalizedEventSchedule recurrenceSchedule = new NormalizedEventSchedule(
+                Instant.parse("2026-07-01T09:00:00Z"),
+                Instant.parse("2026-07-01T10:00:00Z"),
+                false,
+                "UTC"
+        );
+        RecurrenceEventUpsert firstRecurrenceEvent = new RecurrenceEventUpsert(
+                "recurrence-event-a",
+                null,
+                null,
+                "First recurrence event",
+                null,
+                recurrenceSchedule,
+                List.of("RRULE:FREQ=DAILY")
+        );
+        RecurrenceEventUpsert secondRecurrenceEvent = new RecurrenceEventUpsert(
+                "recurrence-event-b",
+                null,
+                null,
+                "Second recurrence event",
+                null,
+                recurrenceSchedule,
+                List.of("RRULE:FREQ=WEEKLY")
+        );
+        ActiveRecurrenceEventOverrideUpsert firstOverride =
+                recurrenceOverride("shared-override", "recurrence-event-a");
+        pagePersistenceService.persistNormalizedPage(
+                integration.getId(),
+                account.getId(),
+                "cross-parent-run",
+                new GoogleCalendarNormalizedPage(
+                        List.of(firstRecurrenceEvent, secondRecurrenceEvent, firstOverride),
+                        null,
+                        "cursor"
+                )
+        );
+        ActiveRecurrenceEventOverrideUpsert conflictingOverride =
+                recurrenceOverride("shared-override", "recurrence-event-b");
+
+        // when, then
+        assertThatThrownBy(() -> pagePersistenceService.persistNormalizedPage(
+                integration.getId(),
+                account.getId(),
+                "cross-parent-run",
+                new GoogleCalendarNormalizedPage(
+                        List.of(conflictingOverride),
+                        null,
+                        "cursor"
+                )
+        )).isInstanceOfSatisfying(CalioException.class, exception ->
+                assertThat(exception.getErrorCode())
+                        .isEqualTo(ErrorCode.GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID));
+        assertThat(recurrenceEventOverrideRepository.count()).isOne();
+        assertThat(recurrenceOverrideMappingRepository.findAll())
+                .singleElement()
+                .satisfies(mapping -> {
+                    assertThat(mapping.getExternalEventId()).isEqualTo("shared-override");
+                    assertThat(mapping.getRecurrenceEventMapping().getExternalEventId())
+                            .isEqualTo("recurrence-event-a");
+                });
+    }
+
+    @Test
+    @Transactional
     @DisplayName("같은 page에서 override보다 먼저 온 recurrence-event cancellation도 aggregate를 삭제한다")
     void givenCancellationBeforeOverride_whenPersistPage_thenDeletesRecurrenceAggregate() {
         // given
@@ -852,6 +925,27 @@ class GoogleCalendarEventPagePersistenceServiceTest {
                 new GoogleCalendarEventTime(null, "2026-07-02T09:00:00Z", "UTC"),
                 null,
                 null
+        );
+    }
+
+    private ActiveRecurrenceEventOverrideUpsert recurrenceOverride(
+            String externalEventId,
+            String recurrenceEventExternalId
+    ) {
+        return new ActiveRecurrenceEventOverrideUpsert(
+                externalEventId,
+                recurrenceEventExternalId,
+                Instant.parse("2026-07-02T09:00:00Z"),
+                null,
+                null,
+                "Moved",
+                null,
+                new NormalizedEventSchedule(
+                        Instant.parse("2026-07-02T11:00:00Z"),
+                        Instant.parse("2026-07-02T12:00:00Z"),
+                        false,
+                        "UTC"
+                )
         );
     }
 

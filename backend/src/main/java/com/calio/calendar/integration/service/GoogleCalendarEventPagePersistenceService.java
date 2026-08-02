@@ -169,6 +169,7 @@ public class GoogleCalendarEventPagePersistenceService {
                         ));
         Map<GoogleCalendarRecurrenceOverrideKey, GoogleCalendarRecurrenceOverrideMapping>
                 googleOverrideMappings = loadGoogleOverrideMappings(
+                        integrationId,
                         recurrenceEventMappings,
                         items
                 );
@@ -184,15 +185,21 @@ public class GoogleCalendarEventPagePersistenceService {
 
     private Map<GoogleCalendarRecurrenceOverrideKey, GoogleCalendarRecurrenceOverrideMapping>
             loadGoogleOverrideMappings(
+                    Long integrationId,
                     Map<String, GoogleCalendarRecurrenceEventMapping> recurrenceEventMappings,
                     List<NormalizedItem> items
             ) {
+        Map<String, String> recurrenceEventExternalIdsByOverrideExternalId =
+                recurrenceEventExternalIdsByOverrideExternalId(items);
+        rejectOverrideExternalIdsUsedByDifferentRecurrenceEvent(
+                integrationId,
+                recurrenceEventExternalIdsByOverrideExternalId
+        );
         Set<Long> recurrenceEventMappingIds = recurrenceEventMappings.values().stream()
                 .map(GoogleCalendarRecurrenceEventMapping::getId)
                 .collect(Collectors.toSet());
-        boolean containsRecurrenceEventOverrides = items.stream()
-                .anyMatch(RecurrenceEventOverrideUpsert.class::isInstance);
-        if (recurrenceEventMappingIds.isEmpty() || !containsRecurrenceEventOverrides) {
+        if (recurrenceEventMappingIds.isEmpty()
+                || recurrenceEventExternalIdsByOverrideExternalId.isEmpty()) {
             return new HashMap<>();
         }
         return overrideMappingRepository
@@ -208,6 +215,55 @@ public class GoogleCalendarEventPagePersistenceService {
                         (left, right) -> left,
                         HashMap::new
                 ));
+    }
+
+    private Map<String, String> recurrenceEventExternalIdsByOverrideExternalId(
+            List<NormalizedItem> items
+    ) {
+        Map<String, String> recurrenceEventExternalIdsByOverrideExternalId = new HashMap<>();
+        items.stream()
+                .filter(RecurrenceEventOverrideUpsert.class::isInstance)
+                .map(RecurrenceEventOverrideUpsert.class::cast)
+                .forEach(override -> {
+                    String existingRecurrenceEventId =
+                            recurrenceEventExternalIdsByOverrideExternalId.putIfAbsent(
+                                    override.externalEventId(),
+                                    override.recurrenceEventExternalId()
+                            );
+                    if (existingRecurrenceEventId != null
+                            && !existingRecurrenceEventId.equals(
+                                    override.recurrenceEventExternalId()
+                            )) {
+                        throw new CalioException(
+                                ErrorCode.GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID
+                        );
+                    }
+                });
+        return recurrenceEventExternalIdsByOverrideExternalId;
+    }
+
+    private void rejectOverrideExternalIdsUsedByDifferentRecurrenceEvent(
+            Long integrationId,
+            Map<String, String> recurrenceEventExternalIdsByOverrideExternalId
+    ) {
+        if (recurrenceEventExternalIdsByOverrideExternalId.isEmpty()) {
+            return;
+        }
+        overrideMappingRepository.findAllWithRecurrenceEventMappingByExternalEventIds(
+                integrationId,
+                GoogleCalendarRecurrenceEventMapping.PRIMARY_CALENDAR_KEY,
+                recurrenceEventExternalIdsByOverrideExternalId.keySet()
+        ).forEach(mapping -> {
+            String expectedRecurrenceEventId =
+                    recurrenceEventExternalIdsByOverrideExternalId.get(
+                            mapping.getExternalEventId()
+                    );
+            String mappedRecurrenceEventId =
+                    mapping.getRecurrenceEventMapping().getExternalEventId();
+            if (!mappedRecurrenceEventId.equals(expectedRecurrenceEventId)) {
+                throw new CalioException(ErrorCode.GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID);
+            }
+        });
     }
 
     private Map<RecurrenceEventOverrideKey, RecurrenceEventOverride>

@@ -20,13 +20,13 @@ public interface GoogleCalendarRecurrenceOverrideMappingRepository
             join overrideMapping.recurrenceEventMapping recurrenceEventMapping
             where recurrenceEventMapping.integration.id = :integrationId
               and recurrenceEventMapping.calendarKey = :calendarKey
-              and overrideMapping.externalEventId = :externalEventId
+              and overrideMapping.externalEventId in :externalEventIds
             """)
     List<GoogleCalendarRecurrenceOverrideMapping>
-    findAllWithRecurrenceEventMappingByExternalIdentity(
+    findAllWithRecurrenceEventMappingByExternalEventIds(
             @Param("integrationId") Long integrationId,
             @Param("calendarKey") String calendarKey,
-            @Param("externalEventId") String externalEventId
+            @Param("externalEventIds") Collection<String> externalEventIds
     );
 
     @EntityGraph(attributePaths = {"recurrenceEventMapping", "recurrenceEventOverride"})
