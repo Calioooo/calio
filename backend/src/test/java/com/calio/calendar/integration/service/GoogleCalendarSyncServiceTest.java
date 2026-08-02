@@ -334,7 +334,7 @@ class GoogleCalendarSyncServiceTest {
         private RuntimeException releaseFailure;
 
         private FakeProviderDataService() {
-            super(null, null, null);
+            super(null, null, null, null, null, null, null);
         }
 
         @Override

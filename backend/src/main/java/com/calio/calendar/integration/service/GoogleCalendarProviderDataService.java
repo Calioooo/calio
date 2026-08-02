@@ -16,7 +16,6 @@ import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepositor
 import com.calio.calendar.integration.service.GoogleCalendarSyncRunContext.RecurrenceEventOverrideExternalKey;
 import java.util.List;
 import java.util.Set;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,7 +30,6 @@ public class GoogleCalendarProviderDataService {
     private final RecurrenceEventOverrideRepository overrideRepository;
     private final GoogleCalendarEventPagePersistenceService pagePersistenceService;
 
-    @Autowired
     public GoogleCalendarProviderDataService(
             GoogleCalendarIntegrationRepository integrationRepository,
             GoogleCalendarEventMappingRepository eventMappingRepository,
@@ -50,20 +48,9 @@ public class GoogleCalendarProviderDataService {
         this.pagePersistenceService = pagePersistenceService;
     }
 
-    GoogleCalendarProviderDataService(
-            GoogleCalendarIntegrationRepository integrationRepository,
-            GoogleCalendarEventMappingRepository eventMappingRepository,
-            EventRepository eventRepository
-    ) {
-        this(integrationRepository, eventMappingRepository, eventRepository,
-                null, null, null, null);
-    }
-
     @Transactional
     public void deleteProviderData(Long integrationId) {
-        if (recurrenceMappingRepository != null) {
-            deleteAllRecurrenceProviderData(integrationId);
-        }
+        deleteAllRecurrenceProviderData(integrationId);
         deleteAllEventProviderData(integrationId);
     }
 
