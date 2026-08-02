@@ -96,9 +96,10 @@ public class GoogleCalendarPageNormalizer {
         }
 
         List<NormalizedItem> orderedItems = new ArrayList<>();
-        fetchedRecurrenceEvents.values().stream()
-                .peek(item -> context.seeRecurrenceEvent(item.externalEventId()))
-                .forEach(orderedItems::add);
+        for (RecurrenceEventUpsert recurrenceEvent : fetchedRecurrenceEvents.values()) {
+            context.seeRecurrenceEvent(recurrenceEvent.externalEventId());
+            orderedItems.add(recurrenceEvent);
+        }
         normalizedItems.stream()
                 .filter(RecurrenceEventUpsert.class::isInstance)
                 .forEach(orderedItems::add);
