@@ -210,6 +210,36 @@ class GoogleCalendarSyncMigrationTest {
         }
     }
 
+    @Test
+    @DisplayName("V13은 Account sequence와 durable Google operation Job 제약 및 조회 index를 추가한다")
+    void givenV12Schema_whenMigrateToV13_thenAddsDurableOperationRuntime() throws Exception {
+        // given
+        String url = "jdbc:h2:mem:google-operation-runtime;MODE=MySQL;DB_CLOSE_DELAY=-1";
+        migrateTo(url, MigrationVersion.fromVersion("12"));
+
+        // when
+        migrateTo(url, MigrationVersion.fromVersion("13"));
+
+        // then
+        try (Connection connection = DriverManager.getConnection(url, "sa", "")) {
+            assertThat(columnNames(connection, "ACCOUNTS")).contains(
+                    "NEXT_GOOGLE_OPERATION_SEQUENCE",
+                    "GOOGLE_OPERATION_LEASE_OWNER",
+                    "GOOGLE_OPERATION_LEASE_EXPIRES_AT"
+            );
+            assertThat(columnNames(connection, "GOOGLE_OPERATION_JOBS")).contains(
+                    "OPERATION_ID", "INTEGRATION_ID", "ACCOUNT_ID", "ACCOUNT_SEQUENCE",
+                    "JOB_KIND", "JOB_TRIGGER", "JOB_STATE", "RUNNABLE_AT", "RETRY_COUNT",
+                    "OWNER_TOKEN", "TERMINAL_REASON", "TERMINAL_AT"
+            );
+            assertThat(indexNames(connection, "GOOGLE_OPERATION_JOBS")).contains(
+                    "IDX_GOOGLE_OPERATION_JOBS_ACCOUNT_HEAD",
+                    "IDX_GOOGLE_OPERATION_JOBS_RUNNABLE",
+                    "IDX_GOOGLE_OPERATION_JOBS_TERMINAL_CLEANUP"
+            );
+        }
+    }
+
     private void migrateTo(String url, MigrationVersion target) {
         Flyway.configure()
                 .dataSource(url, "sa", "")

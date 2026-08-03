@@ -36,6 +36,7 @@ public class GoogleCalendarProviderDataService {
     private final RecurrenceEventRepository recurrenceEventRepository;
     private final RecurrenceEventOverrideRepository overrideRepository;
     private final GoogleCalendarEventPagePersistenceService pagePersistenceService;
+    private GoogleOperationJobPersistenceService operationJobPersistenceService;
 
     public GoogleCalendarProviderDataService(
             GoogleCalendarIntegrationRepository integrationRepository,
@@ -55,6 +56,13 @@ public class GoogleCalendarProviderDataService {
         this.recurrenceEventRepository = recurrenceEventRepository;
         this.overrideRepository = overrideRepository;
         this.pagePersistenceService = pagePersistenceService;
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setOperationJobPersistenceService(
+            GoogleOperationJobPersistenceService operationJobPersistenceService
+    ) {
+        this.operationJobPersistenceService = operationJobPersistenceService;
     }
 
     @Transactional
@@ -86,6 +94,31 @@ public class GoogleCalendarProviderDataService {
             );
         }
         finalizeSync(integrationId, runId, nextSyncToken);
+    }
+
+    @Transactional
+    public void finalizeOwnedReconciliation(
+            Long jobId,
+            Long accountId,
+            Long integrationId,
+            String workerToken,
+            GoogleCalendarSyncMode syncMode,
+            Set<String> seenEventIds,
+            Set<String> seenRecurrenceEventIds,
+            Set<RecurrenceEventOverrideExternalKey> seenOverrideIds,
+            String nextSyncToken
+    ) {
+        operationJobPersistenceService.renewAndAssertOwned(jobId, accountId, workerToken);
+        if (!hasText(nextSyncToken)) {
+            throw new CalioException(ErrorCode.GOOGLE_CALENDAR_SYNC_TOKEN_MISSING);
+        }
+        if (syncMode == GoogleCalendarSyncMode.FULL) {
+            deleteUnseenProviderData(
+                    integrationId, workerToken, seenEventIds,
+                    seenRecurrenceEventIds, seenOverrideIds);
+        }
+        finalizeSync(integrationId, workerToken, nextSyncToken);
+        operationJobPersistenceService.succeed(jobId, workerToken);
     }
 
     @Transactional

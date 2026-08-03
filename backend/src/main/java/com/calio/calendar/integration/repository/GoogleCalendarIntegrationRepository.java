@@ -3,6 +3,7 @@ package com.calio.calendar.integration.repository;
 import com.calio.calendar.integration.domain.GoogleCalendarIntegration;
 import jakarta.persistence.LockModeType;
 import java.util.Optional;
+import java.util.List;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -23,6 +24,9 @@ public interface GoogleCalendarIntegrationRepository extends JpaRepository<Googl
     Optional<GoogleCalendarIntegration> findByAccountIdForUpdate(@Param("accountId") Long accountId);
 
     boolean existsByAccountId(Long accountId);
+
+    @Query("select integration.accountId from GoogleCalendarIntegration integration")
+    List<Long> findAllConnectedAccountIds();
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(value = """

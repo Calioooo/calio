@@ -11,13 +11,24 @@ public class GoogleCalendarIntegrationPersistenceService {
 
     private final GoogleCalendarIntegrationRepository googleCalendarIntegrationRepository;
     private final GoogleCalendarProviderDataService providerDataService;
+    private final com.calio.calendar.integration.repository.GoogleOperationJobRepository jobRepository;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public GoogleCalendarIntegrationPersistenceService(
             GoogleCalendarIntegrationRepository googleCalendarIntegrationRepository,
-            GoogleCalendarProviderDataService providerDataService
+            GoogleCalendarProviderDataService providerDataService,
+            com.calio.calendar.integration.repository.GoogleOperationJobRepository jobRepository
     ) {
         this.googleCalendarIntegrationRepository = googleCalendarIntegrationRepository;
         this.providerDataService = providerDataService;
+        this.jobRepository = jobRepository;
+    }
+
+    protected GoogleCalendarIntegrationPersistenceService(
+            GoogleCalendarIntegrationRepository googleCalendarIntegrationRepository,
+            GoogleCalendarProviderDataService providerDataService
+    ) {
+        this(googleCalendarIntegrationRepository, providerDataService, null);
     }
 
     @Transactional
@@ -81,6 +92,9 @@ public class GoogleCalendarIntegrationPersistenceService {
     public void deleteByAccountId(Long accountId) {
         googleCalendarIntegrationRepository.findByAccountIdForUpdate(accountId)
                 .ifPresent(integration -> {
+                    if (jobRepository != null) {
+                        jobRepository.deleteByIntegrationId(integration.getId());
+                    }
                     providerDataService.deleteProviderData(integration.getId());
                     googleCalendarIntegrationRepository.delete(integration);
                 });
