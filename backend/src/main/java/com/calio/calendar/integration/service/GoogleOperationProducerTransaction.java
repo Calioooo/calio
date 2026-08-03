@@ -1,7 +1,5 @@
 package com.calio.calendar.integration.service;
 
-import com.calio.calendar.account.domain.Account;
-import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.integration.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.domain.GoogleOperationJob;
 import com.calio.calendar.integration.repository.GoogleCalendarIntegrationRepository;
@@ -18,20 +16,17 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 @Service
 public class GoogleOperationProducerTransaction {
 
-    private final AccountRepository accountRepository;
     private final GoogleCalendarIntegrationRepository integrationRepository;
     private final GoogleOperationJobRepository jobRepository;
     private final GoogleOperationWorker worker;
     private final Clock clock;
 
     public GoogleOperationProducerTransaction(
-            AccountRepository accountRepository,
             GoogleCalendarIntegrationRepository integrationRepository,
             GoogleOperationJobRepository jobRepository,
             GoogleOperationWorker worker,
             Clock clock
     ) {
-        this.accountRepository = accountRepository;
         this.integrationRepository = integrationRepository;
         this.jobRepository = jobRepository;
         this.worker = worker;
@@ -45,16 +40,14 @@ public class GoogleOperationProducerTransaction {
             OutboundJobDraft jobDraft
     ) {
         T result = authorizedCanonicalMutation.get();
-        GoogleCalendarIntegration integration = integrationRepository.findByAccountId(accountId)
+        GoogleCalendarIntegration integration = integrationRepository.findByAccountIdForUpdate(accountId)
                 .orElse(null);
         if (integration == null) {
             return result;
         }
-        Account account = accountRepository.findByIdForGoogleOperation(accountId)
-                .orElseThrow();
         jobRepository.saveAndFlush(GoogleOperationJob.outbound(
                 UUID.randomUUID().toString(), integration.getId(), accountId,
-                account.allocateGoogleOperationSequence(), jobDraft.kind(),
+                integration.allocateGoogleOperationSequence(), jobDraft.kind(),
                 jobDraft.resourceScope(), jobDraft.resourceKey(), jobDraft.providerIdentity(),
                 jobDraft.desiredPayload(), Instant.now(clock)));
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {

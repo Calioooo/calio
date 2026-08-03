@@ -31,6 +31,37 @@ public interface GoogleCalendarIntegrationRepository extends JpaRepository<Googl
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(value = """
             UPDATE google_calendar_integrations
+            SET google_operation_lease_owner = :owner,
+                google_operation_lease_expires_at = TIMESTAMPADD(MINUTE, 5, CURRENT_TIMESTAMP)
+            WHERE account_id = :accountId
+              AND (google_operation_lease_owner IS NULL
+                   OR google_operation_lease_expires_at < CURRENT_TIMESTAMP)
+            """, nativeQuery = true)
+    int acquireGoogleOperationLease(@Param("accountId") Long accountId, @Param("owner") String owner);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(value = """
+            UPDATE google_calendar_integrations
+            SET google_operation_lease_expires_at = TIMESTAMPADD(MINUTE, 5, CURRENT_TIMESTAMP)
+            WHERE account_id = :accountId
+              AND google_operation_lease_owner = :owner
+              AND google_operation_lease_expires_at >= CURRENT_TIMESTAMP
+            """, nativeQuery = true)
+    int renewGoogleOperationLease(@Param("accountId") Long accountId, @Param("owner") String owner);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            update GoogleCalendarIntegration integration
+            set integration.googleOperationLeaseOwner = null,
+                integration.googleOperationLeaseExpiresAt = null
+            where integration.accountId = :accountId
+              and integration.googleOperationLeaseOwner = :owner
+            """)
+    int releaseGoogleOperationLease(@Param("accountId") Long accountId, @Param("owner") String owner);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(value = """
+            UPDATE google_calendar_integrations
             SET active_sync_run_id = :runId,
                 sync_lease_expires_at = TIMESTAMPADD(MINUTE, 5, CURRENT_TIMESTAMP)
             WHERE account_id = :accountId

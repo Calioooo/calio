@@ -222,7 +222,12 @@ class GoogleCalendarSyncMigrationTest {
 
         // then
         try (Connection connection = DriverManager.getConnection(url, "sa", "")) {
-            assertThat(columnNames(connection, "ACCOUNTS")).contains(
+            assertThat(columnNames(connection, "GOOGLE_CALENDAR_INTEGRATIONS")).contains(
+                    "NEXT_GOOGLE_OPERATION_SEQUENCE",
+                    "GOOGLE_OPERATION_LEASE_OWNER",
+                    "GOOGLE_OPERATION_LEASE_EXPIRES_AT"
+            );
+            assertThat(columnNames(connection, "ACCOUNTS")).doesNotContain(
                     "NEXT_GOOGLE_OPERATION_SEQUENCE",
                     "GOOGLE_OPERATION_LEASE_OWNER",
                     "GOOGLE_OPERATION_LEASE_EXPIRES_AT"

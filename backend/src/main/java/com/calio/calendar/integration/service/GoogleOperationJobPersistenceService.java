@@ -1,6 +1,6 @@
 package com.calio.calendar.integration.service;
 
-import com.calio.calendar.account.repository.AccountRepository;
+import com.calio.calendar.integration.repository.GoogleCalendarIntegrationRepository;
 import com.calio.calendar.integration.domain.GoogleOperationJob;
 import com.calio.calendar.integration.domain.GoogleOperationJobState;
 import com.calio.calendar.integration.repository.GoogleOperationJobRepository;
@@ -18,23 +18,23 @@ public class GoogleOperationJobPersistenceService {
     private static final List<Duration> RETRY_DELAYS = List.of(
             Duration.ofMinutes(10), Duration.ofMinutes(30), Duration.ofHours(1), Duration.ofHours(6));
 
-    private final AccountRepository accountRepository;
+    private final GoogleCalendarIntegrationRepository integrationRepository;
     private final GoogleOperationJobRepository jobRepository;
     private final Clock clock;
 
     public GoogleOperationJobPersistenceService(
-            AccountRepository accountRepository,
+            GoogleCalendarIntegrationRepository integrationRepository,
             GoogleOperationJobRepository jobRepository,
             Clock clock
     ) {
-        this.accountRepository = accountRepository;
+        this.integrationRepository = integrationRepository;
         this.jobRepository = jobRepository;
         this.clock = clock;
     }
 
     @Transactional
     public boolean acquireLease(Long accountId, String workerToken) {
-        return accountRepository.acquireGoogleOperationLease(accountId, workerToken) == 1;
+        return integrationRepository.acquireGoogleOperationLease(accountId, workerToken) == 1;
     }
 
     @Transactional
@@ -58,7 +58,7 @@ public class GoogleOperationJobPersistenceService {
 
     @Transactional
     public void renewAndAssertOwned(Long jobId, Long accountId, String workerToken) {
-        if (accountRepository.renewGoogleOperationLease(accountId, workerToken) != 1
+        if (integrationRepository.renewGoogleOperationLease(accountId, workerToken) != 1
                 || jobRepository.countActiveOwnership(jobId, workerToken) != 1) {
             throw new StaleGoogleOperationWorkerException();
         }
@@ -88,7 +88,7 @@ public class GoogleOperationJobPersistenceService {
 
     @Transactional
     public void releaseLease(Long accountId, String workerToken) {
-        accountRepository.releaseGoogleOperationLease(accountId, workerToken);
+        integrationRepository.releaseGoogleOperationLease(accountId, workerToken);
     }
 
     @Transactional

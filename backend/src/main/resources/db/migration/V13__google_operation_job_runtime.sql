@@ -1,14 +1,14 @@
-ALTER TABLE accounts
+ALTER TABLE google_calendar_integrations
     ADD COLUMN next_google_operation_sequence BIGINT NOT NULL DEFAULT 1;
 
-ALTER TABLE accounts
+ALTER TABLE google_calendar_integrations
     ADD COLUMN google_operation_lease_owner VARCHAR(36) NULL;
 
-ALTER TABLE accounts
+ALTER TABLE google_calendar_integrations
     ADD COLUMN google_operation_lease_expires_at DATETIME(6) NULL;
 
-ALTER TABLE accounts
-    ADD CONSTRAINT ck_accounts_google_operation_lease
+ALTER TABLE google_calendar_integrations
+    ADD CONSTRAINT ck_google_calendar_integrations_operation_lease
         CHECK (
             (google_operation_lease_owner IS NULL AND google_operation_lease_expires_at IS NULL)
             OR

@@ -1,7 +1,5 @@
 package com.calio.calendar.integration.service;
 
-import com.calio.calendar.account.domain.Account;
-import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.integration.domain.GoogleCalendarIntegration;
@@ -20,20 +18,17 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 @Service
 public class GoogleOperationJobEnqueueService {
 
-    private final AccountRepository accountRepository;
     private final GoogleCalendarIntegrationRepository integrationRepository;
     private final GoogleOperationJobRepository jobRepository;
     private final GoogleOperationWorker worker;
     private final Clock clock;
 
     public GoogleOperationJobEnqueueService(
-            AccountRepository accountRepository,
             GoogleCalendarIntegrationRepository integrationRepository,
             GoogleOperationJobRepository jobRepository,
             GoogleOperationWorker worker,
             Clock clock
     ) {
-        this.accountRepository = accountRepository;
         this.integrationRepository = integrationRepository;
         this.jobRepository = jobRepository;
         this.worker = worker;
@@ -52,15 +47,13 @@ public class GoogleOperationJobEnqueueService {
     }
 
     private void enqueueSync(Long accountId, GoogleOperationJobTrigger trigger) {
-        GoogleCalendarIntegration integration = integrationRepository.findByAccountId(accountId)
+        GoogleCalendarIntegration integration = integrationRepository.findByAccountIdForUpdate(accountId)
                 .orElseThrow(() -> new CalioException(ErrorCode.GOOGLE_CALENDAR_NOT_CONNECTED));
-        Account account = accountRepository.findByIdForGoogleOperation(accountId)
-                .orElseThrow(() -> new CalioException(ErrorCode.INTERNAL_SERVER_ERROR));
         GoogleOperationJob job = GoogleOperationJob.sync(
                 UUID.randomUUID().toString(),
                 integration.getId(),
                 accountId,
-                account.allocateGoogleOperationSequence(),
+                integration.allocateGoogleOperationSequence(),
                 trigger,
                 Instant.now(clock)
         );

@@ -30,10 +30,10 @@ public interface GoogleOperationJobRepository extends JpaRepository<GoogleOperat
             WHERE id = :jobId AND job_state = 'PENDING'
               AND runnable_at <= CURRENT_TIMESTAMP
               AND EXISTS (
-                  SELECT 1 FROM accounts account
-                  WHERE account.id = google_operation_jobs.account_id
-                    AND account.google_operation_lease_owner = :owner
-                    AND account.google_operation_lease_expires_at >= CURRENT_TIMESTAMP
+                  SELECT 1 FROM google_calendar_integrations integration
+                  WHERE integration.id = google_operation_jobs.integration_id
+                    AND integration.google_operation_lease_owner = :owner
+                    AND integration.google_operation_lease_expires_at >= CURRENT_TIMESTAMP
               )
             """, nativeQuery = true)
     int claim(@Param("jobId") Long jobId, @Param("owner") String owner);
@@ -44,21 +44,21 @@ public interface GoogleOperationJobRepository extends JpaRepository<GoogleOperat
             SET owner_token = :owner, updated_at = CURRENT_TIMESTAMP
             WHERE id = :jobId AND job_state = 'PROCESSING'
               AND EXISTS (
-                  SELECT 1 FROM accounts account
-                  WHERE account.id = google_operation_jobs.account_id
-                    AND account.google_operation_lease_owner = :owner
-                    AND account.google_operation_lease_expires_at >= CURRENT_TIMESTAMP
+                  SELECT 1 FROM google_calendar_integrations integration
+                  WHERE integration.id = google_operation_jobs.integration_id
+                    AND integration.google_operation_lease_owner = :owner
+                    AND integration.google_operation_lease_expires_at >= CURRENT_TIMESTAMP
               )
             """, nativeQuery = true)
     int reclaimProcessing(@Param("jobId") Long jobId, @Param("owner") String owner);
 
     @Query(value = """
             SELECT COUNT(*) FROM google_operation_jobs job
-            JOIN accounts account ON account.id = job.account_id
+            JOIN google_calendar_integrations integration ON integration.id = job.integration_id
             WHERE job.id = :jobId AND job.job_state = 'PROCESSING'
               AND job.owner_token = :owner
-              AND account.google_operation_lease_owner = :owner
-              AND account.google_operation_lease_expires_at >= CURRENT_TIMESTAMP
+              AND integration.google_operation_lease_owner = :owner
+              AND integration.google_operation_lease_expires_at >= CURRENT_TIMESTAMP
             """, nativeQuery = true)
     int countActiveOwnership(@Param("jobId") Long jobId, @Param("owner") String owner);
 
@@ -71,10 +71,10 @@ public interface GoogleOperationJobRepository extends JpaRepository<GoogleOperat
             WHERE id = :jobId AND job_state = 'PROCESSING'
               AND owner_token = :owner
               AND EXISTS (
-                  SELECT 1 FROM accounts account
-                  WHERE account.id = google_operation_jobs.account_id
-                    AND account.google_operation_lease_owner = :owner
-                    AND account.google_operation_lease_expires_at >= CURRENT_TIMESTAMP
+                  SELECT 1 FROM google_calendar_integrations integration
+                  WHERE integration.id = google_operation_jobs.integration_id
+                    AND integration.google_operation_lease_owner = :owner
+                    AND integration.google_operation_lease_expires_at >= CURRENT_TIMESTAMP
               )
             """, nativeQuery = true)
     int retry(@Param("jobId") Long jobId, @Param("owner") String owner,
@@ -89,10 +89,10 @@ public interface GoogleOperationJobRepository extends JpaRepository<GoogleOperat
             WHERE id = :jobId AND job_state = 'PROCESSING'
               AND owner_token = :owner
               AND EXISTS (
-                  SELECT 1 FROM accounts account
-                  WHERE account.id = google_operation_jobs.account_id
-                    AND account.google_operation_lease_owner = :owner
-                    AND account.google_operation_lease_expires_at >= CURRENT_TIMESTAMP
+                  SELECT 1 FROM google_calendar_integrations integration
+                  WHERE integration.id = google_operation_jobs.integration_id
+                    AND integration.google_operation_lease_owner = :owner
+                    AND integration.google_operation_lease_expires_at >= CURRENT_TIMESTAMP
               )
             """, nativeQuery = true)
     int terminateWithSyncError(@Param("jobId") Long jobId, @Param("owner") String owner,
@@ -104,10 +104,10 @@ public interface GoogleOperationJobRepository extends JpaRepository<GoogleOperat
             WHERE id = :jobId AND job_state = 'PROCESSING'
               AND owner_token = :owner
               AND EXISTS (
-                  SELECT 1 FROM accounts account
-                  WHERE account.id = google_operation_jobs.account_id
-                    AND account.google_operation_lease_owner = :owner
-                    AND account.google_operation_lease_expires_at >= CURRENT_TIMESTAMP
+                  SELECT 1 FROM google_calendar_integrations integration
+                  WHERE integration.id = google_operation_jobs.integration_id
+                    AND integration.google_operation_lease_owner = :owner
+                    AND integration.google_operation_lease_expires_at >= CURRENT_TIMESTAMP
               )
             """, nativeQuery = true)
     int deleteOwnedSuccessful(@Param("jobId") Long jobId, @Param("owner") String owner);
