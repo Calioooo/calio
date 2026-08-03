@@ -8,6 +8,7 @@ import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.event.repository.EventRepository;
 import com.calio.calendar.integration.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.domain.GoogleCalendarIntegration;
+import com.calio.calendar.integration.domain.GoogleCalendarIntegrationState;
 import com.calio.calendar.integration.domain.GoogleCalendarRecurrenceEventMapping;
 import com.calio.calendar.integration.domain.GoogleCalendarRecurrenceOverrideMapping;
 import com.calio.calendar.integration.repository.GoogleCalendarEventMappingRepository;
@@ -71,8 +72,8 @@ class GoogleCalendarIntegrationPersistenceServiceTest {
 
     @Test
     @Transactional
-    @DisplayName("reconnect는 같은 integration row에서 provider data와 이전 lease를 무효화한다")
-    void givenConnectedProviderData_whenReconnect_thenReplacesIdentityAndInvalidatesOldRun() {
+    @DisplayName("reconnect는 retained mapping을 보존하고 cursor와 이전 lease를 무효화한다")
+    void givenConnectedProviderData_whenReconnect_thenRetainsIdentityAndInvalidatesOldRun() {
         // given
         Account account = accountRepository.saveAndFlush(new Account());
         GoogleCalendarIntegration integration = integrationRepository.saveAndFlush(
@@ -104,14 +105,15 @@ class GoogleCalendarIntegrationPersistenceServiceTest {
         assertThat(reconnected.getNextSyncToken()).isNull();
         assertThat(reconnected.getActiveSyncRunId()).isNull();
         assertThat(reconnected.getSyncLeaseExpiresAt()).isNull();
-        assertThat(mappingRepository.findEventIdsByIntegrationId(integration.getId())).isEmpty();
-        assertThat(eventRepository.findById(importedEvent.getId())).isEmpty();
+        assertThat(mappingRepository.findEventIdsByIntegrationId(integration.getId()))
+                .containsExactly(importedEvent.getId());
+        assertThat(eventRepository.findById(importedEvent.getId())).isPresent();
         assertThat(integrationRepository.extendSyncLease(integration.getId(), "old-run")).isZero();
     }
 
     @Test
-    @DisplayName("disconnect local delete는 mapping, import Event, integration을 함께 제거한다")
-    void givenConnectedProviderData_whenDeleteIntegration_thenDeletesProviderDataFirst() {
+    @DisplayName("disconnect는 integration과 mapping identity를 retained 상태로 보존한다")
+    void givenConnectedProviderData_whenDisconnect_thenRetainsProviderIdentity() {
         // given
         Account account = accountRepository.saveAndFlush(new Account());
         GoogleCalendarIntegration integration = integrationRepository.saveAndFlush(
@@ -123,14 +125,19 @@ class GoogleCalendarIntegrationPersistenceServiceTest {
         persistenceService.deleteByAccountId(account.getId());
 
         // then
-        assertThat(mappingRepository.findEventIdsByIntegrationId(integration.getId())).isEmpty();
-        assertThat(eventRepository.findById(importedEvent.getId())).isEmpty();
-        assertThat(integrationRepository.findById(integration.getId())).isEmpty();
+        assertThat(mappingRepository.findEventIdsByIntegrationId(integration.getId()))
+                .containsExactly(importedEvent.getId());
+        assertThat(eventRepository.findById(importedEvent.getId())).isPresent();
+        GoogleCalendarIntegration disconnected = integrationRepository
+                .findById(integration.getId()).orElseThrow();
+        assertThat(disconnected.getState()).isEqualTo(GoogleCalendarIntegrationState.DISCONNECTED);
+        assertThat(disconnected.getEncryptedRefreshToken()).isNull();
+        assertThat(disconnected.getEncryptedAccessToken()).isNull();
     }
 
     @Test
-    @DisplayName("disconnect는 provider recurrence aggregate를 child-first로 지우고 local recurrence는 보존한다")
-    void givenProviderAndLocalRecurrence_whenDisconnect_thenDeletesOnlyProviderAggregate() {
+    @DisplayName("disconnect는 provider recurrence aggregate와 local recurrence를 모두 보존한다")
+    void givenProviderAndLocalRecurrence_whenDisconnect_thenRetainsMappingsAndCanonicalData() {
         // given
         Account account = accountRepository.saveAndFlush(new Account());
         Tag defaultTag = tagRepository.saveAndFlush(
@@ -164,10 +171,10 @@ class GoogleCalendarIntegrationPersistenceServiceTest {
         persistenceService.deleteByAccountId(account.getId());
 
         // then
-        assertThat(overrideMappingRepository.count()).isZero();
-        assertThat(overrideRepository.findById(providerOverride.getOverrideId())).isEmpty();
-        assertThat(recurrenceMappingRepository.count()).isZero();
-        assertThat(recurrenceEventRepository.findById(providerRecurrence.getId())).isEmpty();
+        assertThat(overrideMappingRepository.count()).isOne();
+        assertThat(overrideRepository.findById(providerOverride.getOverrideId())).isPresent();
+        assertThat(recurrenceMappingRepository.count()).isOne();
+        assertThat(recurrenceEventRepository.findById(providerRecurrence.getId())).isPresent();
         assertThat(recurrenceEventRepository.findById(localRecurrence.getId())).isPresent();
     }
 

@@ -63,7 +63,7 @@ public class GoogleCalendarIntegrationService {
 
     public GoogleCalendarIntegrationResponse getConnectionStatus(Long accountId) {
         GoogleCalendarIntegration integration = persistenceService.findByAccountIdOrNull(accountId);
-        if (integration == null) {
+        if (integration == null || !integration.isConnected()) {
             return GoogleCalendarIntegrationResponse.disconnected();
         }
 
@@ -76,9 +76,14 @@ public class GoogleCalendarIntegrationService {
             return;
         }
 
-        String refreshToken = tokenEncryptor.decrypt(integration.getEncryptedRefreshToken());
-        googleOAuthClient.revokeToken(refreshToken);
-        persistenceService.deleteByAccountId(accountId);
+        try {
+            if (integration.isConnected()) {
+                String refreshToken = tokenEncryptor.decrypt(integration.getEncryptedRefreshToken());
+                googleOAuthClient.revokeToken(refreshToken);
+            }
+        } finally {
+            persistenceService.deleteByAccountId(accountId);
+        }
     }
 
     private void validateConfiguration() {

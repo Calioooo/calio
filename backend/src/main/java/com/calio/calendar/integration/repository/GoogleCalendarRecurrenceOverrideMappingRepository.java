@@ -1,17 +1,39 @@
 package com.calio.calendar.integration.repository;
 
 import com.calio.calendar.integration.domain.GoogleCalendarRecurrenceOverrideMapping;
+import com.calio.calendar.integration.domain.GoogleCalendarMappingStatus;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
+import java.time.Instant;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.repository.query.Param;
 
 public interface GoogleCalendarRecurrenceOverrideMappingRepository
         extends JpaRepository<GoogleCalendarRecurrenceOverrideMapping, Long> {
+
+    long countByRecurrenceEventMapping_Integration_IdAndSyncStatus(
+            Long integrationId,
+            GoogleCalendarMappingStatus status
+    );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @EntityGraph(attributePaths = {"recurrenceEventMapping", "recurrenceEventOverride"})
+    @Query("""
+            select mapping from GoogleCalendarRecurrenceOverrideMapping mapping
+            where mapping.recurrenceEventMapping.id = :masterMappingId
+              and mapping.recurrenceEventOverride.originStartAt = :originStartAt
+            """)
+    Optional<GoogleCalendarRecurrenceOverrideMapping> findExactScopeForUpdate(
+            @Param("masterMappingId") Long masterMappingId,
+            @Param("originStartAt") Instant originStartAt
+    );
 
     @EntityGraph(attributePaths = "recurrenceEventMapping")
     @Query("""

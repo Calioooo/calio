@@ -10,6 +10,7 @@ import com.calio.calendar.event.repository.EventRepository;
 import com.calio.calendar.external.google.GoogleCalendarEventTimeNormalizer.NormalizedEventSchedule;
 import com.calio.calendar.integration.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.domain.GoogleCalendarIntegration;
+import com.calio.calendar.integration.domain.GoogleCalendarMappingStatus;
 import com.calio.calendar.integration.domain.GoogleCalendarRecurrenceEventMapping;
 import com.calio.calendar.integration.domain.GoogleCalendarRecurrenceOverrideMapping;
 import com.calio.calendar.integration.repository.GoogleCalendarEventMappingRepository;
@@ -38,7 +39,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import com.calio.calendar.integration.service.GoogleCalendarConflictClassifier.Result;
+import com.calio.calendar.integration.service.GoogleCalendarContentFingerprint.Fingerprint;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -53,7 +57,9 @@ public class GoogleCalendarEventPagePersistenceService {
     private final GoogleCalendarRecurrenceOverrideMappingRepository overrideMappingRepository;
     private final RecurrenceEventRepository recurrenceEventRepository;
     private final RecurrenceEventOverrideRepository overrideRepository;
+    private final GoogleCalendarContentFingerprint contentFingerprint;
 
+    @Autowired
     public GoogleCalendarEventPagePersistenceService(
             GoogleCalendarIntegrationRepository integrationRepository,
             GoogleCalendarEventMappingRepository eventMappingRepository,
@@ -63,7 +69,8 @@ public class GoogleCalendarEventPagePersistenceService {
             GoogleCalendarRecurrenceEventMappingRepository recurrenceMappingRepository,
             GoogleCalendarRecurrenceOverrideMappingRepository overrideMappingRepository,
             RecurrenceEventRepository recurrenceEventRepository,
-            RecurrenceEventOverrideRepository overrideRepository
+            RecurrenceEventOverrideRepository overrideRepository,
+            GoogleCalendarContentFingerprint contentFingerprint
     ) {
         this.integrationRepository = integrationRepository;
         this.eventMappingRepository = eventMappingRepository;
@@ -74,10 +81,36 @@ public class GoogleCalendarEventPagePersistenceService {
         this.overrideMappingRepository = overrideMappingRepository;
         this.recurrenceEventRepository = recurrenceEventRepository;
         this.overrideRepository = overrideRepository;
+        this.contentFingerprint = contentFingerprint;
+    }
+
+    protected GoogleCalendarEventPagePersistenceService(
+            GoogleCalendarIntegrationRepository integrationRepository,
+            GoogleCalendarEventMappingRepository eventMappingRepository,
+            EventRepository eventRepository,
+            AccountRepository accountRepository,
+            TagService tagService,
+            GoogleCalendarRecurrenceEventMappingRepository recurrenceMappingRepository,
+            GoogleCalendarRecurrenceOverrideMappingRepository overrideMappingRepository,
+            RecurrenceEventRepository recurrenceEventRepository,
+            RecurrenceEventOverrideRepository overrideRepository
+    ) {
+        this(
+                integrationRepository,
+                eventMappingRepository,
+                eventRepository,
+                accountRepository,
+                tagService,
+                recurrenceMappingRepository,
+                overrideMappingRepository,
+                recurrenceEventRepository,
+                overrideRepository,
+                new GoogleCalendarContentFingerprint()
+        );
     }
 
     @Transactional
-    public void persistNormalizedPage(
+    public boolean persistNormalizedPage(
             Long integrationId,
             Long accountId,
             String runId,
@@ -85,10 +118,10 @@ public class GoogleCalendarEventPagePersistenceService {
     ) {
         extendSyncLeaseOrThrow(integrationId, runId);
         GoogleCalendarIntegration integration = integrationRepository.getReferenceById(integrationId);
-        applyEventChanges(integration, accountId, page.items());
+        return applyEventChanges(integration, accountId, page.items());
     }
 
-    private void applyEventChanges(
+    private boolean applyEventChanges(
             GoogleCalendarIntegration integration,
             Long accountId,
             List<NormalizedItem> items
@@ -104,7 +137,9 @@ public class GoogleCalendarEventPagePersistenceService {
                 ? tagService.getTagOrDefault(accountId, null)
                 : null;
 
+        boolean conflictDetected = false;
         for (NormalizedItem item : items) {
+            boolean wasConflicted = isConflictedScope(item, existingRecords);
             switch (item) {
                 case EventUpsert event ->
                         upsertEvent(integration, event, existingRecords, account, defaultTag);
@@ -124,7 +159,41 @@ public class GoogleCalendarEventPagePersistenceService {
                 case RecurrenceEventOverrideUpsert override ->
                         upsertRecurrenceEventOverride(override, existingRecords);
             }
+            conflictDetected |= !wasConflicted && isConflictedScope(item, existingRecords);
         }
+        return conflictDetected;
+    }
+
+    private boolean isConflictedScope(
+            NormalizedItem item,
+            ExistingMappingsAndOverrides existingRecords
+    ) {
+        GoogleCalendarEventMapping eventMapping =
+                existingRecords.eventMappings().get(item.externalEventId());
+        if (eventMapping != null
+                && eventMapping.getSyncStatus() == GoogleCalendarMappingStatus.CONFLICTED) {
+            return true;
+        }
+        if (item instanceof RecurrenceEventOverrideUpsert override) {
+            GoogleCalendarRecurrenceEventMapping master = existingRecords
+                    .recurrenceEventMappings().get(override.recurrenceEventExternalId());
+            if (master == null) {
+                return false;
+            }
+            if (master.getSyncStatus() == GoogleCalendarMappingStatus.CONFLICTED) {
+                return true;
+            }
+            GoogleCalendarRecurrenceOverrideMapping mapping = existingRecords
+                    .googleOverrideMappings().get(new GoogleCalendarRecurrenceOverrideKey(
+                            master.getId(), override.externalEventId()
+                    ));
+            return mapping != null
+                    && mapping.getSyncStatus() == GoogleCalendarMappingStatus.CONFLICTED;
+        }
+        GoogleCalendarRecurrenceEventMapping recurrenceMapping = existingRecords
+                .recurrenceEventMappings().get(item.externalEventId());
+        return recurrenceMapping != null
+                && recurrenceMapping.getSyncStatus() == GoogleCalendarMappingStatus.CONFLICTED;
     }
 
     private ExistingMappingsAndOverrides loadExistingMappingsAndOverrides(
@@ -324,14 +393,21 @@ public class GoogleCalendarEventPagePersistenceService {
             Account account,
             Tag defaultTag
     ) {
-        if (existingRecords.recurrenceEventMappings().containsKey(item.externalEventId())) {
-            deleteRecurrenceEventByExternalId(item.externalEventId(), existingRecords);
+        if (existingRecords.recurrenceEventMappings().containsKey(item.externalEventId())
+                && !deleteRecurrenceEventByExternalId(item.externalEventId(), existingRecords)) {
+            return;
         }
+        eventMappingRepository.findByExternalIdentityForUpdate(
+                integration.getId(),
+                GoogleCalendarEventMapping.PRIMARY_CALENDAR_KEY,
+                item.externalEventId()
+        ).ifPresent(mapping -> existingRecords.eventMappings().put(
+                item.externalEventId(), mapping
+        ));
         GoogleCalendarEventMapping existingMapping =
                 existingRecords.eventMappings().get(item.externalEventId());
         if (existingMapping != null) {
-            updateEvent(existingMapping.getEvent(), item);
-            existingMapping.updateProviderVersion(item.googleEtag(), item.googleUpdatedAt());
+            reconcileEvent(existingMapping, item);
             return;
         }
         Event event = eventRepository.save(new Event(
@@ -354,7 +430,38 @@ public class GoogleCalendarEventPagePersistenceService {
                         item.googleUpdatedAt()
                 )
         );
+        Fingerprint fingerprint = eventFingerprint(item);
+        mapping.updateBaseline(
+                item.googleEtag(), item.googleUpdatedAt(), fingerprint.version(), fingerprint.hash()
+        );
         existingRecords.eventMappings().put(item.externalEventId(), mapping);
+    }
+
+    private void reconcileEvent(GoogleCalendarEventMapping mapping, EventUpsert item) {
+        if (mapping.getSyncStatus() == GoogleCalendarMappingStatus.CONFLICTED
+                || mapping.isLocalDeleted()) {
+            return;
+        }
+        Fingerprint provider = eventFingerprint(item);
+        Fingerprint local = eventFingerprint(mapping.getEvent());
+        Result result = GoogleCalendarConflictClassifier.classify(
+                mapping.getSyncedContentHash(), local.hash(), provider.hash()
+        );
+        if (result == Result.TRUE_CONFLICT) {
+            mapping.updateProviderVersion(item.googleEtag(), item.googleUpdatedAt());
+            mapping.markConflicted();
+            return;
+        }
+        if (result == Result.CALIO_ONLY) {
+            mapping.updateProviderVersion(item.googleEtag(), item.googleUpdatedAt());
+            return;
+        }
+        if (result == Result.GOOGLE_ONLY) {
+            updateEvent(mapping.getEvent(), item);
+        }
+        mapping.updateBaseline(
+                item.googleEtag(), item.googleUpdatedAt(), provider.version(), provider.hash()
+        );
     }
 
     private void updateEvent(Event event, EventUpsert item) {
@@ -375,20 +482,22 @@ public class GoogleCalendarEventPagePersistenceService {
             Account account,
             Tag defaultTag
     ) {
-        if (existingRecords.eventMappings().containsKey(item.externalEventId())) {
-            deleteEvent(item.externalEventId(), existingRecords);
+        if (existingRecords.eventMappings().containsKey(item.externalEventId())
+                && !deleteEvent(item.externalEventId(), existingRecords)) {
+            return;
         }
+        recurrenceMappingRepository.findByExternalIdentityForUpdate(
+                integration.getId(),
+                GoogleCalendarRecurrenceEventMapping.PRIMARY_CALENDAR_KEY,
+                item.externalEventId()
+        ).ifPresent(mapping -> existingRecords.recurrenceEventMappings().put(
+                item.externalEventId(), mapping
+        ));
         RecurrenceSchedule schedule = toRecurrenceSchedule(item.schedule());
         GoogleCalendarRecurrenceEventMapping existingMapping =
                 existingRecords.recurrenceEventMappings().get(item.externalEventId());
         if (existingMapping != null) {
-            existingMapping.getRecurrenceEvent().updateProviderContent(
-                    item.title(),
-                    item.description(),
-                    schedule,
-                    item.recurrenceRules()
-            );
-            existingMapping.updateProviderVersion(item.googleEtag(), item.googleUpdatedAt());
+            reconcileRecurrenceEvent(existingMapping, item, schedule);
             return;
         }
         RecurrenceEvent recurrenceEvent = recurrenceEventRepository.save(new RecurrenceEvent(
@@ -408,7 +517,44 @@ public class GoogleCalendarEventPagePersistenceService {
                         item.googleUpdatedAt()
                 )
         );
+        Fingerprint fingerprint = recurrenceFingerprint(item);
+        mapping.updateBaseline(
+                item.googleEtag(), item.googleUpdatedAt(), fingerprint.version(), fingerprint.hash()
+        );
         existingRecords.recurrenceEventMappings().put(item.externalEventId(), mapping);
+    }
+
+    private void reconcileRecurrenceEvent(
+            GoogleCalendarRecurrenceEventMapping mapping,
+            RecurrenceEventUpsert item,
+            RecurrenceSchedule schedule
+    ) {
+        if (mapping.getSyncStatus() == GoogleCalendarMappingStatus.CONFLICTED
+                || mapping.isLocalDeleted()) {
+            return;
+        }
+        Fingerprint provider = recurrenceFingerprint(item);
+        Fingerprint local = recurrenceFingerprint(mapping.getRecurrenceEvent());
+        Result result = GoogleCalendarConflictClassifier.classify(
+                mapping.getSyncedContentHash(), local.hash(), provider.hash()
+        );
+        if (result == Result.TRUE_CONFLICT) {
+            mapping.updateProviderVersion(item.googleEtag(), item.googleUpdatedAt());
+            mapping.markConflicted();
+            return;
+        }
+        if (result == Result.CALIO_ONLY) {
+            mapping.updateProviderVersion(item.googleEtag(), item.googleUpdatedAt());
+            return;
+        }
+        if (result == Result.GOOGLE_ONLY) {
+            mapping.getRecurrenceEvent().updateProviderContent(
+                    item.title(), item.description(), schedule, item.recurrenceRules()
+            );
+        }
+        mapping.updateBaseline(
+                item.googleEtag(), item.googleUpdatedAt(), provider.version(), provider.hash()
+        );
     }
 
     private void upsertRecurrenceEventOverride(
@@ -421,6 +567,17 @@ public class GoogleCalendarEventPagePersistenceService {
         if (recurrenceEventMapping == null) {
             throw new CalioException(ErrorCode.GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID);
         }
+        if (recurrenceEventMapping.getSyncStatus() == GoogleCalendarMappingStatus.CONFLICTED
+                || recurrenceEventMapping.isLocalDeleted()) {
+            return;
+        }
+        recurrenceEventMapping = recurrenceMappingRepository.findByExternalIdentityForUpdate(
+                recurrenceEventMapping.getIntegration().getId(),
+                GoogleCalendarRecurrenceEventMapping.PRIMARY_CALENDAR_KEY,
+                item.recurrenceEventExternalId()
+        ).orElseThrow(() -> new CalioException(
+                ErrorCode.GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID
+        ));
         GoogleCalendarRecurrenceOverrideKey googleOverrideKey =
                 new GoogleCalendarRecurrenceOverrideKey(
                         recurrenceEventMapping.getId(),
@@ -433,6 +590,13 @@ public class GoogleCalendarEventPagePersistenceService {
                 );
         GoogleCalendarRecurrenceOverrideMapping googleOverrideMapping =
                 existingRecords.googleOverrideMappings().get(googleOverrideKey);
+        GoogleCalendarRecurrenceOverrideMapping lockedOverride = overrideMappingRepository
+                .findExactScopeForUpdate(recurrenceEventMapping.getId(), item.originStartAt())
+                .orElse(null);
+        if (lockedOverride != null) {
+            googleOverrideMapping = lockedOverride;
+            existingRecords.googleOverrideMappings().put(googleOverrideKey, lockedOverride);
+        }
         RecurrenceEventOverride recurrenceEventOverride =
                 existingRecords.recurrenceEventOverrides().get(recurrenceEventOverrideKey);
         if (googleOverrideMapping != null) {
@@ -441,6 +605,32 @@ public class GoogleCalendarEventPagePersistenceService {
                     recurrenceEventOverrideKey
             );
             recurrenceEventOverride = googleOverrideMapping.getRecurrenceEventOverride();
+            if (googleOverrideMapping.getSyncStatus() == GoogleCalendarMappingStatus.CONFLICTED) {
+                return;
+            }
+            Fingerprint provider = overrideFingerprint(item);
+            Fingerprint local = overrideFingerprint(
+                    item.recurrenceEventExternalId(),
+                    recurrenceEventOverride
+            );
+            Result result = GoogleCalendarConflictClassifier.classify(
+                    googleOverrideMapping.getSyncedContentHash(),
+                    local.hash(),
+                    provider.hash()
+            );
+            if (result == Result.TRUE_CONFLICT) {
+                googleOverrideMapping.updateProviderVersion(
+                        item.googleEtag(), item.googleUpdatedAt()
+                );
+                googleOverrideMapping.markConflicted();
+                return;
+            }
+            if (result == Result.CALIO_ONLY) {
+                googleOverrideMapping.updateProviderVersion(
+                        item.googleEtag(), item.googleUpdatedAt()
+                );
+                return;
+            }
         }
         throwIfOverrideMappedToDifferentGoogleEvent(
                 googleOverrideMapping,
@@ -474,12 +664,77 @@ public class GoogleCalendarEventPagePersistenceService {
                     googleOverrideKey,
                     googleOverrideMapping
             );
-        } else {
-            googleOverrideMapping.updateProviderVersion(
-                    item.googleEtag(),
-                    item.googleUpdatedAt()
+        }
+        Fingerprint provider = overrideFingerprint(item);
+        googleOverrideMapping.updateBaseline(
+                item.googleEtag(), item.googleUpdatedAt(), provider.version(), provider.hash()
+        );
+    }
+
+    private Fingerprint eventFingerprint(EventUpsert item) {
+        return contentFingerprint.generalEvent(
+                item.title(), item.description(), item.schedule().startAt(),
+                item.schedule().endAt(), item.schedule().allDay(), item.schedule().timeZone()
+        );
+    }
+
+    private Fingerprint eventFingerprint(Event event) {
+        return contentFingerprint.generalEvent(
+                event.getTitle(), event.getDescription(), event.getStartAt(), event.getEndAt(),
+                event.isAllDay(), event.getTimeZone()
+        );
+    }
+
+    private Fingerprint recurrenceFingerprint(RecurrenceEventUpsert item) {
+        return contentFingerprint.recurrenceMaster(
+                item.title(), item.description(), item.schedule().startAt(),
+                item.schedule().endAt(), item.schedule().allDay(), item.schedule().timeZone(),
+                item.recurrenceRules()
+        );
+    }
+
+    private Fingerprint recurrenceFingerprint(RecurrenceEvent event) {
+        return contentFingerprint.recurrenceMaster(
+                event.getRecurrenceTitle(), event.getRecurrenceDescription(),
+                event.getFirstOccurrenceStartAt(), event.getFirstOccurrenceEndAt(),
+                event.isAllDay(), event.getTimeZone(), event.getRecurrenceRules()
+        );
+    }
+
+    private Fingerprint overrideFingerprint(RecurrenceEventOverrideUpsert item) {
+        if (item instanceof CancelledRecurrenceEventOverrideUpsert) {
+            return contentFingerprint.deletedOverride(
+                    item.recurrenceEventExternalId(), item.originStartAt()
             );
         }
+        ActiveRecurrenceEventOverrideUpsert active =
+                (ActiveRecurrenceEventOverrideUpsert) item;
+        return contentFingerprint.activeOverride(
+                item.recurrenceEventExternalId(), item.originStartAt(), active.title(),
+                active.description(), active.schedule().startAt(), active.schedule().endAt(),
+                active.schedule().allDay(), active.schedule().timeZone()
+        );
+    }
+
+    private Fingerprint overrideFingerprint(
+            String recurrenceEventExternalId,
+            RecurrenceEventOverride override
+    ) {
+        if (override.isDeleted()) {
+            return contentFingerprint.deletedOverride(
+                    recurrenceEventExternalId, override.getOriginStartAt()
+            );
+        }
+        return contentFingerprint.activeOverride(
+                recurrenceEventExternalId,
+                override.getOriginStartAt(),
+                override.getOverrideTitle(),
+                override.getOverrideDescription(),
+                override.getOverrideStartAt(),
+                override.getOverrideEndAt(),
+                override.isOverrideAllDay(),
+                override.getOverrideTimeZone()
+        );
     }
 
     private void validateMappedRecurrenceOverrideKey(
@@ -579,37 +834,84 @@ public class GoogleCalendarEventPagePersistenceService {
         );
     }
 
-    private void deleteEvent(
+    private boolean deleteEvent(
             String externalEventId,
             ExistingMappingsAndOverrides existingRecords
     ) {
         GoogleCalendarEventMapping eventMapping =
-                existingRecords.eventMappings().remove(externalEventId);
+                existingRecords.eventMappings().get(externalEventId);
         if (eventMapping == null) {
-            return;
+            return true;
+        }
+        eventMapping = eventMappingRepository.findByExternalIdentityForUpdate(
+                eventMapping.getIntegration().getId(),
+                GoogleCalendarEventMapping.PRIMARY_CALENDAR_KEY,
+                externalEventId
+        ).orElse(null);
+        if (eventMapping == null) {
+            existingRecords.eventMappings().remove(externalEventId);
+            return true;
+        }
+        existingRecords.eventMappings().put(externalEventId, eventMapping);
+        if (eventMapping.getSyncStatus() == GoogleCalendarMappingStatus.CONFLICTED
+                || eventMapping.isLocalDeleted()) {
+            return false;
+        }
+        Fingerprint local = eventFingerprint(eventMapping.getEvent());
+        if (eventMapping.getSyncedContentHash() != null
+                && !eventMapping.getSyncedContentHash().equals(local.hash())) {
+            eventMapping.markConflicted();
+            return false;
         }
         Event event = eventMapping.getEvent();
         eventMappingRepository.delete(eventMapping);
         eventMappingRepository.flush();
         eventRepository.delete(event);
+        existingRecords.eventMappings().remove(externalEventId);
+        return true;
     }
 
-    private void deleteRecurrenceEventByExternalId(
+    private boolean deleteRecurrenceEventByExternalId(
             String externalEventId,
             ExistingMappingsAndOverrides existingRecords
     ) {
         GoogleCalendarRecurrenceEventMapping recurrenceEventMapping =
-                existingRecords.recurrenceEventMappings().remove(externalEventId);
+                existingRecords.recurrenceEventMappings().get(externalEventId);
         if (recurrenceEventMapping == null) {
-            return;
+            return true;
         }
-        deleteRecurrenceEvent(recurrenceEventMapping);
+        GoogleCalendarRecurrenceEventMapping lockedMapping = recurrenceMappingRepository
+                .findByExternalIdentityForUpdate(
+                recurrenceEventMapping.getIntegration().getId(),
+                GoogleCalendarRecurrenceEventMapping.PRIMARY_CALENDAR_KEY,
+                externalEventId
+        ).orElse(null);
+        if (lockedMapping == null) {
+            existingRecords.recurrenceEventMappings().remove(externalEventId);
+            return true;
+        }
+        existingRecords.recurrenceEventMappings().put(externalEventId, lockedMapping);
+        if (lockedMapping.getSyncStatus() == GoogleCalendarMappingStatus.CONFLICTED
+                || lockedMapping.isLocalDeleted()) {
+            return false;
+        }
+        Fingerprint local = recurrenceFingerprint(lockedMapping.getRecurrenceEvent());
+        if (lockedMapping.getSyncedContentHash() != null
+                && !lockedMapping.getSyncedContentHash().equals(local.hash())) {
+            lockedMapping.markConflicted();
+            return false;
+        }
+        Long lockedMappingId = lockedMapping.getId();
+        Long lockedRecurrenceEventId = lockedMapping.getRecurrenceEvent().getId();
+        deleteRecurrenceEvent(lockedMapping);
+        existingRecords.recurrenceEventMappings().remove(externalEventId);
         existingRecords.googleOverrideMappings().entrySet().removeIf(entry ->
                 entry.getKey().recurrenceEventMappingId()
-                        .equals(recurrenceEventMapping.getId()));
+                        .equals(lockedMappingId));
         existingRecords.recurrenceEventOverrides().entrySet().removeIf(entry ->
                 entry.getKey().recurrenceEventId()
-                        .equals(recurrenceEventMapping.getRecurrenceEvent().getId()));
+                        .equals(lockedRecurrenceEventId));
+        return true;
     }
 
     void deleteRecurrenceEvent(GoogleCalendarRecurrenceEventMapping recurrenceEventMapping) {

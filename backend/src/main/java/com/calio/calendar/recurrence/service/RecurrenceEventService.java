@@ -18,6 +18,11 @@ import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepositor
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.service.TagService;
+import com.calio.calendar.integration.domain.GoogleCalendarIntegrationState;
+import com.calio.calendar.integration.domain.GoogleCalendarMappingStatus;
+import com.calio.calendar.integration.domain.GoogleCalendarRecurrenceEventMapping;
+import com.calio.calendar.integration.repository.GoogleCalendarRecurrenceEventMappingRepository;
+import com.calio.calendar.integration.repository.GoogleCalendarRecurrenceOverrideMappingRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -34,6 +39,8 @@ public class RecurrenceEventService {
     private final AccountRepository accountRepository;
     private final TagService tagService;
     private final Rfc5545RecurrenceEngine recurrenceEngine;
+    private final GoogleCalendarRecurrenceEventMappingRepository googleRecurrenceMappingRepository;
+    private final GoogleCalendarRecurrenceOverrideMappingRepository googleOverrideMappingRepository;
 
     public RecurrenceEventService(
             RecurrenceEventRepository recurrenceEventRepository,
@@ -41,7 +48,9 @@ public class RecurrenceEventService {
             RecurrenceEventOverrideRepository recurrenceEventOverrideRepository,
             AccountRepository accountRepository,
             TagService tagService,
-            Rfc5545RecurrenceEngine recurrenceEngine
+            Rfc5545RecurrenceEngine recurrenceEngine,
+            GoogleCalendarRecurrenceEventMappingRepository googleRecurrenceMappingRepository,
+            GoogleCalendarRecurrenceOverrideMappingRepository googleOverrideMappingRepository
     ) {
         this.recurrenceEventRepository = recurrenceEventRepository;
         this.eventRepository = eventRepository;
@@ -49,6 +58,8 @@ public class RecurrenceEventService {
         this.accountRepository = accountRepository;
         this.tagService = tagService;
         this.recurrenceEngine = recurrenceEngine;
+        this.googleRecurrenceMappingRepository = googleRecurrenceMappingRepository;
+        this.googleOverrideMappingRepository = googleOverrideMappingRepository;
     }
 
     @Transactional
@@ -79,6 +90,7 @@ public class RecurrenceEventService {
             UpdateRecurrenceEventRequest request
     ) {
         RecurrenceEvent recurrenceEvent = findRecurrenceEventForUpdate(accountId, recurrenceId);
+        rejectActiveProviderMutation(recurrenceEvent, accountId);
         RecurrenceSchedule schedule = createSchedule(request);
         List<String> recurrenceRules = recurrenceEngine.validate(schedule, request.recurrence());
         Tag tag = tagService.getTagOrDefault(accountId, request.tagId());
@@ -95,6 +107,7 @@ public class RecurrenceEventService {
             UpdateRecurrenceOccurrenceRequest request
     ) {
         RecurrenceEvent recurrenceEvent = findRecurrenceEventForUpdate(accountId, recurrenceId);
+        rejectActiveProviderMutation(recurrenceEvent, accountId);
         CanonicalSchedule schedule = CanonicalSchedule.recurrenceOverride(
                 request.startAt(),
                 request.endAt(),
@@ -123,16 +136,37 @@ public class RecurrenceEventService {
     @Transactional
     public void deleteRecurrenceEvent(Long accountId, Long recurrenceId) {
         RecurrenceEvent recurrenceEvent = findRecurrenceEventForUpdate(accountId, recurrenceId);
+        GoogleCalendarRecurrenceEventMapping mapping = googleRecurrenceMappingRepository
+                .findByRecurrenceEventForUpdate(recurrenceId, accountId)
+                .orElse(null);
+        if (mapping != null && !canDetach(mapping)) {
+            throw new CalioException(ErrorCode.EXTERNAL_EVENT_MUTATION_NOT_SUPPORTED);
+        }
+        if (mapping != null) {
+            googleOverrideMappingRepository.deleteAllByRecurrenceEventMappingIds(
+                    List.of(mapping.getId())
+            );
+        }
         recurrenceEventOverrideRepository.deleteByRecurrenceEvent_Id(recurrenceId);
         eventRepository.deleteAll(
                 eventRepository.findByRecurrenceIdAndAccount_IdOrderByStartAtAsc(recurrenceId, accountId)
         );
+        if (mapping != null) {
+            mapping.detachLocalDeletion();
+        }
         recurrenceEventRepository.delete(recurrenceEvent);
+    }
+
+    private boolean canDetach(GoogleCalendarRecurrenceEventMapping mapping) {
+        return mapping.getSyncStatus() == GoogleCalendarMappingStatus.CONFLICTED
+                || mapping.getIntegration().getState()
+                == GoogleCalendarIntegrationState.DISCONNECTED;
     }
 
     @Transactional
     public void deleteRecurrenceOccurrence(Long accountId, Long recurrenceId, Instant originStartAt) {
         RecurrenceEvent recurrenceEvent = findRecurrenceEventForUpdate(accountId, recurrenceId);
+        rejectActiveProviderMutation(recurrenceEvent, accountId);
         Optional<RecurrenceEventOverride> existingOverride =
                 findOverrideOrRejectIneligible(recurrenceEvent, originStartAt);
         Instant deletedAt = Instant.now();
@@ -144,6 +178,18 @@ public class RecurrenceEventService {
             override = RecurrenceEventOverride.deleted(recurrenceEvent, originStartAt, deletedAt);
         }
         recurrenceEventOverrideRepository.saveAndFlush(override);
+    }
+
+    private void rejectActiveProviderMutation(RecurrenceEvent recurrenceEvent, Long accountId) {
+        GoogleCalendarRecurrenceEventMapping mapping = googleRecurrenceMappingRepository
+                .findByRecurrenceEventForUpdate(recurrenceEvent.getId(), accountId)
+                .orElse(null);
+        if (mapping != null
+                && mapping.getSyncStatus() == GoogleCalendarMappingStatus.ACTIVE
+                && mapping.getIntegration().getState()
+                != GoogleCalendarIntegrationState.DISCONNECTED) {
+            throw new CalioException(ErrorCode.EXTERNAL_EVENT_MUTATION_NOT_SUPPORTED);
+        }
     }
 
     private RecurrenceSchedule createSchedule(CreateRecurrenceEventRequest request) {

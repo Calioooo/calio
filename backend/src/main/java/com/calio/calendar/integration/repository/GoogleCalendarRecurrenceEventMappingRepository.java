@@ -1,6 +1,7 @@
 package com.calio.calendar.integration.repository;
 
 import com.calio.calendar.integration.domain.GoogleCalendarRecurrenceEventMapping;
+import com.calio.calendar.integration.domain.GoogleCalendarMappingStatus;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -9,6 +10,8 @@ import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.Lock;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.repository.query.Param;
 
 public interface GoogleCalendarRecurrenceEventMappingRepository
@@ -16,11 +19,39 @@ public interface GoogleCalendarRecurrenceEventMappingRepository
 
     Optional<GoogleCalendarRecurrenceEventMapping> findByRecurrenceEvent_Id(Long recurrenceEventId);
 
+    long countByIntegration_IdAndSyncStatus(Long integrationId, GoogleCalendarMappingStatus status);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @EntityGraph(attributePaths = "integration")
+    @Query("""
+            select mapping from GoogleCalendarRecurrenceEventMapping mapping
+            where mapping.recurrenceEvent.id = :recurrenceEventId
+              and mapping.integration.accountId = :accountId
+            """)
+    Optional<GoogleCalendarRecurrenceEventMapping> findByRecurrenceEventForUpdate(
+            @Param("recurrenceEventId") Long recurrenceEventId,
+            @Param("accountId") Long accountId
+    );
+
     Optional<GoogleCalendarRecurrenceEventMapping>
     findByIntegration_IdAndCalendarKeyAndExternalEventId(
             Long integrationId,
             String calendarKey,
             String externalEventId
+    );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @EntityGraph(attributePaths = "recurrenceEvent")
+    @Query("""
+            select mapping from GoogleCalendarRecurrenceEventMapping mapping
+            where mapping.integration.id = :integrationId
+              and mapping.calendarKey = :calendarKey
+              and mapping.externalEventId = :externalEventId
+            """)
+    Optional<GoogleCalendarRecurrenceEventMapping> findByExternalIdentityForUpdate(
+            @Param("integrationId") Long integrationId,
+            @Param("calendarKey") String calendarKey,
+            @Param("externalEventId") String externalEventId
     );
 
     @EntityGraph(attributePaths = {"recurrenceEvent", "recurrenceEvent.tag"})

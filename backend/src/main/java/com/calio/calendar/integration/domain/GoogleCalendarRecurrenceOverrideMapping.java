@@ -4,6 +4,8 @@ import com.calio.calendar.common.domain.BaseEntity;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -55,6 +57,16 @@ public class GoogleCalendarRecurrenceOverrideMapping extends BaseEntity {
     @Column(name = "provider_updated_at")
     private Instant providerUpdatedAt;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "sync_status", nullable = false, length = 32)
+    private GoogleCalendarMappingStatus syncStatus;
+
+    @Column(name = "synced_content_hash", length = 64)
+    private String syncedContentHash;
+
+    @Column(name = "synced_content_hash_version", length = 32)
+    private String syncedContentHashVersion;
+
     protected GoogleCalendarRecurrenceOverrideMapping() {
     }
 
@@ -68,6 +80,7 @@ public class GoogleCalendarRecurrenceOverrideMapping extends BaseEntity {
         this.recurrenceEventMapping = recurrenceEventMapping;
         this.recurrenceEventOverride = recurrenceEventOverride;
         this.externalEventId = externalEventId;
+        this.syncStatus = GoogleCalendarMappingStatus.ACTIVE;
         this.providerEtag = providerEtag;
         this.providerUpdatedAt = providerUpdatedAt;
     }
@@ -76,6 +89,19 @@ public class GoogleCalendarRecurrenceOverrideMapping extends BaseEntity {
         this.providerEtag = providerEtag;
         this.providerUpdatedAt = providerUpdatedAt;
     }
+
+    public void updateBaseline(
+            String providerEtag,
+            Instant providerUpdatedAt,
+            String hashVersion,
+            String contentHash
+    ) {
+        updateProviderVersion(providerEtag, providerUpdatedAt);
+        this.syncedContentHashVersion = hashVersion;
+        this.syncedContentHash = contentHash;
+    }
+
+    public void markConflicted() { this.syncStatus = GoogleCalendarMappingStatus.CONFLICTED; }
 
     public Long getId() {
         return id;
@@ -100,4 +126,8 @@ public class GoogleCalendarRecurrenceOverrideMapping extends BaseEntity {
     public Instant getProviderUpdatedAt() {
         return providerUpdatedAt;
     }
+
+    public GoogleCalendarMappingStatus getSyncStatus() { return syncStatus; }
+    public String getSyncedContentHash() { return syncedContentHash; }
+    public String getSyncedContentHashVersion() { return syncedContentHashVersion; }
 }

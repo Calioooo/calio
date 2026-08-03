@@ -382,6 +382,10 @@ class GoogleCalendarSyncServiceTest {
         public SyncLease acquire(Long accountId, String runId) {
             return new SyncLease(20L, accountId, nextSyncToken, runId);
         }
+
+        @Override
+        public void release(SyncLease lease) {
+        }
     }
 
     private static final class FakeProviderDataService
@@ -419,7 +423,7 @@ class GoogleCalendarSyncServiceTest {
         }
 
         @Override
-        public void finalizeReconciliation(
+        public boolean finalizeReconciliation(
                 Long integrationId,
                 String runId,
                 GoogleCalendarSyncMode syncMode,
@@ -435,6 +439,7 @@ class GoogleCalendarSyncServiceTest {
             finalizedSeenEventIds = Set.copyOf(seenEventIds);
             finalizedSeenRecurrenceEventIds = Set.copyOf(seenRecurrenceEventIds);
             finalizedSeenOverrideIds = Set.copyOf(seenOverrideIds);
+            return false;
         }
     }
 
@@ -513,13 +518,14 @@ class GoogleCalendarSyncServiceTest {
         }
 
         @Override
-        public void persistNormalizedPage(
+        public boolean persistNormalizedPage(
                 Long integrationId,
                 Long accountId,
                 String runId,
                 GoogleCalendarNormalizedPage page
         ) {
             normalizedPersistCount++;
+            return false;
         }
     }
 

@@ -77,7 +77,7 @@ class GoogleCalendarIntegrationServiceTest {
     }
 
     @Test
-    @DisplayName("disconnect는 저장된 refresh token을 복호화해 Google revoke를 성공한 뒤 row를 삭제한다")
+    @DisplayName("disconnect는 저장된 refresh token을 revoke하고 retained integration을 정리한다")
     void givenConnectedIntegration_whenDisconnect_thenRevokesRefreshTokenBeforeDelete() {
         // given
         FakeGoogleOAuthClient googleOAuthClient = new FakeGoogleOAuthClient(googleOAuthProperties);
@@ -94,7 +94,7 @@ class GoogleCalendarIntegrationServiceTest {
     }
 
     @Test
-    @DisplayName("disconnect는 Google revoke가 invalid_token이면 row를 삭제한다")
+    @DisplayName("disconnect는 Google revoke가 invalid_token이어도 retained integration을 정리한다")
     void givenInvalidTokenRevokeResponse_whenDisconnect_thenDeletesIntegrationRow() {
         // given
         FakeGoogleOAuthClient googleOAuthClient = new FakeGoogleOAuthClient(googleOAuthProperties);
@@ -112,7 +112,7 @@ class GoogleCalendarIntegrationServiceTest {
     }
 
     @Test
-    @DisplayName("disconnect는 invalid_token 외 Google revoke 실패 시 기존 row를 삭제하지 않는다")
+    @DisplayName("disconnect는 Google revoke 실패 시에도 local runtime state를 정리한다")
     void givenUnexpectedRevokeFailure_whenDisconnect_thenKeepsIntegrationRow() {
         // given
         FakeGoogleOAuthClient googleOAuthClient = new FakeGoogleOAuthClient(googleOAuthProperties);
@@ -125,7 +125,7 @@ class GoogleCalendarIntegrationServiceTest {
         assertThatThrownBy(() -> service.disconnect(ACCOUNT_ID))
                 .isInstanceOfSatisfying(CalioException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.GOOGLE_TOKEN_REVOKE_FAILED));
-        assertThat(persistenceService.deleteCount).isZero();
+        assertThat(persistenceService.deleteCount).isOne();
     }
 
     private GoogleCalendarIntegrationService service(

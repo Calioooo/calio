@@ -6,12 +6,20 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.integration.domain.GoogleCalendarIntegration;
+import com.calio.calendar.integration.domain.GoogleCalendarOperationJob;
+import com.calio.calendar.integration.domain.GoogleCalendarOperationStatus;
+import com.calio.calendar.integration.domain.GoogleCalendarOperationTrigger;
+import com.calio.calendar.integration.service.GoogleCalendarOperationCoordinator;
+import com.calio.calendar.integration.service.GoogleCalendarOperationCoordinator.ClaimedOperation;
+import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest(properties = {
@@ -28,6 +36,12 @@ class GoogleCalendarIntegrationRepositoryTest {
 
     @Autowired
     private GoogleCalendarIntegrationRepository googleCalendarIntegrationRepository;
+
+    @Autowired
+    private GoogleCalendarOperationJobRepository googleCalendarOperationJobRepository;
+
+    @Autowired
+    private GoogleCalendarOperationCoordinator operationCoordinator;
 
     @Test
     @Transactional
@@ -86,6 +100,77 @@ class GoogleCalendarIntegrationRepositoryTest {
                 integration.getId(),
                 "first-run"
         )).isOne();
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("만료된 lease의 PROCESSING head는 recovery polling 대상으로 복구된다")
+    void givenExpiredProcessingHead_whenFindRunnableAccounts_thenRecoversAccount() {
+        // given
+        Account account = accountRepository.saveAndFlush(new Account());
+        GoogleCalendarIntegration integration = googleCalendarIntegrationRepository.saveAndFlush(
+                integration(account.getId(), "google-subject")
+        );
+        Instant claimedAt = Instant.now();
+        GoogleCalendarOperationJob job = GoogleCalendarOperationJob.sync(
+                integration,
+                integration.allocateOperationSequence(),
+                GoogleCalendarOperationTrigger.MANUAL,
+                claimedAt
+        );
+        job.claim("expired-owner");
+        googleCalendarOperationJobRepository.saveAndFlush(job);
+        assertThat(googleCalendarIntegrationRepository.acquireSyncLease(
+                account.getId(), "expired-owner"
+        )).isOne();
+
+        // when
+        List<Long> runnableAccounts = googleCalendarOperationJobRepository.findRunnableAccountIds(
+                claimedAt.plus(Duration.ofMinutes(6)),
+                List.of(
+                        GoogleCalendarOperationStatus.PENDING,
+                        GoogleCalendarOperationStatus.PROCESSING
+                ),
+                PageRequest.of(0, 4)
+        );
+
+        // then
+        assertThat(runnableAccounts).containsExactly(account.getId());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("conflict outcome은 cursor와 lease를 정리하고 terminal job을 보존한다")
+    void givenClaimedSync_whenConflictTerminates_thenCommitsCursorAndTerminalJob() {
+        // given
+        Account account = accountRepository.saveAndFlush(new Account());
+        GoogleCalendarIntegration integration = googleCalendarIntegrationRepository.saveAndFlush(
+                integration(account.getId(), "google-subject")
+        );
+        GoogleCalendarOperationJob job = googleCalendarOperationJobRepository.saveAndFlush(
+                GoogleCalendarOperationJob.sync(
+                        integration,
+                        integration.allocateOperationSequence(),
+                        GoogleCalendarOperationTrigger.MANUAL,
+                        Instant.now().minusSeconds(1)
+                )
+        );
+        ClaimedOperation claimed = operationCoordinator.claim(account.getId(), "conflict-owner")
+                .orElseThrow();
+
+        // when
+        operationCoordinator.terminateConflict(claimed, "next-sync-token");
+
+        // then
+        GoogleCalendarOperationJob conflicted = googleCalendarOperationJobRepository
+                .findById(job.getId()).orElseThrow();
+        GoogleCalendarIntegration finalized = googleCalendarIntegrationRepository
+                .findById(integration.getId()).orElseThrow();
+        assertThat(conflicted.getStatus()).isEqualTo(GoogleCalendarOperationStatus.CONFLICTED);
+        assertThat(conflicted.getTerminalReason()).isEqualTo("SEMANTIC_CONFLICT");
+        assertThat(finalized.getNextSyncToken()).isEqualTo("next-sync-token");
+        assertThat(finalized.getActiveSyncRunId()).isNull();
+        assertThat(finalized.getSyncLeaseExpiresAt()).isNull();
     }
 
     @Test

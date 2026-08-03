@@ -1,8 +1,10 @@
 package com.calio.calendar.integration.repository;
 
 import com.calio.calendar.integration.domain.GoogleCalendarIntegration;
+import com.calio.calendar.integration.domain.GoogleCalendarIntegrationState;
 import jakarta.persistence.LockModeType;
 import java.util.Optional;
+import java.util.List;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -24,12 +26,15 @@ public interface GoogleCalendarIntegrationRepository extends JpaRepository<Googl
 
     boolean existsByAccountId(Long accountId);
 
+    List<GoogleCalendarIntegration> findAllByState(GoogleCalendarIntegrationState state);
+
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(value = """
             UPDATE google_calendar_integrations
             SET active_sync_run_id = :runId,
                 sync_lease_expires_at = TIMESTAMPADD(MINUTE, 5, CURRENT_TIMESTAMP)
             WHERE account_id = :accountId
+              AND integration_state = 'CONNECTED'
               AND (
                   active_sync_run_id IS NULL
                   OR sync_lease_expires_at < CURRENT_TIMESTAMP
@@ -48,6 +53,20 @@ public interface GoogleCalendarIntegrationRepository extends JpaRepository<Googl
     int extendSyncLease(
             @Param("integrationId") Long integrationId,
             @Param("runId") String runId
+    );
+
+    @Query("""
+            select case when count(integration) = 1 then true else false end
+            from GoogleCalendarIntegration integration
+            where integration.id = :integrationId
+              and integration.state = com.calio.calendar.integration.domain.GoogleCalendarIntegrationState.CONNECTED
+              and integration.activeSyncRunId = :runId
+              and integration.syncLeaseExpiresAt >= :now
+            """)
+    boolean ownsActiveLease(
+            @Param("integrationId") Long integrationId,
+            @Param("runId") String runId,
+            @Param("now") java.time.Instant now
     );
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)

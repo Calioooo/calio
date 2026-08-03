@@ -52,39 +52,54 @@ public class GoogleCalendarSyncService {
         }
 
         try {
-            GoogleCalendarSyncMode completedMode = synchronize(lease, context);
-            return GoogleCalendarSyncResponse.from(completedMode);
+            SyncExecution result = synchronize(lease, context, false);
+            leaseService.release(lease);
+            return GoogleCalendarSyncResponse.from(result.mode());
         } catch (RuntimeException exception) {
             throw releaseOwnedLeasePreservingFailure(lease, exception);
         }
     }
 
-    private GoogleCalendarSyncMode synchronize(
+    public SyncOperationResult performOwnedSync(SyncLease lease) {
+        GoogleCalendarSyncRunContext context = new GoogleCalendarSyncRunContext(
+                accessTokenService.getAccessToken(lease.integrationId())
+        );
+        SyncExecution result = synchronize(lease, context, true);
+        return new SyncOperationResult(result.nextSyncToken(), result.conflictDetected());
+    }
+
+    private SyncExecution synchronize(
             SyncLease lease,
-            GoogleCalendarSyncRunContext context
+            GoogleCalendarSyncRunContext context,
+            boolean deferCursorCommit
     ) {
         if (modeFor(lease.nextSyncToken()) == GoogleCalendarSyncMode.FULL) {
-            synchronizePages(lease, GoogleCalendarSyncMode.FULL, context);
-            return GoogleCalendarSyncMode.FULL;
+            return synchronizePages(
+                    lease, GoogleCalendarSyncMode.FULL, context, deferCursorCommit
+            );
         }
         try {
-            synchronizePages(lease, GoogleCalendarSyncMode.INCREMENTAL, context);
-            return GoogleCalendarSyncMode.INCREMENTAL;
+            return synchronizePages(
+                    lease, GoogleCalendarSyncMode.INCREMENTAL, context, deferCursorCommit
+            );
         } catch (GoogleCalendarSyncTokenExpiredException exception) {
             context.resetSeenIdentities();
-            synchronizePages(lease, GoogleCalendarSyncMode.FULL, context);
-            return GoogleCalendarSyncMode.FULL;
+            return synchronizePages(
+                    lease, GoogleCalendarSyncMode.FULL, context, deferCursorCommit
+            );
         }
     }
 
-    private void synchronizePages(
+    private SyncExecution synchronizePages(
             SyncLease lease,
             GoogleCalendarSyncMode mode,
-            GoogleCalendarSyncRunContext context
+            GoogleCalendarSyncRunContext context,
+            boolean deferCursorCommit
     ) {
         String pageToken = null;
         String nextSyncToken = null;
         Set<String> seenPageTokens = new HashSet<>();
+        boolean conflictDetected = false;
         do {
             GoogleCalendarEventPage page = requestPage(lease, mode, pageToken, context);
             GoogleCalendarNormalizedPage normalizedPage = pageNormalizer.normalize(
@@ -92,7 +107,7 @@ public class GoogleCalendarSyncService {
                     page,
                     context
             );
-            pagePersistenceService.persistNormalizedPage(
+            conflictDetected |= pagePersistenceService.persistNormalizedPage(
                     lease.integrationId(),
                     lease.accountId(),
                     lease.runId(),
@@ -101,14 +116,30 @@ public class GoogleCalendarSyncService {
             nextSyncToken = page.nextSyncToken();
             pageToken = nextPageToken(page, seenPageTokens);
         } while (pageToken != null);
-        providerDataService.finalizeReconciliation(
-                lease.integrationId(),
-                lease.runId(),
-                mode,
-                context.seenEventIds(),
-                context.seenRecurrenceEventIds(),
-                context.seenRecurrenceEventOverrideIds(),
-                nextSyncToken
+        conflictDetected |= finishReconciliation(
+                lease, mode, context, nextSyncToken, deferCursorCommit
+        );
+        return new SyncExecution(mode, nextSyncToken, conflictDetected);
+    }
+
+    private boolean finishReconciliation(
+            SyncLease lease,
+            GoogleCalendarSyncMode mode,
+            GoogleCalendarSyncRunContext context,
+            String nextSyncToken,
+            boolean deferCursorCommit
+    ) {
+        if (deferCursorCommit) {
+            return providerDataService.prepareReconciliation(
+                    lease.integrationId(), lease.runId(), mode,
+                    context.seenEventIds(), context.seenRecurrenceEventIds(),
+                    context.seenRecurrenceEventOverrideIds(), nextSyncToken
+            );
+        }
+        return providerDataService.finalizeReconciliation(
+                lease.integrationId(), lease.runId(), mode,
+                context.seenEventIds(), context.seenRecurrenceEventIds(),
+                context.seenRecurrenceEventOverrideIds(), nextSyncToken
         );
     }
 
@@ -172,5 +203,15 @@ public class GoogleCalendarSyncService {
         return nextSyncToken == null
                 ? GoogleCalendarSyncMode.FULL
                 : GoogleCalendarSyncMode.INCREMENTAL;
+    }
+
+    public record SyncOperationResult(String nextSyncToken, boolean conflictDetected) {
+    }
+
+    private record SyncExecution(
+            GoogleCalendarSyncMode mode,
+            String nextSyncToken,
+            boolean conflictDetected
+    ) {
     }
 }

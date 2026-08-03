@@ -210,6 +210,49 @@ class GoogleCalendarSyncMigrationTest {
         }
     }
 
+    @Test
+    @DisplayName("V13 upgrade는 retained identity를 보존하고 durable operation schema를 추가한다")
+    void givenV12ProviderData_whenMigrateToV13_thenAddsAsyncFoundationWithoutBackfillHash()
+            throws Exception {
+        // given
+        String url = "jdbc:h2:mem:google-calendar-async-upgrade;MODE=MySQL;DB_CLOSE_DELAY=-1";
+        migrateTo(url, MigrationVersion.fromVersion("8"));
+        insertLegacyEventAndIntegration(url);
+        migrateTo(url, MigrationVersion.fromVersion("12"));
+        insertV9ProviderAndRecurrenceData(url);
+
+        // when
+        migrateTo(url, MigrationVersion.fromVersion("13"));
+
+        // then
+        try (Connection connection = DriverManager.getConnection(url, "sa", "")) {
+            assertThat(columnNames(connection, "GOOGLE_CALENDAR_INTEGRATIONS"))
+                    .contains("INTEGRATION_STATE", "NEXT_OPERATION_SEQUENCE", "DISCONNECTED_AT");
+            assertThat(columnNames(connection, "GOOGLE_CALENDAR_OPERATION_JOBS"))
+                    .contains(
+                            "OPERATION_ID", "SEQUENCE_NUMBER", "OPERATION_KIND", "SCOPE_TYPE",
+                            "RUNNABLE_AT", "RETRY_TIER", "OWNER_TOKEN", "TERMINAL_AT"
+                    );
+            assertThat(singleString(connection, """
+                    SELECT synced_content_hash
+                    FROM google_calendar_event_mappings
+                    WHERE id = 900
+                    """)).isNull();
+            assertThat(singleString(connection, """
+                    SELECT provider_etag
+                    FROM google_calendar_event_mappings
+                    WHERE id = 900
+                    """)).isEqualTo("existing-etag");
+            assertThat(isNullable(
+                    connection,
+                    "GOOGLE_CALENDAR_INTEGRATIONS",
+                    "ENCRYPTED_REFRESH_TOKEN"
+            )).isTrue();
+            assertThat(indexNames(connection, "GOOGLE_CALENDAR_OPERATION_JOBS"))
+                    .contains("IDX_GOOGLE_CALENDAR_OPERATION_ACCOUNT_HEAD");
+        }
+    }
+
     private void migrateTo(String url, MigrationVersion target) {
         Flyway.configure()
                 .dataSource(url, "sa", "")

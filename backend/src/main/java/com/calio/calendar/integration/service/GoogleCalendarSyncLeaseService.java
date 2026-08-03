@@ -36,6 +36,18 @@ public class GoogleCalendarSyncLeaseService {
         );
     }
 
+    @Transactional
+    public void renew(SyncLease lease) {
+        if (integrationRepository.extendSyncLease(lease.integrationId(), lease.runId()) != 1) {
+            throw new StaleGoogleCalendarOperationOwnerException();
+        }
+    }
+
+    @Transactional
+    public void release(SyncLease lease) {
+        integrationRepository.releaseSyncLease(lease.integrationId(), lease.runId());
+    }
+
     public record SyncLease(
             Long integrationId,
             Long accountId,

@@ -10,7 +10,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -34,6 +33,7 @@ public class GoogleOAuthClient {
     private static final String AUTHORIZATION_CODE_GRANT = "authorization_code";
     private static final String REFRESH_TOKEN_GRANT = "refresh_token";
     private static final String INVALID_TOKEN_ERROR = "invalid_token";
+    private static final String INVALID_GRANT_ERROR = "invalid_grant";
 
     private final GoogleOAuthProperties properties;
     private final ObjectMapper objectMapper;
@@ -121,9 +121,15 @@ public class GoogleOAuthClient {
             logGoogleApiFailure("accessTokenRefresh", exception.getErrorCode(), exception);
             throw exception;
         } catch (RestClientResponseException exception) {
-            ErrorCode errorCode = permanentRefreshFailure(exception)
-                    ? ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED
-                    : ErrorCode.GOOGLE_CALENDAR_SYNC_FAILED;
+            if (isInvalidGrantResponse(exception)) {
+                logGoogleApiFailure(
+                        "accessTokenRefresh",
+                        ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED,
+                        exception
+                );
+                throw new GoogleOAuthInvalidGrantException(exception);
+            }
+            ErrorCode errorCode = ErrorCode.GOOGLE_CALENDAR_SYNC_FAILED;
             logGoogleApiFailure("accessTokenRefresh", errorCode, exception);
             throw new CalioException(errorCode, exception);
         } catch (RestClientException exception) {
@@ -209,12 +215,6 @@ public class GoogleOAuthClient {
         return form;
     }
 
-    private boolean permanentRefreshFailure(RestClientResponseException exception) {
-        int status = exception.getStatusCode().value();
-        return status == HttpStatus.BAD_REQUEST.value()
-                || status == HttpStatus.UNAUTHORIZED.value();
-    }
-
     private boolean isDeserializationFailure(RestClientException exception) {
         return exception.contains(HttpMessageNotReadableException.class);
     }
@@ -224,6 +224,16 @@ public class GoogleOAuthClient {
             JsonNode root = objectMapper.readTree(exception.getResponseBodyAsString());
             JsonNode error = root.get("error");
             return error != null && INVALID_TOKEN_ERROR.equals(error.asString());
+        } catch (JacksonException ignored) {
+            return false;
+        }
+    }
+
+    private boolean isInvalidGrantResponse(RestClientResponseException exception) {
+        try {
+            JsonNode root = objectMapper.readTree(exception.getResponseBodyAsString());
+            JsonNode error = root.get("error");
+            return error != null && INVALID_GRANT_ERROR.equals(error.asString());
         } catch (JacksonException ignored) {
             return false;
         }

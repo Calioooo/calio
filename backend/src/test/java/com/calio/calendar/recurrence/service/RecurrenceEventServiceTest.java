@@ -28,6 +28,8 @@ import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.domain.TagType;
 import com.calio.calendar.tag.service.TagService;
+import com.calio.calendar.integration.repository.GoogleCalendarRecurrenceEventMappingRepository;
+import com.calio.calendar.integration.repository.GoogleCalendarRecurrenceOverrideMappingRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -61,6 +63,12 @@ class RecurrenceEventServiceTest {
 
     @Mock
     private Rfc5545RecurrenceEngine recurrenceEngine;
+
+    @Mock
+    private GoogleCalendarRecurrenceEventMappingRepository googleRecurrenceMappingRepository;
+
+    @Mock
+    private GoogleCalendarRecurrenceOverrideMappingRepository googleOverrideMappingRepository;
 
     @InjectMocks
     private RecurrenceEventService recurrenceEventService;

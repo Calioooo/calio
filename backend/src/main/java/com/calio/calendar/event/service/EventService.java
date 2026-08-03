@@ -12,6 +12,9 @@ import com.calio.calendar.event.controller.dto.UpdateImportantEventRequest;
 import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.event.repository.EventRepository;
 import com.calio.calendar.integration.repository.GoogleCalendarEventMappingRepository;
+import com.calio.calendar.integration.domain.GoogleCalendarEventMapping;
+import com.calio.calendar.integration.domain.GoogleCalendarIntegrationState;
+import com.calio.calendar.integration.domain.GoogleCalendarMappingStatus;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceOccurrence;
@@ -119,8 +122,22 @@ public class EventService {
     @Transactional
     public void deleteEvent(Long accountId, Long eventId) {
         Event event = findEvent(accountId, eventId);
-        rejectExternalEventMutation(accountId, eventId);
+        GoogleCalendarEventMapping mapping = googleCalendarEventMappingRepository
+                .findByEventForUpdate(eventId, accountId)
+                .orElse(null);
+        if (mapping != null && !canDetach(mapping)) {
+            throw new CalioException(ErrorCode.EXTERNAL_EVENT_MUTATION_NOT_SUPPORTED);
+        }
+        if (mapping != null) {
+            mapping.detachLocalDeletion();
+        }
         eventRepository.delete(event);
+    }
+
+    private boolean canDetach(GoogleCalendarEventMapping mapping) {
+        return mapping.getSyncStatus() == GoogleCalendarMappingStatus.CONFLICTED
+                || mapping.getIntegration().getState()
+                == GoogleCalendarIntegrationState.DISCONNECTED;
     }
 
     @Transactional(readOnly = true)
@@ -225,8 +242,13 @@ public class EventService {
     }
 
     private void rejectExternalEventMutation(Long accountId, Long eventId) {
-        if (googleCalendarEventMappingRepository
-                .existsByEvent_IdAndIntegration_AccountId(eventId, accountId)) {
+        GoogleCalendarEventMapping mapping = googleCalendarEventMappingRepository
+                .findByEventForUpdate(eventId, accountId)
+                .orElse(null);
+        if (mapping != null
+                && mapping.getSyncStatus() == GoogleCalendarMappingStatus.ACTIVE
+                && mapping.getIntegration().getState()
+                != GoogleCalendarIntegrationState.DISCONNECTED) {
             throw new CalioException(ErrorCode.EXTERNAL_EVENT_MUTATION_NOT_SUPPORTED);
         }
     }

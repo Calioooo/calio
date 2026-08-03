@@ -1,6 +1,7 @@
 package com.calio.calendar.integration.repository;
 
 import com.calio.calendar.integration.domain.GoogleCalendarEventMapping;
+import com.calio.calendar.integration.domain.GoogleCalendarMappingStatus;
 import java.util.Collection;
 import java.util.List;
 import org.springframework.data.domain.Pageable;
@@ -8,6 +9,9 @@ import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.Lock;
+import jakarta.persistence.LockModeType;
+import java.util.Optional;
 import org.springframework.data.repository.query.Param;
 
 public interface GoogleCalendarEventMappingRepository
@@ -28,6 +32,34 @@ public interface GoogleCalendarEventMappingRepository
     );
 
     boolean existsByEvent_IdAndIntegration_AccountId(Long eventId, Long accountId);
+
+    long countByIntegration_IdAndSyncStatus(Long integrationId, GoogleCalendarMappingStatus status);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @EntityGraph(attributePaths = "integration")
+    @Query("""
+            select mapping from GoogleCalendarEventMapping mapping
+            where mapping.event.id = :eventId
+              and mapping.integration.accountId = :accountId
+            """)
+    Optional<GoogleCalendarEventMapping> findByEventForUpdate(
+            @Param("eventId") Long eventId,
+            @Param("accountId") Long accountId
+    );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @EntityGraph(attributePaths = "event")
+    @Query("""
+            select mapping from GoogleCalendarEventMapping mapping
+            where mapping.integration.id = :integrationId
+              and mapping.calendarKey = :calendarKey
+              and mapping.externalEventId = :externalEventId
+            """)
+    Optional<GoogleCalendarEventMapping> findByExternalIdentityForUpdate(
+            @Param("integrationId") Long integrationId,
+            @Param("calendarKey") String calendarKey,
+            @Param("externalEventId") String externalEventId
+    );
 
     @Query("""
             select mapping.event.id

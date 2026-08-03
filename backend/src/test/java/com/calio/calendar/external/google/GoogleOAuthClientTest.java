@@ -194,13 +194,13 @@ class GoogleOAuthClientTest {
         server.verify();
     }
 
-    @ParameterizedTest(name = "HTTP {0} refresh 실패는 Google Calendar 재연결을 요구한다")
-    @DisplayName("access-token refresh의 HTTP 400/401 실패는 Google Calendar 재연결을 요구한다")
+    @ParameterizedTest(name = "invalid_grant가 아닌 HTTP {0} refresh 실패는 재시도 대상으로 유지한다")
+    @DisplayName("invalid_grant가 확인되지 않은 refresh 실패는 연결을 끊지 않는다")
     @EnumSource(
             value = HttpStatus.class,
             names = {"BAD_REQUEST", "UNAUTHORIZED"}
     )
-    void givenPermanentRefreshFailure_whenRefreshAccessToken_thenRequiresReconnect(
+    void givenUnconfirmedRefreshFailure_whenRefreshAccessToken_thenRemainsRetryable(
             HttpStatus status
     ) {
         // given
@@ -218,7 +218,29 @@ class GoogleOAuthClientTest {
         assertThatThrownBy(() -> client.refreshAccessToken("refresh-token"))
                 .isInstanceOfSatisfying(CalioException.class, exception ->
                         assertThat(exception.getErrorCode())
-                                .isEqualTo(ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED));
+                                .isEqualTo(ErrorCode.GOOGLE_CALENDAR_SYNC_FAILED));
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("refresh 응답이 invalid_grant이면 confirmed credential revocation으로 분류한다")
+    void givenInvalidGrant_whenRefreshAccessToken_thenSignalsConfirmedRevocation() {
+        // given
+        RestClient.Builder restClientBuilder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
+        GoogleOAuthClient client = new GoogleOAuthClient(
+                properties(),
+                objectMapper,
+                restClientBuilder.build()
+        );
+        server.expect(requestTo("https://oauth.example.test/token"))
+                .andRespond(withStatus(HttpStatus.BAD_REQUEST)
+                        .body("{\"error\":\"invalid_grant\"}")
+                        .contentType(MediaType.APPLICATION_JSON));
+
+        // when, then
+        assertThatThrownBy(() -> client.refreshAccessToken("refresh-token"))
+                .isInstanceOf(GoogleOAuthInvalidGrantException.class);
         server.verify();
     }
 

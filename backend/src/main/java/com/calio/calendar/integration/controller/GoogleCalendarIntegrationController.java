@@ -3,8 +3,7 @@ package com.calio.calendar.integration.controller;
 import com.calio.calendar.integration.controller.dto.GoogleCalendarConnectRequest;
 import com.calio.calendar.integration.controller.dto.GoogleCalendarIntegrationResponse;
 import com.calio.calendar.integration.service.GoogleCalendarIntegrationService;
-import com.calio.calendar.integration.service.GoogleCalendarSyncService;
-import com.calio.calendar.integration.controller.dto.GoogleCalendarSyncResponse;
+import com.calio.calendar.integration.service.GoogleCalendarOperationEnqueueService;
 import com.calio.calendar.security.AuthenticatedAccount;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -23,14 +22,14 @@ import org.springframework.web.bind.annotation.RestController;
 public class GoogleCalendarIntegrationController {
 
     private final GoogleCalendarIntegrationService googleCalendarIntegrationService;
-    private final GoogleCalendarSyncService googleCalendarSyncService;
+    private final GoogleCalendarOperationEnqueueService operationEnqueueService;
 
     public GoogleCalendarIntegrationController(
             GoogleCalendarIntegrationService googleCalendarIntegrationService,
-            GoogleCalendarSyncService googleCalendarSyncService
+            GoogleCalendarOperationEnqueueService operationEnqueueService
     ) {
         this.googleCalendarIntegrationService = googleCalendarIntegrationService;
-        this.googleCalendarSyncService = googleCalendarSyncService;
+        this.operationEnqueueService = operationEnqueueService;
     }
 
     @PostMapping
@@ -57,9 +56,10 @@ public class GoogleCalendarIntegrationController {
     }
 
     @PostMapping("/sync")
-    public GoogleCalendarSyncResponse sync(
+    public ResponseEntity<Void> sync(
             @AuthenticationPrincipal AuthenticatedAccount account
     ) {
-        return googleCalendarSyncService.sync(account.accountId());
+        operationEnqueueService.enqueueManualSync(account.accountId());
+        return ResponseEntity.accepted().build();
     }
 }

@@ -2,22 +2,43 @@ package com.calio.calendar.integration.service;
 
 import com.calio.calendar.integration.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.repository.GoogleCalendarIntegrationRepository;
+import com.calio.calendar.integration.repository.GoogleCalendarOperationJobRepository;
 import java.time.Instant;
+import java.time.Clock;
+import com.calio.calendar.integration.domain.GoogleCalendarOperationJob;
+import com.calio.calendar.integration.domain.GoogleCalendarOperationTrigger;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.beans.factory.annotation.Autowired;
 
 @Service
 public class GoogleCalendarIntegrationPersistenceService {
 
     private final GoogleCalendarIntegrationRepository googleCalendarIntegrationRepository;
-    private final GoogleCalendarProviderDataService providerDataService;
+    private final GoogleCalendarOperationJobRepository operationJobRepository;
+    private final GoogleCalendarOperationWakeup wakeup;
+    private final Clock clock;
 
+    @Autowired
     public GoogleCalendarIntegrationPersistenceService(
+            GoogleCalendarIntegrationRepository googleCalendarIntegrationRepository,
+            GoogleCalendarOperationJobRepository operationJobRepository,
+            GoogleCalendarOperationWakeup wakeup,
+            Clock clock
+    ) {
+        this.googleCalendarIntegrationRepository = googleCalendarIntegrationRepository;
+        this.operationJobRepository = operationJobRepository;
+        this.wakeup = wakeup;
+        this.clock = clock;
+    }
+
+    protected GoogleCalendarIntegrationPersistenceService(
             GoogleCalendarIntegrationRepository googleCalendarIntegrationRepository,
             GoogleCalendarProviderDataService providerDataService
     ) {
-        this.googleCalendarIntegrationRepository = googleCalendarIntegrationRepository;
-        this.providerDataService = providerDataService;
+        this(googleCalendarIntegrationRepository, null, null, null);
     }
 
     @Transactional
@@ -30,9 +51,10 @@ public class GoogleCalendarIntegrationPersistenceService {
             Instant accessTokenExpiresAt,
             Instant connectedAt
     ) {
-        return googleCalendarIntegrationRepository.findByAccountIdForUpdate(accountId)
-                .map(integration -> replace(
-                        integration,
+        GoogleCalendarIntegration integration = googleCalendarIntegrationRepository
+                .findByAccountIdForUpdate(accountId)
+                .map(existingIntegration -> replace(
+                        existingIntegration,
                         googleSubject,
                         googleEmail,
                         encryptedRefreshToken,
@@ -49,6 +71,8 @@ public class GoogleCalendarIntegrationPersistenceService {
                         accessTokenExpiresAt,
                         connectedAt
                 )));
+        enqueueFullInventory(integration);
+        return integration;
     }
 
     private GoogleCalendarIntegration replace(
@@ -60,7 +84,7 @@ public class GoogleCalendarIntegrationPersistenceService {
             Instant accessTokenExpiresAt,
             Instant connectedAt
     ) {
-        providerDataService.deleteProviderData(integration.getId());
+        operationJobRepository.deleteAllByIntegrationId(integration.getId());
         integration.replace(
                 googleSubject,
                 googleEmail,
@@ -81,8 +105,27 @@ public class GoogleCalendarIntegrationPersistenceService {
     public void deleteByAccountId(Long accountId) {
         googleCalendarIntegrationRepository.findByAccountIdForUpdate(accountId)
                 .ifPresent(integration -> {
-                    providerDataService.deleteProviderData(integration.getId());
-                    googleCalendarIntegrationRepository.delete(integration);
+                    operationJobRepository.deleteAllByIntegrationId(integration.getId());
+                    integration.disconnect(Instant.now(clock));
                 });
+    }
+
+    private void enqueueFullInventory(GoogleCalendarIntegration integration) {
+        long sequence = integration.allocateOperationSequence();
+        operationJobRepository.save(GoogleCalendarOperationJob.sync(
+                integration,
+                sequence,
+                GoogleCalendarOperationTrigger.PERIODIC,
+                Instant.now(clock)
+        ));
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                wakeup.wakeUp();
+            }
+        });
     }
 }
