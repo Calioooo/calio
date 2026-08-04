@@ -7,12 +7,16 @@ import com.calio.calendar.integration.service.GoogleOperationWorker;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 @Component
 public class GoogleOperationScheduler {
+
+    private static final Logger log = LoggerFactory.getLogger(GoogleOperationScheduler.class);
 
     private final GoogleCalendarIntegrationRepository integrationRepository;
     private final GoogleOperationJobEnqueueService enqueueService;
@@ -43,8 +47,10 @@ public class GoogleOperationScheduler {
     private void enqueuePeriodicSafely(Long accountId) {
         try {
             enqueueService.enqueuePeriodicSync(accountId);
-        } catch (DataIntegrityViolationException ignored) {
-            // The database uniqueness guarantee resolves scheduler races.
+        } catch (DataIntegrityViolationException exception) {
+            log.debug("Periodic Google sync Job already exists. accountId={}", accountId);
+        } catch (RuntimeException exception) {
+            log.error("Failed to enqueue periodic Google sync Job. accountId={}", accountId, exception);
         }
     }
 
