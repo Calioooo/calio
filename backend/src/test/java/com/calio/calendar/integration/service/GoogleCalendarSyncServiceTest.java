@@ -68,7 +68,8 @@ class GoogleCalendarSyncServiceTest {
                                 "full-override",
                                 "full-recurrence-event"
                         )
-                )
+                ),
+                mock(GoogleOperationJobPersistenceService.class)
         );
 
         // when
@@ -284,7 +285,8 @@ class GoogleCalendarSyncServiceTest {
                                 "override-2",
                                 "recurrence-event-2"
                         )
-                )
+                ),
+                mock(GoogleOperationJobPersistenceService.class)
         );
 
         // when
@@ -357,7 +359,8 @@ class GoogleCalendarSyncServiceTest {
                 accessTokenService,
                 eventsClient,
                 pagePersistenceService,
-                new FakePageNormalizer()
+                new FakePageNormalizer(),
+                mock(GoogleOperationJobPersistenceService.class)
         );
     }
 

@@ -23,7 +23,7 @@ public class GoogleCalendarSyncService {
     private final GoogleCalendarEventsClient eventsClient;
     private final GoogleCalendarEventPagePersistenceService pagePersistenceService;
     private final GoogleCalendarPageNormalizer pageNormalizer;
-    private GoogleOperationJobPersistenceService operationJobPersistenceService;
+    private final GoogleOperationJobPersistenceService operationJobPersistenceService;
 
     public GoogleCalendarSyncService(
             GoogleCalendarSyncLeaseService leaseService,
@@ -31,7 +31,8 @@ public class GoogleCalendarSyncService {
             GoogleCalendarAccessTokenService accessTokenService,
             GoogleCalendarEventsClient eventsClient,
             GoogleCalendarEventPagePersistenceService pagePersistenceService,
-            GoogleCalendarPageNormalizer pageNormalizer
+            GoogleCalendarPageNormalizer pageNormalizer,
+            GoogleOperationJobPersistenceService operationJobPersistenceService
     ) {
         this.leaseService = leaseService;
         this.providerDataService = providerDataService;
@@ -39,6 +40,7 @@ public class GoogleCalendarSyncService {
         this.eventsClient = eventsClient;
         this.pagePersistenceService = pagePersistenceService;
         this.pageNormalizer = pageNormalizer;
+        this.operationJobPersistenceService = operationJobPersistenceService;
     }
 
     public GoogleCalendarSyncResponse sync(Long accountId) {
@@ -58,13 +60,6 @@ public class GoogleCalendarSyncService {
         } catch (RuntimeException exception) {
             throw releaseOwnedLeasePreservingFailure(lease, exception);
         }
-    }
-
-    @org.springframework.beans.factory.annotation.Autowired
-    void setOperationJobPersistenceService(
-            GoogleOperationJobPersistenceService operationJobPersistenceService
-    ) {
-        this.operationJobPersistenceService = operationJobPersistenceService;
     }
 
     public GoogleCalendarSyncMode executeOwned(
@@ -131,9 +126,6 @@ public class GoogleCalendarSyncService {
     }
 
     private void assertOwned(Long jobId, Long accountId, String workerToken) {
-        if (operationJobPersistenceService == null) {
-            throw new IllegalStateException("Google operation fencing service is unavailable");
-        }
         operationJobPersistenceService.renewAndAssertOwned(jobId, accountId, workerToken);
     }
 
