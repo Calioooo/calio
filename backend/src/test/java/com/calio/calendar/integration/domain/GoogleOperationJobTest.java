@@ -1,6 +1,7 @@
 package com.calio.calendar.integration.domain;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Instant;
 import org.junit.jupiter.api.DisplayName;
@@ -33,6 +34,70 @@ class GoogleOperationJobTest {
         assertThat(job.getState()).isEqualTo(GoogleOperationJobState.PROCESSING);
         assertThat(job.getOwnerToken()).isEqualTo("worker-token");
         assertThat(job.getRunnableAt()).isEqualTo(NOW);
+    }
+
+    @Test
+    @DisplayName("Sync Job은 CANONICAL_MUTATION trigger를 허용하지 않는다")
+    void givenCanonicalMutationTrigger_whenCreatingSyncJob_thenRejectsTrigger() {
+        assertThatThrownBy(() -> GoogleOperationJob.sync(
+                "operation-id",
+                1L,
+                2L,
+                3L,
+                GoogleOperationJobTrigger.CANONICAL_MUTATION,
+                NOW
+        )).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("Outbound Job은 SYNC kind를 허용하지 않는다")
+    void givenSyncKind_whenCreatingOutboundJob_thenRejectsKind() {
+        assertThatThrownBy(() -> GoogleOperationJob.outbound(
+                "operation-id",
+                1L,
+                2L,
+                3L,
+                GoogleOperationJob.SYNC_KIND,
+                "EVENT",
+                "event-id",
+                null,
+                "{}",
+                NOW
+        )).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("Outbound Job은 실행 대상을 요구한다")
+    void givenMissingResourceScope_whenCreatingOutboundJob_thenRejectsTarget() {
+        assertThatThrownBy(() -> GoogleOperationJob.outbound(
+                "operation-id",
+                1L,
+                2L,
+                3L,
+                "EVENT_UPSERT",
+                "",
+                "event-id",
+                null,
+                "{}",
+                NOW
+        )).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("Outbound Job은 immutable desired payload를 요구한다")
+    void givenMissingPayload_whenCreatingOutboundJob_thenRejectsPayload() {
+        assertThatThrownBy(() -> GoogleOperationJob.outbound(
+                "operation-id",
+                1L,
+                2L,
+                3L,
+                "EVENT_UPSERT",
+                "EVENT",
+                "event-id",
+                null,
+                "",
+                NOW
+        )).isInstanceOf(IllegalArgumentException.class);
     }
 
     private GoogleOperationJob syncJob(Instant runnableAt) {

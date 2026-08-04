@@ -87,6 +87,7 @@ public class GoogleOperationJob extends BaseEntity {
             GoogleOperationJobTrigger trigger,
             Instant runnableAt
     ) {
+        validateSyncTrigger(trigger);
         GoogleOperationJob job = new GoogleOperationJob();
         job.operationId = operationId;
         job.integrationId = integrationId;
@@ -113,12 +114,7 @@ public class GoogleOperationJob extends BaseEntity {
             String desiredPayload,
             Instant runnableAt
     ) {
-        if (kind == null || kind.isBlank() || SYNC_KIND.equals(kind)
-                || resourceScope == null || resourceScope.isBlank()
-                || resourceKey == null || resourceKey.isBlank()
-                || desiredPayload == null || desiredPayload.isBlank()) {
-            throw new IllegalArgumentException("Outbound Google operation fields are required");
-        }
+        validateOutboundFields(kind, resourceScope, resourceKey, desiredPayload);
         GoogleOperationJob job = new GoogleOperationJob();
         job.operationId = operationId;
         job.integrationId = integrationId;
@@ -133,6 +129,27 @@ public class GoogleOperationJob extends BaseEntity {
         job.state = GoogleOperationJobState.PENDING;
         job.runnableAt = runnableAt;
         return job;
+    }
+
+    private static void validateSyncTrigger(GoogleOperationJobTrigger trigger) {
+        if (trigger != GoogleOperationJobTrigger.MANUAL
+                && trigger != GoogleOperationJobTrigger.PERIODIC) {
+            throw new IllegalArgumentException("Sync Google operation trigger must be MANUAL or PERIODIC");
+        }
+    }
+
+    private static void validateOutboundFields(
+            String kind,
+            String resourceScope,
+            String resourceKey,
+            String desiredPayload
+    ) {
+        if (kind == null || kind.isBlank() || SYNC_KIND.equals(kind)
+                || resourceScope == null || resourceScope.isBlank()
+                || resourceKey == null || resourceKey.isBlank()
+                || desiredPayload == null || desiredPayload.isBlank()) {
+            throw new IllegalArgumentException("Outbound Google operation fields are required");
+        }
     }
 
     public boolean canBeClaimedAt(Instant now) {
