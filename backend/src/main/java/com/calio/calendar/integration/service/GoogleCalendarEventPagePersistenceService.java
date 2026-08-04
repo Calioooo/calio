@@ -53,7 +53,7 @@ public class GoogleCalendarEventPagePersistenceService {
     private final GoogleCalendarRecurrenceOverrideMappingRepository overrideMappingRepository;
     private final RecurrenceEventRepository recurrenceEventRepository;
     private final RecurrenceEventOverrideRepository overrideRepository;
-    private GoogleOperationJobPersistenceService operationJobPersistenceService;
+    private final GoogleOperationJobPersistenceService operationJobPersistenceService;
 
     public GoogleCalendarEventPagePersistenceService(
             GoogleCalendarIntegrationRepository integrationRepository,
@@ -64,7 +64,8 @@ public class GoogleCalendarEventPagePersistenceService {
             GoogleCalendarRecurrenceEventMappingRepository recurrenceMappingRepository,
             GoogleCalendarRecurrenceOverrideMappingRepository overrideMappingRepository,
             RecurrenceEventRepository recurrenceEventRepository,
-            RecurrenceEventOverrideRepository overrideRepository
+            RecurrenceEventOverrideRepository overrideRepository,
+            GoogleOperationJobPersistenceService operationJobPersistenceService
     ) {
         this.integrationRepository = integrationRepository;
         this.eventMappingRepository = eventMappingRepository;
@@ -75,12 +76,6 @@ public class GoogleCalendarEventPagePersistenceService {
         this.overrideMappingRepository = overrideMappingRepository;
         this.recurrenceEventRepository = recurrenceEventRepository;
         this.overrideRepository = overrideRepository;
-    }
-
-    @org.springframework.beans.factory.annotation.Autowired
-    void setOperationJobPersistenceService(
-            GoogleOperationJobPersistenceService operationJobPersistenceService
-    ) {
         this.operationJobPersistenceService = operationJobPersistenceService;
     }
 
