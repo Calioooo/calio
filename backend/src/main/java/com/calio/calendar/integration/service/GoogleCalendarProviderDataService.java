@@ -78,16 +78,18 @@ public class GoogleCalendarProviderDataService {
             Set<RecurrenceEventOverrideExternalKey> seenOverrideIds,
             String nextSyncToken
     ) {
-        operationJobPersistenceService.renewAndAssertOwned(jobId, accountId, workerToken);
+        OperationOwnership ownership = new OperationOwnership(jobId, accountId, workerToken);
+        renewOperationOwnership(ownership);
         if (!hasText(nextSyncToken)) {
             throw new CalioException(ErrorCode.GOOGLE_CALENDAR_SYNC_TOKEN_MISSING);
         }
         if (syncMode == GoogleCalendarSyncMode.FULL) {
             deleteUnseenProviderData(
-                    integrationId, workerToken, seenEventIds,
+                    integrationId, ownership, seenEventIds,
                     seenRecurrenceEventIds, seenOverrideIds);
         }
         finalizeSync(integrationId, workerToken, nextSyncToken);
+        renewOperationOwnership(ownership);
         operationJobPersistenceService.succeed(jobId, accountId, workerToken);
     }
 
@@ -98,30 +100,30 @@ public class GoogleCalendarProviderDataService {
 
     private void deleteUnseenProviderData(
             Long integrationId,
-            String runId,
+            OperationOwnership ownership,
             Set<String> seenEventIds,
             Set<String> seenRecurrenceEventIds,
             Set<RecurrenceEventOverrideExternalKey> seenOverrideIds
     ) {
-        deleteUnseenOverridesInBatches(integrationId, runId, seenOverrideIds);
-        deleteUnseenEventsInBatches(integrationId, runId, seenEventIds);
+        deleteUnseenOverridesInBatches(integrationId, ownership, seenOverrideIds);
+        deleteUnseenEventsInBatches(integrationId, ownership, seenEventIds);
         deleteUnseenRecurrenceEventsInBatches(
                 integrationId,
-                runId,
+                ownership,
                 seenRecurrenceEventIds
         );
     }
 
     private void deleteUnseenOverridesInBatches(
             Long integrationId,
-            String runId,
+            OperationOwnership ownership,
             Set<RecurrenceEventOverrideExternalKey> seenOverrideIds
     ) {
         long afterId = FIRST_MAPPING_ID;
         while (true) {
             Long nextId = deleteNextOverrideBatch(
                     integrationId,
-                    runId,
+                    ownership,
                     seenOverrideIds,
                     afterId
             );
@@ -134,11 +136,11 @@ public class GoogleCalendarProviderDataService {
 
     private Long deleteNextOverrideBatch(
             Long integrationId,
-            String runId,
+            OperationOwnership ownership,
             Set<RecurrenceEventOverrideExternalKey> seenOverrideIds,
             long afterId
     ) {
-        extendSyncLeaseOrThrow(integrationId, runId);
+        renewReconciliationLeases(integrationId, ownership);
         List<GoogleCalendarRecurrenceOverrideMapping> mappings = overrideMappingRepository
                 .findNextBatchWithRecurrenceEventMappingAndRecurrenceEventOverrideByIntegrationId(
                         integrationId,
@@ -169,14 +171,14 @@ public class GoogleCalendarProviderDataService {
 
     private void deleteUnseenEventsInBatches(
             Long integrationId,
-            String runId,
+            OperationOwnership ownership,
             Set<String> seenEventIds
     ) {
         long afterId = FIRST_MAPPING_ID;
         while (true) {
             Long nextId = deleteNextEventBatch(
                     integrationId,
-                    runId,
+                    ownership,
                     seenEventIds,
                     afterId
             );
@@ -189,11 +191,11 @@ public class GoogleCalendarProviderDataService {
 
     private Long deleteNextEventBatch(
             Long integrationId,
-            String runId,
+            OperationOwnership ownership,
             Set<String> seenEventIds,
             long afterId
     ) {
-        extendSyncLeaseOrThrow(integrationId, runId);
+        renewReconciliationLeases(integrationId, ownership);
         List<GoogleCalendarEventMapping> mappings =
                 eventMappingRepository.findNextBatchWithEventByIntegrationId(
                         integrationId,
@@ -220,14 +222,14 @@ public class GoogleCalendarProviderDataService {
 
     private void deleteUnseenRecurrenceEventsInBatches(
             Long integrationId,
-            String runId,
+            OperationOwnership ownership,
             Set<String> seenRecurrenceEventIds
     ) {
         long afterId = FIRST_MAPPING_ID;
         while (true) {
             Long nextId = deleteNextRecurrenceEventBatch(
                     integrationId,
-                    runId,
+                    ownership,
                     seenRecurrenceEventIds,
                     afterId
             );
@@ -240,11 +242,11 @@ public class GoogleCalendarProviderDataService {
 
     private Long deleteNextRecurrenceEventBatch(
             Long integrationId,
-            String runId,
+            OperationOwnership ownership,
             Set<String> seenRecurrenceEventIds,
             long afterId
     ) {
-        extendSyncLeaseOrThrow(integrationId, runId);
+        renewReconciliationLeases(integrationId, ownership);
         List<GoogleCalendarRecurrenceEventMapping> mappings = recurrenceMappingRepository
                 .findNextBatchWithRecurrenceEventByIntegrationId(
                         integrationId,
@@ -285,6 +287,22 @@ public class GoogleCalendarProviderDataService {
         if (integrationRepository.extendSyncLease(integrationId, runId) != 1) {
             throw new CalioException(ErrorCode.GOOGLE_CALENDAR_SYNC_CONFLICT);
         }
+    }
+
+    private void renewReconciliationLeases(
+            Long integrationId,
+            OperationOwnership ownership
+    ) {
+        renewOperationOwnership(ownership);
+        extendSyncLeaseOrThrow(integrationId, ownership.workerToken());
+    }
+
+    private void renewOperationOwnership(OperationOwnership ownership) {
+        operationJobPersistenceService.renewAndAssertOwned(
+                ownership.jobId(),
+                ownership.accountId(),
+                ownership.workerToken()
+        );
     }
 
     private void deleteAllRecurrenceProviderData(Long integrationId) {
@@ -330,5 +348,12 @@ public class GoogleCalendarProviderDataService {
 
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
+    }
+
+    private record OperationOwnership(
+            Long jobId,
+            Long accountId,
+            String workerToken
+    ) {
     }
 }
