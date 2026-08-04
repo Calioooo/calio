@@ -78,7 +78,8 @@ public class GoogleOperationWorker {
             return JobExecutionResult.STOP_ACCOUNT_PROCESSING;
         }
         if (!GoogleOperationJob.SYNC_KIND.equals(job.getKind())) {
-            jobPersistenceService.terminate(job.getId(), workerToken, UNSUPPORTED_JOB_KIND);
+            jobPersistenceService.terminate(
+                    job.getId(), job.getAccountId(), workerToken, UNSUPPORTED_JOB_KIND);
             return JobExecutionResult.CONTINUE_WITH_NEXT_JOB;
         }
         return executeSync(job, workerToken);
@@ -105,7 +106,8 @@ public class GoogleOperationWorker {
                 yield JobExecutionResult.STOP_ACCOUNT_PROCESSING;
             }
             case TERMINAL -> {
-                jobPersistenceService.terminate(job.getId(), workerToken, classification.reason());
+                jobPersistenceService.terminate(
+                        job.getId(), job.getAccountId(), workerToken, classification.reason());
                 yield JobExecutionResult.CONTINUE_WITH_NEXT_JOB;
             }
         };

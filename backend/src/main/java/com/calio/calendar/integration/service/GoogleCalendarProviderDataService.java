@@ -118,7 +118,7 @@ public class GoogleCalendarProviderDataService {
                     seenRecurrenceEventIds, seenOverrideIds);
         }
         finalizeSync(integrationId, workerToken, nextSyncToken);
-        operationJobPersistenceService.succeed(jobId, workerToken);
+        operationJobPersistenceService.succeed(jobId, accountId, workerToken);
     }
 
     @Transactional
