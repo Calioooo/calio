@@ -17,6 +17,7 @@ import org.springframework.stereotype.Component;
 public class GoogleOperationScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(GoogleOperationScheduler.class);
+    private static final int TERMINAL_CLEANUP_BATCH_SIZE = 500;
 
     private final GoogleCalendarIntegrationRepository integrationRepository;
     private final GoogleOperationJobEnqueueService enqueueService;
@@ -57,7 +58,7 @@ public class GoogleOperationScheduler {
     @Scheduled(cron = "0 40 4 * * *", zone = "Asia/Seoul")
     public void cleanTerminalJobs() {
         Instant cutoff = Instant.now(clock).minus(Duration.ofDays(30));
-        while (persistenceService.deleteTerminalBatch(cutoff) == 500) {
+        while (persistenceService.deleteTerminalBatch(cutoff) == TERMINAL_CLEANUP_BATCH_SIZE) {
             // Keep the fixed cutoff while each batch commits independently.
         }
     }
