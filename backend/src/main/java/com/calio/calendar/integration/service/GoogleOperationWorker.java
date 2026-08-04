@@ -13,6 +13,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.TransientDataAccessException;
@@ -23,6 +24,7 @@ public class GoogleOperationWorker {
 
     private static final Logger log = LoggerFactory.getLogger(GoogleOperationWorker.class);
     private static final String UNSUPPORTED_JOB_KIND = "UNSUPPORTED_JOB_KIND";
+    private static final long SHUTDOWN_GRACE_SECONDS = 5L;
     private final ExecutorService executor = Executors.newFixedThreadPool(4);
     private final Set<Long> activeAccounts = ConcurrentHashMap.newKeySet();
     private final GoogleOperationJobPersistenceService jobPersistenceService;
@@ -196,5 +198,13 @@ public class GoogleOperationWorker {
     @PreDestroy
     void shutdown() {
         executor.shutdown();
+        try {
+            if (!executor.awaitTermination(SHUTDOWN_GRACE_SECONDS, TimeUnit.SECONDS)) {
+                executor.shutdownNow();
+            }
+        } catch (InterruptedException exception) {
+            executor.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
     }
 }
