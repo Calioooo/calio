@@ -18,7 +18,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.TransientDataAccessException;
 import org.springframework.stereotype.Service;
-import org.springframework.beans.factory.annotation.Autowired;
 
 @Service
 public class GoogleOperationWorker {
@@ -30,24 +29,13 @@ public class GoogleOperationWorker {
     private final Set<Long> activeAccounts = ConcurrentHashMap.newKeySet();
     private final GoogleOperationJobPersistenceService jobPersistenceService;
     private final GoogleCalendarSyncService syncService;
-    private final GoogleMappingConflictService mappingConflictService;
 
-    @Autowired
     public GoogleOperationWorker(
-            GoogleOperationJobPersistenceService jobPersistenceService,
-            GoogleCalendarSyncService syncService,
-            GoogleMappingConflictService mappingConflictService
-    ) {
-        this.jobPersistenceService = jobPersistenceService;
-        this.syncService = syncService;
-        this.mappingConflictService = mappingConflictService;
-    }
-
-    GoogleOperationWorker(
             GoogleOperationJobPersistenceService jobPersistenceService,
             GoogleCalendarSyncService syncService
     ) {
-        this(jobPersistenceService, syncService, null);
+        this.jobPersistenceService = jobPersistenceService;
+        this.syncService = syncService;
     }
 
     public void wake(Long accountId) {
@@ -90,12 +78,7 @@ public class GoogleOperationWorker {
             return JobExecutionResult.STOP_ACCOUNT_PROCESSING;
         }
         if (!GoogleOperationJob.SYNC_KIND.equals(job.getKind())) {
-            if (job.hasCanonicalEffectiveScope()
-                    && mappingConflictService != null
-                    && mappingConflictService.isConflicted(
-                    job.getIntegrationId(), job.getEffectiveScope())) {
-                jobPersistenceService.skipConflicted(
-                        job.getId(), job.getAccountId(), workerToken);
+            if (jobPersistenceService.skipIfConflicted(job, workerToken)) {
                 return JobExecutionResult.CONTINUE_WITH_NEXT_JOB;
             }
             jobPersistenceService.terminate(

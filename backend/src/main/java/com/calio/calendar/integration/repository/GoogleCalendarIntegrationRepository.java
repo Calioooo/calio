@@ -48,7 +48,7 @@ public interface GoogleCalendarIntegrationRepository extends JpaRepository<Googl
             """, nativeQuery = true)
     int acquireGoogleOperationLease(@Param("accountId") Long accountId, @Param("owner") String owner);
 
-    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Modifying(flushAutomatically = true)
     @Query(value = """
             UPDATE google_calendar_integrations
             SET google_operation_lease_expires_at = TIMESTAMPADD(MINUTE, 5, CURRENT_TIMESTAMP)
@@ -65,6 +65,19 @@ public interface GoogleCalendarIntegrationRepository extends JpaRepository<Googl
             """, nativeQuery = true)
     int renewOwnedGoogleOperationLease(
             @Param("jobId") Long jobId,
+            @Param("accountId") Long accountId,
+            @Param("owner") String owner
+    );
+
+    @Modifying(flushAutomatically = true)
+    @Query(value = """
+            UPDATE google_calendar_integrations
+            SET google_operation_lease_expires_at = TIMESTAMPADD(MINUTE, 5, CURRENT_TIMESTAMP)
+            WHERE account_id = :accountId
+              AND google_operation_lease_owner = :owner
+              AND google_operation_lease_expires_at >= CURRENT_TIMESTAMP
+            """, nativeQuery = true)
+    int renewGoogleOperationLease(
             @Param("accountId") Long accountId,
             @Param("owner") String owner
     );
@@ -92,7 +105,7 @@ public interface GoogleCalendarIntegrationRepository extends JpaRepository<Googl
             """, nativeQuery = true)
     int acquireSyncLease(@Param("accountId") Long accountId, @Param("runId") String runId);
 
-    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Modifying(flushAutomatically = true)
     @Query(value = """
             UPDATE google_calendar_integrations
             SET sync_lease_expires_at = TIMESTAMPADD(MINUTE, 5, CURRENT_TIMESTAMP)

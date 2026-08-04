@@ -47,13 +47,7 @@ ALTER TABLE google_operation_jobs
     ADD COLUMN conflict_detected BOOLEAN NOT NULL DEFAULT FALSE;
 
 ALTER TABLE google_operation_jobs
-    MODIFY COLUMN effective_resource_key VARCHAR(2300) NOT NULL;
-
-UPDATE google_operation_jobs
-SET desired_content_hash =
-        'v1:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
-WHERE job_kind <> 'SYNC'
-  AND desired_content_hash IS NULL;
+    MODIFY COLUMN effective_resource_key VARCHAR(128) NOT NULL;
 
 ALTER TABLE google_operation_jobs
     ADD CONSTRAINT ck_google_operation_jobs_desired_content_hash
@@ -66,5 +60,5 @@ ALTER TABLE google_operation_jobs
 CREATE INDEX idx_google_operation_jobs_pending_scope
     ON google_operation_jobs (
         account_id, integration_id, effective_resource_scope,
-        job_state, account_sequence
+        effective_resource_key, job_state, account_sequence
     );

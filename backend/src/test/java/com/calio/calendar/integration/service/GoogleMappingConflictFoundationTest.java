@@ -61,10 +61,10 @@ class GoogleMappingConflictFoundationTest {
     @DisplayName("master scope는 모든 child override scope를 포괄한다")
     void givenMasterAndOverrideScopes_whenComparingCoverage_thenMasterCoversChild() {
         GoogleCalendarEffectiveScope master =
-                GoogleCalendarEffectiveScope.recurrenceMaster("master:id");
+                GoogleCalendarEffectiveScope.recurrenceMaster(1L);
         GoogleCalendarEffectiveScope override =
                 GoogleCalendarEffectiveScope.recurrenceOverride(
-                        "master:id", Instant.parse("2026-08-04T00:00:00Z"));
+                        1L, Instant.parse("2026-08-04T00:00:00Z"));
 
         assertThat(master.covers(override)).isTrue();
         assertThat(override.covers(master)).isFalse();
@@ -95,6 +95,62 @@ class GoogleMappingConflictFoundationTest {
                 hash("baseline"), hash("canonical"),
                 List.of(earlierDesired, hash("latest")), earlierDesired))
                 .isEqualTo(GoogleInboundChangeClassifier.Classification.ALREADY_CONVERGED);
+    }
+
+    @Test
+    @DisplayName("Google과 canonical이 baseline이면 METADATA_ONLY로 분류한다")
+    void givenNoSemanticChange_whenClassifying_thenMetadataOnly() {
+        String baseline = hash("baseline");
+
+        assertThat(classifier.classify(
+                baseline, baseline, List.of(), baseline))
+                .isEqualTo(GoogleInboundChangeClassifier.Classification.METADATA_ONLY);
+    }
+
+    @Test
+    @DisplayName("canonical만 baseline에서 변경되면 CALIO_ONLY로 분류한다")
+    void givenOnlyCanonicalChanged_whenClassifying_thenCalioOnly() {
+        String baseline = hash("baseline");
+
+        assertThat(classifier.classify(
+                baseline, hash("canonical"), List.of(), baseline))
+                .isEqualTo(GoogleInboundChangeClassifier.Classification.CALIO_ONLY);
+    }
+
+    @Test
+    @DisplayName("local branch 없이 Google만 변경되면 GOOGLE_ONLY로 분류한다")
+    void givenOnlyGoogleChanged_whenClassifying_thenGoogleOnly() {
+        String baseline = hash("baseline");
+
+        assertThat(classifier.classify(
+                baseline, baseline, List.of(), hash("google")))
+                .isEqualTo(GoogleInboundChangeClassifier.Classification.GOOGLE_ONLY);
+    }
+
+    @Test
+    @DisplayName("pending Job이 없어도 canonical과 Google이 각각 변경되면 충돌이다")
+    void givenCanonicalAndGoogleChanged_whenClassifying_thenTrueConflict() {
+        assertThat(classifier.classify(
+                hash("baseline"), hash("canonical"), List.of(), hash("google")))
+                .isEqualTo(GoogleInboundChangeClassifier.Classification.TRUE_CONFLICT);
+    }
+
+    @Test
+    @DisplayName("Google이 현재 canonical과 같으면 ALREADY_CONVERGED로 분류한다")
+    void givenGoogleMatchesCanonical_whenClassifying_thenAlreadyConverged() {
+        String canonical = hash("canonical");
+
+        assertThat(classifier.classify(
+                hash("baseline"), canonical, List.of(), canonical))
+                .isEqualTo(GoogleInboundChangeClassifier.Classification.ALREADY_CONVERGED);
+    }
+
+    @Test
+    @DisplayName("provider 삭제도 canonical local branch가 있으면 충돌로 분류한다")
+    void givenCanonicalChanged_whenClassifyingDeletion_thenTrueConflict() {
+        assertThat(classifier.classifyDeletion(
+                hash("baseline"), hash("canonical"), List.of()))
+                .isEqualTo(GoogleInboundChangeClassifier.Classification.TRUE_CONFLICT);
     }
 
     private String hash(String value) {

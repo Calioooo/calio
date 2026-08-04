@@ -22,36 +22,35 @@ public sealed interface GoogleCalendarEffectiveScope permits
         }
         return this instanceof RecurrenceMaster master
                 && other instanceof RecurrenceOverride override
-                && master.externalMasterId().equals(override.externalMasterId());
+                && master.recurrenceEventId().equals(override.recurrenceEventId());
     }
 
-    static GeneralEvent generalEvent(String externalEventId) {
-        return new GeneralEvent(requireIdentity(externalEventId));
+    static GeneralEvent generalEvent(Long eventId) {
+        return new GeneralEvent(requireId(eventId));
     }
 
-    static RecurrenceMaster recurrenceMaster(String externalMasterId) {
-        return new RecurrenceMaster(requireIdentity(externalMasterId));
+    static RecurrenceMaster recurrenceMaster(Long recurrenceEventId) {
+        return new RecurrenceMaster(requireId(recurrenceEventId));
     }
 
     static RecurrenceOverride recurrenceOverride(
-            String externalMasterId,
+            Long recurrenceEventId,
             Instant originStartAt
     ) {
         return new RecurrenceOverride(
-                requireIdentity(externalMasterId),
+                requireId(recurrenceEventId),
                 Objects.requireNonNull(originStartAt, "originStartAt")
         );
     }
 
-    static String recurrenceOverrideKeyPrefix(String externalMasterId) {
-        String masterId = requireIdentity(externalMasterId);
-        return masterId.length() + ":" + masterId + ":";
+    static String recurrenceOverrideKeyPrefix(Long recurrenceEventId) {
+        return requireId(recurrenceEventId) + ":";
     }
 
     static GoogleCalendarEffectiveScope decode(String type, String key) {
         return switch (type) {
-            case GENERAL_EVENT -> generalEvent(key);
-            case RECURRENCE_MASTER -> recurrenceMaster(key);
+            case GENERAL_EVENT -> generalEvent(parseId(key));
+            case RECURRENCE_MASTER -> recurrenceMaster(parseId(key));
             case RECURRENCE_OVERRIDE -> decodeOverride(key);
             default -> throw new IllegalArgumentException("Unsupported effective scope: " + type);
         };
@@ -59,45 +58,47 @@ public sealed interface GoogleCalendarEffectiveScope permits
 
     private static RecurrenceOverride decodeOverride(String key) {
         int separator = key.indexOf(':');
-        if (separator <= 0) {
-            throw new IllegalArgumentException("Invalid recurrence override scope key");
-        }
-        int masterLength = Integer.parseInt(key.substring(0, separator));
-        int masterStart = separator + 1;
-        int originSeparator = masterStart + masterLength;
-        if (originSeparator >= key.length() || key.charAt(originSeparator) != ':') {
+        if (separator <= 0 || separator == key.length() - 1) {
             throw new IllegalArgumentException("Invalid recurrence override scope key");
         }
         return recurrenceOverride(
-                key.substring(masterStart, originSeparator),
-                Instant.parse(key.substring(originSeparator + 1))
+                parseId(key.substring(0, separator)),
+                Instant.parse(key.substring(separator + 1))
         );
     }
 
-    private static String requireIdentity(String identity) {
-        if (identity == null || identity.isBlank()) {
-            throw new IllegalArgumentException("Provider identity is required");
+    private static Long requireId(Long id) {
+        if (id == null || id <= 0) {
+            throw new IllegalArgumentException("Canonical resource ID must be positive");
         }
-        return identity;
+        return id;
     }
 
-    record GeneralEvent(String externalEventId) implements GoogleCalendarEffectiveScope {
+    private static Long parseId(String encodedId) {
+        try {
+            return requireId(Long.valueOf(encodedId));
+        } catch (NumberFormatException exception) {
+            throw new IllegalArgumentException("Invalid canonical resource ID", exception);
+        }
+    }
+
+    record GeneralEvent(Long eventId) implements GoogleCalendarEffectiveScope {
         @Override public String encodedType() { return GENERAL_EVENT; }
-        @Override public String encodedKey() { return externalEventId; }
+        @Override public String encodedKey() { return eventId.toString(); }
     }
 
-    record RecurrenceMaster(String externalMasterId) implements GoogleCalendarEffectiveScope {
+    record RecurrenceMaster(Long recurrenceEventId) implements GoogleCalendarEffectiveScope {
         @Override public String encodedType() { return RECURRENCE_MASTER; }
-        @Override public String encodedKey() { return externalMasterId; }
+        @Override public String encodedKey() { return recurrenceEventId.toString(); }
     }
 
     record RecurrenceOverride(
-            String externalMasterId,
+            Long recurrenceEventId,
             Instant originStartAt
     ) implements GoogleCalendarEffectiveScope {
         @Override public String encodedType() { return RECURRENCE_OVERRIDE; }
         @Override public String encodedKey() {
-            return recurrenceOverrideKeyPrefix(externalMasterId) + originStartAt;
+            return recurrenceOverrideKeyPrefix(recurrenceEventId) + originStartAt;
         }
     }
 }

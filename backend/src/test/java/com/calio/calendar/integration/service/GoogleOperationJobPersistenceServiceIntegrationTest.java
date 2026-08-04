@@ -5,15 +5,23 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
+import com.calio.calendar.event.domain.Event;
+import com.calio.calendar.event.repository.EventRepository;
+import com.calio.calendar.integration.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.domain.GoogleCalendarEffectiveScope;
 import com.calio.calendar.integration.domain.GoogleContentHash;
 import com.calio.calendar.integration.domain.GoogleOperationJob;
 import com.calio.calendar.integration.domain.GoogleOperationJobState;
 import com.calio.calendar.integration.domain.GoogleOperationJobTrigger;
+import com.calio.calendar.integration.domain.GoogleProviderObservation;
+import com.calio.calendar.integration.repository.GoogleCalendarEventMappingRepository;
 import com.calio.calendar.integration.repository.GoogleCalendarIntegrationRepository;
 import com.calio.calendar.integration.repository.GoogleOperationJobRepository;
 import com.calio.calendar.integration.service.GoogleOperationJobPersistenceService.GoogleOperationOwnershipLostException;
+import com.calio.calendar.tag.domain.Tag;
+import com.calio.calendar.tag.domain.TagType;
+import com.calio.calendar.tag.repository.TagRepository;
 import java.time.Instant;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -42,26 +50,26 @@ class GoogleOperationJobPersistenceServiceIntegrationTest {
         jobRepository.saveAndFlush(GoogleOperationJob.outbound(
                 "master-operation", integration.getId(), account.getId(),
                 integration.allocateGoogleOperationSequence(), "MASTER_UPSERT",
-                GoogleCalendarEffectiveScope.recurrenceMaster("master-1"), null,
+                GoogleCalendarEffectiveScope.recurrenceMaster(1L), null,
                 "{}", desiredHash, Instant.now()));
         jobRepository.saveAndFlush(GoogleOperationJob.outbound(
                 "child-operation", integration.getId(), account.getId(),
                 integration.allocateGoogleOperationSequence(), "OVERRIDE_UPSERT",
                 GoogleCalendarEffectiveScope.recurrenceOverride(
-                        "master-1", Instant.parse("2026-08-04T00:00:00Z")), null,
+                        1L, Instant.parse("2026-08-04T00:00:00Z")), null,
                 "{}", desiredHash, Instant.now()));
         jobRepository.saveAndFlush(GoogleOperationJob.outbound(
                 "other-child-operation", integration.getId(), account.getId(),
                 integration.allocateGoogleOperationSequence(), "OVERRIDE_UPSERT",
                 GoogleCalendarEffectiveScope.recurrenceOverride(
-                        "master-10", Instant.parse("2026-08-04T00:00:00Z")), null,
+                        10L, Instant.parse("2026-08-04T00:00:00Z")), null,
                 "{}", desiredHash, Instant.now()));
         String childPrefix = GoogleCalendarEffectiveScope.recurrenceOverrideKeyPrefix(
-                "master-1");
+                1L);
 
         // when
         long pendingBranches = jobRepository.countPendingRecurrenceAggregateBranches(
-                account.getId(), integration.getId(), "master-1",
+                account.getId(), integration.getId(), "1",
                 childPrefix, childPrefix.length());
 
         // then
@@ -79,6 +87,15 @@ class GoogleOperationJobPersistenceServiceIntegrationTest {
 
     @Autowired
     private AccountRepository accountRepository;
+
+    @Autowired
+    private EventRepository eventRepository;
+
+    @Autowired
+    private TagRepository tagRepository;
+
+    @Autowired
+    private GoogleCalendarEventMappingRepository eventMappingRepository;
 
     @Test
     @DisplayName("실행 시각이 남은 FIFO head는 뒤의 실행 가능한 Job 선점을 차단한다")
@@ -251,6 +268,103 @@ class GoogleOperationJobPersistenceServiceIntegrationTest {
                     assertThat(terminated.getState()).isEqualTo(GoogleOperationJobState.SYNC_ERROR);
                     assertThat(terminated.getOwnerToken()).isNull();
                     assertThat(terminated.getLastErrorReason()).isEqualTo("PERMANENT_FAILURE");
+                });
+    }
+
+    @Test
+    @DisplayName("conflict를 발견한 Sync Job은 성공 시 삭제하지 않고 CONFLICTED 진단으로 남긴다")
+    void givenConflictEvidence_whenSyncSucceeds_thenRetainsConflictedDiagnostic() {
+        // given
+        JobFixture fixture = jobs(Instant.now().minusSeconds(60));
+        assertThat(persistenceService.acquireLease(fixture.accountId(), "worker-a")).isTrue();
+        GoogleOperationJob claimed = persistenceService.claimHead(
+                fixture.accountId(), "worker-a"
+        );
+        persistenceService.markConflictDetected(
+                claimed.getId(), fixture.accountId(), "worker-a"
+        );
+
+        // when
+        persistenceService.succeed(claimed.getId(), fixture.accountId(), "worker-a");
+
+        // then
+        assertThat(jobRepository.findById(claimed.getId()))
+                .get()
+                .satisfies(conflicted -> {
+                    assertThat(conflicted.getState())
+                            .isEqualTo(GoogleOperationJobState.CONFLICTED);
+                    assertThat(conflicted.getOwnerToken()).isNull();
+                    assertThat(conflicted.getLastErrorReason())
+                            .isEqualTo("MAPPING_CONFLICT_DETECTED");
+                    assertThat(conflicted.isConflictDetected()).isTrue();
+                });
+    }
+
+    @Test
+    @DisplayName("이미 conflicted인 mapping scope의 outbound Job은 owner-fenced SKIPPED로 종료한다")
+    void givenConflictedMapping_whenSkippingOutboundJob_thenStoresSkippedDiagnostic() {
+        // given
+        Account account = accountRepository.saveAndFlush(new Account());
+        Tag tag = tagRepository.saveAndFlush(new Tag(
+                TagType.DEFAULT, "기타", "#64748B"
+        ));
+        GoogleCalendarIntegration integration = integrationRepository.saveAndFlush(
+                integration(account.getId())
+        );
+        Event event = eventRepository.saveAndFlush(new Event(
+                "Event",
+                null,
+                Instant.parse("2026-08-05T00:00:00Z"),
+                Instant.parse("2026-08-05T01:00:00Z"),
+                false,
+                "UTC",
+                null,
+                tag,
+                account
+        ));
+        GoogleCalendarEventMapping mapping = new GoogleCalendarEventMapping(
+                integration,
+                event,
+                "external-event",
+                new GoogleProviderObservation(
+                        "etag",
+                        Instant.parse("2026-08-05T01:00:00Z"),
+                        GoogleProviderContentProjector.event(event)
+                )
+        );
+        mapping.markConflicted();
+        eventMappingRepository.saveAndFlush(mapping);
+        GoogleOperationJob outbound = jobRepository.saveAndFlush(
+                GoogleOperationJob.outbound(
+                        "outbound-operation",
+                        integration.getId(),
+                        account.getId(),
+                        integration.allocateGoogleOperationSequence(),
+                        "EVENT_UPSERT",
+                        GoogleCalendarEffectiveScope.generalEvent(event.getId()),
+                        "external-event",
+                        "{}",
+                        GoogleContentHash.digest("TEST", "desired"),
+                        Instant.now().minusSeconds(60)
+                )
+        );
+        assertThat(persistenceService.acquireLease(account.getId(), "worker-a")).isTrue();
+        GoogleOperationJob claimed = persistenceService.claimHead(
+                account.getId(), "worker-a"
+        );
+
+        // when
+        boolean skipped = persistenceService.skipIfConflicted(claimed, "worker-a");
+
+        // then
+        assertThat(skipped).isTrue();
+        assertThat(jobRepository.findById(outbound.getId()))
+                .get()
+                .satisfies(saved -> {
+                    assertThat(saved.getState()).isEqualTo(GoogleOperationJobState.SKIPPED);
+                    assertThat(saved.getOwnerToken()).isNull();
+                    assertThat(saved.getLastErrorReason())
+                            .isEqualTo("MAPPING_ALREADY_CONFLICTED");
                 });
     }
 

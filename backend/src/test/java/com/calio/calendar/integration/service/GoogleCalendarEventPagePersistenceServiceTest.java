@@ -16,6 +16,7 @@ import com.calio.calendar.external.google.GoogleCalendarEventTimeNormalizer.Norm
 import com.calio.calendar.integration.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.domain.GoogleCalendarSyncMode;
+import com.calio.calendar.integration.domain.GoogleProviderObservation;
 import com.calio.calendar.integration.repository.GoogleCalendarEventMappingRepository;
 import com.calio.calendar.integration.repository.GoogleCalendarIntegrationRepository;
 import com.calio.calendar.integration.repository.GoogleCalendarRecurrenceEventMappingRepository;
@@ -89,6 +90,9 @@ class GoogleCalendarEventPagePersistenceServiceTest {
 
     @MockitoBean
     private GoogleOperationJobPersistenceService operationJobPersistenceService;
+
+    @MockitoBean
+    private GoogleCalendarSyncLeaseService syncLeaseService;
 
     @Test
     @Transactional
@@ -434,7 +438,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
                         "UTC"
                 )
         );
-        pagePersistenceService.persistNormalizedPage(
+        persistPage(
                 integration.getId(),
                 account.getId(),
                 "recurrence-run",
@@ -463,7 +467,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
                 recurrenceSchedule,
                 List.of("RRULE:FREQ=WEEKLY")
         );
-        pagePersistenceService.persistNormalizedPage(
+        persistPage(
                 integration.getId(),
                 account.getId(),
                 "recurrence-run",
@@ -541,7 +545,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
         );
         ActiveRecurrenceEventOverrideUpsert firstOverride =
                 recurrenceOverride("shared-override", "recurrence-event-a");
-        pagePersistenceService.persistNormalizedPage(
+        persistPage(
                 integration.getId(),
                 account.getId(),
                 "cross-parent-run",
@@ -555,7 +559,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
                 recurrenceOverride("shared-override", "recurrence-event-b");
 
         // when, then
-        assertThatThrownBy(() -> pagePersistenceService.persistNormalizedPage(
+        assertThatThrownBy(() -> persistPage(
                 integration.getId(),
                 account.getId(),
                 "cross-parent-run",
@@ -618,7 +622,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
                                 "UTC"
                         )
                 );
-        pagePersistenceService.persistNormalizedPage(
+        persistPage(
                 integration.getId(),
                 account.getId(),
                 "recurrence-cancellation-run",
@@ -646,7 +650,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
                 ),
                 new GoogleCalendarSyncRunContext("access-token")
         );
-        pagePersistenceService.persistNormalizedPage(
+        persistPage(
                 integration.getId(),
                 account.getId(),
                 "recurrence-cancellation-run",
@@ -700,8 +704,9 @@ class GoogleCalendarEventPagePersistenceServiceTest {
                     integration,
                     events.get(index),
                     "event-" + index,
-                    null,
-                    null
+                    new GoogleProviderObservation(
+                            null, null,
+                            GoogleProviderContentProjector.event(events.get(index)))
             ));
         }
         mappingRepository.saveAllAndFlush(mappings);
@@ -730,7 +735,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
                                 "UTC"
                         )
                 );
-        pagePersistenceService.persistNormalizedPage(
+        persistPage(
                 integration.getId(),
                 account.getId(),
                 "full-reconciliation-run",
@@ -836,7 +841,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
                 page,
                 context
         );
-        pagePersistenceService.persistNormalizedPage(
+        persistPage(
                 integrationId,
                 accountId,
                 runId,
@@ -971,6 +976,17 @@ class GoogleCalendarEventPagePersistenceServiceTest {
                 null,
                 "2026-07-01T10:00:00Z",
                 "UTC"
+        );
+    }
+
+    private void persistPage(
+            Long integrationId,
+            Long accountId,
+            String workerToken,
+            GoogleCalendarNormalizedPage page
+    ) {
+        pagePersistenceService.persistOwnedNormalizedPage(
+                1L, integrationId, accountId, workerToken, page
         );
     }
 

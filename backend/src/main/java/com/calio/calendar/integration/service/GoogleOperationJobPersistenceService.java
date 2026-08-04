@@ -26,15 +26,18 @@ public class GoogleOperationJobPersistenceService {
     private final GoogleCalendarIntegrationRepository integrationRepository;
     private final GoogleOperationJobRepository jobRepository;
     private final Clock clock;
+    private final GoogleCalendarMappingLockCoordinator mappingLockCoordinator;
 
     public GoogleOperationJobPersistenceService(
             GoogleCalendarIntegrationRepository integrationRepository,
             GoogleOperationJobRepository jobRepository,
-            Clock clock
+            Clock clock,
+            GoogleCalendarMappingLockCoordinator mappingLockCoordinator
     ) {
         this.integrationRepository = integrationRepository;
         this.jobRepository = jobRepository;
         this.clock = clock;
+        this.mappingLockCoordinator = mappingLockCoordinator;
     }
 
     @Transactional
@@ -124,10 +127,17 @@ public class GoogleOperationJobPersistenceService {
     }
 
     @Transactional
-    public void skipConflicted(Long jobId, Long accountId, String workerToken) {
-        if (jobRepository.skipOwnedConflicted(jobId, accountId, workerToken) != 1) {
+    public boolean skipIfConflicted(GoogleOperationJob job, String workerToken) {
+        if (!job.hasCanonicalEffectiveScope()
+                || !mappingLockCoordinator.isConflictedAfterLock(
+                job.getIntegrationId(), job.getEffectiveScope())) {
+            return false;
+        }
+        if (jobRepository.skipOwnedConflicted(
+                job.getId(), job.getAccountId(), workerToken) != 1) {
             throw new GoogleOperationOwnershipLostException();
         }
+        return true;
     }
 
     @Transactional

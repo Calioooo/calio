@@ -3,11 +3,16 @@ package com.calio.calendar.integration.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.integration.domain.GoogleCalendarIntegration;
+import com.calio.calendar.integration.domain.GoogleCalendarEffectiveScope;
+import com.calio.calendar.integration.domain.GoogleContentHash;
 import com.calio.calendar.integration.domain.GoogleOperationJob;
 import com.calio.calendar.integration.domain.GoogleOperationJobState;
 import com.calio.calendar.integration.domain.GoogleOperationJobTrigger;
@@ -17,12 +22,16 @@ import com.calio.calendar.integration.service.GoogleOperationProducerTransaction
 import com.calio.calendar.task.domain.Task;
 import com.calio.calendar.task.repository.TaskRepository;
 import java.time.Instant;
+import java.time.Clock;
+import java.util.Optional;
+import java.util.function.Supplier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.mockito.InOrder;
 
 @SpringBootTest(properties = {
         "spring.datasource.url=jdbc:h2:mem:google-operation-producer-test;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE",
@@ -99,10 +108,10 @@ class GoogleOperationProducerTransactionTest {
         integrationRepository.saveAndFlush(integration(account.getId()));
         OutboundJobDraft invalidDraft = new OutboundJobDraft(
                 GoogleOperationJob.SYNC_KIND,
-                "EVENT",
-                "event-1",
+                GoogleCalendarEffectiveScope.generalEvent(1L),
                 null,
-                "{}"
+                "{}",
+                GoogleContentHash.digest("TEST", "invalid")
         );
 
         // when, then
@@ -154,13 +163,57 @@ class GoogleOperationProducerTransactionTest {
         verify(worker, never()).wake(account.getId());
     }
 
+    @Test
+    @DisplayName("conflicted scope는 mapping을 먼저 잠근 뒤 canonical만 변경한다")
+    void givenConflictedScope_whenMutating_thenLocksMappingFirstAndKeepsMutationLocal() {
+        // given
+        GoogleCalendarIntegrationRepository integrations =
+                mock(GoogleCalendarIntegrationRepository.class);
+        GoogleOperationJobRepository jobs = mock(GoogleOperationJobRepository.class);
+        GoogleOperationWorker localWorker = mock(GoogleOperationWorker.class);
+        GoogleCalendarMappingLockCoordinator lockCoordinator =
+                mock(GoogleCalendarMappingLockCoordinator.class);
+        GoogleCalendarIntegration integration = mock(GoogleCalendarIntegration.class);
+        GoogleCalendarEffectiveScope scope = GoogleCalendarEffectiveScope.generalEvent(99L);
+        @SuppressWarnings("unchecked")
+        Supplier<String> mutation = mock(Supplier.class);
+        when(integration.getId()).thenReturn(3L);
+        when(integrations.findByAccountId(2L)).thenReturn(Optional.of(integration));
+        when(lockCoordinator.isConflictedAfterLock(3L, scope)).thenReturn(true);
+        when(integrations.findByAccountIdForUpdate(2L)).thenReturn(Optional.of(integration));
+        when(mutation.get()).thenReturn("local-result");
+        GoogleOperationProducerTransaction transaction =
+                new GoogleOperationProducerTransaction(
+                        integrations, jobs, localWorker, Clock.systemUTC(), lockCoordinator
+                );
+
+        // when
+        String result = transaction.mutate(
+                2L,
+                mutation,
+                new OutboundJobDraft(
+                        "EVENT_UPSERT", scope, null, "{}",
+                        GoogleContentHash.digest("TEST", "desired"))
+        );
+
+        // then
+        assertThat(result).isEqualTo("local-result");
+        InOrder order = inOrder(integrations, lockCoordinator, mutation);
+        order.verify(integrations).findByAccountId(2L);
+        order.verify(lockCoordinator).isConflictedAfterLock(3L, scope);
+        order.verify(integrations).findByAccountIdForUpdate(2L);
+        order.verify(mutation).get();
+        verify(jobs, never()).saveAndFlush(org.mockito.ArgumentMatchers.any());
+        verify(localWorker, never()).wake(2L);
+    }
+
     private OutboundJobDraft outboundDraft() {
         return new OutboundJobDraft(
                 "EVENT_UPSERT",
-                "EVENT",
-                "event-1",
+                GoogleCalendarEffectiveScope.generalEvent(1L),
                 null,
-                "{}"
+                "{}",
+                GoogleContentHash.digest("TEST", "desired")
         );
     }
 

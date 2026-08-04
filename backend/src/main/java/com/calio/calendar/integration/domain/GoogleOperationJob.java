@@ -45,7 +45,7 @@ public class GoogleOperationJob extends BaseEntity {
     @Column(name = "effective_resource_scope", nullable = false, updatable = false, length = 64)
     private String effectiveResourceScope;
 
-    @Column(name = "effective_resource_key", nullable = false, updatable = false, length = 2300)
+    @Column(name = "effective_resource_key", nullable = false, updatable = false, length = 128)
     private String effectiveResourceKey;
 
     @Column(name = "provider_identity", updatable = false, length = 1024)
@@ -114,31 +114,15 @@ public class GoogleOperationJob extends BaseEntity {
             Long accountId,
             long accountSequence,
             String kind,
-            String resourceScope,
-            String resourceKey,
-            String providerIdentity,
-            String desiredPayload,
-            Instant runnableAt
-    ) {
-        GoogleCalendarEffectiveScope effectiveScope =
-                GoogleCalendarEffectiveScope.decode(resourceScope, resourceKey);
-        return outbound(operationId, integrationId, accountId, accountSequence, kind,
-                effectiveScope, providerIdentity, desiredPayload,
-                GoogleContentHash.requireValid(desiredPayload), runnableAt);
-    }
-
-    public static GoogleOperationJob outbound(
-            String operationId,
-            Long integrationId,
-            Long accountId,
-            long accountSequence,
-            String kind,
             GoogleCalendarEffectiveScope effectiveScope,
             String providerIdentity,
             String desiredPayload,
             String desiredContentHash,
             Instant runnableAt
     ) {
+        if (effectiveScope == null) {
+            throw new IllegalArgumentException("Outbound Google operation scope is required");
+        }
         String resourceScope = effectiveScope.encodedType();
         String resourceKey = effectiveScope.encodedKey();
         validateOutboundFields(kind, resourceScope, resourceKey, desiredPayload);

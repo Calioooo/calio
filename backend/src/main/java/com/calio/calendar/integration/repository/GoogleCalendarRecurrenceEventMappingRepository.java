@@ -26,6 +26,20 @@ public interface GoogleCalendarRecurrenceEventMappingRepository
     );
 
     @EntityGraph(attributePaths = {"recurrenceEvent", "recurrenceEvent.tag"})
+    @Query("""
+            select mapping
+            from GoogleCalendarRecurrenceEventMapping mapping
+            where mapping.integration.id = :integrationId
+              and mapping.calendarKey = :calendarKey
+              and mapping.externalEventId in :externalEventIds
+            """)
+    List<GoogleCalendarRecurrenceEventMapping> findAllWithRecurrenceEventAndTagByExternalIdentity(
+            @Param("integrationId") Long integrationId,
+            @Param("calendarKey") String calendarKey,
+            @Param("externalEventIds") Collection<String> externalEventIds
+    );
+
+    @EntityGraph(attributePaths = {"recurrenceEvent", "recurrenceEvent.tag"})
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             select mapping
@@ -35,7 +49,8 @@ public interface GoogleCalendarRecurrenceEventMappingRepository
               and mapping.externalEventId in :externalEventIds
             order by mapping.id
             """)
-    List<GoogleCalendarRecurrenceEventMapping> findAllWithRecurrenceEventAndTagByExternalIdentity(
+    List<GoogleCalendarRecurrenceEventMapping>
+    findAllWithRecurrenceEventAndTagByExternalIdentityForUpdate(
             @Param("integrationId") Long integrationId,
             @Param("calendarKey") String calendarKey,
             @Param("externalEventIds") Collection<String> externalEventIds
@@ -43,6 +58,19 @@ public interface GoogleCalendarRecurrenceEventMappingRepository
 
     @EntityGraph(attributePaths = "recurrenceEvent")
     @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select mapping
+            from GoogleCalendarRecurrenceEventMapping mapping
+            where mapping.integration.id = :integrationId
+              and mapping.recurrenceEvent.id = :recurrenceEventId
+            """)
+    Optional<GoogleCalendarRecurrenceEventMapping>
+    findWithRecurrenceEventByIntegrationIdAndRecurrenceEventIdForUpdate(
+            @Param("integrationId") Long integrationId,
+            @Param("recurrenceEventId") Long recurrenceEventId
+    );
+
+    @EntityGraph(attributePaths = "recurrenceEvent")
     @Query("""
             select mapping
             from GoogleCalendarRecurrenceEventMapping mapping
@@ -62,7 +90,7 @@ public interface GoogleCalendarRecurrenceEventMappingRepository
             order by mapping.id
             """)
     List<GoogleCalendarRecurrenceEventMapping>
-    findNextBatchWithRecurrenceEventByIntegrationId(
+    findNextBatchWithRecurrenceEventByIntegrationIdAfterIdForUpdate(
             @Param("integrationId") Long integrationId,
             @Param("afterId") Long afterId,
             Pageable pageable
@@ -75,12 +103,4 @@ public interface GoogleCalendarRecurrenceEventMappingRepository
             """)
     int deleteAllByIds(@Param("mappingIds") Collection<Long> mappingIds);
 
-    @Query("""
-            select count(mapping) > 0 from GoogleCalendarRecurrenceEventMapping mapping
-            where mapping.integration.id = :integrationId
-              and mapping.externalEventId = :externalEventId
-              and mapping.syncStatus = com.calio.calendar.integration.domain.GoogleCalendarMappingSyncStatus.CONFLICTED
-            """)
-    boolean isConflicted(@Param("integrationId") Long integrationId,
-                         @Param("externalEventId") String externalEventId);
 }

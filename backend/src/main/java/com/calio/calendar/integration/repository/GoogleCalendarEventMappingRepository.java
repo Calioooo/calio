@@ -3,6 +3,7 @@ package com.calio.calendar.integration.repository;
 import com.calio.calendar.integration.domain.GoogleCalendarEventMapping;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -16,6 +17,20 @@ public interface GoogleCalendarEventMappingRepository
         extends JpaRepository<GoogleCalendarEventMapping, Long> {
 
     @EntityGraph(attributePaths = "event")
+    @Query("""
+            select mapping
+            from GoogleCalendarEventMapping mapping
+            where mapping.integration.id = :integrationId
+              and mapping.calendarKey = :calendarKey
+              and mapping.externalEventId in :externalEventIds
+            """)
+    List<GoogleCalendarEventMapping> findAllWithEventByExternalIdentity(
+            @Param("integrationId") Long integrationId,
+            @Param("calendarKey") String calendarKey,
+            @Param("externalEventIds") Collection<String> externalEventIds
+    );
+
+    @EntityGraph(attributePaths = "event")
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             select mapping
@@ -25,10 +40,23 @@ public interface GoogleCalendarEventMappingRepository
               and mapping.externalEventId in :externalEventIds
             order by mapping.id
             """)
-    List<GoogleCalendarEventMapping> findAllWithEventByExternalIdentity(
+    List<GoogleCalendarEventMapping> findAllWithEventByExternalIdentityForUpdate(
             @Param("integrationId") Long integrationId,
             @Param("calendarKey") String calendarKey,
             @Param("externalEventIds") Collection<String> externalEventIds
+    );
+
+    @EntityGraph(attributePaths = "event")
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select mapping
+            from GoogleCalendarEventMapping mapping
+            where mapping.integration.id = :integrationId
+              and mapping.event.id = :eventId
+            """)
+    Optional<GoogleCalendarEventMapping> findWithEventByIntegrationIdAndEventIdForUpdate(
+            @Param("integrationId") Long integrationId,
+            @Param("eventId") Long eventId
     );
 
     boolean existsByEvent_IdAndIntegration_AccountId(Long eventId, Long accountId);
@@ -40,17 +68,7 @@ public interface GoogleCalendarEventMappingRepository
             """)
     List<Long> findEventIdsByIntegrationId(@Param("integrationId") Long integrationId);
 
-    @Query("""
-            select mapping
-            from GoogleCalendarEventMapping mapping
-            where mapping.integration.id = :integrationId
-            """)
-    List<GoogleCalendarEventMapping> findAllByIntegrationId(
-            @Param("integrationId") Long integrationId
-    );
-
     @EntityGraph(attributePaths = "event")
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             select mapping
             from GoogleCalendarEventMapping mapping
@@ -69,7 +87,7 @@ public interface GoogleCalendarEventMappingRepository
               and mapping.id > :afterId
             order by mapping.id
             """)
-    List<GoogleCalendarEventMapping> findNextBatchWithEventByIntegrationId(
+    List<GoogleCalendarEventMapping> findNextBatchWithEventByIntegrationIdAfterIdForUpdate(
             @Param("integrationId") Long integrationId,
             @Param("afterId") Long afterId,
             Pageable pageable
@@ -79,12 +97,4 @@ public interface GoogleCalendarEventMappingRepository
     @Query("delete from GoogleCalendarEventMapping mapping where mapping.id in :mappingIds")
     int deleteAllByIds(@Param("mappingIds") Collection<Long> mappingIds);
 
-    @Query("""
-            select count(mapping) > 0 from GoogleCalendarEventMapping mapping
-            where mapping.integration.id = :integrationId
-              and mapping.externalEventId = :externalEventId
-              and mapping.syncStatus = com.calio.calendar.integration.domain.GoogleCalendarMappingSyncStatus.CONFLICTED
-            """)
-    boolean isConflicted(@Param("integrationId") Long integrationId,
-                         @Param("externalEventId") String externalEventId);
 }

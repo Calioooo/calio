@@ -58,10 +58,10 @@ class GoogleOperationJobTest {
                 2L,
                 3L,
                 GoogleOperationJob.SYNC_KIND,
-                "EVENT",
-                "event-id",
+                GoogleCalendarEffectiveScope.generalEvent(1L),
                 null,
                 "{}",
+                hash("desired"),
                 NOW
         )).isInstanceOf(IllegalArgumentException.class);
     }
@@ -75,10 +75,10 @@ class GoogleOperationJobTest {
                 2L,
                 3L,
                 "EVENT_UPSERT",
-                "",
-                "event-id",
+                null,
                 null,
                 "{}",
+                hash("desired"),
                 NOW
         )).isInstanceOf(IllegalArgumentException.class);
     }
@@ -92,12 +92,16 @@ class GoogleOperationJobTest {
                 2L,
                 3L,
                 "EVENT_UPSERT",
-                "EVENT",
-                "event-id",
+                GoogleCalendarEffectiveScope.generalEvent(1L),
                 null,
                 "",
+                hash("desired"),
                 NOW
         )).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    private String hash(String value) {
+        return GoogleContentHash.digest("TEST", value);
     }
 
     private GoogleOperationJob syncJob(Instant runnableAt) {

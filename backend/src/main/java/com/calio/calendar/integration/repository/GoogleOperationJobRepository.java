@@ -155,7 +155,7 @@ public interface GoogleOperationJobRepository extends JpaRepository<GoogleOperat
                              @Param("accountId") Long accountId,
                              @Param("owner") String owner);
 
-    @Modifying(flushAutomatically = true)
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(value = """
             UPDATE google_operation_jobs
             SET job_state = 'CONFLICTED', owner_token = NULL,
@@ -176,7 +176,7 @@ public interface GoogleOperationJobRepository extends JpaRepository<GoogleOperat
                                  @Param("accountId") Long accountId,
                                  @Param("owner") String owner);
 
-    @Modifying(flushAutomatically = true)
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(value = """
             UPDATE google_operation_jobs
             SET job_state = 'SKIPPED', owner_token = NULL,

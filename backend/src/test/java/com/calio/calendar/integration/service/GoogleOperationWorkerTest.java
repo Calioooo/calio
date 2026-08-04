@@ -165,6 +165,27 @@ class GoogleOperationWorkerTest {
     }
 
     @Test
+    @DisplayName("이미 충돌된 scope의 outbound Job은 provider 호출 전에 SKIPPED 처리한다")
+    void givenConflictedOutboundScope_whenWoken_thenSkipsBeforeProviderCall() {
+        // given
+        GoogleOperationJob job = job(1L, 10L, "EVENT_UPSERT");
+        when(persistenceService.acquireLease(eq(10L), anyString())).thenReturn(true);
+        when(persistenceService.claimHead(eq(10L), anyString()))
+                .thenReturn(job)
+                .thenReturn(null);
+        when(persistenceService.skipIfConflicted(eq(job), anyString())).thenReturn(true);
+
+        // when
+        worker.wake(10L);
+
+        // then
+        verify(persistenceService, timeout()).skipIfConflicted(eq(job), anyString());
+        verify(persistenceService, never()).terminate(
+                anyLong(), anyLong(), anyString(), anyString());
+        verify(syncService, never()).executeOwned(anyLong(), anyLong(), anyString());
+    }
+
+    @Test
     @DisplayName("처리 중인 Account의 중복 wake는 별도 worker를 시작하지 않는다")
     void givenActiveAccount_whenWokenAgain_thenKeepsSingleWorker() throws Exception {
         // given

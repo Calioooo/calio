@@ -3,6 +3,7 @@ package com.calio.calendar.integration.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doNothing;
 
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
@@ -13,6 +14,8 @@ import com.calio.calendar.event.repository.EventRepository;
 import com.calio.calendar.integration.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.domain.GoogleCalendarSyncMode;
+import com.calio.calendar.integration.domain.GoogleContentHash;
+import com.calio.calendar.integration.domain.GoogleProviderObservation;
 import com.calio.calendar.integration.repository.GoogleCalendarEventMappingRepository;
 import com.calio.calendar.integration.repository.GoogleCalendarIntegrationRepository;
 import com.calio.calendar.tag.domain.Tag;
@@ -39,7 +42,7 @@ class GoogleCalendarProviderDataServiceTransactionTest {
     @Autowired
     private GoogleCalendarProviderDataService providerDataService;
 
-    @Autowired
+    @MockitoSpyBean
     private GoogleCalendarSyncLeaseService leaseService;
 
     @MockitoSpyBean
@@ -85,11 +88,15 @@ class GoogleCalendarProviderDataServiceTransactionTest {
                         integration,
                         event,
                         "unseen-event",
-                        null,
-                        null
+                        new GoogleProviderObservation(
+                                null, null,
+                                GoogleContentHash.digest("TEST", "unseen-event"))
                 )
         );
         leaseService.acquire(account.getId(), "full-run");
+        doNothing().when(leaseService).renewOwnedLeases(
+                account.getId(), integration.getId(), "full-run"
+        );
         doReturn(0).when(integrationRepository).finalizeSync(
                 integration.getId(),
                 "full-run",

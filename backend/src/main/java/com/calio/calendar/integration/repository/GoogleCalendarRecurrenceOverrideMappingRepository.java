@@ -3,6 +3,7 @@ package com.calio.calendar.integration.repository;
 import com.calio.calendar.integration.domain.GoogleCalendarRecurrenceOverrideMapping;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -38,13 +39,32 @@ public interface GoogleCalendarRecurrenceOverrideMappingRepository
             select overrideMapping
             from GoogleCalendarRecurrenceOverrideMapping overrideMapping
             join overrideMapping.recurrenceEventMapping recurrenceEventMapping
-            where recurrenceEventMapping.id in :recurrenceEventMappingIds
+            where recurrenceEventMapping.integration.id = :integrationId
+              and recurrenceEventMapping.calendarKey = :calendarKey
               and overrideMapping.externalEventId in :externalEventIds
+            order by overrideMapping.id
             """)
     List<GoogleCalendarRecurrenceOverrideMapping>
-    findAllWithRecurrenceEventMappingAndRecurrenceEventOverrideByExternalIdentity(
-            @Param("recurrenceEventMappingIds") Collection<Long> recurrenceEventMappingIds,
+    findAllWithRecurrenceEventMappingAndRecurrenceEventOverrideByExternalEventIdsForUpdate(
+            @Param("integrationId") Long integrationId,
+            @Param("calendarKey") String calendarKey,
             @Param("externalEventIds") Collection<String> externalEventIds
+    );
+
+    @EntityGraph(attributePaths = {"recurrenceEventMapping", "recurrenceEventOverride"})
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select mapping
+            from GoogleCalendarRecurrenceOverrideMapping mapping
+            where mapping.recurrenceEventMapping.integration.id = :integrationId
+              and mapping.recurrenceEventMapping.recurrenceEvent.id = :recurrenceEventId
+              and mapping.recurrenceEventOverride.originStartAt = :originStartAt
+            """)
+    Optional<GoogleCalendarRecurrenceOverrideMapping>
+    findWithRecurrenceEventMappingAndRecurrenceEventOverrideByScopeForUpdate(
+            @Param("integrationId") Long integrationId,
+            @Param("recurrenceEventId") Long recurrenceEventId,
+            @Param("originStartAt") Instant originStartAt
     );
 
     @EntityGraph(attributePaths = {"recurrenceEventMapping", "recurrenceEventOverride"})
@@ -57,7 +77,7 @@ public interface GoogleCalendarRecurrenceOverrideMappingRepository
             order by recurrenceEventMapping.id, overrideMapping.id
             """)
     List<GoogleCalendarRecurrenceOverrideMapping>
-    findAllWithRecurrenceEventMappingAndRecurrenceEventOverrideByRecurrenceEventMappingIds(
+    findAllWithRecurrenceEventMappingAndRecurrenceEventOverrideByRecurrenceEventMappingIdsForUpdate(
             @Param("recurrenceEventMappingIds") Collection<Long> recurrenceEventMappingIds
     );
 
@@ -83,7 +103,7 @@ public interface GoogleCalendarRecurrenceOverrideMappingRepository
             order by mapping.id
             """)
     List<GoogleCalendarRecurrenceOverrideMapping>
-    findNextBatchWithRecurrenceEventMappingAndRecurrenceEventOverrideByIntegrationId(
+    findNextBatchWithRecurrenceEventMappingAndRecurrenceEventOverrideByIntegrationIdAfterIdForUpdate(
             @Param("integrationId") Long integrationId,
             @Param("afterId") Long afterId,
             Pageable pageable
@@ -105,14 +125,4 @@ public interface GoogleCalendarRecurrenceOverrideMappingRepository
             @Param("recurrenceEventMappingIds") Collection<Long> recurrenceEventMappingIds
     );
 
-    @Query("""
-            select count(mapping) > 0 from GoogleCalendarRecurrenceOverrideMapping mapping
-            where mapping.recurrenceEventMapping.integration.id = :integrationId
-              and mapping.recurrenceEventMapping.externalEventId = :externalMasterId
-              and mapping.recurrenceEventOverride.originStartAt = :originStartAt
-              and mapping.syncStatus = com.calio.calendar.integration.domain.GoogleCalendarMappingSyncStatus.CONFLICTED
-            """)
-    boolean isConflicted(@Param("integrationId") Long integrationId,
-                         @Param("externalMasterId") String externalMasterId,
-                         @Param("originStartAt") Instant originStartAt);
 }

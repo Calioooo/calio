@@ -32,7 +32,8 @@ class GoogleOperationJobPersistenceServiceTest {
         GoogleOperationJobPersistenceService service = new GoogleOperationJobPersistenceService(
                 integrationRepository,
                 jobRepository,
-                Clock.fixed(now, ZoneOffset.UTC)
+                Clock.fixed(now, ZoneOffset.UTC),
+                mock(GoogleCalendarMappingLockCoordinator.class)
         );
 
         // when

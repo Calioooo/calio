@@ -9,6 +9,8 @@ import com.calio.calendar.common.domain.CanonicalSchedule;
 import com.calio.calendar.integration.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.domain.GoogleCalendarRecurrenceEventMapping;
 import com.calio.calendar.integration.domain.GoogleCalendarRecurrenceOverrideMapping;
+import com.calio.calendar.integration.domain.GoogleContentHash;
+import com.calio.calendar.integration.domain.GoogleProviderObservation;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
@@ -91,8 +93,9 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
                         integration,
                         recurrenceEvent,
                         externalRecurrenceEventId,
-                        etag,
-                        null
+                        new GoogleProviderObservation(
+                                etag, null,
+                                GoogleContentHash.digest("TEST", externalRecurrenceEventId))
                 )
         );
         GoogleCalendarRecurrenceOverrideMapping overrideMapping =
@@ -101,8 +104,10 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
                                 eventMapping,
                                 recurrenceOverride,
                                 externalRecurrenceOverrideId,
-                                etag,
-                                null
+                                new GoogleProviderObservation(
+                                        etag, null,
+                                        GoogleContentHash.digest(
+                                                "TEST", externalRecurrenceOverrideId))
                         )
                 );
 
@@ -366,8 +371,7 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
                 fixture.integration(),
                 recurrenceEvent,
                 externalEventId,
-                null,
-                null
+                observation(externalEventId)
         );
     }
 
@@ -400,8 +404,13 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
                 parentMapping,
                 recurrenceOverride,
                 externalEventId,
-                null,
-                null
+                observation(externalEventId)
+        );
+    }
+
+    private GoogleProviderObservation observation(String identity) {
+        return new GoogleProviderObservation(
+                null, null, GoogleContentHash.digest("TEST", identity)
         );
     }
 

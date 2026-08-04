@@ -16,7 +16,6 @@ import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
-import com.calio.calendar.integration.service.GoogleProviderContentProjector;
 
 @Entity
 @Table(
@@ -72,26 +71,19 @@ public class GoogleCalendarRecurrenceOverrideMapping extends BaseEntity {
             GoogleCalendarRecurrenceEventMapping recurrenceEventMapping,
             RecurrenceEventOverride recurrenceEventOverride,
             String externalEventId,
-            String providerEtag,
-            Instant providerUpdatedAt
+            GoogleProviderObservation observation
     ) {
         this.recurrenceEventMapping = recurrenceEventMapping;
         this.recurrenceEventOverride = recurrenceEventOverride;
         this.externalEventId = externalEventId;
         this.syncStatus = GoogleCalendarMappingSyncStatus.ACTIVE;
-        observeProvider(providerEtag, providerUpdatedAt,
-                GoogleProviderContentProjector.recurrenceOverride(
-                        recurrenceEventMapping.getExternalEventId(), recurrenceEventOverride));
+        observeProvider(observation);
     }
 
-    public void observeProvider(
-            String providerEtag,
-            Instant providerUpdatedAt,
-            String syncedContentHash
-    ) {
-        this.providerEtag = providerEtag;
-        this.providerUpdatedAt = providerUpdatedAt;
-        this.syncedContentHash = GoogleContentHash.requireValid(syncedContentHash);
+    public void observeProvider(GoogleProviderObservation observation) {
+        this.providerEtag = observation.etag();
+        this.providerUpdatedAt = observation.updatedAt();
+        this.syncedContentHash = observation.contentHash();
     }
 
     public void markConflicted() {

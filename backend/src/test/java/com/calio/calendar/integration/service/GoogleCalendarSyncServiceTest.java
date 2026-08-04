@@ -447,7 +447,9 @@ class GoogleCalendarSyncServiceTest {
                     null,
                     null,
                     null,
-                    mock(GoogleOperationJobPersistenceService.class)
+                    mock(GoogleOperationJobPersistenceService.class),
+                    null,
+                    null
             );
         }
 
@@ -509,7 +511,7 @@ class GoogleCalendarSyncServiceTest {
         private int assertionCount;
 
         private FakeOperationJobPersistenceService() {
-            super(null, null, null);
+            super(null, null, null, null);
         }
 
         @Override
@@ -571,7 +573,9 @@ class GoogleCalendarSyncServiceTest {
                     mock(GoogleCalendarRecurrenceOverrideMappingRepository.class),
                     mock(RecurrenceEventRepository.class),
                     mock(RecurrenceEventOverrideRepository.class),
-                    mock(GoogleOperationJobPersistenceService.class)
+                    mock(GoogleOperationJobPersistenceService.class),
+                    mock(GoogleCalendarInboundConflictService.class),
+                    mock(GoogleCalendarMappingLockCoordinator.class)
             );
         }
 

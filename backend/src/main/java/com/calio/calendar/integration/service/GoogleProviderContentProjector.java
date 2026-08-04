@@ -3,6 +3,7 @@ package com.calio.calendar.integration.service;
 import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.external.google.GoogleCalendarEventTimeNormalizer.NormalizedEventSchedule;
 import com.calio.calendar.integration.domain.GoogleContentHash;
+import com.calio.calendar.integration.domain.GoogleProviderObservation;
 import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.ActiveRecurrenceEventOverrideUpsert;
 import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.EventUpsert;
 import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.RecurrenceEventOverrideUpsert;
@@ -15,6 +16,28 @@ import java.util.List;
 public final class GoogleProviderContentProjector {
 
     private GoogleProviderContentProjector() {
+    }
+
+    public static GoogleProviderObservation eventObservation(EventUpsert item) {
+        return new GoogleProviderObservation(
+                item.googleEtag(), item.googleUpdatedAt(), event(item)
+        );
+    }
+
+    public static GoogleProviderObservation recurrenceEventObservation(
+            RecurrenceEventUpsert item
+    ) {
+        return new GoogleProviderObservation(
+                item.googleEtag(), item.googleUpdatedAt(), recurrenceMaster(item)
+        );
+    }
+
+    public static GoogleProviderObservation recurrenceEventOverrideObservation(
+            RecurrenceEventOverrideUpsert item
+    ) {
+        return new GoogleProviderObservation(
+                item.googleEtag(), item.googleUpdatedAt(), recurrenceOverride(item)
+        );
     }
 
     public static String event(EventUpsert item) {
