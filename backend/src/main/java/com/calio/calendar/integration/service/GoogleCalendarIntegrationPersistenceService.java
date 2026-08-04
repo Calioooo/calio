@@ -26,13 +26,6 @@ public class GoogleCalendarIntegrationPersistenceService {
         this.jobRepository = jobRepository;
     }
 
-    protected GoogleCalendarIntegrationPersistenceService(
-            GoogleCalendarIntegrationRepository googleCalendarIntegrationRepository,
-            GoogleCalendarProviderDataService providerDataService
-    ) {
-        this(googleCalendarIntegrationRepository, providerDataService, null);
-    }
-
     @Transactional
     public GoogleCalendarIntegration saveOrReplace(
             Long accountId,
@@ -94,9 +87,7 @@ public class GoogleCalendarIntegrationPersistenceService {
     public void deleteByAccountId(Long accountId) {
         googleCalendarIntegrationRepository.findByAccountIdForUpdate(accountId)
                 .ifPresent(integration -> {
-                    if (jobRepository != null) {
-                        jobRepository.deleteByIntegrationId(integration.getId());
-                    }
+                    jobRepository.deleteByIntegrationId(integration.getId());
                     providerDataService.deleteProviderData(integration.getId());
                     googleCalendarIntegrationRepository.delete(integration);
                 });
