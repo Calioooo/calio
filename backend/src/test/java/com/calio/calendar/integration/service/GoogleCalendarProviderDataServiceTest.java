@@ -85,9 +85,9 @@ class GoogleCalendarProviderDataServiceTest {
                 overrideMappingRepository,
                 recurrenceEventRepository,
                 overrideRepository,
-                null
+                null,
+                operationJobPersistenceService
         );
-        service.setOperationJobPersistenceService(operationJobPersistenceService);
 
         // when
         service.finalizeOwnedReconciliation(
