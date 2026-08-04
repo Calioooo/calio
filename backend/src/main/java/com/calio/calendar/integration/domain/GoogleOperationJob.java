@@ -135,6 +135,15 @@ public class GoogleOperationJob extends BaseEntity {
         return job;
     }
 
+    public boolean canBeClaimedAt(Instant now) {
+        return !runnableAt.isAfter(now);
+    }
+
+    public void claim(String workerToken) {
+        state = GoogleOperationJobState.PROCESSING;
+        ownerToken = workerToken;
+    }
+
     public Long getId() { return id; }
     public String getOperationId() { return operationId; }
     public Long getIntegrationId() { return integrationId; }

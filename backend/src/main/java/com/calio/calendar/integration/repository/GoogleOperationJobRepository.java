@@ -22,36 +22,6 @@ public interface GoogleOperationJobRepository extends JpaRepository<GoogleOperat
             """, nativeQuery = true)
     Optional<GoogleOperationJob> findAccountHeadForUpdate(@Param("accountId") Long accountId);
 
-    @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query(value = """
-            UPDATE google_operation_jobs
-            SET job_state = 'PROCESSING', owner_token = :owner,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE id = :jobId AND job_state = 'PENDING'
-              AND runnable_at <= CURRENT_TIMESTAMP
-              AND EXISTS (
-                  SELECT 1 FROM google_calendar_integrations integration
-                  WHERE integration.id = google_operation_jobs.integration_id
-                    AND integration.google_operation_lease_owner = :owner
-                    AND integration.google_operation_lease_expires_at >= CURRENT_TIMESTAMP
-              )
-            """, nativeQuery = true)
-    int claim(@Param("jobId") Long jobId, @Param("owner") String owner);
-
-    @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query(value = """
-            UPDATE google_operation_jobs
-            SET owner_token = :owner, updated_at = CURRENT_TIMESTAMP
-            WHERE id = :jobId AND job_state = 'PROCESSING'
-              AND EXISTS (
-                  SELECT 1 FROM google_calendar_integrations integration
-                  WHERE integration.id = google_operation_jobs.integration_id
-                    AND integration.google_operation_lease_owner = :owner
-                    AND integration.google_operation_lease_expires_at >= CURRENT_TIMESTAMP
-              )
-            """, nativeQuery = true)
-    int reclaimProcessing(@Param("jobId") Long jobId, @Param("owner") String owner);
-
     @Query(value = """
             SELECT COUNT(*) FROM google_operation_jobs job
             JOIN google_calendar_integrations integration ON integration.id = job.integration_id

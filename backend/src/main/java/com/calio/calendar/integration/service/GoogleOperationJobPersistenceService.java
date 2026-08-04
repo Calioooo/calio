@@ -2,7 +2,6 @@ package com.calio.calendar.integration.service;
 
 import com.calio.calendar.integration.repository.GoogleCalendarIntegrationRepository;
 import com.calio.calendar.integration.domain.GoogleOperationJob;
-import com.calio.calendar.integration.domain.GoogleOperationJobState;
 import com.calio.calendar.integration.repository.GoogleOperationJobRepository;
 import java.time.Clock;
 import java.time.Duration;
@@ -43,17 +42,11 @@ public class GoogleOperationJobPersistenceService {
         if (head == null) {
             return null;
         }
-        int changed = head.getState() == GoogleOperationJobState.PROCESSING
-                ? jobRepository.reclaimProcessing(head.getId(), workerToken)
-                : claimPending(head, workerToken);
-        return changed == 1 ? jobRepository.findById(head.getId()).orElseThrow() : null;
-    }
-
-    private int claimPending(GoogleOperationJob head, String workerToken) {
-        if (head.getRunnableAt().isAfter(Instant.now(clock))) {
-            return 0;
+        if (!head.canBeClaimedAt(Instant.now(clock))) {
+            return null;
         }
-        return jobRepository.claim(head.getId(), workerToken);
+        head.claim(workerToken);
+        return head;
     }
 
     @Transactional
