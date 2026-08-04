@@ -7,9 +7,11 @@ import com.calio.calendar.integration.service.GoogleOperationWorker;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -17,7 +19,9 @@ import org.springframework.stereotype.Component;
 public class GoogleOperationScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(GoogleOperationScheduler.class);
+    private static final int PERIODIC_ENQUEUE_BATCH_SIZE = 500;
     private static final int TERMINAL_CLEANUP_BATCH_SIZE = 500;
+    private static final long FIRST_ACCOUNT_ID = 0L;
 
     private final GoogleCalendarIntegrationRepository integrationRepository;
     private final GoogleOperationJobEnqueueService enqueueService;
@@ -42,7 +46,22 @@ public class GoogleOperationScheduler {
     @Scheduled(cron = "0 */10 * * * *")
     public void recoverAndEnqueuePeriodicSyncs() {
         persistenceService.findRecoverableAccountIds().forEach(worker::wake);
-        integrationRepository.findAllConnectedAccountIds().forEach(this::enqueuePeriodicSafely);
+        enqueuePeriodicSyncsInBatches();
+    }
+
+    private void enqueuePeriodicSyncsInBatches() {
+        long lastAccountId = FIRST_ACCOUNT_ID;
+        while (true) {
+            List<Long> accountIds = integrationRepository.findConnectedAccountIdsAfter(
+                    lastAccountId,
+                    PageRequest.of(0, PERIODIC_ENQUEUE_BATCH_SIZE)
+            );
+            accountIds.forEach(this::enqueuePeriodicSafely);
+            if (accountIds.size() < PERIODIC_ENQUEUE_BATCH_SIZE) {
+                return;
+            }
+            lastAccountId = accountIds.getLast();
+        }
     }
 
     private void enqueuePeriodicSafely(Long accountId) {
