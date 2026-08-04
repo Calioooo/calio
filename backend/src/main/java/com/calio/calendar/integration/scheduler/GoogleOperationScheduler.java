@@ -1,7 +1,6 @@
 package com.calio.calendar.integration.scheduler;
 
 import com.calio.calendar.integration.repository.GoogleCalendarIntegrationRepository;
-import com.calio.calendar.integration.repository.GoogleOperationJobRepository;
 import com.calio.calendar.integration.service.GoogleOperationJobEnqueueService;
 import com.calio.calendar.integration.service.GoogleOperationJobPersistenceService;
 import com.calio.calendar.integration.service.GoogleOperationWorker;
@@ -16,7 +15,6 @@ import org.springframework.stereotype.Component;
 public class GoogleOperationScheduler {
 
     private final GoogleCalendarIntegrationRepository integrationRepository;
-    private final GoogleOperationJobRepository jobRepository;
     private final GoogleOperationJobEnqueueService enqueueService;
     private final GoogleOperationJobPersistenceService persistenceService;
     private final GoogleOperationWorker worker;
@@ -24,14 +22,12 @@ public class GoogleOperationScheduler {
 
     public GoogleOperationScheduler(
             GoogleCalendarIntegrationRepository integrationRepository,
-            GoogleOperationJobRepository jobRepository,
             GoogleOperationJobEnqueueService enqueueService,
             GoogleOperationJobPersistenceService persistenceService,
             GoogleOperationWorker worker,
             Clock clock
     ) {
         this.integrationRepository = integrationRepository;
-        this.jobRepository = jobRepository;
         this.enqueueService = enqueueService;
         this.persistenceService = persistenceService;
         this.worker = worker;
@@ -40,8 +36,7 @@ public class GoogleOperationScheduler {
 
     @Scheduled(cron = "0 */10 * * * *")
     public void recoverAndEnqueuePeriodicSyncs() {
-        Instant now = Instant.now(clock);
-        jobRepository.findRecoverableAccountIds(now).forEach(worker::wake);
+        persistenceService.findRecoverableAccountIds().forEach(worker::wake);
         integrationRepository.findAllConnectedAccountIds().forEach(this::enqueuePeriodicSafely);
     }
 

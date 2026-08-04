@@ -84,6 +84,11 @@ public class GoogleOperationJobPersistenceService {
         integrationRepository.releaseGoogleOperationLease(accountId, workerToken);
     }
 
+    @Transactional(readOnly = true)
+    public List<Long> findRecoverableAccountIds() {
+        return jobRepository.findRecoverableAccountIds(Instant.now(clock));
+    }
+
     @Transactional
     public int deleteTerminalBatch(Instant cutoff) {
         List<Long> ids = jobRepository.findTerminalIdsBefore(cutoff, PageRequest.of(0, 500));
