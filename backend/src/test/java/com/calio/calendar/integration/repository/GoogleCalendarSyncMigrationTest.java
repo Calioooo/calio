@@ -245,6 +245,78 @@ class GoogleCalendarSyncMigrationTest {
         }
     }
 
+    @Test
+    @DisplayName("V14 empty-mapping upgrade는 durable baseline과 conflict evidence 제약을 추가한다")
+    void givenV13EmptyMappings_whenMigrateToV14_thenAddsConflictFoundation() throws Exception {
+        // given
+        String url = "jdbc:h2:mem:google-mapping-conflict-foundation;MODE=MySQL;DB_CLOSE_DELAY=-1";
+        migrateTo(url, MigrationVersion.fromVersion("13"));
+        insertV13OutboundJob(url);
+
+        // when
+        migrateTo(url, MigrationVersion.fromVersion("14"));
+
+        // then
+        try (Connection connection = DriverManager.getConnection(url, "sa", "")) {
+            assertThat(columnNames(connection, "GOOGLE_CALENDAR_EVENT_MAPPINGS"))
+                    .contains("SYNC_STATUS", "SYNCED_CONTENT_HASH");
+            assertThat(columnNames(connection, "GOOGLE_CALENDAR_RECURRENCE_EVENT_MAPPINGS"))
+                    .contains("SYNC_STATUS", "SYNCED_CONTENT_HASH");
+            assertThat(columnNames(connection, "GOOGLE_CALENDAR_RECURRENCE_OVERRIDE_MAPPINGS"))
+                    .contains("SYNC_STATUS", "SYNCED_CONTENT_HASH");
+            assertThat(columnNames(connection, "GOOGLE_OPERATION_JOBS"))
+                    .contains("CONFLICT_DETECTED", "DESIRED_CONTENT_HASH");
+            assertThat(indexNames(connection, "GOOGLE_OPERATION_JOBS"))
+                    .contains("IDX_GOOGLE_OPERATION_JOBS_PENDING_SCOPE");
+            assertThat(singleString(connection, """
+                    SELECT desired_content_hash FROM google_operation_jobs WHERE id = 950
+                    """)).isEqualTo(
+                    "v1:e3b0c44298fc1c149afbf4c8996fb924"
+                            + "27ae41e4649b934ca495991b7852b855"
+            );
+        }
+    }
+
+    private void insertV13OutboundJob(String url) throws Exception {
+        try (Connection connection = DriverManager.getConnection(url, "sa", "");
+             Statement statement = connection.createStatement()) {
+            statement.executeUpdate("""
+                    ALTER TABLE google_operation_jobs
+                    DROP COLUMN active_periodic_sync_account_id
+                    """);
+            statement.executeUpdate("""
+                    INSERT INTO accounts (id, created_at, updated_at)
+                    VALUES (950, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))
+                    """);
+            statement.executeUpdate("""
+                    INSERT INTO google_calendar_integrations (
+                        id, account_id, google_subject, google_email,
+                        encrypted_refresh_token, encrypted_access_token,
+                        access_token_expires_at, connected_at, created_at, updated_at
+                    ) VALUES (
+                        950, 950, 'subject-950', 'user950@example.com',
+                        'encrypted-refresh', 'encrypted-access',
+                        '2026-08-04 01:00:00', '2026-08-04 00:00:00',
+                        CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+                    )
+                    """);
+            statement.executeUpdate("""
+                    INSERT INTO google_operation_jobs (
+                        id, operation_id, integration_id, account_id, account_sequence,
+                        job_kind, job_trigger, effective_resource_scope,
+                        effective_resource_key, provider_identity, desired_payload,
+                        job_state, runnable_at, retry_count, created_at, updated_at
+                    ) VALUES (
+                        950, '00000000-0000-0000-0000-000000000950', 950, 950, 1,
+                        'EVENT_UPSERT', 'CANONICAL_MUTATION', 'EVENT',
+                        'legacy-event', NULL, '{"title":"legacy"}',
+                        'PENDING', CURRENT_TIMESTAMP(6), 0,
+                        CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+                    )
+                    """);
+        }
+    }
+
     private void migrateTo(String url, MigrationVersion target) {
         Flyway.configure()
                 .dataSource(url, "sa", "")

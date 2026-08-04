@@ -12,8 +12,11 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
+import com.calio.calendar.integration.service.GoogleProviderContentProjector;
 
 @Entity
 @Table(
@@ -57,6 +60,13 @@ public class GoogleCalendarEventMapping extends BaseEntity {
     @Column(name = "provider_updated_at")
     private Instant providerUpdatedAt;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "sync_status", nullable = false, length = 32)
+    private GoogleCalendarMappingSyncStatus syncStatus;
+
+    @Column(name = "synced_content_hash", nullable = false, length = 67)
+    private String syncedContentHash;
+
     protected GoogleCalendarEventMapping() {
     }
 
@@ -71,12 +81,23 @@ public class GoogleCalendarEventMapping extends BaseEntity {
         this.event = event;
         this.calendarKey = PRIMARY_CALENDAR_KEY;
         this.externalEventId = externalEventId;
-        updateProviderVersion(providerEtag, providerUpdatedAt);
+        this.syncStatus = GoogleCalendarMappingSyncStatus.ACTIVE;
+        observeProvider(providerEtag, providerUpdatedAt,
+                GoogleProviderContentProjector.event(event));
     }
 
-    public void updateProviderVersion(String providerEtag, Instant providerUpdatedAt) {
+    public void observeProvider(
+            String providerEtag,
+            Instant providerUpdatedAt,
+            String syncedContentHash
+    ) {
         this.providerEtag = providerEtag;
         this.providerUpdatedAt = providerUpdatedAt;
+        this.syncedContentHash = GoogleContentHash.requireValid(syncedContentHash);
+    }
+
+    public void markConflicted() {
+        this.syncStatus = GoogleCalendarMappingSyncStatus.CONFLICTED;
     }
 
     public Long getId() {
@@ -106,4 +127,7 @@ public class GoogleCalendarEventMapping extends BaseEntity {
     public Instant getProviderUpdatedAt() {
         return providerUpdatedAt;
     }
+
+    public GoogleCalendarMappingSyncStatus getSyncStatus() { return syncStatus; }
+    public String getSyncedContentHash() { return syncedContentHash; }
 }

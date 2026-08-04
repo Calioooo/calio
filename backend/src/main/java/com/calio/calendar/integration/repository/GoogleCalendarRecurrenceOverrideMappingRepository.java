@@ -8,6 +8,9 @@ import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.Lock;
+import jakarta.persistence.LockModeType;
+import java.time.Instant;
 import org.springframework.data.repository.query.Param;
 
 public interface GoogleCalendarRecurrenceOverrideMappingRepository
@@ -30,6 +33,7 @@ public interface GoogleCalendarRecurrenceOverrideMappingRepository
     );
 
     @EntityGraph(attributePaths = {"recurrenceEventMapping", "recurrenceEventOverride"})
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             select overrideMapping
             from GoogleCalendarRecurrenceOverrideMapping overrideMapping
@@ -44,11 +48,13 @@ public interface GoogleCalendarRecurrenceOverrideMappingRepository
     );
 
     @EntityGraph(attributePaths = {"recurrenceEventMapping", "recurrenceEventOverride"})
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             select overrideMapping
             from GoogleCalendarRecurrenceOverrideMapping overrideMapping
             join overrideMapping.recurrenceEventMapping recurrenceEventMapping
             where recurrenceEventMapping.id in :recurrenceEventMappingIds
+            order by recurrenceEventMapping.id, overrideMapping.id
             """)
     List<GoogleCalendarRecurrenceOverrideMapping>
     findAllWithRecurrenceEventMappingAndRecurrenceEventOverrideByRecurrenceEventMappingIds(
@@ -68,6 +74,7 @@ public interface GoogleCalendarRecurrenceOverrideMappingRepository
     );
 
     @EntityGraph(attributePaths = {"recurrenceEventMapping", "recurrenceEventOverride"})
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             select mapping
             from GoogleCalendarRecurrenceOverrideMapping mapping
@@ -97,4 +104,15 @@ public interface GoogleCalendarRecurrenceOverrideMappingRepository
     int deleteAllByRecurrenceEventMappingIds(
             @Param("recurrenceEventMappingIds") Collection<Long> recurrenceEventMappingIds
     );
+
+    @Query("""
+            select count(mapping) > 0 from GoogleCalendarRecurrenceOverrideMapping mapping
+            where mapping.recurrenceEventMapping.integration.id = :integrationId
+              and mapping.recurrenceEventMapping.externalEventId = :externalMasterId
+              and mapping.recurrenceEventOverride.originStartAt = :originStartAt
+              and mapping.syncStatus = com.calio.calendar.integration.domain.GoogleCalendarMappingSyncStatus.CONFLICTED
+            """)
+    boolean isConflicted(@Param("integrationId") Long integrationId,
+                         @Param("externalMasterId") String externalMasterId,
+                         @Param("originStartAt") Instant originStartAt);
 }

@@ -6,6 +6,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.integration.domain.GoogleCalendarIntegration;
+import com.calio.calendar.integration.domain.GoogleCalendarEffectiveScope;
+import com.calio.calendar.integration.domain.GoogleContentHash;
 import com.calio.calendar.integration.domain.GoogleOperationJob;
 import com.calio.calendar.integration.domain.GoogleOperationJobState;
 import com.calio.calendar.integration.domain.GoogleOperationJobTrigger;
@@ -28,6 +30,43 @@ import org.springframework.transaction.annotation.Transactional;
 })
 @Transactional
 class GoogleOperationJobPersistenceServiceIntegrationTest {
+
+    @Test
+    @DisplayName("recurrence aggregate pending 조회는 master와 해당 child override branch만 포함한다")
+    void givenMasterAndChildOverrideJobs_whenCountingAggregateBranches_thenIncludesBoth() {
+        // given
+        Account account = accountRepository.saveAndFlush(new Account());
+        GoogleCalendarIntegration integration = integrationRepository.saveAndFlush(
+                integration(account.getId()));
+        String desiredHash = GoogleContentHash.digest("TEST", "desired");
+        jobRepository.saveAndFlush(GoogleOperationJob.outbound(
+                "master-operation", integration.getId(), account.getId(),
+                integration.allocateGoogleOperationSequence(), "MASTER_UPSERT",
+                GoogleCalendarEffectiveScope.recurrenceMaster("master-1"), null,
+                "{}", desiredHash, Instant.now()));
+        jobRepository.saveAndFlush(GoogleOperationJob.outbound(
+                "child-operation", integration.getId(), account.getId(),
+                integration.allocateGoogleOperationSequence(), "OVERRIDE_UPSERT",
+                GoogleCalendarEffectiveScope.recurrenceOverride(
+                        "master-1", Instant.parse("2026-08-04T00:00:00Z")), null,
+                "{}", desiredHash, Instant.now()));
+        jobRepository.saveAndFlush(GoogleOperationJob.outbound(
+                "other-child-operation", integration.getId(), account.getId(),
+                integration.allocateGoogleOperationSequence(), "OVERRIDE_UPSERT",
+                GoogleCalendarEffectiveScope.recurrenceOverride(
+                        "master-10", Instant.parse("2026-08-04T00:00:00Z")), null,
+                "{}", desiredHash, Instant.now()));
+        String childPrefix = GoogleCalendarEffectiveScope.recurrenceOverrideKeyPrefix(
+                "master-1");
+
+        // when
+        long pendingBranches = jobRepository.countPendingRecurrenceAggregateBranches(
+                account.getId(), integration.getId(), "master-1",
+                childPrefix, childPrefix.length());
+
+        // then
+        assertThat(pendingBranches).isEqualTo(2L);
+    }
 
     @Autowired
     private GoogleOperationJobPersistenceService persistenceService;

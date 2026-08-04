@@ -4,6 +4,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -11,11 +12,13 @@ import static org.mockito.Mockito.when;
 import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.event.repository.EventRepository;
 import com.calio.calendar.integration.domain.GoogleCalendarEventMapping;
+import com.calio.calendar.integration.domain.GoogleCalendarRecurrenceEventMapping;
 import com.calio.calendar.integration.domain.GoogleCalendarSyncMode;
 import com.calio.calendar.integration.repository.GoogleCalendarEventMappingRepository;
 import com.calio.calendar.integration.repository.GoogleCalendarIntegrationRepository;
 import com.calio.calendar.integration.repository.GoogleCalendarRecurrenceEventMappingRepository;
 import com.calio.calendar.integration.repository.GoogleCalendarRecurrenceOverrideMappingRepository;
+import com.calio.calendar.integration.repository.GoogleOperationJobRepository;
 import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import java.util.List;
@@ -25,6 +28,58 @@ import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.Pageable;
 
 class GoogleCalendarProviderDataServiceTest {
+
+    @Test
+    @DisplayName("unseen recurrence master는 pending child override branch가 있으면 conflict로 보존한다")
+    void givenPendingChildOverride_whenMasterIsUnseen_thenQuarantinesMaster() {
+        // given
+        GoogleCalendarIntegrationRepository integrationRepository =
+                mock(GoogleCalendarIntegrationRepository.class);
+        GoogleCalendarEventMappingRepository eventMappingRepository =
+                mock(GoogleCalendarEventMappingRepository.class);
+        EventRepository eventRepository = mock(EventRepository.class);
+        GoogleCalendarRecurrenceEventMappingRepository recurrenceMappingRepository =
+                mock(GoogleCalendarRecurrenceEventMappingRepository.class);
+        GoogleCalendarRecurrenceOverrideMappingRepository overrideMappingRepository =
+                mock(GoogleCalendarRecurrenceOverrideMappingRepository.class);
+        GoogleOperationJobRepository jobRepository = mock(GoogleOperationJobRepository.class);
+        GoogleOperationJobPersistenceService jobPersistenceService =
+                mock(GoogleOperationJobPersistenceService.class);
+        GoogleCalendarRecurrenceEventMapping master =
+                mock(GoogleCalendarRecurrenceEventMapping.class);
+        when(master.getId()).thenReturn(10L);
+        when(master.getExternalEventId()).thenReturn("master-1");
+        when(recurrenceMappingRepository.findNextBatchWithRecurrenceEventByIntegrationId(
+                eq(1L), eq(0L), any(Pageable.class))).thenReturn(List.of(master));
+        when(recurrenceMappingRepository.findNextBatchWithRecurrenceEventByIntegrationId(
+                eq(1L), eq(10L), any(Pageable.class))).thenReturn(List.of());
+        when(overrideMappingRepository
+                .findNextBatchWithRecurrenceEventMappingAndRecurrenceEventOverrideByIntegrationId(
+                        eq(1L), eq(0L), any(Pageable.class))).thenReturn(List.of());
+        when(eventMappingRepository.findNextBatchWithEventByIntegrationId(
+                eq(1L), eq(0L), any(Pageable.class))).thenReturn(List.of());
+        when(jobRepository.countPendingRecurrenceAggregateBranches(
+                eq(2L), eq(1L), eq("master-1"), eq("8:master-1:"), eq(11)))
+                .thenReturn(1L);
+        when(integrationRepository.extendSyncLease(1L, "run-1")).thenReturn(1);
+        when(integrationRepository.finalizeSync(1L, "run-1", "next-token")).thenReturn(1);
+        GoogleCalendarProviderDataService service = new GoogleCalendarProviderDataService(
+                integrationRepository, eventMappingRepository, eventRepository,
+                recurrenceMappingRepository, overrideMappingRepository,
+                mock(RecurrenceEventRepository.class),
+                mock(RecurrenceEventOverrideRepository.class), null,
+                jobPersistenceService, jobRepository);
+
+        // when
+        service.finalizeOwnedReconciliation(
+                9L, 2L, 1L, "run-1", GoogleCalendarSyncMode.FULL,
+                Set.of(), Set.of(), Set.of(), "next-token");
+
+        // then
+        verify(master).markConflicted();
+        verify(jobPersistenceService).markConflictDetected(9L, 2L, "run-1");
+        verify(recurrenceMappingRepository, never()).deleteAllByIds(any());
+    }
 
     @Test
     @DisplayName("FULL reconciliation은 각 mapping batch에서 sync lease와 operation ownership을 갱신한다")

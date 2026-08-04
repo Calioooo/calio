@@ -96,4 +96,103 @@ public interface GoogleOperationJobRepository extends JpaRepository<GoogleOperat
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("delete from GoogleOperationJob job where job.integrationId = :integrationId")
     int deleteByIntegrationId(@Param("integrationId") Long integrationId);
+
+    @Query("""
+            select job.desiredContentHash from GoogleOperationJob job
+            where job.accountId = :accountId
+              and job.integrationId = :integrationId
+              and job.kind <> 'SYNC'
+              and job.effectiveResourceScope = :scope
+              and job.effectiveResourceKey = :scopeKey
+              and job.state in (com.calio.calendar.integration.domain.GoogleOperationJobState.PENDING,
+                                com.calio.calendar.integration.domain.GoogleOperationJobState.PROCESSING)
+            order by job.accountSequence
+            """)
+    List<String> findPendingDesiredContentHashes(
+            @Param("accountId") Long accountId,
+            @Param("integrationId") Long integrationId,
+            @Param("scope") String scope,
+            @Param("scopeKey") String scopeKey
+    );
+
+    @Query(value = """
+            SELECT COUNT(*) FROM google_operation_jobs job
+            WHERE job.account_id = :accountId
+              AND job.integration_id = :integrationId
+              AND job.job_kind <> 'SYNC'
+              AND job.job_state IN ('PENDING', 'PROCESSING')
+              AND (
+                  (job.effective_resource_scope = 'RECURRENCE_MASTER'
+                   AND job.effective_resource_key = :masterKey)
+                  OR
+                  (job.effective_resource_scope = 'RECURRENCE_OVERRIDE'
+                   AND LEFT(job.effective_resource_key, :childPrefixLength) = :childPrefix)
+              )
+            """, nativeQuery = true)
+    long countPendingRecurrenceAggregateBranches(
+            @Param("accountId") Long accountId,
+            @Param("integrationId") Long integrationId,
+            @Param("masterKey") String masterKey,
+            @Param("childPrefix") String childPrefix,
+            @Param("childPrefixLength") int childPrefixLength
+    );
+
+    @Modifying(flushAutomatically = true)
+    @Query(value = """
+            UPDATE google_operation_jobs SET conflict_detected = TRUE,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = :jobId AND account_id = :accountId
+              AND job_kind = 'SYNC' AND job_state = 'PROCESSING'
+              AND owner_token = :owner
+              AND EXISTS (
+                  SELECT 1 FROM google_calendar_integrations integration
+                  WHERE integration.id = google_operation_jobs.integration_id
+                    AND integration.google_operation_lease_owner = :owner
+                    AND integration.google_operation_lease_expires_at >= CURRENT_TIMESTAMP
+              )
+            """, nativeQuery = true)
+    int markConflictDetected(@Param("jobId") Long jobId,
+                             @Param("accountId") Long accountId,
+                             @Param("owner") String owner);
+
+    @Modifying(flushAutomatically = true)
+    @Query(value = """
+            UPDATE google_operation_jobs
+            SET job_state = 'CONFLICTED', owner_token = NULL,
+                terminal_reason = 'MAPPING_CONFLICT_DETECTED',
+                last_error_reason = 'MAPPING_CONFLICT_DETECTED',
+                terminal_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+            WHERE id = :jobId AND account_id = :accountId
+              AND job_state = 'PROCESSING' AND conflict_detected = TRUE
+              AND owner_token = :owner
+              AND EXISTS (
+                  SELECT 1 FROM google_calendar_integrations integration
+                  WHERE integration.id = google_operation_jobs.integration_id
+                    AND integration.google_operation_lease_owner = :owner
+                    AND integration.google_operation_lease_expires_at >= CURRENT_TIMESTAMP
+              )
+            """, nativeQuery = true)
+    int terminalizeOwnedConflict(@Param("jobId") Long jobId,
+                                 @Param("accountId") Long accountId,
+                                 @Param("owner") String owner);
+
+    @Modifying(flushAutomatically = true)
+    @Query(value = """
+            UPDATE google_operation_jobs
+            SET job_state = 'SKIPPED', owner_token = NULL,
+                terminal_reason = 'MAPPING_ALREADY_CONFLICTED',
+                last_error_reason = 'MAPPING_ALREADY_CONFLICTED',
+                terminal_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+            WHERE id = :jobId AND account_id = :accountId
+              AND job_state = 'PROCESSING' AND owner_token = :owner
+              AND EXISTS (
+                  SELECT 1 FROM google_calendar_integrations integration
+                  WHERE integration.id = google_operation_jobs.integration_id
+                    AND integration.google_operation_lease_owner = :owner
+                    AND integration.google_operation_lease_expires_at >= CURRENT_TIMESTAMP
+              )
+            """, nativeQuery = true)
+    int skipOwnedConflicted(@Param("jobId") Long jobId,
+                            @Param("accountId") Long accountId,
+                            @Param("owner") String owner);
 }

@@ -8,10 +8,13 @@ import com.calio.calendar.integration.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.domain.GoogleCalendarRecurrenceEventMapping;
 import com.calio.calendar.integration.domain.GoogleCalendarRecurrenceOverrideMapping;
 import com.calio.calendar.integration.domain.GoogleCalendarSyncMode;
+import com.calio.calendar.integration.domain.GoogleCalendarMappingSyncStatus;
+import com.calio.calendar.integration.domain.GoogleCalendarEffectiveScope;
 import com.calio.calendar.integration.repository.GoogleCalendarEventMappingRepository;
 import com.calio.calendar.integration.repository.GoogleCalendarIntegrationRepository;
 import com.calio.calendar.integration.repository.GoogleCalendarRecurrenceEventMappingRepository;
 import com.calio.calendar.integration.repository.GoogleCalendarRecurrenceOverrideMappingRepository;
+import com.calio.calendar.integration.repository.GoogleOperationJobRepository;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
@@ -21,6 +24,7 @@ import java.util.Set;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.beans.factory.annotation.Autowired;
 
 @Service
 public class GoogleCalendarProviderDataService {
@@ -37,7 +41,9 @@ public class GoogleCalendarProviderDataService {
     private final RecurrenceEventOverrideRepository overrideRepository;
     private final GoogleCalendarEventPagePersistenceService pagePersistenceService;
     private final GoogleOperationJobPersistenceService operationJobPersistenceService;
+    private final GoogleOperationJobRepository operationJobRepository;
 
+    @Autowired
     public GoogleCalendarProviderDataService(
             GoogleCalendarIntegrationRepository integrationRepository,
             GoogleCalendarEventMappingRepository eventMappingRepository,
@@ -47,7 +53,8 @@ public class GoogleCalendarProviderDataService {
             RecurrenceEventRepository recurrenceEventRepository,
             RecurrenceEventOverrideRepository overrideRepository,
             GoogleCalendarEventPagePersistenceService pagePersistenceService,
-            GoogleOperationJobPersistenceService operationJobPersistenceService
+            GoogleOperationJobPersistenceService operationJobPersistenceService,
+            GoogleOperationJobRepository operationJobRepository
     ) {
         this.integrationRepository = integrationRepository;
         this.eventMappingRepository = eventMappingRepository;
@@ -58,6 +65,24 @@ public class GoogleCalendarProviderDataService {
         this.overrideRepository = overrideRepository;
         this.pagePersistenceService = pagePersistenceService;
         this.operationJobPersistenceService = operationJobPersistenceService;
+        this.operationJobRepository = operationJobRepository;
+    }
+
+    GoogleCalendarProviderDataService(
+            GoogleCalendarIntegrationRepository integrationRepository,
+            GoogleCalendarEventMappingRepository eventMappingRepository,
+            EventRepository eventRepository,
+            GoogleCalendarRecurrenceEventMappingRepository recurrenceMappingRepository,
+            GoogleCalendarRecurrenceOverrideMappingRepository overrideMappingRepository,
+            RecurrenceEventRepository recurrenceEventRepository,
+            RecurrenceEventOverrideRepository overrideRepository,
+            GoogleCalendarEventPagePersistenceService pagePersistenceService,
+            GoogleOperationJobPersistenceService operationJobPersistenceService
+    ) {
+        this(integrationRepository, eventMappingRepository, eventRepository,
+                recurrenceMappingRepository, overrideMappingRepository,
+                recurrenceEventRepository, overrideRepository, pagePersistenceService,
+                operationJobPersistenceService, null);
     }
 
     @Transactional
@@ -105,13 +130,13 @@ public class GoogleCalendarProviderDataService {
             Set<String> seenRecurrenceEventIds,
             Set<RecurrenceEventOverrideExternalKey> seenOverrideIds
     ) {
-        deleteUnseenOverridesInBatches(integrationId, ownership, seenOverrideIds);
-        deleteUnseenEventsInBatches(integrationId, ownership, seenEventIds);
         deleteUnseenRecurrenceEventsInBatches(
                 integrationId,
                 ownership,
                 seenRecurrenceEventIds
         );
+        deleteUnseenOverridesInBatches(integrationId, ownership, seenOverrideIds);
+        deleteUnseenEventsInBatches(integrationId, ownership, seenEventIds);
     }
 
     private void deleteUnseenOverridesInBatches(
@@ -156,6 +181,8 @@ public class GoogleCalendarProviderDataService {
                                 mapping.getRecurrenceEventMapping().getExternalEventId(),
                                 mapping.getExternalEventId()
                         )))
+                .filter(mapping -> canDeleteUnseenOverride(
+                        integrationId, mapping, ownership))
                 .toList();
         if (!unseenMappings.isEmpty()) {
             overrideMappingRepository.deleteAllByIds(unseenMappings.stream()
@@ -207,6 +234,8 @@ public class GoogleCalendarProviderDataService {
         }
         List<GoogleCalendarEventMapping> unseenMappings = mappings.stream()
                 .filter(mapping -> !seenEventIds.contains(mapping.getExternalEventId()))
+                .filter(mapping -> canDeleteUnseenEvent(
+                        integrationId, mapping, ownership))
                 .toList();
         if (!unseenMappings.isEmpty()) {
             eventMappingRepository.deleteAllByIds(unseenMappings.stream()
@@ -258,6 +287,8 @@ public class GoogleCalendarProviderDataService {
         }
         List<GoogleCalendarRecurrenceEventMapping> unseenMappings = mappings.stream()
                 .filter(mapping -> !seenRecurrenceEventIds.contains(mapping.getExternalEventId()))
+                .filter(mapping -> canDeleteUnseenMaster(
+                        integrationId, mapping, ownership))
                 .toList();
         if (!unseenMappings.isEmpty()) {
             List<Long> mappingIds = unseenMappings.stream()
@@ -281,6 +312,104 @@ public class GoogleCalendarProviderDataService {
         if (integrationRepository.finalizeSync(integrationId, runId, nextSyncToken) != 1) {
             throw new CalioException(ErrorCode.GOOGLE_CALENDAR_SYNC_CONFLICT);
         }
+    }
+
+    private boolean canDeleteUnseenEvent(
+            Long integrationId,
+            GoogleCalendarEventMapping mapping,
+            OperationOwnership ownership
+    ) {
+        if (mapping.getSyncStatus() == GoogleCalendarMappingSyncStatus.CONFLICTED) {
+            return false;
+        }
+        return quarantineIfPending(integrationId, mapping,
+                GoogleCalendarEffectiveScope.generalEvent(mapping.getExternalEventId()), ownership);
+    }
+
+    private boolean canDeleteUnseenMaster(
+            Long integrationId,
+            GoogleCalendarRecurrenceEventMapping mapping,
+            OperationOwnership ownership
+    ) {
+        if (mapping.getSyncStatus() == GoogleCalendarMappingSyncStatus.CONFLICTED) {
+            return false;
+        }
+        GoogleCalendarEffectiveScope.RecurrenceMaster scope =
+                GoogleCalendarEffectiveScope.recurrenceMaster(mapping.getExternalEventId());
+        if (!hasPendingMasterOrChild(ownership, integrationId, scope)) {
+            return true;
+        }
+        mapping.markConflicted();
+        operationJobPersistenceService.markConflictDetected(
+                ownership.jobId(), ownership.accountId(), ownership.workerToken());
+        return false;
+    }
+
+    private boolean canDeleteUnseenOverride(
+            Long integrationId,
+            GoogleCalendarRecurrenceOverrideMapping mapping,
+            OperationOwnership ownership
+    ) {
+        if (mapping.getSyncStatus() == GoogleCalendarMappingSyncStatus.CONFLICTED
+                || mapping.getRecurrenceEventMapping().getSyncStatus()
+                == GoogleCalendarMappingSyncStatus.CONFLICTED) {
+            return false;
+        }
+        GoogleCalendarEffectiveScope scope = GoogleCalendarEffectiveScope.recurrenceOverride(
+                mapping.getRecurrenceEventMapping().getExternalEventId(),
+                mapping.getRecurrenceEventOverride().getOriginStartAt());
+        if (!hasPending(ownership, integrationId, scope)) {
+            return true;
+        }
+        mapping.markConflicted();
+        operationJobPersistenceService.markConflictDetected(
+                ownership.jobId(), ownership.accountId(), ownership.workerToken());
+        return false;
+    }
+
+    private boolean quarantineIfPending(
+            Long integrationId,
+            Object mapping,
+            GoogleCalendarEffectiveScope scope,
+            OperationOwnership ownership
+    ) {
+        if (!hasPending(ownership, integrationId, scope)) {
+            return true;
+        }
+        if (mapping instanceof GoogleCalendarEventMapping event) {
+            event.markConflicted();
+        } else {
+            ((GoogleCalendarRecurrenceEventMapping) mapping).markConflicted();
+        }
+        operationJobPersistenceService.markConflictDetected(
+                ownership.jobId(), ownership.accountId(), ownership.workerToken());
+        return false;
+    }
+
+    private boolean hasPending(
+            OperationOwnership ownership,
+            Long integrationId,
+            GoogleCalendarEffectiveScope scope
+    ) {
+        return operationJobRepository != null
+                && !operationJobRepository.findPendingDesiredContentHashes(
+                ownership.accountId(), integrationId,
+                scope.encodedType(), scope.encodedKey()).isEmpty();
+    }
+
+    private boolean hasPendingMasterOrChild(
+            OperationOwnership ownership,
+            Long integrationId,
+            GoogleCalendarEffectiveScope.RecurrenceMaster scope
+    ) {
+        if (operationJobRepository == null) {
+            return false;
+        }
+        String childPrefix = GoogleCalendarEffectiveScope.recurrenceOverrideKeyPrefix(
+                scope.externalMasterId());
+        return operationJobRepository.countPendingRecurrenceAggregateBranches(
+                ownership.accountId(), integrationId, scope.encodedKey(),
+                childPrefix, childPrefix.length()) > 0;
     }
 
     private void extendSyncLeaseOrThrow(Long integrationId, String runId) {

@@ -45,7 +45,7 @@ public class GoogleOperationJob extends BaseEntity {
     @Column(name = "effective_resource_scope", nullable = false, updatable = false, length = 64)
     private String effectiveResourceScope;
 
-    @Column(name = "effective_resource_key", nullable = false, updatable = false, length = 1024)
+    @Column(name = "effective_resource_key", nullable = false, updatable = false, length = 2300)
     private String effectiveResourceKey;
 
     @Column(name = "provider_identity", updatable = false, length = 1024)
@@ -53,6 +53,12 @@ public class GoogleOperationJob extends BaseEntity {
 
     @Column(name = "desired_payload", updatable = false, columnDefinition = "JSON")
     private String desiredPayload;
+
+    @Column(name = "desired_content_hash", updatable = false, length = 67)
+    private String desiredContentHash;
+
+    @Column(name = "conflict_detected", nullable = false)
+    private boolean conflictDetected;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "job_state", nullable = false, length = 32)
@@ -114,6 +120,27 @@ public class GoogleOperationJob extends BaseEntity {
             String desiredPayload,
             Instant runnableAt
     ) {
+        GoogleCalendarEffectiveScope effectiveScope =
+                GoogleCalendarEffectiveScope.decode(resourceScope, resourceKey);
+        return outbound(operationId, integrationId, accountId, accountSequence, kind,
+                effectiveScope, providerIdentity, desiredPayload,
+                GoogleContentHash.requireValid(desiredPayload), runnableAt);
+    }
+
+    public static GoogleOperationJob outbound(
+            String operationId,
+            Long integrationId,
+            Long accountId,
+            long accountSequence,
+            String kind,
+            GoogleCalendarEffectiveScope effectiveScope,
+            String providerIdentity,
+            String desiredPayload,
+            String desiredContentHash,
+            Instant runnableAt
+    ) {
+        String resourceScope = effectiveScope.encodedType();
+        String resourceKey = effectiveScope.encodedKey();
         validateOutboundFields(kind, resourceScope, resourceKey, desiredPayload);
         GoogleOperationJob job = new GoogleOperationJob();
         job.operationId = operationId;
@@ -126,6 +153,7 @@ public class GoogleOperationJob extends BaseEntity {
         job.effectiveResourceKey = resourceKey;
         job.providerIdentity = providerIdentity;
         job.desiredPayload = desiredPayload;
+        job.desiredContentHash = GoogleContentHash.requireValid(desiredContentHash);
         job.state = GoogleOperationJobState.PENDING;
         job.runnableAt = runnableAt;
         return job;
@@ -173,4 +201,16 @@ public class GoogleOperationJob extends BaseEntity {
     public int getRetryCount() { return retryCount; }
     public String getLastErrorReason() { return lastErrorReason; }
     public String getOwnerToken() { return ownerToken; }
+    public GoogleCalendarEffectiveScope getEffectiveScope() {
+        return GoogleCalendarEffectiveScope.decode(effectiveResourceScope, effectiveResourceKey);
+    }
+    public boolean hasCanonicalEffectiveScope() {
+        return GoogleCalendarEffectiveScope.GENERAL_EVENT.equals(effectiveResourceScope)
+                || GoogleCalendarEffectiveScope.RECURRENCE_MASTER.equals(effectiveResourceScope)
+                || GoogleCalendarEffectiveScope.RECURRENCE_OVERRIDE.equals(effectiveResourceScope);
+    }
+    public String getEffectiveResourceScope() { return effectiveResourceScope; }
+    public String getEffectiveResourceKey() { return effectiveResourceKey; }
+    public String getDesiredContentHash() { return desiredContentHash; }
+    public boolean isConflictDetected() { return conflictDetected; }
 }

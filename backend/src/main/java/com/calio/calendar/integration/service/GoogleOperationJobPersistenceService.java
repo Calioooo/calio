@@ -102,6 +102,11 @@ public class GoogleOperationJobPersistenceService {
 
     @Transactional
     public void succeed(Long jobId, Long accountId, String workerToken) {
+        if (jobRepository.terminalizeOwnedConflict(jobId, accountId, workerToken) == 1) {
+            log.info("Google sync job retained after mapping conflict. accountId={} jobId={} state=CONFLICTED",
+                    accountId, jobId);
+            return;
+        }
         if (jobRepository.deleteOwnedSuccessful(jobId, workerToken) != 1) {
             log.warn("Google operation success deletion rejected. accountId={} jobId={} state=PROCESSING",
                     accountId, jobId);
@@ -109,6 +114,20 @@ public class GoogleOperationJobPersistenceService {
         }
         log.info("Google operation job deleted after success. accountId={} jobId={} state=PROCESSING transition=DELETE",
                 accountId, jobId);
+    }
+
+    @Transactional
+    public void markConflictDetected(Long jobId, Long accountId, String workerToken) {
+        if (jobRepository.markConflictDetected(jobId, accountId, workerToken) != 1) {
+            throw new GoogleOperationOwnershipLostException();
+        }
+    }
+
+    @Transactional
+    public void skipConflicted(Long jobId, Long accountId, String workerToken) {
+        if (jobRepository.skipOwnedConflicted(jobId, accountId, workerToken) != 1) {
+            throw new GoogleOperationOwnershipLostException();
+        }
     }
 
     @Transactional
