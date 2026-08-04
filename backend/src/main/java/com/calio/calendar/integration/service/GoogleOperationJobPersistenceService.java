@@ -51,8 +51,8 @@ public class GoogleOperationJobPersistenceService {
 
     @Transactional
     public void renewAndAssertOwned(Long jobId, Long accountId, String workerToken) {
-        if (integrationRepository.renewGoogleOperationLease(accountId, workerToken) != 1
-                || jobRepository.countActiveOwnership(jobId, workerToken) != 1) {
+        if (integrationRepository.renewOwnedGoogleOperationLease(
+                jobId, accountId, workerToken) != 1) {
             throw new GoogleOperationOwnershipLostException();
         }
     }

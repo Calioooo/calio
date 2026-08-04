@@ -46,8 +46,19 @@ public interface GoogleCalendarIntegrationRepository extends JpaRepository<Googl
             WHERE account_id = :accountId
               AND google_operation_lease_owner = :owner
               AND google_operation_lease_expires_at >= CURRENT_TIMESTAMP
+              AND EXISTS (
+                  SELECT 1 FROM google_operation_jobs job
+                  WHERE job.id = :jobId
+                    AND job.integration_id = google_calendar_integrations.id
+                    AND job.job_state = 'PROCESSING'
+                    AND job.owner_token = :owner
+              )
             """, nativeQuery = true)
-    int renewGoogleOperationLease(@Param("accountId") Long accountId, @Param("owner") String owner);
+    int renewOwnedGoogleOperationLease(
+            @Param("jobId") Long jobId,
+            @Param("accountId") Long accountId,
+            @Param("owner") String owner
+    );
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""

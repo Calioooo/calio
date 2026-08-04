@@ -22,16 +22,6 @@ public interface GoogleOperationJobRepository extends JpaRepository<GoogleOperat
             """, nativeQuery = true)
     Optional<GoogleOperationJob> findAccountHeadForUpdate(@Param("accountId") Long accountId);
 
-    @Query(value = """
-            SELECT COUNT(*) FROM google_operation_jobs job
-            JOIN google_calendar_integrations integration ON integration.id = job.integration_id
-            WHERE job.id = :jobId AND job.job_state = 'PROCESSING'
-              AND job.owner_token = :owner
-              AND integration.google_operation_lease_owner = :owner
-              AND integration.google_operation_lease_expires_at >= CURRENT_TIMESTAMP
-            """, nativeQuery = true)
-    int countActiveOwnership(@Param("jobId") Long jobId, @Param("owner") String owner);
-
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(value = """
             UPDATE google_operation_jobs
