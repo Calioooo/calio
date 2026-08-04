@@ -43,6 +43,8 @@ class GoogleCalendarProviderDataServiceTest {
                 mock(RecurrenceEventRepository.class);
         RecurrenceEventOverrideRepository overrideRepository =
                 mock(RecurrenceEventOverrideRepository.class);
+        GoogleOperationJobPersistenceService operationJobPersistenceService =
+                mock(GoogleOperationJobPersistenceService.class);
         when(integrationRepository.extendSyncLease(1L, "run-1")).thenReturn(1);
         when(integrationRepository.finalizeSync(1L, "run-1", "next-token")).thenReturn(1);
 
@@ -85,9 +87,12 @@ class GoogleCalendarProviderDataServiceTest {
                 overrideRepository,
                 null
         );
+        service.setOperationJobPersistenceService(operationJobPersistenceService);
 
         // when
-        service.finalizeReconciliation(
+        service.finalizeOwnedReconciliation(
+                9L,
+                2L,
                 1L,
                 "run-1",
                 GoogleCalendarSyncMode.FULL,
@@ -107,5 +112,7 @@ class GoogleCalendarProviderDataServiceTest {
         );
         verify(integrationRepository, times(5)).extendSyncLease(1L, "run-1");
         verify(integrationRepository).finalizeSync(1L, "run-1", "next-token");
+        verify(operationJobPersistenceService).renewAndAssertOwned(9L, 2L, "run-1");
+        verify(operationJobPersistenceService).succeed(9L, 2L, "run-1");
     }
 }

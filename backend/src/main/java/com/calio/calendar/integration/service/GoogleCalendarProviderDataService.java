@@ -72,31 +72,6 @@ public class GoogleCalendarProviderDataService {
     }
 
     @Transactional
-    public void finalizeReconciliation(
-            Long integrationId,
-            String runId,
-            GoogleCalendarSyncMode syncMode,
-            Set<String> seenEventIds,
-            Set<String> seenRecurrenceEventIds,
-            Set<RecurrenceEventOverrideExternalKey> seenOverrideIds,
-            String nextSyncToken
-    ) {
-        if (!hasText(nextSyncToken)) {
-            throw new CalioException(ErrorCode.GOOGLE_CALENDAR_SYNC_TOKEN_MISSING);
-        }
-        if (syncMode == GoogleCalendarSyncMode.FULL) {
-            deleteUnseenProviderData(
-                    integrationId,
-                    runId,
-                    seenEventIds,
-                    seenRecurrenceEventIds,
-                    seenOverrideIds
-            );
-        }
-        finalizeSync(integrationId, runId, nextSyncToken);
-    }
-
-    @Transactional
     public void finalizeOwnedReconciliation(
             Long jobId,
             Long accountId,

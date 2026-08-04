@@ -39,6 +39,7 @@ import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest(properties = {
@@ -85,6 +86,9 @@ class GoogleCalendarEventPagePersistenceServiceTest {
 
     @Autowired
     private TagRepository tagRepository;
+
+    @MockitoBean
+    private GoogleOperationJobPersistenceService operationJobPersistenceService;
 
     @Test
     @Transactional
@@ -741,7 +745,9 @@ class GoogleCalendarEventPagePersistenceServiceTest {
         );
 
         // when
-        providerDataService.finalizeReconciliation(
+        providerDataService.finalizeOwnedReconciliation(
+                1L,
+                account.getId(),
                 integration.getId(),
                 "full-reconciliation-run",
                 GoogleCalendarSyncMode.FULL,
@@ -839,7 +845,9 @@ class GoogleCalendarEventPagePersistenceServiceTest {
         if (page.hasNextPage()) {
             return;
         }
-        providerDataService.finalizeReconciliation(
+        providerDataService.finalizeOwnedReconciliation(
+                1L,
+                accountId,
                 integrationId,
                 runId,
                 GoogleCalendarSyncMode.INCREMENTAL,
