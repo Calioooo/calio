@@ -53,7 +53,7 @@ public class GoogleOperationJobPersistenceService {
     public void renewAndAssertOwned(Long jobId, Long accountId, String workerToken) {
         if (integrationRepository.renewGoogleOperationLease(accountId, workerToken) != 1
                 || jobRepository.countActiveOwnership(jobId, workerToken) != 1) {
-            throw new StaleGoogleOperationWorkerException();
+            throw new GoogleOperationOwnershipLostException();
         }
     }
 
@@ -61,21 +61,21 @@ public class GoogleOperationJobPersistenceService {
     public void retry(GoogleOperationJob job, String workerToken, String reason) {
         Duration delay = RETRY_DELAYS.get(Math.min(job.getRetryCount(), RETRY_DELAYS.size() - 1));
         if (jobRepository.retry(job.getId(), workerToken, Instant.now(clock).plus(delay), reason) != 1) {
-            throw new StaleGoogleOperationWorkerException();
+            throw new GoogleOperationOwnershipLostException();
         }
     }
 
     @Transactional
     public void terminate(Long jobId, String workerToken, String reason) {
         if (jobRepository.terminateWithSyncError(jobId, workerToken, reason) != 1) {
-            throw new StaleGoogleOperationWorkerException();
+            throw new GoogleOperationOwnershipLostException();
         }
     }
 
     @Transactional
     public void succeed(Long jobId, String workerToken) {
         if (jobRepository.deleteOwnedSuccessful(jobId, workerToken) != 1) {
-            throw new StaleGoogleOperationWorkerException();
+            throw new GoogleOperationOwnershipLostException();
         }
     }
 
@@ -91,6 +91,6 @@ public class GoogleOperationJobPersistenceService {
         return ids.size();
     }
 
-    public static final class StaleGoogleOperationWorkerException extends RuntimeException {
+    public static final class GoogleOperationOwnershipLostException extends RuntimeException {
     }
 }

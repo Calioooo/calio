@@ -3,6 +3,7 @@ package com.calio.calendar.integration.service;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.integration.domain.GoogleOperationJob;
+import com.calio.calendar.integration.service.GoogleOperationJobPersistenceService.GoogleOperationOwnershipLostException;
 import jakarta.annotation.PreDestroy;
 import java.sql.SQLRecoverableException;
 import java.sql.SQLTransientException;
@@ -109,7 +110,7 @@ public class GoogleOperationWorker {
     }
 
     private FailureClassification classifyFailure(RuntimeException failure) {
-        if (failure instanceof GoogleOperationJobPersistenceService.StaleGoogleOperationWorkerException) {
+        if (failure instanceof GoogleOperationOwnershipLostException) {
             return FailureClassification.abandon();
         }
         if (failure instanceof CalioException calioException) {
