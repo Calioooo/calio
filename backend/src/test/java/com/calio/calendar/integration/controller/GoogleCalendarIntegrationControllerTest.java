@@ -18,9 +18,13 @@ import com.calio.calendar.external.google.dto.GoogleTokenResponse;
 import com.calio.calendar.external.google.dto.GoogleUserInfoResponse;
 import com.calio.calendar.integration.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.domain.GoogleCalendarSyncMode;
+import com.calio.calendar.integration.domain.GoogleOperationJob;
+import com.calio.calendar.integration.domain.GoogleOperationJobState;
+import com.calio.calendar.integration.domain.GoogleOperationJobTrigger;
 import com.calio.calendar.integration.repository.GoogleCalendarIntegrationRepository;
 import com.calio.calendar.integration.repository.GoogleOperationJobRepository;
 import com.calio.calendar.integration.service.GoogleCalendarSyncLeaseService;
+import com.calio.calendar.integration.service.GoogleOperationWorker;
 import com.calio.calendar.security.AuthenticatedAccountMockMvcTestConfig;
 import com.calio.calendar.security.WithAuthenticatedAccount;
 import java.util.ArrayList;
@@ -36,6 +40,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.client.RestClient;
 import tools.jackson.databind.ObjectMapper;
@@ -76,6 +81,9 @@ class GoogleCalendarIntegrationControllerTest {
 
     @Autowired
     private GoogleCalendarSyncLeaseService googleCalendarSyncLeaseService;
+
+    @MockitoBean
+    private GoogleOperationWorker googleOperationWorker;
 
     @BeforeEach
     void setUp() {
@@ -161,6 +169,21 @@ class GoogleCalendarIntegrationControllerTest {
         mockMvc.perform(post("/api/integrations/google-calendar/sync"))
                 .andExpect(status().isAccepted())
                 .andExpect(result -> assertThat(result.getResponse().getContentAsByteArray()).isEmpty());
+
+        GoogleCalendarIntegration integration = googleCalendarIntegrationRepository.findAll().getFirst();
+        List<GoogleOperationJob> jobs = googleOperationJobRepository.findAll();
+        assertThat(jobs).hasSize(1);
+        GoogleOperationJob job = jobs.getFirst();
+        assertThat(job.getOperationId()).isNotBlank();
+        assertThat(job.getIntegrationId()).isEqualTo(integration.getId());
+        assertThat(job.getAccountId()).isEqualTo(integration.getAccountId());
+        assertThat(job.getAccountSequence()).isEqualTo(1L);
+        assertThat(job.getKind()).isEqualTo(GoogleOperationJob.SYNC_KIND);
+        assertThat(job.getTrigger()).isEqualTo(GoogleOperationJobTrigger.MANUAL);
+        assertThat(job.getState()).isEqualTo(GoogleOperationJobState.PENDING);
+        assertThat(job.getRunnableAt()).isNotNull();
+        assertThat(job.getRetryCount()).isZero();
+        assertThat(job.getOwnerToken()).isNull();
     }
 
     private void connectGoogleCalendar() throws Exception {
