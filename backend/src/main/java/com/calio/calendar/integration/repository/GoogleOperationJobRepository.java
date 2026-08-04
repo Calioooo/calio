@@ -77,8 +77,12 @@ public interface GoogleOperationJobRepository extends JpaRepository<GoogleOperat
             where (job.state = com.calio.calendar.integration.domain.GoogleOperationJobState.PENDING
                    and job.runnableAt <= :now)
                or job.state = com.calio.calendar.integration.domain.GoogleOperationJobState.PROCESSING
+            order by job.accountId
             """)
-    List<Long> findRecoverableAccountIds(@Param("now") Instant now);
+    List<Long> findRecoverableAccountIds(
+            @Param("now") Instant now,
+            Pageable pageable
+    );
 
     @Query("""
             select job.id from GoogleOperationJob job

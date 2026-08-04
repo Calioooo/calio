@@ -18,6 +18,7 @@ public class GoogleOperationJobPersistenceService {
 
     private static final Logger log =
             LoggerFactory.getLogger(GoogleOperationJobPersistenceService.class);
+    private static final int RECOVERY_BATCH_SIZE = 500;
     private static final int TERMINAL_CLEANUP_BATCH_SIZE = 500;
     private static final List<Duration> RETRY_DELAYS = List.of(
             Duration.ofMinutes(10), Duration.ofMinutes(30), Duration.ofHours(1), Duration.ofHours(6));
@@ -122,7 +123,10 @@ public class GoogleOperationJobPersistenceService {
 
     @Transactional(readOnly = true)
     public List<Long> findRecoverableAccountIds() {
-        return jobRepository.findRecoverableAccountIds(Instant.now(clock));
+        return jobRepository.findRecoverableAccountIds(
+                Instant.now(clock),
+                PageRequest.of(0, RECOVERY_BATCH_SIZE)
+        );
     }
 
     @Transactional
