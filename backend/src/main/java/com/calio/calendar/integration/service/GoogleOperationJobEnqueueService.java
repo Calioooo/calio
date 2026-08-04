@@ -41,9 +41,8 @@ public class GoogleOperationJobEnqueueService {
     }
 
     @Transactional
-    public boolean enqueuePeriodicSync(Long accountId) {
+    public void enqueuePeriodicSync(Long accountId) {
         enqueueSync(accountId, GoogleOperationJobTrigger.PERIODIC);
-        return true;
     }
 
     private void enqueueSync(Long accountId, GoogleOperationJobTrigger trigger) {
