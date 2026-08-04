@@ -18,6 +18,7 @@ public class GoogleOperationJobPersistenceService {
 
     private static final Logger log =
             LoggerFactory.getLogger(GoogleOperationJobPersistenceService.class);
+    private static final int TERMINAL_CLEANUP_BATCH_SIZE = 500;
     private static final List<Duration> RETRY_DELAYS = List.of(
             Duration.ofMinutes(10), Duration.ofMinutes(30), Duration.ofHours(1), Duration.ofHours(6));
 
@@ -126,7 +127,8 @@ public class GoogleOperationJobPersistenceService {
 
     @Transactional
     public int deleteTerminalBatch(Instant cutoff) {
-        List<Long> ids = jobRepository.findTerminalIdsBefore(cutoff, PageRequest.of(0, 500));
+        List<Long> ids = jobRepository.findTerminalIdsBefore(
+                cutoff, PageRequest.of(0, TERMINAL_CLEANUP_BATCH_SIZE));
         jobRepository.deleteAllByIdInBatch(ids);
         return ids.size();
     }
