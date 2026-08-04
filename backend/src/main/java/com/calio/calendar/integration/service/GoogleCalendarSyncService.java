@@ -6,12 +6,10 @@ import com.calio.calendar.external.google.GoogleCalendarEventsClient;
 import com.calio.calendar.external.google.GoogleCalendarSyncTokenExpiredException;
 import com.calio.calendar.external.google.GoogleCalendarUnauthorizedException;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventPage;
-import com.calio.calendar.integration.controller.dto.GoogleCalendarSyncResponse;
 import com.calio.calendar.integration.domain.GoogleCalendarSyncMode;
 import com.calio.calendar.integration.service.GoogleCalendarSyncLeaseService.SyncLease;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.UUID;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -41,25 +39,6 @@ public class GoogleCalendarSyncService {
         this.pagePersistenceService = pagePersistenceService;
         this.pageNormalizer = pageNormalizer;
         this.operationJobPersistenceService = operationJobPersistenceService;
-    }
-
-    public GoogleCalendarSyncResponse sync(Long accountId) {
-        SyncLease lease = leaseService.acquire(accountId, UUID.randomUUID().toString());
-        GoogleCalendarSyncRunContext context;
-        try {
-            context = new GoogleCalendarSyncRunContext(
-                    accessTokenService.getAccessToken(lease.integrationId())
-            );
-        } catch (RuntimeException exception) {
-            throw releaseOwnedLeasePreservingFailure(lease, exception);
-        }
-
-        try {
-            GoogleCalendarSyncMode completedMode = synchronize(lease, context);
-            return GoogleCalendarSyncResponse.from(completedMode);
-        } catch (RuntimeException exception) {
-            throw releaseOwnedLeasePreservingFailure(lease, exception);
-        }
     }
 
     public GoogleCalendarSyncMode executeOwned(
@@ -127,59 +106,6 @@ public class GoogleCalendarSyncService {
 
     private void assertOwned(Long jobId, Long accountId, String workerToken) {
         operationJobPersistenceService.renewAndAssertOwned(jobId, accountId, workerToken);
-    }
-
-    private GoogleCalendarSyncMode synchronize(
-            SyncLease lease,
-            GoogleCalendarSyncRunContext context
-    ) {
-        if (modeFor(lease.nextSyncToken()) == GoogleCalendarSyncMode.FULL) {
-            synchronizePages(lease, GoogleCalendarSyncMode.FULL, context);
-            return GoogleCalendarSyncMode.FULL;
-        }
-        try {
-            synchronizePages(lease, GoogleCalendarSyncMode.INCREMENTAL, context);
-            return GoogleCalendarSyncMode.INCREMENTAL;
-        } catch (GoogleCalendarSyncTokenExpiredException exception) {
-            context.resetSeenIdentities();
-            synchronizePages(lease, GoogleCalendarSyncMode.FULL, context);
-            return GoogleCalendarSyncMode.FULL;
-        }
-    }
-
-    private void synchronizePages(
-            SyncLease lease,
-            GoogleCalendarSyncMode mode,
-            GoogleCalendarSyncRunContext context
-    ) {
-        String pageToken = null;
-        String nextSyncToken = null;
-        Set<String> seenPageTokens = new HashSet<>();
-        do {
-            GoogleCalendarEventPage page = requestPage(lease, mode, pageToken, context);
-            GoogleCalendarNormalizedPage normalizedPage = pageNormalizer.normalize(
-                    lease.integrationId(),
-                    page,
-                    context
-            );
-            pagePersistenceService.persistNormalizedPage(
-                    lease.integrationId(),
-                    lease.accountId(),
-                    lease.runId(),
-                    normalizedPage
-            );
-            nextSyncToken = page.nextSyncToken();
-            pageToken = nextPageToken(page, seenPageTokens);
-        } while (pageToken != null);
-        providerDataService.finalizeReconciliation(
-                lease.integrationId(),
-                lease.runId(),
-                mode,
-                context.seenEventIds(),
-                context.seenRecurrenceEventIds(),
-                context.seenRecurrenceEventOverrideIds(),
-                nextSyncToken
-        );
     }
 
     private GoogleCalendarEventPage requestPage(
