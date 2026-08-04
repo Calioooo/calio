@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -274,6 +275,160 @@ class GoogleCalendarSyncMigrationTest {
         }
     }
 
+    @Test
+    @DisplayName("V14는 outbound hash와 mapping baseline/status의 잘못된 값을 DB에서 거부한다")
+    void givenInvalidConflictFoundationValues_whenPersisting_thenConstraintsRejectThem()
+            throws Exception {
+        // given
+        String url = "jdbc:h2:mem:google-mapping-conflict-constraints;MODE=MySQL;"
+                + "DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE";
+        try (Connection connection = DriverManager.getConnection(url, "sa", "")) {
+            migrateTo(url, MigrationVersion.fromVersion("14"));
+
+            // when, then
+            removeH2GeneratedPeriodicScope(connection);
+            insertV14ConstraintFixtures(connection);
+            insertSyncJobWithNullHash(connection);
+            assertThat(singleLong(
+                    connection,
+                    "SELECT COUNT(*) FROM google_operation_jobs WHERE id = 919"
+            )).isOne();
+            assertThatThrownBy(() -> insertOutboundJob(
+                    connection, 920L, null
+            )).isInstanceOf(SQLException.class);
+            assertThatThrownBy(() -> insertOutboundJob(
+                    connection, 921L, "invalid-hash"
+            )).isInstanceOf(SQLException.class);
+            assertThatThrownBy(() -> insertEventMapping(
+                    connection, "INVALID", validHash()
+            )).isInstanceOf(SQLException.class);
+            assertThatThrownBy(() -> insertEventMapping(
+                    connection, "ACTIVE", null
+            )).isInstanceOf(SQLException.class);
+            assertThatThrownBy(() -> insertEventMapping(
+                    connection, "ACTIVE", "invalid-hash"
+            )).isInstanceOf(SQLException.class);
+        }
+    }
+
+    private void removeH2GeneratedPeriodicScope(Connection connection) throws SQLException {
+        try (Statement statement = connection.createStatement()) {
+            statement.executeUpdate("""
+                    ALTER TABLE google_operation_jobs
+                    DROP CONSTRAINT uk_google_operation_jobs_active_periodic_sync
+                    """);
+            statement.executeUpdate("""
+                    ALTER TABLE google_operation_jobs
+                    DROP COLUMN active_periodic_sync_account_id
+                    """);
+        }
+    }
+
+    private void insertSyncJobWithNullHash(Connection connection) throws SQLException {
+        try (Statement statement = connection.createStatement()) {
+            statement.executeUpdate("""
+                    INSERT INTO google_operation_jobs (
+                        id, operation_id, integration_id, account_id, account_sequence,
+                        job_kind, job_trigger, effective_resource_scope,
+                        effective_resource_key, desired_content_hash,
+                        job_state, runnable_at, retry_count, created_at, updated_at
+                    )
+                    VALUES (
+                        919, 'constraint-sync-operation', 920, 920, 919,
+                        'SYNC', 'MANUAL', 'PRIMARY_CALENDAR', 'primary', NULL,
+                        'PENDING', CURRENT_TIMESTAMP(6), 0,
+                        CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+                    )
+                    """);
+        }
+    }
+
+    private void insertV14ConstraintFixtures(Connection connection) throws SQLException {
+        try (Statement statement = connection.createStatement()) {
+            statement.executeUpdate("""
+                    INSERT INTO accounts (id, created_at, updated_at)
+                    VALUES (920, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))
+                    """);
+            statement.executeUpdate("""
+                    INSERT INTO google_calendar_integrations (
+                        id, account_id, google_subject, google_email,
+                        encrypted_refresh_token, encrypted_access_token,
+                        access_token_expires_at, connected_at, created_at, updated_at
+                    )
+                    VALUES (
+                        920, 920, 'constraint-subject', 'constraint@example.com',
+                        'encrypted-refresh', 'encrypted-access',
+                        '2026-08-05 01:00:00', '2026-08-05 00:00:00',
+                        CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+                    )
+                    """);
+            statement.executeUpdate("""
+                    INSERT INTO events (
+                        id, title, description, start_at, end_at, all_day, time_zone,
+                        important_event, recurrence_id, account_id, tag_id,
+                        created_at, updated_at
+                    )
+                    VALUES (
+                        920, 'Constraint event', NULL,
+                        '2026-08-05 00:00:00', '2026-08-05 01:00:00', FALSE, 'UTC',
+                        FALSE, NULL, 920, 1, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+                    )
+                    """);
+        }
+    }
+
+    private void insertOutboundJob(
+            Connection connection,
+            long id,
+            String desiredContentHash
+    ) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                INSERT INTO google_operation_jobs (
+                    id, operation_id, integration_id, account_id, account_sequence,
+                    job_kind, job_trigger, effective_resource_scope,
+                    effective_resource_key, desired_payload, desired_content_hash,
+                    job_state, runnable_at, retry_count, created_at, updated_at
+                )
+                VALUES (
+                    ?, ?, 920, 920, ?, 'EVENT_UPSERT', 'CANONICAL_MUTATION',
+                    'GENERAL_EVENT', '920', '{}', ?,
+                    'PENDING', CURRENT_TIMESTAMP(6), 0,
+                    CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+                )
+                """)) {
+            statement.setLong(1, id);
+            statement.setString(2, "constraint-operation-" + id);
+            statement.setLong(3, id);
+            statement.setString(4, desiredContentHash);
+            statement.executeUpdate();
+        }
+    }
+
+    private void insertEventMapping(
+            Connection connection,
+            String syncStatus,
+            String syncedContentHash
+    ) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                INSERT INTO google_calendar_event_mappings (
+                    id, integration_id, event_id, calendar_key, external_event_id,
+                    sync_status, synced_content_hash, created_at, updated_at
+                )
+                VALUES (
+                    920, 920, 920, 'primary', 'constraint-event',
+                    ?, ?, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+                )
+                """)) {
+            statement.setString(1, syncStatus);
+            statement.setString(2, syncedContentHash);
+            statement.executeUpdate();
+        }
+    }
+
+    private String validHash() {
+        return "v1:" + "a".repeat(64);
+    }
+
     private void migrateTo(String url, MigrationVersion target) {
         Flyway.configure()
                 .dataSource(url, "sa", "")
@@ -413,6 +568,14 @@ class GoogleCalendarSyncMigrationTest {
              ResultSet resultSet = statement.executeQuery(query)) {
             assertThat(resultSet.next()).isTrue();
             return resultSet.getString(1);
+        }
+    }
+
+    private long singleLong(Connection connection, String query) throws Exception {
+        try (Statement statement = connection.createStatement();
+             ResultSet resultSet = statement.executeQuery(query)) {
+            assertThat(resultSet.next()).isTrue();
+            return resultSet.getLong(1);
         }
     }
 

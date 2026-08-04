@@ -9,6 +9,7 @@ import com.calio.calendar.integration.repository.GoogleOperationJobRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,25 +40,58 @@ public class GoogleOperationProducerTransaction {
     }
 
     @Transactional
+    public <T> T create(
+            Long accountId,
+            Supplier<T> authorizedCanonicalCreation,
+            Function<T, OutboundJobDraft> jobDraftFactory
+    ) {
+        GoogleCalendarIntegration integration = integrationRepository
+                .findByAccountIdForUpdate(accountId)
+                .orElse(null);
+        T createdResource = authorizedCanonicalCreation.get();
+        if (integration != null) {
+            enqueue(accountId, integration, jobDraftFactory.apply(createdResource));
+        }
+        return createdResource;
+    }
+
+    @Transactional
     public <T> T mutate(
             Long accountId,
+            GoogleCalendarEffectiveScope effectiveScope,
             Supplier<T> authorizedCanonicalMutation,
-            OutboundJobDraft jobDraft
+            Function<T, OutboundJobDraft> jobDraftFactory
     ) {
-        GoogleCalendarIntegration observedIntegration = integrationRepository.findByAccountId(accountId)
+        GoogleCalendarIntegration observedIntegration = integrationRepository
+                .findByAccountId(accountId)
                 .orElse(null);
         if (observedIntegration == null) {
             return authorizedCanonicalMutation.get();
         }
         boolean isConflicted = mappingLockCoordinator.isConflictedAfterLock(
-                observedIntegration.getId(), jobDraft.effectiveScope());
-        GoogleCalendarIntegration integration = integrationRepository.findByAccountIdForUpdate(accountId)
+                observedIntegration.getId(), effectiveScope);
+        GoogleCalendarIntegration integration = integrationRepository
+                .findByAccountIdForUpdate(accountId)
                 .filter(current -> current.getId().equals(observedIntegration.getId()))
                 .orElse(null);
-        T result = authorizedCanonicalMutation.get();
-        if (integration == null || isConflicted) {
-            return result;
+        T mutatedResource = authorizedCanonicalMutation.get();
+        if (integration != null && !isConflicted) {
+            OutboundJobDraft jobDraft = jobDraftFactory.apply(mutatedResource);
+            if (!effectiveScope.equals(jobDraft.effectiveScope())) {
+                throw new IllegalArgumentException(
+                        "Outbound Job scope must match the locked mapping scope"
+                );
+            }
+            enqueue(accountId, integration, jobDraft);
         }
+        return mutatedResource;
+    }
+
+    private void enqueue(
+            Long accountId,
+            GoogleCalendarIntegration integration,
+            OutboundJobDraft jobDraft
+    ) {
         jobRepository.saveAndFlush(GoogleOperationJob.outbound(
                 UUID.randomUUID().toString(), integration.getId(), accountId,
                 integration.allocateGoogleOperationSequence(), jobDraft.kind(),
@@ -69,7 +103,6 @@ public class GoogleOperationProducerTransaction {
                 worker.wake(accountId);
             }
         });
-        return result;
     }
 
     public record OutboundJobDraft(

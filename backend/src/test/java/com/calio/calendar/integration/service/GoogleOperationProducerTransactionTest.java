@@ -69,8 +69,8 @@ class GoogleOperationProducerTransactionTest {
     }
 
     @Test
-    @DisplayName("canonical mutation과 outbound Job은 같은 transaction으로 commit한 뒤 worker를 깨운다")
-    void givenConnectedAccount_whenMutating_thenCommitsMutationAndJobBeforeWake() {
+    @DisplayName("신규 canonical ID로 만든 outbound Job을 같은 transaction으로 commit한다")
+    void givenConnectedAccount_whenCreating_thenUsesCreatedIdAndCommitsJob() {
         // given
         Account account = accountRepository.saveAndFlush(new Account());
         GoogleCalendarIntegration integration = integrationRepository.saveAndFlush(
@@ -78,10 +78,10 @@ class GoogleOperationProducerTransactionTest {
         );
 
         // when
-        Task task = producerTransaction.mutate(
+        Task task = producerTransaction.create(
                 account.getId(),
                 () -> taskRepository.save(new Task("Google 반영 작업", account)),
-                outboundDraft()
+                createdTask -> outboundDraft(createdTask.getTaskId())
         );
 
         // then
@@ -96,6 +96,9 @@ class GoogleOperationProducerTransactionTest {
                     assertThat(job.getTrigger())
                             .isEqualTo(GoogleOperationJobTrigger.CANONICAL_MUTATION);
                     assertThat(job.getState()).isEqualTo(GoogleOperationJobState.PENDING);
+                    assertThat(job.getEffectiveScope()).isEqualTo(
+                            GoogleCalendarEffectiveScope.generalEvent(task.getTaskId())
+                    );
                 });
         verify(worker).wake(account.getId());
     }
@@ -115,10 +118,10 @@ class GoogleOperationProducerTransactionTest {
         );
 
         // when, then
-        assertThatThrownBy(() -> producerTransaction.mutate(
+        assertThatThrownBy(() -> producerTransaction.create(
                 account.getId(),
                 () -> taskRepository.save(new Task("rollback 대상", account)),
-                invalidDraft
+                createdTask -> invalidDraft
         )).isInstanceOf(IllegalArgumentException.class);
         assertThat(taskRepository.count()).isZero();
         assertThat(jobRepository.count()).isZero();
@@ -133,12 +136,12 @@ class GoogleOperationProducerTransactionTest {
         integrationRepository.saveAndFlush(integration(account.getId()));
 
         // when, then
-        assertThatThrownBy(() -> producerTransaction.mutate(
+        assertThatThrownBy(() -> producerTransaction.create(
                 account.getId(),
                 () -> {
                     throw new IllegalStateException("mutation failed");
                 },
-                outboundDraft()
+                ignored -> outboundDraft(1L)
         )).isInstanceOf(IllegalStateException.class);
         assertThat(jobRepository.count()).isZero();
         verify(worker, never()).wake(account.getId());
@@ -151,10 +154,10 @@ class GoogleOperationProducerTransactionTest {
         Account account = accountRepository.saveAndFlush(new Account());
 
         // when
-        Task task = producerTransaction.mutate(
+        Task task = producerTransaction.create(
                 account.getId(),
                 () -> taskRepository.save(new Task("로컬 전용 작업", account)),
-                outboundDraft()
+                createdTask -> outboundDraft(createdTask.getTaskId())
         );
 
         // then
@@ -190,8 +193,9 @@ class GoogleOperationProducerTransactionTest {
         // when
         String result = transaction.mutate(
                 2L,
+                scope,
                 mutation,
-                new OutboundJobDraft(
+                mutated -> new OutboundJobDraft(
                         "EVENT_UPSERT", scope, null, "{}",
                         GoogleContentHash.digest("TEST", "desired"))
         );
@@ -207,10 +211,10 @@ class GoogleOperationProducerTransactionTest {
         verify(localWorker, never()).wake(2L);
     }
 
-    private OutboundJobDraft outboundDraft() {
+    private OutboundJobDraft outboundDraft(Long eventId) {
         return new OutboundJobDraft(
                 "EVENT_UPSERT",
-                GoogleCalendarEffectiveScope.generalEvent(1L),
+                GoogleCalendarEffectiveScope.generalEvent(eventId),
                 null,
                 "{}",
                 GoogleContentHash.digest("TEST", "desired")

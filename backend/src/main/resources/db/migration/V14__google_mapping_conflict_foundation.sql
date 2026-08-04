@@ -54,7 +54,9 @@ ALTER TABLE google_operation_jobs
         CHECK (
             (job_kind = 'SYNC' AND desired_content_hash IS NULL)
             OR
-            (job_kind <> 'SYNC' AND desired_content_hash REGEXP '^v1:[0-9a-f]{64}$')
+            (job_kind <> 'SYNC'
+                AND desired_content_hash IS NOT NULL
+                AND desired_content_hash REGEXP '^v1:[0-9a-f]{64}$')
         );
 
 CREATE INDEX idx_google_operation_jobs_pending_scope
