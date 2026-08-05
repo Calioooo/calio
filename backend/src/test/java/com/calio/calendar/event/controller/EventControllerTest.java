@@ -91,6 +91,7 @@ class EventControllerTest {
                   "startAt": "2026-06-01T00:00:00Z",
                   "endAt": "2026-06-01T01:00:00Z",
                   "allDay": false,
+                  "timeZone": "UTC",
                   "createdAt": "2000-01-01T00:00:00Z",
                   "updatedAt": "2000-01-01T00:00:00Z"
                 }
@@ -108,6 +109,7 @@ class EventControllerTest {
                 .andExpect(jsonPath("$.startAt").value("2026-06-01T00:00:00Z"))
                 .andExpect(jsonPath("$.endAt").value("2026-06-01T01:00:00Z"))
                 .andExpect(jsonPath("$.allDay").value(false))
+                .andExpect(jsonPath("$.timeZone").value("UTC"))
                 .andExpect(jsonPath("$.importantEvent").value(false))
                 .andExpect(jsonPath("$.tag.title").value("기타"))
                 .andExpect(jsonPath("$.tag.colorCode").value("#64748B"))
@@ -141,7 +143,7 @@ class EventControllerTest {
     @DisplayName("UTC 자정과 exclusive end로 생성한 종일 일정은 저장된 allDay=true를 반환한다")
     void givenUtcMidnightExclusiveRange_whenCreateAllDayEvent_thenReturnsStoredAllDay() throws Exception {
         // when, then
-        mockMvc.perform(post("/api/events")
+        MvcResult result = mockMvc.perform(post("/api/events")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -154,7 +156,50 @@ class EventControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.startAt").value("2026-06-10T00:00:00Z"))
                 .andExpect(jsonPath("$.endAt").value("2026-06-12T00:00:00Z"))
-                .andExpect(jsonPath("$.allDay").value(true));
+                .andExpect(jsonPath("$.allDay").value(true))
+                .andReturn();
+        assertThat(readResponse(result).get("timeZone").isNull()).isTrue();
+    }
+
+    @Test
+    @DisplayName("timed 일정은 non-blank valid IANA timeZone 없이는 생성할 수 없다")
+    void givenMissingOrInvalidTimeZone_whenCreateTimedEvent_thenReturnsInvalidTimeZone()
+            throws Exception {
+        // when, then
+        for (String timeZoneField : new String[]{"", ", \"timeZone\": \"\"", ", \"timeZone\": \"Invalid/Zone\""}) {
+            mockMvc.perform(post("/api/events")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {
+                                      "title": "Invalid timed zone",
+                                      "startAt": "2026-06-10T09:00:00Z",
+                                      "endAt": "2026-06-10T10:00:00Z",
+                                      "allDay": false%s
+                                    }
+                                    """.formatted(timeZoneField)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.title").value("INVALID_TIME_ZONE"));
+        }
+    }
+
+    @Test
+    @DisplayName("all-day 일정에 timeZone이 있으면 INVALID_ALL_DAY_SCHEDULE을 반환한다")
+    void givenTimeZone_whenCreateAllDayEvent_thenReturnsInvalidAllDaySchedule()
+            throws Exception {
+        // when, then
+        mockMvc.perform(post("/api/events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Invalid all-day zone",
+                                  "startAt": "2026-06-10T00:00:00Z",
+                                  "endAt": "2026-06-11T00:00:00Z",
+                                  "allDay": true,
+                                  "timeZone": "UTC"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("INVALID_ALL_DAY_SCHEDULE"));
     }
 
     @Test
@@ -218,6 +263,7 @@ class EventControllerTest {
                                   "startAt": "2026-06-16T00:00:00Z",
                                   "endAt": "2026-06-16T01:00:00Z",
                                   "allDay": false,
+                                  "timeZone": "UTC",
                                   "tagId": %d
                                 }
                                 """.formatted(workTag.getId())))
@@ -244,6 +290,7 @@ class EventControllerTest {
                                   "startAt": "2026-06-17T00:00:00Z",
                                   "endAt": "2026-06-17T01:00:00Z",
                                   "allDay": false,
+                                  "timeZone": "UTC",
                                   "tagId": %d
                                 }
                                 """.formatted(customTag.getId())))
@@ -268,6 +315,7 @@ class EventControllerTest {
                                   "startAt": "2026-06-18T00:00:00Z",
                                   "endAt": "2026-06-18T01:00:00Z",
                                   "allDay": false,
+                                  "timeZone": "UTC",
                                   "tagId": %d
                                 }
                                 """.formatted(workTag.getId())))
@@ -284,6 +332,7 @@ class EventControllerTest {
                                   "startAt": "2026-06-18T02:00:00Z",
                                   "endAt": "2026-06-18T03:00:00Z",
                                   "allDay": false,
+                                  "timeZone": "UTC",
                                   "tagId": null
                                 }
                                 """))
@@ -309,6 +358,7 @@ class EventControllerTest {
                                   "startAt": "2026-06-19T02:00:00Z",
                                   "endAt": "2026-06-19T03:00:00Z",
                                   "allDay": false,
+                                  "timeZone": "UTC",
                                   "tagId": %d
                                 }
                                 """.formatted(customTag.getId())))
@@ -332,6 +382,7 @@ class EventControllerTest {
                                   "startAt": "2026-06-20T00:00:00Z",
                                   "endAt": "2026-06-20T01:00:00Z",
                                   "allDay": false,
+                                  "timeZone": "UTC",
                                   "tagId": 999999
                                 }
                                 """))
@@ -358,6 +409,7 @@ class EventControllerTest {
                                   "startAt": "2026-06-20T00:00:00Z",
                                   "endAt": "2026-06-20T01:00:00Z",
                                   "allDay": false,
+                                  "timeZone": "UTC",
                                   "tagId": %d
                                 }
                                 """.formatted(otherAccountTag.getId())))
@@ -375,7 +427,8 @@ class EventControllerTest {
                   "title": " ",
                   "startAt": "2026-06-01T00:00:00Z",
                   "endAt": "2026-06-01T01:00:00Z",
-                  "allDay": false
+                  "allDay": false,
+                  "timeZone": "UTC"
                 }
                 """;
 
@@ -398,7 +451,8 @@ class EventControllerTest {
                   "title": "Planning",
                   "startAt": "2026-06-01T01:00:00Z",
                   "endAt": "2026-06-01T01:00:00Z",
-                  "allDay": false
+                  "allDay": false,
+                  "timeZone": "UTC"
                 }
                 """;
 
@@ -568,6 +622,7 @@ class EventControllerTest {
                   "startAt": "2026-06-04T02:00:00Z",
                   "endAt": "2026-06-04T03:00:00Z",
                   "allDay": false,
+                  "timeZone": "UTC",
                   "createdAt": "2000-01-01T00:00:00Z",
                   "updatedAt": "2000-01-01T00:00:00Z",
                   "unknown": "ignored"
@@ -603,7 +658,8 @@ class EventControllerTest {
                   "title": " ",
                   "startAt": "2026-06-05T02:00:00Z",
                   "endAt": "2026-06-05T03:00:00Z",
-                  "allDay": false
+                  "allDay": false,
+                  "timeZone": "UTC"
                 }
                 """;
 
@@ -631,7 +687,8 @@ class EventControllerTest {
                                 {
                                   "title": "Updated",
                                   "endAt": "2026-06-06T03:00:00Z",
-                                  "allDay": false
+                                  "allDay": false,
+                                  "timeZone": "UTC"
                                 }
                                 """))
                 .andExpect(status().isBadRequest())
@@ -689,7 +746,8 @@ class EventControllerTest {
                   "title": "Updated",
                   "startAt": "2026-06-07T02:00:00Z",
                   "endAt": "2026-06-07T02:00:00Z",
-                  "allDay": false
+                  "allDay": false,
+                  "timeZone": "UTC"
                 }
                 """;
 
@@ -705,6 +763,42 @@ class EventControllerTest {
     }
 
     @Test
+    @DisplayName("잘못된 timed timezone 수정은 Event 필드와 Tag를 부분 변경하지 않는다")
+    void givenInvalidTimeZoneAndNewTag_whenUpdateEvent_thenPreservesEventAndTag()
+            throws Exception {
+        // given
+        long eventId = createEvent("Stable", "2026-06-07T00:00:00Z", "2026-06-07T01:00:00Z");
+        Event before = eventRepository.findById(eventId).orElseThrow();
+        Long originalTagId = before.getTag().getId();
+        Tag replacementTag = tagRepository.save(new Tag(TagType.DEFAULT, "교체 대상", "#123456"));
+
+        // when
+        mockMvc.perform(put("/api/events/{eventId}", eventId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Changed",
+                                  "description": "partial mutation",
+                                  "startAt": "2026-06-07T02:00:00Z",
+                                  "endAt": "2026-06-07T03:00:00Z",
+                                  "allDay": false,
+                                  "timeZone": "Invalid/Zone",
+                                  "tagId": %d
+                                }
+                                """.formatted(replacementTag.getId())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("INVALID_TIME_ZONE"));
+
+        // then
+        Event persisted = eventRepository.findById(eventId).orElseThrow();
+        assertThat(persisted.getTitle()).isEqualTo("Stable");
+        assertThat(persisted.getStartAt()).isEqualTo(Instant.parse("2026-06-07T00:00:00Z"));
+        assertThat(persisted.getEndAt()).isEqualTo(Instant.parse("2026-06-07T01:00:00Z"));
+        assertThat(persisted.getTimeZone()).isEqualTo("UTC");
+        assertThat(persisted.getTag().getId()).isEqualTo(originalTagId);
+    }
+
+    @Test
     @DisplayName("사용자는 존재하지 않는 일정 id를 수정하면 EVENT_NOT_FOUND를 받는다")
     void givenMissingEventId_whenUpdateEvent_thenReturnsEventNotFound() throws Exception {
         // given
@@ -714,7 +808,8 @@ class EventControllerTest {
                   "title": "Updated",
                   "startAt": "2026-06-08T00:00:00Z",
                   "endAt": "2026-06-08T01:00:00Z",
-                  "allDay": false
+                  "allDay": false,
+                  "timeZone": "UTC"
                 }
                 """;
 
@@ -791,7 +886,8 @@ class EventControllerTest {
                                   "title": "Blocked update",
                                   "startAt": "2026-06-21T02:00:00Z",
                                   "endAt": "2026-06-21T03:00:00Z",
-                                  "allDay": false
+                                  "allDay": false,
+                                  "timeZone": "UTC"
                                 }
                                 """))
                 .andExpect(status().isConflict())
@@ -904,7 +1000,8 @@ class EventControllerTest {
                                   "title": "%s",
                                   "startAt": "%s",
                                   "endAt": "%s",
-                                  "allDay": false
+                                  "allDay": false,
+                                  "timeZone": "UTC"
                                 }
                                 """.formatted(title, startAt, endAt)))
                 .andExpect(status().isCreated())

@@ -4,6 +4,7 @@ import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.tag.domain.Tag;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -51,4 +52,8 @@ public interface RecurrenceEventRepository extends JpaRepository<RecurrenceEvent
             @Param("fallbackTag") Tag fallbackTag,
             @Param("accountId") Long accountId
     );
+
+    @Modifying(flushAutomatically = true)
+    @Query("delete from RecurrenceEvent recurrenceEvent where recurrenceEvent.id in :ids")
+    int deleteAllByIds(@Param("ids") Collection<Long> ids);
 }

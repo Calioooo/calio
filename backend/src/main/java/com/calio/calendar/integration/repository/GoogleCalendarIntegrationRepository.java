@@ -2,7 +2,9 @@ package com.calio.calendar.integration.repository;
 
 import com.calio.calendar.integration.domain.GoogleCalendarIntegration;
 import jakarta.persistence.LockModeType;
+import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -23,6 +25,59 @@ public interface GoogleCalendarIntegrationRepository extends JpaRepository<Googl
     Optional<GoogleCalendarIntegration> findByAccountIdForUpdate(@Param("accountId") Long accountId);
 
     boolean existsByAccountId(Long accountId);
+
+    @Query("""
+            select integration.accountId
+            from GoogleCalendarIntegration integration
+            where integration.accountId > :lastAccountId
+            order by integration.accountId
+            """)
+    List<Long> findConnectedAccountIdsAfter(
+            @Param("lastAccountId") Long lastAccountId,
+            Pageable pageable
+    );
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(value = """
+            UPDATE google_calendar_integrations
+            SET google_operation_lease_owner = :owner,
+                google_operation_lease_expires_at = TIMESTAMPADD(MINUTE, 5, CURRENT_TIMESTAMP)
+            WHERE account_id = :accountId
+              AND (google_operation_lease_owner IS NULL
+                   OR google_operation_lease_expires_at < CURRENT_TIMESTAMP)
+            """, nativeQuery = true)
+    int acquireGoogleOperationLease(@Param("accountId") Long accountId, @Param("owner") String owner);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(value = """
+            UPDATE google_calendar_integrations
+            SET google_operation_lease_expires_at = TIMESTAMPADD(MINUTE, 5, CURRENT_TIMESTAMP)
+            WHERE account_id = :accountId
+              AND google_operation_lease_owner = :owner
+              AND google_operation_lease_expires_at >= CURRENT_TIMESTAMP
+              AND EXISTS (
+                  SELECT 1 FROM google_operation_jobs job
+                  WHERE job.id = :jobId
+                    AND job.integration_id = google_calendar_integrations.id
+                    AND job.job_state = 'PROCESSING'
+                    AND job.owner_token = :owner
+              )
+            """, nativeQuery = true)
+    int renewOwnedGoogleOperationLease(
+            @Param("jobId") Long jobId,
+            @Param("accountId") Long accountId,
+            @Param("owner") String owner
+    );
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            update GoogleCalendarIntegration integration
+            set integration.googleOperationLeaseOwner = null,
+                integration.googleOperationLeaseExpiresAt = null
+            where integration.accountId = :accountId
+              and integration.googleOperationLeaseOwner = :owner
+            """)
+    int releaseGoogleOperationLease(@Param("accountId") Long accountId, @Param("owner") String owner);
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(value = """

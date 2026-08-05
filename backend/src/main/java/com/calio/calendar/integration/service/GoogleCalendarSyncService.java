@@ -6,12 +6,10 @@ import com.calio.calendar.external.google.GoogleCalendarEventsClient;
 import com.calio.calendar.external.google.GoogleCalendarSyncTokenExpiredException;
 import com.calio.calendar.external.google.GoogleCalendarUnauthorizedException;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventPage;
-import com.calio.calendar.integration.controller.dto.GoogleCalendarSyncResponse;
 import com.calio.calendar.integration.domain.GoogleCalendarSyncMode;
 import com.calio.calendar.integration.service.GoogleCalendarSyncLeaseService.SyncLease;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.UUID;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -22,113 +20,107 @@ public class GoogleCalendarSyncService {
     private final GoogleCalendarAccessTokenService accessTokenService;
     private final GoogleCalendarEventsClient eventsClient;
     private final GoogleCalendarEventPagePersistenceService pagePersistenceService;
+    private final GoogleCalendarPageNormalizer pageNormalizer;
+    private final GoogleOperationJobPersistenceService operationJobPersistenceService;
 
     public GoogleCalendarSyncService(
             GoogleCalendarSyncLeaseService leaseService,
             GoogleCalendarProviderDataService providerDataService,
             GoogleCalendarAccessTokenService accessTokenService,
             GoogleCalendarEventsClient eventsClient,
-            GoogleCalendarEventPagePersistenceService pagePersistenceService
+            GoogleCalendarEventPagePersistenceService pagePersistenceService,
+            GoogleCalendarPageNormalizer pageNormalizer,
+            GoogleOperationJobPersistenceService operationJobPersistenceService
     ) {
         this.leaseService = leaseService;
         this.providerDataService = providerDataService;
         this.accessTokenService = accessTokenService;
         this.eventsClient = eventsClient;
         this.pagePersistenceService = pagePersistenceService;
+        this.pageNormalizer = pageNormalizer;
+        this.operationJobPersistenceService = operationJobPersistenceService;
     }
 
-    public GoogleCalendarSyncResponse sync(Long accountId) {
-        SyncLease lease = leaseService.acquire(accountId, UUID.randomUUID().toString());
-        String accessToken;
-        try {
-            accessToken = accessTokenService.getAccessToken(lease.integrationId());
-        } catch (RuntimeException exception) {
-            throw releaseOwnedLeasePreservingFailure(lease, exception);
-        }
-
-        GoogleCalendarSyncMode completedMode = modeFor(lease.nextSyncToken())
-                == GoogleCalendarSyncMode.FULL
-                ? synchronizeFull(lease, accessToken)
-                : synchronizeIncremental(lease, accessToken);
-        return GoogleCalendarSyncResponse.from(completedMode);
-    }
-
-    private GoogleCalendarSyncMode synchronizeFull(
-            SyncLease lease,
-            String accessToken
+    public GoogleCalendarSyncMode executeOwned(
+            Long jobId,
+            Long accountId,
+            String workerToken
     ) {
+        SyncLease lease = leaseService.acquire(accountId, workerToken);
         try {
-            resetProviderData(lease);
+            assertOwned(jobId, accountId, workerToken);
+            GoogleCalendarSyncRunContext context = new GoogleCalendarSyncRunContext(
+                    accessTokenService.getAccessToken(lease.integrationId())
+            );
+            return synchronizeOwned(jobId, lease, context);
         } catch (RuntimeException exception) {
             throw releaseOwnedLeasePreservingFailure(lease, exception);
         }
+    }
 
-        try {
-            synchronizePages(lease, GoogleCalendarSyncMode.FULL, accessToken);
+    private GoogleCalendarSyncMode synchronizeOwned(
+            Long jobId,
+            SyncLease lease,
+            GoogleCalendarSyncRunContext context
+    ) {
+        if (modeFor(lease.nextSyncToken()) == GoogleCalendarSyncMode.FULL) {
+            synchronizeOwnedPages(jobId, lease, GoogleCalendarSyncMode.FULL, context);
             return GoogleCalendarSyncMode.FULL;
-        } catch (GoogleCalendarSyncTokenExpiredException exception) {
-            CalioException failure =
-                    new CalioException(ErrorCode.GOOGLE_CALENDAR_SYNC_FAILED, exception);
-            throw cleanupFullFailurePreservingFailure(lease, failure);
-        } catch (RuntimeException exception) {
-            throw cleanupFullFailurePreservingFailure(lease, exception);
         }
-    }
-
-    private GoogleCalendarSyncMode synchronizeIncremental(
-            SyncLease lease,
-            String accessToken
-    ) {
         try {
-            synchronizePages(lease, GoogleCalendarSyncMode.INCREMENTAL, accessToken);
+            synchronizeOwnedPages(jobId, lease, GoogleCalendarSyncMode.INCREMENTAL, context);
             return GoogleCalendarSyncMode.INCREMENTAL;
         } catch (GoogleCalendarSyncTokenExpiredException exception) {
-            return synchronizeFull(lease, accessToken);
-        } catch (RuntimeException exception) {
-            throw releaseOwnedLeasePreservingFailure(lease, exception);
+            context.resetSeenIdentities();
+            synchronizeOwnedPages(jobId, lease, GoogleCalendarSyncMode.FULL, context);
+            return GoogleCalendarSyncMode.FULL;
         }
     }
 
-    private void synchronizePages(
+    private void synchronizeOwnedPages(
+            Long jobId,
             SyncLease lease,
             GoogleCalendarSyncMode mode,
-            String initialAccessToken
+            GoogleCalendarSyncRunContext context
     ) {
         String pageToken = null;
-        String accessToken = initialAccessToken;
+        String nextSyncToken = null;
         Set<String> seenPageTokens = new HashSet<>();
         do {
-            PageRequestResult result = requestPage(
-                    lease,
-                    mode,
-                    pageToken,
-                    accessToken
-            );
-            GoogleCalendarEventPage page = result.page();
-            accessToken = result.accessToken();
-            persistPage(lease, page);
+            assertOwned(jobId, lease.accountId(), lease.runId());
+            GoogleCalendarEventPage page = requestPage(lease, mode, pageToken, context);
+            GoogleCalendarNormalizedPage normalizedPage = pageNormalizer.normalize(
+                    lease.integrationId(), page, context);
+            assertOwned(jobId, lease.accountId(), lease.runId());
+            pagePersistenceService.persistOwnedNormalizedPage(
+                    jobId, lease.integrationId(), lease.accountId(), lease.runId(), normalizedPage);
+            nextSyncToken = page.nextSyncToken();
             pageToken = nextPageToken(page, seenPageTokens);
         } while (pageToken != null);
+        assertOwned(jobId, lease.accountId(), lease.runId());
+        providerDataService.finalizeOwnedReconciliation(
+                jobId, lease.accountId(), lease.integrationId(), lease.runId(), mode,
+                context.seenEventIds(), context.seenRecurrenceEventIds(),
+                context.seenRecurrenceEventOverrideIds(), nextSyncToken);
     }
 
-    private PageRequestResult requestPage(
+    private void assertOwned(Long jobId, Long accountId, String workerToken) {
+        operationJobPersistenceService.renewAndAssertOwned(jobId, accountId, workerToken);
+    }
+
+    private GoogleCalendarEventPage requestPage(
             SyncLease lease,
             GoogleCalendarSyncMode mode,
             String pageToken,
-            String accessToken
+            GoogleCalendarSyncRunContext context
     ) {
         try {
-            return new PageRequestResult(
-                    listEvents(lease, mode, pageToken, accessToken),
-                    accessToken
-            );
+            return listEvents(lease, mode, pageToken, context.accessToken());
         } catch (GoogleCalendarUnauthorizedException exception) {
             String refreshedAccessToken = accessTokenService.forceRefresh(lease.integrationId());
+            context.replaceAccessToken(refreshedAccessToken);
             try {
-                return new PageRequestResult(
-                        listEvents(lease, mode, pageToken, refreshedAccessToken),
-                        refreshedAccessToken
-                );
+                return listEvents(lease, mode, pageToken, refreshedAccessToken);
             } catch (GoogleCalendarUnauthorizedException retryException) {
                 throw new CalioException(
                         ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED,
@@ -152,28 +144,7 @@ public class GoogleCalendarSyncService {
         );
     }
 
-    private void persistPage(SyncLease lease, GoogleCalendarEventPage page) {
-        if (page.hasNextPage()) {
-            pagePersistenceService.persistPage(
-                    lease.integrationId(),
-                    lease.accountId(),
-                    lease.runId(),
-                    page
-            );
-            return;
-        }
-        pagePersistenceService.persistLastPageAndFinalize(
-                lease.integrationId(),
-                lease.accountId(),
-                lease.runId(),
-                page
-        );
-    }
-
-    private String nextPageToken(
-            GoogleCalendarEventPage page,
-            Set<String> seenPageTokens
-    ) {
+    private String nextPageToken(GoogleCalendarEventPage page, Set<String> seenPageTokens) {
         String nextPageToken = page.nextPageToken();
         if (nextPageToken != null && !seenPageTokens.add(nextPageToken)) {
             throw new CalioException(ErrorCode.GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID);
@@ -181,51 +152,14 @@ public class GoogleCalendarSyncService {
         return nextPageToken;
     }
 
-    private void resetProviderData(SyncLease lease) {
-        boolean reset = providerDataService.resetUnderLease(
-                lease.integrationId(),
-                lease.runId()
-        );
-        if (!reset) {
-            throw new CalioException(ErrorCode.GOOGLE_CALENDAR_SYNC_CONFLICT);
-        }
-    }
-
-    private void cleanupFullFailure(SyncLease lease) {
-        providerDataService.cleanupFullFailureAndRelease(
-                lease.integrationId(),
-                lease.runId()
-        );
-    }
-
-    private RuntimeException cleanupFullFailurePreservingFailure(
-            SyncLease lease,
-            RuntimeException failure
-    ) {
-        return preserveFailure(failure, () -> cleanupFullFailure(lease));
-    }
-
     private RuntimeException releaseOwnedLeasePreservingFailure(
             SyncLease lease,
             RuntimeException failure
     ) {
-        return preserveFailure(
-                failure,
-                () -> providerDataService.releaseOwnedLease(
-                        lease.integrationId(),
-                        lease.runId()
-                )
-        );
-    }
-
-    private RuntimeException preserveFailure(
-            RuntimeException failure,
-            Runnable cleanup
-    ) {
         try {
-            cleanup.run();
-        } catch (RuntimeException cleanupException) {
-            failure.addSuppressed(cleanupException);
+            providerDataService.releaseOwnedLease(lease.integrationId(), lease.runId());
+        } catch (RuntimeException releaseException) {
+            failure.addSuppressed(releaseException);
         }
         return failure;
     }
@@ -234,11 +168,5 @@ public class GoogleCalendarSyncService {
         return nextSyncToken == null
                 ? GoogleCalendarSyncMode.FULL
                 : GoogleCalendarSyncMode.INCREMENTAL;
-    }
-
-    private record PageRequestResult(
-            GoogleCalendarEventPage page,
-            String accessToken
-    ) {
     }
 }

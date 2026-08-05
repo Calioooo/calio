@@ -8,12 +8,22 @@ import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.event.repository.EventRepository;
 import com.calio.calendar.integration.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.domain.GoogleCalendarIntegration;
+import com.calio.calendar.integration.domain.GoogleCalendarRecurrenceEventMapping;
+import com.calio.calendar.integration.domain.GoogleCalendarRecurrenceOverrideMapping;
 import com.calio.calendar.integration.repository.GoogleCalendarEventMappingRepository;
 import com.calio.calendar.integration.repository.GoogleCalendarIntegrationRepository;
+import com.calio.calendar.integration.repository.GoogleCalendarRecurrenceEventMappingRepository;
+import com.calio.calendar.integration.repository.GoogleCalendarRecurrenceOverrideMappingRepository;
+import com.calio.calendar.recurrence.domain.RecurrenceEvent;
+import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
+import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
+import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
+import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.domain.TagType;
 import com.calio.calendar.tag.repository.TagRepository;
 import java.time.Instant;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -40,6 +50,18 @@ class GoogleCalendarIntegrationPersistenceServiceTest {
 
     @Autowired
     private EventRepository eventRepository;
+
+    @Autowired
+    private GoogleCalendarRecurrenceEventMappingRepository recurrenceMappingRepository;
+
+    @Autowired
+    private GoogleCalendarRecurrenceOverrideMappingRepository overrideMappingRepository;
+
+    @Autowired
+    private RecurrenceEventRepository recurrenceEventRepository;
+
+    @Autowired
+    private RecurrenceEventOverrideRepository overrideRepository;
 
     @Autowired
     private AccountRepository accountRepository;
@@ -106,6 +128,49 @@ class GoogleCalendarIntegrationPersistenceServiceTest {
         assertThat(integrationRepository.findById(integration.getId())).isEmpty();
     }
 
+    @Test
+    @DisplayName("disconnect는 provider recurrence aggregate를 child-first로 지우고 local recurrence는 보존한다")
+    void givenProviderAndLocalRecurrence_whenDisconnect_thenDeletesOnlyProviderAggregate() {
+        // given
+        Account account = accountRepository.saveAndFlush(new Account());
+        Tag defaultTag = tagRepository.saveAndFlush(
+                new Tag(TagType.DEFAULT, "기타", "#64748B")
+        );
+        GoogleCalendarIntegration integration = integrationRepository.saveAndFlush(
+                integration(account.getId())
+        );
+        RecurrenceEvent providerRecurrence = recurrenceEventRepository.saveAndFlush(
+                recurrenceEvent(account, defaultTag, "Provider")
+        );
+        GoogleCalendarRecurrenceEventMapping parentMapping =
+                recurrenceMappingRepository.saveAndFlush(new GoogleCalendarRecurrenceEventMapping(
+                        integration, providerRecurrence, "master-1", null, null
+                ));
+        RecurrenceEventOverride providerOverride = overrideRepository.saveAndFlush(
+                RecurrenceEventOverride.deleted(
+                        providerRecurrence,
+                        Instant.parse("2026-07-02T09:00:00Z"),
+                        Instant.parse("2026-07-02T08:00:00Z")
+                )
+        );
+        overrideMappingRepository.saveAndFlush(new GoogleCalendarRecurrenceOverrideMapping(
+                parentMapping, providerOverride, "exception-1", null, null
+        ));
+        RecurrenceEvent localRecurrence = recurrenceEventRepository.saveAndFlush(
+                recurrenceEvent(account, defaultTag, "Local")
+        );
+
+        // when
+        persistenceService.deleteByAccountId(account.getId());
+
+        // then
+        assertThat(overrideMappingRepository.count()).isZero();
+        assertThat(overrideRepository.findById(providerOverride.getOverrideId())).isEmpty();
+        assertThat(recurrenceMappingRepository.count()).isZero();
+        assertThat(recurrenceEventRepository.findById(providerRecurrence.getId())).isEmpty();
+        assertThat(recurrenceEventRepository.findById(localRecurrence.getId())).isPresent();
+    }
+
     private Event createMappedEvent(
             Account account,
             GoogleCalendarIntegration integration,
@@ -120,6 +185,7 @@ class GoogleCalendarIntegrationPersistenceServiceTest {
                 Instant.parse("2026-07-01T00:00:00Z"),
                 Instant.parse("2026-07-01T01:00:00Z"),
                 false,
+                "UTC",
                 null,
                 fallbackTag,
                 account
@@ -143,6 +209,22 @@ class GoogleCalendarIntegrationPersistenceServiceTest {
                 "encrypted-access-token",
                 Instant.parse("2026-07-01T01:00:00Z"),
                 Instant.parse("2026-07-01T00:00:00Z")
+        );
+    }
+
+    private RecurrenceEvent recurrenceEvent(Account account, Tag tag, String title) {
+        return new RecurrenceEvent(
+                title,
+                null,
+                RecurrenceSchedule.create(
+                        false,
+                        Instant.parse("2026-07-01T09:00:00Z"),
+                        Instant.parse("2026-07-01T10:00:00Z"),
+                        "UTC"
+                ),
+                List.of("RRULE:FREQ=DAILY"),
+                tag,
+                account
         );
     }
 }

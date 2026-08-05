@@ -136,6 +136,115 @@ class GoogleCalendarSyncMigrationTest {
         }
     }
 
+    @Test
+    @DisplayName("V10 empty schema upgrade는 nullable VARCHAR(255) events.time_zone만 추가한다")
+    void givenV10EmptySchema_whenMigrateToV11_thenAddsNullableEventTimeZone()
+            throws Exception {
+        // given
+        String url = "jdbc:h2:mem:event-time-zone-upgrade;MODE=MySQL;DB_CLOSE_DELAY=-1";
+        migrateTo(url, MigrationVersion.fromVersion("10"));
+
+        // when
+        migrateTo(url, MigrationVersion.fromVersion("11"));
+
+        // then
+        try (Connection connection = DriverManager.getConnection(url, "sa", "")) {
+            assertThat(columnNames(connection, "EVENTS")).contains("TIME_ZONE");
+            assertThat(columnSize(connection, "EVENTS", "TIME_ZONE")).isEqualTo(255);
+            assertThat(isNullable(connection, "EVENTS", "TIME_ZONE")).isTrue();
+            assertThat(columnDefault(connection, "EVENTS", "TIME_ZONE")).isNull();
+        }
+    }
+
+    @Test
+    @DisplayName("V12 activation upgrade는 Google cursor만 reset하고 provider와 canonical data를 보존한다")
+    void givenV11ProviderData_whenMigrateToV12_thenOnlyResetsGoogleCursor()
+            throws Exception {
+        // given
+        String url = "jdbc:h2:mem:google-calendar-recurrence-activation;MODE=MySQL;DB_CLOSE_DELAY=-1";
+        migrateTo(url, MigrationVersion.fromVersion("8"));
+        insertLegacyEventAndIntegration(url);
+        migrateTo(url, MigrationVersion.fromVersion("11"));
+        insertV9ProviderAndRecurrenceData(url);
+
+        // when
+        migrateTo(url, MigrationVersion.fromVersion("12"));
+
+        // then
+        try (Connection connection = DriverManager.getConnection(url, "sa", "")) {
+            assertThat(singleString(
+                    connection,
+                    "SELECT next_sync_token FROM google_calendar_integrations WHERE id = 900"
+            )).isNull();
+            assertThat(singleString(
+                    connection,
+                    "SELECT provider_etag FROM google_calendar_event_mappings WHERE id = 900"
+            )).isEqualTo("existing-etag");
+            assertThat(singleString(
+                    connection,
+                    "SELECT title FROM events WHERE id = 900"
+            )).isEqualTo("Legacy");
+            assertThat(singleString(
+                    connection,
+                    "SELECT recurrence_title FROM recurrence_events WHERE id = 901"
+            )).isEqualTo("Existing recurrence");
+        }
+    }
+
+    @Test
+    @DisplayName("clean migration은 V12 recurrence activation schema를 적용한다")
+    void givenEmptyDatabase_whenMigrateToV12_thenAppliesActivationMigration()
+            throws Exception {
+        // given
+        String url = "jdbc:h2:mem:google-calendar-recurrence-activation-clean;MODE=MySQL;DB_CLOSE_DELAY=-1";
+
+        // when
+        migrateTo(url, MigrationVersion.fromVersion("12"));
+
+        // then
+        try (Connection connection = DriverManager.getConnection(url, "sa", "")) {
+            assertThat(columnNames(connection, "GOOGLE_CALENDAR_INTEGRATIONS"))
+                    .contains("NEXT_SYNC_TOKEN");
+            assertThat(columnNames(connection, "GOOGLE_CALENDAR_RECURRENCE_EVENT_MAPPINGS"))
+                    .isNotEmpty();
+        }
+    }
+
+    @Test
+    @DisplayName("V13은 Account sequence와 durable Google operation Job 제약 및 조회 index를 추가한다")
+    void givenV12Schema_whenMigrateToV13_thenAddsDurableOperationRuntime() throws Exception {
+        // given
+        String url = "jdbc:h2:mem:google-operation-runtime;MODE=MySQL;DB_CLOSE_DELAY=-1";
+        migrateTo(url, MigrationVersion.fromVersion("12"));
+
+        // when
+        migrateTo(url, MigrationVersion.fromVersion("13"));
+
+        // then
+        try (Connection connection = DriverManager.getConnection(url, "sa", "")) {
+            assertThat(columnNames(connection, "GOOGLE_CALENDAR_INTEGRATIONS")).contains(
+                    "NEXT_GOOGLE_OPERATION_SEQUENCE",
+                    "GOOGLE_OPERATION_LEASE_OWNER",
+                    "GOOGLE_OPERATION_LEASE_EXPIRES_AT"
+            );
+            assertThat(columnNames(connection, "ACCOUNTS")).doesNotContain(
+                    "NEXT_GOOGLE_OPERATION_SEQUENCE",
+                    "GOOGLE_OPERATION_LEASE_OWNER",
+                    "GOOGLE_OPERATION_LEASE_EXPIRES_AT"
+            );
+            assertThat(columnNames(connection, "GOOGLE_OPERATION_JOBS")).contains(
+                    "OPERATION_ID", "INTEGRATION_ID", "ACCOUNT_ID", "ACCOUNT_SEQUENCE",
+                    "JOB_KIND", "JOB_TRIGGER", "JOB_STATE", "RUNNABLE_AT", "RETRY_COUNT",
+                    "OWNER_TOKEN", "TERMINAL_REASON", "TERMINAL_AT"
+            );
+            assertThat(indexNames(connection, "GOOGLE_OPERATION_JOBS")).contains(
+                    "IDX_GOOGLE_OPERATION_JOBS_ACCOUNT_HEAD",
+                    "IDX_GOOGLE_OPERATION_JOBS_RUNNABLE",
+                    "IDX_GOOGLE_OPERATION_JOBS_TERMINAL_CLEANUP"
+            );
+        }
+    }
+
     private void migrateTo(String url, MigrationVersion target) {
         Flyway.configure()
                 .dataSource(url, "sa", "")

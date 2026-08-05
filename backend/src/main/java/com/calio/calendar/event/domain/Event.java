@@ -38,6 +38,9 @@ public class Event extends BaseEntity {
     @Column(name = "all_day", nullable = false)
     private boolean allDay;
 
+    @Column(name = "time_zone")
+    private String timeZone;
+
     @Column(name = "important_event", nullable = false, columnDefinition = "boolean default false")
     private boolean importantEvent = false;
 
@@ -61,6 +64,7 @@ public class Event extends BaseEntity {
             Instant startAt,
             Instant endAt,
             boolean allDay,
+            String timeZone,
             Long recurrenceId,
             Tag tag,
             Account account
@@ -70,6 +74,7 @@ public class Event extends BaseEntity {
         this.startAt = startAt;
         this.endAt = endAt;
         this.allDay = allDay;
+        this.timeZone = timeZone;
         this.recurrenceId = recurrenceId;
         this.tag = tag;
         this.account = account;
@@ -80,13 +85,15 @@ public class Event extends BaseEntity {
             String description,
             Instant startAt,
             Instant endAt,
-            boolean allDay
+            boolean allDay,
+            String timeZone
     ) {
         this.title = title;
         this.description = description;
         this.startAt = startAt;
         this.endAt = endAt;
         this.allDay = allDay;
+        this.timeZone = timeZone;
     }
 
     public void replace(
@@ -95,9 +102,10 @@ public class Event extends BaseEntity {
             Instant startAt,
             Instant endAt,
             boolean allDay,
+            String timeZone,
             Tag tag
     ) {
-        replace(title, description, startAt, endAt, allDay);
+        replace(title, description, startAt, endAt, allDay, timeZone);
         changeTag(tag);
     }
 
@@ -131,6 +139,10 @@ public class Event extends BaseEntity {
 
     public boolean isAllDay() {
         return allDay;
+    }
+
+    public String getTimeZone() {
+        return timeZone;
     }
 
     public boolean importantEvent() {

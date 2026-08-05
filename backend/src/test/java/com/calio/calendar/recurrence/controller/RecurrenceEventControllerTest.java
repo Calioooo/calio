@@ -225,12 +225,16 @@ class RecurrenceEventControllerTest {
                                   "title": "Moved",
                                   "description": null,
                                   "startAt": "2026-11-01T12:00:00Z",
-                                  "endAt": "2026-11-01T13:00:00Z"
+                                  "endAt": "2026-11-01T13:00:00Z",
+                                  "allDay": false,
+                                  "timeZone": "UTC"
                                 }
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.title").value("Moved"))
                 .andExpect(jsonPath("$.description").doesNotExist())
+                .andExpect(jsonPath("$.allDay").value(false))
+                .andExpect(jsonPath("$.timeZone").value("UTC"))
                 .andExpect(jsonPath("$.originStartAt").value("2026-10-01T09:00:00Z"));
 
         // when, then
@@ -250,6 +254,73 @@ class RecurrenceEventControllerTest {
     }
 
     @Test
+    @DisplayName("all-day master의 occurrence를 독립된 timed snapshot으로 변경할 수 있다")
+    void givenAllDayMaster_whenPatchTimedOccurrence_thenUsesRequestScheduleTypeAndTimeZone()
+            throws Exception {
+        // given
+        MvcResult createResult = mockMvc.perform(post("/api/recurrence-events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "All-day master",
+                                  "allDay": true,
+                                  "firstOccurrenceStartAt": "2026-10-01T00:00:00Z",
+                                  "firstOccurrenceEndAt": "2026-10-02T00:00:00Z",
+                                  "timeZone": null,
+                                  "recurrence": ["RRULE:FREQ=DAILY;COUNT=2"]
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn();
+        long recurrenceId = readResponse(createResult).get("recurrenceId").asLong();
+
+        // when, then
+        mockMvc.perform(patch("/api/recurrence-events/{id}/occurrences", recurrenceId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "originStartAt": "2026-10-01T00:00:00Z",
+                                  "title": "Timed override",
+                                  "description": null,
+                                  "startAt": "2026-10-01T09:00:00Z",
+                                  "endAt": "2026-10-01T10:00:00Z",
+                                  "allDay": false,
+                                  "timeZone": "Asia/Seoul"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.allDay").value(false))
+                .andExpect(jsonPath("$.timeZone").value("Asia/Seoul"));
+    }
+
+    @Test
+    @DisplayName("occurrence PATCH에서 allDay를 누락하면 snapshot을 저장하지 않는다")
+    void givenMissingAllDay_whenPatchOccurrence_thenReturnsValidationFailedWithoutOverride()
+            throws Exception {
+        // given
+        long recurrenceId = createTimedRecurrence("Required allDay", "2026-10-01", "UTC");
+
+        // when, then
+        mockMvc.perform(patch("/api/recurrence-events/{id}/occurrences", recurrenceId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "originStartAt": "2026-10-01T09:00:00Z",
+                                  "title": "Missing allDay",
+                                  "startAt": "2026-10-01T12:00:00Z",
+                                  "endAt": "2026-10-01T13:00:00Z",
+                                  "timeZone": "UTC"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"));
+        assertThat(overrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(
+                recurrenceId,
+                Instant.parse("2026-10-01T09:00:00Z")
+        )).isEmpty();
+    }
+
+    @Test
     @DisplayName("새 virtual occurrence와 orphan active override는 final start 순서로 exact once 조회된다")
     void givenVirtualOccurrencesAndOrphanOverride_whenList_thenReturnsExactOnceInStartOrder() throws Exception {
         // given
@@ -263,7 +334,9 @@ class RecurrenceEventControllerTest {
                                   "title": "Orphan override",
                                   "description": null,
                                   "startAt": "2029-08-10T11:00:00Z",
-                                  "endAt": "2029-08-10T12:00:00Z"
+                                  "endAt": "2029-08-10T12:00:00Z",
+                                  "allDay": false,
+                                  "timeZone": "Asia/Seoul"
                                 }
                                 """))
                 .andExpect(status().isOk());
@@ -280,9 +353,12 @@ class RecurrenceEventControllerTest {
                 .andExpect(jsonPath("$", hasSize(3)))
                 .andExpect(jsonPath("$[0].startAt").value("2029-08-10T09:00:00Z"))
                 .andExpect(jsonPath("$[0].originStartAt").value("2029-08-10T09:00:00Z"))
+                .andExpect(jsonPath("$[0].timeZone").value("UTC"))
                 .andExpect(jsonPath("$[1].startAt").value("2029-08-10T11:00:00Z"))
                 .andExpect(jsonPath("$[1].originStartAt").value(orphanOrigin.toString()))
+                .andExpect(jsonPath("$[1].timeZone").value("Asia/Seoul"))
                 .andExpect(jsonPath("$[2].startAt").value("2029-08-11T09:00:00Z"))
+                .andExpect(jsonPath("$[2].timeZone").value("UTC"))
                 .andReturn();
 
         // then
@@ -318,7 +394,9 @@ class RecurrenceEventControllerTest {
                                   "title": "Preserved active",
                                   "description": "snapshot memo",
                                   "startAt": "2026-12-10T12:00:00Z",
-                                  "endAt": "2026-12-10T13:00:00Z"
+                                  "endAt": "2026-12-10T13:00:00Z",
+                                  "allDay": false,
+                                  "timeZone": "UTC"
                                 }
                                 """))
                 .andExpect(status().isOk());
@@ -336,6 +414,7 @@ class RecurrenceEventControllerTest {
                 Instant.parse("2026-12-20T09:00:00Z"),
                 Instant.parse("2026-12-20T10:00:00Z"),
                 false,
+                "UTC",
                 recurrenceId,
                 originalTag,
                 accountRepository.getReferenceById(accountId)
@@ -424,7 +503,9 @@ class RecurrenceEventControllerTest {
                                   "title": "Re-edited orphan",
                                   "description": null,
                                   "startAt": "2027-03-01T00:00:00Z",
-                                  "endAt": "2027-03-02T00:00:00Z"
+                                  "endAt": "2027-03-02T00:00:00Z",
+                                  "allDay": true,
+                                  "timeZone": null
                                 }
                                 """))
                 .andExpect(status().isOk())
@@ -440,7 +521,9 @@ class RecurrenceEventControllerTest {
                                   "title": "Restored orphan",
                                   "description": "restored memo",
                                   "startAt": "2027-03-03T00:00:00Z",
-                                  "endAt": "2027-03-04T00:00:00Z"
+                                  "endAt": "2027-03-04T00:00:00Z",
+                                  "allDay": true,
+                                  "timeZone": null
                                 }
                                 """))
                 .andExpect(status().isOk())
@@ -462,7 +545,9 @@ class RecurrenceEventControllerTest {
                                   "title": "Stable override",
                                   "description": "stable memo",
                                   "startAt": "2028-01-10T12:00:00Z",
-                                  "endAt": "2028-01-10T13:00:00Z"
+                                  "endAt": "2028-01-10T13:00:00Z",
+                                  "allDay": false,
+                                  "timeZone": "UTC"
                                 }
                                 """))
                 .andExpect(status().isOk());
@@ -532,7 +617,9 @@ class RecurrenceEventControllerTest {
                                   "title": "Restored",
                                   "description": null,
                                   "startAt": "2027-01-02T12:00:00Z",
-                                  "endAt": "2027-01-02T13:00:00Z"
+                                  "endAt": "2027-01-02T13:00:00Z",
+                                  "allDay": false,
+                                  "timeZone": "UTC"
                                 }
                                 """))
                 .andExpect(status().isOk())
@@ -573,7 +660,9 @@ class RecurrenceEventControllerTest {
                                   "title": "Unknown",
                                   "description": null,
                                   "startAt": "2027-02-01T12:00:00Z",
-                                  "endAt": "2027-02-01T13:00:00Z"
+                                  "endAt": "2027-02-01T13:00:00Z",
+                                  "allDay": false,
+                                  "timeZone": "UTC"
                                 }
                                 """))
                 .andExpect(status().isNotFound())
@@ -614,8 +703,12 @@ class RecurrenceEventControllerTest {
                 originStartAt,
                 "Private override",
                 null,
-                Instant.parse("2027-03-02T12:00:00Z"),
-                Instant.parse("2027-03-02T13:00:00Z")
+                com.calio.calendar.common.domain.CanonicalSchedule.recurrenceOverride(
+                        Instant.parse("2027-03-02T12:00:00Z"),
+                        Instant.parse("2027-03-02T13:00:00Z"),
+                        false,
+                        "UTC"
+                )
         ));
 
         // when
@@ -630,7 +723,9 @@ class RecurrenceEventControllerTest {
                                   "title": "Leaked",
                                   "description": null,
                                   "startAt": "2027-03-05T12:00:00Z",
-                                  "endAt": "2027-03-05T13:00:00Z"
+                                  "endAt": "2027-03-05T13:00:00Z",
+                                  "allDay": false,
+                                  "timeZone": "UTC"
                                 }
                                 """))
                 .andExpect(status().isNotFound())
@@ -666,7 +761,9 @@ class RecurrenceEventControllerTest {
                                   "title": "Active child",
                                   "description": null,
                                   "startAt": "2027-05-10T12:00:00Z",
-                                  "endAt": "2027-05-10T13:00:00Z"
+                                  "endAt": "2027-05-10T13:00:00Z",
+                                  "allDay": false,
+                                  "timeZone": "UTC"
                                 }
                                 """))
                 .andExpect(status().isOk());
@@ -680,6 +777,7 @@ class RecurrenceEventControllerTest {
                 Instant.parse("2027-05-20T09:00:00Z"),
                 Instant.parse("2027-05-20T10:00:00Z"),
                 false,
+                "UTC",
                 recurrenceId,
                 master.getTag(),
                 accountRepository.getReferenceById(accountId)
