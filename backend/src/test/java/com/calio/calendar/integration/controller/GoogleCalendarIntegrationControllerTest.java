@@ -18,8 +18,13 @@ import com.calio.calendar.external.google.dto.GoogleTokenResponse;
 import com.calio.calendar.external.google.dto.GoogleUserInfoResponse;
 import com.calio.calendar.integration.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.domain.GoogleCalendarSyncMode;
+import com.calio.calendar.integration.domain.GoogleOperationJob;
+import com.calio.calendar.integration.domain.GoogleOperationJobState;
+import com.calio.calendar.integration.domain.GoogleOperationJobTrigger;
 import com.calio.calendar.integration.repository.GoogleCalendarIntegrationRepository;
+import com.calio.calendar.integration.repository.GoogleOperationJobRepository;
 import com.calio.calendar.integration.service.GoogleCalendarSyncLeaseService;
+import com.calio.calendar.integration.service.GoogleOperationWorker;
 import com.calio.calendar.security.AuthenticatedAccountMockMvcTestConfig;
 import com.calio.calendar.security.WithAuthenticatedAccount;
 import java.util.ArrayList;
@@ -35,6 +40,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.client.RestClient;
 import tools.jackson.databind.ObjectMapper;
@@ -71,10 +77,17 @@ class GoogleCalendarIntegrationControllerTest {
     private GoogleCalendarIntegrationRepository googleCalendarIntegrationRepository;
 
     @Autowired
+    private GoogleOperationJobRepository googleOperationJobRepository;
+
+    @Autowired
     private GoogleCalendarSyncLeaseService googleCalendarSyncLeaseService;
+
+    @MockitoBean
+    private GoogleOperationWorker googleOperationWorker;
 
     @BeforeEach
     void setUp() {
+        googleOperationJobRepository.deleteAll();
         googleCalendarIntegrationRepository.deleteAll();
         googleOAuthClient.reset();
         googleCalendarEventsClient.reset();
@@ -147,78 +160,30 @@ class GoogleCalendarIntegrationControllerTest {
     }
 
     @Test
-    @DisplayName("cursor가 없는 연결의 sync는 FULL을 수행하고 primary와 최종 mode를 반환한다")
-    void givenConnectionWithoutCursor_whenSync_thenReturnsFullMode() throws Exception {
+    @DisplayName("연결된 Account의 sync 요청은 실행 결과 없이 202 Accepted를 반환한다")
+    void givenConnection_whenSync_thenReturnsAcceptedWithoutOperationMetadata() throws Exception {
         // given
         connectGoogleCalendar();
 
         // when, then
         mockMvc.perform(post("/api/integrations/google-calendar/sync"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.calendarKey").value("primary"))
-                .andExpect(jsonPath("$.mode").value("FULL"));
-        assertThat(googleCalendarEventsClient.listCount).isOne();
-        assertThat(googleCalendarEventsClient.lastMode).isEqualTo(GoogleCalendarSyncMode.FULL);
-    }
+                .andExpect(status().isAccepted())
+                .andExpect(result -> assertThat(result.getResponse().getContentAsByteArray()).isEmpty());
 
-    @Test
-    @DisplayName("cursor가 있는 연결의 sync는 INCREMENTAL을 수행하고 최종 mode를 반환한다")
-    void givenConnectionWithCursor_whenSync_thenReturnsIncrementalMode() throws Exception {
-        // given
-        connectGoogleCalendar();
-        mockMvc.perform(post("/api/integrations/google-calendar/sync"))
-                .andExpect(status().isOk());
-        googleCalendarEventsClient.reset();
-
-        // when, then
-        mockMvc.perform(post("/api/integrations/google-calendar/sync"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.calendarKey").value("primary"))
-                .andExpect(jsonPath("$.mode").value("INCREMENTAL"));
-        assertThat(googleCalendarEventsClient.requestedModes)
-                .containsExactly(GoogleCalendarSyncMode.INCREMENTAL);
-    }
-
-    @Test
-    @DisplayName("INCREMENTAL 410은 동일 요청에서 FULL로 복구하고 최종 mode를 반환한다")
-    void givenExpiredSyncToken_whenSync_thenRecoversWithFullMode() throws Exception {
-        // given
-        connectGoogleCalendar();
-        mockMvc.perform(post("/api/integrations/google-calendar/sync"))
-                .andExpect(status().isOk());
-        googleCalendarEventsClient.reset();
-        googleCalendarEventsClient.nextFailure =
-                new GoogleCalendarSyncTokenExpiredException();
-
-        // when, then
-        mockMvc.perform(post("/api/integrations/google-calendar/sync"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.calendarKey").value("primary"))
-                .andExpect(jsonPath("$.mode").value("FULL"));
-        assertThat(googleCalendarEventsClient.requestedModes)
-                .containsExactly(
-                        GoogleCalendarSyncMode.INCREMENTAL,
-                        GoogleCalendarSyncMode.FULL
-                );
-    }
-
-    @Test
-    @DisplayName("다른 run이 sync lease를 보유하면 GOOGLE_CALENDAR_SYNC_CONFLICT를 반환한다")
-    void givenActiveSyncLease_whenSync_thenReturnsConflict() throws Exception {
-        // given
-        connectGoogleCalendar();
-        GoogleCalendarIntegration integration =
-                googleCalendarIntegrationRepository.findAll().getFirst();
-        googleCalendarSyncLeaseService.acquire(
-                integration.getAccountId(),
-                "active-run"
-        );
-
-        // when, then
-        mockMvc.perform(post("/api/integrations/google-calendar/sync"))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.title").value("GOOGLE_CALENDAR_SYNC_CONFLICT"));
-        assertThat(googleCalendarEventsClient.listCount).isZero();
+        GoogleCalendarIntegration integration = googleCalendarIntegrationRepository.findAll().getFirst();
+        List<GoogleOperationJob> jobs = googleOperationJobRepository.findAll();
+        assertThat(jobs).hasSize(1);
+        GoogleOperationJob job = jobs.getFirst();
+        assertThat(job.getOperationId()).isNotBlank();
+        assertThat(job.getIntegrationId()).isEqualTo(integration.getId());
+        assertThat(job.getAccountId()).isEqualTo(integration.getAccountId());
+        assertThat(job.getAccountSequence()).isEqualTo(1L);
+        assertThat(job.getKind()).isEqualTo(GoogleOperationJob.SYNC_KIND);
+        assertThat(job.getTrigger()).isEqualTo(GoogleOperationJobTrigger.MANUAL);
+        assertThat(job.getState()).isEqualTo(GoogleOperationJobState.PENDING);
+        assertThat(job.getRunnableAt()).isNotNull();
+        assertThat(job.getRetryCount()).isZero();
+        assertThat(job.getOwnerToken()).isNull();
     }
 
     private void connectGoogleCalendar() throws Exception {

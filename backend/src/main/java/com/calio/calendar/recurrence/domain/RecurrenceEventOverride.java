@@ -1,6 +1,7 @@
 package com.calio.calendar.recurrence.domain;
 
 import com.calio.calendar.common.domain.BaseEntity;
+import com.calio.calendar.common.domain.CanonicalSchedule;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -68,11 +69,10 @@ public class RecurrenceEventOverride extends BaseEntity {
             Instant originStartAt,
             String title,
             String description,
-            Instant startAt,
-            Instant endAt
+            CanonicalSchedule schedule
     ) {
         RecurrenceEventOverride override = new RecurrenceEventOverride(recurrenceEvent, originStartAt);
-        override.activate(title, description, startAt, endAt);
+        override.activate(title, description, schedule);
         return override;
     }
 
@@ -86,13 +86,13 @@ public class RecurrenceEventOverride extends BaseEntity {
         return override;
     }
 
-    public void activate(String title, String description, Instant startAt, Instant endAt) {
+    public void activate(String title, String description, CanonicalSchedule schedule) {
         this.overrideTitle = title;
         this.overrideDescription = description;
-        this.overrideStartAt = startAt;
-        this.overrideEndAt = endAt;
-        this.overrideAllDay = recurrenceEvent.isAllDay();
-        this.overrideTimeZone = recurrenceEvent.getTimeZone();
+        this.overrideStartAt = schedule.startAt();
+        this.overrideEndAt = schedule.endAt();
+        this.overrideAllDay = schedule.allDay();
+        this.overrideTimeZone = schedule.timeZone();
         this.deletedAt = null;
     }
 
@@ -112,6 +112,10 @@ public class RecurrenceEventOverride extends BaseEntity {
 
     public RecurrenceEvent getRecurrenceEvent() {
         return recurrenceEvent;
+    }
+
+    public Long getOverrideId() {
+        return overrideId;
     }
 
     public Long getRecurrenceId() {

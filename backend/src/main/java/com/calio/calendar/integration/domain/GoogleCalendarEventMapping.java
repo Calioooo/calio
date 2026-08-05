@@ -51,7 +51,7 @@ public class GoogleCalendarEventMapping extends BaseEntity {
     @Column(name = "external_event_id", nullable = false, length = 1024)
     private String externalEventId;
 
-    @Column(name = "provider_etag")
+    @Column(name = "provider_etag", length = 1024)
     private String providerEtag;
 
     @Column(name = "provider_updated_at")

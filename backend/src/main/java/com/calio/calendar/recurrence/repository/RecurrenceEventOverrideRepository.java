@@ -6,6 +6,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -35,4 +36,20 @@ public interface RecurrenceEventOverrideRepository extends JpaRepository<Recurre
     );
 
     void deleteByRecurrenceEvent_Id(Long recurrenceId);
+
+    @Modifying(flushAutomatically = true)
+    @Query("""
+            delete from RecurrenceEventOverride recurrenceOverride
+            where recurrenceOverride.overrideId in :overrideIds
+            """)
+    int deleteAllByIds(@Param("overrideIds") Collection<Long> overrideIds);
+
+    @Modifying(flushAutomatically = true)
+    @Query("""
+            delete from RecurrenceEventOverride recurrenceOverride
+            where recurrenceOverride.recurrenceEvent.id in :recurrenceEventIds
+            """)
+    int deleteAllByRecurrenceEventIds(
+            @Param("recurrenceEventIds") Collection<Long> recurrenceEventIds
+    );
 }

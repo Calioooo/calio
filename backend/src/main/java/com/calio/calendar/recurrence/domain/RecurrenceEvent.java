@@ -85,6 +85,17 @@ public class RecurrenceEvent extends BaseEntity {
         this.tag = tag;
     }
 
+    public void updateProviderContent(
+            String title,
+            String description,
+            RecurrenceSchedule schedule,
+            List<String> recurrenceRules
+    ) {
+        this.recurrenceTitle = title;
+        this.recurrenceDescription = description;
+        replaceSchedule(schedule, recurrenceRules);
+    }
+
     private void replaceSchedule(RecurrenceSchedule schedule, List<String> recurrenceRules) {
         this.allDay = schedule.allDay();
         this.timeZone = schedule.timeZone();
