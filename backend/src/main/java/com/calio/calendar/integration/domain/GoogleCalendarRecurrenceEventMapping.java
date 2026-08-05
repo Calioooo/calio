@@ -75,6 +75,11 @@ public class GoogleCalendarRecurrenceEventMapping extends BaseEntity {
         this.providerUpdatedAt = providerUpdatedAt;
     }
 
+    public void updateProviderVersion(String providerEtag, Instant providerUpdatedAt) {
+        this.providerEtag = providerEtag;
+        this.providerUpdatedAt = providerUpdatedAt;
+    }
+
     public Long getId() {
         return id;
     }

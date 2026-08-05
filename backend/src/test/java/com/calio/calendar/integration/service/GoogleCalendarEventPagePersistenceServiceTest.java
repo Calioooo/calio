@@ -12,19 +12,26 @@ import com.calio.calendar.event.repository.EventRepository;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventItem;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventPage;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventTime;
+import com.calio.calendar.external.google.GoogleCalendarEventTimeNormalizer.NormalizedEventSchedule;
 import com.calio.calendar.integration.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.domain.GoogleCalendarIntegration;
+import com.calio.calendar.integration.domain.GoogleCalendarSyncMode;
 import com.calio.calendar.integration.repository.GoogleCalendarEventMappingRepository;
 import com.calio.calendar.integration.repository.GoogleCalendarIntegrationRepository;
 import com.calio.calendar.integration.repository.GoogleCalendarRecurrenceEventMappingRepository;
 import com.calio.calendar.integration.repository.GoogleCalendarRecurrenceOverrideMappingRepository;
+import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.ActiveRecurrenceEventOverrideUpsert;
+import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.CancelledRecurrenceEventOverrideUpsert;
+import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.RecurrenceEventUpsert;
 import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.domain.TagType;
 import com.calio.calendar.tag.repository.TagRepository;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -32,6 +39,7 @@ import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest(properties = {
@@ -45,6 +53,12 @@ class GoogleCalendarEventPagePersistenceServiceTest {
 
     @Autowired
     private GoogleCalendarEventPagePersistenceService pagePersistenceService;
+
+    @Autowired
+    private GoogleCalendarPageNormalizer pageNormalizer;
+
+    @Autowired
+    private GoogleCalendarProviderDataService providerDataService;
 
     @Autowired
     private GoogleCalendarIntegrationRepository integrationRepository;
@@ -73,6 +87,9 @@ class GoogleCalendarEventPagePersistenceServiceTest {
     @Autowired
     private TagRepository tagRepository;
 
+    @MockitoBean
+    private GoogleOperationJobPersistenceService operationJobPersistenceService;
+
     @Test
     @Transactional
     @DisplayName("동일 external identity 재반영은 내부 Event를 유지하며 provider schedule만 갱신한다")
@@ -89,7 +106,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
         );
 
         acquireLease(account.getId(), "first-run");
-        pagePersistenceService.persistLastPageAndFinalize(
+        persistProviderPage(
                 integration.getId(),
                 account.getId(),
                 "first-run",
@@ -106,7 +123,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
 
         // when
         acquireLease(account.getId(), "second-run");
-        pagePersistenceService.persistLastPageAndFinalize(
+        persistProviderPage(
                 integration.getId(),
                 account.getId(),
                 "second-run",
@@ -154,7 +171,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
         acquireLease(account.getId(), "page-zone-run");
 
         // when
-        pagePersistenceService.persistLastPageAndFinalize(
+        persistProviderPage(
                 integration.getId(),
                 account.getId(),
                 "page-zone-run",
@@ -189,25 +206,25 @@ class GoogleCalendarEventPagePersistenceServiceTest {
                 integration(account.getId())
         );
         String externalEventId = "a".repeat(1024);
-        String providerEtag = "e".repeat(1024);
+        String googleEtag = "e".repeat(1024);
         acquireLease(account.getId(), "maximum-id-run");
 
         // when
-        pagePersistenceService.persistLastPageAndFinalize(
+        persistProviderPage(
                 integration.getId(),
                 account.getId(),
                 "maximum-id-run",
-                page(timedItem(externalEventId, "Maximum ID", providerEtag), "cursor-1")
+                page(timedItem(externalEventId, "Maximum ID", googleEtag), "cursor-1")
         );
 
         // then
-        assertThat(mappingRepository.findAllByExternalIdentity(
+        assertThat(mappingRepository.findAllWithEventByExternalIdentity(
                 integration.getId(),
                 GoogleCalendarEventMapping.PRIMARY_CALENDAR_KEY,
                 List.of(externalEventId)
         )).singleElement().satisfies(mapping -> {
             assertThat(mapping.getExternalEventId()).isEqualTo(externalEventId);
-            assertThat(mapping.getProviderEtag()).isEqualTo(providerEtag);
+            assertThat(mapping.getProviderEtag()).isEqualTo(googleEtag);
         });
     }
 
@@ -223,7 +240,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
         acquireLease(account.getId(), "lease-owner");
 
         // when, then
-        assertThatThrownBy(() -> pagePersistenceService.persistPage(
+        assertThatThrownBy(() -> persistProviderPage(
                 integration.getId(),
                 account.getId(),
                 "different-run",
@@ -249,7 +266,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
         acquireLease(account.getId(), "token-run");
 
         // when, then
-        assertThatThrownBy(() -> pagePersistenceService.persistLastPageAndFinalize(
+        assertThatThrownBy(() -> persistProviderPage(
                 integration.getId(),
                 account.getId(),
                 "token-run",
@@ -284,7 +301,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
         );
 
         // when, then
-        assertThatThrownBy(() -> pagePersistenceService.persistLastPageAndFinalize(
+        assertThatThrownBy(() -> persistProviderPage(
                 integration.getId(),
                 account.getId(),
                 "invalid-range-run",
@@ -315,7 +332,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
         );
 
         // when, then
-        assertThatThrownBy(() -> pagePersistenceService.persistLastPageAndFinalize(
+        assertThatThrownBy(() -> persistProviderPage(
                 integration.getId(),
                 account.getId(),
                 "duplicate-run",
@@ -337,7 +354,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
                 integration(account.getId())
         );
         acquireLease(account.getId(), "first-run");
-        pagePersistenceService.persistLastPageAndFinalize(
+        persistProviderPage(
                 integration.getId(),
                 account.getId(),
                 "first-run",
@@ -358,7 +375,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
                 timedStart(),
                 timedEnd()
         );
-        pagePersistenceService.persistLastPageAndFinalize(
+        persistProviderPage(
                 integration.getId(),
                 account.getId(),
                 "second-run",
@@ -372,71 +389,388 @@ class GoogleCalendarEventPagePersistenceServiceTest {
                 Instant.parse("2026-07-01T00:00:00Z"),
                 Instant.parse("2026-07-02T00:00:00Z")
         )).isEmpty();
+        assertThat(recurrenceEventRepository.count()).isOne();
     }
 
     @Test
     @Transactional
-    @DisplayName("기존 sync는 recurrence event와 override를 skip하고 foundation row를 생성하지 않는다")
-    void givenRecurringItems_whenPersistPage_thenKeepsRecurrenceFoundationInert() {
+    @DisplayName("recurrence-event와 active/cancelled override 재처리는 하나의 aggregate로 수렴한다")
+    void givenNormalizedRecurrenceReplay_whenPersistPages_thenUpsertsCanonicalAggregate() {
         // given
         Account account = accountRepository.saveAndFlush(new Account());
+        Tag defaultTag = tagRepository.saveAndFlush(new Tag(TagType.DEFAULT, "기타", "#64748B"));
         GoogleCalendarIntegration integration = integrationRepository.saveAndFlush(
                 integration(account.getId())
         );
-        GoogleCalendarEventItem recurrenceEventItem = new GoogleCalendarEventItem(
-                "recurrence-event-id",
-                "confirmed",
-                null,
-                null,
+        acquireLease(account.getId(), "recurrence-run");
+        NormalizedEventSchedule recurrenceSchedule = new NormalizedEventSchedule(
+                Instant.parse("2026-07-01T09:00:00Z"),
+                Instant.parse("2026-07-01T10:00:00Z"),
+                false,
+                "UTC"
+        );
+        RecurrenceEventUpsert recurrenceEvent = new RecurrenceEventUpsert(
+                "recurrence-event-1",
+                "recurrence-etag-1",
+                Instant.parse("2026-07-01T08:00:00Z"),
                 "Daily",
                 null,
-                List.of("RRULE:FREQ=DAILY"),
-                null,
-                null,
-                timedStart(),
-                timedEnd()
+                recurrenceSchedule,
+                List.of("RRULE:FREQ=DAILY")
         );
-        GoogleCalendarEventItem recurrenceOverrideItem = new GoogleCalendarEventItem(
-                "recurrence-override-id",
-                "confirmed",
-                null,
-                null,
+        ActiveRecurrenceEventOverrideUpsert activeOverride =
+                new ActiveRecurrenceEventOverrideUpsert(
+                "exception-1",
+                "recurrence-event-1",
+                Instant.parse("2026-07-02T09:00:00Z"),
+                "override-etag-1",
+                Instant.parse("2026-07-02T07:00:00Z"),
                 "Moved",
-                null,
-                List.of(),
-                "recurrence-event-id",
-                timedStart(),
-                new GoogleCalendarEventTime(
-                        null,
-                        "2026-07-02T09:00:00Z",
-                        "UTC"
-                ),
-                new GoogleCalendarEventTime(
-                        null,
-                        "2026-07-02T10:00:00Z",
+                "Final snapshot",
+                new NormalizedEventSchedule(
+                        Instant.parse("2026-07-02T11:00:00Z"),
+                        Instant.parse("2026-07-02T12:00:00Z"),
+                        false,
                         "UTC"
                 )
         );
-        acquireLease(account.getId(), "inert-run");
-
-        // when
-        pagePersistenceService.persistLastPageAndFinalize(
+        pagePersistenceService.persistNormalizedPage(
                 integration.getId(),
                 account.getId(),
-                "inert-run",
-                new GoogleCalendarEventPage(
-                        List.of(recurrenceEventItem, recurrenceOverrideItem),
+                "recurrence-run",
+                new GoogleCalendarNormalizedPage(
+                        List.of(recurrenceEvent, activeOverride),
                         null,
-                        "cursor-1",
-                        "UTC"
+                        "cursor"
+                )
+        );
+
+        // when
+        CancelledRecurrenceEventOverrideUpsert cancelledOverride =
+                new CancelledRecurrenceEventOverrideUpsert(
+                "exception-1",
+                "recurrence-event-1",
+                Instant.parse("2026-07-02T09:00:00Z"),
+                "override-etag-2",
+                Instant.parse("2026-07-02T08:00:00Z")
+        );
+        RecurrenceEventUpsert updatedRecurrenceEvent = new RecurrenceEventUpsert(
+                "recurrence-event-1",
+                "recurrence-etag-2",
+                Instant.parse("2026-07-03T08:00:00Z"),
+                "Changed",
+                "Google description",
+                recurrenceSchedule,
+                List.of("RRULE:FREQ=WEEKLY")
+        );
+        pagePersistenceService.persistNormalizedPage(
+                integration.getId(),
+                account.getId(),
+                "recurrence-run",
+                new GoogleCalendarNormalizedPage(
+                        List.of(
+                                updatedRecurrenceEvent,
+                                cancelledOverride
+                        ),
+                        null,
+                        "cursor"
                 )
         );
 
         // then
-        assertThat(recurrenceEventRepository.count()).isZero();
-        assertThat(recurrenceEventOverrideRepository.count()).isZero();
+        assertThat(recurrenceEventRepository.findAll()).singleElement().satisfies(recurrence -> {
+            assertThat(recurrence.getRecurrenceTitle()).isEqualTo("Changed");
+            assertThat(recurrence.getTag().getId()).isEqualTo(defaultTag.getId());
+            assertThat(recurrence.getRecurrenceRules()).containsExactly("RRULE:FREQ=WEEKLY");
+        });
+        assertThat(recurrenceEventOverrideRepository.findAll()).singleElement().satisfies(override -> {
+            assertThat(override.getOriginStartAt())
+                    .isEqualTo(Instant.parse("2026-07-02T09:00:00Z"));
+            assertThat(override.isDeleted()).isTrue();
+        });
+        assertThat(recurrenceEventMappingRepository.findAll())
+                .singleElement()
+                .satisfies(mapping -> {
+                    assertThat(mapping.getProviderEtag()).isEqualTo("recurrence-etag-2");
+                    assertThat(mapping.getProviderUpdatedAt())
+                            .isEqualTo(Instant.parse("2026-07-03T08:00:00Z"));
+                });
+        assertThat(recurrenceOverrideMappingRepository.findAll())
+                .singleElement()
+                .satisfies(mapping -> {
+                    assertThat(mapping.getProviderEtag()).isEqualTo("override-etag-2");
+                    assertThat(mapping.getProviderUpdatedAt())
+                            .isEqualTo(Instant.parse("2026-07-02T08:00:00Z"));
+                });
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("동일 override external ID가 다른 recurrence-event를 참조하면 저장하지 않는다")
+    void givenOverrideExternalIdMappedToDifferentRecurrenceEvent_whenPersistPage_thenRejectsResponse() {
+        // given
+        Account account = accountRepository.saveAndFlush(new Account());
+        tagRepository.saveAndFlush(new Tag(TagType.DEFAULT, "기타", "#64748B"));
+        GoogleCalendarIntegration integration = integrationRepository.saveAndFlush(
+                integration(account.getId())
+        );
+        acquireLease(account.getId(), "cross-parent-run");
+        NormalizedEventSchedule recurrenceSchedule = new NormalizedEventSchedule(
+                Instant.parse("2026-07-01T09:00:00Z"),
+                Instant.parse("2026-07-01T10:00:00Z"),
+                false,
+                "UTC"
+        );
+        RecurrenceEventUpsert firstRecurrenceEvent = new RecurrenceEventUpsert(
+                "recurrence-event-a",
+                null,
+                null,
+                "First recurrence event",
+                null,
+                recurrenceSchedule,
+                List.of("RRULE:FREQ=DAILY")
+        );
+        RecurrenceEventUpsert secondRecurrenceEvent = new RecurrenceEventUpsert(
+                "recurrence-event-b",
+                null,
+                null,
+                "Second recurrence event",
+                null,
+                recurrenceSchedule,
+                List.of("RRULE:FREQ=WEEKLY")
+        );
+        ActiveRecurrenceEventOverrideUpsert firstOverride =
+                recurrenceOverride("shared-override", "recurrence-event-a");
+        pagePersistenceService.persistNormalizedPage(
+                integration.getId(),
+                account.getId(),
+                "cross-parent-run",
+                new GoogleCalendarNormalizedPage(
+                        List.of(firstRecurrenceEvent, secondRecurrenceEvent, firstOverride),
+                        null,
+                        "cursor"
+                )
+        );
+        ActiveRecurrenceEventOverrideUpsert conflictingOverride =
+                recurrenceOverride("shared-override", "recurrence-event-b");
+
+        // when, then
+        assertThatThrownBy(() -> pagePersistenceService.persistNormalizedPage(
+                integration.getId(),
+                account.getId(),
+                "cross-parent-run",
+                new GoogleCalendarNormalizedPage(
+                        List.of(conflictingOverride),
+                        null,
+                        "cursor"
+                )
+        )).isInstanceOfSatisfying(CalioException.class, exception ->
+                assertThat(exception.getErrorCode())
+                        .isEqualTo(ErrorCode.GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID));
+        assertThat(recurrenceEventOverrideRepository.count()).isOne();
+        assertThat(recurrenceOverrideMappingRepository.findAll())
+                .singleElement()
+                .satisfies(mapping -> {
+                    assertThat(mapping.getExternalEventId()).isEqualTo("shared-override");
+                    assertThat(mapping.getRecurrenceEventMapping().getExternalEventId())
+                            .isEqualTo("recurrence-event-a");
+                });
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("같은 page에서 override보다 먼저 온 recurrence-event cancellation도 aggregate를 삭제한다")
+    void givenCancellationBeforeOverride_whenPersistPage_thenDeletesRecurrenceAggregate() {
+        // given
+        Account account = accountRepository.saveAndFlush(new Account());
+        tagRepository.saveAndFlush(new Tag(TagType.DEFAULT, "기타", "#64748B"));
+        GoogleCalendarIntegration integration = integrationRepository.saveAndFlush(
+                integration(account.getId())
+        );
+        acquireLease(account.getId(), "recurrence-cancellation-run");
+        RecurrenceEventUpsert recurrenceEvent = new RecurrenceEventUpsert(
+                "recurrence-event-1",
+                null,
+                null,
+                "Daily",
+                null,
+                new NormalizedEventSchedule(
+                        Instant.parse("2026-07-01T09:00:00Z"),
+                        Instant.parse("2026-07-01T10:00:00Z"),
+                        false,
+                        "UTC"
+                ),
+                List.of("RRULE:FREQ=DAILY")
+        );
+        ActiveRecurrenceEventOverrideUpsert override =
+                new ActiveRecurrenceEventOverrideUpsert(
+                        "override-1",
+                        "recurrence-event-1",
+                        Instant.parse("2026-07-02T09:00:00Z"),
+                        null,
+                        null,
+                        "Moved",
+                        null,
+                        new NormalizedEventSchedule(
+                                Instant.parse("2026-07-02T11:00:00Z"),
+                                Instant.parse("2026-07-02T12:00:00Z"),
+                                false,
+                                "UTC"
+                        )
+                );
+        pagePersistenceService.persistNormalizedPage(
+                integration.getId(),
+                account.getId(),
+                "recurrence-cancellation-run",
+                new GoogleCalendarNormalizedPage(
+                        List.of(recurrenceEvent, override),
+                        null,
+                        "cursor-1"
+                )
+        );
+
+        // when
+        GoogleCalendarNormalizedPage normalizedPage = pageNormalizer.normalize(
+                integration.getId(),
+                new GoogleCalendarEventPage(
+                        List.of(
+                                cancelledItem("recurrence-event-1"),
+                                deletedRecurrenceOccurrence(
+                                        "override-1",
+                                        "recurrence-event-1"
+                                )
+                        ),
+                        null,
+                        "cursor-2",
+                        "UTC"
+                ),
+                new GoogleCalendarSyncRunContext("access-token")
+        );
+        pagePersistenceService.persistNormalizedPage(
+                integration.getId(),
+                account.getId(),
+                "recurrence-cancellation-run",
+                normalizedPage
+        );
+
+        // then
         assertThat(recurrenceEventMappingRepository.count()).isZero();
         assertThat(recurrenceOverrideMappingRepository.count()).isZero();
+        assertThat(recurrenceEventRepository.count()).isZero();
+        assertThat(recurrenceEventOverrideRepository.count()).isZero();
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("FULL reconciliation은 unseen provider aggregate를 batch로 삭제하고 sync를 완료한다")
+    void givenUnseenProviderData_whenFinalizeFullSync_thenDeletesInBatches() {
+        // given
+        Account account = accountRepository.saveAndFlush(new Account());
+        Tag defaultTag = tagRepository.saveAndFlush(
+                new Tag(TagType.DEFAULT, "기타", "#64748B")
+        );
+        GoogleCalendarIntegration integration = integrationRepository.saveAndFlush(
+                integration(account.getId())
+        );
+        acquireLease(account.getId(), "full-reconciliation-run");
+        NormalizedEventSchedule eventSchedule = new NormalizedEventSchedule(
+                Instant.parse("2026-07-01T09:00:00Z"),
+                Instant.parse("2026-07-01T10:00:00Z"),
+                false,
+                "UTC"
+        );
+        List<Event> events = new ArrayList<>();
+        for (int index = 0; index <= 500; index++) {
+            events.add(new Event(
+                    "Event " + index,
+                    null,
+                    eventSchedule.startAt(),
+                    eventSchedule.endAt(),
+                    false,
+                    "UTC",
+                    null,
+                    defaultTag,
+                    account
+            ));
+        }
+        eventRepository.saveAllAndFlush(events);
+        List<GoogleCalendarEventMapping> mappings = new ArrayList<>();
+        for (int index = 0; index < events.size(); index++) {
+            mappings.add(new GoogleCalendarEventMapping(
+                    integration,
+                    events.get(index),
+                    "event-" + index,
+                    null,
+                    null
+            ));
+        }
+        mappingRepository.saveAllAndFlush(mappings);
+        RecurrenceEventUpsert recurrenceEvent = new RecurrenceEventUpsert(
+                "recurrence-event-1",
+                null,
+                null,
+                "Daily",
+                null,
+                eventSchedule,
+                List.of("RRULE:FREQ=DAILY")
+        );
+        ActiveRecurrenceEventOverrideUpsert override =
+                new ActiveRecurrenceEventOverrideUpsert(
+                        "override-1",
+                        "recurrence-event-1",
+                        Instant.parse("2026-07-02T09:00:00Z"),
+                        null,
+                        null,
+                        "Moved",
+                        null,
+                        new NormalizedEventSchedule(
+                                Instant.parse("2026-07-02T11:00:00Z"),
+                                Instant.parse("2026-07-02T12:00:00Z"),
+                                false,
+                                "UTC"
+                        )
+                );
+        pagePersistenceService.persistNormalizedPage(
+                integration.getId(),
+                account.getId(),
+                "full-reconciliation-run",
+                new GoogleCalendarNormalizedPage(
+                        List.of(
+                                recurrenceEvent,
+                                override
+                        ),
+                        null,
+                        "next-sync-token"
+                )
+        );
+
+        // when
+        providerDataService.finalizeOwnedReconciliation(
+                1L,
+                account.getId(),
+                integration.getId(),
+                "full-reconciliation-run",
+                GoogleCalendarSyncMode.FULL,
+                Set.of(),
+                Set.of(),
+                Set.of(),
+                "next-sync-token"
+        );
+
+        // then
+        assertThat(mappingRepository.count()).isZero();
+        assertThat(recurrenceEventMappingRepository.count()).isZero();
+        assertThat(recurrenceOverrideMappingRepository.count()).isZero();
+        assertThat(eventRepository.count()).isZero();
+        assertThat(recurrenceEventRepository.count()).isZero();
+        assertThat(recurrenceEventOverrideRepository.count()).isZero();
+        assertThat(integrationRepository.findById(integration.getId()))
+                .get()
+                .satisfies(completed -> {
+                    assertThat(completed.getNextSyncToken()).isEqualTo("next-sync-token");
+                    assertThat(completed.getActiveSyncRunId()).isNull();
+                    assertThat(completed.getSyncLeaseExpiresAt()).isNull();
+                });
     }
 
     @Test
@@ -450,7 +784,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
                 integration(account.getId())
         );
         acquireLease(account.getId(), "first-run");
-        pagePersistenceService.persistLastPageAndFinalize(
+        persistProviderPage(
                 integration.getId(),
                 account.getId(),
                 "first-run",
@@ -467,14 +801,14 @@ class GoogleCalendarEventPagePersistenceServiceTest {
 
         // when
         acquireLease(account.getId(), "second-run");
-        pagePersistenceService.persistLastPageAndFinalize(
+        persistProviderPage(
                 integration.getId(),
                 account.getId(),
                 "second-run",
                 page(cancelledItem("external-blank"), "cursor-2")
         );
         acquireLease(account.getId(), "third-run");
-        pagePersistenceService.persistLastPageAndFinalize(
+        persistProviderPage(
                 integration.getId(),
                 account.getId(),
                 "third-run",
@@ -488,6 +822,40 @@ class GoogleCalendarEventPagePersistenceServiceTest {
 
     private void acquireLease(Long accountId, String runId) {
         assertThat(integrationRepository.acquireSyncLease(accountId, runId)).isOne();
+    }
+
+    private void persistProviderPage(
+            Long integrationId,
+            Long accountId,
+            String runId,
+            GoogleCalendarEventPage page
+    ) {
+        GoogleCalendarSyncRunContext context = new GoogleCalendarSyncRunContext("access-token");
+        GoogleCalendarNormalizedPage normalizedPage = pageNormalizer.normalize(
+                integrationId,
+                page,
+                context
+        );
+        pagePersistenceService.persistNormalizedPage(
+                integrationId,
+                accountId,
+                runId,
+                normalizedPage
+        );
+        if (page.hasNextPage()) {
+            return;
+        }
+        providerDataService.finalizeOwnedReconciliation(
+                1L,
+                accountId,
+                integrationId,
+                runId,
+                GoogleCalendarSyncMode.INCREMENTAL,
+                context.seenEventIds(),
+                context.seenRecurrenceEventIds(),
+                context.seenRecurrenceEventOverrideIds(),
+                page.nextSyncToken()
+        );
     }
 
     private GoogleCalendarEventPage page(
@@ -504,12 +872,12 @@ class GoogleCalendarEventPagePersistenceServiceTest {
     private GoogleCalendarEventItem timedItem(
             String id,
             String summary,
-            String providerEtag
+            String googleEtag
     ) {
         return new GoogleCalendarEventItem(
                 id,
                 "confirmed",
-                providerEtag,
+                googleEtag,
                 Instant.parse("2026-07-01T00:00:00Z"),
                 summary,
                 "Description",
@@ -547,6 +915,46 @@ class GoogleCalendarEventPagePersistenceServiceTest {
                 null,
                 null,
                 null
+        );
+    }
+
+    private GoogleCalendarEventItem deletedRecurrenceOccurrence(
+            String id,
+            String recurrenceEventId
+    ) {
+        return new GoogleCalendarEventItem(
+                id,
+                "cancelled",
+                null,
+                Instant.parse("2026-07-02T08:00:00Z"),
+                null,
+                null,
+                List.of(),
+                recurrenceEventId,
+                new GoogleCalendarEventTime(null, "2026-07-02T09:00:00Z", "UTC"),
+                null,
+                null
+        );
+    }
+
+    private ActiveRecurrenceEventOverrideUpsert recurrenceOverride(
+            String externalEventId,
+            String recurrenceEventExternalId
+    ) {
+        return new ActiveRecurrenceEventOverrideUpsert(
+                externalEventId,
+                recurrenceEventExternalId,
+                Instant.parse("2026-07-02T09:00:00Z"),
+                null,
+                null,
+                "Moved",
+                null,
+                new NormalizedEventSchedule(
+                        Instant.parse("2026-07-02T11:00:00Z"),
+                        Instant.parse("2026-07-02T12:00:00Z"),
+                        false,
+                        "UTC"
+                )
         );
     }
 

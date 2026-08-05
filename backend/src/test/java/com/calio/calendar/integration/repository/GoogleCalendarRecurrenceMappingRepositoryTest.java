@@ -118,10 +118,10 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
                 ))
                 .map(GoogleCalendarRecurrenceEventMapping::getProviderEtag)
                 .contains(etag);
-        assertThat(overrideMappingRepository.findAllByExternalIdentity(
+        assertThat(overrideMappingRepository.findAllWithRecurrenceEventMappingByExternalEventIds(
                 integration.getId(),
                 GoogleCalendarRecurrenceEventMapping.PRIMARY_CALENDAR_KEY,
-                externalRecurrenceOverrideId
+                List.of(externalRecurrenceOverrideId)
         )).extracting(GoogleCalendarRecurrenceOverrideMapping::getId)
                 .containsExactly(overrideMapping.getId());
         assertThat(eventMapping.getCreatedAt()).isNotNull();

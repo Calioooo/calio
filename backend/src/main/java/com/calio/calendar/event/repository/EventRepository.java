@@ -3,6 +3,7 @@ package com.calio.calendar.event.repository;
 import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.tag.domain.Tag;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -17,6 +18,12 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     @Modifying(flushAutomatically = true)
     @Query("delete from Event event where event.id in :eventIds")
     int deleteAllByIds(@Param("eventIds") List<Long> eventIds);
+
+    @Modifying(flushAutomatically = true)
+    @Query("delete from Event event where event.recurrenceId in :recurrenceEventIds")
+    int deleteAllByRecurrenceEventIds(
+            @Param("recurrenceEventIds") Collection<Long> recurrenceEventIds
+    );
 
     @Query("""
             select event
