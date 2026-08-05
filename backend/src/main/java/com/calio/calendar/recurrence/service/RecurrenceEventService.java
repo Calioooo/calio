@@ -2,6 +2,7 @@ package com.calio.calendar.recurrence.service;
 
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
+import com.calio.calendar.common.domain.CanonicalSchedule;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.event.controller.dto.EventResponse;
@@ -18,9 +19,8 @@ import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.service.TagService;
 import java.time.Instant;
-import java.time.LocalTime;
-import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -85,7 +85,6 @@ public class RecurrenceEventService {
 
         recurrenceEvent.update(request.title(), request.description(), schedule, recurrenceRules, tag);
         recurrenceEventRepository.flush();
-        recurrenceEventOverrideRepository.deleteByRecurrenceEvent_Id(recurrenceId);
         return RecurrenceEventResponse.from(recurrenceEvent);
     }
 
@@ -96,20 +95,27 @@ public class RecurrenceEventService {
             UpdateRecurrenceOccurrenceRequest request
     ) {
         RecurrenceEvent recurrenceEvent = findRecurrenceEventForUpdate(accountId, recurrenceId);
-        validateOverrideSchedule(recurrenceEvent, request.startAt(), request.endAt());
-        validateOriginStartAt(recurrenceEvent, request.originStartAt());
-
-        RecurrenceEventOverride override = recurrenceEventOverrideRepository
-                .findByRecurrenceEvent_IdAndOriginStartAt(recurrenceId, request.originStartAt())
-                .orElseGet(() -> RecurrenceEventOverride.active(
-                        recurrenceEvent,
-                        request.originStartAt(),
-                        request.title(),
-                        request.description(),
-                        request.startAt(),
-                        request.endAt()
-                ));
-        override.activate(request.title(), request.description(), request.startAt(), request.endAt());
+        CanonicalSchedule schedule = CanonicalSchedule.recurrenceOverride(
+                request.startAt(),
+                request.endAt(),
+                request.allDay(),
+                request.timeZone()
+        );
+        Optional<RecurrenceEventOverride> existingOverride =
+                findOverrideOrRejectIneligible(recurrenceEvent, request.originStartAt());
+        RecurrenceEventOverride override;
+        if (existingOverride.isPresent()) {
+            override = existingOverride.get();
+            override.activate(request.title(), request.description(), schedule);
+        } else {
+            override = RecurrenceEventOverride.active(
+                    recurrenceEvent,
+                    request.originStartAt(),
+                    request.title(),
+                    request.description(),
+                    schedule
+            );
+        }
         recurrenceEventOverrideRepository.saveAndFlush(override);
         return EventResponse.recurrenceOverride(override);
     }
@@ -127,12 +133,16 @@ public class RecurrenceEventService {
     @Transactional
     public void deleteRecurrenceOccurrence(Long accountId, Long recurrenceId, Instant originStartAt) {
         RecurrenceEvent recurrenceEvent = findRecurrenceEventForUpdate(accountId, recurrenceId);
-        validateOriginStartAt(recurrenceEvent, originStartAt);
-
-        RecurrenceEventOverride override = recurrenceEventOverrideRepository
-                .findByRecurrenceEvent_IdAndOriginStartAt(recurrenceId, originStartAt)
-                .orElseGet(() -> RecurrenceEventOverride.deleted(recurrenceEvent, originStartAt, Instant.now()));
-        override.markDeleted(Instant.now());
+        Optional<RecurrenceEventOverride> existingOverride =
+                findOverrideOrRejectIneligible(recurrenceEvent, originStartAt);
+        Instant deletedAt = Instant.now();
+        RecurrenceEventOverride override;
+        if (existingOverride.isPresent()) {
+            override = existingOverride.get();
+            override.markDeleted(deletedAt);
+        } else {
+            override = RecurrenceEventOverride.deleted(recurrenceEvent, originStartAt, deletedAt);
+        }
         recurrenceEventOverrideRepository.saveAndFlush(override);
     }
 
@@ -154,32 +164,24 @@ public class RecurrenceEventService {
         );
     }
 
-    private void validateOverrideSchedule(RecurrenceEvent recurrenceEvent, Instant startAt, Instant endAt) {
-        if (!startAt.isBefore(endAt)) {
-            throw new CalioException(ErrorCode.INVALID_RECURRENCE_SCHEDULE);
+    private Optional<RecurrenceEventOverride> findOverrideOrRejectIneligible(
+            RecurrenceEvent recurrenceEvent,
+            Instant originStartAt
+    ) {
+        Optional<RecurrenceEventOverride> existingOverride = recurrenceEventOverrideRepository
+                .findByRecurrenceEvent_IdAndOriginStartAt(recurrenceEvent.getId(), originStartAt);
+        if (existingOverride.isEmpty() && !recurrenceContainsOrigin(recurrenceEvent, originStartAt)) {
+            throw new CalioException(ErrorCode.RECURRENCE_OCCURRENCE_NOT_FOUND);
         }
-        if (!recurrenceEvent.isAllDay()) {
-            return;
-        }
-        boolean usesUtcMidnight = isUtcMidnight(startAt) && isUtcMidnight(endAt);
-        if (!usesUtcMidnight) {
-            throw new CalioException(ErrorCode.INVALID_RECURRENCE_SCHEDULE);
-        }
+        return existingOverride;
     }
 
-    private boolean isUtcMidnight(Instant instant) {
-        return instant.atOffset(ZoneOffset.UTC).toLocalTime().equals(LocalTime.MIDNIGHT);
-    }
-
-    private void validateOriginStartAt(RecurrenceEvent recurrenceEvent, Instant originStartAt) {
-        boolean exists = recurrenceEngine.containsOrigin(
+    private boolean recurrenceContainsOrigin(RecurrenceEvent recurrenceEvent, Instant originStartAt) {
+        return recurrenceEngine.containsOrigin(
                 RecurrenceSchedule.from(recurrenceEvent),
                 recurrenceEvent.getRecurrenceRules(),
                 originStartAt
         );
-        if (!exists) {
-            throw new CalioException(ErrorCode.RECURRENCE_OCCURRENCE_NOT_FOUND);
-        }
     }
 
     private RecurrenceEvent findRecurrenceEvent(Long accountId, Long recurrenceId) {

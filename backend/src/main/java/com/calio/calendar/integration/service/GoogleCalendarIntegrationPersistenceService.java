@@ -2,7 +2,9 @@ package com.calio.calendar.integration.service;
 
 import com.calio.calendar.integration.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.repository.GoogleCalendarIntegrationRepository;
+import com.calio.calendar.integration.repository.GoogleOperationJobRepository;
 import java.time.Instant;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -10,11 +12,18 @@ import org.springframework.transaction.annotation.Transactional;
 public class GoogleCalendarIntegrationPersistenceService {
 
     private final GoogleCalendarIntegrationRepository googleCalendarIntegrationRepository;
+    private final GoogleCalendarProviderDataService providerDataService;
+    private final GoogleOperationJobRepository jobRepository;
 
+    @Autowired
     public GoogleCalendarIntegrationPersistenceService(
-            GoogleCalendarIntegrationRepository googleCalendarIntegrationRepository
+            GoogleCalendarIntegrationRepository googleCalendarIntegrationRepository,
+            GoogleCalendarProviderDataService providerDataService,
+            GoogleOperationJobRepository jobRepository
     ) {
         this.googleCalendarIntegrationRepository = googleCalendarIntegrationRepository;
+        this.providerDataService = providerDataService;
+        this.jobRepository = jobRepository;
     }
 
     @Transactional
@@ -27,7 +36,7 @@ public class GoogleCalendarIntegrationPersistenceService {
             Instant accessTokenExpiresAt,
             Instant connectedAt
     ) {
-        return googleCalendarIntegrationRepository.findByAccountId(accountId)
+        return googleCalendarIntegrationRepository.findByAccountIdForUpdate(accountId)
                 .map(integration -> replace(
                         integration,
                         googleSubject,
@@ -57,6 +66,7 @@ public class GoogleCalendarIntegrationPersistenceService {
             Instant accessTokenExpiresAt,
             Instant connectedAt
     ) {
+        providerDataService.deleteProviderData(integration.getId());
         integration.replace(
                 googleSubject,
                 googleEmail,
@@ -75,6 +85,11 @@ public class GoogleCalendarIntegrationPersistenceService {
 
     @Transactional
     public void deleteByAccountId(Long accountId) {
-        googleCalendarIntegrationRepository.deleteByAccountId(accountId);
+        googleCalendarIntegrationRepository.findByAccountIdForUpdate(accountId)
+                .ifPresent(integration -> {
+                    jobRepository.deleteByIntegrationId(integration.getId());
+                    providerDataService.deleteProviderData(integration.getId());
+                    googleCalendarIntegrationRepository.delete(integration);
+                });
     }
 }

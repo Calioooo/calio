@@ -2,6 +2,7 @@ package com.calio.calendar.integration.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
 
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
@@ -12,6 +13,8 @@ import com.calio.calendar.external.google.dto.GoogleUserInfoResponse;
 import com.calio.calendar.integration.controller.dto.GoogleCalendarConnectRequest;
 import com.calio.calendar.integration.controller.dto.GoogleCalendarIntegrationResponse;
 import com.calio.calendar.integration.domain.GoogleCalendarIntegration;
+import com.calio.calendar.integration.repository.GoogleCalendarIntegrationRepository;
+import com.calio.calendar.integration.repository.GoogleOperationJobRepository;
 import com.calio.calendar.security.TokenEncryptionConfig;
 import com.calio.calendar.security.TokenEncryptionProperties;
 import com.calio.calendar.security.TokenEncryptor;
@@ -218,7 +221,11 @@ class GoogleCalendarIntegrationServiceTest {
         private GoogleCalendarIntegration integration;
 
         FakePersistenceService() {
-            super(null);
+            super(
+                    mock(GoogleCalendarIntegrationRepository.class),
+                    mock(GoogleCalendarProviderDataService.class),
+                    mock(GoogleOperationJobRepository.class)
+            );
         }
 
         @Override

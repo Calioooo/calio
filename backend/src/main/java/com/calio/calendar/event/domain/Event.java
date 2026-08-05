@@ -23,10 +23,10 @@ public class Event extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String title;
 
-    @Column
+    @Column(columnDefinition = "TEXT")
     private String description;
 
     @Column(nullable = false)
@@ -34,6 +34,12 @@ public class Event extends BaseEntity {
 
     @Column(nullable = false)
     private Instant endAt;
+
+    @Column(name = "all_day", nullable = false)
+    private boolean allDay;
+
+    @Column(name = "time_zone")
+    private String timeZone;
 
     @Column(name = "important_event", nullable = false, columnDefinition = "boolean default false")
     private boolean importantEvent = false;
@@ -57,6 +63,8 @@ public class Event extends BaseEntity {
             String description,
             Instant startAt,
             Instant endAt,
+            boolean allDay,
+            String timeZone,
             Long recurrenceId,
             Tag tag,
             Account account
@@ -65,20 +73,39 @@ public class Event extends BaseEntity {
         this.description = description;
         this.startAt = startAt;
         this.endAt = endAt;
+        this.allDay = allDay;
+        this.timeZone = timeZone;
         this.recurrenceId = recurrenceId;
         this.tag = tag;
         this.account = account;
     }
 
-    public void replace(String title, String description, Instant startAt, Instant endAt) {
+    public void replace(
+            String title,
+            String description,
+            Instant startAt,
+            Instant endAt,
+            boolean allDay,
+            String timeZone
+    ) {
         this.title = title;
         this.description = description;
         this.startAt = startAt;
         this.endAt = endAt;
+        this.allDay = allDay;
+        this.timeZone = timeZone;
     }
 
-    public void replace(String title, String description, Instant startAt, Instant endAt, Tag tag) {
-        replace(title, description, startAt, endAt);
+    public void replace(
+            String title,
+            String description,
+            Instant startAt,
+            Instant endAt,
+            boolean allDay,
+            String timeZone,
+            Tag tag
+    ) {
+        replace(title, description, startAt, endAt, allDay, timeZone);
         changeTag(tag);
     }
 
@@ -108,6 +135,14 @@ public class Event extends BaseEntity {
 
     public Instant getEndAt() {
         return endAt;
+    }
+
+    public boolean isAllDay() {
+        return allDay;
+    }
+
+    public String getTimeZone() {
+        return timeZone;
     }
 
     public boolean importantEvent() {

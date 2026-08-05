@@ -23,13 +23,11 @@
 
 ## 공통 용어
 
-- `event`: 캘린더에 표시되는 기본 일정 단위
-- `all-day-event`: 특정 timezone 기준 하루 전체를 차지하는 일정
-- `repeat-event`: 반복 일정
-- `startAt`: 일정 시작 시각
-- `endAt`: 일정 종료 시각
-- `conflict`: 허용되지 않는 일정 겹침 상태
-- `availability`: 일정 집합으로부터 계산된 사용 가능 상태
+- `event`: 캘린더에 표시되는 기본 일정 단위다. 독립 일정과 반복 일정의 개별 회차를 포괄한다.
+- `recurrence-event`: 반복 규칙을 가지며 여러 개의 반복 회차를 생성하는 일정 시리즈다. 개별 회차 자체를 의미하지 않는다.
+- `recurrence-occurrence`: `recurrence-event`에 속하는 개별 일정 회차다.
+- `recurrence-event-override`: 특정 `recurrence-occurrence`의 시간이나 내용을 변경하거나 해당 회차를 제외한 상태다.
+- `all-day-event`: 특정 시각이 아니라 하나 이상의 날짜 전체를 차지하는 일정이다.
 
 ## 테스트 원칙
 

@@ -3,15 +3,18 @@ package com.calio.calendar.external.google;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.external.google.dto.GoogleTokenResponse;
+import com.calio.calendar.external.google.dto.GoogleAccessTokenRefreshResponse;
 import com.calio.calendar.external.google.dto.GoogleUserInfoResponse;
 import java.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -29,6 +32,7 @@ public class GoogleOAuthClient {
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
     private static final Duration READ_TIMEOUT = Duration.ofSeconds(15);
     private static final String AUTHORIZATION_CODE_GRANT = "authorization_code";
+    private static final String REFRESH_TOKEN_GRANT = "refresh_token";
     private static final String INVALID_TOKEN_ERROR = "invalid_token";
 
     private final GoogleOAuthProperties properties;
@@ -56,42 +60,78 @@ public class GoogleOAuthClient {
 
     public GoogleTokenResponse exchangeAuthorizationCode(String authorizationCode) {
         try {
-            String responseBody = restClient.post()
+            GoogleTokenResponse response = restClient.post()
                     .uri(properties.getTokenUrl())
                     .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                     .body(tokenExchangeForm(authorizationCode))
                     .retrieve()
-                    .body(String.class);
-            return GoogleTokenResponse.fromJson(responseBody, objectMapper);
+                    .body(GoogleTokenResponse.class);
+            if (response == null) {
+                throw new CalioException(ErrorCode.GOOGLE_TOKEN_RESPONSE_INVALID);
+            }
+            return response;
         } catch (CalioException exception) {
             logGoogleApiFailure("tokenExchange", exception.getErrorCode(), exception);
             throw exception;
-        } catch (JacksonException exception) {
-            logGoogleApiFailure("tokenExchange", ErrorCode.GOOGLE_TOKEN_RESPONSE_INVALID, exception);
-            throw new CalioException(ErrorCode.GOOGLE_TOKEN_RESPONSE_INVALID, exception);
         } catch (RestClientException exception) {
-            logGoogleApiFailure("tokenExchange", ErrorCode.GOOGLE_TOKEN_EXCHANGE_FAILED, exception);
-            throw new CalioException(ErrorCode.GOOGLE_TOKEN_EXCHANGE_FAILED, exception);
+            ErrorCode errorCode = isDeserializationFailure(exception)
+                    ? ErrorCode.GOOGLE_TOKEN_RESPONSE_INVALID
+                    : ErrorCode.GOOGLE_TOKEN_EXCHANGE_FAILED;
+            logGoogleApiFailure("tokenExchange", errorCode, exception);
+            throw new CalioException(errorCode, exception);
         }
     }
 
     public GoogleUserInfoResponse fetchUserInfo(String accessToken) {
         try {
-            String responseBody = restClient.get()
+            GoogleUserInfoResponse response = restClient.get()
                     .uri(properties.getUserInfoUrl())
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                     .retrieve()
-                    .body(String.class);
-            return GoogleUserInfoResponse.fromJson(responseBody, objectMapper);
+                    .body(GoogleUserInfoResponse.class);
+            if (response == null) {
+                throw new CalioException(ErrorCode.GOOGLE_USER_INFO_INVALID);
+            }
+            return response;
         } catch (CalioException exception) {
             logGoogleApiFailure("userInfoFetch", exception.getErrorCode(), exception);
             throw exception;
-        } catch (JacksonException exception) {
-            logGoogleApiFailure("userInfoFetch", ErrorCode.GOOGLE_USER_INFO_INVALID, exception);
-            throw new CalioException(ErrorCode.GOOGLE_USER_INFO_INVALID, exception);
         } catch (RestClientException exception) {
-            logGoogleApiFailure("userInfoFetch", ErrorCode.GOOGLE_USER_INFO_FETCH_FAILED, exception);
-            throw new CalioException(ErrorCode.GOOGLE_USER_INFO_FETCH_FAILED, exception);
+            ErrorCode errorCode = isDeserializationFailure(exception)
+                    ? ErrorCode.GOOGLE_USER_INFO_INVALID
+                    : ErrorCode.GOOGLE_USER_INFO_FETCH_FAILED;
+            logGoogleApiFailure("userInfoFetch", errorCode, exception);
+            throw new CalioException(errorCode, exception);
+        }
+    }
+
+    public GoogleAccessTokenRefreshResponse refreshAccessToken(String refreshToken) {
+        try {
+            GoogleAccessTokenRefreshResponse response = restClient.post()
+                    .uri(properties.getTokenUrl())
+                    .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                    .body(accessTokenRefreshForm(refreshToken))
+                    .retrieve()
+                    .body(GoogleAccessTokenRefreshResponse.class);
+            if (response == null) {
+                throw new CalioException(ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED);
+            }
+            return response;
+        } catch (CalioException exception) {
+            logGoogleApiFailure("accessTokenRefresh", exception.getErrorCode(), exception);
+            throw exception;
+        } catch (RestClientResponseException exception) {
+            ErrorCode errorCode = permanentRefreshFailure(exception)
+                    ? ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED
+                    : ErrorCode.GOOGLE_CALENDAR_SYNC_FAILED;
+            logGoogleApiFailure("accessTokenRefresh", errorCode, exception);
+            throw new CalioException(errorCode, exception);
+        } catch (RestClientException exception) {
+            ErrorCode errorCode = isDeserializationFailure(exception)
+                    ? ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED
+                    : ErrorCode.GOOGLE_CALENDAR_SYNC_FAILED;
+            logGoogleApiFailure("accessTokenRefresh", errorCode, exception);
+            throw new CalioException(errorCode, exception);
         }
     }
 
@@ -158,6 +198,25 @@ public class GoogleOAuthClient {
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
         form.add("token", token);
         return form;
+    }
+
+    private MultiValueMap<String, String> accessTokenRefreshForm(String refreshToken) {
+        MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+        form.add("refresh_token", refreshToken);
+        form.add("client_id", properties.getClientId());
+        form.add("client_secret", properties.getClientSecret());
+        form.add("grant_type", REFRESH_TOKEN_GRANT);
+        return form;
+    }
+
+    private boolean permanentRefreshFailure(RestClientResponseException exception) {
+        int status = exception.getStatusCode().value();
+        return status == HttpStatus.BAD_REQUEST.value()
+                || status == HttpStatus.UNAUTHORIZED.value();
+    }
+
+    private boolean isDeserializationFailure(RestClientException exception) {
+        return exception.contains(HttpMessageNotReadableException.class);
     }
 
     private boolean isInvalidTokenRevokeResponse(RestClientResponseException exception) {

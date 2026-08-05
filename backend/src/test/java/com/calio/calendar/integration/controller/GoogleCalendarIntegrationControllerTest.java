@@ -1,5 +1,6 @@
 package com.calio.calendar.integration.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.anonymous;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -8,13 +9,26 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.calio.calendar.external.google.GoogleCalendarSyncTokenExpiredException;
 import com.calio.calendar.external.google.GoogleOAuthClient;
 import com.calio.calendar.external.google.GoogleOAuthProperties;
+import com.calio.calendar.external.google.GoogleCalendarEventsClient;
+import com.calio.calendar.external.google.dto.GoogleCalendarEventPage;
 import com.calio.calendar.external.google.dto.GoogleTokenResponse;
 import com.calio.calendar.external.google.dto.GoogleUserInfoResponse;
+import com.calio.calendar.integration.domain.GoogleCalendarIntegration;
+import com.calio.calendar.integration.domain.GoogleCalendarSyncMode;
+import com.calio.calendar.integration.domain.GoogleOperationJob;
+import com.calio.calendar.integration.domain.GoogleOperationJobState;
+import com.calio.calendar.integration.domain.GoogleOperationJobTrigger;
 import com.calio.calendar.integration.repository.GoogleCalendarIntegrationRepository;
+import com.calio.calendar.integration.repository.GoogleOperationJobRepository;
+import com.calio.calendar.integration.service.GoogleCalendarSyncLeaseService;
+import com.calio.calendar.integration.service.GoogleOperationWorker;
 import com.calio.calendar.security.AuthenticatedAccountMockMvcTestConfig;
 import com.calio.calendar.security.WithAuthenticatedAccount;
+import java.util.ArrayList;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -26,6 +40,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.client.RestClient;
 import tools.jackson.databind.ObjectMapper;
@@ -56,12 +71,26 @@ class GoogleCalendarIntegrationControllerTest {
     private FakeGoogleOAuthClient googleOAuthClient;
 
     @Autowired
+    private FakeGoogleCalendarEventsClient googleCalendarEventsClient;
+
+    @Autowired
     private GoogleCalendarIntegrationRepository googleCalendarIntegrationRepository;
+
+    @Autowired
+    private GoogleOperationJobRepository googleOperationJobRepository;
+
+    @Autowired
+    private GoogleCalendarSyncLeaseService googleCalendarSyncLeaseService;
+
+    @MockitoBean
+    private GoogleOperationWorker googleOperationWorker;
 
     @BeforeEach
     void setUp() {
+        googleOperationJobRepository.deleteAll();
         googleCalendarIntegrationRepository.deleteAll();
         googleOAuthClient.reset();
+        googleCalendarEventsClient.reset();
     }
 
     @Test
@@ -120,6 +149,63 @@ class GoogleCalendarIntegrationControllerTest {
                 .andExpect(status().isNoContent());
     }
 
+    @Test
+    @DisplayName("연결되지 않은 Account가 sync를 요청하면 GOOGLE_CALENDAR_NOT_CONNECTED 409를 반환한다")
+    void givenNoIntegration_whenSync_thenReturnsNotConnected() throws Exception {
+        // when, then
+        mockMvc.perform(post("/api/integrations/google-calendar/sync"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.title").value("GOOGLE_CALENDAR_NOT_CONNECTED"));
+        assertThat(googleCalendarEventsClient.listCount).isZero();
+    }
+
+    @Test
+    @DisplayName("연결된 Account의 sync 요청은 실행 결과 없이 202 Accepted를 반환한다")
+    void givenConnection_whenSync_thenReturnsAcceptedWithoutOperationMetadata() throws Exception {
+        // given
+        connectGoogleCalendar();
+
+        // when, then
+        mockMvc.perform(post("/api/integrations/google-calendar/sync"))
+                .andExpect(status().isAccepted())
+                .andExpect(result -> assertThat(result.getResponse().getContentAsByteArray()).isEmpty());
+
+        GoogleCalendarIntegration integration = googleCalendarIntegrationRepository.findAll().getFirst();
+        List<GoogleOperationJob> jobs = googleOperationJobRepository.findAll();
+        assertThat(jobs).hasSize(1);
+        GoogleOperationJob job = jobs.getFirst();
+        assertThat(job.getOperationId()).isNotBlank();
+        assertThat(job.getIntegrationId()).isEqualTo(integration.getId());
+        assertThat(job.getAccountId()).isEqualTo(integration.getAccountId());
+        assertThat(job.getAccountSequence()).isEqualTo(1L);
+        assertThat(job.getKind()).isEqualTo(GoogleOperationJob.SYNC_KIND);
+        assertThat(job.getTrigger()).isEqualTo(GoogleOperationJobTrigger.MANUAL);
+        assertThat(job.getState()).isEqualTo(GoogleOperationJobState.PENDING);
+        assertThat(job.getRunnableAt()).isNotNull();
+        assertThat(job.getRetryCount()).isZero();
+        assertThat(job.getOwnerToken()).isNull();
+    }
+
+    private void connectGoogleCalendar() throws Exception {
+        googleOAuthClient.tokenResponse = new GoogleTokenResponse(
+                "access-token",
+                "refresh-token",
+                3600
+        );
+        googleOAuthClient.userInfoResponse = new GoogleUserInfoResponse(
+                "google-subject",
+                "user@example.com"
+        );
+        mockMvc.perform(post("/api/integrations/google-calendar")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "authorizationCode": "auth-code"
+                                }
+                                """))
+                .andExpect(status().isOk());
+    }
+
     @TestConfiguration
     static class GoogleOAuthClientMockConfig {
 
@@ -133,6 +219,15 @@ class GoogleCalendarIntegrationControllerTest {
             properties.setClientSecret("test-client-secret");
             properties.setRedirectUri("https://example.com/oauth/callback");
             return new FakeGoogleOAuthClient(properties);
+        }
+
+        @Bean
+        @Primary
+        FakeGoogleCalendarEventsClient googleCalendarEventsClientMock(
+                GoogleOAuthProperties properties,
+                ObjectMapper objectMapper
+        ) {
+            return new FakeGoogleCalendarEventsClient(properties, objectMapper);
         }
     }
 
@@ -158,6 +253,46 @@ class GoogleCalendarIntegrationControllerTest {
         private void reset() {
             tokenResponse = null;
             userInfoResponse = null;
+        }
+    }
+
+    static class FakeGoogleCalendarEventsClient extends GoogleCalendarEventsClient {
+
+        private int listCount;
+        private GoogleCalendarSyncMode lastMode;
+        private final List<GoogleCalendarSyncMode> requestedModes = new ArrayList<>();
+        private RuntimeException nextFailure;
+
+        FakeGoogleCalendarEventsClient(
+                GoogleOAuthProperties properties,
+                ObjectMapper objectMapper
+        ) {
+            super(properties, objectMapper, RestClient.builder());
+        }
+
+        @Override
+        public GoogleCalendarEventPage listEvents(
+                String accessToken,
+                GoogleCalendarSyncMode mode,
+                String syncToken,
+                String pageToken
+        ) {
+            listCount++;
+            lastMode = mode;
+            requestedModes.add(mode);
+            if (nextFailure != null) {
+                RuntimeException failure = nextFailure;
+                nextFailure = null;
+                throw failure;
+            }
+            return new GoogleCalendarEventPage(List.of(), null, "next-sync-token", "UTC");
+        }
+
+        private void reset() {
+            listCount = 0;
+            lastMode = null;
+            requestedModes.clear();
+            nextFailure = null;
         }
     }
 }

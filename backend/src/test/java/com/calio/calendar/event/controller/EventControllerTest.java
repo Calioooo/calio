@@ -12,6 +12,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static com.calio.calendar.security.TestAccountSupport.currentAccountReference;
 
 import com.calio.calendar.account.repository.AccountRepository;
+import com.calio.calendar.event.domain.Event;
+import com.calio.calendar.event.repository.EventRepository;
+import com.calio.calendar.integration.domain.GoogleCalendarEventMapping;
+import com.calio.calendar.integration.domain.GoogleCalendarIntegration;
+import com.calio.calendar.integration.repository.GoogleCalendarEventMappingRepository;
+import com.calio.calendar.integration.repository.GoogleCalendarIntegrationRepository;
 import com.calio.calendar.tag.repository.TagRepository;
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.tag.domain.Tag;
@@ -19,6 +25,7 @@ import com.calio.calendar.tag.domain.TagType;
 import com.calio.calendar.security.AuthenticatedAccountMockMvcTestConfig;
 import com.calio.calendar.security.WithAuthenticatedAccount;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -57,6 +64,15 @@ class EventControllerTest {
     @Autowired
     private AccountRepository accountRepository;
 
+    @Autowired
+    private EventRepository eventRepository;
+
+    @Autowired
+    private GoogleCalendarIntegrationRepository googleCalendarIntegrationRepository;
+
+    @Autowired
+    private GoogleCalendarEventMappingRepository googleCalendarEventMappingRepository;
+
     @BeforeEach
     void setUpDefaultTag() {
         tagRepository.findFirstByTagTypeAndTitleAndAccountIsNullOrderByIdAsc(TagType.DEFAULT, "기타")
@@ -74,6 +90,8 @@ class EventControllerTest {
                   "description": "Weekly planning",
                   "startAt": "2026-06-01T00:00:00Z",
                   "endAt": "2026-06-01T01:00:00Z",
+                  "allDay": false,
+                  "timeZone": "UTC",
                   "createdAt": "2000-01-01T00:00:00Z",
                   "updatedAt": "2000-01-01T00:00:00Z"
                 }
@@ -91,6 +109,7 @@ class EventControllerTest {
                 .andExpect(jsonPath("$.startAt").value("2026-06-01T00:00:00Z"))
                 .andExpect(jsonPath("$.endAt").value("2026-06-01T01:00:00Z"))
                 .andExpect(jsonPath("$.allDay").value(false))
+                .andExpect(jsonPath("$.timeZone").value("UTC"))
                 .andExpect(jsonPath("$.importantEvent").value(false))
                 .andExpect(jsonPath("$.tag.title").value("기타"))
                 .andExpect(jsonPath("$.tag.colorCode").value("#64748B"))
@@ -101,6 +120,132 @@ class EventControllerTest {
         JsonNode response = readResponse(result);
         assertThat(response.get("createdAt").asString()).isNotEqualTo("2000-01-01T00:00:00Z");
         assertThat(response.get("updatedAt").asString()).isNotEqualTo("2000-01-01T00:00:00Z");
+    }
+
+    @Test
+    @DisplayName("일정 생성 요청에서 allDay를 누락하면 VALIDATION_FAILED를 반환한다")
+    void givenMissingAllDay_whenCreateEvent_thenReturnsValidationFailed() throws Exception {
+        // when, then
+        mockMvc.perform(post("/api/events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Missing allDay",
+                                  "startAt": "2026-06-01T00:00:00Z",
+                                  "endAt": "2026-06-01T01:00:00Z"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"));
+    }
+
+    @Test
+    @DisplayName("UTC 자정과 exclusive end로 생성한 종일 일정은 저장된 allDay=true를 반환한다")
+    void givenUtcMidnightExclusiveRange_whenCreateAllDayEvent_thenReturnsStoredAllDay() throws Exception {
+        // when, then
+        MvcResult result = mockMvc.perform(post("/api/events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "All day",
+                                  "startAt": "2026-06-10T00:00:00Z",
+                                  "endAt": "2026-06-12T00:00:00Z",
+                                  "allDay": true
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.startAt").value("2026-06-10T00:00:00Z"))
+                .andExpect(jsonPath("$.endAt").value("2026-06-12T00:00:00Z"))
+                .andExpect(jsonPath("$.allDay").value(true))
+                .andReturn();
+        assertThat(readResponse(result).get("timeZone").isNull()).isTrue();
+    }
+
+    @Test
+    @DisplayName("timed 일정은 non-blank valid IANA timeZone 없이는 생성할 수 없다")
+    void givenMissingOrInvalidTimeZone_whenCreateTimedEvent_thenReturnsInvalidTimeZone()
+            throws Exception {
+        // when, then
+        for (String timeZoneField : new String[]{"", ", \"timeZone\": \"\"", ", \"timeZone\": \"Invalid/Zone\""}) {
+            mockMvc.perform(post("/api/events")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {
+                                      "title": "Invalid timed zone",
+                                      "startAt": "2026-06-10T09:00:00Z",
+                                      "endAt": "2026-06-10T10:00:00Z",
+                                      "allDay": false%s
+                                    }
+                                    """.formatted(timeZoneField)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.title").value("INVALID_TIME_ZONE"));
+        }
+    }
+
+    @Test
+    @DisplayName("all-day 일정에 timeZone이 있으면 INVALID_ALL_DAY_SCHEDULE을 반환한다")
+    void givenTimeZone_whenCreateAllDayEvent_thenReturnsInvalidAllDaySchedule()
+            throws Exception {
+        // when, then
+        mockMvc.perform(post("/api/events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Invalid all-day zone",
+                                  "startAt": "2026-06-10T00:00:00Z",
+                                  "endAt": "2026-06-11T00:00:00Z",
+                                  "allDay": true,
+                                  "timeZone": "UTC"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("INVALID_ALL_DAY_SCHEDULE"));
+    }
+
+    @Test
+    @DisplayName("종일 일정은 UTC 자정이 아닌 경계를 허용하지 않는다")
+    void givenNonMidnightBoundary_whenCreateAllDayEvent_thenReturnsInvalidAllDaySchedule()
+            throws Exception {
+        // when, then
+        mockMvc.perform(post("/api/events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Invalid all day",
+                                  "startAt": "2026-06-10T01:00:00Z",
+                                  "endAt": "2026-06-11T01:00:00Z",
+                                  "allDay": true
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("INVALID_ALL_DAY_SCHEDULE"));
+    }
+
+    @Test
+    @DisplayName("PUT은 timed 일정을 all-day 일정으로 전환하고 저장값을 반환한다")
+    void givenTimedEvent_whenUpdateToAllDay_thenReplacesCanonicalSchedule() throws Exception {
+        // given
+        long eventId = createEvent(
+                "Timed",
+                "2026-06-13T09:00:00Z",
+                "2026-06-13T10:00:00Z"
+        );
+
+        // when, then
+        mockMvc.perform(put("/api/events/{eventId}", eventId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Now all day",
+                                  "startAt": "2026-06-14T00:00:00Z",
+                                  "endAt": "2026-06-15T00:00:00Z",
+                                  "allDay": true
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.allDay").value(true))
+                .andExpect(jsonPath("$.startAt").value("2026-06-14T00:00:00Z"))
+                .andExpect(jsonPath("$.endAt").value("2026-06-15T00:00:00Z"));
     }
 
     @Test
@@ -117,6 +262,8 @@ class EventControllerTest {
                                   "title": "Tagged event",
                                   "startAt": "2026-06-16T00:00:00Z",
                                   "endAt": "2026-06-16T01:00:00Z",
+                                  "allDay": false,
+                                  "timeZone": "UTC",
                                   "tagId": %d
                                 }
                                 """.formatted(workTag.getId())))
@@ -142,6 +289,8 @@ class EventControllerTest {
                                   "title": "Custom tag rejected",
                                   "startAt": "2026-06-17T00:00:00Z",
                                   "endAt": "2026-06-17T01:00:00Z",
+                                  "allDay": false,
+                                  "timeZone": "UTC",
                                   "tagId": %d
                                 }
                                 """.formatted(customTag.getId())))
@@ -165,6 +314,8 @@ class EventControllerTest {
                                   "title": "Change to fallback",
                                   "startAt": "2026-06-18T00:00:00Z",
                                   "endAt": "2026-06-18T01:00:00Z",
+                                  "allDay": false,
+                                  "timeZone": "UTC",
                                   "tagId": %d
                                 }
                                 """.formatted(workTag.getId())))
@@ -180,6 +331,8 @@ class EventControllerTest {
                                   "title": "Fallback tag",
                                   "startAt": "2026-06-18T02:00:00Z",
                                   "endAt": "2026-06-18T03:00:00Z",
+                                  "allDay": false,
+                                  "timeZone": "UTC",
                                   "tagId": null
                                 }
                                 """))
@@ -204,6 +357,8 @@ class EventControllerTest {
                                   "title": "Custom updated",
                                   "startAt": "2026-06-19T02:00:00Z",
                                   "endAt": "2026-06-19T03:00:00Z",
+                                  "allDay": false,
+                                  "timeZone": "UTC",
                                   "tagId": %d
                                 }
                                 """.formatted(customTag.getId())))
@@ -226,6 +381,8 @@ class EventControllerTest {
                                   "title": "Missing tag",
                                   "startAt": "2026-06-20T00:00:00Z",
                                   "endAt": "2026-06-20T01:00:00Z",
+                                  "allDay": false,
+                                  "timeZone": "UTC",
                                   "tagId": 999999
                                 }
                                 """))
@@ -251,6 +408,8 @@ class EventControllerTest {
                                   "title": "Other account tag",
                                   "startAt": "2026-06-20T00:00:00Z",
                                   "endAt": "2026-06-20T01:00:00Z",
+                                  "allDay": false,
+                                  "timeZone": "UTC",
                                   "tagId": %d
                                 }
                                 """.formatted(otherAccountTag.getId())))
@@ -267,7 +426,9 @@ class EventControllerTest {
                 {
                   "title": " ",
                   "startAt": "2026-06-01T00:00:00Z",
-                  "endAt": "2026-06-01T01:00:00Z"
+                  "endAt": "2026-06-01T01:00:00Z",
+                  "allDay": false,
+                  "timeZone": "UTC"
                 }
                 """;
 
@@ -289,7 +450,9 @@ class EventControllerTest {
                 {
                   "title": "Planning",
                   "startAt": "2026-06-01T01:00:00Z",
-                  "endAt": "2026-06-01T01:00:00Z"
+                  "endAt": "2026-06-01T01:00:00Z",
+                  "allDay": false,
+                  "timeZone": "UTC"
                 }
                 """;
 
@@ -458,6 +621,8 @@ class EventControllerTest {
                   "description": null,
                   "startAt": "2026-06-04T02:00:00Z",
                   "endAt": "2026-06-04T03:00:00Z",
+                  "allDay": false,
+                  "timeZone": "UTC",
                   "createdAt": "2000-01-01T00:00:00Z",
                   "updatedAt": "2000-01-01T00:00:00Z",
                   "unknown": "ignored"
@@ -492,7 +657,9 @@ class EventControllerTest {
                 {
                   "title": " ",
                   "startAt": "2026-06-05T02:00:00Z",
-                  "endAt": "2026-06-05T03:00:00Z"
+                  "endAt": "2026-06-05T03:00:00Z",
+                  "allDay": false,
+                  "timeZone": "UTC"
                 }
                 """;
 
@@ -519,7 +686,9 @@ class EventControllerTest {
                         .content("""
                                 {
                                   "title": "Updated",
-                                  "endAt": "2026-06-06T03:00:00Z"
+                                  "endAt": "2026-06-06T03:00:00Z",
+                                  "allDay": false,
+                                  "timeZone": "UTC"
                                 }
                                 """))
                 .andExpect(status().isBadRequest())
@@ -542,6 +711,32 @@ class EventControllerTest {
     }
 
     @Test
+    @DisplayName("사용자는 종일 일정 여부 없이 일정을 수정할 수 없다")
+    void givenMissingAllDay_whenUpdateEvent_thenReturnsValidationFailed() throws Exception {
+        // given
+        long eventId = createEvent(
+                "Editable",
+                "2026-06-06T00:00:00Z",
+                "2026-06-06T01:00:00Z"
+        );
+
+        // when, then
+        mockMvc.perform(put("/api/events/{eventId}", eventId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Updated",
+                                  "startAt": "2026-06-06T02:00:00Z",
+                                  "endAt": "2026-06-06T03:00:00Z"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.detail").isString())
+                .andExpect(jsonPath("$.*", hasSize(6)));
+    }
+
+    @Test
     @DisplayName("사용자는 시작 시각이 종료 시각보다 빠르지 않게 일정을 수정할 수 없다")
     void givenStartAtIsNotEarlierThanEndAt_whenUpdateEvent_thenReturnsInvalidTimeRange() throws Exception {
         // given
@@ -550,7 +745,9 @@ class EventControllerTest {
                 {
                   "title": "Updated",
                   "startAt": "2026-06-07T02:00:00Z",
-                  "endAt": "2026-06-07T02:00:00Z"
+                  "endAt": "2026-06-07T02:00:00Z",
+                  "allDay": false,
+                  "timeZone": "UTC"
                 }
                 """;
 
@@ -566,6 +763,42 @@ class EventControllerTest {
     }
 
     @Test
+    @DisplayName("잘못된 timed timezone 수정은 Event 필드와 Tag를 부분 변경하지 않는다")
+    void givenInvalidTimeZoneAndNewTag_whenUpdateEvent_thenPreservesEventAndTag()
+            throws Exception {
+        // given
+        long eventId = createEvent("Stable", "2026-06-07T00:00:00Z", "2026-06-07T01:00:00Z");
+        Event before = eventRepository.findById(eventId).orElseThrow();
+        Long originalTagId = before.getTag().getId();
+        Tag replacementTag = tagRepository.save(new Tag(TagType.DEFAULT, "교체 대상", "#123456"));
+
+        // when
+        mockMvc.perform(put("/api/events/{eventId}", eventId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Changed",
+                                  "description": "partial mutation",
+                                  "startAt": "2026-06-07T02:00:00Z",
+                                  "endAt": "2026-06-07T03:00:00Z",
+                                  "allDay": false,
+                                  "timeZone": "Invalid/Zone",
+                                  "tagId": %d
+                                }
+                                """.formatted(replacementTag.getId())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("INVALID_TIME_ZONE"));
+
+        // then
+        Event persisted = eventRepository.findById(eventId).orElseThrow();
+        assertThat(persisted.getTitle()).isEqualTo("Stable");
+        assertThat(persisted.getStartAt()).isEqualTo(Instant.parse("2026-06-07T00:00:00Z"));
+        assertThat(persisted.getEndAt()).isEqualTo(Instant.parse("2026-06-07T01:00:00Z"));
+        assertThat(persisted.getTimeZone()).isEqualTo("UTC");
+        assertThat(persisted.getTag().getId()).isEqualTo(originalTagId);
+    }
+
+    @Test
     @DisplayName("사용자는 존재하지 않는 일정 id를 수정하면 EVENT_NOT_FOUND를 받는다")
     void givenMissingEventId_whenUpdateEvent_thenReturnsEventNotFound() throws Exception {
         // given
@@ -574,7 +807,9 @@ class EventControllerTest {
                 {
                   "title": "Updated",
                   "startAt": "2026-06-08T00:00:00Z",
-                  "endAt": "2026-06-08T01:00:00Z"
+                  "endAt": "2026-06-08T01:00:00Z",
+                  "allDay": false,
+                  "timeZone": "UTC"
                 }
                 """;
 
@@ -630,6 +865,44 @@ class EventControllerTest {
                 .andReturn();
         JsonNode events = readResponse(listResult);
         assertThat(containsEventId(events, deletedEventId)).isFalse();
+    }
+
+    @Test
+    @DisplayName("Google mapping 일정은 PUT과 DELETE를 차단하지만 important-event PATCH는 허용한다")
+    void givenGoogleMappedEvent_whenMutate_thenAppliesExternalMutationPolicy() throws Exception {
+        // given
+        long eventId = createEvent(
+                "Google import",
+                "2026-06-21T00:00:00Z",
+                "2026-06-21T01:00:00Z"
+        );
+        mapAsGoogleEvent(eventId);
+
+        // when, then
+        mockMvc.perform(put("/api/events/{eventId}", eventId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Blocked update",
+                                  "startAt": "2026-06-21T02:00:00Z",
+                                  "endAt": "2026-06-21T03:00:00Z",
+                                  "allDay": false,
+                                  "timeZone": "UTC"
+                                }
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.title")
+                        .value("EXTERNAL_EVENT_MUTATION_NOT_SUPPORTED"));
+
+        mockMvc.perform(delete("/api/events/{eventId}", eventId))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.title")
+                        .value("EXTERNAL_EVENT_MUTATION_NOT_SUPPORTED"));
+
+        updateImportantEventResult(eventId, true)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("Google import"))
+                .andExpect(jsonPath("$.importantEvent").value(true));
     }
 
     @Test
@@ -726,7 +999,9 @@ class EventControllerTest {
                                 {
                                   "title": "%s",
                                   "startAt": "%s",
-                                  "endAt": "%s"
+                                  "endAt": "%s",
+                                  "allDay": false,
+                                  "timeZone": "UTC"
                                 }
                                 """.formatted(title, startAt, endAt)))
                 .andExpect(status().isCreated())
@@ -741,6 +1016,28 @@ class EventControllerTest {
                           "importantEvent": %s
                         }
                         """.formatted(importantEvent)));
+    }
+
+    private void mapAsGoogleEvent(long eventId) {
+        Event event = eventRepository.findById(eventId).orElseThrow();
+        GoogleCalendarIntegration integration = googleCalendarIntegrationRepository.saveAndFlush(
+                new GoogleCalendarIntegration(
+                        event.getAccount().getId(),
+                        "google-subject-" + eventId,
+                        "user@example.com",
+                        "encrypted-refresh-token",
+                        "encrypted-access-token",
+                        Instant.parse("2026-06-21T02:00:00Z"),
+                        Instant.parse("2026-06-21T00:00:00Z")
+                )
+        );
+        googleCalendarEventMappingRepository.saveAndFlush(new GoogleCalendarEventMapping(
+                integration,
+                event,
+                "external-" + eventId,
+                null,
+                null
+        ));
     }
 
     private JsonNode readResponse(MvcResult result) throws Exception {

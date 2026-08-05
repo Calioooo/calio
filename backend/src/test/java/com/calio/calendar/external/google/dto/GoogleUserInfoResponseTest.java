@@ -26,7 +26,10 @@ class GoogleUserInfoResponseTest {
                 """;
 
         // when
-        GoogleUserInfoResponse response = GoogleUserInfoResponse.fromJson(json, objectMapper);
+        GoogleUserInfoResponse response = objectMapper.readValue(
+                json,
+                GoogleUserInfoResponse.class
+        );
 
         // then
         assertThat(response.subject()).isEqualTo("google-subject");
@@ -46,8 +49,17 @@ class GoogleUserInfoResponseTest {
                 """;
 
         // when, then
-        assertThatThrownBy(() -> GoogleUserInfoResponse.fromJson(json, objectMapper))
-                .isInstanceOfSatisfying(CalioException.class, exception ->
-                        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.GOOGLE_USER_INFO_INVALID));
+        assertThatThrownBy(() -> objectMapper.readValue(json, GoogleUserInfoResponse.class))
+                .satisfies(exception ->
+                        assertErrorCode(exception, ErrorCode.GOOGLE_USER_INFO_INVALID));
+    }
+
+    private void assertErrorCode(Throwable throwable, ErrorCode errorCode) {
+        Throwable cause = throwable;
+        while (cause != null && !(cause instanceof CalioException)) {
+            cause = cause.getCause();
+        }
+        assertThat(cause).isInstanceOfSatisfying(CalioException.class, exception ->
+                assertThat(exception.getErrorCode()).isEqualTo(errorCode));
     }
 }

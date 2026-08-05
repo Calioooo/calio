@@ -3,6 +3,7 @@ package com.calio.calendar.integration.controller;
 import com.calio.calendar.integration.controller.dto.GoogleCalendarConnectRequest;
 import com.calio.calendar.integration.controller.dto.GoogleCalendarIntegrationResponse;
 import com.calio.calendar.integration.service.GoogleCalendarIntegrationService;
+import com.calio.calendar.integration.service.GoogleOperationJobEnqueueService;
 import com.calio.calendar.security.AuthenticatedAccount;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -21,9 +22,14 @@ import org.springframework.web.bind.annotation.RestController;
 public class GoogleCalendarIntegrationController {
 
     private final GoogleCalendarIntegrationService googleCalendarIntegrationService;
+    private final GoogleOperationJobEnqueueService operationJobEnqueueService;
 
-    public GoogleCalendarIntegrationController(GoogleCalendarIntegrationService googleCalendarIntegrationService) {
+    public GoogleCalendarIntegrationController(
+            GoogleCalendarIntegrationService googleCalendarIntegrationService,
+            GoogleOperationJobEnqueueService operationJobEnqueueService
+    ) {
         this.googleCalendarIntegrationService = googleCalendarIntegrationService;
+        this.operationJobEnqueueService = operationJobEnqueueService;
     }
 
     @PostMapping
@@ -47,5 +53,13 @@ public class GoogleCalendarIntegrationController {
     ) {
         googleCalendarIntegrationService.disconnect(account.accountId());
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/sync")
+    public ResponseEntity<Void> sync(
+            @AuthenticationPrincipal AuthenticatedAccount account
+    ) {
+        operationJobEnqueueService.enqueueManualSync(account.accountId());
+        return ResponseEntity.accepted().build();
     }
 }

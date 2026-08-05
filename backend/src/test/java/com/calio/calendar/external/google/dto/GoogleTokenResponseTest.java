@@ -27,7 +27,7 @@ class GoogleTokenResponseTest {
                 """;
 
         // when
-        GoogleTokenResponse response = GoogleTokenResponse.fromJson(json, objectMapper);
+        GoogleTokenResponse response = objectMapper.readValue(json, GoogleTokenResponse.class);
 
         // then
         assertThat(response.accessToken()).isEqualTo("access-token");
@@ -49,8 +49,17 @@ class GoogleTokenResponseTest {
                 """;
 
         // when, then
-        assertThatThrownBy(() -> GoogleTokenResponse.fromJson(json, objectMapper))
-                .isInstanceOfSatisfying(CalioException.class, exception ->
-                        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.GOOGLE_TOKEN_RESPONSE_INVALID));
+        assertThatThrownBy(() -> objectMapper.readValue(json, GoogleTokenResponse.class))
+                .satisfies(exception ->
+                        assertErrorCode(exception, ErrorCode.GOOGLE_TOKEN_RESPONSE_INVALID));
+    }
+
+    private void assertErrorCode(Throwable throwable, ErrorCode errorCode) {
+        Throwable cause = throwable;
+        while (cause != null && !(cause instanceof CalioException)) {
+            cause = cause.getCause();
+        }
+        assertThat(cause).isInstanceOfSatisfying(CalioException.class, exception ->
+                assertThat(exception.getErrorCode()).isEqualTo(errorCode));
     }
 }

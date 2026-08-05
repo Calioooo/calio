@@ -13,8 +13,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
+import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.event.repository.EventRepository;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
+import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
 import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
@@ -223,12 +225,16 @@ class RecurrenceEventControllerTest {
                                   "title": "Moved",
                                   "description": null,
                                   "startAt": "2026-11-01T12:00:00Z",
-                                  "endAt": "2026-11-01T13:00:00Z"
+                                  "endAt": "2026-11-01T13:00:00Z",
+                                  "allDay": false,
+                                  "timeZone": "UTC"
                                 }
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.title").value("Moved"))
                 .andExpect(jsonPath("$.description").doesNotExist())
+                .andExpect(jsonPath("$.allDay").value(false))
+                .andExpect(jsonPath("$.timeZone").value("UTC"))
                 .andExpect(jsonPath("$.originStartAt").value("2026-10-01T09:00:00Z"));
 
         // when, then
@@ -248,33 +254,348 @@ class RecurrenceEventControllerTest {
     }
 
     @Test
-    @DisplayName("DELETE override는 nullable snapshot 삭제 상태로 저장되고 전체 master 수정은 override를 제거한다")
-    void givenDeletedOverride_whenReplaceMaster_thenClearsOverrideState() throws Exception {
+    @DisplayName("all-day master의 occurrence를 독립된 timed snapshot으로 변경할 수 있다")
+    void givenAllDayMaster_whenPatchTimedOccurrence_thenUsesRequestScheduleTypeAndTimeZone()
+            throws Exception {
         // given
-        long recurrenceId = createTimedRecurrence("Master", "2026-12-01", "UTC");
-        mockMvc.perform(delete("/api/recurrence-events/{id}/occurrences", recurrenceId)
-                        .param("originStartAt", "2026-12-01T09:00:00Z"))
-                .andExpect(status().isNoContent());
+        MvcResult createResult = mockMvc.perform(post("/api/recurrence-events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "All-day master",
+                                  "allDay": true,
+                                  "firstOccurrenceStartAt": "2026-10-01T00:00:00Z",
+                                  "firstOccurrenceEndAt": "2026-10-02T00:00:00Z",
+                                  "timeZone": null,
+                                  "recurrence": ["RRULE:FREQ=DAILY;COUNT=2"]
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn();
+        long recurrenceId = readResponse(createResult).get("recurrenceId").asLong();
+
+        // when, then
+        mockMvc.perform(patch("/api/recurrence-events/{id}/occurrences", recurrenceId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "originStartAt": "2026-10-01T00:00:00Z",
+                                  "title": "Timed override",
+                                  "description": null,
+                                  "startAt": "2026-10-01T09:00:00Z",
+                                  "endAt": "2026-10-01T10:00:00Z",
+                                  "allDay": false,
+                                  "timeZone": "Asia/Seoul"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.allDay").value(false))
+                .andExpect(jsonPath("$.timeZone").value("Asia/Seoul"));
+    }
+
+    @Test
+    @DisplayName("occurrence PATCH에서 allDay를 누락하면 snapshot을 저장하지 않는다")
+    void givenMissingAllDay_whenPatchOccurrence_thenReturnsValidationFailedWithoutOverride()
+            throws Exception {
+        // given
+        long recurrenceId = createTimedRecurrence("Required allDay", "2026-10-01", "UTC");
+
+        // when, then
+        mockMvc.perform(patch("/api/recurrence-events/{id}/occurrences", recurrenceId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "originStartAt": "2026-10-01T09:00:00Z",
+                                  "title": "Missing allDay",
+                                  "startAt": "2026-10-01T12:00:00Z",
+                                  "endAt": "2026-10-01T13:00:00Z",
+                                  "timeZone": "UTC"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"));
         assertThat(overrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(
                 recurrenceId,
-                java.time.Instant.parse("2026-12-01T09:00:00Z")
-        )).hasValueSatisfying(override -> {
-            assertThat(override.isDeleted()).isTrue();
-            assertThat(override.getOverrideTitle()).isNull();
-            assertThat(override.getOverrideStartAt()).isNull();
-        });
+                Instant.parse("2026-10-01T09:00:00Z")
+        )).isEmpty();
+    }
+
+    @Test
+    @DisplayName("새 virtual occurrence와 orphan active override는 final start 순서로 exact once 조회된다")
+    void givenVirtualOccurrencesAndOrphanOverride_whenList_thenReturnsExactOnceInStartOrder() throws Exception {
+        // given
+        long recurrenceId = createTimedRecurrence("Original rule", "2029-08-01", "UTC");
+        Instant orphanOrigin = Instant.parse("2029-08-01T09:00:00Z");
+        mockMvc.perform(patch("/api/recurrence-events/{id}/occurrences", recurrenceId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "originStartAt": "2029-08-01T09:00:00Z",
+                                  "title": "Orphan override",
+                                  "description": null,
+                                  "startAt": "2029-08-10T11:00:00Z",
+                                  "endAt": "2029-08-10T12:00:00Z",
+                                  "allDay": false,
+                                  "timeZone": "Asia/Seoul"
+                                }
+                                """))
+                .andExpect(status().isOk());
+        mockMvc.perform(put("/api/recurrence-events/{id}", recurrenceId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(timedRequest("Current rule", "2029-08-10", "UTC")))
+                .andExpect(status().isOk());
+
+        // when
+        MvcResult result = mockMvc.perform(get("/api/events")
+                        .param("from", "2029-08-10T00:00:00Z")
+                        .param("to", "2029-08-12T00:00:00Z"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(3)))
+                .andExpect(jsonPath("$[0].startAt").value("2029-08-10T09:00:00Z"))
+                .andExpect(jsonPath("$[0].originStartAt").value("2029-08-10T09:00:00Z"))
+                .andExpect(jsonPath("$[0].timeZone").value("UTC"))
+                .andExpect(jsonPath("$[1].startAt").value("2029-08-10T11:00:00Z"))
+                .andExpect(jsonPath("$[1].originStartAt").value(orphanOrigin.toString()))
+                .andExpect(jsonPath("$[1].timeZone").value("Asia/Seoul"))
+                .andExpect(jsonPath("$[2].startAt").value("2029-08-11T09:00:00Z"))
+                .andExpect(jsonPath("$[2].timeZone").value("UTC"))
+                .andReturn();
+
+        // then
+        JsonNode events = readResponse(result);
+        int orphanMatches = 0;
+        for (JsonNode event : events) {
+            if (orphanOrigin.toString().equals(event.get("originStartAt").asText())) {
+                orphanMatches++;
+            }
+        }
+        assertThat(orphanMatches).isEqualTo(1);
+        mockMvc.perform(get("/api/events")
+                        .param("from", "2029-08-10T09:00:00Z")
+                        .param("to", "2029-08-11T09:00:00Z"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$[0].startAt").value("2029-08-10T09:00:00Z"))
+                .andExpect(jsonPath("$[1].startAt").value("2029-08-10T11:00:00Z"));
+    }
+
+    @Test
+    @DisplayName("전체 master 수정은 active와 deleted override 및 legacy Event를 보존하고 orphan 조회를 유지한다")
+    void givenActiveAndDeletedOverrides_whenReplaceMaster_thenPreservesChildStateAndOrphanQuery() throws Exception {
+        // given
+        long recurrenceId = createTimedRecurrence("Master", "2026-12-01", "UTC");
+        Instant activeOrigin = Instant.parse("2026-12-01T09:00:00Z");
+        Instant deletedOrigin = Instant.parse("2026-12-02T09:00:00Z");
+        mockMvc.perform(patch("/api/recurrence-events/{id}/occurrences", recurrenceId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "originStartAt": "2026-12-01T09:00:00Z",
+                                  "title": "Preserved active",
+                                  "description": "snapshot memo",
+                                  "startAt": "2026-12-10T12:00:00Z",
+                                  "endAt": "2026-12-10T13:00:00Z",
+                                  "allDay": false,
+                                  "timeZone": "UTC"
+                                }
+                                """))
+                .andExpect(status().isOk());
+        mockMvc.perform(delete("/api/recurrence-events/{id}/occurrences", recurrenceId)
+                        .param("originStartAt", deletedOrigin.toString()))
+                .andExpect(status().isNoContent());
+        Instant deletedAt = overrideRepository
+                .findByRecurrenceEvent_IdAndOriginStartAt(recurrenceId, deletedOrigin)
+                .orElseThrow()
+                .getDeletedAt();
+        Tag originalTag = recurrenceEventRepository.findById(recurrenceId).orElseThrow().getTag();
+        Event legacyEvent = eventRepository.save(new Event(
+                "Legacy",
+                null,
+                Instant.parse("2026-12-20T09:00:00Z"),
+                Instant.parse("2026-12-20T10:00:00Z"),
+                false,
+                "UTC",
+                recurrenceId,
+                originalTag,
+                accountRepository.getReferenceById(accountId)
+        ));
+        Tag replacementTag = tagRepository.save(new Tag(
+                TagType.CUSTOM,
+                "Changed tag",
+                "#123456",
+                accountRepository.getReferenceById(accountId)
+        ));
 
         // when
         mockMvc.perform(put("/api/recurrence-events/{id}", recurrenceId)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(timedRequest("Replaced", "2026-12-02", "UTC")))
-                .andExpect(status().isOk());
+                        .content("""
+                                {
+                                  "title": "All-day replacement",
+                                  "description": "new master memo",
+                                  "allDay": true,
+                                  "firstOccurrenceStartAt": "2027-01-01T00:00:00Z",
+                                  "firstOccurrenceEndAt": "2027-01-02T00:00:00Z",
+                                  "timeZone": null,
+                                  "recurrence": ["RRULE:FREQ=DAILY;COUNT=2"],
+                                  "tagId": %d
+                                }
+                                """.formatted(replacementTag.getId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.allDay").value(true))
+                .andExpect(jsonPath("$.timeZone").doesNotExist());
 
         // then
-        assertThat(overrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(
-                recurrenceId,
-                java.time.Instant.parse("2026-12-01T09:00:00Z")
-        )).isEmpty();
+        assertThat(overrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(recurrenceId, activeOrigin))
+                .hasValueSatisfying(override -> {
+                    assertThat(override.getRecurrenceId()).isEqualTo(recurrenceId);
+                    assertThat(override.getOriginStartAt()).isEqualTo(activeOrigin);
+                    assertThat(override.getOverrideTitle()).isEqualTo("Preserved active");
+                    assertThat(override.getOverrideDescription()).isEqualTo("snapshot memo");
+                    assertThat(override.getOverrideStartAt()).isEqualTo(Instant.parse("2026-12-10T12:00:00Z"));
+                    assertThat(override.getOverrideEndAt()).isEqualTo(Instant.parse("2026-12-10T13:00:00Z"));
+                    assertThat(override.isOverrideAllDay()).isFalse();
+                    assertThat(override.getOverrideTimeZone()).isEqualTo("UTC");
+                    assertThat(override.getDeletedAt()).isNull();
+                });
+        assertThat(overrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(recurrenceId, deletedOrigin))
+                .hasValueSatisfying(override -> {
+                    assertThat(override.getRecurrenceId()).isEqualTo(recurrenceId);
+                    assertThat(override.getOriginStartAt()).isEqualTo(deletedOrigin);
+                    assertThat(override.getOverrideTitle()).isNull();
+                    assertThat(override.getOverrideStartAt()).isNull();
+                    assertThat(override.getOverrideEndAt()).isNull();
+                    assertThat(override.getOverrideTimeZone()).isNull();
+                    assertThat(override.getDeletedAt()).isEqualTo(deletedAt);
+                });
+        assertThat(eventRepository.findById(legacyEvent.getId())).isPresent();
+
+        mockMvc.perform(get("/api/events")
+                        .param("from", "2026-12-10T12:00:00Z")
+                        .param("to", "2026-12-10T13:00:00Z"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].originStartAt").value(activeOrigin.toString()))
+                .andExpect(jsonPath("$[0].title").value("Preserved active"))
+                .andExpect(jsonPath("$[0].tag.title").value("Changed tag"));
+        mockMvc.perform(get("/api/events")
+                        .param("from", "2026-12-10T11:00:00Z")
+                        .param("to", "2026-12-10T12:00:00Z"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(0)));
+        mockMvc.perform(get("/api/events")
+                        .param("from", "2026-12-10T13:00:00Z")
+                        .param("to", "2026-12-10T14:00:00Z"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(0)));
+
+        mockMvc.perform(get("/api/events")
+                        .param("from", "2026-12-02T09:00:00Z")
+                        .param("to", "2026-12-02T10:00:00Z"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(0)));
+
+        mockMvc.perform(patch("/api/recurrence-events/{id}/occurrences", recurrenceId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "originStartAt": "2026-12-01T09:00:00Z",
+                                  "title": "Re-edited orphan",
+                                  "description": null,
+                                  "startAt": "2027-03-01T00:00:00Z",
+                                  "endAt": "2027-03-02T00:00:00Z",
+                                  "allDay": true,
+                                  "timeZone": null
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.allDay").value(true))
+                .andExpect(jsonPath("$.tag.title").value("Changed tag"));
+        assertCurrentAllDaySnapshot(recurrenceId, activeOrigin, "Re-edited orphan");
+
+        mockMvc.perform(patch("/api/recurrence-events/{id}/occurrences", recurrenceId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "originStartAt": "2026-12-02T09:00:00Z",
+                                  "title": "Restored orphan",
+                                  "description": "restored memo",
+                                  "startAt": "2027-03-03T00:00:00Z",
+                                  "endAt": "2027-03-04T00:00:00Z",
+                                  "allDay": true,
+                                  "timeZone": null
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.allDay").value(true));
+        assertCurrentAllDaySnapshot(recurrenceId, deletedOrigin, "Restored orphan");
+    }
+
+    @Test
+    @DisplayName("잘못된 master schedule, timezone, recurrence rule은 master와 override를 변경하지 않는다")
+    void givenInvalidMasterUpdates_whenReplaceMaster_thenPreservesMasterAndOverrideState() throws Exception {
+        // given
+        long recurrenceId = createTimedRecurrence("Validation master", "2028-01-01", "UTC");
+        Instant originStartAt = Instant.parse("2028-01-01T09:00:00Z");
+        mockMvc.perform(patch("/api/recurrence-events/{id}/occurrences", recurrenceId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "originStartAt": "2028-01-01T09:00:00Z",
+                                  "title": "Stable override",
+                                  "description": "stable memo",
+                                  "startAt": "2028-01-10T12:00:00Z",
+                                  "endAt": "2028-01-10T13:00:00Z",
+                                  "allDay": false,
+                                  "timeZone": "UTC"
+                                }
+                                """))
+                .andExpect(status().isOk());
+
+        // when
+        mockMvc.perform(put("/api/recurrence-events/{id}", recurrenceId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Invalid schedule",
+                                  "allDay": false,
+                                  "firstOccurrenceStartAt": "2028-02-01T10:00:00Z",
+                                  "firstOccurrenceEndAt": "2028-02-01T09:00:00Z",
+                                  "timeZone": "UTC",
+                                  "recurrence": ["RRULE:FREQ=DAILY;COUNT=2"]
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("INVALID_RECURRENCE_SCHEDULE"));
+        mockMvc.perform(put("/api/recurrence-events/{id}", recurrenceId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(timedRequest("Invalid timezone", "2028-02-01", "Mars/Olympus")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("INVALID_TIME_ZONE"));
+        mockMvc.perform(put("/api/recurrence-events/{id}", recurrenceId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(timedRequest("Invalid rule", "2028-02-01", "UTC")
+                                .replace("RRULE:FREQ=DAILY;COUNT=3", "VEVENT:BAD")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("INVALID_RECURRENCE_RULE"));
+
+        // then
+        RecurrenceEvent unchangedMaster = recurrenceEventRepository.findById(recurrenceId).orElseThrow();
+        assertThat(unchangedMaster.getRecurrenceTitle()).isEqualTo("Validation master");
+        assertThat(unchangedMaster.getFirstOccurrenceStartAt()).isEqualTo(originStartAt);
+        assertThat(unchangedMaster.getFirstOccurrenceEndAt()).isEqualTo(Instant.parse("2028-01-01T10:00:00Z"));
+        assertThat(unchangedMaster.getTimeZone()).isEqualTo("UTC");
+        assertThat(unchangedMaster.getRecurrenceRules()).containsExactly("RRULE:FREQ=DAILY;COUNT=3");
+        assertThat(overrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(recurrenceId, originStartAt))
+                .hasValueSatisfying(override -> {
+                    assertThat(override.getOverrideTitle()).isEqualTo("Stable override");
+                    assertThat(override.getOverrideDescription()).isEqualTo("stable memo");
+                    assertThat(override.getOverrideStartAt()).isEqualTo(Instant.parse("2028-01-10T12:00:00Z"));
+                    assertThat(override.getOverrideEndAt()).isEqualTo(Instant.parse("2028-01-10T13:00:00Z"));
+                    assertThat(override.isOverrideAllDay()).isFalse();
+                    assertThat(override.getOverrideTimeZone()).isEqualTo("UTC");
+                    assertThat(override.getDeletedAt()).isNull();
+                });
     }
 
     @Test
@@ -296,7 +617,9 @@ class RecurrenceEventControllerTest {
                                   "title": "Restored",
                                   "description": null,
                                   "startAt": "2027-01-02T12:00:00Z",
-                                  "endAt": "2027-01-02T13:00:00Z"
+                                  "endAt": "2027-01-02T13:00:00Z",
+                                  "allDay": false,
+                                  "timeZone": "UTC"
                                 }
                                 """))
                 .andExpect(status().isOk())
@@ -326,8 +649,9 @@ class RecurrenceEventControllerTest {
     void givenUnknownOriginStartAt_whenPatchOccurrence_thenReturnsOccurrenceNotFound() throws Exception {
         // given
         long recurrenceId = createTimedRecurrence("Origin", "2027-02-01", "UTC");
+        long overrideCount = overrideRepository.count();
 
-        // when, then
+        // when
         mockMvc.perform(patch("/api/recurrence-events/{id}/occurrences", recurrenceId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -336,16 +660,25 @@ class RecurrenceEventControllerTest {
                                   "title": "Unknown",
                                   "description": null,
                                   "startAt": "2027-02-01T12:00:00Z",
-                                  "endAt": "2027-02-01T13:00:00Z"
+                                  "endAt": "2027-02-01T13:00:00Z",
+                                  "allDay": false,
+                                  "timeZone": "UTC"
                                 }
                                 """))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.title").value("RECURRENCE_OCCURRENCE_NOT_FOUND"));
+        mockMvc.perform(delete("/api/recurrence-events/{id}/occurrences", recurrenceId)
+                        .param("originStartAt", "2027-02-01T09:00:01Z"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("RECURRENCE_OCCURRENCE_NOT_FOUND"));
+
+        // then
+        assertThat(overrideRepository.count()).isEqualTo(overrideCount);
     }
 
     @Test
-    @DisplayName("다른 account의 recurrence master는 RECURRENCE_EVENT_NOT_FOUND로 격리한다")
-    void givenOtherAccountMaster_whenGet_thenReturnsRecurrenceNotFound() throws Exception {
+    @DisplayName("다른 account의 실제 override identity도 master 소유권 경로에서 격리한다")
+    void givenOtherAccountOverride_whenMutate_thenReturnsRecurrenceNotFoundWithoutStateChange() throws Exception {
         // given
         Account otherAccount = accountRepository.save(new Account());
         Tag defaultTag = tagRepository
@@ -364,11 +697,103 @@ class RecurrenceEventControllerTest {
                 defaultTag,
                 otherAccount
         ));
+        Instant originStartAt = Instant.parse("2027-03-01T09:00:00Z");
+        overrideRepository.save(RecurrenceEventOverride.active(
+                otherMaster,
+                originStartAt,
+                "Private override",
+                null,
+                com.calio.calendar.common.domain.CanonicalSchedule.recurrenceOverride(
+                        Instant.parse("2027-03-02T12:00:00Z"),
+                        Instant.parse("2027-03-02T13:00:00Z"),
+                        false,
+                        "UTC"
+                )
+        ));
 
-        // when, then
+        // when
         mockMvc.perform(get("/api/recurrence-events/{id}", otherMaster.getId()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.title").value("RECURRENCE_EVENT_NOT_FOUND"));
+        mockMvc.perform(patch("/api/recurrence-events/{id}/occurrences", otherMaster.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "originStartAt": "2027-03-01T09:00:00Z",
+                                  "title": "Leaked",
+                                  "description": null,
+                                  "startAt": "2027-03-05T12:00:00Z",
+                                  "endAt": "2027-03-05T13:00:00Z",
+                                  "allDay": false,
+                                  "timeZone": "UTC"
+                                }
+                                """))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("RECURRENCE_EVENT_NOT_FOUND"));
+        mockMvc.perform(delete("/api/recurrence-events/{id}/occurrences", otherMaster.getId())
+                        .param("originStartAt", originStartAt.toString()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("RECURRENCE_EVENT_NOT_FOUND"));
+
+        // then
+        assertThat(overrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(
+                otherMaster.getId(),
+                originStartAt
+        ))
+                .hasValueSatisfying(override -> {
+                    assertThat(override.getOverrideTitle()).isEqualTo("Private override");
+                    assertThat(override.isDeleted()).isFalse();
+                });
+    }
+
+    @Test
+    @DisplayName("전체 recurrence 삭제는 active와 deleted override, account legacy Event, master를 모두 제거한다")
+    void givenRecurrenceChildren_whenDeleteMaster_thenRemovesAllChildrenAndMaster() throws Exception {
+        // given
+        long recurrenceId = createTimedRecurrence("Delete all", "2027-05-01", "UTC");
+        Instant activeOrigin = Instant.parse("2027-05-01T09:00:00Z");
+        Instant deletedOrigin = Instant.parse("2027-05-02T09:00:00Z");
+        mockMvc.perform(patch("/api/recurrence-events/{id}/occurrences", recurrenceId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "originStartAt": "2027-05-01T09:00:00Z",
+                                  "title": "Active child",
+                                  "description": null,
+                                  "startAt": "2027-05-10T12:00:00Z",
+                                  "endAt": "2027-05-10T13:00:00Z",
+                                  "allDay": false,
+                                  "timeZone": "UTC"
+                                }
+                                """))
+                .andExpect(status().isOk());
+        mockMvc.perform(delete("/api/recurrence-events/{id}/occurrences", recurrenceId)
+                        .param("originStartAt", deletedOrigin.toString()))
+                .andExpect(status().isNoContent());
+        RecurrenceEvent master = recurrenceEventRepository.findById(recurrenceId).orElseThrow();
+        Event legacyEvent = eventRepository.save(new Event(
+                "Legacy child",
+                null,
+                Instant.parse("2027-05-20T09:00:00Z"),
+                Instant.parse("2027-05-20T10:00:00Z"),
+                false,
+                "UTC",
+                recurrenceId,
+                master.getTag(),
+                accountRepository.getReferenceById(accountId)
+        ));
+
+        // when
+        mockMvc.perform(delete("/api/recurrence-events/{id}", recurrenceId))
+                .andExpect(status().isNoContent());
+
+        // then
+        assertThat(overrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(recurrenceId, activeOrigin))
+                .isEmpty();
+        assertThat(overrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(recurrenceId, deletedOrigin))
+                .isEmpty();
+        assertThat(eventRepository.findById(legacyEvent.getId())).isEmpty();
+        assertThat(recurrenceEventRepository.findById(recurrenceId)).isEmpty();
     }
 
     @Test
@@ -463,6 +888,17 @@ class RecurrenceEventControllerTest {
                 .andExpect(status().isCreated())
                 .andReturn();
         return readResponse(result).get("recurrenceId").asLong();
+    }
+
+    private void assertCurrentAllDaySnapshot(Long recurrenceId, Instant originStartAt, String title) {
+        assertThat(overrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(recurrenceId, originStartAt))
+                .hasValueSatisfying(override -> {
+                    assertThat(override.getOriginStartAt()).isEqualTo(originStartAt);
+                    assertThat(override.getOverrideTitle()).isEqualTo(title);
+                    assertThat(override.isOverrideAllDay()).isTrue();
+                    assertThat(override.getOverrideTimeZone()).isNull();
+                    assertThat(override.getDeletedAt()).isNull();
+                });
     }
 
     private String timedRequest(String title, String date, String timeZone) {

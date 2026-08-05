@@ -10,6 +10,8 @@ public class GoogleOAuthProperties {
     private String tokenUrl = "https://oauth2.googleapis.com/token";
     private String userInfoUrl = "https://www.googleapis.com/oauth2/v3/userinfo";
     private String revokeUrl = "https://oauth2.googleapis.com/revoke";
+    private String calendarEventsUrl =
+            "https://www.googleapis.com/calendar/v3/calendars/primary/events";
     private String clientId;
     private String clientSecret;
     private String redirectUri;
@@ -42,6 +44,14 @@ public class GoogleOAuthProperties {
         return clientId;
     }
 
+    public String getCalendarEventsUrl() {
+        return calendarEventsUrl;
+    }
+
+    public void setCalendarEventsUrl(String calendarEventsUrl) {
+        this.calendarEventsUrl = calendarEventsUrl;
+    }
+
     public void setClientId(String clientId) {
         this.clientId = clientId;
     }
@@ -66,6 +76,7 @@ public class GoogleOAuthProperties {
         return hasText(tokenUrl)
                 && hasText(userInfoUrl)
                 && hasText(revokeUrl)
+                && hasText(calendarEventsUrl)
                 && hasText(clientId)
                 && hasText(clientSecret)
                 && hasText(redirectUri);

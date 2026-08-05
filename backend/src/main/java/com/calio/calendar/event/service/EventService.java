@@ -2,6 +2,7 @@ package com.calio.calendar.event.service;
 
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
+import com.calio.calendar.common.domain.CanonicalSchedule;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.event.controller.dto.CreateEventRequest;
@@ -10,6 +11,7 @@ import com.calio.calendar.event.controller.dto.UpdateEventRequest;
 import com.calio.calendar.event.controller.dto.UpdateImportantEventRequest;
 import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.event.repository.EventRepository;
+import com.calio.calendar.integration.repository.GoogleCalendarEventMappingRepository;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceOccurrence;
@@ -43,6 +45,7 @@ public class EventService {
     private final AccountRepository accountRepository;
     private final TagService tagService;
     private final Rfc5545RecurrenceEngine recurrenceEngine;
+    private final GoogleCalendarEventMappingRepository googleCalendarEventMappingRepository;
 
     public EventService(
             EventRepository eventRepository,
@@ -50,7 +53,8 @@ public class EventService {
             RecurrenceEventOverrideRepository recurrenceEventOverrideRepository,
             AccountRepository accountRepository,
             TagService tagService,
-            Rfc5545RecurrenceEngine recurrenceEngine
+            Rfc5545RecurrenceEngine recurrenceEngine,
+            GoogleCalendarEventMappingRepository googleCalendarEventMappingRepository
     ) {
         this.eventRepository = eventRepository;
         this.recurrenceEventRepository = recurrenceEventRepository;
@@ -58,11 +62,17 @@ public class EventService {
         this.accountRepository = accountRepository;
         this.tagService = tagService;
         this.recurrenceEngine = recurrenceEngine;
+        this.googleCalendarEventMappingRepository = googleCalendarEventMappingRepository;
     }
 
     @Transactional
     public EventResponse createEvent(Long accountId, CreateEventRequest request) {
-        validateEventTimeRange(request.startAt(), request.endAt());
+        CanonicalSchedule.event(
+                request.startAt(),
+                request.endAt(),
+                request.allDay(),
+                request.timeZone()
+        );
         Account account = accountRepository.getReferenceById(accountId);
         Tag tag = tagService.getTagOrDefault(accountId, request.tagId());
         Event event = eventRepository.save(request.toEntity(tag, account));
@@ -76,10 +86,24 @@ public class EventService {
 
     @Transactional
     public EventResponse updateEvent(Long accountId, Long eventId, UpdateEventRequest request) {
-        validateEventTimeRange(request.startAt(), request.endAt());
         Event event = findEvent(accountId, eventId);
+        rejectExternalEventMutation(accountId, eventId);
+        CanonicalSchedule schedule = CanonicalSchedule.event(
+                request.startAt(),
+                request.endAt(),
+                request.allDay(),
+                request.timeZone()
+        );
         Tag tag = tagService.getTagOrDefault(accountId, request.tagId());
-        event.replace(request.title(), request.description(), request.startAt(), request.endAt(), tag);
+        event.replace(
+                request.title(),
+                request.description(),
+                schedule.startAt(),
+                schedule.endAt(),
+                schedule.allDay(),
+                schedule.timeZone(),
+                tag
+        );
         eventRepository.flush();
         return EventResponse.from(event);
     }
@@ -94,7 +118,9 @@ public class EventService {
 
     @Transactional
     public void deleteEvent(Long accountId, Long eventId) {
-        eventRepository.delete(findEvent(accountId, eventId));
+        Event event = findEvent(accountId, eventId);
+        rejectExternalEventMutation(accountId, eventId);
+        eventRepository.delete(event);
     }
 
     @Transactional(readOnly = true)
@@ -198,9 +224,10 @@ public class EventService {
                 .orElseThrow(() -> new CalioException(ErrorCode.EVENT_NOT_FOUND));
     }
 
-    private void validateEventTimeRange(Instant startAt, Instant endAt) {
-        if (!startAt.isBefore(endAt)) {
-            throw new CalioException(ErrorCode.INVALID_TIME_RANGE);
+    private void rejectExternalEventMutation(Long accountId, Long eventId) {
+        if (googleCalendarEventMappingRepository
+                .existsByEvent_IdAndIntegration_AccountId(eventId, accountId)) {
+            throw new CalioException(ErrorCode.EXTERNAL_EVENT_MUTATION_NOT_SUPPORTED);
         }
     }
 
