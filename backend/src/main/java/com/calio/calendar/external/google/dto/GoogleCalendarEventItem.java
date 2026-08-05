@@ -17,6 +17,7 @@ public record GoogleCalendarEventItem(
         String description,
         List<String> recurrence,
         String recurringEventId,
+        GoogleCalendarEventTime originalStartTime,
         GoogleCalendarEventTime start,
         GoogleCalendarEventTime end
 ) {
@@ -24,10 +25,37 @@ public record GoogleCalendarEventItem(
     public GoogleCalendarEventItem {
         recurrence = recurrence == null
                 ? List.of()
-                : recurrence.stream().filter(GoogleCalendarEventItem::hasText).toList();
+                : List.copyOf(recurrence);
         if (!hasText(id) || (!"cancelled".equals(status) && !hasValidSchedulePair(start, end))) {
             throw invalidResponse();
         }
+    }
+
+    public GoogleCalendarEventItem(
+            String id,
+            String status,
+            String etag,
+            Instant updatedAt,
+            String summary,
+            String description,
+            List<String> recurrence,
+            String recurringEventId,
+            GoogleCalendarEventTime start,
+            GoogleCalendarEventTime end
+    ) {
+        this(
+                id,
+                status,
+                etag,
+                updatedAt,
+                summary,
+                description,
+                recurrence,
+                recurringEventId,
+                null,
+                start,
+                end
+        );
     }
 
     public boolean isCancelled() {
@@ -35,14 +63,14 @@ public record GoogleCalendarEventItem(
     }
 
     public boolean isRecurring() {
-        return isRecurrenceMaster() || isRecurrenceOccurrence();
+        return isRecurrenceEvent() || isRecurrenceOverride();
     }
 
-    public boolean isRecurrenceMaster() {
+    public boolean isRecurrenceEvent() {
         return !recurrence.isEmpty();
     }
 
-    public boolean isRecurrenceOccurrence() {
+    public boolean isRecurrenceOverride() {
         return hasText(recurringEventId);
     }
 

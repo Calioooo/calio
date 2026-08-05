@@ -1,0 +1,2 @@
+ALTER TABLE events
+    ADD COLUMN time_zone VARCHAR(255) NULL;

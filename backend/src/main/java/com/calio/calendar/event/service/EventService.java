@@ -2,6 +2,7 @@ package com.calio.calendar.event.service;
 
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
+import com.calio.calendar.common.domain.CanonicalSchedule;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.event.controller.dto.CreateEventRequest;
@@ -66,7 +67,12 @@ public class EventService {
 
     @Transactional
     public EventResponse createEvent(Long accountId, CreateEventRequest request) {
-        validateEventSchedule(request.startAt(), request.endAt(), request.allDay());
+        CanonicalSchedule.event(
+                request.startAt(),
+                request.endAt(),
+                request.allDay(),
+                request.timeZone()
+        );
         Account account = accountRepository.getReferenceById(accountId);
         Tag tag = tagService.getTagOrDefault(accountId, request.tagId());
         Event event = eventRepository.save(request.toEntity(tag, account));
@@ -82,14 +88,20 @@ public class EventService {
     public EventResponse updateEvent(Long accountId, Long eventId, UpdateEventRequest request) {
         Event event = findEvent(accountId, eventId);
         rejectExternalEventMutation(accountId, eventId);
-        validateEventSchedule(request.startAt(), request.endAt(), request.allDay());
+        CanonicalSchedule schedule = CanonicalSchedule.event(
+                request.startAt(),
+                request.endAt(),
+                request.allDay(),
+                request.timeZone()
+        );
         Tag tag = tagService.getTagOrDefault(accountId, request.tagId());
         event.replace(
                 request.title(),
                 request.description(),
-                request.startAt(),
-                request.endAt(),
-                request.allDay(),
+                schedule.startAt(),
+                schedule.endAt(),
+                schedule.allDay(),
+                schedule.timeZone(),
                 tag
         );
         eventRepository.flush();
@@ -217,22 +229,6 @@ public class EventService {
                 .existsByEvent_IdAndIntegration_AccountId(eventId, accountId)) {
             throw new CalioException(ErrorCode.EXTERNAL_EVENT_MUTATION_NOT_SUPPORTED);
         }
-    }
-
-    private void validateEventSchedule(Instant startAt, Instant endAt, boolean allDay) {
-        if (!startAt.isBefore(endAt)) {
-            throw new CalioException(ErrorCode.INVALID_TIME_RANGE);
-        }
-        if (allDay && (!isUtcMidnight(startAt) || !isUtcMidnight(endAt))) {
-            throw new CalioException(ErrorCode.INVALID_ALL_DAY_SCHEDULE);
-        }
-        if (allDay && Duration.between(startAt, endAt).compareTo(Duration.ofDays(1)) < 0) {
-            throw new CalioException(ErrorCode.INVALID_ALL_DAY_SCHEDULE);
-        }
-    }
-
-    private boolean isUtcMidnight(Instant instant) {
-        return instant.atOffset(java.time.ZoneOffset.UTC).toLocalTime().equals(java.time.LocalTime.MIDNIGHT);
     }
 
     private void validateListTimeRange(Instant from, Instant to) {
