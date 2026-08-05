@@ -32,14 +32,13 @@ public class GroupInvitationCleanupScheduler {
     public void deleteRetainedExpiredInvitations() {
         try {
             Instant cutoff = clock.instant().minus(properties.getExpiredRetention());
-            int deletedCount = deleteBatches(cutoff);
-            log.info("Group invitation cleanup finished. deletedCount={}", deletedCount);
+            deleteBatches(cutoff);
         } catch (Exception exception) {
             log.error("Group invitation cleanup failed. errorCode=GROUP_INVITATION_CLEANUP_FAILED");
         }
     }
 
-    private int deleteBatches(Instant cutoff) {
+    private void deleteBatches(Instant cutoff) {
         int totalDeleted = 0;
         for (int batch = 0; batch < properties.getCleanupMaxBatchesPerRun(); batch++) {
             int deleted = invitationService.deleteExpiredBatch(cutoff);
@@ -48,6 +47,7 @@ public class GroupInvitationCleanupScheduler {
                 break;
             }
         }
-        return totalDeleted;
+
+        log.info("Group invitation cleanup finished. deletedCount={}", totalDeleted);
     }
 }

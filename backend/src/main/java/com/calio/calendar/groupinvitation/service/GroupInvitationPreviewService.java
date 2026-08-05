@@ -11,26 +11,27 @@ import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.repository.GroupMemberRepository;
 import com.calio.calendar.groupspace.repository.GroupSpaceRepository;
 import java.time.Clock;
+import org.apache.commons.lang3.Validate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class GroupInvitationPreviewService {
 
-    private final GroupInvitationRepository invitationRepository;
+    private final GroupInvitationQueryService invitationQueryService;
     private final GroupSpaceRepository groupSpaceRepository;
     private final GroupMemberRepository groupMemberRepository;
     private final InvitationCredentialService credentialService;
     private final Clock clock;
 
     public GroupInvitationPreviewService(
-            GroupInvitationRepository invitationRepository,
+            GroupInvitationQueryService invitationQueryService,
             GroupSpaceRepository groupSpaceRepository,
             GroupMemberRepository groupMemberRepository,
             InvitationCredentialService credentialService,
             Clock clock
     ) {
-        this.invitationRepository = invitationRepository;
+        this.invitationQueryService = invitationQueryService;
         this.groupSpaceRepository = groupSpaceRepository;
         this.groupMemberRepository = groupMemberRepository;
         this.credentialService = credentialService;
@@ -43,10 +44,7 @@ public class GroupInvitationPreviewService {
                 request.credentialType(),
                 request.credential()
         );
-        GroupInvitation invitation = (switch (request.credentialType()) {
-            case LINK_TOKEN -> invitationRepository.findByLinkTokenHash(credentialHash);
-            case CODE -> invitationRepository.findByInviteCodeHash(credentialHash);
-        }).orElseThrow(GroupInvitationPreviewService::invitationNotFound);
+        GroupInvitation invitation = invitationQueryService.getInvitation(request.credentialType(), credentialHash);
 
         if (invitation.isExpiredAt(clock.instant())) {
             throw new CalioException(ErrorCode.GROUP_INVITATION_EXPIRED);
