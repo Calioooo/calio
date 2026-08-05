@@ -78,7 +78,7 @@ public class GoogleOperationWorker {
             return JobExecutionResult.STOP_ACCOUNT_PROCESSING;
         }
         if (!GoogleOperationJob.SYNC_KIND.equals(job.getKind())) {
-            if (jobPersistenceService.skipIfConflicted(job, workerToken)) {
+            if (jobPersistenceService.skipIfTargetConflicted(job, workerToken)) {
                 return JobExecutionResult.CONTINUE_WITH_NEXT_JOB;
             }
             jobPersistenceService.terminate(

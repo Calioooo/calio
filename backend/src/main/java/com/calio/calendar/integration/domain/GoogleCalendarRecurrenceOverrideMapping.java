@@ -71,19 +71,19 @@ public class GoogleCalendarRecurrenceOverrideMapping extends BaseEntity {
             GoogleCalendarRecurrenceEventMapping recurrenceEventMapping,
             RecurrenceEventOverride recurrenceEventOverride,
             String externalEventId,
-            GoogleProviderObservation observation
+            GoogleCalendarItemSnapshot googleSnapshot
     ) {
         this.recurrenceEventMapping = recurrenceEventMapping;
         this.recurrenceEventOverride = recurrenceEventOverride;
         this.externalEventId = externalEventId;
         this.syncStatus = GoogleCalendarMappingSyncStatus.ACTIVE;
-        observeProvider(observation);
+        updateGoogleSnapshot(googleSnapshot);
     }
 
-    public void observeProvider(GoogleProviderObservation observation) {
-        this.providerEtag = observation.etag();
-        this.providerUpdatedAt = observation.updatedAt();
-        this.syncedContentHash = observation.contentHash();
+    public void updateGoogleSnapshot(GoogleCalendarItemSnapshot googleSnapshot) {
+        this.providerEtag = googleSnapshot.etag();
+        this.providerUpdatedAt = googleSnapshot.updatedAt();
+        this.syncedContentHash = googleSnapshot.contentHash();
     }
 
     public void markConflicted() {

@@ -574,8 +574,8 @@ class GoogleCalendarSyncServiceTest {
                     mock(RecurrenceEventRepository.class),
                     mock(RecurrenceEventOverrideRepository.class),
                     mock(GoogleOperationJobPersistenceService.class),
-                    mock(GoogleCalendarInboundConflictService.class),
-                    mock(GoogleCalendarMappingLockCoordinator.class)
+                    mock(GoogleCalendarChangeDetectionService.class),
+                    mock(GoogleCalendarMappingLockService.class)
             );
         }
 

@@ -88,7 +88,7 @@ class GoogleCalendarProviderDataServiceTest {
                 overrideRepository,
                 null,
                 jobPersistenceService,
-                new GoogleCalendarInboundConflictService(
+                new GoogleCalendarChangeDetectionService(
                         mock(GoogleOperationJobRepository.class)),
                 mock(GoogleCalendarSyncLeaseService.class)
         );
@@ -106,8 +106,8 @@ class GoogleCalendarProviderDataServiceTest {
     }
 
     @Test
-    @DisplayName("unseen recurrence master는 pending child override branch가 있으면 conflict로 보존한다")
-    void givenPendingChildOverride_whenMasterIsUnseen_thenQuarantinesMaster() {
+    @DisplayName("조회되지 않은 반복 일정에 대기 중인 예외 일정 쓰기가 있으면 충돌로 보존한다")
+    void givenPendingOverrideWrite_whenRecurrenceEventIsUnseen_thenMarksConflict() {
         // given
         GoogleCalendarIntegrationRepository integrationRepository =
                 mock(GoogleCalendarIntegrationRepository.class);
@@ -121,18 +121,20 @@ class GoogleCalendarProviderDataServiceTest {
         GoogleOperationJobRepository jobRepository = mock(GoogleOperationJobRepository.class);
         GoogleOperationJobPersistenceService jobPersistenceService =
                 mock(GoogleOperationJobPersistenceService.class);
-        GoogleCalendarRecurrenceEventMapping master =
+        GoogleCalendarRecurrenceEventMapping recurrenceEventMapping =
                 mock(GoogleCalendarRecurrenceEventMapping.class);
         RecurrenceEvent recurrenceEvent = mock(RecurrenceEvent.class);
-        when(master.getId()).thenReturn(10L);
-        when(master.getExternalEventId()).thenReturn("master-1");
-        when(master.getRecurrenceEvent()).thenReturn(recurrenceEvent);
+        when(recurrenceEventMapping.getId()).thenReturn(10L);
+        when(recurrenceEventMapping.getExternalEventId()).thenReturn("recurrence-event-1");
+        when(recurrenceEventMapping.getRecurrenceEvent()).thenReturn(recurrenceEvent);
         when(recurrenceEvent.getId()).thenReturn(100L);
-        String recurrenceBaseline =
-                GoogleProviderContentProjector.recurrenceMaster(recurrenceEvent);
-        when(master.getSyncedContentHash()).thenReturn(recurrenceBaseline);
+        String lastSyncedContentHash =
+                GoogleCalendarContentHasher.hashRecurrenceEvent(recurrenceEvent);
+        when(recurrenceEventMapping.getSyncedContentHash())
+                .thenReturn(lastSyncedContentHash);
         when(recurrenceMappingRepository.findNextBatchWithRecurrenceEventByIntegrationIdAfterIdForUpdate(
-                eq(1L), eq(0L), any(Pageable.class))).thenReturn(List.of(master));
+                eq(1L), eq(0L), any(Pageable.class)))
+                .thenReturn(List.of(recurrenceEventMapping));
         when(recurrenceMappingRepository.findNextBatchWithRecurrenceEventByIntegrationIdAfterIdForUpdate(
                 eq(1L), eq(10L), any(Pageable.class))).thenReturn(List.of());
         when(overrideMappingRepository
@@ -140,7 +142,7 @@ class GoogleCalendarProviderDataServiceTest {
                         eq(1L), eq(0L), any(Pageable.class))).thenReturn(List.of());
         when(eventMappingRepository.findNextBatchWithEventByIntegrationIdAfterIdForUpdate(
                 eq(1L), eq(0L), any(Pageable.class))).thenReturn(List.of());
-        when(jobRepository.countPendingRecurrenceAggregateBranches(
+        when(jobRepository.countPendingRecurrenceChanges(
                 eq(2L), eq(1L), eq("100"), eq("100:"), eq(4)))
                 .thenReturn(1L);
         when(integrationRepository.extendSyncLease(1L, "run-1")).thenReturn(1);
@@ -151,7 +153,7 @@ class GoogleCalendarProviderDataServiceTest {
                 mock(RecurrenceEventRepository.class),
                 mock(RecurrenceEventOverrideRepository.class), null,
                 jobPersistenceService,
-                new GoogleCalendarInboundConflictService(jobRepository),
+                new GoogleCalendarChangeDetectionService(jobRepository),
                 mock(GoogleCalendarSyncLeaseService.class));
 
         // when
@@ -160,8 +162,8 @@ class GoogleCalendarProviderDataServiceTest {
                 Set.of(), Set.of(), Set.of(), "next-token");
 
         // then
-        verify(master).markConflicted();
-        verify(jobPersistenceService).markConflictDetected(9L, 2L, "run-1");
+        verify(recurrenceEventMapping).markConflicted();
+        verify(jobPersistenceService).markMappingConflict(9L, 2L, "run-1");
         verify(recurrenceMappingRepository, never()).deleteAllByIds(any());
     }
 
@@ -195,7 +197,7 @@ class GoogleCalendarProviderDataServiceTest {
         when(eventMapping.getExternalEventId()).thenReturn("unseen-event");
         when(eventMapping.getEvent()).thenReturn(event);
         when(event.getId()).thenReturn(20L);
-        String eventBaseline = GoogleProviderContentProjector.event(event);
+        String eventBaseline = GoogleCalendarContentHasher.hashEvent(event);
         when(eventMapping.getSyncedContentHash()).thenReturn(eventBaseline);
         when(overrideMappingRepository
                 .findNextBatchWithRecurrenceEventMappingAndRecurrenceEventOverrideByIntegrationIdAfterIdForUpdate(
@@ -230,7 +232,7 @@ class GoogleCalendarProviderDataServiceTest {
                 overrideRepository,
                 null,
                 operationJobPersistenceService,
-                new GoogleCalendarInboundConflictService(
+                new GoogleCalendarChangeDetectionService(
                         mock(GoogleOperationJobRepository.class)),
                 syncLeaseService
         );

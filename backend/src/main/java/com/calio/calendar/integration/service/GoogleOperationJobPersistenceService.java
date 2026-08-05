@@ -26,18 +26,18 @@ public class GoogleOperationJobPersistenceService {
     private final GoogleCalendarIntegrationRepository integrationRepository;
     private final GoogleOperationJobRepository jobRepository;
     private final Clock clock;
-    private final GoogleCalendarMappingLockCoordinator mappingLockCoordinator;
+    private final GoogleCalendarMappingLockService mappingLockService;
 
     public GoogleOperationJobPersistenceService(
             GoogleCalendarIntegrationRepository integrationRepository,
             GoogleOperationJobRepository jobRepository,
             Clock clock,
-            GoogleCalendarMappingLockCoordinator mappingLockCoordinator
+            GoogleCalendarMappingLockService mappingLockService
     ) {
         this.integrationRepository = integrationRepository;
         this.jobRepository = jobRepository;
         this.clock = clock;
-        this.mappingLockCoordinator = mappingLockCoordinator;
+        this.mappingLockService = mappingLockService;
     }
 
     @Transactional
@@ -105,7 +105,7 @@ public class GoogleOperationJobPersistenceService {
 
     @Transactional
     public void succeed(Long jobId, Long accountId, String workerToken) {
-        if (jobRepository.terminalizeOwnedConflict(jobId, accountId, workerToken) == 1) {
+        if (jobRepository.finishOwnedJobAsConflicted(jobId, accountId, workerToken) == 1) {
             log.info("Google sync job retained after mapping conflict. accountId={} jobId={} state=CONFLICTED",
                     accountId, jobId);
             return;
@@ -120,20 +120,20 @@ public class GoogleOperationJobPersistenceService {
     }
 
     @Transactional
-    public void markConflictDetected(Long jobId, Long accountId, String workerToken) {
-        if (jobRepository.markConflictDetected(jobId, accountId, workerToken) != 1) {
+    public void markMappingConflict(Long jobId, Long accountId, String workerToken) {
+        if (jobRepository.markMappingConflict(jobId, accountId, workerToken) != 1) {
             throw new GoogleOperationOwnershipLostException();
         }
     }
 
     @Transactional
-    public boolean skipIfConflicted(GoogleOperationJob job, String workerToken) {
-        if (!job.hasCanonicalEffectiveScope()
-                || !mappingLockCoordinator.isConflictedAfterLock(
-                job.getIntegrationId(), job.getEffectiveScope())) {
+    public boolean skipIfTargetConflicted(GoogleOperationJob job, String workerToken) {
+        if (!job.hasItemSyncTarget()
+                || !mappingLockService.isTargetConflictedAfterLocking(
+                job.getIntegrationId(), job.getSyncTarget())) {
             return false;
         }
-        if (jobRepository.skipOwnedConflicted(
+        if (jobRepository.skipOwnedJobBecauseMappingConflicted(
                 job.getId(), job.getAccountId(), workerToken) != 1) {
             throw new GoogleOperationOwnershipLostException();
         }

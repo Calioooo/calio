@@ -11,7 +11,7 @@ import static org.mockito.Mockito.when;
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.integration.domain.GoogleCalendarIntegration;
-import com.calio.calendar.integration.domain.GoogleCalendarEffectiveScope;
+import com.calio.calendar.integration.domain.GoogleCalendarSyncTarget;
 import com.calio.calendar.integration.domain.GoogleContentHash;
 import com.calio.calendar.integration.domain.GoogleOperationJob;
 import com.calio.calendar.integration.domain.GoogleOperationJobState;
@@ -96,8 +96,8 @@ class GoogleOperationProducerTransactionTest {
                     assertThat(job.getTrigger())
                             .isEqualTo(GoogleOperationJobTrigger.CANONICAL_MUTATION);
                     assertThat(job.getState()).isEqualTo(GoogleOperationJobState.PENDING);
-                    assertThat(job.getEffectiveScope()).isEqualTo(
-                            GoogleCalendarEffectiveScope.generalEvent(task.getTaskId())
+                    assertThat(job.getSyncTarget()).isEqualTo(
+                            GoogleCalendarSyncTarget.event(task.getTaskId())
                     );
                 });
         verify(worker).wake(account.getId());
@@ -111,7 +111,7 @@ class GoogleOperationProducerTransactionTest {
         integrationRepository.saveAndFlush(integration(account.getId()));
         OutboundJobDraft invalidDraft = new OutboundJobDraft(
                 GoogleOperationJob.SYNC_KIND,
-                GoogleCalendarEffectiveScope.generalEvent(1L),
+                GoogleCalendarSyncTarget.event(1L),
                 null,
                 "{}",
                 GoogleContentHash.digest("TEST", "invalid")
@@ -167,44 +167,44 @@ class GoogleOperationProducerTransactionTest {
     }
 
     @Test
-    @DisplayName("conflicted scope는 mapping을 먼저 잠근 뒤 canonical만 변경한다")
+    @DisplayName("동기화 대상이 충돌 상태면 매핑을 잠근 뒤 Calio 데이터만 변경한다")
     void givenConflictedScope_whenMutating_thenLocksMappingFirstAndKeepsMutationLocal() {
         // given
         GoogleCalendarIntegrationRepository integrations =
                 mock(GoogleCalendarIntegrationRepository.class);
         GoogleOperationJobRepository jobs = mock(GoogleOperationJobRepository.class);
         GoogleOperationWorker localWorker = mock(GoogleOperationWorker.class);
-        GoogleCalendarMappingLockCoordinator lockCoordinator =
-                mock(GoogleCalendarMappingLockCoordinator.class);
+        GoogleCalendarMappingLockService mappingLockService =
+                mock(GoogleCalendarMappingLockService.class);
         GoogleCalendarIntegration integration = mock(GoogleCalendarIntegration.class);
-        GoogleCalendarEffectiveScope scope = GoogleCalendarEffectiveScope.generalEvent(99L);
+        GoogleCalendarSyncTarget syncTarget = GoogleCalendarSyncTarget.event(99L);
         @SuppressWarnings("unchecked")
         Supplier<String> mutation = mock(Supplier.class);
         when(integration.getId()).thenReturn(3L);
         when(integrations.findByAccountId(2L)).thenReturn(Optional.of(integration));
-        when(lockCoordinator.isConflictedAfterLock(3L, scope)).thenReturn(true);
+        when(mappingLockService.isTargetConflictedAfterLocking(3L, syncTarget)).thenReturn(true);
         when(integrations.findByAccountIdForUpdate(2L)).thenReturn(Optional.of(integration));
         when(mutation.get()).thenReturn("local-result");
         GoogleOperationProducerTransaction transaction =
                 new GoogleOperationProducerTransaction(
-                        integrations, jobs, localWorker, Clock.systemUTC(), lockCoordinator
+                        integrations, jobs, localWorker, Clock.systemUTC(), mappingLockService
                 );
 
         // when
         String result = transaction.mutate(
                 2L,
-                scope,
+                syncTarget,
                 mutation,
                 mutated -> new OutboundJobDraft(
-                        "EVENT_UPSERT", scope, null, "{}",
+                        "EVENT_UPSERT", syncTarget, null, "{}",
                         GoogleContentHash.digest("TEST", "desired"))
         );
 
         // then
         assertThat(result).isEqualTo("local-result");
-        InOrder order = inOrder(integrations, lockCoordinator, mutation);
+        InOrder order = inOrder(integrations, mappingLockService, mutation);
         order.verify(integrations).findByAccountId(2L);
-        order.verify(lockCoordinator).isConflictedAfterLock(3L, scope);
+        order.verify(mappingLockService).isTargetConflictedAfterLocking(3L, syncTarget);
         order.verify(integrations).findByAccountIdForUpdate(2L);
         order.verify(mutation).get();
         verify(jobs, never()).saveAndFlush(org.mockito.ArgumentMatchers.any());
@@ -214,7 +214,7 @@ class GoogleOperationProducerTransactionTest {
     private OutboundJobDraft outboundDraft(Long eventId) {
         return new OutboundJobDraft(
                 "EVENT_UPSERT",
-                GoogleCalendarEffectiveScope.generalEvent(eventId),
+                GoogleCalendarSyncTarget.event(eventId),
                 null,
                 "{}",
                 GoogleContentHash.digest("TEST", "desired")

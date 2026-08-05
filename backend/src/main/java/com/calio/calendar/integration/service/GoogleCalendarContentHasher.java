@@ -3,7 +3,7 @@ package com.calio.calendar.integration.service;
 import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.external.google.GoogleCalendarEventTimeNormalizer.NormalizedEventSchedule;
 import com.calio.calendar.integration.domain.GoogleContentHash;
-import com.calio.calendar.integration.domain.GoogleProviderObservation;
+import com.calio.calendar.integration.domain.GoogleCalendarItemSnapshot;
 import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.ActiveRecurrenceEventOverrideUpsert;
 import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.EventUpsert;
 import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.RecurrenceEventOverrideUpsert;
@@ -13,86 +13,88 @@ import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import java.time.Instant;
 import java.util.List;
 
-public final class GoogleProviderContentProjector {
+public final class GoogleCalendarContentHasher {
 
-    private GoogleProviderContentProjector() {
+    private GoogleCalendarContentHasher() {
     }
 
-    public static GoogleProviderObservation eventObservation(EventUpsert item) {
-        return new GoogleProviderObservation(
-                item.googleEtag(), item.googleUpdatedAt(), event(item)
+    public static GoogleCalendarItemSnapshot snapshotForEvent(EventUpsert item) {
+        return new GoogleCalendarItemSnapshot(
+                item.googleEtag(), item.googleUpdatedAt(), hashEvent(item)
         );
     }
 
-    public static GoogleProviderObservation recurrenceEventObservation(
+    public static GoogleCalendarItemSnapshot snapshotForRecurrenceEvent(
             RecurrenceEventUpsert item
     ) {
-        return new GoogleProviderObservation(
-                item.googleEtag(), item.googleUpdatedAt(), recurrenceMaster(item)
+        return new GoogleCalendarItemSnapshot(
+                item.googleEtag(), item.googleUpdatedAt(), hashRecurrenceEvent(item)
         );
     }
 
-    public static GoogleProviderObservation recurrenceEventOverrideObservation(
+    public static GoogleCalendarItemSnapshot snapshotForRecurrenceOverride(
             RecurrenceEventOverrideUpsert item
     ) {
-        return new GoogleProviderObservation(
-                item.googleEtag(), item.googleUpdatedAt(), recurrenceOverride(item)
+        return new GoogleCalendarItemSnapshot(
+                item.googleEtag(), item.googleUpdatedAt(), hashRecurrenceOverride(item)
         );
     }
 
-    public static String event(EventUpsert item) {
-        return event(item.title(), item.description(), item.schedule());
+    public static String hashEvent(EventUpsert item) {
+        return hashEvent(item.title(), item.description(), item.schedule());
     }
 
-    public static String event(Event event) {
-        return scheduleDigest("GENERAL_EVENT", event.getTitle(), event.getDescription(),
+    public static String hashEvent(Event event) {
+        return hashSchedule("GENERAL_EVENT", event.getTitle(), event.getDescription(),
                 event.getStartAt(), event.getEndAt(), event.isAllDay(), event.getTimeZone());
     }
 
-    public static String recurrenceMaster(RecurrenceEventUpsert item) {
-        return recurrenceMaster(item.title(), item.description(), item.schedule(),
+    public static String hashRecurrenceEvent(RecurrenceEventUpsert item) {
+        return hashRecurrenceEvent(item.title(), item.description(), item.schedule(),
                 item.recurrenceRules());
     }
 
-    public static String recurrenceMaster(RecurrenceEvent event) {
+    public static String hashRecurrenceEvent(RecurrenceEvent event) {
         return GoogleContentHash.digest("RECURRENCE_MASTER", event.getRecurrenceTitle(),
                 event.getRecurrenceDescription(), event.getFirstOccurrenceStartAt(),
                 event.getFirstOccurrenceEndAt(), event.isAllDay(), event.getTimeZone(),
-                recurrenceContent(event.getRecurrenceRules()));
+                encodeRecurrenceRules(event.getRecurrenceRules()));
     }
 
-    public static String recurrenceOverride(RecurrenceEventOverrideUpsert item) {
+    public static String hashRecurrenceOverride(RecurrenceEventOverrideUpsert item) {
         if (item instanceof ActiveRecurrenceEventOverrideUpsert active) {
-            return overrideActive(active.recurrenceEventExternalId(), active.originStartAt(),
+            return hashActiveOverride(active.recurrenceEventExternalId(), active.originStartAt(),
                     active.title(), active.description(), active.schedule());
         }
-        return overrideDeleted(item.recurrenceEventExternalId(), item.originStartAt());
+        return hashDeletedOverride(item.recurrenceEventExternalId(), item.originStartAt());
     }
 
-    public static String recurrenceOverride(
-            String externalMasterId,
+    public static String hashRecurrenceOverride(
+            String recurrenceEventExternalId,
             RecurrenceEventOverride override
     ) {
         if (override.isDeleted()) {
-            return overrideDeleted(externalMasterId, override.getOriginStartAt());
+            return hashDeletedOverride(
+                    recurrenceEventExternalId, override.getOriginStartAt()
+            );
         }
-        return scheduleDigest("RECURRENCE_OVERRIDE_ACTIVE", externalMasterId,
+        return hashSchedule("RECURRENCE_OVERRIDE_ACTIVE", recurrenceEventExternalId,
                 override.getOriginStartAt(), override.getOverrideTitle(),
                 override.getOverrideDescription(), override.getOverrideStartAt(),
                 override.getOverrideEndAt(), override.isOverrideAllDay(),
                 override.getOverrideTimeZone());
     }
 
-    private static String event(
+    private static String hashEvent(
             String title,
             String description,
             NormalizedEventSchedule schedule
     ) {
-        return scheduleDigest("GENERAL_EVENT", title, description, schedule.startAt(),
+        return hashSchedule("GENERAL_EVENT", title, description, schedule.startAt(),
                 schedule.endAt(), schedule.allDay(), schedule.timeZone());
     }
 
-    private static String recurrenceMaster(
+    private static String hashRecurrenceEvent(
             String title,
             String description,
             NormalizedEventSchedule schedule,
@@ -100,36 +102,40 @@ public final class GoogleProviderContentProjector {
     ) {
         return GoogleContentHash.digest("RECURRENCE_MASTER", title, description,
                 schedule.startAt(), schedule.endAt(), schedule.allDay(), schedule.timeZone(),
-                recurrenceContent(recurrenceRules));
+                encodeRecurrenceRules(recurrenceRules));
     }
 
-    private static String overrideActive(
-            String externalMasterId,
+    private static String hashActiveOverride(
+            String recurrenceEventExternalId,
             Instant originStartAt,
             String title,
             String description,
             NormalizedEventSchedule schedule
     ) {
-        return scheduleDigest("RECURRENCE_OVERRIDE_ACTIVE", externalMasterId, originStartAt,
+        return hashSchedule("RECURRENCE_OVERRIDE_ACTIVE", recurrenceEventExternalId,
+                originStartAt,
                 title, description, schedule.startAt(), schedule.endAt(), schedule.allDay(),
                 schedule.timeZone());
     }
 
-    private static String overrideDeleted(String externalMasterId, Instant originStartAt) {
+    private static String hashDeletedOverride(
+            String recurrenceEventExternalId,
+            Instant originStartAt
+    ) {
         return GoogleContentHash.digest(
-                "RECURRENCE_OVERRIDE_DELETED", externalMasterId, originStartAt
+                "RECURRENCE_OVERRIDE_DELETED", recurrenceEventExternalId, originStartAt
         );
     }
 
-    private static String scheduleDigest(String type, Object... fields) {
+    private static String hashSchedule(String type, Object... fields) {
         return GoogleContentHash.digest(type, fields);
     }
 
-    private static String recurrenceContent(List<String> recurrenceRules) {
-        StringBuilder canonical = new StringBuilder();
+    private static String encodeRecurrenceRules(List<String> recurrenceRules) {
+        StringBuilder encodedRules = new StringBuilder();
         for (String rule : recurrenceRules) {
-            canonical.append(rule.length()).append(':').append(rule);
+            encodedRules.append(rule.length()).append(':').append(rule);
         }
-        return canonical.toString();
+        return encodedRules.toString();
     }
 }

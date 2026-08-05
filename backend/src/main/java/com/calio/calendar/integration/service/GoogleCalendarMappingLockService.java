@@ -2,7 +2,7 @@ package com.calio.calendar.integration.service;
 
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
-import com.calio.calendar.integration.domain.GoogleCalendarEffectiveScope;
+import com.calio.calendar.integration.domain.GoogleCalendarSyncTarget;
 import com.calio.calendar.integration.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.domain.GoogleCalendarMappingSyncStatus;
 import com.calio.calendar.integration.domain.GoogleCalendarRecurrenceEventMapping;
@@ -23,23 +23,26 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 
 @Service
-public class GoogleCalendarMappingLockCoordinator {
+public class GoogleCalendarMappingLockService {
 
-    private final GoogleCalendarEventMappingRepository eventMappings;
-    private final GoogleCalendarRecurrenceEventMappingRepository recurrenceEventMappings;
-    private final GoogleCalendarRecurrenceOverrideMappingRepository overrideMappings;
+    private final GoogleCalendarEventMappingRepository eventMappingRepository;
+    private final GoogleCalendarRecurrenceEventMappingRepository
+            recurrenceEventMappingRepository;
+    private final GoogleCalendarRecurrenceOverrideMappingRepository
+            overrideMappingRepository;
 
-    public GoogleCalendarMappingLockCoordinator(
-            GoogleCalendarEventMappingRepository eventMappings,
-            GoogleCalendarRecurrenceEventMappingRepository recurrenceEventMappings,
-            GoogleCalendarRecurrenceOverrideMappingRepository overrideMappings
+    public GoogleCalendarMappingLockService(
+            GoogleCalendarEventMappingRepository eventMappingRepository,
+            GoogleCalendarRecurrenceEventMappingRepository
+                    recurrenceEventMappingRepository,
+            GoogleCalendarRecurrenceOverrideMappingRepository overrideMappingRepository
     ) {
-        this.eventMappings = eventMappings;
-        this.recurrenceEventMappings = recurrenceEventMappings;
-        this.overrideMappings = overrideMappings;
+        this.eventMappingRepository = eventMappingRepository;
+        this.recurrenceEventMappingRepository = recurrenceEventMappingRepository;
+        this.overrideMappingRepository = overrideMappingRepository;
     }
 
-    public LockedMappings lockPage(Long integrationId, List<NormalizedItem> items) {
+    public LockedMappingIndex lockMappingsForPage(Long integrationId, List<NormalizedItem> items) {
         Set<String> externalEventIds = items.stream()
                 .map(NormalizedItem::externalEventId)
                 .collect(Collectors.toCollection(TreeSet::new));
@@ -52,65 +55,69 @@ public class GoogleCalendarMappingLockCoordinator {
 
         Map<String, GoogleCalendarEventMapping> lockedEvents = externalEventIds.isEmpty()
                 ? new HashMap<>()
-                : indexEvents(eventMappings.findAllWithEventByExternalIdentityForUpdate(
-                        integrationId,
-                        GoogleCalendarEventMapping.PRIMARY_CALENDAR_KEY,
-                        externalEventIds
-                ));
+                : indexEvents(eventMappingRepository
+                        .findAllWithEventByExternalIdentityForUpdate(
+                                integrationId,
+                                GoogleCalendarEventMapping.PRIMARY_CALENDAR_KEY,
+                                externalEventIds
+                        ));
         Map<String, GoogleCalendarRecurrenceEventMapping> lockedRecurrenceEvents =
                 recurrenceEventExternalIds.isEmpty()
                         ? new HashMap<>()
-                        : indexRecurrenceEvents(recurrenceEventMappings
-                        .findAllWithRecurrenceEventAndTagByExternalIdentityForUpdate(
-                                integrationId,
-                                GoogleCalendarRecurrenceEventMapping.PRIMARY_CALENDAR_KEY,
-                                recurrenceEventExternalIds
-                        ));
+                        : indexRecurrenceEvents(recurrenceEventMappingRepository
+                                .findAllWithRecurrenceEventAndTagByExternalIdentityForUpdate(
+                                        integrationId,
+                                        GoogleCalendarRecurrenceEventMapping.PRIMARY_CALENDAR_KEY,
+                                        recurrenceEventExternalIds
+                                ));
 
-        Map<String, String> expectedMastersByOverride = expectedMastersByOverride(items);
-        Map<OverrideMappingKey, GoogleCalendarRecurrenceOverrideMapping> lockedOverrides =
-                expectedMastersByOverride.isEmpty()
+        Map<String, String> expectedRecurrenceEventIdsByOverrideId =
+                findExpectedRecurrenceEventIdsByOverrideId(items);
+        Map<RecurrenceOverrideMappingKey, GoogleCalendarRecurrenceOverrideMapping> lockedOverrides =
+                expectedRecurrenceEventIdsByOverrideId.isEmpty()
                         ? new HashMap<>()
                         : indexAndValidateOverrides(
                                 integrationId,
-                                expectedMastersByOverride,
-                                overrideMappings
+                                expectedRecurrenceEventIdsByOverrideId,
+                                overrideMappingRepository
                                         .findAllWithRecurrenceEventMappingAndRecurrenceEventOverrideByExternalEventIdsForUpdate(
                                                 integrationId,
                                                 GoogleCalendarRecurrenceEventMapping
                                                         .PRIMARY_CALENDAR_KEY,
-                                                new TreeSet<>(expectedMastersByOverride.keySet())
+                                                new TreeSet<>(
+                                                        expectedRecurrenceEventIdsByOverrideId
+                                                                .keySet())
                                         )
                         );
-        return new LockedMappings(lockedEvents, lockedRecurrenceEvents, lockedOverrides);
+        return new LockedMappingIndex(lockedEvents, lockedRecurrenceEvents, lockedOverrides);
     }
 
-    public boolean isConflictedAfterLock(
+    public boolean isTargetConflictedAfterLocking(
             Long integrationId,
-            GoogleCalendarEffectiveScope scope
+            GoogleCalendarSyncTarget syncTarget
     ) {
-        return switch (scope) {
-            case GoogleCalendarEffectiveScope.GeneralEvent event -> eventMappings
+        return switch (syncTarget) {
+            case GoogleCalendarSyncTarget.Event event -> eventMappingRepository
                     .findWithEventByIntegrationIdAndEventIdForUpdate(
                             integrationId, event.eventId())
                     .map(this::isConflicted)
                     .orElse(false);
-            case GoogleCalendarEffectiveScope.RecurrenceMaster recurrenceEvent ->
-                    recurrenceEventMappings
+            case GoogleCalendarSyncTarget.RecurrenceEvent recurrenceEvent ->
+                    recurrenceEventMappingRepository
                             .findWithRecurrenceEventByIntegrationIdAndRecurrenceEventIdForUpdate(
                                     integrationId, recurrenceEvent.recurrenceEventId())
                             .map(this::isConflicted)
                             .orElse(false);
-            case GoogleCalendarEffectiveScope.RecurrenceOverride override -> {
-                boolean masterConflicted = recurrenceEventMappings
+            case GoogleCalendarSyncTarget.RecurrenceOverride override -> {
+                boolean recurrenceEventConflicted = recurrenceEventMappingRepository
                         .findWithRecurrenceEventByIntegrationIdAndRecurrenceEventIdForUpdate(
                                 integrationId, override.recurrenceEventId())
                         .map(this::isConflicted)
                         .orElse(false);
-                if (masterConflicted) {
+                if (recurrenceEventConflicted) {
                     yield true;
                 }
-                yield overrideMappings
+                yield overrideMappingRepository
                         .findWithRecurrenceEventMappingAndRecurrenceEventOverrideByScopeForUpdate(
                                 integrationId,
                                 override.recurrenceEventId(),
@@ -144,44 +151,49 @@ public class GoogleCalendarMappingLockCoordinator {
         ));
     }
 
-    private Map<String, String> expectedMastersByOverride(List<NormalizedItem> items) {
-        Map<String, String> expectedMasters = new HashMap<>();
+    private Map<String, String> findExpectedRecurrenceEventIdsByOverrideId(
+            List<NormalizedItem> items
+    ) {
+        Map<String, String> recurrenceEventIdsByOverrideId = new HashMap<>();
         items.stream()
                 .filter(RecurrenceEventOverrideUpsert.class::isInstance)
                 .map(RecurrenceEventOverrideUpsert.class::cast)
                 .forEach(override -> {
-                    String previous = expectedMasters.putIfAbsent(
-                            override.externalEventId(),
-                            override.recurrenceEventExternalId()
-                    );
-                    if (previous != null
-                            && !previous.equals(override.recurrenceEventExternalId())) {
+                    String previousRecurrenceEventId = recurrenceEventIdsByOverrideId
+                            .putIfAbsent(
+                                    override.externalEventId(),
+                                    override.recurrenceEventExternalId()
+                            );
+                    if (previousRecurrenceEventId != null
+                            && !previousRecurrenceEventId.equals(
+                                    override.recurrenceEventExternalId())) {
                         throw invalidResponse();
                     }
                 });
-        return expectedMasters;
+        return recurrenceEventIdsByOverrideId;
     }
 
-    private Map<OverrideMappingKey, GoogleCalendarRecurrenceOverrideMapping>
+    private Map<RecurrenceOverrideMappingKey, GoogleCalendarRecurrenceOverrideMapping>
             indexAndValidateOverrides(
                     Long integrationId,
-                    Map<String, String> expectedMasters,
+                    Map<String, String> expectedRecurrenceEventIdsByOverrideId,
                     Collection<GoogleCalendarRecurrenceOverrideMapping> mappings
             ) {
-        Map<OverrideMappingKey, GoogleCalendarRecurrenceOverrideMapping> indexed =
+        Map<RecurrenceOverrideMappingKey, GoogleCalendarRecurrenceOverrideMapping> indexed =
                 new HashMap<>();
         for (GoogleCalendarRecurrenceOverrideMapping mapping : mappings) {
             if (!mapping.getRecurrenceEventMapping().getIntegration().getId()
                     .equals(integrationId)) {
                 throw invalidResponse();
             }
-            String expectedMaster = expectedMasters.get(mapping.getExternalEventId());
+            String expectedRecurrenceEventId =
+                    expectedRecurrenceEventIdsByOverrideId.get(mapping.getExternalEventId());
             if (!mapping.getRecurrenceEventMapping().getExternalEventId()
-                    .equals(expectedMaster)) {
+                    .equals(expectedRecurrenceEventId)) {
                 throw invalidResponse();
             }
             indexed.put(
-                    new OverrideMappingKey(
+                    new RecurrenceOverrideMappingKey(
                             mapping.getRecurrenceEventMapping().getId(),
                             mapping.getExternalEventId()
                     ),
@@ -207,14 +219,14 @@ public class GoogleCalendarMappingLockCoordinator {
         return new CalioException(ErrorCode.GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID);
     }
 
-    public record LockedMappings(
+    public record LockedMappingIndex(
             Map<String, GoogleCalendarEventMapping> eventMappings,
             Map<String, GoogleCalendarRecurrenceEventMapping> recurrenceEventMappings,
-            Map<OverrideMappingKey, GoogleCalendarRecurrenceOverrideMapping> overrideMappings
+            Map<RecurrenceOverrideMappingKey, GoogleCalendarRecurrenceOverrideMapping> overrideMappings
     ) {
     }
 
-    public record OverrideMappingKey(
+    public record RecurrenceOverrideMappingKey(
             Long recurrenceEventMappingId,
             String overrideExternalEventId
     ) {

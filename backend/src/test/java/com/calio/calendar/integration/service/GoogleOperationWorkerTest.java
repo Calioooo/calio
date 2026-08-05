@@ -165,21 +165,21 @@ class GoogleOperationWorkerTest {
     }
 
     @Test
-    @DisplayName("이미 충돌된 scope의 outbound Job은 provider 호출 전에 SKIPPED 처리한다")
-    void givenConflictedOutboundScope_whenWoken_thenSkipsBeforeProviderCall() {
+    @DisplayName("동기화 대상이 이미 충돌 상태면 Google 호출 전에 쓰기 작업을 건너뛴다")
+    void givenConflictedSyncTarget_whenWorkerRuns_thenSkipsBeforeGoogleCall() {
         // given
         GoogleOperationJob job = job(1L, 10L, "EVENT_UPSERT");
         when(persistenceService.acquireLease(eq(10L), anyString())).thenReturn(true);
         when(persistenceService.claimHead(eq(10L), anyString()))
                 .thenReturn(job)
                 .thenReturn(null);
-        when(persistenceService.skipIfConflicted(eq(job), anyString())).thenReturn(true);
+        when(persistenceService.skipIfTargetConflicted(eq(job), anyString())).thenReturn(true);
 
         // when
         worker.wake(10L);
 
         // then
-        verify(persistenceService, timeout()).skipIfConflicted(eq(job), anyString());
+        verify(persistenceService, timeout()).skipIfTargetConflicted(eq(job), anyString());
         verify(persistenceService, never()).terminate(
                 anyLong(), anyLong(), anyString(), anyString());
         verify(syncService, never()).executeOwned(anyLong(), anyLong(), anyString());

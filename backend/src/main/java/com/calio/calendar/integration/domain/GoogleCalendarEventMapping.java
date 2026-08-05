@@ -73,20 +73,20 @@ public class GoogleCalendarEventMapping extends BaseEntity {
             GoogleCalendarIntegration integration,
             Event event,
             String externalEventId,
-            GoogleProviderObservation observation
+            GoogleCalendarItemSnapshot googleSnapshot
     ) {
         this.integration = integration;
         this.event = event;
         this.calendarKey = PRIMARY_CALENDAR_KEY;
         this.externalEventId = externalEventId;
         this.syncStatus = GoogleCalendarMappingSyncStatus.ACTIVE;
-        observeProvider(observation);
+        updateGoogleSnapshot(googleSnapshot);
     }
 
-    public void observeProvider(GoogleProviderObservation observation) {
-        this.providerEtag = observation.etag();
-        this.providerUpdatedAt = observation.updatedAt();
-        this.syncedContentHash = observation.contentHash();
+    public void updateGoogleSnapshot(GoogleCalendarItemSnapshot googleSnapshot) {
+        this.providerEtag = googleSnapshot.etag();
+        this.providerUpdatedAt = googleSnapshot.updatedAt();
+        this.syncedContentHash = googleSnapshot.contentHash();
     }
 
     public void markConflicted() {

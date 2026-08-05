@@ -2,7 +2,7 @@ package com.calio.calendar.integration.service;
 
 import com.calio.calendar.integration.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.domain.GoogleOperationJob;
-import com.calio.calendar.integration.domain.GoogleCalendarEffectiveScope;
+import com.calio.calendar.integration.domain.GoogleCalendarSyncTarget;
 import com.calio.calendar.integration.domain.GoogleContentHash;
 import com.calio.calendar.integration.repository.GoogleCalendarIntegrationRepository;
 import com.calio.calendar.integration.repository.GoogleOperationJobRepository;
@@ -23,20 +23,20 @@ public class GoogleOperationProducerTransaction {
     private final GoogleOperationJobRepository jobRepository;
     private final GoogleOperationWorker worker;
     private final Clock clock;
-    private final GoogleCalendarMappingLockCoordinator mappingLockCoordinator;
+    private final GoogleCalendarMappingLockService mappingLockService;
 
     public GoogleOperationProducerTransaction(
             GoogleCalendarIntegrationRepository integrationRepository,
             GoogleOperationJobRepository jobRepository,
             GoogleOperationWorker worker,
             Clock clock,
-            GoogleCalendarMappingLockCoordinator mappingLockCoordinator
+            GoogleCalendarMappingLockService mappingLockService
     ) {
         this.integrationRepository = integrationRepository;
         this.jobRepository = jobRepository;
         this.worker = worker;
         this.clock = clock;
-        this.mappingLockCoordinator = mappingLockCoordinator;
+        this.mappingLockService = mappingLockService;
     }
 
     @Transactional
@@ -58,7 +58,7 @@ public class GoogleOperationProducerTransaction {
     @Transactional
     public <T> T mutate(
             Long accountId,
-            GoogleCalendarEffectiveScope effectiveScope,
+            GoogleCalendarSyncTarget syncTarget,
             Supplier<T> authorizedCanonicalMutation,
             Function<T, OutboundJobDraft> jobDraftFactory
     ) {
@@ -68,18 +68,18 @@ public class GoogleOperationProducerTransaction {
         if (observedIntegration == null) {
             return authorizedCanonicalMutation.get();
         }
-        boolean isConflicted = mappingLockCoordinator.isConflictedAfterLock(
-                observedIntegration.getId(), effectiveScope);
+        boolean mappingConflicted = mappingLockService.isTargetConflictedAfterLocking(
+                observedIntegration.getId(), syncTarget);
         GoogleCalendarIntegration integration = integrationRepository
                 .findByAccountIdForUpdate(accountId)
                 .filter(current -> current.getId().equals(observedIntegration.getId()))
                 .orElse(null);
         T mutatedResource = authorizedCanonicalMutation.get();
-        if (integration != null && !isConflicted) {
+        if (integration != null && !mappingConflicted) {
             OutboundJobDraft jobDraft = jobDraftFactory.apply(mutatedResource);
-            if (!effectiveScope.equals(jobDraft.effectiveScope())) {
+            if (!syncTarget.equals(jobDraft.syncTarget())) {
                 throw new IllegalArgumentException(
-                        "Outbound Job scope must match the locked mapping scope"
+                        "Outbound job target must match the locked mapping target"
                 );
             }
             enqueue(accountId, integration, jobDraft);
@@ -95,8 +95,9 @@ public class GoogleOperationProducerTransaction {
         jobRepository.saveAndFlush(GoogleOperationJob.outbound(
                 UUID.randomUUID().toString(), integration.getId(), accountId,
                 integration.allocateGoogleOperationSequence(), jobDraft.kind(),
-                jobDraft.effectiveScope(), jobDraft.providerIdentity(),
-                jobDraft.desiredPayload(), jobDraft.desiredContentHash(), Instant.now(clock)));
+                jobDraft.syncTarget(), jobDraft.providerIdentity(),
+                jobDraft.desiredPayload(), jobDraft.desiredGoogleContentHash(),
+                Instant.now(clock)));
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
@@ -107,13 +108,13 @@ public class GoogleOperationProducerTransaction {
 
     public record OutboundJobDraft(
             String kind,
-            GoogleCalendarEffectiveScope effectiveScope,
+            GoogleCalendarSyncTarget syncTarget,
             String providerIdentity,
             String desiredPayload,
-            String desiredContentHash
+            String desiredGoogleContentHash
     ) {
         public OutboundJobDraft {
-            GoogleContentHash.requireValid(desiredContentHash);
+            GoogleContentHash.requireValid(desiredGoogleContentHash);
         }
     }
 }

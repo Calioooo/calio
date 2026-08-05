@@ -247,7 +247,7 @@ class GoogleCalendarSyncMigrationTest {
     }
 
     @Test
-    @DisplayName("V14 empty-mapping upgrade는 durable baseline과 conflict evidence 제약을 추가한다")
+    @DisplayName("V14는 빈 매핑에도 마지막 동기화 내용과 충돌 기록 제약을 추가한다")
     void givenV13EmptyMappings_whenMigrateToV14_thenAddsConflictFoundation() throws Exception {
         // given
         String url = "jdbc:h2:mem:google-mapping-conflict-foundation;MODE=MySQL;DB_CLOSE_DELAY=-1";
@@ -276,7 +276,7 @@ class GoogleCalendarSyncMigrationTest {
     }
 
     @Test
-    @DisplayName("V14는 outbound hash와 mapping baseline/status의 잘못된 값을 DB에서 거부한다")
+    @DisplayName("V14는 Google 쓰기 해시와 매핑 동기화 값이 잘못되면 DB에서 거부한다")
     void givenInvalidConflictFoundationValues_whenPersisting_thenConstraintsRejectThem()
             throws Exception {
         // given
@@ -380,7 +380,7 @@ class GoogleCalendarSyncMigrationTest {
     private void insertOutboundJob(
             Connection connection,
             long id,
-            String desiredContentHash
+            String desiredGoogleContentHash
     ) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement("""
                 INSERT INTO google_operation_jobs (
@@ -399,7 +399,7 @@ class GoogleCalendarSyncMigrationTest {
             statement.setLong(1, id);
             statement.setString(2, "constraint-operation-" + id);
             statement.setLong(3, id);
-            statement.setString(4, desiredContentHash);
+            statement.setString(4, desiredGoogleContentHash);
             statement.executeUpdate();
         }
     }

@@ -17,7 +17,7 @@ import com.calio.calendar.event.repository.EventRepository;
 import com.calio.calendar.integration.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.domain.GoogleContentHash;
-import com.calio.calendar.integration.domain.GoogleProviderObservation;
+import com.calio.calendar.integration.domain.GoogleCalendarItemSnapshot;
 import com.calio.calendar.integration.repository.GoogleCalendarEventMappingRepository;
 import com.calio.calendar.integration.repository.GoogleCalendarIntegrationRepository;
 import com.calio.calendar.tag.repository.TagRepository;
@@ -1037,7 +1037,7 @@ class EventControllerTest {
                 integration,
                 event,
                 "external-" + eventId,
-                new GoogleProviderObservation(
+                new GoogleCalendarItemSnapshot(
                         null, null, GoogleContentHash.digest("TEST", eventId))
         ));
     }

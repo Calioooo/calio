@@ -10,7 +10,7 @@ import com.calio.calendar.integration.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.domain.GoogleCalendarRecurrenceEventMapping;
 import com.calio.calendar.integration.domain.GoogleCalendarRecurrenceOverrideMapping;
 import com.calio.calendar.integration.domain.GoogleContentHash;
-import com.calio.calendar.integration.domain.GoogleProviderObservation;
+import com.calio.calendar.integration.domain.GoogleCalendarItemSnapshot;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
@@ -93,7 +93,7 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
                         integration,
                         recurrenceEvent,
                         externalRecurrenceEventId,
-                        new GoogleProviderObservation(
+                        new GoogleCalendarItemSnapshot(
                                 etag, null,
                                 GoogleContentHash.digest("TEST", externalRecurrenceEventId))
                 )
@@ -104,7 +104,7 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
                                 eventMapping,
                                 recurrenceOverride,
                                 externalRecurrenceOverrideId,
-                                new GoogleProviderObservation(
+                                new GoogleCalendarItemSnapshot(
                                         etag, null,
                                         GoogleContentHash.digest(
                                                 "TEST", externalRecurrenceOverrideId))
@@ -371,7 +371,7 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
                 fixture.integration(),
                 recurrenceEvent,
                 externalEventId,
-                observation(externalEventId)
+                googleSnapshot(externalEventId)
         );
     }
 
@@ -404,12 +404,12 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
                 parentMapping,
                 recurrenceOverride,
                 externalEventId,
-                observation(externalEventId)
+                googleSnapshot(externalEventId)
         );
     }
 
-    private GoogleProviderObservation observation(String identity) {
-        return new GoogleProviderObservation(
+    private GoogleCalendarItemSnapshot googleSnapshot(String identity) {
+        return new GoogleCalendarItemSnapshot(
                 null, null, GoogleContentHash.digest("TEST", identity)
         );
     }

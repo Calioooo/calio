@@ -12,7 +12,7 @@ import static org.mockito.Mockito.when;
 
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
-import com.calio.calendar.integration.domain.GoogleCalendarEffectiveScope;
+import com.calio.calendar.integration.domain.GoogleCalendarSyncTarget;
 import com.calio.calendar.integration.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.domain.GoogleCalendarMappingSyncStatus;
 import com.calio.calendar.integration.domain.GoogleCalendarRecurrenceEventMapping;
@@ -31,17 +31,17 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 
-class GoogleCalendarMappingLockCoordinatorTest {
+class GoogleCalendarMappingLockServiceTest {
 
-    private final GoogleCalendarEventMappingRepository eventMappings =
+    private final GoogleCalendarEventMappingRepository eventMappingRepository =
             mock(GoogleCalendarEventMappingRepository.class);
-    private final GoogleCalendarRecurrenceEventMappingRepository recurrenceEventMappings =
+    private final GoogleCalendarRecurrenceEventMappingRepository recurrenceEventMappingRepository =
             mock(GoogleCalendarRecurrenceEventMappingRepository.class);
-    private final GoogleCalendarRecurrenceOverrideMappingRepository overrideMappings =
+    private final GoogleCalendarRecurrenceOverrideMappingRepository overrideMappingRepository =
             mock(GoogleCalendarRecurrenceOverrideMappingRepository.class);
-    private final GoogleCalendarMappingLockCoordinator coordinator =
-            new GoogleCalendarMappingLockCoordinator(
-                    eventMappings, recurrenceEventMappings, overrideMappings
+    private final GoogleCalendarMappingLockService mappingLockService =
+            new GoogleCalendarMappingLockService(
+                    eventMappingRepository, recurrenceEventMappingRepository, overrideMappingRepository
             );
 
     @Test
@@ -54,51 +54,51 @@ class GoogleCalendarMappingLockCoordinatorTest {
                 "etag",
                 Instant.parse("2026-08-05T01:00:00Z")
         );
-        when(eventMappings.findAllWithEventByExternalIdentityForUpdate(
+        when(eventMappingRepository.findAllWithEventByExternalIdentityForUpdate(
                 eq(1L), eq("primary"), anyCollection())).thenReturn(List.of());
-        when(recurrenceEventMappings
+        when(recurrenceEventMappingRepository
                 .findAllWithRecurrenceEventAndTagByExternalIdentityForUpdate(
                         eq(1L), eq("primary"), anyCollection())).thenReturn(List.of());
-        when(overrideMappings
+        when(overrideMappingRepository
                 .findAllWithRecurrenceEventMappingAndRecurrenceEventOverrideByExternalEventIdsForUpdate(
                         eq(1L), eq("primary"), anyCollection())).thenReturn(List.of());
 
-        coordinator.lockPage(1L, List.of(
+        mappingLockService.lockMappingsForPage(1L, List.of(
                 override,
                 new EventCancellation("event-1"),
                 new RecurrenceEventCancellation("recurrence-event-1")
         ));
 
-        InOrder lockOrder = inOrder(eventMappings, recurrenceEventMappings, overrideMappings);
-        lockOrder.verify(eventMappings).findAllWithEventByExternalIdentityForUpdate(
+        InOrder lockOrder = inOrder(eventMappingRepository, recurrenceEventMappingRepository, overrideMappingRepository);
+        lockOrder.verify(eventMappingRepository).findAllWithEventByExternalIdentityForUpdate(
                 eq(1L), eq("primary"), anyCollection());
-        lockOrder.verify(recurrenceEventMappings)
+        lockOrder.verify(recurrenceEventMappingRepository)
                 .findAllWithRecurrenceEventAndTagByExternalIdentityForUpdate(
                         eq(1L), eq("primary"), anyCollection());
-        lockOrder.verify(overrideMappings)
+        lockOrder.verify(overrideMappingRepository)
                 .findAllWithRecurrenceEventMappingAndRecurrenceEventOverrideByExternalEventIdsForUpdate(
                         eq(1L), eq("primary"), anyCollection());
     }
 
     @Test
-    @DisplayName("conflicted recurrence-event는 child override 조회 전에 전체 scope를 차단한다")
+    @DisplayName("반복 일정이 충돌 상태면 예외 일정을 조회하지 않고 동기화 대상을 차단한다")
     void givenConflictedRecurrenceEvent_whenCheckingOverride_thenSkipsOverrideLock() {
         GoogleCalendarRecurrenceEventMapping recurrenceEvent =
                 mock(GoogleCalendarRecurrenceEventMapping.class);
         when(recurrenceEvent.getSyncStatus())
                 .thenReturn(GoogleCalendarMappingSyncStatus.CONFLICTED);
-        when(recurrenceEventMappings
+        when(recurrenceEventMappingRepository
                 .findWithRecurrenceEventByIntegrationIdAndRecurrenceEventIdForUpdate(1L, 10L))
                 .thenReturn(Optional.of(recurrenceEvent));
 
-        boolean conflicted = coordinator.isConflictedAfterLock(
+        boolean conflicted = mappingLockService.isTargetConflictedAfterLocking(
                 1L,
-                GoogleCalendarEffectiveScope.recurrenceOverride(
+                GoogleCalendarSyncTarget.recurrenceOverride(
                         10L, Instant.parse("2026-08-05T00:00:00Z"))
         );
 
         assertThat(conflicted).isTrue();
-        verify(overrideMappings, never())
+        verify(overrideMappingRepository, never())
                 .findWithRecurrenceEventMappingAndRecurrenceEventOverrideByScopeForUpdate(
                         eq(1L), eq(10L), eq(Instant.parse("2026-08-05T00:00:00Z"))
                 );
@@ -126,17 +126,17 @@ class GoogleCalendarMappingLockCoordinatorTest {
                 .thenReturn("other-recurrence-event");
         when(existingOverride.getRecurrenceEventMapping()).thenReturn(existingRecurrenceEvent);
         when(existingOverride.getExternalEventId()).thenReturn("override-1");
-        when(eventMappings.findAllWithEventByExternalIdentityForUpdate(
+        when(eventMappingRepository.findAllWithEventByExternalIdentityForUpdate(
                 eq(1L), eq("primary"), anyCollection())).thenReturn(List.of());
-        when(recurrenceEventMappings
+        when(recurrenceEventMappingRepository
                 .findAllWithRecurrenceEventAndTagByExternalIdentityForUpdate(
                         eq(1L), eq("primary"), anyCollection())).thenReturn(List.of());
-        when(overrideMappings
+        when(overrideMappingRepository
                 .findAllWithRecurrenceEventMappingAndRecurrenceEventOverrideByExternalEventIdsForUpdate(
                         eq(1L), eq("primary"), anyCollection()))
                 .thenReturn(List.of(existingOverride));
 
-        assertThatThrownBy(() -> coordinator.lockPage(1L, List.of(override)))
+        assertThatThrownBy(() -> mappingLockService.lockMappingsForPage(1L, List.of(override)))
                 .isInstanceOfSatisfying(CalioException.class, exception ->
                         assertThat(exception.getErrorCode())
                                 .isEqualTo(ErrorCode.GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID));

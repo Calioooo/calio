@@ -11,7 +11,7 @@ import com.calio.calendar.integration.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.domain.GoogleCalendarRecurrenceEventMapping;
 import com.calio.calendar.integration.domain.GoogleCalendarRecurrenceOverrideMapping;
 import com.calio.calendar.integration.domain.GoogleContentHash;
-import com.calio.calendar.integration.domain.GoogleProviderObservation;
+import com.calio.calendar.integration.domain.GoogleCalendarItemSnapshot;
 import com.calio.calendar.integration.repository.GoogleCalendarEventMappingRepository;
 import com.calio.calendar.integration.repository.GoogleCalendarIntegrationRepository;
 import com.calio.calendar.integration.repository.GoogleCalendarRecurrenceEventMappingRepository;
@@ -146,7 +146,7 @@ class GoogleCalendarIntegrationPersistenceServiceTest {
         );
         GoogleCalendarRecurrenceEventMapping parentMapping =
                 recurrenceMappingRepository.saveAndFlush(new GoogleCalendarRecurrenceEventMapping(
-                        integration, providerRecurrence, "master-1", observation("master-1")
+                        integration, providerRecurrence, "master-1", googleSnapshot("master-1")
                 ));
         RecurrenceEventOverride providerOverride = overrideRepository.saveAndFlush(
                 RecurrenceEventOverride.deleted(
@@ -156,7 +156,7 @@ class GoogleCalendarIntegrationPersistenceServiceTest {
                 )
         );
         overrideMappingRepository.saveAndFlush(new GoogleCalendarRecurrenceOverrideMapping(
-                parentMapping, providerOverride, "exception-1", observation("exception-1")
+                parentMapping, providerOverride, "exception-1", googleSnapshot("exception-1")
         ));
         RecurrenceEvent localRecurrence = recurrenceEventRepository.saveAndFlush(
                 recurrenceEvent(account, defaultTag, "Local")
@@ -196,13 +196,13 @@ class GoogleCalendarIntegrationPersistenceServiceTest {
                 integration,
                 event,
                 externalEventId,
-                observation(externalEventId)
+                googleSnapshot(externalEventId)
         ));
         return event;
     }
 
-    private GoogleProviderObservation observation(String identity) {
-        return new GoogleProviderObservation(
+    private GoogleCalendarItemSnapshot googleSnapshot(String identity) {
+        return new GoogleCalendarItemSnapshot(
                 null, null, GoogleContentHash.digest("TEST", identity)
         );
     }

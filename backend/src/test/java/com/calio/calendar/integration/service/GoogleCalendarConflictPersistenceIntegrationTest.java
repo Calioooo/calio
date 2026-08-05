@@ -8,14 +8,14 @@ import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.event.repository.EventRepository;
 import com.calio.calendar.external.google.GoogleCalendarEventTimeNormalizer.NormalizedEventSchedule;
-import com.calio.calendar.integration.domain.GoogleCalendarEffectiveScope;
+import com.calio.calendar.integration.domain.GoogleCalendarSyncTarget;
 import com.calio.calendar.integration.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.domain.GoogleCalendarMappingSyncStatus;
 import com.calio.calendar.integration.domain.GoogleContentHash;
 import com.calio.calendar.integration.domain.GoogleOperationJob;
 import com.calio.calendar.integration.domain.GoogleOperationJobTrigger;
-import com.calio.calendar.integration.domain.GoogleProviderObservation;
+import com.calio.calendar.integration.domain.GoogleCalendarItemSnapshot;
 import com.calio.calendar.integration.repository.GoogleCalendarEventMappingRepository;
 import com.calio.calendar.integration.repository.GoogleCalendarIntegrationRepository;
 import com.calio.calendar.integration.repository.GoogleOperationJobRepository;
@@ -76,8 +76,8 @@ class GoogleCalendarConflictPersistenceIntegrationTest {
     private GoogleCalendarEventPagePersistenceService pagePersistenceService;
 
     @Test
-    @DisplayName("true conflict는 mapping 격리와 Sync Job evidence를 함께 commit한다")
-    void givenTwoSidedConflict_whenPersistingOwnedPage_thenCommitsMappingAndJobEvidence() {
+    @DisplayName("Calio와 Google이 모두 변경되면 매핑과 동기화 작업을 충돌 상태로 저장한다")
+    void givenCalioAndGoogleChanged_whenPersistingPage_thenMarksMappingAndJobConflicted() {
         // given
         Fixture fixture = fixture(true);
 
@@ -97,7 +97,7 @@ class GoogleCalendarConflictPersistenceIntegrationTest {
                 .isEqualTo(GoogleCalendarMappingSyncStatus.CONFLICTED);
         assertThat(jobRepository.findById(fixture.jobId()))
                 .get()
-                .satisfies(job -> assertThat(job.isConflictDetected()).isTrue());
+                .satisfies(job -> assertThat(job.isMappingConflictDetected()).isTrue());
         assertThat(eventRepository.findById(fixture.eventId()))
                 .get()
                 .extracting(Event::getTitle)
@@ -105,8 +105,8 @@ class GoogleCalendarConflictPersistenceIntegrationTest {
     }
 
     @Test
-    @DisplayName("Job conflict evidence가 owner fence를 통과하지 못하면 mapping 격리도 rollback한다")
-    void givenNonSyncOwnedJob_whenRecordingConflict_thenRollsBackMappingTransition() {
+    @DisplayName("동기화 작업의 소유권 확인이 실패하면 매핑의 충돌 변경도 롤백한다")
+    void givenJobOwnershipCheckFails_whenMarkingConflict_thenRollsBackMappingChange() {
         // given
         Fixture fixture = fixture(false);
 
@@ -125,7 +125,7 @@ class GoogleCalendarConflictPersistenceIntegrationTest {
                 .isEqualTo(GoogleCalendarMappingSyncStatus.ACTIVE);
         assertThat(jobRepository.findById(fixture.jobId()))
                 .get()
-                .satisfies(job -> assertThat(job.isConflictDetected()).isFalse());
+                .satisfies(job -> assertThat(job.isMappingConflictDetected()).isFalse());
     }
 
     private Fixture fixture(boolean syncJob) {
@@ -160,10 +160,10 @@ class GoogleCalendarConflictPersistenceIntegrationTest {
                         integration,
                         event,
                         "external-event-" + event.getId(),
-                        new GoogleProviderObservation(
+                        new GoogleCalendarItemSnapshot(
                                 "etag-baseline",
                                 Instant.parse("2026-08-05T00:00:00Z"),
-                                GoogleProviderContentProjector.event(event)
+                                GoogleCalendarContentHasher.hashEvent(event)
                         )
                 )
         );
@@ -191,7 +191,7 @@ class GoogleCalendarConflictPersistenceIntegrationTest {
                         account.getId(),
                         1L,
                         "EVENT_UPSERT",
-                        GoogleCalendarEffectiveScope.generalEvent(event.getId()),
+                        GoogleCalendarSyncTarget.event(event.getId()),
                         mapping.getExternalEventId(),
                         "{}",
                         GoogleContentHash.digest("TEST", "desired"),

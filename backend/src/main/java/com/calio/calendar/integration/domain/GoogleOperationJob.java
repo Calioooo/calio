@@ -43,10 +43,10 @@ public class GoogleOperationJob extends BaseEntity {
     private GoogleOperationJobTrigger trigger;
 
     @Column(name = "effective_resource_scope", nullable = false, updatable = false, length = 64)
-    private String effectiveResourceScope;
+    private String syncTargetType;
 
     @Column(name = "effective_resource_key", nullable = false, updatable = false, length = 128)
-    private String effectiveResourceKey;
+    private String syncTargetKey;
 
     @Column(name = "provider_identity", updatable = false, length = 1024)
     private String providerIdentity;
@@ -55,10 +55,10 @@ public class GoogleOperationJob extends BaseEntity {
     private String desiredPayload;
 
     @Column(name = "desired_content_hash", updatable = false, length = 67)
-    private String desiredContentHash;
+    private String desiredGoogleContentHash;
 
     @Column(name = "conflict_detected", nullable = false)
-    private boolean conflictDetected;
+    private boolean mappingConflictDetected;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "job_state", nullable = false, length = 32)
@@ -101,8 +101,8 @@ public class GoogleOperationJob extends BaseEntity {
         job.accountSequence = accountSequence;
         job.kind = SYNC_KIND;
         job.trigger = trigger;
-        job.effectiveResourceScope = PRIMARY_CALENDAR_SCOPE;
-        job.effectiveResourceKey = PRIMARY_CALENDAR_KEY;
+        job.syncTargetType = PRIMARY_CALENDAR_SCOPE;
+        job.syncTargetKey = PRIMARY_CALENDAR_KEY;
         job.state = GoogleOperationJobState.PENDING;
         job.runnableAt = runnableAt;
         return job;
@@ -114,18 +114,18 @@ public class GoogleOperationJob extends BaseEntity {
             Long accountId,
             long accountSequence,
             String kind,
-            GoogleCalendarEffectiveScope effectiveScope,
+            GoogleCalendarSyncTarget syncTarget,
             String providerIdentity,
             String desiredPayload,
-            String desiredContentHash,
+            String desiredGoogleContentHash,
             Instant runnableAt
     ) {
-        if (effectiveScope == null) {
-            throw new IllegalArgumentException("Outbound Google operation scope is required");
+        if (syncTarget == null) {
+            throw new IllegalArgumentException("Outbound Google operation target is required");
         }
-        String resourceScope = effectiveScope.encodedType();
-        String resourceKey = effectiveScope.encodedKey();
-        validateOutboundFields(kind, resourceScope, resourceKey, desiredPayload);
+        String targetType = syncTarget.storedType();
+        String targetKey = syncTarget.storedKey();
+        validateOutboundFields(kind, targetType, targetKey, desiredPayload);
         GoogleOperationJob job = new GoogleOperationJob();
         job.operationId = operationId;
         job.integrationId = integrationId;
@@ -133,11 +133,13 @@ public class GoogleOperationJob extends BaseEntity {
         job.accountSequence = accountSequence;
         job.kind = kind;
         job.trigger = GoogleOperationJobTrigger.CANONICAL_MUTATION;
-        job.effectiveResourceScope = resourceScope;
-        job.effectiveResourceKey = resourceKey;
+        job.syncTargetType = targetType;
+        job.syncTargetKey = targetKey;
         job.providerIdentity = providerIdentity;
         job.desiredPayload = desiredPayload;
-        job.desiredContentHash = GoogleContentHash.requireValid(desiredContentHash);
+        job.desiredGoogleContentHash = GoogleContentHash.requireValid(
+                desiredGoogleContentHash
+        );
         job.state = GoogleOperationJobState.PENDING;
         job.runnableAt = runnableAt;
         return job;
@@ -152,13 +154,13 @@ public class GoogleOperationJob extends BaseEntity {
 
     private static void validateOutboundFields(
             String kind,
-            String resourceScope,
-            String resourceKey,
+            String targetType,
+            String targetKey,
             String desiredPayload
     ) {
         if (kind == null || kind.isBlank() || SYNC_KIND.equals(kind)
-                || resourceScope == null || resourceScope.isBlank()
-                || resourceKey == null || resourceKey.isBlank()
+                || targetType == null || targetType.isBlank()
+                || targetKey == null || targetKey.isBlank()
                 || desiredPayload == null || desiredPayload.isBlank()) {
             throw new IllegalArgumentException("Outbound Google operation fields are required");
         }
@@ -185,16 +187,16 @@ public class GoogleOperationJob extends BaseEntity {
     public int getRetryCount() { return retryCount; }
     public String getLastErrorReason() { return lastErrorReason; }
     public String getOwnerToken() { return ownerToken; }
-    public GoogleCalendarEffectiveScope getEffectiveScope() {
-        return GoogleCalendarEffectiveScope.decode(effectiveResourceScope, effectiveResourceKey);
+    public GoogleCalendarSyncTarget getSyncTarget() {
+        return GoogleCalendarSyncTarget.fromStoredValues(syncTargetType, syncTargetKey);
     }
-    public boolean hasCanonicalEffectiveScope() {
-        return GoogleCalendarEffectiveScope.GENERAL_EVENT.equals(effectiveResourceScope)
-                || GoogleCalendarEffectiveScope.RECURRENCE_MASTER.equals(effectiveResourceScope)
-                || GoogleCalendarEffectiveScope.RECURRENCE_OVERRIDE.equals(effectiveResourceScope);
+    public boolean hasItemSyncTarget() {
+        return GoogleCalendarSyncTarget.EVENT_TYPE.equals(syncTargetType)
+                || GoogleCalendarSyncTarget.RECURRENCE_EVENT_TYPE.equals(syncTargetType)
+                || GoogleCalendarSyncTarget.RECURRENCE_OVERRIDE_TYPE.equals(syncTargetType);
     }
-    public String getEffectiveResourceScope() { return effectiveResourceScope; }
-    public String getEffectiveResourceKey() { return effectiveResourceKey; }
-    public String getDesiredContentHash() { return desiredContentHash; }
-    public boolean isConflictDetected() { return conflictDetected; }
+    public String getSyncTargetType() { return syncTargetType; }
+    public String getSyncTargetKey() { return syncTargetKey; }
+    public String getDesiredGoogleContentHash() { return desiredGoogleContentHash; }
+    public boolean isMappingConflictDetected() { return mappingConflictDetected; }
 }

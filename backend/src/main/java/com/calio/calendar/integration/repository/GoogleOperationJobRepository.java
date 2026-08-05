@@ -98,21 +98,21 @@ public interface GoogleOperationJobRepository extends JpaRepository<GoogleOperat
     int deleteByIntegrationId(@Param("integrationId") Long integrationId);
 
     @Query("""
-            select job.desiredContentHash from GoogleOperationJob job
+            select job.desiredGoogleContentHash from GoogleOperationJob job
             where job.accountId = :accountId
               and job.integrationId = :integrationId
               and job.kind <> 'SYNC'
-              and job.effectiveResourceScope = :scope
-              and job.effectiveResourceKey = :scopeKey
+              and job.syncTargetType = :targetType
+              and job.syncTargetKey = :targetKey
               and job.state in (com.calio.calendar.integration.domain.GoogleOperationJobState.PENDING,
                                 com.calio.calendar.integration.domain.GoogleOperationJobState.PROCESSING)
             order by job.accountSequence
             """)
-    List<String> findPendingDesiredContentHashes(
+    List<String> findPendingGoogleWriteContentHashes(
             @Param("accountId") Long accountId,
             @Param("integrationId") Long integrationId,
-            @Param("scope") String scope,
-            @Param("scopeKey") String scopeKey
+            @Param("targetType") String targetType,
+            @Param("targetKey") String targetKey
     );
 
     @Query(value = """
@@ -123,18 +123,19 @@ public interface GoogleOperationJobRepository extends JpaRepository<GoogleOperat
               AND job.job_state IN ('PENDING', 'PROCESSING')
               AND (
                   (job.effective_resource_scope = 'RECURRENCE_MASTER'
-                   AND job.effective_resource_key = :masterKey)
+                   AND job.effective_resource_key = :recurrenceEventKey)
                   OR
                   (job.effective_resource_scope = 'RECURRENCE_OVERRIDE'
-                   AND LEFT(job.effective_resource_key, :childPrefixLength) = :childPrefix)
+                   AND LEFT(job.effective_resource_key, :overrideKeyPrefixLength)
+                       = :overrideKeyPrefix)
               )
             """, nativeQuery = true)
-    long countPendingRecurrenceAggregateBranches(
+    long countPendingRecurrenceChanges(
             @Param("accountId") Long accountId,
             @Param("integrationId") Long integrationId,
-            @Param("masterKey") String masterKey,
-            @Param("childPrefix") String childPrefix,
-            @Param("childPrefixLength") int childPrefixLength
+            @Param("recurrenceEventKey") String recurrenceEventKey,
+            @Param("overrideKeyPrefix") String overrideKeyPrefix,
+            @Param("overrideKeyPrefixLength") int overrideKeyPrefixLength
     );
 
     @Modifying(flushAutomatically = true)
@@ -151,9 +152,9 @@ public interface GoogleOperationJobRepository extends JpaRepository<GoogleOperat
                     AND integration.google_operation_lease_expires_at >= CURRENT_TIMESTAMP
               )
             """, nativeQuery = true)
-    int markConflictDetected(@Param("jobId") Long jobId,
-                             @Param("accountId") Long accountId,
-                             @Param("owner") String owner);
+    int markMappingConflict(@Param("jobId") Long jobId,
+                            @Param("accountId") Long accountId,
+                            @Param("owner") String owner);
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(value = """
@@ -172,9 +173,9 @@ public interface GoogleOperationJobRepository extends JpaRepository<GoogleOperat
                     AND integration.google_operation_lease_expires_at >= CURRENT_TIMESTAMP
               )
             """, nativeQuery = true)
-    int terminalizeOwnedConflict(@Param("jobId") Long jobId,
-                                 @Param("accountId") Long accountId,
-                                 @Param("owner") String owner);
+    int finishOwnedJobAsConflicted(@Param("jobId") Long jobId,
+                                @Param("accountId") Long accountId,
+                                @Param("owner") String owner);
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(value = """
@@ -192,7 +193,7 @@ public interface GoogleOperationJobRepository extends JpaRepository<GoogleOperat
                     AND integration.google_operation_lease_expires_at >= CURRENT_TIMESTAMP
               )
             """, nativeQuery = true)
-    int skipOwnedConflicted(@Param("jobId") Long jobId,
-                            @Param("accountId") Long accountId,
-                            @Param("owner") String owner);
+    int skipOwnedJobBecauseMappingConflicted(@Param("jobId") Long jobId,
+                                          @Param("accountId") Long accountId,
+                                          @Param("owner") String owner);
 }

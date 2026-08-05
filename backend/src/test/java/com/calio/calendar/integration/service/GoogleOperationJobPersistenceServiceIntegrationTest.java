@@ -9,12 +9,12 @@ import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.event.repository.EventRepository;
 import com.calio.calendar.integration.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.domain.GoogleCalendarIntegration;
-import com.calio.calendar.integration.domain.GoogleCalendarEffectiveScope;
+import com.calio.calendar.integration.domain.GoogleCalendarSyncTarget;
 import com.calio.calendar.integration.domain.GoogleContentHash;
 import com.calio.calendar.integration.domain.GoogleOperationJob;
 import com.calio.calendar.integration.domain.GoogleOperationJobState;
 import com.calio.calendar.integration.domain.GoogleOperationJobTrigger;
-import com.calio.calendar.integration.domain.GoogleProviderObservation;
+import com.calio.calendar.integration.domain.GoogleCalendarItemSnapshot;
 import com.calio.calendar.integration.repository.GoogleCalendarEventMappingRepository;
 import com.calio.calendar.integration.repository.GoogleCalendarIntegrationRepository;
 import com.calio.calendar.integration.repository.GoogleOperationJobRepository;
@@ -40,40 +40,40 @@ import org.springframework.transaction.annotation.Transactional;
 class GoogleOperationJobPersistenceServiceIntegrationTest {
 
     @Test
-    @DisplayName("recurrence aggregate pending 조회는 master와 해당 child override branch만 포함한다")
-    void givenMasterAndChildOverrideJobs_whenCountingAggregateBranches_thenIncludesBoth() {
+    @DisplayName("반복 일정의 대기 중인 변경 수에는 해당 일정과 예외 일정 쓰기만 포함한다")
+    void givenRecurrenceAndOverrideWrites_whenCountingPendingChanges_thenIncludesBoth() {
         // given
         Account account = accountRepository.saveAndFlush(new Account());
         GoogleCalendarIntegration integration = integrationRepository.saveAndFlush(
                 integration(account.getId()));
-        String desiredHash = GoogleContentHash.digest("TEST", "desired");
+        String desiredGoogleContentHash = GoogleContentHash.digest("TEST", "desired");
         jobRepository.saveAndFlush(GoogleOperationJob.outbound(
                 "master-operation", integration.getId(), account.getId(),
                 integration.allocateGoogleOperationSequence(), "MASTER_UPSERT",
-                GoogleCalendarEffectiveScope.recurrenceMaster(1L), null,
-                "{}", desiredHash, Instant.now()));
+                GoogleCalendarSyncTarget.recurrenceEvent(1L), null,
+                "{}", desiredGoogleContentHash, Instant.now()));
         jobRepository.saveAndFlush(GoogleOperationJob.outbound(
                 "child-operation", integration.getId(), account.getId(),
                 integration.allocateGoogleOperationSequence(), "OVERRIDE_UPSERT",
-                GoogleCalendarEffectiveScope.recurrenceOverride(
+                GoogleCalendarSyncTarget.recurrenceOverride(
                         1L, Instant.parse("2026-08-04T00:00:00Z")), null,
-                "{}", desiredHash, Instant.now()));
+                "{}", desiredGoogleContentHash, Instant.now()));
         jobRepository.saveAndFlush(GoogleOperationJob.outbound(
                 "other-child-operation", integration.getId(), account.getId(),
                 integration.allocateGoogleOperationSequence(), "OVERRIDE_UPSERT",
-                GoogleCalendarEffectiveScope.recurrenceOverride(
+                GoogleCalendarSyncTarget.recurrenceOverride(
                         10L, Instant.parse("2026-08-04T00:00:00Z")), null,
-                "{}", desiredHash, Instant.now()));
-        String childPrefix = GoogleCalendarEffectiveScope.recurrenceOverrideKeyPrefix(
+                "{}", desiredGoogleContentHash, Instant.now()));
+        String overrideKeyPrefix = GoogleCalendarSyncTarget.overrideKeyPrefix(
                 1L);
 
         // when
-        long pendingBranches = jobRepository.countPendingRecurrenceAggregateBranches(
+        long pendingRecurrenceChanges = jobRepository.countPendingRecurrenceChanges(
                 account.getId(), integration.getId(), "1",
-                childPrefix, childPrefix.length());
+                overrideKeyPrefix, overrideKeyPrefix.length());
 
         // then
-        assertThat(pendingBranches).isEqualTo(2L);
+        assertThat(pendingRecurrenceChanges).isEqualTo(2L);
     }
 
     @Autowired
@@ -272,15 +272,15 @@ class GoogleOperationJobPersistenceServiceIntegrationTest {
     }
 
     @Test
-    @DisplayName("conflict를 발견한 Sync Job은 성공 시 삭제하지 않고 CONFLICTED 진단으로 남긴다")
-    void givenConflictEvidence_whenSyncSucceeds_thenRetainsConflictedDiagnostic() {
+    @DisplayName("매핑 충돌을 발견한 동기화 작업은 삭제하지 않고 충돌 상태로 남긴다")
+    void givenMappingConflict_whenSyncSucceeds_thenKeepsConflictedJob() {
         // given
         JobFixture fixture = jobs(Instant.now().minusSeconds(60));
         assertThat(persistenceService.acquireLease(fixture.accountId(), "worker-a")).isTrue();
         GoogleOperationJob claimed = persistenceService.claimHead(
                 fixture.accountId(), "worker-a"
         );
-        persistenceService.markConflictDetected(
+        persistenceService.markMappingConflict(
                 claimed.getId(), fixture.accountId(), "worker-a"
         );
 
@@ -296,13 +296,13 @@ class GoogleOperationJobPersistenceServiceIntegrationTest {
                     assertThat(conflicted.getOwnerToken()).isNull();
                     assertThat(conflicted.getLastErrorReason())
                             .isEqualTo("MAPPING_CONFLICT_DETECTED");
-                    assertThat(conflicted.isConflictDetected()).isTrue();
+                    assertThat(conflicted.isMappingConflictDetected()).isTrue();
                 });
     }
 
     @Test
-    @DisplayName("이미 conflicted인 mapping scope의 outbound Job은 owner-fenced SKIPPED로 종료한다")
-    void givenConflictedMapping_whenSkippingOutboundJob_thenStoresSkippedDiagnostic() {
+    @DisplayName("매핑이 이미 충돌 상태면 해당 Google 쓰기 작업을 건너뛴 상태로 종료한다")
+    void givenConflictedMapping_whenSkippingGoogleWrite_thenStoresSkippedState() {
         // given
         Account account = accountRepository.saveAndFlush(new Account());
         Tag tag = tagRepository.saveAndFlush(new Tag(
@@ -326,10 +326,10 @@ class GoogleOperationJobPersistenceServiceIntegrationTest {
                 integration,
                 event,
                 "external-event",
-                new GoogleProviderObservation(
+                new GoogleCalendarItemSnapshot(
                         "etag",
                         Instant.parse("2026-08-05T01:00:00Z"),
-                        GoogleProviderContentProjector.event(event)
+                        GoogleCalendarContentHasher.hashEvent(event)
                 )
         );
         mapping.markConflicted();
@@ -341,7 +341,7 @@ class GoogleOperationJobPersistenceServiceIntegrationTest {
                         account.getId(),
                         integration.allocateGoogleOperationSequence(),
                         "EVENT_UPSERT",
-                        GoogleCalendarEffectiveScope.generalEvent(event.getId()),
+                        GoogleCalendarSyncTarget.event(event.getId()),
                         "external-event",
                         "{}",
                         GoogleContentHash.digest("TEST", "desired"),
@@ -354,7 +354,7 @@ class GoogleOperationJobPersistenceServiceIntegrationTest {
         );
 
         // when
-        boolean skipped = persistenceService.skipIfConflicted(claimed, "worker-a");
+        boolean skipped = persistenceService.skipIfTargetConflicted(claimed, "worker-a");
 
         // then
         assertThat(skipped).isTrue();

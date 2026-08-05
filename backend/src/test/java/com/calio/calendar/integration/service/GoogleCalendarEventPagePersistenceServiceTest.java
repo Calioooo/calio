@@ -16,7 +16,7 @@ import com.calio.calendar.external.google.GoogleCalendarEventTimeNormalizer.Norm
 import com.calio.calendar.integration.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.domain.GoogleCalendarSyncMode;
-import com.calio.calendar.integration.domain.GoogleProviderObservation;
+import com.calio.calendar.integration.domain.GoogleCalendarItemSnapshot;
 import com.calio.calendar.integration.repository.GoogleCalendarEventMappingRepository;
 import com.calio.calendar.integration.repository.GoogleCalendarIntegrationRepository;
 import com.calio.calendar.integration.repository.GoogleCalendarRecurrenceEventMappingRepository;
@@ -704,9 +704,9 @@ class GoogleCalendarEventPagePersistenceServiceTest {
                     integration,
                     events.get(index),
                     "event-" + index,
-                    new GoogleProviderObservation(
+                    new GoogleCalendarItemSnapshot(
                             null, null,
-                            GoogleProviderContentProjector.event(events.get(index)))
+                            GoogleCalendarContentHasher.hashEvent(events.get(index)))
             ));
         }
         mappingRepository.saveAllAndFlush(mappings);
