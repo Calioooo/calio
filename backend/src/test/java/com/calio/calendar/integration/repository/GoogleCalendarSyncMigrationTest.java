@@ -19,15 +19,16 @@ import org.junit.jupiter.api.Test;
 class GoogleCalendarSyncMigrationTest {
 
     @Test
-    @DisplayName("V9는 기존 Event를 timed로 backfill하고 lease와 mapping 제약을 추가한다")
-    void givenV8Data_whenMigrateToV9_thenAppliesGoogleCalendarSyncSchema() throws Exception {
+    @DisplayName("V12는 기존 Event를 timed로 backfill하고 lease와 mapping 제약을 추가한다")
+    void givenPreGoogleSyncData_whenMigrateToV12_thenAppliesGoogleCalendarSyncSchema()
+            throws Exception {
         // given
         String url = "jdbc:h2:mem:google-calendar-sync-migration;MODE=MySQL;DB_CLOSE_DELAY=-1";
         migrateTo(url, MigrationVersion.fromVersion("8"));
         insertLegacyEventAndIntegration(url);
 
         // when
-        migrateTo(url, MigrationVersion.fromVersion("9"));
+        migrateTo(url, MigrationVersion.fromVersion("12"));
 
         // then
         try (Connection connection = DriverManager.getConnection(url, "sa", "")) {
@@ -63,18 +64,18 @@ class GoogleCalendarSyncMigrationTest {
     }
 
     @Test
-    @DisplayName("V10 upgrade는 기존 provider/cursor/canonical data를 보존하고 recurrence mapping schema를 추가한다")
-    void givenV9Data_whenMigrateToV10_thenAddsRecurrenceFoundationWithoutChangingData()
+    @DisplayName("V13 upgrade는 기존 provider/cursor/canonical data를 보존하고 recurrence mapping schema를 추가한다")
+    void givenV12Data_whenMigrateToV13_thenAddsRecurrenceFoundationWithoutChangingData()
             throws Exception {
         // given
         String url = "jdbc:h2:mem:google-calendar-recurrence-upgrade;MODE=MySQL;DB_CLOSE_DELAY=-1";
         migrateTo(url, MigrationVersion.fromVersion("8"));
         insertLegacyEventAndIntegration(url);
-        migrateTo(url, MigrationVersion.fromVersion("9"));
-        insertV9ProviderAndRecurrenceData(url);
+        migrateTo(url, MigrationVersion.fromVersion("12"));
+        insertGoogleProviderAndRecurrenceData(url);
 
         // when
-        migrateTo(url, MigrationVersion.fromVersion("10"));
+        migrateTo(url, MigrationVersion.fromVersion("13"));
 
         // then
         try (Connection connection = DriverManager.getConnection(url, "sa", "")) {
@@ -114,14 +115,14 @@ class GoogleCalendarSyncMigrationTest {
     }
 
     @Test
-    @DisplayName("clean migration은 V10 recurrence provider mapping table을 생성한다")
-    void givenEmptyDatabase_whenMigrateToV10_thenCreatesRecurrenceMappingTables()
+    @DisplayName("clean migration은 V13 recurrence provider mapping table을 생성한다")
+    void givenEmptyDatabase_whenMigrateToV13_thenCreatesRecurrenceMappingTables()
             throws Exception {
         // given
         String url = "jdbc:h2:mem:google-calendar-recurrence-clean;MODE=MySQL;DB_CLOSE_DELAY=-1";
 
         // when
-        migrateTo(url, MigrationVersion.fromVersion("10"));
+        migrateTo(url, MigrationVersion.fromVersion("13"));
 
         // then
         try (Connection connection = DriverManager.getConnection(url, "sa", "")) {
@@ -137,15 +138,15 @@ class GoogleCalendarSyncMigrationTest {
     }
 
     @Test
-    @DisplayName("V10 empty schema upgrade는 nullable VARCHAR(255) events.time_zone만 추가한다")
-    void givenV10EmptySchema_whenMigrateToV11_thenAddsNullableEventTimeZone()
+    @DisplayName("V14 empty schema upgrade는 nullable VARCHAR(255) events.time_zone만 추가한다")
+    void givenV13EmptySchema_whenMigrateToV14_thenAddsNullableEventTimeZone()
             throws Exception {
         // given
         String url = "jdbc:h2:mem:event-time-zone-upgrade;MODE=MySQL;DB_CLOSE_DELAY=-1";
-        migrateTo(url, MigrationVersion.fromVersion("10"));
+        migrateTo(url, MigrationVersion.fromVersion("13"));
 
         // when
-        migrateTo(url, MigrationVersion.fromVersion("11"));
+        migrateTo(url, MigrationVersion.fromVersion("14"));
 
         // then
         try (Connection connection = DriverManager.getConnection(url, "sa", "")) {
@@ -157,18 +158,18 @@ class GoogleCalendarSyncMigrationTest {
     }
 
     @Test
-    @DisplayName("V12 activation upgrade는 Google cursor만 reset하고 provider와 canonical data를 보존한다")
-    void givenV11ProviderData_whenMigrateToV12_thenOnlyResetsGoogleCursor()
+    @DisplayName("V15 activation upgrade는 Google cursor만 reset하고 provider와 canonical data를 보존한다")
+    void givenV14ProviderData_whenMigrateToV15_thenOnlyResetsGoogleCursor()
             throws Exception {
         // given
         String url = "jdbc:h2:mem:google-calendar-recurrence-activation;MODE=MySQL;DB_CLOSE_DELAY=-1";
         migrateTo(url, MigrationVersion.fromVersion("8"));
         insertLegacyEventAndIntegration(url);
-        migrateTo(url, MigrationVersion.fromVersion("11"));
-        insertV9ProviderAndRecurrenceData(url);
+        migrateTo(url, MigrationVersion.fromVersion("14"));
+        insertGoogleProviderAndRecurrenceData(url);
 
         // when
-        migrateTo(url, MigrationVersion.fromVersion("12"));
+        migrateTo(url, MigrationVersion.fromVersion("15"));
 
         // then
         try (Connection connection = DriverManager.getConnection(url, "sa", "")) {
@@ -192,14 +193,14 @@ class GoogleCalendarSyncMigrationTest {
     }
 
     @Test
-    @DisplayName("clean migration은 V12 recurrence activation schema를 적용한다")
-    void givenEmptyDatabase_whenMigrateToV12_thenAppliesActivationMigration()
+    @DisplayName("clean migration은 V15 recurrence activation schema를 적용한다")
+    void givenEmptyDatabase_whenMigrateToV15_thenAppliesActivationMigration()
             throws Exception {
         // given
         String url = "jdbc:h2:mem:google-calendar-recurrence-activation-clean;MODE=MySQL;DB_CLOSE_DELAY=-1";
 
         // when
-        migrateTo(url, MigrationVersion.fromVersion("12"));
+        migrateTo(url, MigrationVersion.fromVersion("15"));
 
         // then
         try (Connection connection = DriverManager.getConnection(url, "sa", "")) {
@@ -211,14 +212,14 @@ class GoogleCalendarSyncMigrationTest {
     }
 
     @Test
-    @DisplayName("V13은 Account sequence와 durable Google operation Job 제약 및 조회 index를 추가한다")
-    void givenV12Schema_whenMigrateToV13_thenAddsDurableOperationRuntime() throws Exception {
+    @DisplayName("V16은 Account sequence와 durable Google operation Job 제약 및 조회 index를 추가한다")
+    void givenV15Schema_whenMigrateToV16_thenAddsDurableOperationRuntime() throws Exception {
         // given
         String url = "jdbc:h2:mem:google-operation-runtime;MODE=MySQL;DB_CLOSE_DELAY=-1";
-        migrateTo(url, MigrationVersion.fromVersion("12"));
+        migrateTo(url, MigrationVersion.fromVersion("15"));
 
         // when
-        migrateTo(url, MigrationVersion.fromVersion("13"));
+        migrateTo(url, MigrationVersion.fromVersion("16"));
 
         // then
         try (Connection connection = DriverManager.getConnection(url, "sa", "")) {
@@ -287,7 +288,7 @@ class GoogleCalendarSyncMigrationTest {
         }
     }
 
-    private void insertV9ProviderAndRecurrenceData(String url) throws Exception {
+    private void insertGoogleProviderAndRecurrenceData(String url) throws Exception {
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
              Statement statement = connection.createStatement()) {
             statement.executeUpdate("""
