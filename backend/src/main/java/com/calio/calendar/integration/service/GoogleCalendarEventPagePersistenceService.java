@@ -53,6 +53,7 @@ public class GoogleCalendarEventPagePersistenceService {
     private final GoogleCalendarRecurrenceOverrideMappingRepository overrideMappingRepository;
     private final RecurrenceEventRepository recurrenceEventRepository;
     private final RecurrenceEventOverrideRepository overrideRepository;
+    private final GoogleOperationJobPersistenceService operationJobPersistenceService;
 
     public GoogleCalendarEventPagePersistenceService(
             GoogleCalendarIntegrationRepository integrationRepository,
@@ -63,7 +64,8 @@ public class GoogleCalendarEventPagePersistenceService {
             GoogleCalendarRecurrenceEventMappingRepository recurrenceMappingRepository,
             GoogleCalendarRecurrenceOverrideMappingRepository overrideMappingRepository,
             RecurrenceEventRepository recurrenceEventRepository,
-            RecurrenceEventOverrideRepository overrideRepository
+            RecurrenceEventOverrideRepository overrideRepository,
+            GoogleOperationJobPersistenceService operationJobPersistenceService
     ) {
         this.integrationRepository = integrationRepository;
         this.eventMappingRepository = eventMappingRepository;
@@ -74,6 +76,21 @@ public class GoogleCalendarEventPagePersistenceService {
         this.overrideMappingRepository = overrideMappingRepository;
         this.recurrenceEventRepository = recurrenceEventRepository;
         this.overrideRepository = overrideRepository;
+        this.operationJobPersistenceService = operationJobPersistenceService;
+    }
+
+    @Transactional
+    public void persistOwnedNormalizedPage(
+            Long jobId,
+            Long integrationId,
+            Long accountId,
+            String workerToken,
+            GoogleCalendarNormalizedPage page
+    ) {
+        operationJobPersistenceService.renewAndAssertOwned(jobId, accountId, workerToken);
+        extendSyncLeaseOrThrow(integrationId, workerToken);
+        GoogleCalendarIntegration integration = integrationRepository.getReferenceById(integrationId);
+        applyEventChanges(integration, accountId, page.items());
     }
 
     @Transactional

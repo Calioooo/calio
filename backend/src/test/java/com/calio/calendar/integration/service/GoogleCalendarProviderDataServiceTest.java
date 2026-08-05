@@ -27,7 +27,7 @@ import org.springframework.data.domain.Pageable;
 class GoogleCalendarProviderDataServiceTest {
 
     @Test
-    @DisplayName("FULL reconciliation은 mapping을 batch 조회하고 각 batch에서 lease를 갱신한다")
+    @DisplayName("FULL reconciliation은 각 mapping batch에서 sync lease와 operation ownership을 갱신한다")
     void givenUnseenMappings_whenFinalizeFullSync_thenDeletesByBatchAndRenewsLease() {
         // given
         GoogleCalendarIntegrationRepository integrationRepository =
@@ -43,6 +43,8 @@ class GoogleCalendarProviderDataServiceTest {
                 mock(RecurrenceEventRepository.class);
         RecurrenceEventOverrideRepository overrideRepository =
                 mock(RecurrenceEventOverrideRepository.class);
+        GoogleOperationJobPersistenceService operationJobPersistenceService =
+                mock(GoogleOperationJobPersistenceService.class);
         when(integrationRepository.extendSyncLease(1L, "run-1")).thenReturn(1);
         when(integrationRepository.finalizeSync(1L, "run-1", "next-token")).thenReturn(1);
 
@@ -83,11 +85,14 @@ class GoogleCalendarProviderDataServiceTest {
                 overrideMappingRepository,
                 recurrenceEventRepository,
                 overrideRepository,
-                null
+                null,
+                operationJobPersistenceService
         );
 
         // when
-        service.finalizeReconciliation(
+        service.finalizeOwnedReconciliation(
+                9L,
+                2L,
                 1L,
                 "run-1",
                 GoogleCalendarSyncMode.FULL,
@@ -107,5 +112,8 @@ class GoogleCalendarProviderDataServiceTest {
         );
         verify(integrationRepository, times(5)).extendSyncLease(1L, "run-1");
         verify(integrationRepository).finalizeSync(1L, "run-1", "next-token");
+        verify(operationJobPersistenceService, times(6))
+                .renewAndAssertOwned(9L, 2L, "run-1");
+        verify(operationJobPersistenceService).succeed(9L, 2L, "run-1");
     }
 }

@@ -24,6 +24,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 @SpringBootTest(properties = {
@@ -55,6 +56,9 @@ class GoogleCalendarProviderDataServiceTransactionTest {
 
     @Autowired
     private TagRepository tagRepository;
+
+    @MockitoBean
+    private GoogleOperationJobPersistenceService operationJobPersistenceService;
 
     @Test
     @DisplayName("FULL reconciliation의 cursor 저장이 실패하면 앞선 provider data 삭제도 rollback한다")
@@ -93,7 +97,9 @@ class GoogleCalendarProviderDataServiceTransactionTest {
         );
 
         // when, then
-        assertThatThrownBy(() -> providerDataService.finalizeReconciliation(
+        assertThatThrownBy(() -> providerDataService.finalizeOwnedReconciliation(
+                1L,
+                account.getId(),
                 integration.getId(),
                 "full-run",
                 GoogleCalendarSyncMode.FULL,
