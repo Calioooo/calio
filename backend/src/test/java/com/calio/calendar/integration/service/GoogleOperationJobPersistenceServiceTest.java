@@ -30,8 +30,9 @@ class GoogleOperationJobPersistenceServiceTest {
                 pageable -> pageable.getPageNumber() == 0 && pageable.getPageSize() == 500
         ))).thenReturn(List.of(1L, 2L));
         GoogleOperationJobPersistenceService service = new GoogleOperationJobPersistenceService(
-                integrationRepository,
-                jobRepository,
+                new GoogleCalendarIntegrationCommandService(integrationRepository),
+                new GoogleOperationJobQueryService(jobRepository),
+                new GoogleOperationJobCommandService(jobRepository),
                 Clock.fixed(now, ZoneOffset.UTC)
         );
 

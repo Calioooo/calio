@@ -14,8 +14,6 @@ import com.calio.calendar.external.google.dto.GoogleCalendarEventItem;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventPage;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventTime;
 import com.calio.calendar.integration.domain.GoogleCalendarRecurrenceEventMapping;
-import com.calio.calendar.integration.repository.GoogleCalendarEventMappingRepository;
-import com.calio.calendar.integration.repository.GoogleCalendarRecurrenceEventMappingRepository;
 import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.CancelledRecurrenceEventOverrideUpsert;
 import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.RecurrenceEventCancellation;
 import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.RecurrenceEventUpsert;
@@ -28,10 +26,8 @@ import org.junit.jupiter.api.Test;
 
 class GoogleCalendarPageNormalizerTest {
 
-    private final GoogleCalendarEventMappingRepository eventMappingRepository =
-            mock(GoogleCalendarEventMappingRepository.class);
-    private final GoogleCalendarRecurrenceEventMappingRepository recurrenceMappingRepository =
-            mock(GoogleCalendarRecurrenceEventMappingRepository.class);
+    private final GoogleCalendarMappingQueryService mappingQueryService =
+            mock(GoogleCalendarMappingQueryService.class);
     private final GoogleCalendarEventTimeNormalizer timeNormalizer =
             mock(GoogleCalendarEventTimeNormalizer.class);
     private final GoogleCalendarRecurrenceMapper recurrenceMapper =
@@ -44,17 +40,15 @@ class GoogleCalendarPageNormalizerTest {
     @BeforeEach
     void setUp() {
         normalizer = new GoogleCalendarPageNormalizer(
-                eventMappingRepository,
-                recurrenceMappingRepository,
+                mappingQueryService,
                 timeNormalizer,
                 recurrenceMapper,
                 eventsClient,
                 accessTokenService
         );
-        when(eventMappingRepository.findAllWithEventByExternalIdentity(any(), any(), any()))
+        when(mappingQueryService.listEventMappings(any(), any(), any()))
                 .thenReturn(List.of());
-        when(recurrenceMappingRepository
-                .findAllWithRecurrenceEventAndTagByExternalIdentity(any(), any(), any()))
+        when(mappingQueryService.listRecurrenceEventMappings(any(), any(), any()))
                 .thenReturn(List.of());
     }
 
@@ -67,8 +61,7 @@ class GoogleCalendarPageNormalizerTest {
         GoogleCalendarRecurrenceEventMapping recurrenceEventMapping =
                 mock(GoogleCalendarRecurrenceEventMapping.class);
         when(recurrenceEventMapping.getExternalEventId()).thenReturn("recurrence-event-1");
-        when(recurrenceMappingRepository
-                .findAllWithRecurrenceEventAndTagByExternalIdentity(any(), any(), any()))
+        when(mappingQueryService.listRecurrenceEventMappings(any(), any(), any()))
                 .thenReturn(List.of(recurrenceEventMapping));
         var override = new CancelledRecurrenceEventOverrideUpsert(
                 "override-1",
@@ -171,8 +164,7 @@ class GoogleCalendarPageNormalizerTest {
         GoogleCalendarRecurrenceEventMapping recurrenceEventMapping =
                 mock(GoogleCalendarRecurrenceEventMapping.class);
         when(recurrenceEventMapping.getExternalEventId()).thenReturn("recurrence-event-1");
-        when(recurrenceMappingRepository
-                .findAllWithRecurrenceEventAndTagByExternalIdentity(any(), any(), any()))
+        when(mappingQueryService.listRecurrenceEventMappings(any(), any(), any()))
                 .thenReturn(List.of(recurrenceEventMapping));
         var override = new CancelledRecurrenceEventOverrideUpsert(
                 "override-1",

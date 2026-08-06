@@ -13,8 +13,6 @@ import com.calio.calendar.external.google.dto.GoogleUserInfoResponse;
 import com.calio.calendar.integration.controller.dto.GoogleCalendarConnectRequest;
 import com.calio.calendar.integration.controller.dto.GoogleCalendarIntegrationResponse;
 import com.calio.calendar.integration.domain.GoogleCalendarIntegration;
-import com.calio.calendar.integration.repository.GoogleCalendarIntegrationRepository;
-import com.calio.calendar.integration.repository.GoogleOperationJobRepository;
 import com.calio.calendar.security.TokenEncryptionConfig;
 import com.calio.calendar.security.TokenEncryptionProperties;
 import com.calio.calendar.security.TokenEncryptor;
@@ -222,9 +220,10 @@ class GoogleCalendarIntegrationServiceTest {
 
         FakePersistenceService() {
             super(
-                    mock(GoogleCalendarIntegrationRepository.class),
+                    mock(GoogleCalendarIntegrationQueryService.class),
+                    mock(GoogleCalendarIntegrationCommandService.class),
                     mock(GoogleCalendarProviderDataService.class),
-                    mock(GoogleOperationJobRepository.class)
+                    mock(GoogleOperationJobCommandService.class)
             );
         }
 

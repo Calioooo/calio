@@ -2,8 +2,6 @@ package com.calio.calendar.integration.service;
 
 import com.calio.calendar.integration.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.domain.GoogleOperationJob;
-import com.calio.calendar.integration.repository.GoogleCalendarIntegrationRepository;
-import com.calio.calendar.integration.repository.GoogleOperationJobRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
@@ -16,19 +14,19 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 @Service
 public class GoogleOperationProducerTransaction {
 
-    private final GoogleCalendarIntegrationRepository integrationRepository;
-    private final GoogleOperationJobRepository jobRepository;
+    private final GoogleCalendarIntegrationCommandService integrationCommandService;
+    private final GoogleOperationJobCommandService jobCommandService;
     private final GoogleOperationWorker worker;
     private final Clock clock;
 
     public GoogleOperationProducerTransaction(
-            GoogleCalendarIntegrationRepository integrationRepository,
-            GoogleOperationJobRepository jobRepository,
+            GoogleCalendarIntegrationCommandService integrationCommandService,
+            GoogleOperationJobCommandService jobCommandService,
             GoogleOperationWorker worker,
             Clock clock
     ) {
-        this.integrationRepository = integrationRepository;
-        this.jobRepository = jobRepository;
+        this.integrationCommandService = integrationCommandService;
+        this.jobCommandService = jobCommandService;
         this.worker = worker;
         this.clock = clock;
     }
@@ -40,14 +38,14 @@ public class GoogleOperationProducerTransaction {
             OutboundJobDraft jobDraft
     ) {
         T result = authorizedCanonicalMutation.get();
-        GoogleCalendarIntegration integration = integrationRepository.findByAccountIdForUpdate(accountId)
+        GoogleCalendarIntegration integration = integrationCommandService.tryLockIntegration(accountId)
                 .orElse(null);
         if (integration == null) {
             return result;
         }
-        jobRepository.saveAndFlush(GoogleOperationJob.outbound(
+        jobCommandService.enqueueOperationJob(GoogleOperationJob.outbound(
                 UUID.randomUUID().toString(), integration.getId(), accountId,
-                integration.allocateGoogleOperationSequence(), jobDraft.kind(),
+                integrationCommandService.allocateOperationSequence(integration), jobDraft.kind(),
                 jobDraft.resourceScope(), jobDraft.resourceKey(), jobDraft.providerIdentity(),
                 jobDraft.desiredPayload(), Instant.now(clock)));
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {

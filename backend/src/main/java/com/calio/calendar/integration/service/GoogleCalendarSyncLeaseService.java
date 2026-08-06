@@ -1,33 +1,27 @@
 package com.calio.calendar.integration.service;
 
-import com.calio.calendar.common.error.CalioException;
-import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.integration.domain.GoogleCalendarIntegration;
-import com.calio.calendar.integration.repository.GoogleCalendarIntegrationRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class GoogleCalendarSyncLeaseService {
 
-    private final GoogleCalendarIntegrationRepository integrationRepository;
+    private final GoogleCalendarIntegrationQueryService integrationQueryService;
+    private final GoogleCalendarIntegrationCommandService integrationCommandService;
 
     public GoogleCalendarSyncLeaseService(
-            GoogleCalendarIntegrationRepository integrationRepository
+            GoogleCalendarIntegrationQueryService integrationQueryService,
+            GoogleCalendarIntegrationCommandService integrationCommandService
     ) {
-        this.integrationRepository = integrationRepository;
+        this.integrationQueryService = integrationQueryService;
+        this.integrationCommandService = integrationCommandService;
     }
 
     @Transactional
     public SyncLease acquire(Long accountId, String runId) {
-        if (!integrationRepository.existsByAccountId(accountId)) {
-            throw new CalioException(ErrorCode.GOOGLE_CALENDAR_NOT_CONNECTED);
-        }
-        if (integrationRepository.acquireSyncLease(accountId, runId) != 1) {
-            throw new CalioException(ErrorCode.GOOGLE_CALENDAR_SYNC_CONFLICT);
-        }
-        GoogleCalendarIntegration integration = integrationRepository.findByAccountId(accountId)
-                .orElseThrow(() -> new CalioException(ErrorCode.GOOGLE_CALENDAR_NOT_CONNECTED));
+        GoogleCalendarIntegration integration = integrationQueryService.getIntegration(accountId);
+        integrationCommandService.acquireSyncLease(accountId, runId);
         return new SyncLease(
                 integration.getId(),
                 integration.getAccountId(),

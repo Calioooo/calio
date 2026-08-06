@@ -1,15 +1,12 @@
 package com.calio.calendar.integration.service;
 
-import com.calio.calendar.integration.repository.GoogleCalendarIntegrationRepository;
 import com.calio.calendar.integration.domain.GoogleOperationJob;
-import com.calio.calendar.integration.repository.GoogleOperationJobRepository;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,23 +20,26 @@ public class GoogleOperationJobPersistenceService {
     private static final List<Duration> RETRY_DELAYS = List.of(
             Duration.ofMinutes(10), Duration.ofMinutes(30), Duration.ofHours(1), Duration.ofHours(6));
 
-    private final GoogleCalendarIntegrationRepository integrationRepository;
-    private final GoogleOperationJobRepository jobRepository;
+    private final GoogleCalendarIntegrationCommandService integrationCommandService;
+    private final GoogleOperationJobQueryService jobQueryService;
+    private final GoogleOperationJobCommandService jobCommandService;
     private final Clock clock;
 
     public GoogleOperationJobPersistenceService(
-            GoogleCalendarIntegrationRepository integrationRepository,
-            GoogleOperationJobRepository jobRepository,
+            GoogleCalendarIntegrationCommandService integrationCommandService,
+            GoogleOperationJobQueryService jobQueryService,
+            GoogleOperationJobCommandService jobCommandService,
             Clock clock
     ) {
-        this.integrationRepository = integrationRepository;
-        this.jobRepository = jobRepository;
+        this.integrationCommandService = integrationCommandService;
+        this.jobQueryService = jobQueryService;
+        this.jobCommandService = jobCommandService;
         this.clock = clock;
     }
 
     @Transactional
     public boolean acquireLease(Long accountId, String workerToken) {
-        boolean acquired = integrationRepository.acquireGoogleOperationLease(accountId, workerToken) == 1;
+        boolean acquired = integrationCommandService.acquireOperationLease(accountId, workerToken);
         if (acquired) {
             log.info("Google operation lease acquired. accountId={} state=ACQUIRED", accountId);
         } else {
@@ -50,7 +50,7 @@ public class GoogleOperationJobPersistenceService {
 
     @Transactional
     public GoogleOperationJob claimHead(Long accountId, String workerToken) {
-        GoogleOperationJob head = jobRepository.findAccountHeadForUpdate(accountId).orElse(null);
+        GoogleOperationJob head = jobCommandService.tryLockNextOperationJob(accountId).orElse(null);
         if (head == null) {
             log.debug("Google operation head not found. accountId={} state=EMPTY", accountId);
             return null;
@@ -63,7 +63,7 @@ public class GoogleOperationJobPersistenceService {
             return null;
         }
         String previousState = head.getState().name();
-        head.claim(workerToken);
+        jobCommandService.claimOperationJob(head, workerToken);
         log.info("Google operation job claimed. accountId={} jobId={} state={} previousState={}",
                 accountId, head.getId(), head.getState().name(), previousState);
         return head;
@@ -71,20 +71,28 @@ public class GoogleOperationJobPersistenceService {
 
     @Transactional
     public void renewAndAssertOwned(Long jobId, Long accountId, String workerToken) {
-        if (integrationRepository.renewOwnedGoogleOperationLease(
-                jobId, accountId, workerToken) != 1) {
+        try {
+            integrationCommandService.renewOperationLease(jobId, accountId, workerToken);
+        } catch (GoogleOperationOwnershipLostException exception) {
             log.warn("Google operation ownership lost. accountId={} jobId={} state=PROCESSING", accountId, jobId);
-            throw new GoogleOperationOwnershipLostException();
+            throw exception;
         }
     }
 
     @Transactional
     public void retry(GoogleOperationJob job, String workerToken, String reason) {
         Duration delay = RETRY_DELAYS.get(Math.min(job.getRetryCount(), RETRY_DELAYS.size() - 1));
-        if (jobRepository.retry(job.getId(), workerToken, Instant.now(clock).plus(delay), reason) != 1) {
+        try {
+            jobCommandService.retryOperationJob(
+                    job,
+                    workerToken,
+                    Instant.now(clock).plus(delay),
+                    reason
+            );
+        } catch (GoogleOperationOwnershipLostException exception) {
             log.warn("Google operation retry transition rejected. accountId={} jobId={} state=PENDING delaySeconds={}",
                     job.getAccountId(), job.getId(), delay.toSeconds());
-            throw new GoogleOperationOwnershipLostException();
+            throw exception;
         }
         log.info("Google operation job scheduled for retry. accountId={} jobId={} state=PENDING delaySeconds={}",
                 job.getAccountId(), job.getId(), delay.toSeconds());
@@ -92,20 +100,24 @@ public class GoogleOperationJobPersistenceService {
 
     @Transactional
     public void terminate(Long jobId, Long accountId, String workerToken, String reason) {
-        if (jobRepository.terminateWithSyncError(jobId, workerToken, reason) != 1) {
+        try {
+            jobCommandService.failOperationJob(jobId, workerToken, reason);
+        } catch (GoogleOperationOwnershipLostException exception) {
             log.warn("Google operation terminal transition rejected. accountId={} jobId={} state=SYNC_ERROR",
                     accountId, jobId);
-            throw new GoogleOperationOwnershipLostException();
+            throw exception;
         }
         log.info("Google operation job terminated. accountId={} jobId={} state=SYNC_ERROR", accountId, jobId);
     }
 
     @Transactional
     public void succeed(Long jobId, Long accountId, String workerToken) {
-        if (jobRepository.deleteOwnedSuccessful(jobId, workerToken) != 1) {
+        try {
+            jobCommandService.completeOperationJob(jobId, workerToken);
+        } catch (GoogleOperationOwnershipLostException exception) {
             log.warn("Google operation success deletion rejected. accountId={} jobId={} state=PROCESSING",
                     accountId, jobId);
-            throw new GoogleOperationOwnershipLostException();
+            throw exception;
         }
         log.info("Google operation job deleted after success. accountId={} jobId={} state=PROCESSING transition=DELETE",
                 accountId, jobId);
@@ -113,8 +125,8 @@ public class GoogleOperationJobPersistenceService {
 
     @Transactional
     public void releaseLease(Long accountId, String workerToken) {
-        int released = integrationRepository.releaseGoogleOperationLease(accountId, workerToken);
-        if (released == 1) {
+        boolean released = integrationCommandService.releaseOperationLease(accountId, workerToken);
+        if (released) {
             log.info("Google operation lease released. accountId={} state=RELEASED", accountId);
         } else {
             log.warn("Google operation lease release skipped. accountId={} state=NOT_OWNED", accountId);
@@ -123,20 +135,19 @@ public class GoogleOperationJobPersistenceService {
 
     @Transactional(readOnly = true)
     public List<Long> findRecoverableAccountIds() {
-        return jobRepository.findRecoverableAccountIds(
+        return jobQueryService.listRecoverableAccountIds(
                 Instant.now(clock),
-                PageRequest.of(0, RECOVERY_BATCH_SIZE)
+                RECOVERY_BATCH_SIZE
         );
     }
 
     @Transactional
     public int deleteTerminalBatch(Instant cutoff) {
-        List<Long> ids = jobRepository.findTerminalIdsBefore(
-                cutoff, PageRequest.of(0, TERMINAL_CLEANUP_BATCH_SIZE));
-        jobRepository.deleteAllByIdInBatch(ids);
+        List<Long> ids = jobQueryService.listExpiredTerminalJobIds(
+                cutoff,
+                TERMINAL_CLEANUP_BATCH_SIZE
+        );
+        jobCommandService.deleteOperationJobs(ids);
         return ids.size();
-    }
-
-    public static final class GoogleOperationOwnershipLostException extends RuntimeException {
     }
 }

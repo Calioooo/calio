@@ -11,7 +11,6 @@ import com.calio.calendar.integration.domain.GoogleOperationJobState;
 import com.calio.calendar.integration.domain.GoogleOperationJobTrigger;
 import com.calio.calendar.integration.repository.GoogleCalendarIntegrationRepository;
 import com.calio.calendar.integration.repository.GoogleOperationJobRepository;
-import com.calio.calendar.integration.service.GoogleOperationJobPersistenceService.GoogleOperationOwnershipLostException;
 import java.time.Instant;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

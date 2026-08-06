@@ -1,7 +1,7 @@
 package com.calio.calendar.recurrence.service;
 
 import com.calio.calendar.account.domain.Account;
-import com.calio.calendar.account.repository.AccountRepository;
+import com.calio.calendar.account.service.AccountQueryService;
 import com.calio.calendar.common.domain.CanonicalSchedule;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
@@ -17,7 +17,7 @@ import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
 import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.tag.domain.Tag;
-import com.calio.calendar.tag.service.TagService;
+import com.calio.calendar.tag.service.TagQueryService;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -31,23 +31,23 @@ public class RecurrenceEventService {
     private final RecurrenceEventRepository recurrenceEventRepository;
     private final EventRepository eventRepository;
     private final RecurrenceEventOverrideRepository recurrenceEventOverrideRepository;
-    private final AccountRepository accountRepository;
-    private final TagService tagService;
+    private final AccountQueryService accountQueryService;
+    private final TagQueryService tagQueryService;
     private final Rfc5545RecurrenceEngine recurrenceEngine;
 
     public RecurrenceEventService(
             RecurrenceEventRepository recurrenceEventRepository,
             EventRepository eventRepository,
             RecurrenceEventOverrideRepository recurrenceEventOverrideRepository,
-            AccountRepository accountRepository,
-            TagService tagService,
+            AccountQueryService accountQueryService,
+            TagQueryService tagQueryService,
             Rfc5545RecurrenceEngine recurrenceEngine
     ) {
         this.recurrenceEventRepository = recurrenceEventRepository;
         this.eventRepository = eventRepository;
         this.recurrenceEventOverrideRepository = recurrenceEventOverrideRepository;
-        this.accountRepository = accountRepository;
-        this.tagService = tagService;
+        this.accountQueryService = accountQueryService;
+        this.tagQueryService = tagQueryService;
         this.recurrenceEngine = recurrenceEngine;
     }
 
@@ -55,8 +55,8 @@ public class RecurrenceEventService {
     public RecurrenceEventResponse createRecurrenceEvent(Long accountId, CreateRecurrenceEventRequest request) {
         RecurrenceSchedule schedule = createSchedule(request);
         List<String> recurrenceRules = recurrenceEngine.validate(schedule, request.recurrence());
-        Account account = accountRepository.getReferenceById(accountId);
-        Tag tag = tagService.getTagOrDefault(accountId, request.tagId());
+        Account account = accountQueryService.getAccount(accountId);
+        Tag tag = tagQueryService.getTagOrDefault(accountId, request.tagId());
         RecurrenceEvent recurrenceEvent = recurrenceEventRepository.save(new RecurrenceEvent(
                 request.title(),
                 request.description(),
@@ -81,7 +81,7 @@ public class RecurrenceEventService {
         RecurrenceEvent recurrenceEvent = findRecurrenceEventForUpdate(accountId, recurrenceId);
         RecurrenceSchedule schedule = createSchedule(request);
         List<String> recurrenceRules = recurrenceEngine.validate(schedule, request.recurrence());
-        Tag tag = tagService.getTagOrDefault(accountId, request.tagId());
+        Tag tag = tagQueryService.getTagOrDefault(accountId, request.tagId());
 
         recurrenceEvent.update(request.title(), request.description(), schedule, recurrenceRules, tag);
         recurrenceEventRepository.flush();

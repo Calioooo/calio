@@ -7,7 +7,7 @@ import static org.mockito.Mockito.mock;
 
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
-import com.calio.calendar.account.repository.AccountRepository;
+import com.calio.calendar.account.service.AccountQueryService;
 import com.calio.calendar.event.repository.EventRepository;
 import com.calio.calendar.external.google.GoogleCalendarEventsClient;
 import com.calio.calendar.external.google.GoogleCalendarSyncTokenExpiredException;
@@ -15,15 +15,10 @@ import com.calio.calendar.external.google.GoogleCalendarUnauthorizedException;
 import com.calio.calendar.external.google.GoogleOAuthProperties;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventPage;
 import com.calio.calendar.integration.domain.GoogleCalendarSyncMode;
-import com.calio.calendar.integration.repository.GoogleCalendarEventMappingRepository;
-import com.calio.calendar.integration.repository.GoogleCalendarIntegrationRepository;
-import com.calio.calendar.integration.repository.GoogleCalendarRecurrenceEventMappingRepository;
-import com.calio.calendar.integration.repository.GoogleCalendarRecurrenceOverrideMappingRepository;
-import com.calio.calendar.integration.service.GoogleOperationJobPersistenceService.GoogleOperationOwnershipLostException;
 import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.integration.service.GoogleCalendarSyncLeaseService.SyncLease;
-import com.calio.calendar.tag.service.TagService;
+import com.calio.calendar.tag.service.TagQueryService;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -414,7 +409,7 @@ class GoogleCalendarSyncServiceTest {
         private final String nextSyncToken;
 
         private FakeLeaseService(String nextSyncToken) {
-            super(null);
+            super(null, null);
             this.nextSyncToken = nextSyncToken;
         }
 
@@ -439,7 +434,6 @@ class GoogleCalendarSyncServiceTest {
 
         private FakeProviderDataService() {
             super(
-                    null,
                     null,
                     null,
                     null,
@@ -487,7 +481,7 @@ class GoogleCalendarSyncServiceTest {
         private int forceRefreshCount;
 
         private FakeAccessTokenService() {
-            super(null, null, null, null);
+            super(null, null, null, null, null);
         }
 
         @Override
@@ -509,7 +503,7 @@ class GoogleCalendarSyncServiceTest {
         private int assertionCount;
 
         private FakeOperationJobPersistenceService() {
-            super(null, null, null);
+            super(null, null, null, null);
         }
 
         @Override
@@ -562,13 +556,13 @@ class GoogleCalendarSyncServiceTest {
 
         private FakePagePersistenceService() {
             super(
-                    mock(GoogleCalendarIntegrationRepository.class),
-                    mock(GoogleCalendarEventMappingRepository.class),
+                    mock(GoogleCalendarIntegrationQueryService.class),
+                    mock(GoogleCalendarIntegrationCommandService.class),
+                    mock(GoogleCalendarMappingQueryService.class),
+                    mock(GoogleCalendarMappingCommandService.class),
                     mock(EventRepository.class),
-                    mock(AccountRepository.class),
-                    mock(TagService.class),
-                    mock(GoogleCalendarRecurrenceEventMappingRepository.class),
-                    mock(GoogleCalendarRecurrenceOverrideMappingRepository.class),
+                    mock(AccountQueryService.class),
+                    mock(TagQueryService.class),
                     mock(RecurrenceEventRepository.class),
                     mock(RecurrenceEventOverrideRepository.class),
                     mock(GoogleOperationJobPersistenceService.class)
@@ -592,7 +586,7 @@ class GoogleCalendarSyncServiceTest {
         private final Deque<NormalizedPageIdentities> identities = new ArrayDeque<>();
 
         private FakePageNormalizer(NormalizedPageIdentities... identities) {
-            super(null, null, null, null, null, null);
+            super(null, null, null, null, null);
             this.identities.addAll(List.of(identities));
         }
 

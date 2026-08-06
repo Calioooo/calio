@@ -9,8 +9,6 @@ import com.calio.calendar.external.google.dto.GoogleCalendarEventItem;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventPage;
 import com.calio.calendar.integration.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.domain.GoogleCalendarRecurrenceEventMapping;
-import com.calio.calendar.integration.repository.GoogleCalendarEventMappingRepository;
-import com.calio.calendar.integration.repository.GoogleCalendarRecurrenceEventMappingRepository;
 import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.EventCancellation;
 import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.EventUpsert;
 import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.NormalizedItem;
@@ -36,23 +34,20 @@ public class GoogleCalendarPageNormalizer {
 
     private static final String UNTITLED_EVENT_TITLE = "(제목 없음)";
 
-    private final GoogleCalendarEventMappingRepository eventMappingRepository;
-    private final GoogleCalendarRecurrenceEventMappingRepository recurrenceMappingRepository;
+    private final GoogleCalendarMappingQueryService mappingQueryService;
     private final GoogleCalendarEventTimeNormalizer timeNormalizer;
     private final GoogleCalendarRecurrenceMapper recurrenceMapper;
     private final GoogleCalendarEventsClient eventsClient;
     private final GoogleCalendarAccessTokenService accessTokenService;
 
     public GoogleCalendarPageNormalizer(
-            GoogleCalendarEventMappingRepository eventMappingRepository,
-            GoogleCalendarRecurrenceEventMappingRepository recurrenceMappingRepository,
+            GoogleCalendarMappingQueryService mappingQueryService,
             GoogleCalendarEventTimeNormalizer timeNormalizer,
             GoogleCalendarRecurrenceMapper recurrenceMapper,
             GoogleCalendarEventsClient eventsClient,
             GoogleCalendarAccessTokenService accessTokenService
     ) {
-        this.eventMappingRepository = eventMappingRepository;
-        this.recurrenceMappingRepository = recurrenceMappingRepository;
+        this.mappingQueryService = mappingQueryService;
         this.timeNormalizer = timeNormalizer;
         this.recurrenceMapper = recurrenceMapper;
         this.eventsClient = eventsClient;
@@ -362,7 +357,7 @@ public class GoogleCalendarPageNormalizer {
         if (externalIds.isEmpty()) {
             return Map.of();
         }
-        return eventMappingRepository.findAllWithEventByExternalIdentity(
+        return mappingQueryService.listEventMappings(
                         integrationId,
                         GoogleCalendarEventMapping.PRIMARY_CALENDAR_KEY,
                         externalIds
@@ -380,7 +375,7 @@ public class GoogleCalendarPageNormalizer {
         if (externalIds.isEmpty()) {
             return Map.of();
         }
-        return recurrenceMappingRepository.findAllWithRecurrenceEventAndTagByExternalIdentity(
+        return mappingQueryService.listRecurrenceEventMappings(
                         integrationId,
                         GoogleCalendarRecurrenceEventMapping.PRIMARY_CALENDAR_KEY,
                         externalIds

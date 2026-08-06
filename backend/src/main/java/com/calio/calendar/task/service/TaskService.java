@@ -5,7 +5,7 @@ import com.calio.calendar.task.controller.dto.TaskResponse;
 import com.calio.calendar.task.controller.dto.UpdateTaskTitleRequest;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
-import com.calio.calendar.account.repository.AccountRepository;
+import com.calio.calendar.account.service.AccountQueryService;
 import com.calio.calendar.task.repository.TaskRepository;
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.task.domain.Task;
@@ -24,16 +24,16 @@ public class TaskService {
     private static final int DEFAULT_PAGE_SIZE = 20;
 
     private final TaskRepository taskRepository;
-    private final AccountRepository accountRepository;
+    private final AccountQueryService accountQueryService;
 
-    public TaskService(TaskRepository taskRepository, AccountRepository accountRepository) {
+    public TaskService(TaskRepository taskRepository, AccountQueryService accountQueryService) {
         this.taskRepository = taskRepository;
-        this.accountRepository = accountRepository;
+        this.accountQueryService = accountQueryService;
     }
 
     @Transactional
     public TaskResponse createTask(Long accountId, CreateTaskRequest request) {
-        Account account = accountRepository.getReferenceById(accountId);
+        Account account = accountQueryService.getAccount(accountId);
         Task task = taskRepository.save(request.toEntity(account));
         return TaskResponse.from(task);
     }

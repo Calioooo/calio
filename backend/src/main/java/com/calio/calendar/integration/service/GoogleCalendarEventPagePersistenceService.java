@@ -1,7 +1,7 @@
 package com.calio.calendar.integration.service;
 
 import com.calio.calendar.account.domain.Account;
-import com.calio.calendar.account.repository.AccountRepository;
+import com.calio.calendar.account.service.AccountQueryService;
 import com.calio.calendar.common.domain.CanonicalSchedule;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
@@ -12,10 +12,6 @@ import com.calio.calendar.integration.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.domain.GoogleCalendarRecurrenceEventMapping;
 import com.calio.calendar.integration.domain.GoogleCalendarRecurrenceOverrideMapping;
-import com.calio.calendar.integration.repository.GoogleCalendarEventMappingRepository;
-import com.calio.calendar.integration.repository.GoogleCalendarIntegrationRepository;
-import com.calio.calendar.integration.repository.GoogleCalendarRecurrenceEventMappingRepository;
-import com.calio.calendar.integration.repository.GoogleCalendarRecurrenceOverrideMappingRepository;
 import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.ActiveRecurrenceEventOverrideUpsert;
 import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.CancelledRecurrenceEventOverrideUpsert;
 import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.EventCancellation;
@@ -30,7 +26,7 @@ import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
 import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.tag.domain.Tag;
-import com.calio.calendar.tag.service.TagService;
+import com.calio.calendar.tag.service.TagQueryService;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -44,36 +40,36 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class GoogleCalendarEventPagePersistenceService {
 
-    private final GoogleCalendarIntegrationRepository integrationRepository;
-    private final GoogleCalendarEventMappingRepository eventMappingRepository;
+    private final GoogleCalendarIntegrationQueryService integrationQueryService;
+    private final GoogleCalendarIntegrationCommandService integrationCommandService;
+    private final GoogleCalendarMappingQueryService mappingQueryService;
+    private final GoogleCalendarMappingCommandService mappingCommandService;
     private final EventRepository eventRepository;
-    private final AccountRepository accountRepository;
-    private final TagService tagService;
-    private final GoogleCalendarRecurrenceEventMappingRepository recurrenceMappingRepository;
-    private final GoogleCalendarRecurrenceOverrideMappingRepository overrideMappingRepository;
+    private final AccountQueryService accountQueryService;
+    private final TagQueryService tagQueryService;
     private final RecurrenceEventRepository recurrenceEventRepository;
     private final RecurrenceEventOverrideRepository overrideRepository;
     private final GoogleOperationJobPersistenceService operationJobPersistenceService;
 
     public GoogleCalendarEventPagePersistenceService(
-            GoogleCalendarIntegrationRepository integrationRepository,
-            GoogleCalendarEventMappingRepository eventMappingRepository,
+            GoogleCalendarIntegrationQueryService integrationQueryService,
+            GoogleCalendarIntegrationCommandService integrationCommandService,
+            GoogleCalendarMappingQueryService mappingQueryService,
+            GoogleCalendarMappingCommandService mappingCommandService,
             EventRepository eventRepository,
-            AccountRepository accountRepository,
-            TagService tagService,
-            GoogleCalendarRecurrenceEventMappingRepository recurrenceMappingRepository,
-            GoogleCalendarRecurrenceOverrideMappingRepository overrideMappingRepository,
+            AccountQueryService accountQueryService,
+            TagQueryService tagQueryService,
             RecurrenceEventRepository recurrenceEventRepository,
             RecurrenceEventOverrideRepository overrideRepository,
             GoogleOperationJobPersistenceService operationJobPersistenceService
     ) {
-        this.integrationRepository = integrationRepository;
-        this.eventMappingRepository = eventMappingRepository;
+        this.integrationQueryService = integrationQueryService;
+        this.integrationCommandService = integrationCommandService;
+        this.mappingQueryService = mappingQueryService;
+        this.mappingCommandService = mappingCommandService;
         this.eventRepository = eventRepository;
-        this.accountRepository = accountRepository;
-        this.tagService = tagService;
-        this.recurrenceMappingRepository = recurrenceMappingRepository;
-        this.overrideMappingRepository = overrideMappingRepository;
+        this.accountQueryService = accountQueryService;
+        this.tagQueryService = tagQueryService;
         this.recurrenceEventRepository = recurrenceEventRepository;
         this.overrideRepository = overrideRepository;
         this.operationJobPersistenceService = operationJobPersistenceService;
@@ -89,7 +85,7 @@ public class GoogleCalendarEventPagePersistenceService {
     ) {
         operationJobPersistenceService.renewAndAssertOwned(jobId, accountId, workerToken);
         extendSyncLeaseOrThrow(integrationId, workerToken);
-        GoogleCalendarIntegration integration = integrationRepository.getReferenceById(integrationId);
+        GoogleCalendarIntegration integration = integrationQueryService.getIntegrationById(integrationId);
         applyEventChanges(integration, accountId, page.items());
     }
 
@@ -101,7 +97,7 @@ public class GoogleCalendarEventPagePersistenceService {
             GoogleCalendarNormalizedPage page
     ) {
         extendSyncLeaseOrThrow(integrationId, runId);
-        GoogleCalendarIntegration integration = integrationRepository.getReferenceById(integrationId);
+        GoogleCalendarIntegration integration = integrationQueryService.getIntegrationById(integrationId);
         applyEventChanges(integration, accountId, page.items());
     }
 
@@ -115,10 +111,10 @@ public class GoogleCalendarEventPagePersistenceService {
         boolean isLocalCreationNeeded = items.stream().anyMatch(item ->
                 isLocalCreationNeeded(item, existingRecords));
         Account account = isLocalCreationNeeded
-                ? accountRepository.getReferenceById(accountId)
+                ? accountQueryService.getAccount(accountId)
                 : null;
         Tag defaultTag = isLocalCreationNeeded
-                ? tagService.getTagOrDefault(accountId, null)
+                ? tagQueryService.getTagOrDefault(accountId, null)
                 : null;
 
         for (NormalizedItem item : items) {
@@ -160,7 +156,7 @@ public class GoogleCalendarEventPagePersistenceService {
 
         Map<String, GoogleCalendarEventMapping> eventMappings = externalEventIds.isEmpty()
                 ? new HashMap<>()
-                : eventMappingRepository.findAllWithEventByExternalIdentity(
+                : mappingQueryService.listEventMappings(
                         integrationId,
                         GoogleCalendarEventMapping.PRIMARY_CALENDAR_KEY,
                         externalEventIds
@@ -173,8 +169,7 @@ public class GoogleCalendarEventPagePersistenceService {
         Map<String, GoogleCalendarRecurrenceEventMapping> recurrenceEventMappings =
                 recurrenceEventExternalIds.isEmpty()
                         ? new HashMap<>()
-                        : recurrenceMappingRepository
-                                .findAllWithRecurrenceEventAndTagByExternalIdentity(
+                        : mappingQueryService.listRecurrenceEventMappings(
                                 integrationId,
                                 GoogleCalendarRecurrenceEventMapping.PRIMARY_CALENDAR_KEY,
                                 recurrenceEventExternalIds
@@ -219,10 +214,7 @@ public class GoogleCalendarEventPagePersistenceService {
                 || recurrenceEventExternalIdsByOverrideExternalId.isEmpty()) {
             return new HashMap<>();
         }
-        return overrideMappingRepository
-                .findAllWithRecurrenceEventMappingAndRecurrenceEventOverrideByRecurrenceEventMappingIds(
-                        recurrenceEventMappingIds
-                )
+        return mappingQueryService.listOverrideMappings(recurrenceEventMappingIds)
                 .stream().collect(Collectors.toMap(
                         mapping -> new GoogleCalendarRecurrenceOverrideKey(
                                 mapping.getRecurrenceEventMapping().getId(),
@@ -266,7 +258,7 @@ public class GoogleCalendarEventPagePersistenceService {
         if (recurrenceEventExternalIdsByOverrideExternalId.isEmpty()) {
             return;
         }
-        overrideMappingRepository.findAllWithRecurrenceEventMappingByExternalEventIds(
+        mappingQueryService.listOverrideMappings(
                 integrationId,
                 GoogleCalendarRecurrenceEventMapping.PRIMARY_CALENDAR_KEY,
                 recurrenceEventExternalIdsByOverrideExternalId.keySet()
@@ -362,7 +354,7 @@ public class GoogleCalendarEventPagePersistenceService {
                 defaultTag,
                 account
         ));
-        GoogleCalendarEventMapping mapping = eventMappingRepository.save(
+        GoogleCalendarEventMapping mapping = mappingCommandService.createEventMapping(
                 new GoogleCalendarEventMapping(
                         integration,
                         event,
@@ -416,7 +408,8 @@ public class GoogleCalendarEventPagePersistenceService {
                 defaultTag,
                 account
         ));
-        GoogleCalendarRecurrenceEventMapping mapping = recurrenceMappingRepository.saveAndFlush(
+        GoogleCalendarRecurrenceEventMapping mapping =
+                mappingCommandService.createRecurrenceEventMapping(
                 new GoogleCalendarRecurrenceEventMapping(
                         integration,
                         recurrenceEvent,
@@ -479,7 +472,7 @@ public class GoogleCalendarEventPagePersistenceService {
             updateRecurrenceEventOverride(recurrenceEventOverride, item);
         }
         if (googleOverrideMapping == null) {
-            googleOverrideMapping = overrideMappingRepository.save(
+            googleOverrideMapping = mappingCommandService.createOverrideMapping(
                     new GoogleCalendarRecurrenceOverrideMapping(
                             recurrenceEventMapping,
                             recurrenceEventOverride,
@@ -606,8 +599,7 @@ public class GoogleCalendarEventPagePersistenceService {
             return;
         }
         Event event = eventMapping.getEvent();
-        eventMappingRepository.delete(eventMapping);
-        eventMappingRepository.flush();
+        mappingCommandService.deleteEventMapping(eventMapping);
         eventRepository.delete(event);
     }
 
@@ -631,20 +623,15 @@ public class GoogleCalendarEventPagePersistenceService {
 
     void deleteRecurrenceEvent(GoogleCalendarRecurrenceEventMapping recurrenceEventMapping) {
         List<GoogleCalendarRecurrenceOverrideMapping> overrideMappings =
-                overrideMappingRepository
-                        .findAllWithRecurrenceEventMappingAndRecurrenceEventOverrideByRecurrenceEventMappingIds(
-                        Set.of(recurrenceEventMapping.getId())
-                );
+                mappingQueryService.listOverrideMappings(Set.of(recurrenceEventMapping.getId()));
         if (!overrideMappings.isEmpty()) {
-            overrideMappingRepository.deleteAll(overrideMappings);
-            overrideMappingRepository.flush();
+            mappingCommandService.deleteOverrideMappings(overrideMappings);
         }
         overrideRepository.deleteByRecurrenceEvent_Id(
                 recurrenceEventMapping.getRecurrenceEvent().getId()
         );
         overrideRepository.flush();
-        recurrenceMappingRepository.delete(recurrenceEventMapping);
-        recurrenceMappingRepository.flush();
+        mappingCommandService.deleteRecurrenceEventMapping(recurrenceEventMapping);
         List<Event> occurrences = eventRepository.findByRecurrenceIdAndAccount_IdOrderByStartAtAsc(
                 recurrenceEventMapping.getRecurrenceEvent().getId(),
                 recurrenceEventMapping.getRecurrenceEvent().getAccount().getId()
@@ -657,9 +644,7 @@ public class GoogleCalendarEventPagePersistenceService {
     }
 
     private void extendSyncLeaseOrThrow(Long integrationId, String runId) {
-        if (integrationRepository.extendSyncLease(integrationId, runId) != 1) {
-            throw new CalioException(ErrorCode.GOOGLE_CALENDAR_SYNC_CONFLICT);
-        }
+        integrationCommandService.renewSyncLease(integrationId, runId);
     }
 
     private record ExistingMappingsAndOverrides(
