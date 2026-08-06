@@ -3,8 +3,8 @@
 ## 기술 맥락
 
 - backend는 Java(21) + Spring boot(4.0.6) 기반 서비스다.
-- Spring MVC / Controller /Service / Repository 경계를 명확히 유지한다.
-- 비즈니스 의미와 상태 판단은 transport layer가 아니라 service layer에서 처리한다.
+- Spring MVC / Controller / Application Service / Query·Command Service / Repository 경계를 명확히 유지한다.
+- 비즈니스 의미와 상태 판단은 transport layer가 아니라 Application Service와 domain model에서 처리한다.
 - 구조는 기능 도메인을 최상위 패키지로 두고, 각 도메인 안에 `controller`, `service`, `repository`, `domain` 경계를 두는 기능 중심 구조를 따른다.
 
 ## 구조 원칙
@@ -16,15 +16,28 @@
 - persistence model을 포함한 도메인 모델과 닫힌 enum은 해당 도메인의 `domain` 아래에 둔다.
 - 공통 persistence 기반 모델은 `common/persistence` 아래에 둔다.
 - 외부 연동 client와 해당 client에 전속된 properties는 기능 도메인의 `client` 아래에 둔다.
-- 주기적인 job은 해당 도메인의 `scheduler` 아래에 두고, 실제 업무 흐름은 service에 위임한다.
+- 주기적인 job은 해당 도메인의 `scheduler` 아래에 두고, 실제 업무 흐름은 Application Service에 위임한다.
 - 기능 도메인에 속하지 않는 공통 설정, 오류, persistence 기반 기능만 `common` 아래에 둔다.
 - 인증·인가 파이프라인은 `security` 패키지가 소유하며, 파일 수와 책임이 커지면 그 안에서 계층적으로 분리한다.
 - controller는 transport layer로 유지하고 business logic을 넣지 않는다.
-- service는 유스케이스 흐름과 비즈니스 규칙 적용의 중심이 된다.
-- repository는 persistence 접근만 담당한다.
 - 서로 다른 도메인이 필요 없이 내부 구현을 소유하거나 DTO를 공유하지 않도록 한다.
 - 공통 로직은 무분별하게 퍼뜨리지 않고, 실제로 공통성이 확인된 경우에만 `common`으로 올린다.
 - 새 레이어나 공용 패키지를 추가하기보다 기존 기능 도메인의 구조를 우선 확장한다.
+
+## Query / Command Service 규칙
+
+- Application Service는 유스케이스 흐름, 비즈니스 정책, 분기, 작업 순서와 transaction boundary를 소유한다.
+- Query Service는 조회만 담당하며 필수·선택 조회, 조회 범위, 정렬, Entity Graph와 not-found 예외를 조회 계약으로 소유한다.
+- Command Service는 생성·변경·삭제와 변경용 잠금만 담당하며 변경 결과 검증과 예외 변환을 변경 계약으로 소유한다.
+- Query/Command Service에는 외부 호출, 여러 도메인의 작업 조합이나 유스케이스 흐름을 넣지 않는다.
+- Application Service, Controller, Scheduler, Security Filter는 Repository를 직접 사용하지 않고 Query/Command Service를 사용한다.
+- Repository는 해당 도메인의 Query/Command Service에서만 직접 사용한다.
+- Query/Command Service는 서로 호출하지 않으며 Application Service가 조합한다.
+- Query/Command Service는 Repository가 있는 도메인에만 두고, Aggregate가 여러 개면 책임별로 분리한다. 공통 Base Service는 만들지 않는다.
+- Query 이름은 `get`, `get...IfExists`, `get...OrDefault`, `list`, `has`를 사용한다.
+- Command 이름은 `lock`, `tryLock`, `create`, `update`, `replace`, `change`, `delete`를 사용한다.
+- Repository 형태의 `find`, `findAll`, `save`, `persist`, `deleteBy`, `existsBy` 이름을 Query/Command Service에 노출하지 않는다.
+- 그 외 동사는 실제 도메인 상태 전이를 더 정확히 표현할 때만 사용한다.
 
 ## 구현 규칙
 
@@ -34,7 +47,7 @@
 - request DTO는 controller 경계에서 사용한다.
 - response DTO 변환은 DTO의 `static from(...)` 메서드에서 처리한다.
 - DTO 변환은 단순 필드 매핑과 표현용 값 조합에 한정한다.
-- service는 response DTO를 반환할 수 있다
+- Application Service는 response DTO를 반환할 수 있다
 - entity는 controller로 직접 노출하지 않는다
 - 정책 판단, 외부 조회, 비즈니스 규칙은 DTO 변환에 넣지 않는다
 - 닫힌 상태 집합은 silent fallback으로 넓히지 않는다.
@@ -54,9 +67,8 @@
 
 ## 트랜잭션 규칙
 
-- transaction boundary는 service layer에서 관리한다.
+- transaction boundary는 Application Service에서 관리한다.
 - 하나의 유스케이스는 가능한 한 하나의 명확한 transaction boundary 안에서 처리한다.
-- 읽기/쓰기 책임이 다른 경우 이를 의식적으로 분리한다
 
 ## 로그 및 관측성 규칙
 
@@ -74,7 +86,7 @@
 
 - request validation은 controller에서 request DTO를 받을 때 처리한다.
 - 형식 검증, 필수값 검증, 기본적인 입력 제약은 request DTO와 controller 경계에서 처리한다.
-- 비즈니스 규칙 판단은 service에서 처리한다.
+- 비즈니스 규칙 판단은 Application Service와 domain model에서 처리한다.
 
 ## API / 계약 규칙
 
