@@ -2,7 +2,7 @@ package com.calio.calendar.integration.controller;
 
 import com.calio.calendar.integration.controller.dto.GoogleCalendarConnectRequest;
 import com.calio.calendar.integration.controller.dto.GoogleCalendarIntegrationResponse;
-import com.calio.calendar.integration.service.GoogleCalendarIntegrationService;
+import com.calio.calendar.integration.service.GoogleCalendarConnectionService;
 import com.calio.calendar.integration.service.GoogleOperationJobEnqueueService;
 import com.calio.calendar.security.AuthenticatedAccount;
 import jakarta.validation.Valid;
@@ -21,14 +21,14 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/integrations/google-calendar")
 public class GoogleCalendarIntegrationController {
 
-    private final GoogleCalendarIntegrationService googleCalendarIntegrationService;
+    private final GoogleCalendarConnectionService googleCalendarConnectionService;
     private final GoogleOperationJobEnqueueService operationJobEnqueueService;
 
     public GoogleCalendarIntegrationController(
-            GoogleCalendarIntegrationService googleCalendarIntegrationService,
+            GoogleCalendarConnectionService googleCalendarConnectionService,
             GoogleOperationJobEnqueueService operationJobEnqueueService
     ) {
-        this.googleCalendarIntegrationService = googleCalendarIntegrationService;
+        this.googleCalendarConnectionService = googleCalendarConnectionService;
         this.operationJobEnqueueService = operationJobEnqueueService;
     }
 
@@ -37,21 +37,24 @@ public class GoogleCalendarIntegrationController {
             @AuthenticationPrincipal AuthenticatedAccount account,
             @Valid @RequestBody GoogleCalendarConnectRequest request
     ) {
-        return googleCalendarIntegrationService.connect(account.accountId(), request);
+        return googleCalendarConnectionService.connect(
+                account.accountId(),
+                request.authorizationCode()
+        );
     }
 
     @GetMapping
     public GoogleCalendarIntegrationResponse getConnectionStatus(
             @AuthenticationPrincipal AuthenticatedAccount account
     ) {
-        return googleCalendarIntegrationService.getConnectionStatus(account.accountId());
+        return googleCalendarConnectionService.getConnectionStatus(account.accountId());
     }
 
     @DeleteMapping
     public ResponseEntity<Void> disconnect(
             @AuthenticationPrincipal AuthenticatedAccount account
     ) {
-        googleCalendarIntegrationService.disconnect(account.accountId());
+        googleCalendarConnectionService.disconnect(account.accountId());
         return ResponseEntity.noContent().build();
     }
 
