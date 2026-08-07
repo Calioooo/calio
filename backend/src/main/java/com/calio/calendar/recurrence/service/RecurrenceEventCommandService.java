@@ -18,6 +18,7 @@ import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepositor
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.service.TagService;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -25,8 +26,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@Transactional(readOnly = true)
-public class RecurrenceEventService {
+@Transactional
+public class RecurrenceEventCommandService {
 
     private final RecurrenceEventRepository recurrenceEventRepository;
     private final EventRepository eventRepository;
@@ -34,14 +35,16 @@ public class RecurrenceEventService {
     private final AccountRepository accountRepository;
     private final TagService tagService;
     private final Rfc5545RecurrenceEngine recurrenceEngine;
+    private final Clock clock;
 
-    public RecurrenceEventService(
+    public RecurrenceEventCommandService(
             RecurrenceEventRepository recurrenceEventRepository,
             EventRepository eventRepository,
             RecurrenceEventOverrideRepository recurrenceEventOverrideRepository,
             AccountRepository accountRepository,
             TagService tagService,
-            Rfc5545RecurrenceEngine recurrenceEngine
+            Rfc5545RecurrenceEngine recurrenceEngine,
+            Clock clock
     ) {
         this.recurrenceEventRepository = recurrenceEventRepository;
         this.eventRepository = eventRepository;
@@ -49,11 +52,16 @@ public class RecurrenceEventService {
         this.accountRepository = accountRepository;
         this.tagService = tagService;
         this.recurrenceEngine = recurrenceEngine;
+        this.clock = clock;
     }
 
-    @Transactional
     public RecurrenceEventResponse createRecurrenceEvent(Long accountId, CreateRecurrenceEventRequest request) {
-        RecurrenceSchedule schedule = createSchedule(request);
+        RecurrenceSchedule schedule = RecurrenceSchedule.create(
+                request.allDay(),
+                request.firstOccurrenceStartAt(),
+                request.firstOccurrenceEndAt(),
+                request.timeZone()
+        );
         List<String> recurrenceRules = recurrenceEngine.validate(schedule, request.recurrence());
         Account account = accountRepository.getReferenceById(accountId);
         Tag tag = tagService.getTagOrDefault(accountId, request.tagId());
@@ -68,18 +76,18 @@ public class RecurrenceEventService {
         return RecurrenceEventResponse.from(recurrenceEvent);
     }
 
-    public RecurrenceEventResponse getRecurrenceEvent(Long accountId, Long recurrenceId) {
-        return RecurrenceEventResponse.from(findRecurrenceEvent(accountId, recurrenceId));
-    }
-
-    @Transactional
     public RecurrenceEventResponse updateRecurrenceEvent(
             Long accountId,
             Long recurrenceId,
             UpdateRecurrenceEventRequest request
     ) {
         RecurrenceEvent recurrenceEvent = findRecurrenceEventForUpdate(accountId, recurrenceId);
-        RecurrenceSchedule schedule = createSchedule(request);
+        RecurrenceSchedule schedule = RecurrenceSchedule.create(
+                request.allDay(),
+                request.firstOccurrenceStartAt(),
+                request.firstOccurrenceEndAt(),
+                request.timeZone()
+        );
         List<String> recurrenceRules = recurrenceEngine.validate(schedule, request.recurrence());
         Tag tag = tagService.getTagOrDefault(accountId, request.tagId());
 
@@ -88,7 +96,6 @@ public class RecurrenceEventService {
         return RecurrenceEventResponse.from(recurrenceEvent);
     }
 
-    @Transactional
     public EventResponse updateRecurrenceOccurrence(
             Long accountId,
             Long recurrenceId,
@@ -120,22 +127,18 @@ public class RecurrenceEventService {
         return EventResponse.recurrenceOverride(override);
     }
 
-    @Transactional
     public void deleteRecurrenceEvent(Long accountId, Long recurrenceId) {
         RecurrenceEvent recurrenceEvent = findRecurrenceEventForUpdate(accountId, recurrenceId);
-        recurrenceEventOverrideRepository.deleteAllByRecurrenceEvent_Id(recurrenceId);
-        eventRepository.deleteAll(
-                eventRepository.findByRecurrenceIdAndAccount_IdOrderByStartAtAsc(recurrenceId, accountId)
-        );
+        recurrenceEventOverrideRepository.deleteAllByRecurrenceEventIds(List.of(recurrenceId));
+        eventRepository.deleteAllByRecurrenceEventIds(List.of(recurrenceId));
         recurrenceEventRepository.delete(recurrenceEvent);
     }
 
-    @Transactional
     public void deleteRecurrenceOccurrence(Long accountId, Long recurrenceId, Instant originStartAt) {
         RecurrenceEvent recurrenceEvent = findRecurrenceEventForUpdate(accountId, recurrenceId);
         Optional<RecurrenceEventOverride> existingOverride =
                 findOverrideOrRejectIneligible(recurrenceEvent, originStartAt);
-        Instant deletedAt = Instant.now();
+        Instant deletedAt = Instant.now(clock);
         RecurrenceEventOverride override;
         if (existingOverride.isPresent()) {
             override = existingOverride.get();
@@ -144,24 +147,6 @@ public class RecurrenceEventService {
             override = RecurrenceEventOverride.deleted(recurrenceEvent, originStartAt, deletedAt);
         }
         recurrenceEventOverrideRepository.saveAndFlush(override);
-    }
-
-    private RecurrenceSchedule createSchedule(CreateRecurrenceEventRequest request) {
-        return RecurrenceSchedule.create(
-                request.allDay(),
-                request.firstOccurrenceStartAt(),
-                request.firstOccurrenceEndAt(),
-                request.timeZone()
-        );
-    }
-
-    private RecurrenceSchedule createSchedule(UpdateRecurrenceEventRequest request) {
-        return RecurrenceSchedule.create(
-                request.allDay(),
-                request.firstOccurrenceStartAt(),
-                request.firstOccurrenceEndAt(),
-                request.timeZone()
-        );
     }
 
     private Optional<RecurrenceEventOverride> findOverrideOrRejectIneligible(
@@ -182,11 +167,6 @@ public class RecurrenceEventService {
                 recurrenceEvent.getRecurrenceRules(),
                 originStartAt
         );
-    }
-
-    private RecurrenceEvent findRecurrenceEvent(Long accountId, Long recurrenceId) {
-        return recurrenceEventRepository.findByIdAndAccount_Id(recurrenceId, accountId)
-                .orElseThrow(() -> new CalioException(ErrorCode.RECURRENCE_EVENT_NOT_FOUND));
     }
 
     private RecurrenceEvent findRecurrenceEventForUpdate(Long accountId, Long recurrenceId) {
