@@ -1,13 +1,6 @@
-//
-//  EventJSONCoding.swift
-//  Calio
-//
-//  Created by Codex on 6/19/26.
-//
-
 import Foundation
 
-enum EventJSONCoding {
+enum APIJSONCoding {
     private static let fractionalFormatter: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
@@ -34,14 +27,12 @@ enum EventJSONCoding {
         decoder.dateDecodingStrategy = .custom { decoder in
             let container = try decoder.singleValueContainer()
             let value = try container.decode(String.self)
-
             guard let date = date(from: value) else {
                 throw DecodingError.dataCorruptedError(
                     in: container,
                     debugDescription: "Invalid ISO-8601 instant: \(value)"
                 )
             }
-
             return date
         }
         return decoder

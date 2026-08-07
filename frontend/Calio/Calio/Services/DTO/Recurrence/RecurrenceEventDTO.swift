@@ -1,43 +1,4 @@
-//
-//  EventRequestDTO.swift
-//  Calio
-//
-//  Created by Codex on 6/19/26.
-//
-
 import Foundation
-
-struct CreateEventRequestDTO: Encodable {
-    let title: String
-    let description: String?
-    let startAt: Date
-    let endAt: Date
-    let tagId: Int64?
-
-    init(title: String, description: String?, startAt: Date, endAt: Date, tagId: Int64? = nil) {
-        self.title = title
-        self.description = description
-        self.startAt = startAt
-        self.endAt = endAt
-        self.tagId = tagId
-    }
-}
-
-struct UpdateEventRequestDTO: Encodable, Equatable {
-    let title: String
-    let description: String?
-    let startAt: Date
-    let endAt: Date
-    let tagId: Int64?
-
-    init(title: String, description: String?, startAt: Date, endAt: Date, tagId: Int64? = nil) {
-        self.title = title
-        self.description = description
-        self.startAt = startAt
-        self.endAt = endAt
-        self.tagId = tagId
-    }
-}
 
 struct UpdateRecurrenceEventRequestDTO: Encodable, Equatable {
     let title: String
@@ -49,16 +10,7 @@ struct UpdateRecurrenceEventRequestDTO: Encodable, Equatable {
     let recurrenceFrequency: RecurrenceFrequency
     let tagId: Int64?
 
-    init(
-        title: String,
-        description: String?,
-        startDate: String,
-        endDate: String,
-        startTime: String,
-        endTime: String,
-        recurrenceFrequency: RecurrenceFrequency,
-        tagId: Int64? = nil
-    ) {
+    init(title: String, description: String?, startDate: String, endDate: String, startTime: String, endTime: String, recurrenceFrequency: RecurrenceFrequency, tagId: Int64? = nil) {
         self.title = title
         self.description = description
         self.startDate = startDate
@@ -86,16 +38,7 @@ struct CreateRecurrenceEventRequestDTO: Encodable, Equatable {
     let recurrenceFrequency: RecurrenceFrequency
     let tagId: Int64?
 
-    init(
-        recurrenceTitle: String,
-        recurrenceDescription: String?,
-        recurrenceStartDate: String,
-        recurrenceEndDate: String,
-        recurrenceStartTime: String,
-        recurrenceEndTime: String,
-        recurrenceFrequency: RecurrenceFrequency,
-        tagId: Int64? = nil
-    ) {
+    init(recurrenceTitle: String, recurrenceDescription: String?, recurrenceStartDate: String, recurrenceEndDate: String, recurrenceStartTime: String, recurrenceEndTime: String, recurrenceFrequency: RecurrenceFrequency, tagId: Int64? = nil) {
         self.recurrenceTitle = recurrenceTitle
         self.recurrenceDescription = recurrenceDescription
         self.recurrenceStartDate = recurrenceStartDate
@@ -105,11 +48,6 @@ struct CreateRecurrenceEventRequestDTO: Encodable, Equatable {
         self.recurrenceFrequency = recurrenceFrequency
         self.tagId = tagId
     }
-}
-
-struct CustomTagRequestDTO: Encodable, Equatable {
-    let title: String
-    let colorCode: String
 }
 
 struct RecurrenceEventResponseDTO: Decodable, Equatable {
@@ -123,22 +61,7 @@ struct RecurrenceEventResponseDTO: Decodable, Equatable {
     let recurrenceFrequency: RecurrenceFrequency
     let tag: TagResponseDTO
 
-    init(
-        recurrenceId: Int64,
-        recurrenceTitle: String,
-        recurrenceDescription: String?,
-        recurrenceStartDate: String,
-        recurrenceEndDate: String,
-        recurrenceStartTime: String,
-        recurrenceEndTime: String,
-        recurrenceFrequency: RecurrenceFrequency,
-        tag: TagResponseDTO = TagResponseDTO(
-            id: CalendarTag.fallback.id,
-            title: CalendarTag.fallback.title,
-            colorCode: CalendarTag.fallback.colorCode,
-            tagType: CalendarTag.fallback.tagType
-        )
-    ) {
+    init(recurrenceId: Int64, recurrenceTitle: String, recurrenceDescription: String?, recurrenceStartDate: String, recurrenceEndDate: String, recurrenceStartTime: String, recurrenceEndTime: String, recurrenceFrequency: RecurrenceFrequency, tag: TagResponseDTO = TagResponseDTO(id: 0, title: "기타", colorCode: "#64748B", tagType: .defaultTag)) {
         self.recurrenceId = recurrenceId
         self.recurrenceTitle = recurrenceTitle
         self.recurrenceDescription = recurrenceDescription

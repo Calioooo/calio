@@ -18,7 +18,7 @@ struct EventService {
         do {
             let response = try await repository.fetchEvents(from: startDate, to: endDate)
             return try response.map(mapToEvent(_:))
-        } catch let error as EventRepositoryError {
+        } catch let error as APIError {
             throw mapToServiceError(error)
         } catch let error as EventServiceError {
             throw error
@@ -44,7 +44,7 @@ struct EventService {
         do {
             let response = try await repository.createEvent(request)
             return try mapToEvent(response)
-        } catch let error as EventRepositoryError {
+        } catch let error as APIError {
             throw mapToServiceError(error)
         } catch let error as EventServiceError {
             throw error
@@ -70,7 +70,7 @@ struct EventService {
         do {
             let response = try await repository.updateEvent(eventId: eventId, request: request)
             return try mapToEvent(response)
-        } catch let error as EventRepositoryError {
+        } catch let error as APIError {
             throw mapToServiceError(error)
         } catch let error as EventServiceError {
             throw error
@@ -83,7 +83,7 @@ struct EventService {
         do {
             let response = try await repository.fetchRecurrenceEvent(recurrenceId: recurrenceId)
             return try mapToRecurrenceEventDetails(response)
-        } catch let error as EventRepositoryError {
+        } catch let error as APIError {
             throw mapToServiceError(error)
         } catch let error as EventServiceError {
             throw error
@@ -113,7 +113,7 @@ struct EventService {
                 request: request
             )
             return try mapToRecurrenceEventDetails(response)
-        } catch let error as EventRepositoryError {
+        } catch let error as APIError {
             throw mapToServiceError(error)
         } catch let error as EventServiceError {
             throw error
@@ -144,7 +144,7 @@ struct EventService {
                 request: request
             )
             return try mapToEvent(response)
-        } catch let error as EventRepositoryError {
+        } catch let error as APIError {
             throw mapToServiceError(error)
         } catch let error as EventServiceError {
             throw error
@@ -156,7 +156,7 @@ struct EventService {
     func deleteEvent(eventId: Int64) async throws {
         do {
             try await repository.deleteEvent(eventId: eventId)
-        } catch let error as EventRepositoryError {
+        } catch let error as APIError {
             throw mapToServiceError(error)
         } catch {
             throw EventServiceError.unexpected
@@ -166,7 +166,7 @@ struct EventService {
     func deleteRecurrenceEvent(recurrenceId: Int64) async throws {
         do {
             try await repository.deleteRecurrenceEvent(recurrenceId: recurrenceId)
-        } catch let error as EventRepositoryError {
+        } catch let error as APIError {
             throw mapToServiceError(error)
         } catch {
             throw EventServiceError.unexpected
@@ -179,7 +179,7 @@ struct EventService {
                 recurrenceId: recurrenceId,
                 originStartAt: originStartAt
             )
-        } catch let error as EventRepositoryError {
+        } catch let error as APIError {
             throw mapToServiceError(error)
         } catch {
             throw EventServiceError.unexpected
@@ -200,7 +200,7 @@ struct EventService {
 
         do {
             _ = try await repository.createRecurrenceEvent(request)
-        } catch let error as EventRepositoryError {
+        } catch let error as APIError {
             throw mapToServiceError(error)
         } catch {
             throw EventServiceError.unexpected
@@ -296,10 +296,10 @@ struct EventService {
     private static let allDayRecurrenceStartTime = "00:00:00"
     private static let allDayRecurrenceEndTime = "23:59:59"
 
-    private func mapToServiceError(_ error: EventRepositoryError) -> EventServiceError {
+    private func mapToServiceError(_ error: APIError) -> EventServiceError {
         switch error {
-        case .backend(_, let response):
-            switch response?.errorCode {
+        case .backend(_, let problem):
+            switch problem?.errorCode {
             case "EVENT_NOT_FOUND":
                 return .eventNotFound
             case "RECURRENCE_EVENT_NOT_FOUND":
@@ -320,7 +320,7 @@ struct EventService {
         case .decoding:
             return .decoding
 
-        case .invalidURL, .invalidResponse, .encoding, .unexpected:
+        case .invalidRequest, .invalidResponse, .encoding, .unexpected:
             return .unexpected
         }
     }
@@ -347,7 +347,7 @@ struct TagService {
     func fetchTags() async throws -> [CalendarTag] {
         do {
             return try await repository.fetchTags().map(mapToCalendarTag(_:))
-        } catch let error as EventRepositoryError {
+        } catch let error as APIError {
             throw mapToServiceError(error)
         } catch {
             throw EventServiceError.unexpected
@@ -363,7 +363,7 @@ struct TagService {
         do {
             let dto = try await repository.createCustomTag(request)
             return mapToCalendarTag(dto)
-        } catch let error as EventRepositoryError {
+        } catch let error as APIError {
             throw mapToServiceError(error)
         } catch {
             throw EventServiceError.unexpected
@@ -379,7 +379,7 @@ struct TagService {
         do {
             let dto = try await repository.updateCustomTag(tagId: tagId, request: request)
             return mapToCalendarTag(dto)
-        } catch let error as EventRepositoryError {
+        } catch let error as APIError {
             throw mapToServiceError(error)
         } catch {
             throw EventServiceError.unexpected
@@ -389,7 +389,7 @@ struct TagService {
     func deleteCustomTag(tagId: Int64) async throws {
         do {
             try await repository.deleteCustomTag(tagId: tagId)
-        } catch let error as EventRepositoryError {
+        } catch let error as APIError {
             throw mapToServiceError(error)
         } catch {
             throw EventServiceError.unexpected
@@ -405,15 +405,15 @@ struct TagService {
         )
     }
 
-    private func mapToServiceError(_ error: EventRepositoryError) -> EventServiceError {
+    private func mapToServiceError(_ error: APIError) -> EventServiceError {
         switch error {
         case .network:
             return .network
         case .decoding:
             return .decoding
-        case .backend(_, let response) where response?.errorCode == "VALIDATION_FAILED":
+        case .backend(_, let problem) where problem?.errorCode == "VALIDATION_FAILED":
             return .validationFailed
-        case .invalidURL, .invalidResponse, .backend, .encoding, .unexpected:
+        case .invalidRequest, .invalidResponse, .backend, .encoding, .unexpected:
             return .unexpected
         }
     }

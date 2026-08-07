@@ -1,17 +1,35 @@
-//
-//  EventResponseDTO.swift
-//  Calio
-//
-//  Created by 김준하 on 6/7/26.
-//
-
 import Foundation
 
-struct TagResponseDTO: Decodable, Equatable {
-    let id: Int64
+struct CreateEventRequestDTO: Encodable {
     let title: String
-    let colorCode: String
-    let tagType: CalendarTagType
+    let description: String?
+    let startAt: Date
+    let endAt: Date
+    let tagId: Int64?
+
+    init(title: String, description: String?, startAt: Date, endAt: Date, tagId: Int64? = nil) {
+        self.title = title
+        self.description = description
+        self.startAt = startAt
+        self.endAt = endAt
+        self.tagId = tagId
+    }
+}
+
+struct UpdateEventRequestDTO: Encodable, Equatable {
+    let title: String
+    let description: String?
+    let startAt: Date
+    let endAt: Date
+    let tagId: Int64?
+
+    init(title: String, description: String?, startAt: Date, endAt: Date, tagId: Int64? = nil) {
+        self.title = title
+        self.description = description
+        self.startAt = startAt
+        self.endAt = endAt
+        self.tagId = tagId
+    }
 }
 
 struct EventResponseDTO: Decodable {
@@ -38,12 +56,7 @@ struct EventResponseDTO: Decodable {
         recurrenceId: Int64? = nil,
         isRecurrenceOccurrence: Bool = false,
         originStartAt: Date? = nil,
-        tag: TagResponseDTO = TagResponseDTO(
-            id: CalendarTag.fallback.id,
-            title: CalendarTag.fallback.title,
-            colorCode: CalendarTag.fallback.colorCode,
-            tagType: CalendarTag.fallback.tagType
-        ),
+        tag: TagResponseDTO = TagResponseDTO(id: 0, title: "기타", colorCode: "#64748B", tagType: .defaultTag),
         createdAt: Date,
         updatedAt: Date
     ) {
@@ -62,23 +75,12 @@ struct EventResponseDTO: Decodable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id
-        case title
-        case description
-        case startAt
-        case endAt
-        case importantEvent
-        case recurrenceId
-        case isRecurrenceOccurrence
-        case originStartAt
-        case tag
-        case createdAt
-        case updatedAt
+        case id, title, description, startAt, endAt, importantEvent, recurrenceId
+        case isRecurrenceOccurrence, originStartAt, tag, createdAt, updatedAt
     }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-
         id = try container.decodeIfPresent(Int64.self, forKey: .id)
         title = try container.decode(String.self, forKey: .title)
         description = try container.decodeIfPresent(String.self, forKey: .description)

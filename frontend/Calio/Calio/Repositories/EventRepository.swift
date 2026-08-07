@@ -25,20 +25,3 @@ protocol EventRepository {
     func deleteRecurrenceEvent(recurrenceId: Int64) async throws
     func deleteRecurrenceOccurrence(recurrenceId: Int64, originStartAt: Date) async throws
 }
-
-protocol TagRepository {
-    func fetchTags() async throws -> [TagResponseDTO]
-    func createCustomTag(_ request: CustomTagRequestDTO) async throws -> TagResponseDTO
-    func updateCustomTag(tagId: Int64, request: CustomTagRequestDTO) async throws -> TagResponseDTO
-    func deleteCustomTag(tagId: Int64) async throws
-}
-
-enum EventRepositoryError: Error {
-    case invalidURL
-    case invalidResponse
-    case network(URLError)
-    case backend(statusCode: Int, response: ErrorResponseDTO?)
-    case decoding(Error)
-    case encoding(Error)
-    case unexpected(Error)
-}
