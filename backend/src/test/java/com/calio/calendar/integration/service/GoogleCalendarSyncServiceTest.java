@@ -544,7 +544,7 @@ class GoogleCalendarSyncServiceTest {
             super(
                     new GoogleOAuthProperties(),
                     new ObjectMapper(),
-                    RestClient.builder()
+                    RestClient.builder().build()
             );
             this.results.addAll(List.of(results));
         }

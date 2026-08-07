@@ -276,7 +276,7 @@ class GoogleCalendarConnectionServiceTest {
         private String revokedToken;
 
         FakeGoogleOAuthClient(GoogleOAuthProperties properties) {
-            super(properties, new ObjectMapper(), RestClient.builder());
+            super(properties, new ObjectMapper(), RestClient.builder().build());
         }
 
         @Override
