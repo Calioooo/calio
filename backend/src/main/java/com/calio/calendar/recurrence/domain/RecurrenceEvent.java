@@ -24,11 +24,11 @@ public class RecurrenceEvent extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
-    private String recurrenceTitle;
+    @Column(name = "recurrence_title", nullable = false)
+    private String title;
 
-    @Column
-    private String recurrenceDescription;
+    @Column(name = "recurrence_description")
+    private String description;
 
     @Column(name = "all_day", nullable = false)
     private boolean allDay;
@@ -65,8 +65,8 @@ public class RecurrenceEvent extends BaseEntity {
             Tag tag,
             Account account
     ) {
-        this.recurrenceTitle = title;
-        this.recurrenceDescription = description;
+        this.title = title;
+        this.description = description;
         replaceSchedule(schedule, recurrenceRules);
         this.tag = tag;
         this.account = account;
@@ -79,8 +79,8 @@ public class RecurrenceEvent extends BaseEntity {
             List<String> recurrenceRules,
             Tag tag
     ) {
-        this.recurrenceTitle = title;
-        this.recurrenceDescription = description;
+        this.title = title;
+        this.description = description;
         replaceSchedule(schedule, recurrenceRules);
         this.tag = tag;
     }
@@ -91,8 +91,8 @@ public class RecurrenceEvent extends BaseEntity {
             RecurrenceSchedule schedule,
             List<String> recurrenceRules
     ) {
-        this.recurrenceTitle = title;
-        this.recurrenceDescription = description;
+        this.title = title;
+        this.description = description;
         replaceSchedule(schedule, recurrenceRules);
     }
 
@@ -108,12 +108,12 @@ public class RecurrenceEvent extends BaseEntity {
         return id;
     }
 
-    public String getRecurrenceTitle() {
-        return recurrenceTitle;
+    public String getTitle() {
+        return title;
     }
 
-    public String getRecurrenceDescription() {
-        return recurrenceDescription;
+    public String getDescription() {
+        return description;
     }
 
     public boolean isAllDay() {

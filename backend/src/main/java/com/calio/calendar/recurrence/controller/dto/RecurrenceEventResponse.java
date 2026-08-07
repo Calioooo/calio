@@ -24,8 +24,8 @@ public record RecurrenceEventResponse(
         RecurrenceSchedule schedule = RecurrenceSchedule.from(recurrenceEvent);
         return new RecurrenceEventResponse(
                 recurrenceEvent.getId(),
-                recurrenceEvent.getRecurrenceTitle(),
-                recurrenceEvent.getRecurrenceDescription(),
+                recurrenceEvent.getTitle(),
+                recurrenceEvent.getDescription(),
                 recurrenceEvent.isAllDay(),
                 schedule.firstOccurrenceStartAt(),
                 schedule.firstOccurrenceEndAt(),

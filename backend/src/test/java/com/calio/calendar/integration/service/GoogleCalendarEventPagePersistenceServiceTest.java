@@ -479,7 +479,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
 
         // then
         assertThat(recurrenceEventRepository.findAll()).singleElement().satisfies(recurrence -> {
-            assertThat(recurrence.getRecurrenceTitle()).isEqualTo("Changed");
+            assertThat(recurrence.getTitle()).isEqualTo("Changed");
             assertThat(recurrence.getTag().getId()).isEqualTo(defaultTag.getId());
             assertThat(recurrence.getRecurrenceRules()).containsExactly("RRULE:FREQ=WEEKLY");
         });

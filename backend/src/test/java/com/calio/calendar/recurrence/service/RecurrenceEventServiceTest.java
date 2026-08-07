@@ -121,7 +121,7 @@ class RecurrenceEventServiceTest {
         recurrenceEventService.updateRecurrenceEvent(1L, 10L, request);
 
         // then
-        assertThat(recurrenceEvent.getRecurrenceTitle()).isEqualTo("Updated");
+        assertThat(recurrenceEvent.getTitle()).isEqualTo("Updated");
         assertThat(recurrenceEvent.isAllDay()).isTrue();
         assertThat(recurrenceEvent.getTimeZone()).isNull();
         verify(recurrenceEventOverrideRepository, never()).deleteByRecurrenceEvent_Id(any());
