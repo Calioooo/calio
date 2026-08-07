@@ -3,8 +3,6 @@ package com.calio.calendar.integration.service;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.external.google.GoogleCalendarEventTimeNormalizer;
-import com.calio.calendar.external.google.GoogleCalendarUnauthorizedException;
-import com.calio.calendar.external.google.GoogleCalendarEventsClient;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventItem;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventPage;
 import com.calio.calendar.integration.domain.GoogleCalendarEventMapping;
@@ -16,9 +14,6 @@ import com.calio.calendar.integration.service.dto.GoogleCalendarNormalizedPage.N
 import com.calio.calendar.integration.service.dto.GoogleCalendarNormalizedPage.RecurrenceEventCancellation;
 import com.calio.calendar.integration.service.dto.GoogleCalendarNormalizedPage.RecurrenceEventOverrideUpsert;
 import com.calio.calendar.integration.service.dto.GoogleCalendarNormalizedPage.RecurrenceEventUpsert;
-import com.calio.calendar.integration.service.dto.GoogleCalendarRecurrenceEventLookup;
-import com.calio.calendar.integration.service.dto.GoogleCalendarRecurrenceEventLookup.FoundRecurrenceEvent;
-import com.calio.calendar.integration.service.dto.GoogleCalendarRecurrenceEventLookup.MissingRecurrenceEvent;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -39,23 +34,20 @@ public class GoogleCalendarPageNormalizer {
     private final GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService;
     private final GoogleCalendarEventTimeNormalizer timeNormalizer;
     private final GoogleCalendarRecurrenceMapper recurrenceMapper;
-    private final GoogleCalendarEventsClient eventsClient;
-    private final GoogleCalendarAccessTokenService accessTokenService;
+    private final GoogleCalendarRecurrenceEventLoader recurrenceEventLoader;
 
     public GoogleCalendarPageNormalizer(
             GoogleCalendarEventMappingQueryService eventMappingQueryService,
             GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService,
             GoogleCalendarEventTimeNormalizer timeNormalizer,
             GoogleCalendarRecurrenceMapper recurrenceMapper,
-            GoogleCalendarEventsClient eventsClient,
-            GoogleCalendarAccessTokenService accessTokenService
+            GoogleCalendarRecurrenceEventLoader recurrenceEventLoader
     ) {
         this.eventMappingQueryService = eventMappingQueryService;
         this.recurrenceMappingQueryService = recurrenceMappingQueryService;
         this.timeNormalizer = timeNormalizer;
         this.recurrenceMapper = recurrenceMapper;
-        this.eventsClient = eventsClient;
-        this.accessTokenService = accessTokenService;
+        this.recurrenceEventLoader = recurrenceEventLoader;
     }
 
     public GoogleCalendarNormalizedPage normalize(
@@ -199,11 +191,12 @@ public class GoogleCalendarPageNormalizer {
             return recurrenceMapper.mapRecurrenceOverride(item);
         }
 
-        Optional<RecurrenceEventUpsert> recurrenceEvent = loadRecurrenceEvent(
-                integrationId,
-                recurrenceEventExternalId,
-                context
-        );
+        Optional<RecurrenceEventUpsert> recurrenceEvent =
+                recurrenceEventLoader.loadRecurrenceEvent(
+                        integrationId,
+                        recurrenceEventExternalId,
+                        context
+                );
         if (recurrenceEvent.isEmpty()) {
             return null;
         }
@@ -240,76 +233,6 @@ public class GoogleCalendarPageNormalizer {
     ) {
         return recurrenceEventMappings.containsKey(recurrenceEventExternalId)
                 || pageRecurrenceEventIds.contains(recurrenceEventExternalId);
-    }
-
-    private Optional<RecurrenceEventUpsert> loadRecurrenceEvent(
-            Long integrationId,
-            String recurrenceEventExternalId,
-            GoogleCalendarSyncRunContext context
-    ) {
-        GoogleCalendarRecurrenceEventLookup cached =
-                context.recurrenceEventLookup(recurrenceEventExternalId);
-        if (cached instanceof FoundRecurrenceEvent found) {
-            return Optional.of(found.recurrenceEvent());
-        }
-        if (cached == MissingRecurrenceEvent.INSTANCE) {
-            return Optional.empty();
-        }
-        Optional<GoogleCalendarEventItem> response = requestRecurrenceEvent(
-                integrationId,
-                recurrenceEventExternalId,
-                context
-        );
-        if (response.isEmpty()) {
-            context.rememberRecurrenceEvent(
-                    recurrenceEventExternalId,
-                    MissingRecurrenceEvent.INSTANCE
-            );
-            return Optional.empty();
-        }
-        GoogleCalendarEventItem recurrenceEventResponse = response.get();
-        validateRecurrenceEventResponse(recurrenceEventExternalId, recurrenceEventResponse);
-        RecurrenceEventUpsert recurrenceEvent =
-                recurrenceMapper.mapRecurrenceEvent(recurrenceEventResponse);
-        context.rememberRecurrenceEvent(
-                recurrenceEventExternalId,
-                new FoundRecurrenceEvent(recurrenceEvent)
-        );
-        return Optional.of(recurrenceEvent);
-    }
-
-    private Optional<GoogleCalendarEventItem> requestRecurrenceEvent(
-            Long integrationId,
-            String recurrenceEventExternalId,
-            GoogleCalendarSyncRunContext context
-    ) {
-        try {
-            return eventsClient.getEvent(context.accessToken(), recurrenceEventExternalId);
-        } catch (GoogleCalendarUnauthorizedException exception) {
-            String refreshedToken = accessTokenService.forceRefresh(integrationId);
-            context.replaceAccessToken(refreshedToken);
-            try {
-                return eventsClient.getEvent(refreshedToken, recurrenceEventExternalId);
-            } catch (GoogleCalendarUnauthorizedException retryException) {
-                throw new CalioException(
-                        ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED,
-                        retryException
-                );
-            }
-        }
-    }
-
-    private void validateRecurrenceEventResponse(
-            String requestedId,
-            GoogleCalendarEventItem recurrenceEvent
-    ) {
-        boolean isInvalid = !requestedId.equals(recurrenceEvent.id())
-                || recurrenceEvent.isCancelled()
-                || !recurrenceEvent.isRecurrenceEvent()
-                || recurrenceEvent.isRecurrenceOverride();
-        if (isInvalid) {
-            throw invalidResponse();
-        }
     }
 
     private void validateActiveShape(GoogleCalendarEventItem item) {

@@ -50,11 +50,12 @@ class GoogleCalendarSyncServiceTest {
         );
         FakePagePersistenceService pagePersistenceService =
                 new FakePagePersistenceService();
+        FakeAccessTokenService accessTokenService = new FakeAccessTokenService();
         GoogleCalendarSyncService service = new GoogleCalendarSyncService(
                 leaseService,
                 providerDataService,
-                new FakeAccessTokenService(),
-                eventsClient,
+                accessTokenService,
+                eventRequestService(eventsClient, accessTokenService),
                 pagePersistenceService,
                 new FakePageNormalizer(
                         identities(
@@ -133,11 +134,12 @@ class GoogleCalendarSyncServiceTest {
         FakeOperationJobPersistenceService ownershipService =
                 new FakeOperationJobPersistenceService();
         ownershipService.failure = new GoogleOperationOwnershipLostException();
+        FakeAccessTokenService accessTokenService = new FakeAccessTokenService();
         GoogleCalendarSyncService service = new GoogleCalendarSyncService(
                 new FakeLeaseService(null),
                 providerDataService,
-                new FakeAccessTokenService(),
-                eventsClient,
+                accessTokenService,
+                eventRequestService(eventsClient, accessTokenService),
                 new FakePagePersistenceService(),
                 new FakePageNormalizer(),
                 ownershipService
@@ -295,11 +297,16 @@ class GoogleCalendarSyncServiceTest {
         FakePagePersistenceService pagePersistenceService = new FakePagePersistenceService();
         FakeOperationJobPersistenceService ownershipService =
                 new FakeOperationJobPersistenceService();
+        FakeAccessTokenService accessTokenService = new FakeAccessTokenService();
+        FakeEventsClient eventsClient = new FakeEventsClient(
+                pageWithNextPage("page-2"),
+                terminalPage("next-cursor")
+        );
         GoogleCalendarSyncService service = new GoogleCalendarSyncService(
                 new FakeLeaseService(null),
                 providerDataService,
-                new FakeAccessTokenService(),
-                new FakeEventsClient(pageWithNextPage("page-2"), terminalPage("next-cursor")),
+                accessTokenService,
+                eventRequestService(eventsClient, accessTokenService),
                 pagePersistenceService,
                 new FakePageNormalizer(
                         identities(
@@ -391,11 +398,18 @@ class GoogleCalendarSyncServiceTest {
                 leaseService,
                 providerDataService,
                 accessTokenService,
-                eventsClient,
+                eventRequestService(eventsClient, accessTokenService),
                 pagePersistenceService,
                 new FakePageNormalizer(),
                 new FakeOperationJobPersistenceService()
         );
+    }
+
+    private static GoogleCalendarEventRequestService eventRequestService(
+            FakeEventsClient eventsClient,
+            FakeAccessTokenService accessTokenService
+    ) {
+        return new GoogleCalendarEventRequestService(eventsClient, accessTokenService);
     }
 
     private GoogleCalendarEventPage pageWithNextPage(String nextPageToken) {
@@ -592,7 +606,7 @@ class GoogleCalendarSyncServiceTest {
         private final Deque<NormalizedPageIdentities> identities = new ArrayDeque<>();
 
         private FakePageNormalizer(NormalizedPageIdentities... identities) {
-            super(null, null, null, null, null, null);
+            super(null, null, null, null, null);
             this.identities.addAll(List.of(identities));
         }
 

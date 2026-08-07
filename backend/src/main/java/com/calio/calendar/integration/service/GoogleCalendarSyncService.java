@@ -2,9 +2,7 @@ package com.calio.calendar.integration.service;
 
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
-import com.calio.calendar.external.google.GoogleCalendarEventsClient;
 import com.calio.calendar.external.google.GoogleCalendarSyncTokenExpiredException;
-import com.calio.calendar.external.google.GoogleCalendarUnauthorizedException;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventPage;
 import com.calio.calendar.integration.domain.GoogleCalendarSyncMode;
 import com.calio.calendar.integration.service.dto.GoogleCalendarNormalizedPage;
@@ -19,7 +17,7 @@ public class GoogleCalendarSyncService {
     private final GoogleCalendarSyncLeaseService leaseService;
     private final GoogleCalendarProviderDataService providerDataService;
     private final GoogleCalendarAccessTokenService accessTokenService;
-    private final GoogleCalendarEventsClient eventsClient;
+    private final GoogleCalendarEventRequestService eventRequestService;
     private final GoogleCalendarEventPagePersistenceService pagePersistenceService;
     private final GoogleCalendarPageNormalizer pageNormalizer;
     private final GoogleOperationJobPersistenceService operationJobPersistenceService;
@@ -28,7 +26,7 @@ public class GoogleCalendarSyncService {
             GoogleCalendarSyncLeaseService leaseService,
             GoogleCalendarProviderDataService providerDataService,
             GoogleCalendarAccessTokenService accessTokenService,
-            GoogleCalendarEventsClient eventsClient,
+            GoogleCalendarEventRequestService eventRequestService,
             GoogleCalendarEventPagePersistenceService pagePersistenceService,
             GoogleCalendarPageNormalizer pageNormalizer,
             GoogleOperationJobPersistenceService operationJobPersistenceService
@@ -36,7 +34,7 @@ public class GoogleCalendarSyncService {
         this.leaseService = leaseService;
         this.providerDataService = providerDataService;
         this.accessTokenService = accessTokenService;
-        this.eventsClient = eventsClient;
+        this.eventRequestService = eventRequestService;
         this.pagePersistenceService = pagePersistenceService;
         this.pageNormalizer = pageNormalizer;
         this.operationJobPersistenceService = operationJobPersistenceService;
@@ -89,7 +87,13 @@ public class GoogleCalendarSyncService {
         Set<String> seenPageTokens = new HashSet<>();
         do {
             assertOwned(jobId, lease.accountId(), lease.runId());
-            GoogleCalendarEventPage page = requestPage(lease, mode, pageToken, context);
+            GoogleCalendarEventPage page = eventRequestService.listEvents(
+                    lease.integrationId(),
+                    mode,
+                    lease.nextSyncToken(),
+                    pageToken,
+                    context
+            );
             GoogleCalendarNormalizedPage normalizedPage = pageNormalizer.normalize(
                     lease.integrationId(), page, context);
             assertOwned(jobId, lease.accountId(), lease.runId());
@@ -107,42 +111,6 @@ public class GoogleCalendarSyncService {
 
     private void assertOwned(Long jobId, Long accountId, String workerToken) {
         operationJobPersistenceService.renewAndAssertOwned(jobId, accountId, workerToken);
-    }
-
-    private GoogleCalendarEventPage requestPage(
-            GoogleCalendarSyncLease lease,
-            GoogleCalendarSyncMode mode,
-            String pageToken,
-            GoogleCalendarSyncRunContext context
-    ) {
-        try {
-            return listEvents(lease, mode, pageToken, context.accessToken());
-        } catch (GoogleCalendarUnauthorizedException exception) {
-            String refreshedAccessToken = accessTokenService.forceRefresh(lease.integrationId());
-            context.replaceAccessToken(refreshedAccessToken);
-            try {
-                return listEvents(lease, mode, pageToken, refreshedAccessToken);
-            } catch (GoogleCalendarUnauthorizedException retryException) {
-                throw new CalioException(
-                        ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED,
-                        retryException
-                );
-            }
-        }
-    }
-
-    private GoogleCalendarEventPage listEvents(
-            GoogleCalendarSyncLease lease,
-            GoogleCalendarSyncMode mode,
-            String pageToken,
-            String accessToken
-    ) {
-        return eventsClient.listEvents(
-                accessToken,
-                mode,
-                mode == GoogleCalendarSyncMode.INCREMENTAL ? lease.nextSyncToken() : null,
-                pageToken
-        );
     }
 
     private String nextPageToken(GoogleCalendarEventPage page, Set<String> seenPageTokens) {
