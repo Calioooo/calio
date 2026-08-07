@@ -17,11 +17,11 @@ public interface EventRepository extends JpaRepository<Event, Long> {
 
     @Modifying(flushAutomatically = true)
     @Query("delete from Event event where event.id in :eventIds")
-    int deleteAllByIds(@Param("eventIds") List<Long> eventIds);
+    void deleteAllByIds(@Param("eventIds") List<Long> eventIds);
 
     @Modifying(flushAutomatically = true)
     @Query("delete from Event event where event.recurrenceId in :recurrenceEventIds")
-    int deleteAllByRecurrenceEventIds(
+    void deleteAllByRecurrenceEventIds(
             @Param("recurrenceEventIds") Collection<Long> recurrenceEventIds
     );
 
@@ -48,7 +48,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
             set event.tag = :fallbackTag
             where event.tag = :sourceTag and event.account.id = :accountId
             """)
-    int reassignAllByTagAndAccountId(
+    void reassignAllByTagAndAccountId(
             @Param("sourceTag") Tag sourceTag,
             @Param("fallbackTag") Tag fallbackTag,
             @Param("accountId") Long accountId
