@@ -5,7 +5,8 @@ import com.calio.calendar.event.controller.dto.EventResponse;
 import com.calio.calendar.event.controller.dto.UpdateImportantEventRequest;
 import com.calio.calendar.event.controller.dto.UpdateEventRequest;
 import com.calio.calendar.security.AuthenticatedAccount;
-import com.calio.calendar.event.service.EventService;
+import com.calio.calendar.event.service.EventCommandService;
+import com.calio.calendar.event.service.EventQueryService;
 import jakarta.validation.Valid;
 import java.time.Instant;
 import java.util.List;
@@ -30,10 +31,15 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/events")
 public class EventController {
 
-    private final EventService eventService;
+    private final EventCommandService eventCommandService;
+    private final EventQueryService eventQueryService;
 
-    public EventController(EventService eventService) {
-        this.eventService = eventService;
+    public EventController(
+            EventCommandService eventCommandService,
+            EventQueryService eventQueryService
+    ) {
+        this.eventCommandService = eventCommandService;
+        this.eventQueryService = eventQueryService;
     }
 
     @PostMapping
@@ -41,7 +47,7 @@ public class EventController {
             @AuthenticationPrincipal AuthenticatedAccount account,
             @Valid @RequestBody CreateEventRequest request
     ) {
-        EventResponse response = eventService.createEvent(account.accountId(), request);
+        EventResponse response = eventCommandService.createEvent(account.accountId(), request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -50,7 +56,7 @@ public class EventController {
             @AuthenticationPrincipal AuthenticatedAccount account,
             @PathVariable("eventId") Long eventId
     ) {
-        return eventService.getEvent(account.accountId(), eventId);
+        return eventQueryService.getEvent(account.accountId(), eventId);
     }
 
     @PutMapping("/{eventId}")
@@ -59,7 +65,7 @@ public class EventController {
             @AuthenticationPrincipal AuthenticatedAccount account,
             @Valid @RequestBody UpdateEventRequest request
     ) {
-        return eventService.updateEvent(account.accountId(), eventId, request);
+        return eventCommandService.updateEvent(account.accountId(), eventId, request);
     }
 
     @PatchMapping("/{eventId}/important-event")
@@ -68,7 +74,7 @@ public class EventController {
             @AuthenticationPrincipal AuthenticatedAccount account,
             @Valid @RequestBody UpdateImportantEventRequest request
     ) {
-        return eventService.updateImportantEvent(account.accountId(), eventId, request);
+        return eventCommandService.updateImportantEvent(account.accountId(), eventId, request);
     }
 
     @DeleteMapping("/{eventId}")
@@ -76,7 +82,7 @@ public class EventController {
             @AuthenticationPrincipal AuthenticatedAccount account,
             @PathVariable("eventId") Long eventId
     ) {
-        eventService.deleteEvent(account.accountId(), eventId);
+        eventCommandService.deleteEvent(account.accountId(), eventId);
         return ResponseEntity.noContent().build();
     }
 
@@ -86,6 +92,6 @@ public class EventController {
             @RequestParam("from") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
             @RequestParam("to") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to
     ) {
-        return eventService.listEvents(account.accountId(), from, to);
+        return eventQueryService.listEvents(account.accountId(), from, to);
     }
 }
