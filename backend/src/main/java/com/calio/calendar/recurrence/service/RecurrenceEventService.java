@@ -123,7 +123,7 @@ public class RecurrenceEventService {
     @Transactional
     public void deleteRecurrenceEvent(Long accountId, Long recurrenceId) {
         RecurrenceEvent recurrenceEvent = findRecurrenceEventForUpdate(accountId, recurrenceId);
-        recurrenceEventOverrideRepository.deleteByRecurrenceEvent_Id(recurrenceId);
+        recurrenceEventOverrideRepository.deleteAllByRecurrenceEvent_Id(recurrenceId);
         eventRepository.deleteAll(
                 eventRepository.findByRecurrenceIdAndAccount_IdOrderByStartAtAsc(recurrenceId, accountId)
         );

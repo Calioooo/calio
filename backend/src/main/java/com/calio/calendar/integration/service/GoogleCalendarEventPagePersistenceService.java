@@ -639,7 +639,7 @@ public class GoogleCalendarEventPagePersistenceService {
             overrideMappingRepository.deleteAll(overrideMappings);
             overrideMappingRepository.flush();
         }
-        overrideRepository.deleteByRecurrenceEvent_Id(
+        overrideRepository.deleteAllByRecurrenceEvent_Id(
                 recurrenceEventMapping.getRecurrenceEvent().getId()
         );
         overrideRepository.flush();

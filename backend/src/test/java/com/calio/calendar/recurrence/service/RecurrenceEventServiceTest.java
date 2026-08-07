@@ -124,7 +124,7 @@ class RecurrenceEventServiceTest {
         assertThat(recurrenceEvent.getTitle()).isEqualTo("Updated");
         assertThat(recurrenceEvent.isAllDay()).isTrue();
         assertThat(recurrenceEvent.getTimeZone()).isNull();
-        verify(recurrenceEventOverrideRepository, never()).deleteByRecurrenceEvent_Id(any());
+        verify(recurrenceEventOverrideRepository, never()).deleteAllByRecurrenceEvent_Id(any());
         verify(eventRepository, never()).deleteAll(any());
     }
 
@@ -149,7 +149,7 @@ class RecurrenceEventServiceTest {
                 eventRepository
         );
         deletionOrder.verify(recurrenceEventRepository).findByIdAndAccountIdForUpdate(10L, 1L);
-        deletionOrder.verify(recurrenceEventOverrideRepository).deleteByRecurrenceEvent_Id(10L);
+        deletionOrder.verify(recurrenceEventOverrideRepository).deleteAllByRecurrenceEvent_Id(10L);
         deletionOrder.verify(eventRepository)
                 .findByRecurrenceIdAndAccount_IdOrderByStartAtAsc(10L, 1L);
         deletionOrder.verify(eventRepository).deleteAll(legacyEvents);

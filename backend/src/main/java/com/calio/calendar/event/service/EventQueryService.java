@@ -67,7 +67,7 @@ public class EventQueryService {
         List<EventResponse> responses = new ArrayList<>();
         Set<OccurrenceKey> responseKeys = new HashSet<>();
         List<RecurrenceEvent> recurrenceEvents =
-                recurrenceEventRepository.findCandidatesStartedBefore(accountId, to);
+                recurrenceEventRepository.findExpansionCandidatesStartedBefore(accountId, to);
         for (RecurrenceEvent recurrenceEvent : recurrenceEvents) {
             addExpandedOccurrences(recurrenceEvent, from, to, responseKeys, responses);
         }
@@ -136,7 +136,7 @@ public class EventQueryService {
             Set<OccurrenceKey> responseKeys,
             List<EventResponse> responses
     ) {
-        recurrenceEventOverrideRepository.findModifiedOverlappingOverrides(accountId, from, to)
+        recurrenceEventOverrideRepository.findActiveOverlappingOverrides(accountId, from, to)
                 .stream()
                 .filter(override -> responseKeys.add(OccurrenceKey.from(override)))
                 .map(EventResponse::recurrenceOverride)
