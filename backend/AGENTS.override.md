@@ -12,6 +12,7 @@
 - 패키지는 `account`, `auth`, `event`, `recurrence`, `task`, `tag`, `holiday` 같은 기능 도메인 기준으로 나눈다.
 - 각 기능 도메인 안에서 필요에 따라 `controller`, `service`, `repository`, `domain`, `client`, `scheduler` 하위 패키지를 사용한다.
 - request / response DTO는 transport 경계 모델이므로 해당 도메인의 `controller/dto` 아래에 둔다.
+- Service 간 공유 DTO는 해당 도메인의 `service/dto`에 두고, 하나의 Service에서만 사용하는 타입은 내부 타입으로 유지한다.
 - 외부 API 요청·응답 DTO는 해당 도메인의 `client/dto` 아래에 둔다.
 - persistence model을 포함한 도메인 모델과 닫힌 enum은 해당 도메인의 `domain` 아래에 둔다.
 - 공통 persistence 기반 모델은 `common/persistence` 아래에 둔다.
@@ -28,6 +29,7 @@
 
 - Application Service는 유스케이스 흐름, 비즈니스 정책, 분기, 작업 순서와 transaction boundary를 소유한다.
 - Query Service는 조회만 담당하며 필수·선택 조회, 조회 범위, 정렬, Entity Graph와 not-found 예외를 조회 계약으로 소유한다.
+- 연관 Entity 조회는 `join fetch`보다 `@EntityGraph`를 우선하되, 조회 조건과 정렬을 위한 `join`은 유지한다.
 - Command Service는 생성·변경·삭제와 변경용 잠금만 담당하며 변경 결과 검증과 예외 변환을 변경 계약으로 소유한다.
 - Query/Command Service에는 외부 호출, 여러 도메인의 작업 조합이나 유스케이스 흐름을 넣지 않는다.
 - Application Service, Controller, Scheduler, Security Filter는 Repository를 직접 사용하지 않고 Query/Command Service를 사용한다.
