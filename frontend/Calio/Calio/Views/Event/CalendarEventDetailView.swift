@@ -453,6 +453,7 @@ struct CalendarEventDetailView: View {
         editInput.startAt = event.startAt
         editInput.endAt = event.endAt
         editInput.isAllDay = event.isAllDay
+        editInput.timeZone = event.timeZone
         editInput.tag = event.tag
     }
 
@@ -476,6 +477,7 @@ struct CalendarEventDetailView: View {
             startAt: editInput.startAt,
             endAt: editInput.endAt,
             isAllDay: editInput.isAllDay,
+            timeZone: editInput.timeZone,
             tagId: editInput.tag?.id
         )
     }

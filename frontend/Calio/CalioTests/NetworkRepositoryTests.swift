@@ -17,6 +17,8 @@ struct NetworkRepositoryTests {
           "description": "메모",
           "startAt": "2026-06-10T09:00:00Z",
           "endAt": "2026-06-10T10:00:00Z",
+          "allDay": false,
+          "timeZone": "Asia/Seoul",
           "tag": {
             "id": 1,
             "title": "업무",
@@ -51,7 +53,9 @@ struct NetworkRepositoryTests {
                 title: "새 일정",
                 description: "메모",
                 startAt: startAt,
-                endAt: endAt
+                endAt: endAt,
+                allDay: false,
+                timeZone: "Asia/Seoul"
             )
         )
         let request = try #require(capturedRequest)
@@ -62,8 +66,10 @@ struct NetworkRepositoryTests {
         #expect(request.url?.absoluteString == "https://example.test/api/events")
         #expect(request.httpMethod == "POST")
         #expect(request.value(forHTTPHeaderField: "Content-Type") == "application/json")
-        #expect(Set(object.keys) == ["title", "description", "startAt", "endAt"])
+        #expect(Set(object.keys) == ["title", "description", "startAt", "endAt", "allDay", "timeZone"])
         #expect(object["title"] as? String == "새 일정")
+        #expect(object["allDay"] as? Bool == false)
+        #expect(object["timeZone"] as? String == "Asia/Seoul")
         #expect(object["selectedColorCode"] == nil)
     }
 
@@ -147,6 +153,8 @@ struct NetworkRepositoryTests {
           "description": "수정 메모",
           "startAt": "2026-06-10T09:00:00Z",
           "endAt": "2026-06-10T10:00:00Z",
+          "allDay": false,
+          "timeZone": "America/New_York",
           "tag": {
             "id": 1,
             "title": "업무",
@@ -182,7 +190,9 @@ struct NetworkRepositoryTests {
                 title: "수정 일정",
                 description: "수정 메모",
                 startAt: startAt,
-                endAt: endAt
+                endAt: endAt,
+                allDay: false,
+                timeZone: "America/New_York"
             )
         )
         let request = try #require(capturedRequest)
@@ -192,8 +202,9 @@ struct NetworkRepositoryTests {
         #expect(event.id == 88)
         #expect(request.url?.absoluteString == "https://example.test/api/events/88")
         #expect(request.httpMethod == "PUT")
-        #expect(Set(object.keys) == ["title", "description", "startAt", "endAt"])
+        #expect(Set(object.keys) == ["title", "description", "startAt", "endAt", "allDay", "timeZone"])
         #expect(object["colorCode"] == nil)
+        #expect(object["timeZone"] as? String == "America/New_York")
     }
 
     @Test func urlSessionEventRepositoryUpdatesRecurrenceEndpointsWithBackendContractBodies() async throws {
@@ -222,6 +233,8 @@ struct NetworkRepositoryTests {
           "description": "설명",
           "startAt": "2026-08-01T09:00:00Z",
           "endAt": "2026-08-01T10:00:00Z",
+          "allDay": false,
+          "timeZone": "Asia/Seoul",
           "importantEvent": true,
           "recurrenceId": 700,
           "isRecurrenceOccurrence": true,

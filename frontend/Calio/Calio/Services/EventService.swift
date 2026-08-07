@@ -9,9 +9,14 @@ import Foundation
 
 struct EventService {
     private let repository: EventRepository
+    private let deviceTimeZone: TimeZone
     
-    init(repository: EventRepository = URLSessionEventRepository()) {
+    init(
+        repository: EventRepository = URLSessionEventRepository(),
+        deviceTimeZone: TimeZone = .current
+    ) {
         self.repository = repository
+        self.deviceTimeZone = deviceTimeZone
     }
     
     func fetchEvents(from startDate: Date, to endDate: Date) async throws -> [Event] {
@@ -38,6 +43,8 @@ struct EventService {
             description: backendDescription(from: input.description),
             startAt: range.startAt,
             endAt: range.endAt,
+            allDay: input.isAllDay,
+            timeZone: input.isAllDay ? nil : deviceTimeZone.identifier,
             tagId: input.tagId
         )
 
@@ -64,6 +71,8 @@ struct EventService {
             description: backendDescription(from: input.description),
             startAt: range.startAt,
             endAt: range.endAt,
+            allDay: input.isAllDay,
+            timeZone: input.isAllDay ? nil : input.timeZone ?? deviceTimeZone.identifier,
             tagId: input.tagId
         )
 
@@ -208,10 +217,12 @@ struct EventService {
     }
 
     private func mapToEvent(_ dto: EventResponseDTO) throws -> Event {
-        let allDayRange = try CalendarDateService.localAllDayRange(
-            utcStartAt: dto.startAt,
-            utcEndAt: dto.endAt
-        )
+        let allDayRange = dto.allDay
+            ? try CalendarDateService.localAllDayDisplayRange(
+                utcStartAt: dto.startAt,
+                utcEndAt: dto.endAt
+            )
+            : nil
         let startAt = allDayRange?.startAt ?? dto.startAt
         let endAt = allDayRange?.endAt ?? dto.endAt
 
@@ -221,7 +232,8 @@ struct EventService {
             description: dto.description ?? "",
             startAt: startAt,
             endAt: endAt,
-            isAllDay: allDayRange != nil,
+            isAllDay: dto.allDay,
+            timeZone: dto.timeZone,
             tag: mapToCalendarTag(dto.tag),
             importantEvent: dto.importantEvent,
             recurrenceId: dto.recurrenceId,
@@ -306,7 +318,7 @@ struct EventService {
                 return .recurrenceEventNotFound
             case "RECURRENCE_OCCURRENCE_NOT_FOUND":
                 return .recurrenceOccurrenceNotFound
-            case "VALIDATION_FAILED":
+            case "VALIDATION_FAILED", "INVALID_ALL_DAY_SCHEDULE", "INVALID_TIME_ZONE":
                 return .validationFailed
             case "INVALID_TIME_RANGE", "RECURRENCE_UPDATE_TIME_RANGE_INVALID":
                 return .invalidTimeRange

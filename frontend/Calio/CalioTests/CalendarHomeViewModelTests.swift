@@ -438,6 +438,46 @@ struct CalendarHomeViewModelTests {
     }
 
     @MainActor
+    @Test func calendarHomeViewModelMapsCanonicalScheduleValidationFailures() async throws {
+        let calendar = fixedCalendar
+        let baseDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8)))
+
+        for errorCode in ["INVALID_ALL_DAY_SCHEDULE", "INVALID_TIME_ZONE"] {
+            let repository = RecordingEventRepository(
+                createError: APIError.backend(
+                    statusCode: 400,
+                    problem: ProblemDetailDTO(
+                        type: "about:blank",
+                        title: errorCode,
+                        status: 400,
+                        detail: "invalid",
+                        errorCode: errorCode
+                    )
+                )
+            )
+            let viewModel = CalendarHomeViewModel(
+                calendar: calendar,
+                dateService: CalendarDateService(calendar: calendar),
+                eventService: EventService(repository: repository),
+                nationalHolidayService: makeNationalHolidayService(calendar: calendar),
+                initialState: makeLoadedState(dayOffsets: 0...2, from: baseDate, calendar: calendar)
+            )
+
+            let didCreate = await viewModel.createEvent(
+                EventCreateInput(
+                    title: "일정",
+                    description: "",
+                    startAt: baseDate,
+                    endAt: baseDate.addingTimeInterval(3600)
+                )
+            )
+
+            #expect(!didCreate)
+            #expect(viewModel.createState.failureMessage == "입력값을 확인해 주세요.")
+        }
+    }
+
+    @MainActor
     @Test func calendarHomeViewModelClearsFailureOnRetryAndBlocksDuplicateCreateWhileSaving() async throws {
         let calendar = fixedCalendar
         let baseDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8)))

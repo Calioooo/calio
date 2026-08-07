@@ -38,6 +38,7 @@ struct EventUpdateInput: Equatable {
     let startAt: Date
     let endAt: Date
     let isAllDay: Bool
+    let timeZone: String?
     let tagId: Int64?
 
     init(
@@ -46,6 +47,7 @@ struct EventUpdateInput: Equatable {
         startAt: Date,
         endAt: Date,
         isAllDay: Bool = false,
+        timeZone: String? = nil,
         tagId: Int64? = nil
     ) {
         self.title = title
@@ -53,6 +55,7 @@ struct EventUpdateInput: Equatable {
         self.startAt = startAt
         self.endAt = endAt
         self.isAllDay = isAllDay
+        self.timeZone = timeZone
         self.tagId = tagId
     }
 }

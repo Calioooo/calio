@@ -5,13 +5,25 @@ struct CreateEventRequestDTO: Encodable {
     let description: String?
     let startAt: Date
     let endAt: Date
+    let allDay: Bool
+    let timeZone: String?
     let tagId: Int64?
 
-    init(title: String, description: String?, startAt: Date, endAt: Date, tagId: Int64? = nil) {
+    init(
+        title: String,
+        description: String?,
+        startAt: Date,
+        endAt: Date,
+        allDay: Bool,
+        timeZone: String?,
+        tagId: Int64? = nil
+    ) {
         self.title = title
         self.description = description
         self.startAt = startAt
         self.endAt = endAt
+        self.allDay = allDay
+        self.timeZone = timeZone
         self.tagId = tagId
     }
 }
@@ -21,13 +33,25 @@ struct UpdateEventRequestDTO: Encodable, Equatable {
     let description: String?
     let startAt: Date
     let endAt: Date
+    let allDay: Bool
+    let timeZone: String?
     let tagId: Int64?
 
-    init(title: String, description: String?, startAt: Date, endAt: Date, tagId: Int64? = nil) {
+    init(
+        title: String,
+        description: String?,
+        startAt: Date,
+        endAt: Date,
+        allDay: Bool,
+        timeZone: String?,
+        tagId: Int64? = nil
+    ) {
         self.title = title
         self.description = description
         self.startAt = startAt
         self.endAt = endAt
+        self.allDay = allDay
+        self.timeZone = timeZone
         self.tagId = tagId
     }
 }
@@ -38,6 +62,8 @@ struct EventResponseDTO: Decodable {
     let description: String?
     let startAt: Date
     let endAt: Date
+    let allDay: Bool
+    let timeZone: String?
     let importantEvent: Bool
     let recurrenceId: Int64?
     let isRecurrenceOccurrence: Bool
@@ -52,6 +78,8 @@ struct EventResponseDTO: Decodable {
         description: String?,
         startAt: Date,
         endAt: Date,
+        allDay: Bool = false,
+        timeZone: String? = nil,
         importantEvent: Bool = false,
         recurrenceId: Int64? = nil,
         isRecurrenceOccurrence: Bool = false,
@@ -65,6 +93,8 @@ struct EventResponseDTO: Decodable {
         self.description = description
         self.startAt = startAt
         self.endAt = endAt
+        self.allDay = allDay
+        self.timeZone = timeZone
         self.importantEvent = importantEvent
         self.recurrenceId = recurrenceId
         self.isRecurrenceOccurrence = isRecurrenceOccurrence
@@ -75,7 +105,7 @@ struct EventResponseDTO: Decodable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, title, description, startAt, endAt, importantEvent, recurrenceId
+        case id, title, description, startAt, endAt, allDay, timeZone, importantEvent, recurrenceId
         case isRecurrenceOccurrence, originStartAt, tag, createdAt, updatedAt
     }
 
@@ -86,6 +116,8 @@ struct EventResponseDTO: Decodable {
         description = try container.decodeIfPresent(String.self, forKey: .description)
         startAt = try container.decode(Date.self, forKey: .startAt)
         endAt = try container.decode(Date.self, forKey: .endAt)
+        allDay = try container.decode(Bool.self, forKey: .allDay)
+        timeZone = try container.decodeIfPresent(String.self, forKey: .timeZone)
         importantEvent = try container.decodeIfPresent(Bool.self, forKey: .importantEvent) ?? false
         recurrenceId = try container.decodeIfPresent(Int64.self, forKey: .recurrenceId)
         isRecurrenceOccurrence = try container.decodeIfPresent(Bool.self, forKey: .isRecurrenceOccurrence) ?? false

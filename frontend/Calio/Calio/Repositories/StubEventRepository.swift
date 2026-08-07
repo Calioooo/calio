@@ -52,6 +52,8 @@ struct StubEventRepository: EventRepository, TagRepository {
             description: request.description,
             startAt: request.startAt,
             endAt: request.endAt,
+            allDay: request.allDay,
+            timeZone: request.timeZone,
             tag: tag(for: request.tagId),
             createdAt: Date(),
             updatedAt: Date()
@@ -93,6 +95,8 @@ struct StubEventRepository: EventRepository, TagRepository {
             description: request.description,
             startAt: request.startAt,
             endAt: request.endAt,
+            allDay: request.allDay,
+            timeZone: request.timeZone,
             tag: tag(for: request.tagId),
             createdAt: Date(),
             updatedAt: Date()

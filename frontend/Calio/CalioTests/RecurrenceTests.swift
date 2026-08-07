@@ -104,15 +104,9 @@ struct RecurrenceTests {
         #expect(request.recurrenceEndTime == "23:59:59")
     }
 
-    @Test func eventServiceRecognizesAllDayRecurrenceOccurrenceWithoutBackendFlag() async throws {
+    @Test func eventServiceUsesCanonicalAllDayFlagForRecurrenceOccurrence() async throws {
         let backendStartAt = try CalendarDateService.utcDate(from: "2026-08-01")
-        let backendEndAt = try #require(
-            Calendar.current.date(
-                byAdding: .second,
-                value: -1,
-                to: CalendarDateService.utcDate(from: "2026-08-02")
-            )
-        )
+        let backendEndAt = try CalendarDateService.utcDate(from: "2026-08-02")
         let repository = RecordingEventRepository(
             fetchResponse: [
                 EventResponseDTO(
@@ -121,6 +115,8 @@ struct RecurrenceTests {
                     description: nil,
                     startAt: backendStartAt,
                     endAt: backendEndAt,
+                    allDay: true,
+                    timeZone: nil,
                     recurrenceId: 700,
                     isRecurrenceOccurrence: true,
                     originStartAt: backendStartAt,

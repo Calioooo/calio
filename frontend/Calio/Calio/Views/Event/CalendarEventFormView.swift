@@ -12,6 +12,7 @@ struct EventInput: Equatable {
     var startAt: Date
     var endAt: Date
     var isAllDay: Bool = false
+    var timeZone: String? = nil
     var description: String
     var tag: CalendarTag?
 }

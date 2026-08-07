@@ -13,19 +13,22 @@ struct EventServiceTests {
             title: "저녁 약속",
             description: "식당 예약",
             startAt: startAt,
-            endAt: endAt
+            endAt: endAt,
+            allDay: false,
+            timeZone: "Asia/Seoul"
         )
 
         let data = try APIJSONCoding.makeEncoder().encode(request)
         let object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
 
-        #expect(Set(object.keys) == ["title", "description", "startAt", "endAt"])
+        #expect(Set(object.keys) == ["title", "description", "startAt", "endAt", "allDay", "timeZone"])
         #expect(object["title"] as? String == "저녁 약속")
         #expect(object["description"] as? String == "식당 예약")
         #expect(object["selectedColorCode"] == nil)
         #expect(object["colorCode"] == nil)
         #expect((object["startAt"] as? String)?.hasSuffix("Z") == true)
-        #expect(object["allDay"] == nil)
+        #expect(object["allDay"] as? Bool == false)
+        #expect(object["timeZone"] as? String == "Asia/Seoul")
     }
 
     @Test func createAllDayEventRequestDTOUsesOnlyCanonicalUTCInstants() async throws {
@@ -35,16 +38,19 @@ struct EventServiceTests {
             title: "여행",
             description: nil,
             startAt: startAt,
-            endAt: endAt
+            endAt: endAt,
+            allDay: true,
+            timeZone: nil
         )
 
         let data = try APIJSONCoding.makeEncoder().encode(request)
         let object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
 
-        #expect(Set(object.keys) == ["title", "startAt", "endAt"])
+        #expect(Set(object.keys) == ["title", "startAt", "endAt", "allDay"])
         #expect(object["startAt"] as? String == "2026-07-18T00:00:00Z")
         #expect(object["endAt"] as? String == "2026-07-22T00:00:00Z")
-        #expect(object["allDay"] == nil)
+        #expect(object["allDay"] as? Bool == true)
+        #expect(object["timeZone"] == nil)
         #expect(object["startDate"] == nil)
         #expect(object["endDate"] == nil)
     }
@@ -56,19 +62,23 @@ struct EventServiceTests {
             title: "수정 일정",
             description: "수정 메모",
             startAt: startAt,
-            endAt: endAt
+            endAt: endAt,
+            allDay: false,
+            timeZone: "America/New_York"
         )
 
         let data = try APIJSONCoding.makeEncoder().encode(request)
         let object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
 
-        #expect(Set(object.keys) == ["title", "description", "startAt", "endAt"])
+        #expect(Set(object.keys) == ["title", "description", "startAt", "endAt", "allDay", "timeZone"])
         #expect(object["title"] as? String == "수정 일정")
         #expect(object["description"] as? String == "수정 메모")
         #expect(object["importantEvent"] == nil)
         #expect(object["recurrenceId"] == nil)
         #expect(object["isRecurrenceOccurrence"] == nil)
         #expect(object["colorCode"] == nil)
+        #expect(object["allDay"] as? Bool == false)
+        #expect(object["timeZone"] as? String == "America/New_York")
     }
     @Test func eventResponseDTODecodingPreservesCanonicalRecurrenceFields() async throws {
         let responseJSON = """
@@ -78,6 +88,8 @@ struct EventServiceTests {
           "description": "backend canonical fields",
           "startAt": "2026-08-01T00:00:00Z",
           "endAt": "2026-08-01T01:00:00Z",
+          "allDay": false,
+          "timeZone": "Asia/Seoul",
           "importantEvent": true,
           "recurrenceId": 44,
           "isRecurrenceOccurrence": true,
@@ -100,9 +112,12 @@ struct EventServiceTests {
         #expect(dto.importantEvent)
         #expect(dto.recurrenceId == 44)
         #expect(dto.isRecurrenceOccurrence)
+        #expect(dto.allDay == false)
+        #expect(dto.timeZone == "Asia/Seoul")
         #expect(event.importantEvent)
         #expect(event.recurrenceId == 44)
         #expect(event.isRecurrenceOccurrence)
+        #expect(event.timeZone == "Asia/Seoul")
     }
 
     @Test func eventServiceCreateEventMapsRepositoryResponseToAppEvent() async throws {
@@ -116,6 +131,8 @@ struct EventServiceTests {
                 description: nil,
                 startAt: startAt,
                 endAt: endAt,
+                allDay: false,
+                timeZone: "Asia/Seoul",
                 tag: TagResponseDTO(
                     id: 1,
                     title: "업무",
@@ -126,7 +143,10 @@ struct EventServiceTests {
                 updatedAt: startAt
             )
         )
-        let service = EventService(repository: repository)
+        let service = EventService(
+            repository: repository,
+            deviceTimeZone: TimeZone(identifier: "Asia/Seoul")!
+        )
 
         let event = try await service.createEvent(
             EventCreateInput(
@@ -142,8 +162,11 @@ struct EventServiceTests {
         #expect(event.description == "")
         #expect(event.startAt == startAt)
         #expect(event.endAt == endAt)
+        #expect(event.timeZone == "Asia/Seoul")
         #expect(event.tag.colorCode == "#4F46E5")
         #expect(repository.createRequests.count == 1)
+        #expect(repository.createRequests.first?.allDay == false)
+        #expect(repository.createRequests.first?.timeZone == "Asia/Seoul")
     }
 
     @Test func eventServiceCreatesAllDayEventWithCanonicalLocalDates() async throws {
@@ -159,6 +182,8 @@ struct EventServiceTests {
                 description: nil,
                 startAt: backendStartAt,
                 endAt: backendEndAt,
+                allDay: true,
+                timeZone: nil,
                 createdAt: backendStartAt,
                 updatedAt: backendStartAt
             )
@@ -178,10 +203,29 @@ struct EventServiceTests {
 
         #expect(request.startAt == backendStartAt)
         #expect(request.endAt == backendEndAt)
+        #expect(request.allDay)
+        #expect(request.timeZone == nil)
         #expect(event.isAllDay)
         #expect(event.startAt == startAt)
         #expect(event.endAt == endAt)
     }
+
+    @Test func allDayDisplayRangePreservesBackendUTCDateAcrossDeviceTimeZones() throws {
+        let backendStartAt = try CalendarDateService.utcDate(from: "2026-07-18")
+        let backendEndAt = try CalendarDateService.utcDate(from: "2026-07-22")
+        var newYorkCalendar = Calendar(identifier: .gregorian)
+        newYorkCalendar.timeZone = try #require(TimeZone(identifier: "America/New_York"))
+
+        let range = try CalendarDateService.localAllDayDisplayRange(
+            utcStartAt: backendStartAt,
+            utcEndAt: backendEndAt,
+            calendar: newYorkCalendar
+        )
+
+        #expect(CalendarDateService.localDateString(from: range.startAt, calendar: newYorkCalendar) == "2026-07-18")
+        #expect(CalendarDateService.localDateString(from: range.endAt, calendar: newYorkCalendar) == "2026-07-22")
+    }
+
     @Test func eventServiceUpdateEventMapsRepositoryResponseAndPreservesCanonicalFields() async throws {
         let calendar = fixedCalendar
         let startAt = try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 10, hour: 9)))
@@ -193,6 +237,8 @@ struct EventServiceTests {
                 description: "수정 설명",
                 startAt: startAt,
                 endAt: endAt,
+                allDay: false,
+                timeZone: "America/New_York",
                 importantEvent: true,
                 recurrenceId: 700,
                 isRecurrenceOccurrence: true,
@@ -200,7 +246,10 @@ struct EventServiceTests {
                 updatedAt: endAt
             )
         )
-        let service = EventService(repository: repository)
+        let service = EventService(
+            repository: repository,
+            deviceTimeZone: TimeZone(identifier: "Asia/Los_Angeles")!
+        )
 
         let event = try await service.updateEvent(
             eventId: 90,
@@ -208,7 +257,8 @@ struct EventServiceTests {
                 title: "수정된 반복 항목",
                 description: "수정 설명",
                 startAt: startAt,
-                endAt: endAt
+                endAt: endAt,
+                timeZone: "America/New_York"
             )
         )
 
@@ -218,5 +268,36 @@ struct EventServiceTests {
         #expect(event.isRecurrenceOccurrence)
         #expect(repository.updateRequests.first?.eventId == 90)
         #expect(repository.updateRequests.first?.request.title == "수정된 반복 항목")
+        #expect(repository.updateRequests.first?.request.timeZone == "America/New_York")
+    }
+
+    @Test func eventServiceUsesCanonicalAllDayFlagForUTCMidnightTimedEvent() async throws {
+        let startAt = try CalendarDateService.utcDate(from: "2026-08-01")
+        let endAt = startAt.addingTimeInterval(3600)
+        let repository = RecordingEventRepository(
+            fetchResponse: [
+                EventResponseDTO(
+                    id: 5,
+                    title: "자정 회의",
+                    description: nil,
+                    startAt: startAt,
+                    endAt: endAt,
+                    allDay: false,
+                    timeZone: "Asia/Seoul",
+                    createdAt: startAt,
+                    updatedAt: endAt
+                )
+            ]
+        )
+
+        let event = try #require(
+            try await EventService(repository: repository)
+                .fetchEvents(from: startAt, to: endAt)
+                .first
+        )
+
+        #expect(!event.isAllDay)
+        #expect(event.startAt == startAt)
+        #expect(event.timeZone == "Asia/Seoul")
     }
 }
