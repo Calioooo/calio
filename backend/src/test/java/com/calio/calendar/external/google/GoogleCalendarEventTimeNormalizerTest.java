@@ -5,8 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
-import com.calio.calendar.external.google.GoogleCalendarEventTimeNormalizer.NormalizedEventTime;
 import com.calio.calendar.external.google.service.dto.NormalizedEventSchedule;
+import com.calio.calendar.external.google.service.dto.NormalizedEventTime;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventTime;
 import java.time.Instant;
 import java.util.TimeZone;
@@ -40,7 +40,7 @@ class GoogleCalendarEventTimeNormalizerTest {
     }
 
     @Test
-    @DisplayName("offsetless overlap 시각은 IANA zone의 earlier offset을 선택한다")
+    @DisplayName("offset 값이 없는 시각은 IANA zone의 offset을 적용한다")
     void givenOffsetlessOverlap_whenNormalize_thenUsesEarlierOffset() {
         // when
         NormalizedEventTime result = normalizer.normalize(
@@ -56,7 +56,7 @@ class GoogleCalendarEventTimeNormalizerTest {
     }
 
     @Test
-    @DisplayName("offset과 IANA zone rule이 일치하면 supplied offset으로 Instant를 계산한다")
+    @DisplayName("offset과 IANA zone rule이 일치하면 요청한 offset으로 Instant를 계산한다")
     void givenMatchingOffsetAndZone_whenNormalize_thenUsesSuppliedOffset() {
         // when
         NormalizedEventTime result = normalizer.normalize(
@@ -72,7 +72,7 @@ class GoogleCalendarEventTimeNormalizerTest {
     }
 
     @Test
-    @DisplayName("active timed schedule은 동일한 명시적 IANA timezone을 요구한다")
+    @DisplayName("active timed schedule은 IANA timezone이 동일하지 않으면 예외를 반환한다")
     void givenDifferentTimedZones_whenNormalizeSchedule_thenRejectsProviderResponse() {
         // when, then
         assertInvalidResponse(() -> normalizer.normalizeSchedule(
@@ -90,7 +90,7 @@ class GoogleCalendarEventTimeNormalizerTest {
     }
 
     @Test
-    @DisplayName("normal Event는 boundary explicit timezone을 우선하고 없으면 page timezone을 사용한다")
+    @DisplayName("일반 이벤트는 이벤트에 직접 지정된 시간대를 우선 적용하고, 없으면 fallback 시간대를 사용한다.")
     void givenExplicitAndMissingBoundaryZones_whenNormalizePageSchedule_thenResolvesSingleZone() {
         // when
         NormalizedEventSchedule result = normalizer.normalizeSchedule(
@@ -114,7 +114,7 @@ class GoogleCalendarEventTimeNormalizerTest {
     }
 
     @Test
-    @DisplayName("page fallback으로 해석한 offsetless overlap은 earlier offset을 선택한다")
+    @DisplayName("오프셋 정보가 없는 중복 시간대 일정은 페이지 타임존 기준 더 빠른 오프셋을 우선 사용한다")
     void givenOffsetlessOverlapAndPageZone_whenNormalizePageSchedule_thenUsesEarlierOffset() {
         // when
         NormalizedEventSchedule result = normalizer.normalizeSchedule(
