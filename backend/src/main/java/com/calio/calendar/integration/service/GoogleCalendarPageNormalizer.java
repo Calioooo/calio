@@ -35,20 +35,23 @@ public class GoogleCalendarPageNormalizer {
 
     private static final String UNTITLED_EVENT_TITLE = "(제목 없음)";
 
-    private final GoogleCalendarMappingQueryService mappingQueryService;
+    private final GoogleCalendarEventMappingQueryService eventMappingQueryService;
+    private final GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService;
     private final GoogleCalendarEventTimeNormalizer timeNormalizer;
     private final GoogleCalendarRecurrenceMapper recurrenceMapper;
     private final GoogleCalendarEventsClient eventsClient;
     private final GoogleCalendarAccessTokenService accessTokenService;
 
     public GoogleCalendarPageNormalizer(
-            GoogleCalendarMappingQueryService mappingQueryService,
+            GoogleCalendarEventMappingQueryService eventMappingQueryService,
+            GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService,
             GoogleCalendarEventTimeNormalizer timeNormalizer,
             GoogleCalendarRecurrenceMapper recurrenceMapper,
             GoogleCalendarEventsClient eventsClient,
             GoogleCalendarAccessTokenService accessTokenService
     ) {
-        this.mappingQueryService = mappingQueryService;
+        this.eventMappingQueryService = eventMappingQueryService;
+        this.recurrenceMappingQueryService = recurrenceMappingQueryService;
         this.timeNormalizer = timeNormalizer;
         this.recurrenceMapper = recurrenceMapper;
         this.eventsClient = eventsClient;
@@ -358,7 +361,7 @@ public class GoogleCalendarPageNormalizer {
         if (externalIds.isEmpty()) {
             return Map.of();
         }
-        return mappingQueryService.listEventMappings(
+        return eventMappingQueryService.listEventMappings(
                         integrationId,
                         GoogleCalendarEventMapping.PRIMARY_CALENDAR_KEY,
                         externalIds
@@ -376,7 +379,7 @@ public class GoogleCalendarPageNormalizer {
         if (externalIds.isEmpty()) {
             return Map.of();
         }
-        return mappingQueryService.listRecurrenceEventMappings(
+        return recurrenceMappingQueryService.listRecurrenceEventMappings(
                         integrationId,
                         GoogleCalendarRecurrenceEventMapping.PRIMARY_CALENDAR_KEY,
                         externalIds

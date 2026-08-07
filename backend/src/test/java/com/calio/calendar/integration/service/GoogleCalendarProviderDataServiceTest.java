@@ -26,10 +26,14 @@ class GoogleCalendarProviderDataServiceTest {
         // given
         GoogleCalendarIntegrationCommandService integrationCommandService =
                 mock(GoogleCalendarIntegrationCommandService.class);
-        GoogleCalendarMappingQueryService mappingQueryService =
-                mock(GoogleCalendarMappingQueryService.class);
-        GoogleCalendarMappingCommandService mappingCommandService =
-                mock(GoogleCalendarMappingCommandService.class);
+        GoogleCalendarEventMappingQueryService eventMappingQueryService =
+                mock(GoogleCalendarEventMappingQueryService.class);
+        GoogleCalendarEventMappingCommandService eventMappingCommandService =
+                mock(GoogleCalendarEventMappingCommandService.class);
+        GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService =
+                mock(GoogleCalendarRecurrenceMappingQueryService.class);
+        GoogleCalendarRecurrenceMappingCommandService recurrenceMappingCommandService =
+                mock(GoogleCalendarRecurrenceMappingCommandService.class);
         EventRepository eventRepository = mock(EventRepository.class);
         RecurrenceEventRepository recurrenceEventRepository =
                 mock(RecurrenceEventRepository.class);
@@ -43,19 +47,21 @@ class GoogleCalendarProviderDataServiceTest {
         when(eventMapping.getExternalEventId()).thenReturn("unseen-event");
         when(eventMapping.getEvent()).thenReturn(event);
         when(event.getId()).thenReturn(20L);
-        when(mappingQueryService.listOverrideMappingBatch(1L, 0L, 500))
+        when(recurrenceMappingQueryService.listOverrideMappingBatch(1L, 0L, 500))
                 .thenReturn(List.of());
-        when(mappingQueryService.listEventMappingBatch(1L, 0L, 500))
+        when(eventMappingQueryService.listEventMappingBatch(1L, 0L, 500))
                 .thenReturn(List.of(eventMapping));
-        when(mappingQueryService.listEventMappingBatch(1L, 10L, 500))
+        when(eventMappingQueryService.listEventMappingBatch(1L, 10L, 500))
                 .thenReturn(List.of());
-        when(mappingQueryService.listRecurrenceEventMappingBatch(1L, 0L, 500))
+        when(recurrenceMappingQueryService.listRecurrenceEventMappingBatch(1L, 0L, 500))
                 .thenReturn(List.of());
 
         GoogleCalendarProviderDataService service = new GoogleCalendarProviderDataService(
                 integrationCommandService,
-                mappingQueryService,
-                mappingCommandService,
+                eventMappingQueryService,
+                eventMappingCommandService,
+                recurrenceMappingQueryService,
+                recurrenceMappingCommandService,
                 eventRepository,
                 recurrenceEventRepository,
                 overrideRepository,
@@ -77,9 +83,9 @@ class GoogleCalendarProviderDataServiceTest {
         );
 
         // then
-        verify(mappingCommandService).deleteEventMappingsWithIds(List.of(10L));
+        verify(eventMappingCommandService).deleteEventMappingsWithIds(List.of(10L));
         verify(eventRepository).deleteAllByIds(List.of(20L));
-        verify(mappingQueryService, times(2))
+        verify(eventMappingQueryService, times(2))
                 .listEventMappingBatch(eq(1L), any(Long.class), eq(500));
         verify(integrationCommandService, times(5)).renewSyncLease(1L, "run-1");
         verify(integrationCommandService).completeSync(1L, "run-1", "next-token");

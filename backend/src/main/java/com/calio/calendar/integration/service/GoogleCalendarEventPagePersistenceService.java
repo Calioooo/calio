@@ -43,8 +43,10 @@ public class GoogleCalendarEventPagePersistenceService {
 
     private final GoogleCalendarIntegrationQueryService integrationQueryService;
     private final GoogleCalendarIntegrationCommandService integrationCommandService;
-    private final GoogleCalendarMappingQueryService mappingQueryService;
-    private final GoogleCalendarMappingCommandService mappingCommandService;
+    private final GoogleCalendarEventMappingQueryService eventMappingQueryService;
+    private final GoogleCalendarEventMappingCommandService eventMappingCommandService;
+    private final GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService;
+    private final GoogleCalendarRecurrenceMappingCommandService recurrenceMappingCommandService;
     private final EventRepository eventRepository;
     private final AccountQueryService accountQueryService;
     private final TagQueryService tagQueryService;
@@ -55,8 +57,10 @@ public class GoogleCalendarEventPagePersistenceService {
     public GoogleCalendarEventPagePersistenceService(
             GoogleCalendarIntegrationQueryService integrationQueryService,
             GoogleCalendarIntegrationCommandService integrationCommandService,
-            GoogleCalendarMappingQueryService mappingQueryService,
-            GoogleCalendarMappingCommandService mappingCommandService,
+            GoogleCalendarEventMappingQueryService eventMappingQueryService,
+            GoogleCalendarEventMappingCommandService eventMappingCommandService,
+            GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService,
+            GoogleCalendarRecurrenceMappingCommandService recurrenceMappingCommandService,
             EventRepository eventRepository,
             AccountQueryService accountQueryService,
             TagQueryService tagQueryService,
@@ -66,8 +70,10 @@ public class GoogleCalendarEventPagePersistenceService {
     ) {
         this.integrationQueryService = integrationQueryService;
         this.integrationCommandService = integrationCommandService;
-        this.mappingQueryService = mappingQueryService;
-        this.mappingCommandService = mappingCommandService;
+        this.eventMappingQueryService = eventMappingQueryService;
+        this.eventMappingCommandService = eventMappingCommandService;
+        this.recurrenceMappingQueryService = recurrenceMappingQueryService;
+        this.recurrenceMappingCommandService = recurrenceMappingCommandService;
         this.eventRepository = eventRepository;
         this.accountQueryService = accountQueryService;
         this.tagQueryService = tagQueryService;
@@ -157,7 +163,7 @@ public class GoogleCalendarEventPagePersistenceService {
 
         Map<String, GoogleCalendarEventMapping> eventMappings = externalEventIds.isEmpty()
                 ? new HashMap<>()
-                : mappingQueryService.listEventMappings(
+                : eventMappingQueryService.listEventMappings(
                         integrationId,
                         GoogleCalendarEventMapping.PRIMARY_CALENDAR_KEY,
                         externalEventIds
@@ -170,7 +176,7 @@ public class GoogleCalendarEventPagePersistenceService {
         Map<String, GoogleCalendarRecurrenceEventMapping> recurrenceEventMappings =
                 recurrenceEventExternalIds.isEmpty()
                         ? new HashMap<>()
-                        : mappingQueryService.listRecurrenceEventMappings(
+                        : recurrenceMappingQueryService.listRecurrenceEventMappings(
                                 integrationId,
                                 GoogleCalendarRecurrenceEventMapping.PRIMARY_CALENDAR_KEY,
                                 recurrenceEventExternalIds
@@ -215,7 +221,7 @@ public class GoogleCalendarEventPagePersistenceService {
                 || recurrenceEventExternalIdsByOverrideExternalId.isEmpty()) {
             return new HashMap<>();
         }
-        return mappingQueryService.listOverrideMappings(recurrenceEventMappingIds)
+        return recurrenceMappingQueryService.listOverrideMappings(recurrenceEventMappingIds)
                 .stream().collect(Collectors.toMap(
                         mapping -> new GoogleCalendarRecurrenceOverrideKey(
                                 mapping.getRecurrenceEventMapping().getId(),
@@ -259,7 +265,7 @@ public class GoogleCalendarEventPagePersistenceService {
         if (recurrenceEventExternalIdsByOverrideExternalId.isEmpty()) {
             return;
         }
-        mappingQueryService.listOverrideMappings(
+        recurrenceMappingQueryService.listOverrideMappings(
                 integrationId,
                 GoogleCalendarRecurrenceEventMapping.PRIMARY_CALENDAR_KEY,
                 recurrenceEventExternalIdsByOverrideExternalId.keySet()
@@ -355,7 +361,7 @@ public class GoogleCalendarEventPagePersistenceService {
                 defaultTag,
                 account
         ));
-        GoogleCalendarEventMapping mapping = mappingCommandService.createEventMapping(
+        GoogleCalendarEventMapping mapping = eventMappingCommandService.createEventMapping(
                 new GoogleCalendarEventMapping(
                         integration,
                         event,
@@ -410,7 +416,7 @@ public class GoogleCalendarEventPagePersistenceService {
                 account
         ));
         GoogleCalendarRecurrenceEventMapping mapping =
-                mappingCommandService.createRecurrenceEventMapping(
+                recurrenceMappingCommandService.createRecurrenceEventMapping(
                 new GoogleCalendarRecurrenceEventMapping(
                         integration,
                         recurrenceEvent,
@@ -473,7 +479,7 @@ public class GoogleCalendarEventPagePersistenceService {
             updateRecurrenceEventOverride(recurrenceEventOverride, item);
         }
         if (googleOverrideMapping == null) {
-            googleOverrideMapping = mappingCommandService.createOverrideMapping(
+            googleOverrideMapping = recurrenceMappingCommandService.createOverrideMapping(
                     new GoogleCalendarRecurrenceOverrideMapping(
                             recurrenceEventMapping,
                             recurrenceEventOverride,
@@ -600,7 +606,7 @@ public class GoogleCalendarEventPagePersistenceService {
             return;
         }
         Event event = eventMapping.getEvent();
-        mappingCommandService.deleteEventMapping(eventMapping);
+        eventMappingCommandService.deleteEventMapping(eventMapping);
         eventRepository.delete(event);
     }
 
@@ -624,15 +630,17 @@ public class GoogleCalendarEventPagePersistenceService {
 
     void deleteRecurrenceEvent(GoogleCalendarRecurrenceEventMapping recurrenceEventMapping) {
         List<GoogleCalendarRecurrenceOverrideMapping> overrideMappings =
-                mappingQueryService.listOverrideMappings(Set.of(recurrenceEventMapping.getId()));
+                recurrenceMappingQueryService.listOverrideMappings(
+                        Set.of(recurrenceEventMapping.getId())
+                );
         if (!overrideMappings.isEmpty()) {
-            mappingCommandService.deleteOverrideMappings(overrideMappings);
+            recurrenceMappingCommandService.deleteOverrideMappings(overrideMappings);
         }
         overrideRepository.deleteByRecurrenceEvent_Id(
                 recurrenceEventMapping.getRecurrenceEvent().getId()
         );
         overrideRepository.flush();
-        mappingCommandService.deleteRecurrenceEventMapping(recurrenceEventMapping);
+        recurrenceMappingCommandService.deleteRecurrenceEventMapping(recurrenceEventMapping);
         List<Event> occurrences = eventRepository.findByRecurrenceIdAndAccount_IdOrderByStartAtAsc(
                 recurrenceEventMapping.getRecurrenceEvent().getId(),
                 recurrenceEventMapping.getRecurrenceEvent().getAccount().getId()

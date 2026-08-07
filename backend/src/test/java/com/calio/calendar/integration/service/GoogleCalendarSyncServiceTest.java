@@ -443,6 +443,8 @@ class GoogleCalendarSyncServiceTest {
                     null,
                     null,
                     null,
+                    null,
+                    null,
                     mock(GoogleOperationJobPersistenceService.class)
             );
         }
@@ -560,8 +562,10 @@ class GoogleCalendarSyncServiceTest {
             super(
                     mock(GoogleCalendarIntegrationQueryService.class),
                     mock(GoogleCalendarIntegrationCommandService.class),
-                    mock(GoogleCalendarMappingQueryService.class),
-                    mock(GoogleCalendarMappingCommandService.class),
+                    mock(GoogleCalendarEventMappingQueryService.class),
+                    mock(GoogleCalendarEventMappingCommandService.class),
+                    mock(GoogleCalendarRecurrenceMappingQueryService.class),
+                    mock(GoogleCalendarRecurrenceMappingCommandService.class),
                     mock(EventRepository.class),
                     mock(AccountQueryService.class),
                     mock(TagQueryService.class),
@@ -588,7 +592,7 @@ class GoogleCalendarSyncServiceTest {
         private final Deque<NormalizedPageIdentities> identities = new ArrayDeque<>();
 
         private FakePageNormalizer(NormalizedPageIdentities... identities) {
-            super(null, null, null, null, null);
+            super(null, null, null, null, null, null);
             this.identities.addAll(List.of(identities));
         }
 

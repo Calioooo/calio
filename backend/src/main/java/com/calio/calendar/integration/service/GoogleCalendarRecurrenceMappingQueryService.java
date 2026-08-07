@@ -1,9 +1,7 @@
 package com.calio.calendar.integration.service;
 
-import com.calio.calendar.integration.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.domain.GoogleCalendarRecurrenceEventMapping;
 import com.calio.calendar.integration.domain.GoogleCalendarRecurrenceOverrideMapping;
-import com.calio.calendar.integration.repository.GoogleCalendarEventMappingRepository;
 import com.calio.calendar.integration.repository.GoogleCalendarRecurrenceEventMappingRepository;
 import com.calio.calendar.integration.repository.GoogleCalendarRecurrenceOverrideMappingRepository;
 import java.util.Collection;
@@ -14,52 +12,17 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Transactional(readOnly = true)
-public class GoogleCalendarMappingQueryService {
+public class GoogleCalendarRecurrenceMappingQueryService {
 
-    private final GoogleCalendarEventMappingRepository eventMappingRepository;
     private final GoogleCalendarRecurrenceEventMappingRepository recurrenceMappingRepository;
     private final GoogleCalendarRecurrenceOverrideMappingRepository overrideMappingRepository;
 
-    public GoogleCalendarMappingQueryService(
-            GoogleCalendarEventMappingRepository eventMappingRepository,
+    public GoogleCalendarRecurrenceMappingQueryService(
             GoogleCalendarRecurrenceEventMappingRepository recurrenceMappingRepository,
             GoogleCalendarRecurrenceOverrideMappingRepository overrideMappingRepository
     ) {
-        this.eventMappingRepository = eventMappingRepository;
         this.recurrenceMappingRepository = recurrenceMappingRepository;
         this.overrideMappingRepository = overrideMappingRepository;
-    }
-
-    public boolean hasExternalEventMapping(Long eventId, Long accountId) {
-        return eventMappingRepository.existsByEvent_IdAndIntegration_AccountId(eventId, accountId);
-    }
-
-    public List<GoogleCalendarEventMapping> listEventMappings(
-            Long integrationId,
-            String calendarKey,
-            Collection<String> externalEventIds
-    ) {
-        return eventMappingRepository.findAllWithEventByExternalIdentity(
-                integrationId,
-                calendarKey,
-                externalEventIds
-        );
-    }
-
-    public List<GoogleCalendarEventMapping> listEventMappings(Long integrationId) {
-        return eventMappingRepository.findAllWithEventByIntegrationId(integrationId);
-    }
-
-    public List<GoogleCalendarEventMapping> listEventMappingBatch(
-            Long integrationId,
-            Long afterId,
-            int limit
-    ) {
-        return eventMappingRepository.findNextBatchWithEventByIntegrationId(
-                integrationId,
-                afterId,
-                PageRequest.of(0, limit)
-        );
     }
 
     public List<GoogleCalendarRecurrenceEventMapping> listRecurrenceEventMappings(
@@ -74,7 +37,9 @@ public class GoogleCalendarMappingQueryService {
         );
     }
 
-    public List<GoogleCalendarRecurrenceEventMapping> listRecurrenceEventMappings(Long integrationId) {
+    public List<GoogleCalendarRecurrenceEventMapping> listRecurrenceEventMappings(
+            Long integrationId
+    ) {
         return recurrenceMappingRepository.findAllWithRecurrenceEventByIntegrationId(integrationId);
     }
 

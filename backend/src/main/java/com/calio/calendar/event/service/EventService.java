@@ -11,7 +11,7 @@ import com.calio.calendar.event.controller.dto.UpdateEventRequest;
 import com.calio.calendar.event.controller.dto.UpdateImportantEventRequest;
 import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.event.repository.EventRepository;
-import com.calio.calendar.integration.service.GoogleCalendarMappingQueryService;
+import com.calio.calendar.integration.service.GoogleCalendarEventMappingQueryService;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceOccurrence;
@@ -45,7 +45,7 @@ public class EventService {
     private final AccountQueryService accountQueryService;
     private final TagQueryService tagQueryService;
     private final Rfc5545RecurrenceEngine recurrenceEngine;
-    private final GoogleCalendarMappingQueryService googleCalendarMappingQueryService;
+    private final GoogleCalendarEventMappingQueryService googleCalendarEventMappingQueryService;
 
     public EventService(
             EventRepository eventRepository,
@@ -54,7 +54,7 @@ public class EventService {
             AccountQueryService accountQueryService,
             TagQueryService tagQueryService,
             Rfc5545RecurrenceEngine recurrenceEngine,
-            GoogleCalendarMappingQueryService googleCalendarMappingQueryService
+            GoogleCalendarEventMappingQueryService googleCalendarEventMappingQueryService
     ) {
         this.eventRepository = eventRepository;
         this.recurrenceEventRepository = recurrenceEventRepository;
@@ -62,7 +62,7 @@ public class EventService {
         this.accountQueryService = accountQueryService;
         this.tagQueryService = tagQueryService;
         this.recurrenceEngine = recurrenceEngine;
-        this.googleCalendarMappingQueryService = googleCalendarMappingQueryService;
+        this.googleCalendarEventMappingQueryService = googleCalendarEventMappingQueryService;
     }
 
     @Transactional
@@ -225,7 +225,7 @@ public class EventService {
     }
 
     private void rejectExternalEventMutation(Long accountId, Long eventId) {
-        if (googleCalendarMappingQueryService.hasExternalEventMapping(eventId, accountId)) {
+        if (googleCalendarEventMappingQueryService.hasExternalEventMapping(eventId, accountId)) {
             throw new CalioException(ErrorCode.EXTERNAL_EVENT_MUTATION_NOT_SUPPORTED);
         }
     }

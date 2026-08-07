@@ -1,9 +1,7 @@
 package com.calio.calendar.integration.service;
 
-import com.calio.calendar.integration.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.domain.GoogleCalendarRecurrenceEventMapping;
 import com.calio.calendar.integration.domain.GoogleCalendarRecurrenceOverrideMapping;
-import com.calio.calendar.integration.repository.GoogleCalendarEventMappingRepository;
 import com.calio.calendar.integration.repository.GoogleCalendarRecurrenceEventMappingRepository;
 import com.calio.calendar.integration.repository.GoogleCalendarRecurrenceOverrideMappingRepository;
 import java.util.Collection;
@@ -13,24 +11,17 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Transactional
-public class GoogleCalendarMappingCommandService {
+public class GoogleCalendarRecurrenceMappingCommandService {
 
-    private final GoogleCalendarEventMappingRepository eventMappingRepository;
     private final GoogleCalendarRecurrenceEventMappingRepository recurrenceMappingRepository;
     private final GoogleCalendarRecurrenceOverrideMappingRepository overrideMappingRepository;
 
-    public GoogleCalendarMappingCommandService(
-            GoogleCalendarEventMappingRepository eventMappingRepository,
+    public GoogleCalendarRecurrenceMappingCommandService(
             GoogleCalendarRecurrenceEventMappingRepository recurrenceMappingRepository,
             GoogleCalendarRecurrenceOverrideMappingRepository overrideMappingRepository
     ) {
-        this.eventMappingRepository = eventMappingRepository;
         this.recurrenceMappingRepository = recurrenceMappingRepository;
         this.overrideMappingRepository = overrideMappingRepository;
-    }
-
-    public GoogleCalendarEventMapping createEventMapping(GoogleCalendarEventMapping mapping) {
-        return eventMappingRepository.save(mapping);
     }
 
     public GoogleCalendarRecurrenceEventMapping createRecurrenceEventMapping(
@@ -43,20 +34,6 @@ public class GoogleCalendarMappingCommandService {
             GoogleCalendarRecurrenceOverrideMapping mapping
     ) {
         return overrideMappingRepository.save(mapping);
-    }
-
-    public void deleteEventMapping(GoogleCalendarEventMapping mapping) {
-        eventMappingRepository.delete(mapping);
-        eventMappingRepository.flush();
-    }
-
-    public void deleteEventMappings(List<GoogleCalendarEventMapping> mappings) {
-        eventMappingRepository.deleteAll(mappings);
-        eventMappingRepository.flush();
-    }
-
-    public void deleteEventMappingsWithIds(Collection<Long> mappingIds) {
-        eventMappingRepository.deleteAllByIds(mappingIds);
     }
 
     public void deleteRecurrenceEventMapping(GoogleCalendarRecurrenceEventMapping mapping) {
