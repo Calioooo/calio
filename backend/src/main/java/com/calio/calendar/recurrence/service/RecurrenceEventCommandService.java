@@ -56,12 +56,7 @@ public class RecurrenceEventCommandService {
     }
 
     public RecurrenceEventResponse createRecurrenceEvent(Long accountId, CreateRecurrenceEventRequest request) {
-        RecurrenceSchedule schedule = RecurrenceSchedule.create(
-                request.allDay(),
-                request.firstOccurrenceStartAt(),
-                request.firstOccurrenceEndAt(),
-                request.timeZone()
-        );
+        RecurrenceSchedule schedule = createSchedule(request);
         List<String> recurrenceRules = recurrenceEngine.validate(schedule, request.recurrence());
         Account account = accountRepository.getReferenceById(accountId);
         Tag tag = tagService.getTagOrDefault(accountId, request.tagId());
@@ -82,12 +77,7 @@ public class RecurrenceEventCommandService {
             UpdateRecurrenceEventRequest request
     ) {
         RecurrenceEvent recurrenceEvent = findRecurrenceEventForUpdate(accountId, recurrenceId);
-        RecurrenceSchedule schedule = RecurrenceSchedule.create(
-                request.allDay(),
-                request.firstOccurrenceStartAt(),
-                request.firstOccurrenceEndAt(),
-                request.timeZone()
-        );
+        RecurrenceSchedule schedule = createSchedule(request);
         List<String> recurrenceRules = recurrenceEngine.validate(schedule, request.recurrence());
         Tag tag = tagService.getTagOrDefault(accountId, request.tagId());
 
@@ -147,6 +137,24 @@ public class RecurrenceEventCommandService {
             override = RecurrenceEventOverride.deleted(recurrenceEvent, originStartAt, deletedAt);
         }
         recurrenceEventOverrideRepository.saveAndFlush(override);
+    }
+
+    private RecurrenceSchedule createSchedule(CreateRecurrenceEventRequest request) {
+        return RecurrenceSchedule.create(
+                request.allDay(),
+                request.firstOccurrenceStartAt(),
+                request.firstOccurrenceEndAt(),
+                request.timeZone()
+        );
+    }
+
+    private RecurrenceSchedule createSchedule(UpdateRecurrenceEventRequest request) {
+        return RecurrenceSchedule.create(
+                request.allDay(),
+                request.firstOccurrenceStartAt(),
+                request.firstOccurrenceEndAt(),
+                request.timeZone()
+        );
     }
 
     private Optional<RecurrenceEventOverride> findOverrideOrRejectIneligible(
