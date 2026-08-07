@@ -1,6 +1,6 @@
-package com.calio.calendar.integration.service;
+package com.calio.calendar.integration.service.dto;
 
-import com.calio.calendar.external.google.GoogleCalendarEventTimeNormalizer.NormalizedEventSchedule;
+import com.calio.calendar.external.google.service.dto.NormalizedEventSchedule;
 import java.time.Instant;
 import java.util.List;
 

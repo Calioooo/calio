@@ -2,7 +2,8 @@ package com.calio.calendar.integration.service;
 
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
-import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.RecurrenceEventUpsert;
+import com.calio.calendar.integration.service.dto.GoogleCalendarRecurrenceEventLookup;
+import com.calio.calendar.integration.service.dto.GoogleCalendarRecurrenceOverrideExternalKey;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -13,10 +14,12 @@ final class GoogleCalendarSyncRunContext {
     private static final int MAX_SEEN_IDENTITIES = 100_000;
 
     private String accessToken;
-    private final Map<String, RecurrenceEventLookup> recurrenceEventLookups = new HashMap<>();
+    private final Map<String, GoogleCalendarRecurrenceEventLookup> recurrenceEventLookups =
+            new HashMap<>();
     private final Set<String> seenEventIds = new HashSet<>();
     private final Set<String> seenRecurrenceEventIds = new HashSet<>();
-    private final Set<RecurrenceEventOverrideExternalKey> seenRecurrenceEventOverrideKeys =
+    private final Set<GoogleCalendarRecurrenceOverrideExternalKey>
+            seenRecurrenceEventOverrideKeys =
             new HashSet<>();
 
     GoogleCalendarSyncRunContext(String accessToken) {
@@ -31,13 +34,15 @@ final class GoogleCalendarSyncRunContext {
         this.accessToken = accessToken;
     }
 
-    RecurrenceEventLookup recurrenceEventLookup(String recurrenceEventExternalId) {
+    GoogleCalendarRecurrenceEventLookup recurrenceEventLookup(
+            String recurrenceEventExternalId
+    ) {
         return recurrenceEventLookups.get(recurrenceEventExternalId);
     }
 
     void rememberRecurrenceEvent(
             String recurrenceEventExternalId,
-            RecurrenceEventLookup lookup
+            GoogleCalendarRecurrenceEventLookup lookup
     ) {
         if (!recurrenceEventLookups.containsKey(recurrenceEventExternalId)
                 && recurrenceEventLookups.size() >= MAX_SEEN_IDENTITIES) {
@@ -60,7 +65,7 @@ final class GoogleCalendarSyncRunContext {
     ) {
         addBounded(
                 seenRecurrenceEventOverrideKeys,
-                new RecurrenceEventOverrideExternalKey(
+                new GoogleCalendarRecurrenceOverrideExternalKey(
                         recurrenceEventExternalId,
                         overrideExternalEventId
                 )
@@ -75,7 +80,7 @@ final class GoogleCalendarSyncRunContext {
         return Set.copyOf(seenRecurrenceEventIds);
     }
 
-    Set<RecurrenceEventOverrideExternalKey> seenRecurrenceEventOverrideIds() {
+    Set<GoogleCalendarRecurrenceOverrideExternalKey> seenRecurrenceEventOverrideIds() {
         return Set.copyOf(seenRecurrenceEventOverrideKeys);
     }
 
@@ -98,21 +103,4 @@ final class GoogleCalendarSyncRunContext {
                 + seenRecurrenceEventOverrideKeys.size();
     }
 
-    sealed interface RecurrenceEventLookup
-            permits FoundRecurrenceEvent, MissingRecurrenceEvent {
-    }
-
-    record FoundRecurrenceEvent(RecurrenceEventUpsert recurrenceEvent)
-            implements RecurrenceEventLookup {
-    }
-
-    record RecurrenceEventOverrideExternalKey(
-            String recurrenceEventExternalId,
-            String overrideExternalEventId
-    ) {
-    }
-
-    enum MissingRecurrenceEvent implements RecurrenceEventLookup {
-        INSTANCE
-    }
 }

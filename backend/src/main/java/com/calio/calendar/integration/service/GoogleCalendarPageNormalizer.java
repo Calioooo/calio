@@ -9,15 +9,16 @@ import com.calio.calendar.external.google.dto.GoogleCalendarEventItem;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventPage;
 import com.calio.calendar.integration.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.domain.GoogleCalendarRecurrenceEventMapping;
-import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.EventCancellation;
-import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.EventUpsert;
-import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.NormalizedItem;
-import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.RecurrenceEventCancellation;
-import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.RecurrenceEventOverrideUpsert;
-import com.calio.calendar.integration.service.GoogleCalendarNormalizedPage.RecurrenceEventUpsert;
-import com.calio.calendar.integration.service.GoogleCalendarSyncRunContext.FoundRecurrenceEvent;
-import com.calio.calendar.integration.service.GoogleCalendarSyncRunContext.MissingRecurrenceEvent;
-import com.calio.calendar.integration.service.GoogleCalendarSyncRunContext.RecurrenceEventLookup;
+import com.calio.calendar.integration.service.dto.GoogleCalendarNormalizedPage;
+import com.calio.calendar.integration.service.dto.GoogleCalendarNormalizedPage.EventCancellation;
+import com.calio.calendar.integration.service.dto.GoogleCalendarNormalizedPage.EventUpsert;
+import com.calio.calendar.integration.service.dto.GoogleCalendarNormalizedPage.NormalizedItem;
+import com.calio.calendar.integration.service.dto.GoogleCalendarNormalizedPage.RecurrenceEventCancellation;
+import com.calio.calendar.integration.service.dto.GoogleCalendarNormalizedPage.RecurrenceEventOverrideUpsert;
+import com.calio.calendar.integration.service.dto.GoogleCalendarNormalizedPage.RecurrenceEventUpsert;
+import com.calio.calendar.integration.service.dto.GoogleCalendarRecurrenceEventLookup;
+import com.calio.calendar.integration.service.dto.GoogleCalendarRecurrenceEventLookup.FoundRecurrenceEvent;
+import com.calio.calendar.integration.service.dto.GoogleCalendarRecurrenceEventLookup.MissingRecurrenceEvent;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -243,7 +244,7 @@ public class GoogleCalendarPageNormalizer {
             String recurrenceEventExternalId,
             GoogleCalendarSyncRunContext context
     ) {
-        RecurrenceEventLookup cached =
+        GoogleCalendarRecurrenceEventLookup cached =
                 context.recurrenceEventLookup(recurrenceEventExternalId);
         if (cached instanceof FoundRecurrenceEvent found) {
             return Optional.of(found.recurrenceEvent());

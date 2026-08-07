@@ -17,7 +17,9 @@ import com.calio.calendar.external.google.dto.GoogleCalendarEventPage;
 import com.calio.calendar.integration.domain.GoogleCalendarSyncMode;
 import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
-import com.calio.calendar.integration.service.GoogleCalendarSyncLeaseService.SyncLease;
+import com.calio.calendar.integration.service.dto.GoogleCalendarNormalizedPage;
+import com.calio.calendar.integration.service.dto.GoogleCalendarRecurrenceOverrideExternalKey;
+import com.calio.calendar.integration.service.dto.GoogleCalendarSyncLease;
 import com.calio.calendar.tag.service.TagQueryService;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -89,7 +91,7 @@ class GoogleCalendarSyncServiceTest {
         assertThat(providerDataService.finalizedSeenRecurrenceEventIds)
                 .containsExactly("full-recurrence-event");
         assertThat(providerDataService.finalizedSeenOverrideIds)
-                .containsExactly(new GoogleCalendarSyncRunContext.RecurrenceEventOverrideExternalKey(
+                .containsExactly(new GoogleCalendarRecurrenceOverrideExternalKey(
                         "full-recurrence-event",
                         "full-override"
                 ));
@@ -331,11 +333,11 @@ class GoogleCalendarSyncServiceTest {
                 .containsExactlyInAnyOrder("recurrence-event-1", "recurrence-event-2");
         assertThat(providerDataService.finalizedSeenOverrideIds)
                 .containsExactlyInAnyOrder(
-                        new GoogleCalendarSyncRunContext.RecurrenceEventOverrideExternalKey(
+                        new GoogleCalendarRecurrenceOverrideExternalKey(
                                 "recurrence-event-1",
                                 "override-1"
                         ),
-                        new GoogleCalendarSyncRunContext.RecurrenceEventOverrideExternalKey(
+                        new GoogleCalendarRecurrenceOverrideExternalKey(
                                 "recurrence-event-2",
                                 "override-2"
                         )
@@ -352,7 +354,7 @@ class GoogleCalendarSyncServiceTest {
         return new NormalizedPageIdentities(
                 Set.of(eventId),
                 Set.of(recurrenceEventId),
-                Set.of(new GoogleCalendarSyncRunContext.RecurrenceEventOverrideExternalKey(
+                Set.of(new GoogleCalendarRecurrenceOverrideExternalKey(
                         overrideRecurrenceEventId,
                         overrideId
                 ))
@@ -414,8 +416,8 @@ class GoogleCalendarSyncServiceTest {
         }
 
         @Override
-        public SyncLease acquire(Long accountId, String runId) {
-            return new SyncLease(20L, accountId, nextSyncToken, runId);
+        public GoogleCalendarSyncLease acquire(Long accountId, String runId) {
+            return new GoogleCalendarSyncLease(20L, accountId, nextSyncToken, runId);
         }
     }
 
@@ -428,7 +430,7 @@ class GoogleCalendarSyncServiceTest {
         private String finalizedCursor;
         private Set<String> finalizedSeenEventIds = Set.of();
         private Set<String> finalizedSeenRecurrenceEventIds = Set.of();
-        private Set<GoogleCalendarSyncRunContext.RecurrenceEventOverrideExternalKey>
+        private Set<GoogleCalendarRecurrenceOverrideExternalKey>
                 finalizedSeenOverrideIds = Set.of();
         private RuntimeException releaseFailure;
 
@@ -462,7 +464,7 @@ class GoogleCalendarSyncServiceTest {
                 GoogleCalendarSyncMode syncMode,
                 Set<String> seenEventIds,
                 Set<String> seenRecurrenceEventIds,
-                Set<GoogleCalendarSyncRunContext.RecurrenceEventOverrideExternalKey>
+                Set<GoogleCalendarRecurrenceOverrideExternalKey>
                         seenOverrideIds,
                 String nextSyncToken
         ) {
@@ -617,7 +619,7 @@ class GoogleCalendarSyncServiceTest {
     private record NormalizedPageIdentities(
             Set<String> eventIds,
             Set<String> recurrenceEventIds,
-            Set<GoogleCalendarSyncRunContext.RecurrenceEventOverrideExternalKey> overrideIds
+            Set<GoogleCalendarRecurrenceOverrideExternalKey> overrideIds
     ) {
     }
 }

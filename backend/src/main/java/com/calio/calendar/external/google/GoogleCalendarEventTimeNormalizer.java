@@ -4,6 +4,7 @@ import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.common.time.IanaTimeZones;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventTime;
+import com.calio.calendar.external.google.service.dto.NormalizedEventSchedule;
 import java.time.DateTimeException;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -192,14 +193,6 @@ public class GoogleCalendarEventTimeNormalizer {
 
     public record NormalizedEventTime(
             Instant instant,
-            boolean allDay,
-            String timeZone
-    ) {
-    }
-
-    public record NormalizedEventSchedule(
-            Instant startAt,
-            Instant endAt,
             boolean allDay,
             String timeZone
     ) {

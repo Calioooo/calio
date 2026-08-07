@@ -7,7 +7,8 @@ import com.calio.calendar.external.google.GoogleCalendarSyncTokenExpiredExceptio
 import com.calio.calendar.external.google.GoogleCalendarUnauthorizedException;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventPage;
 import com.calio.calendar.integration.domain.GoogleCalendarSyncMode;
-import com.calio.calendar.integration.service.GoogleCalendarSyncLeaseService.SyncLease;
+import com.calio.calendar.integration.service.dto.GoogleCalendarNormalizedPage;
+import com.calio.calendar.integration.service.dto.GoogleCalendarSyncLease;
 import java.util.HashSet;
 import java.util.Set;
 import org.springframework.stereotype.Service;
@@ -46,7 +47,7 @@ public class GoogleCalendarSyncService {
             Long accountId,
             String workerToken
     ) {
-        SyncLease lease = leaseService.acquire(accountId, workerToken);
+        GoogleCalendarSyncLease lease = leaseService.acquire(accountId, workerToken);
         try {
             assertOwned(jobId, accountId, workerToken);
             GoogleCalendarSyncRunContext context = new GoogleCalendarSyncRunContext(
@@ -60,7 +61,7 @@ public class GoogleCalendarSyncService {
 
     private GoogleCalendarSyncMode synchronizeOwned(
             Long jobId,
-            SyncLease lease,
+            GoogleCalendarSyncLease lease,
             GoogleCalendarSyncRunContext context
     ) {
         if (modeFor(lease.nextSyncToken()) == GoogleCalendarSyncMode.FULL) {
@@ -79,7 +80,7 @@ public class GoogleCalendarSyncService {
 
     private void synchronizeOwnedPages(
             Long jobId,
-            SyncLease lease,
+            GoogleCalendarSyncLease lease,
             GoogleCalendarSyncMode mode,
             GoogleCalendarSyncRunContext context
     ) {
@@ -109,7 +110,7 @@ public class GoogleCalendarSyncService {
     }
 
     private GoogleCalendarEventPage requestPage(
-            SyncLease lease,
+            GoogleCalendarSyncLease lease,
             GoogleCalendarSyncMode mode,
             String pageToken,
             GoogleCalendarSyncRunContext context
@@ -131,7 +132,7 @@ public class GoogleCalendarSyncService {
     }
 
     private GoogleCalendarEventPage listEvents(
-            SyncLease lease,
+            GoogleCalendarSyncLease lease,
             GoogleCalendarSyncMode mode,
             String pageToken,
             String accessToken
@@ -153,7 +154,7 @@ public class GoogleCalendarSyncService {
     }
 
     private RuntimeException releaseOwnedLeasePreservingFailure(
-            SyncLease lease,
+            GoogleCalendarSyncLease lease,
             RuntimeException failure
     ) {
         try {

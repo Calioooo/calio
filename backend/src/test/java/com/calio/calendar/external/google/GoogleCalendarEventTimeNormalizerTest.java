@@ -5,8 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
-import com.calio.calendar.external.google.GoogleCalendarEventTimeNormalizer.NormalizedEventSchedule;
 import com.calio.calendar.external.google.GoogleCalendarEventTimeNormalizer.NormalizedEventTime;
+import com.calio.calendar.external.google.service.dto.NormalizedEventSchedule;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventTime;
 import java.time.Instant;
 import java.util.TimeZone;

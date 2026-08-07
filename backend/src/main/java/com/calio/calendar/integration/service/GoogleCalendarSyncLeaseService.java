@@ -1,6 +1,7 @@
 package com.calio.calendar.integration.service;
 
 import com.calio.calendar.integration.domain.GoogleCalendarIntegration;
+import com.calio.calendar.integration.service.dto.GoogleCalendarSyncLease;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,10 +20,10 @@ public class GoogleCalendarSyncLeaseService {
     }
 
     @Transactional
-    public SyncLease acquire(Long accountId, String runId) {
+    public GoogleCalendarSyncLease acquire(Long accountId, String runId) {
         GoogleCalendarIntegration integration = integrationQueryService.getIntegration(accountId);
         integrationCommandService.acquireSyncLease(accountId, runId);
-        return new SyncLease(
+        return new GoogleCalendarSyncLease(
                 integration.getId(),
                 integration.getAccountId(),
                 integration.getNextSyncToken(),
@@ -30,11 +31,4 @@ public class GoogleCalendarSyncLeaseService {
         );
     }
 
-    public record SyncLease(
-            Long integrationId,
-            Long accountId,
-            String nextSyncToken,
-            String runId
-    ) {
-    }
 }

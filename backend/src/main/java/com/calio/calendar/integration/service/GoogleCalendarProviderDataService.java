@@ -11,7 +11,7 @@ import com.calio.calendar.integration.domain.GoogleCalendarSyncMode;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
-import com.calio.calendar.integration.service.GoogleCalendarSyncRunContext.RecurrenceEventOverrideExternalKey;
+import com.calio.calendar.integration.service.dto.GoogleCalendarRecurrenceOverrideExternalKey;
 import java.util.List;
 import java.util.Set;
 import org.springframework.stereotype.Service;
@@ -67,7 +67,7 @@ public class GoogleCalendarProviderDataService {
             GoogleCalendarSyncMode syncMode,
             Set<String> seenEventIds,
             Set<String> seenRecurrenceEventIds,
-            Set<RecurrenceEventOverrideExternalKey> seenOverrideIds,
+            Set<GoogleCalendarRecurrenceOverrideExternalKey> seenOverrideIds,
             String nextSyncToken
     ) {
         OperationOwnership ownership = new OperationOwnership(jobId, accountId, workerToken);
@@ -95,7 +95,7 @@ public class GoogleCalendarProviderDataService {
             OperationOwnership ownership,
             Set<String> seenEventIds,
             Set<String> seenRecurrenceEventIds,
-            Set<RecurrenceEventOverrideExternalKey> seenOverrideIds
+            Set<GoogleCalendarRecurrenceOverrideExternalKey> seenOverrideIds
     ) {
         deleteUnseenOverridesInBatches(integrationId, ownership, seenOverrideIds);
         deleteUnseenEventsInBatches(integrationId, ownership, seenEventIds);
@@ -109,7 +109,7 @@ public class GoogleCalendarProviderDataService {
     private void deleteUnseenOverridesInBatches(
             Long integrationId,
             OperationOwnership ownership,
-            Set<RecurrenceEventOverrideExternalKey> seenOverrideIds
+            Set<GoogleCalendarRecurrenceOverrideExternalKey> seenOverrideIds
     ) {
         long afterId = FIRST_MAPPING_ID;
         while (true) {
@@ -129,7 +129,7 @@ public class GoogleCalendarProviderDataService {
     private Long deleteNextOverrideBatch(
             Long integrationId,
             OperationOwnership ownership,
-            Set<RecurrenceEventOverrideExternalKey> seenOverrideIds,
+            Set<GoogleCalendarRecurrenceOverrideExternalKey> seenOverrideIds,
             long afterId
     ) {
         renewReconciliationLeases(integrationId, ownership);
@@ -144,7 +144,7 @@ public class GoogleCalendarProviderDataService {
         }
         List<GoogleCalendarRecurrenceOverrideMapping> unseenMappings = mappings.stream()
                 .filter(mapping -> !seenOverrideIds.contains(
-                        new RecurrenceEventOverrideExternalKey(
+                        new GoogleCalendarRecurrenceOverrideExternalKey(
                                 mapping.getRecurrenceEventMapping().getExternalEventId(),
                                 mapping.getExternalEventId()
                         )))
