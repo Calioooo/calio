@@ -64,6 +64,9 @@ class RecurrenceEventRepositoryTest {
                 .containsExactly(master.getId());
         assertThat(candidates.getFirst().getRecurrenceRules())
                 .containsExactly("RRULE:FREQ=DAILY");
+        assertThat(entityManager.getEntityManagerFactory().getPersistenceUnitUtil()
+                .isLoaded(candidates.getFirst(), "tag"))
+                .isTrue();
     }
 
     @Test

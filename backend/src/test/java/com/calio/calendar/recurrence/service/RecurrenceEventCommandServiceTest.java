@@ -257,6 +257,7 @@ class RecurrenceEventCommandServiceTest {
         // given
         RecurrenceEvent recurrenceEvent = recurrenceEvent();
         Instant originStartAt = Instant.parse("2027-01-01T00:00:00Z");
+        Instant deletedAt = Instant.parse("2027-01-06T00:00:00Z");
         RecurrenceEventOverride existingOverride = RecurrenceEventOverride.active(
                 recurrenceEvent,
                 originStartAt,
@@ -273,7 +274,7 @@ class RecurrenceEventCommandServiceTest {
                 .thenReturn(Optional.of(recurrenceEvent));
         when(recurrenceEventOverrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(10L, originStartAt))
                 .thenReturn(Optional.of(existingOverride));
-        when(clock.instant()).thenReturn(Instant.parse("2027-01-06T00:00:00Z"));
+        when(clock.instant()).thenReturn(deletedAt);
 
         // when
         recurrenceEventCommandService.deleteRecurrenceOccurrence(1L, 10L, originStartAt);
@@ -283,7 +284,7 @@ class RecurrenceEventCommandServiceTest {
         verify(recurrenceEventOverrideRepository).saveAndFlush(existingOverride);
         assertThat(existingOverride.getOriginStartAt()).isEqualTo(originStartAt);
         assertThat(existingOverride.isDeleted()).isTrue();
-        assertThat(existingOverride.getDeletedAt()).isNotNull();
+        assertThat(existingOverride.getDeletedAt()).isEqualTo(deletedAt);
     }
 
     @Test
