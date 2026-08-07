@@ -252,7 +252,7 @@ final class CalendarHomeViewModel: ObservableObject {
             await reloadTags()
             tagMutationState = .idle
             return true
-        } catch let error as EventServiceError {
+        } catch let error as TagServiceError {
             tagMutationState = .failed(CalendarTagMutationFailure(error: error))
             return false
         } catch {
@@ -277,7 +277,7 @@ final class CalendarHomeViewModel: ObservableObject {
             refetchDefaultPrefetchRange()
             tagMutationState = .idle
             return true
-        } catch let error as EventServiceError {
+        } catch let error as TagServiceError {
             tagMutationState = .failed(CalendarTagMutationFailure(error: error))
             return false
         } catch {
@@ -302,7 +302,7 @@ final class CalendarHomeViewModel: ObservableObject {
             refetchDefaultPrefetchRange()
             tagMutationState = .idle
             return true
-        } catch let error as EventServiceError {
+        } catch let error as TagServiceError {
             tagMutationState = .failed(CalendarTagMutationFailure(error: error))
             return false
         } catch {
@@ -1372,13 +1372,13 @@ enum CalendarTagMutationFailure: Equatable {
     case network
     case unexpected
 
-    init(error: EventServiceError) {
+    init(error: TagServiceError) {
         switch error {
-        case .validationFailed, .invalidTimeRange:
+        case .validationFailed:
             self = .validationFailed
         case .network:
             self = .network
-        case .eventNotFound, .recurrenceEventNotFound, .recurrenceOccurrenceNotFound, .decoding, .unexpected:
+        case .decoding, .unexpected:
             self = .unexpected
         }
     }

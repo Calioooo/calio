@@ -7,6 +7,39 @@ import SwiftUI
 struct CalendarHomeViewModelTests {
 
     @MainActor
+    @Test func calendarHomeViewModelTagMutationKeepsValidationFailurePresentation() async throws {
+        let calendar = fixedCalendar
+        let viewModel = CalendarHomeViewModel(
+            calendar: calendar,
+            dateService: CalendarDateService(calendar: calendar),
+            eventService: EventService(repository: RecordingEventRepository()),
+            tagService: TagService(
+                repository: RecordingTagRepository(
+                    createError: APIError.backend(
+                        statusCode: 400,
+                        problem: ProblemDetailDTO(
+                            type: nil,
+                            title: "Validation failed",
+                            status: 400,
+                            detail: nil,
+                            errorCode: "VALIDATION_FAILED"
+                        )
+                    )
+                )
+            ),
+            nationalHolidayService: makeNationalHolidayService(calendar: calendar)
+        )
+
+        let didCreate = await viewModel.createCustomTag(
+            CustomTagInput(title: "", colorCode: "#10B981")
+        )
+
+        #expect(!didCreate)
+        #expect(viewModel.tagMutationState == .failed(.validationFailed))
+        #expect(viewModel.tagMutationState.failureMessage == "태그 이름과 색상을 확인해 주세요.")
+    }
+
+    @MainActor
     @Test func calendarHomeViewModelSetReferenceDayUpdatesCanonicalReferenceDay() async throws {
         let calendar = fixedCalendar
         let baseDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8)))

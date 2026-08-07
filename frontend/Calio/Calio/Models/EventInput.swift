@@ -212,8 +212,3 @@ enum CalendarEventCreationSubmitInput: Equatable {
     case single(EventCreateInput)
     case recurring(RecurrenceEventCreateInput)
 }
-
-struct CustomTagInput: Equatable {
-    let title: String
-    let colorCode: String
-}

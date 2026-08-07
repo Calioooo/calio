@@ -119,6 +119,71 @@ final class RecordingNationalHolidayRepository: NationalHolidayRepository {
     }
 }
 
+final class RecordingTagRepository: TagRepository {
+    private let fetchResponse: [TagResponseDTO]
+    private let createResponse: TagResponseDTO
+    private let updateResponse: TagResponseDTO
+    private let fetchError: Error?
+    private let createError: Error?
+    private let updateError: Error?
+    private let deleteError: Error?
+
+    init(
+        fetchResponse: [TagResponseDTO] = [],
+        createResponse: TagResponseDTO = TagResponseDTO(
+            id: 1,
+            title: "운동",
+            colorCode: "#10B981",
+            tagType: .custom
+        ),
+        updateResponse: TagResponseDTO = TagResponseDTO(
+            id: 1,
+            title: "운동",
+            colorCode: "#10B981",
+            tagType: .custom
+        ),
+        fetchError: Error? = nil,
+        createError: Error? = nil,
+        updateError: Error? = nil,
+        deleteError: Error? = nil
+    ) {
+        self.fetchResponse = fetchResponse
+        self.createResponse = createResponse
+        self.updateResponse = updateResponse
+        self.fetchError = fetchError
+        self.createError = createError
+        self.updateError = updateError
+        self.deleteError = deleteError
+    }
+
+    func fetchTags() async throws -> [TagResponseDTO] {
+        if let fetchError {
+            throw fetchError
+        }
+        return fetchResponse
+    }
+
+    func createCustomTag(_ request: CustomTagRequestDTO) async throws -> TagResponseDTO {
+        if let createError {
+            throw createError
+        }
+        return createResponse
+    }
+
+    func updateCustomTag(tagId: Int64, request: CustomTagRequestDTO) async throws -> TagResponseDTO {
+        if let updateError {
+            throw updateError
+        }
+        return updateResponse
+    }
+
+    func deleteCustomTag(tagId: Int64) async throws {
+        if let deleteError {
+            throw deleteError
+        }
+    }
+}
+
 final class RecordingEventRepository: EventRepository {
     private let lock = NSLock()
     private var storedRequests: [(startDate: Date, endDate: Date)] = []
