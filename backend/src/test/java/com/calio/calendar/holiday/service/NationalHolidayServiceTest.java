@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
+import com.calio.calendar.holiday.client.HolidayApiClient;
 import com.calio.calendar.holiday.controller.dto.NationalHolidayResponse;
 import java.time.LocalDate;
 import java.util.List;
@@ -22,7 +23,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class NationalHolidayServiceTest {
 
     @Mock
+    private HolidayApiClient holidayApiClient;
+
+    @Mock
     private NationalHolidayQueryService nationalHolidayQueryService;
+
+    @Mock
+    private NationalHolidayCommandService nationalHolidayCommandService;
 
     @InjectMocks
     private NationalHolidayService nationalHolidayService;

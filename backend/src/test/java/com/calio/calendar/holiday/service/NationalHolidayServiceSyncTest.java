@@ -25,20 +25,22 @@ import org.springframework.transaction.support.AbstractPlatformTransactionManage
 import org.springframework.transaction.support.DefaultTransactionStatus;
 import tools.jackson.databind.ObjectMapper;
 
-class NationalHolidaySyncServiceTest {
+class NationalHolidayServiceSyncTest {
 
     private FakeHolidayApiClient holidayApiClient;
     private FakeNationalHolidayRepository nationalHolidayRepository;
-    private NationalHolidaySyncService nationalHolidaySyncService;
+    private NationalHolidayService nationalHolidayService;
 
     @BeforeEach
     void setUp() {
         holidayApiClient = new FakeHolidayApiClient();
         nationalHolidayRepository = new FakeNationalHolidayRepository();
-        nationalHolidaySyncService = new NationalHolidaySyncService(
+        NationalHolidayRepository repository = nationalHolidayRepository.proxy();
+        nationalHolidayService = new NationalHolidayService(
                 holidayApiClient,
+                new NationalHolidayQueryService(repository),
                 new NationalHolidayCommandService(
-                        nationalHolidayRepository.proxy(),
+                        repository,
                         new NoOpTransactionManager()
                 )
         );
@@ -57,7 +59,7 @@ class NationalHolidaySyncServiceTest {
         ));
 
         // when
-        nationalHolidaySyncService.syncYear(2026);
+        nationalHolidayService.syncYear(2026);
 
         // then
         assertThat(nationalHolidayRepository.savedHolidays()).singleElement()
@@ -82,7 +84,7 @@ class NationalHolidaySyncServiceTest {
         ));
 
         // when
-        nationalHolidaySyncService.syncYear(2026);
+        nationalHolidayService.syncYear(2026);
 
         // then
         assertThat(nationalHolidayRepository.deletedHolidays()).containsExactly(staleHoliday);
@@ -96,7 +98,7 @@ class NationalHolidaySyncServiceTest {
         holidayApiClient.addResponse(2026, new HolidayApiResponse("99", List.of()));
 
         // when
-        nationalHolidaySyncService.syncYear(2026);
+        nationalHolidayService.syncYear(2026);
 
         // then
         assertThat(nationalHolidayRepository.findRangeCalled()).isFalse();
@@ -117,7 +119,7 @@ class NationalHolidaySyncServiceTest {
         ));
 
         // when
-        nationalHolidaySyncService.syncYearRange(2026, 2027);
+        nationalHolidayService.syncYearRange(2026, 2027);
 
         // then
         assertThat(holidayApiClient.requestedYears()).containsExactly(2026, 2027);
@@ -132,7 +134,7 @@ class NationalHolidaySyncServiceTest {
         holidayApiClient.addResponse(2026, new HolidayApiResponse("00", List.of()));
 
         // when
-        nationalHolidaySyncService.syncYear(2026);
+        nationalHolidayService.syncYear(2026);
 
         // then
         assertThat(nationalHolidayRepository.findRangeCalled()).isFalse();
@@ -153,7 +155,7 @@ class NationalHolidaySyncServiceTest {
         ));
 
         // when
-        nationalHolidaySyncService.syncYear(2026);
+        nationalHolidayService.syncYear(2026);
 
         // then
         assertThat(nationalHolidayRepository.deletedHolidays()).containsExactly(staleHoliday);
@@ -169,7 +171,7 @@ class NationalHolidaySyncServiceTest {
         ));
 
         // when
-        nationalHolidaySyncService.syncYear(2026);
+        nationalHolidayService.syncYear(2026);
 
         // then
         assertThat(nationalHolidayRepository.findRangeCalled()).isFalse();
@@ -187,7 +189,7 @@ class NationalHolidaySyncServiceTest {
         ));
 
         // when
-        nationalHolidaySyncService.syncYear(2026);
+        nationalHolidayService.syncYear(2026);
 
         // then
         assertThat(nationalHolidayRepository.savedHolidays()).isEmpty();
