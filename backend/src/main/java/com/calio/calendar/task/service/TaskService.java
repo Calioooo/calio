@@ -56,7 +56,7 @@ public class TaskService {
     @Transactional
     public TaskResponse completeTask(Long accountId, Long taskId) {
         Task task = getTask(accountId, taskId);
-        task.complete(currentPersistenceTime());
+        task.changeCompleted(currentPersistenceTime());
         taskRepository.flush();
         return TaskResponse.from(task);
     }
@@ -64,7 +64,7 @@ public class TaskService {
     @Transactional
     public TaskResponse uncompleteTask(Long accountId, Long taskId) {
         Task task = getTask(accountId, taskId);
-        task.uncomplete();
+        task.changeUncompleted();
         taskRepository.flush();
         return TaskResponse.from(task);
     }

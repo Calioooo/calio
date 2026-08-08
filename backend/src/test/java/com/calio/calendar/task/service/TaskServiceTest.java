@@ -63,7 +63,7 @@ class TaskServiceTest {
 
     private Task saveCompletedTask(String taskTitle, Instant completedAt) {
         Task task = new Task(taskTitle, account);
-        task.complete(completedAt);
+        task.changeCompleted(completedAt);
         return taskRepository.saveAndFlush(task);
     }
 }
