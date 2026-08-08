@@ -8,7 +8,6 @@ import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionStatus;
@@ -66,9 +65,6 @@ public class NationalHolidayPersistenceService {
             nationalHolidayRepository.saveAndFlush(
                     new NationalHoliday(providerRow.holidayDate(), providerRow.holidayTitle())
             );
-        } catch (DuplicateKeyException exception) {
-            status.setRollbackOnly();
-            logDuplicateInsert(providerRow, exception);
         } catch (DataIntegrityViolationException exception) {
             status.setRollbackOnly();
             logDuplicateInsert(providerRow, exception);
