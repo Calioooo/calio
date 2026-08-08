@@ -1,97 +1,83 @@
 package com.calio.calendar.task.service;
 
+import com.calio.calendar.account.domain.Account;
+import com.calio.calendar.account.repository.AccountRepository;
+import com.calio.calendar.common.error.CalioException;
+import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.task.controller.dto.CreateTaskRequest;
 import com.calio.calendar.task.controller.dto.TaskResponse;
 import com.calio.calendar.task.controller.dto.UpdateTaskTitleRequest;
-import com.calio.calendar.common.error.CalioException;
-import com.calio.calendar.common.error.ErrorCode;
-import com.calio.calendar.account.repository.AccountRepository;
-import com.calio.calendar.task.repository.TaskRepository;
-import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.task.domain.Task;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@Transactional(readOnly = true)
 public class TaskService {
 
-    private static final int FIRST_PAGE = 0;
-    private static final int DEFAULT_PAGE_SIZE = 20;
-
-    private final TaskRepository taskRepository;
+    private final TaskQueryService taskQueryService;
+    private final TaskCommandService taskCommandService;
     private final AccountRepository accountRepository;
+    private final Clock clock;
 
-    public TaskService(TaskRepository taskRepository, AccountRepository accountRepository) {
-        this.taskRepository = taskRepository;
+    public TaskService(
+            TaskQueryService taskQueryService,
+            TaskCommandService taskCommandService,
+            AccountRepository accountRepository,
+            Clock clock
+    ) {
+        this.taskQueryService = taskQueryService;
+        this.taskCommandService = taskCommandService;
         this.accountRepository = accountRepository;
+        this.clock = clock;
     }
 
     @Transactional
     public TaskResponse createTask(Long accountId, CreateTaskRequest request) {
         Account account = accountRepository.getReferenceById(accountId);
-        Task task = taskRepository.save(request.toEntity(account));
+        Task task = taskCommandService.createTask(request.toEntity(account));
         return TaskResponse.from(task);
     }
 
-    @Transactional(readOnly = true)
     public List<TaskResponse> listTasks(Long accountId) {
-        PageRequest pageRequest = PageRequest.of(
-                FIRST_PAGE,
-                DEFAULT_PAGE_SIZE,
-                Sort.by(Sort.Direction.ASC, "taskId")
-        );
-
-        return taskRepository.findByAccount_IdAndCompletedFalse(accountId, pageRequest)
-                .getContent()
-                .stream()
-                .map(TaskResponse::from)
-                .toList();
+        return taskQueryService.listTasks(accountId);
     }
 
     @Transactional
     public TaskResponse completeTask(Long accountId, Long taskId) {
-        Task task = getTask(accountId, taskId);
-        task.changeCompleted(currentPersistenceTime());
-        taskRepository.flush();
+        Task task = taskQueryService.findTask(accountId, taskId);
+        taskCommandService.completeTask(task, currentPersistenceTime());
         return TaskResponse.from(task);
     }
 
     @Transactional
     public TaskResponse uncompleteTask(Long accountId, Long taskId) {
-        Task task = getTask(accountId, taskId);
-        task.changeUncompleted();
-        taskRepository.flush();
+        Task task = taskQueryService.findTask(accountId, taskId);
+        taskCommandService.uncompleteTask(task);
         return TaskResponse.from(task);
     }
 
     @Transactional
     public TaskResponse updateTaskTitle(Long accountId, Long taskId, UpdateTaskTitleRequest request) {
-        Task task = getTask(accountId, taskId);
+        Task task = taskQueryService.findTask(accountId, taskId);
         if (task.isCompleted()) {
             throw new CalioException(ErrorCode.COMPLETED_TASK_TITLE_UPDATE_NOT_ALLOWED);
         }
 
-        task.updateTitle(request.taskTitle());
-        taskRepository.flush();
+        taskCommandService.updateTaskTitle(task, request.taskTitle());
         return TaskResponse.from(task);
     }
 
     @Transactional
     public int deleteCompletedTasksBefore(Instant cutoff) {
-        return taskRepository.deleteCompletedTasksBefore(cutoff);
-    }
-
-    private Task getTask(Long accountId, Long taskId) {
-        return taskRepository.findByTaskIdAndAccount_Id(taskId, accountId)
-                .orElseThrow(() -> new CalioException(ErrorCode.TASK_NOT_FOUND));
+        return taskCommandService.deleteCompletedTasksBefore(cutoff);
     }
 
     private Instant currentPersistenceTime() {
-        return Instant.now().truncatedTo(ChronoUnit.MICROS);
+        return Instant.now(clock).truncatedTo(ChronoUnit.MICROS);
     }
 }
