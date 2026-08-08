@@ -31,18 +31,18 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
-class RecurrenceEventCommandServiceTest {
+class RecurrenceEventApplicationServiceTest {
 
     @Mock
     private RecurrenceEventRepository recurrenceEventRepository;
@@ -65,8 +65,28 @@ class RecurrenceEventCommandServiceTest {
     @Mock
     private Clock clock;
 
-    @InjectMocks
-    private RecurrenceEventCommandService recurrenceEventCommandService;
+    private RecurrenceEventApplicationService recurrenceEventApplicationService;
+
+    @BeforeEach
+    void setUp() {
+        RecurrenceEventQueryService queryService = new RecurrenceEventQueryService(
+                recurrenceEventRepository,
+                recurrenceEventOverrideRepository
+        );
+        RecurrenceEventCommandService commandService = new RecurrenceEventCommandService(
+                recurrenceEventRepository,
+                eventRepository,
+                recurrenceEventOverrideRepository
+        );
+        recurrenceEventApplicationService = new RecurrenceEventApplicationService(
+                queryService,
+                commandService,
+                accountRepository,
+                tagService,
+                recurrenceEngine,
+                clock
+        );
+    }
 
     @Test
     @DisplayName("반복 일정 생성은 정규화된 RFC line과 canonical schedule만 저장하고 Event row를 만들지 않는다")
@@ -84,7 +104,7 @@ class RecurrenceEventCommandServiceTest {
         CreateRecurrenceEventRequest request = timedCreateRequest();
 
         // when
-        recurrenceEventCommandService.createRecurrenceEvent(1L, request);
+        recurrenceEventApplicationService.createRecurrenceEvent(1L, request);
 
         // then
         ArgumentCaptor<RecurrenceEvent> captor = ArgumentCaptor.forClass(RecurrenceEvent.class);
@@ -121,7 +141,7 @@ class RecurrenceEventCommandServiceTest {
         );
 
         // when
-        recurrenceEventCommandService.updateRecurrenceEvent(1L, 10L, request);
+        recurrenceEventApplicationService.updateRecurrenceEvent(1L, 10L, request);
 
         // then
         assertThat(recurrenceEvent.getTitle()).isEqualTo("Updated");
@@ -140,7 +160,7 @@ class RecurrenceEventCommandServiceTest {
                 .thenReturn(Optional.of(recurrenceEvent));
 
         // when
-        recurrenceEventCommandService.deleteRecurrenceEvent(1L, 10L);
+        recurrenceEventApplicationService.deleteRecurrenceEvent(1L, 10L);
 
         // then
         InOrder deletionOrder = inOrder(
@@ -177,7 +197,7 @@ class RecurrenceEventCommandServiceTest {
         );
 
         // when
-        EventResponse response = recurrenceEventCommandService.updateRecurrenceOccurrence(1L, 10L, request);
+        EventResponse response = recurrenceEventApplicationService.updateRecurrenceOccurrence(1L, 10L, request);
 
         // then
         ArgumentCaptor<RecurrenceEventOverride> captor = ArgumentCaptor.forClass(RecurrenceEventOverride.class);
@@ -237,7 +257,7 @@ class RecurrenceEventCommandServiceTest {
         );
 
         // when
-        recurrenceEventCommandService.updateRecurrenceOccurrence(1L, 10L, request);
+        recurrenceEventApplicationService.updateRecurrenceOccurrence(1L, 10L, request);
 
         // then
         verify(recurrenceEngine, never()).containsOrigin(any(), any(), any());
@@ -277,7 +297,7 @@ class RecurrenceEventCommandServiceTest {
         when(clock.instant()).thenReturn(deletedAt);
 
         // when
-        recurrenceEventCommandService.deleteRecurrenceOccurrence(1L, 10L, originStartAt);
+        recurrenceEventApplicationService.deleteRecurrenceOccurrence(1L, 10L, originStartAt);
 
         // then
         verify(recurrenceEngine, never()).containsOrigin(any(), any(), any());
@@ -300,7 +320,9 @@ class RecurrenceEventCommandServiceTest {
         when(recurrenceEngine.containsOrigin(any(), any(), any())).thenReturn(false);
 
         // when, then
-        assertThatThrownBy(() -> recurrenceEventCommandService.deleteRecurrenceOccurrence(1L, 10L, originStartAt))
+        assertThatThrownBy(() ->
+                recurrenceEventApplicationService.deleteRecurrenceOccurrence(1L, 10L, originStartAt)
+        )
                 .isInstanceOf(CalioException.class)
                 .extracting(exception -> ((CalioException) exception).getErrorCode())
                 .isEqualTo(ErrorCode.RECURRENCE_OCCURRENCE_NOT_FOUND);

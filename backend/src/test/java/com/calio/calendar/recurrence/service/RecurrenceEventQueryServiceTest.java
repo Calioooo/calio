@@ -10,6 +10,7 @@ import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.recurrence.controller.dto.RecurrenceEventResponse;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
+import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.domain.TagType;
@@ -29,6 +30,9 @@ class RecurrenceEventQueryServiceTest {
 
     @Mock
     private RecurrenceEventRepository recurrenceEventRepository;
+
+    @Mock
+    private RecurrenceEventOverrideRepository recurrenceEventOverrideRepository;
 
     @InjectMocks
     private RecurrenceEventQueryService recurrenceEventQueryService;
