@@ -46,7 +46,7 @@ public class TaskService {
                 Sort.by(Sort.Direction.ASC, "taskId")
         );
 
-        return taskRepository.findByCompletedFalseAndAccount_Id(accountId, pageRequest)
+        return taskRepository.findByAccount_IdAndCompletedFalse(accountId, pageRequest)
                 .getContent()
                 .stream()
                 .map(TaskResponse::from)
@@ -82,8 +82,8 @@ public class TaskService {
     }
 
     @Transactional
-    public int deleteCompletedTasksOlderThan(Instant cutoff) {
-        return taskRepository.deleteCompletedTasksOlderThan(cutoff);
+    public int deleteCompletedTasksBefore(Instant cutoff) {
+        return taskRepository.deleteCompletedTasksBefore(cutoff);
     }
 
     private Task getTask(Long accountId, Long taskId) {

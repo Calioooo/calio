@@ -52,7 +52,7 @@ class TaskServiceTest {
         Task activeTask = taskRepository.saveAndFlush(new Task("Active task", account));
 
         // when
-        int deletedCount = taskService.deleteCompletedTasksOlderThan(now.minus(30, ChronoUnit.DAYS));
+        int deletedCount = taskService.deleteCompletedTasksBefore(now.minus(30, ChronoUnit.DAYS));
 
         // then
         assertThat(deletedCount).isEqualTo(1);
