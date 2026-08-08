@@ -33,6 +33,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -91,20 +92,25 @@ class GoogleCalendarEventPagePersistenceServiceTest {
     @MockitoBean
     private GoogleOperationJobPersistenceService operationJobPersistenceService;
 
+    private Account account;
+    private GoogleCalendarIntegration integration;
+
+    @BeforeEach
+    void setUp() {
+        account = accountRepository.saveAndFlush(new Account());
+        integration = integrationRepository.saveAndFlush(integration(account.getId()));
+    }
+
     @Test
     @Transactional
     @DisplayName("동일 external identity 재반영은 내부 Event를 유지하며 provider schedule만 갱신한다")
     void givenRepeatedExternalIdentity_whenPersistPages_thenUpsertsAndPreservesLocalFields() {
         // given
-        Account account = accountRepository.saveAndFlush(new Account());
         Tag fallbackTag = tagRepository.saveAndFlush(new Tag(
                 TagType.DEFAULT,
                 "기타",
                 "#64748B"
         ));
-        GoogleCalendarIntegration integration = integrationRepository.saveAndFlush(
-                integration(account.getId())
-        );
 
         acquireLease(account.getId(), "first-run");
         persistProviderPage(
@@ -152,11 +158,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
     @DisplayName("normal Event는 page timezone fallback으로 정규화한 schedule과 timezone을 저장한다")
     void givenOffsetlessTimedItemAndPageZone_whenPersistPage_thenStoresCanonicalSchedule() {
         // given
-        Account account = accountRepository.saveAndFlush(new Account());
         tagRepository.saveAndFlush(new Tag(TagType.DEFAULT, "기타", "#64748B"));
-        GoogleCalendarIntegration integration = integrationRepository.saveAndFlush(
-                integration(account.getId())
-        );
         GoogleCalendarEventItem item = new GoogleCalendarEventItem(
                 "page-zone-event",
                 "confirmed",
@@ -201,11 +203,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
     @DisplayName("Google이 허용하는 최대 1024자 event id를 손실 없이 저장한다")
     void givenMaximumLengthExternalEventId_whenPersistPage_thenStoresCompleteId() {
         // given
-        Account account = accountRepository.saveAndFlush(new Account());
         tagRepository.saveAndFlush(new Tag(TagType.DEFAULT, "기타", "#64748B"));
-        GoogleCalendarIntegration integration = integrationRepository.saveAndFlush(
-                integration(account.getId())
-        );
         String externalEventId = "a".repeat(1024);
         String googleEtag = "e".repeat(1024);
         acquireLease(account.getId(), "maximum-id-run");
@@ -234,10 +232,6 @@ class GoogleCalendarEventPagePersistenceServiceTest {
     @DisplayName("lease를 소유하지 않은 run은 page를 저장할 수 없다")
     void givenDifferentRunId_whenPersistPage_thenReturnsSyncConflict() {
         // given
-        Account account = accountRepository.saveAndFlush(new Account());
-        GoogleCalendarIntegration integration = integrationRepository.saveAndFlush(
-                integration(account.getId())
-        );
         acquireLease(account.getId(), "lease-owner");
 
         // when, then
@@ -260,10 +254,6 @@ class GoogleCalendarEventPagePersistenceServiceTest {
             String nextSyncToken
     ) {
         // given
-        Account account = accountRepository.saveAndFlush(new Account());
-        GoogleCalendarIntegration integration = integrationRepository.saveAndFlush(
-                integration(account.getId())
-        );
         acquireLease(account.getId(), "token-run");
 
         // when, then
@@ -282,11 +272,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
     @DisplayName("Google 일정의 시작 시각이 종료 시각보다 빠르지 않으면 저장하지 않는다")
     void givenInvalidGoogleEventRange_whenPersistPage_thenRejectsResponse() {
         // given
-        Account account = accountRepository.saveAndFlush(new Account());
         tagRepository.saveAndFlush(new Tag(TagType.DEFAULT, "기타", "#64748B"));
-        GoogleCalendarIntegration integration = integrationRepository.saveAndFlush(
-                integration(account.getId())
-        );
         acquireLease(account.getId(), "invalid-range-run");
         GoogleCalendarEventItem item = new GoogleCalendarEventItem(
                 "external-invalid-range",
@@ -318,11 +304,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
     @DisplayName("동일 page에 external event id가 중복되면 partial 저장 없이 invalid response로 거부한다")
     void givenDuplicateExternalEventIds_whenPersistPage_thenRejectsResponse() {
         // given
-        Account account = accountRepository.saveAndFlush(new Account());
         tagRepository.saveAndFlush(new Tag(TagType.DEFAULT, "기타", "#64748B"));
-        GoogleCalendarIntegration integration = integrationRepository.saveAndFlush(
-                integration(account.getId())
-        );
         acquireLease(account.getId(), "duplicate-run");
         GoogleCalendarEventItem item = timedItem("external-1", "Event");
         GoogleCalendarEventPage page = new GoogleCalendarEventPage(
@@ -349,11 +331,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
     @DisplayName("recurring으로 바뀐 기존 일반 mapping은 mapping-first로 Event와 함께 제거한다")
     void givenMappedItemBecomesRecurring_whenPersistPage_thenDeletesStaleProviderData() {
         // given
-        Account account = accountRepository.saveAndFlush(new Account());
         tagRepository.saveAndFlush(new Tag(TagType.DEFAULT, "기타", "#64748B"));
-        GoogleCalendarIntegration integration = integrationRepository.saveAndFlush(
-                integration(account.getId())
-        );
         acquireLease(account.getId(), "first-run");
         persistProviderPage(
                 integration.getId(),
@@ -398,11 +376,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
     @DisplayName("recurrence-event와 active/cancelled override 재처리는 하나의 aggregate로 수렴한다")
     void givenNormalizedRecurrenceReplay_whenPersistPages_thenUpsertsCanonicalAggregate() {
         // given
-        Account account = accountRepository.saveAndFlush(new Account());
         Tag defaultTag = tagRepository.saveAndFlush(new Tag(TagType.DEFAULT, "기타", "#64748B"));
-        GoogleCalendarIntegration integration = integrationRepository.saveAndFlush(
-                integration(account.getId())
-        );
         acquireLease(account.getId(), "recurrence-run");
         NormalizedEventSchedule recurrenceSchedule = new NormalizedEventSchedule(
                 Instant.parse("2026-07-01T09:00:00Z"),
@@ -510,11 +484,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
     @DisplayName("동일 override external ID가 다른 recurrence-event를 참조하면 저장하지 않는다")
     void givenOverrideExternalIdMappedToDifferentRecurrenceEvent_whenPersistPage_thenRejectsResponse() {
         // given
-        Account account = accountRepository.saveAndFlush(new Account());
         tagRepository.saveAndFlush(new Tag(TagType.DEFAULT, "기타", "#64748B"));
-        GoogleCalendarIntegration integration = integrationRepository.saveAndFlush(
-                integration(account.getId())
-        );
         acquireLease(account.getId(), "cross-parent-run");
         NormalizedEventSchedule recurrenceSchedule = new NormalizedEventSchedule(
                 Instant.parse("2026-07-01T09:00:00Z"),
@@ -583,11 +553,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
     @DisplayName("같은 page에서 override보다 먼저 온 recurrence-event cancellation도 aggregate를 삭제한다")
     void givenCancellationBeforeOverride_whenPersistPage_thenDeletesRecurrenceAggregate() {
         // given
-        Account account = accountRepository.saveAndFlush(new Account());
         tagRepository.saveAndFlush(new Tag(TagType.DEFAULT, "기타", "#64748B"));
-        GoogleCalendarIntegration integration = integrationRepository.saveAndFlush(
-                integration(account.getId())
-        );
         acquireLease(account.getId(), "recurrence-cancellation-run");
         RecurrenceEventUpsert recurrenceEvent = new RecurrenceEventUpsert(
                 "recurrence-event-1",
@@ -666,12 +632,8 @@ class GoogleCalendarEventPagePersistenceServiceTest {
     @DisplayName("FULL reconciliation은 unseen provider aggregate를 batch로 삭제하고 sync를 완료한다")
     void givenUnseenProviderData_whenFinalizeFullSync_thenDeletesInBatches() {
         // given
-        Account account = accountRepository.saveAndFlush(new Account());
         Tag defaultTag = tagRepository.saveAndFlush(
                 new Tag(TagType.DEFAULT, "기타", "#64748B")
-        );
-        GoogleCalendarIntegration integration = integrationRepository.saveAndFlush(
-                integration(account.getId())
         );
         acquireLease(account.getId(), "full-reconciliation-run");
         NormalizedEventSchedule eventSchedule = new NormalizedEventSchedule(
@@ -779,11 +741,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
     @DisplayName("blank title의 all-day import는 canonical title을 사용하고 cancelled delta로 hard delete된다")
     void givenBlankAllDayItemThenCancellation_whenPersistPages_thenImportsAndHardDeletesIdempotently() {
         // given
-        Account account = accountRepository.saveAndFlush(new Account());
         tagRepository.saveAndFlush(new Tag(TagType.DEFAULT, "기타", "#64748B"));
-        GoogleCalendarIntegration integration = integrationRepository.saveAndFlush(
-                integration(account.getId())
-        );
         acquireLease(account.getId(), "first-run");
         persistProviderPage(
                 integration.getId(),
