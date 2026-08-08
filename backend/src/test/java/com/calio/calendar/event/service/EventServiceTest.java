@@ -35,7 +35,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
-class EventApplicationServiceTest {
+class EventServiceTest {
 
     @Mock
     private EventQueryService eventQueryService;
@@ -50,7 +50,7 @@ class EventApplicationServiceTest {
     private TagService tagService;
 
     @InjectMocks
-    private EventApplicationService eventApplicationService;
+    private EventService eventService;
 
     @Test
     @DisplayName("일정 생성은 canonical schedule 검증 후 계정과 태그를 결합한 Event를 저장한다")
@@ -76,7 +76,7 @@ class EventApplicationServiceTest {
         });
 
         // when
-        EventResponse response = eventApplicationService.createEvent(1L, request);
+        EventResponse response = eventService.createEvent(1L, request);
 
         // then
         ArgumentCaptor<Event> eventCaptor = ArgumentCaptor.forClass(Event.class);
@@ -128,7 +128,7 @@ class EventApplicationServiceTest {
         }).when(eventCommandService).updateEvent(any(), any(), any(), any());
 
         // when
-        EventResponse response = eventApplicationService.updateEvent(1L, 10L, request);
+        EventResponse response = eventService.updateEvent(1L, 10L, request);
 
         // then
         InOrder order = inOrder(eventQueryService, tagService, eventCommandService);
@@ -159,7 +159,7 @@ class EventApplicationServiceTest {
         );
 
         // when, then
-        assertThatThrownBy(() -> eventApplicationService.updateEvent(1L, 10L, request))
+        assertThatThrownBy(() -> eventService.updateEvent(1L, 10L, request))
                 .isInstanceOfSatisfying(CalioException.class, exception ->
                         assertThat(exception.getErrorCode())
                                 .isEqualTo(ErrorCode.EXTERNAL_EVENT_MUTATION_NOT_SUPPORTED)
@@ -178,7 +178,7 @@ class EventApplicationServiceTest {
         when(eventQueryService.hasExternalEventMapping(1L, 10L)).thenReturn(true);
 
         // when, then
-        assertThatThrownBy(() -> eventApplicationService.deleteEvent(1L, 10L))
+        assertThatThrownBy(() -> eventService.deleteEvent(1L, 10L))
                 .isInstanceOfSatisfying(CalioException.class, exception ->
                         assertThat(exception.getErrorCode())
                                 .isEqualTo(ErrorCode.EXTERNAL_EVENT_MUTATION_NOT_SUPPORTED)
@@ -199,7 +199,7 @@ class EventApplicationServiceTest {
         }).when(eventCommandService).updateImportantEvent(event, true);
 
         // when
-        EventResponse response = eventApplicationService.updateImportantEvent(
+        EventResponse response = eventService.updateImportantEvent(
                 1L,
                 10L,
                 new UpdateImportantEventRequest(true)

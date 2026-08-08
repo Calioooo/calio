@@ -19,14 +19,14 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Transactional(readOnly = true)
-public class EventApplicationService {
+public class EventService {
 
     private final EventQueryService eventQueryService;
     private final EventCommandService eventCommandService;
     private final AccountRepository accountRepository;
     private final TagService tagService;
 
-    public EventApplicationService(
+    public EventService(
             EventQueryService eventQueryService,
             EventCommandService eventCommandService,
             AccountRepository accountRepository,

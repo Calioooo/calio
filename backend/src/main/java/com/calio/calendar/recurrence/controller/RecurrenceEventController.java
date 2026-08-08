@@ -5,7 +5,7 @@ import com.calio.calendar.recurrence.controller.dto.CreateRecurrenceEventRequest
 import com.calio.calendar.recurrence.controller.dto.RecurrenceEventResponse;
 import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceEventRequest;
 import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceOccurrenceRequest;
-import com.calio.calendar.recurrence.service.RecurrenceEventApplicationService;
+import com.calio.calendar.recurrence.service.RecurrenceService;
 import com.calio.calendar.security.AuthenticatedAccount;
 import jakarta.validation.Valid;
 import java.time.Instant;
@@ -30,10 +30,10 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/recurrence-events")
 public class RecurrenceEventController {
 
-    private final RecurrenceEventApplicationService recurrenceEventApplicationService;
+    private final RecurrenceService recurrenceService;
 
-    public RecurrenceEventController(RecurrenceEventApplicationService recurrenceEventApplicationService) {
-        this.recurrenceEventApplicationService = recurrenceEventApplicationService;
+    public RecurrenceEventController(RecurrenceService recurrenceService) {
+        this.recurrenceService = recurrenceService;
     }
 
     @PostMapping
@@ -41,7 +41,7 @@ public class RecurrenceEventController {
             @AuthenticationPrincipal AuthenticatedAccount account,
             @Valid @RequestBody CreateRecurrenceEventRequest request
     ) {
-        RecurrenceEventResponse response = recurrenceEventApplicationService.createRecurrenceEvent(
+        RecurrenceEventResponse response = recurrenceService.createRecurrenceEvent(
                 account.accountId(), request
         );
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
@@ -52,7 +52,7 @@ public class RecurrenceEventController {
             @AuthenticationPrincipal AuthenticatedAccount account,
             @PathVariable("recurrenceId") Long recurrenceId
     ) {
-        return recurrenceEventApplicationService.getRecurrenceEvent(account.accountId(), recurrenceId);
+        return recurrenceService.getRecurrenceEvent(account.accountId(), recurrenceId);
     }
 
     @DeleteMapping("/{recurrenceId}")
@@ -60,7 +60,7 @@ public class RecurrenceEventController {
             @AuthenticationPrincipal AuthenticatedAccount account,
             @PathVariable("recurrenceId") Long recurrenceId
     ) {
-        recurrenceEventApplicationService.deleteRecurrenceEvent(account.accountId(), recurrenceId);
+        recurrenceService.deleteRecurrenceEvent(account.accountId(), recurrenceId);
         return ResponseEntity.noContent().build();
     }
 
@@ -70,7 +70,7 @@ public class RecurrenceEventController {
             @PathVariable("recurrenceId") Long recurrenceId,
             @Valid @RequestBody UpdateRecurrenceEventRequest request
     ) {
-        return recurrenceEventApplicationService.updateRecurrenceEvent(account.accountId(), recurrenceId, request);
+        return recurrenceService.updateRecurrenceEvent(account.accountId(), recurrenceId, request);
     }
 
     @PatchMapping("/{recurrenceId}/occurrences")
@@ -79,7 +79,7 @@ public class RecurrenceEventController {
             @PathVariable("recurrenceId") Long recurrenceId,
             @Valid @RequestBody UpdateRecurrenceOccurrenceRequest request
     ) {
-        return recurrenceEventApplicationService.updateRecurrenceOccurrence(account.accountId(), recurrenceId, request);
+        return recurrenceService.updateRecurrenceOccurrence(account.accountId(), recurrenceId, request);
     }
 
     @DeleteMapping("/{recurrenceId}/occurrences")
@@ -88,7 +88,7 @@ public class RecurrenceEventController {
             @PathVariable("recurrenceId") Long recurrenceId,
             @RequestParam("originStartAt") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant originStartAt
     ) {
-        recurrenceEventApplicationService.deleteRecurrenceOccurrence(account.accountId(), recurrenceId, originStartAt);
+        recurrenceService.deleteRecurrenceOccurrence(account.accountId(), recurrenceId, originStartAt);
         return ResponseEntity.noContent().build();
     }
 }

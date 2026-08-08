@@ -24,7 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Transactional(readOnly = true)
-public class RecurrenceEventApplicationService {
+public class RecurrenceService {
 
     private final RecurrenceEventQueryService recurrenceEventQueryService;
     private final RecurrenceEventCommandService recurrenceEventCommandService;
@@ -33,7 +33,7 @@ public class RecurrenceEventApplicationService {
     private final Rfc5545RecurrenceEngine recurrenceEngine;
     private final Clock clock;
 
-    public RecurrenceEventApplicationService(
+    public RecurrenceService(
             RecurrenceEventQueryService recurrenceEventQueryService,
             RecurrenceEventCommandService recurrenceEventCommandService,
             AccountRepository accountRepository,

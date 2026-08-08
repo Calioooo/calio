@@ -42,7 +42,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
-class RecurrenceEventApplicationServiceTest {
+class RecurrenceServiceTest {
 
     @Mock
     private RecurrenceEventRepository recurrenceEventRepository;
@@ -65,7 +65,7 @@ class RecurrenceEventApplicationServiceTest {
     @Mock
     private Clock clock;
 
-    private RecurrenceEventApplicationService recurrenceEventApplicationService;
+    private RecurrenceService recurrenceService;
 
     @BeforeEach
     void setUp() {
@@ -78,7 +78,7 @@ class RecurrenceEventApplicationServiceTest {
                 eventRepository,
                 recurrenceEventOverrideRepository
         );
-        recurrenceEventApplicationService = new RecurrenceEventApplicationService(
+        recurrenceService = new RecurrenceService(
                 queryService,
                 commandService,
                 accountRepository,
@@ -104,7 +104,7 @@ class RecurrenceEventApplicationServiceTest {
         CreateRecurrenceEventRequest request = timedCreateRequest();
 
         // when
-        recurrenceEventApplicationService.createRecurrenceEvent(1L, request);
+        recurrenceService.createRecurrenceEvent(1L, request);
 
         // then
         ArgumentCaptor<RecurrenceEvent> captor = ArgumentCaptor.forClass(RecurrenceEvent.class);
@@ -141,7 +141,7 @@ class RecurrenceEventApplicationServiceTest {
         );
 
         // when
-        recurrenceEventApplicationService.updateRecurrenceEvent(1L, 10L, request);
+        recurrenceService.updateRecurrenceEvent(1L, 10L, request);
 
         // then
         assertThat(recurrenceEvent.getTitle()).isEqualTo("Updated");
@@ -160,7 +160,7 @@ class RecurrenceEventApplicationServiceTest {
                 .thenReturn(Optional.of(recurrenceEvent));
 
         // when
-        recurrenceEventApplicationService.deleteRecurrenceEvent(1L, 10L);
+        recurrenceService.deleteRecurrenceEvent(1L, 10L);
 
         // then
         InOrder deletionOrder = inOrder(
@@ -197,7 +197,7 @@ class RecurrenceEventApplicationServiceTest {
         );
 
         // when
-        EventResponse response = recurrenceEventApplicationService.updateRecurrenceOccurrence(1L, 10L, request);
+        EventResponse response = recurrenceService.updateRecurrenceOccurrence(1L, 10L, request);
 
         // then
         ArgumentCaptor<RecurrenceEventOverride> captor = ArgumentCaptor.forClass(RecurrenceEventOverride.class);
@@ -257,7 +257,7 @@ class RecurrenceEventApplicationServiceTest {
         );
 
         // when
-        recurrenceEventApplicationService.updateRecurrenceOccurrence(1L, 10L, request);
+        recurrenceService.updateRecurrenceOccurrence(1L, 10L, request);
 
         // then
         verify(recurrenceEngine, never()).containsOrigin(any(), any(), any());
@@ -297,7 +297,7 @@ class RecurrenceEventApplicationServiceTest {
         when(clock.instant()).thenReturn(deletedAt);
 
         // when
-        recurrenceEventApplicationService.deleteRecurrenceOccurrence(1L, 10L, originStartAt);
+        recurrenceService.deleteRecurrenceOccurrence(1L, 10L, originStartAt);
 
         // then
         verify(recurrenceEngine, never()).containsOrigin(any(), any(), any());
@@ -321,7 +321,7 @@ class RecurrenceEventApplicationServiceTest {
 
         // when, then
         assertThatThrownBy(() ->
-                recurrenceEventApplicationService.deleteRecurrenceOccurrence(1L, 10L, originStartAt)
+                recurrenceService.deleteRecurrenceOccurrence(1L, 10L, originStartAt)
         )
                 .isInstanceOf(CalioException.class)
                 .extracting(exception -> ((CalioException) exception).getErrorCode())
