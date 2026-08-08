@@ -1,6 +1,6 @@
 package com.calio.calendar.holiday.scheduler;
 
-import com.calio.calendar.holiday.config.HolidayApiProperties;
+import com.calio.calendar.holiday.client.HolidayApiProperties;
 import com.calio.calendar.holiday.service.NationalHolidaySyncService;
 import java.time.Clock;
 import java.time.LocalDate;

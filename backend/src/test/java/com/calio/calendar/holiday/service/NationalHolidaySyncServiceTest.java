@@ -3,9 +3,9 @@ package com.calio.calendar.holiday.service;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.calio.calendar.holiday.client.HolidayApiClient;
+import com.calio.calendar.holiday.client.HolidayApiProperties;
 import com.calio.calendar.holiday.client.dto.HolidayApiItem;
 import com.calio.calendar.holiday.client.dto.HolidayApiResponse;
-import com.calio.calendar.holiday.config.HolidayApiProperties;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.holiday.repository.NationalHolidayRepository;

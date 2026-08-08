@@ -3,8 +3,8 @@ package com.calio.calendar.holiday.scheduler;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.calio.calendar.holiday.client.HolidayApiClient;
+import com.calio.calendar.holiday.client.HolidayApiProperties;
 import com.calio.calendar.holiday.client.dto.HolidayApiResponse;
-import com.calio.calendar.holiday.config.HolidayApiProperties;
 import com.calio.calendar.holiday.repository.NationalHolidayRepository;
 import com.calio.calendar.holiday.service.NationalHolidayPersistenceService;
 import com.calio.calendar.holiday.service.NationalHolidaySyncService;
@@ -103,9 +103,15 @@ class NationalHolidaySyncSchedulerTest {
     ) {
         return new NationalHolidaySyncScheduler(
                 syncService,
-                new FakeHolidayApiProperties(hasServiceKey),
+                holidayApiProperties(hasServiceKey),
                 Clock.fixed(Instant.parse(instant), ZoneId.of("Asia/Seoul"))
         );
+    }
+
+    private HolidayApiProperties holidayApiProperties(boolean hasServiceKey) {
+        HolidayApiProperties properties = new HolidayApiProperties();
+        properties.setServiceKey(hasServiceKey ? "test-service-key" : "");
+        return properties;
     }
 
     private static class FakeNationalHolidaySyncService extends NationalHolidaySyncService {
@@ -141,20 +147,6 @@ class NationalHolidaySyncSchedulerTest {
 
         private void runOnceDuringSync(Runnable callback) {
             onSync = callback;
-        }
-    }
-
-    private static class FakeHolidayApiProperties extends HolidayApiProperties {
-
-        private final boolean hasServiceKey;
-
-        private FakeHolidayApiProperties(boolean hasServiceKey) {
-            this.hasServiceKey = hasServiceKey;
-        }
-
-        @Override
-        public boolean hasServiceKey() {
-            return hasServiceKey;
         }
     }
 

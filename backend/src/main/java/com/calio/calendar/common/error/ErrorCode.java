@@ -90,6 +90,10 @@ public enum ErrorCode {
             "External event mutation is not supported."
     ),
 
+    HOLIDAY_API_CONFIGURATION_MISSING(
+            HttpStatus.INTERNAL_SERVER_ERROR,
+            "Holiday API configuration is missing."
+    ),
     EXTERNAL_API_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "External API is temporarily unavailable."),
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error.");
 
