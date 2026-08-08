@@ -86,26 +86,64 @@ public class GoogleCalendarPageNormalizer {
             }
         }
 
-        List<NormalizedItem> orderedItems = new ArrayList<>();
-        for (RecurrenceEventUpsert recurrenceEvent : fetchedRecurrenceEvents.values()) {
-            context.seeRecurrenceEvent(recurrenceEvent.externalEventId());
-            orderedItems.add(recurrenceEvent);
-        }
-        normalizedItems.stream()
-                .filter(RecurrenceEventUpsert.class::isInstance)
-                .forEach(orderedItems::add);
-        normalizedItems.stream()
-                .filter(item -> !(item instanceof RecurrenceEventUpsert))
-                .filter(item -> !(item instanceof RecurrenceEventCancellation))
-                .forEach(orderedItems::add);
-        normalizedItems.stream()
-                .filter(RecurrenceEventCancellation.class::isInstance)
-                .forEach(orderedItems::add);
+        List<NormalizedItem> orderedItems = orderForPersistence(
+                fetchedRecurrenceEvents,
+                normalizedItems,
+                context
+        );
         return new GoogleCalendarNormalizedPage(
                 orderedItems,
                 page.nextPageToken(),
                 page.nextSyncToken()
         );
+    }
+
+    private List<NormalizedItem> orderForPersistence(
+            Map<String, RecurrenceEventUpsert> fetchedRecurrenceEvents,
+            List<NormalizedItem> normalizedItems,
+            GoogleCalendarSyncRunContext context
+    ) {
+        List<NormalizedItem> orderedItems = new ArrayList<>();
+
+        // Override는 부모 recurrence-event mapping을 참조하고, series cancellation은 그 mapping을 제거한다.
+        // 따라서 parent upsert를 먼저 반영하고 series cancellation을 마지막에 반영한다.
+        for (RecurrenceEventUpsert recurrenceEvent : fetchedRecurrenceEvents.values()) {
+            context.seeRecurrenceEvent(recurrenceEvent.externalEventId());
+            orderedItems.add(recurrenceEvent);
+        }
+        appendRecurrenceEventUpserts(normalizedItems, orderedItems);
+        appendEventAndOverrideItems(normalizedItems, orderedItems);
+        appendRecurrenceEventCancellations(normalizedItems, orderedItems);
+
+        return orderedItems;
+    }
+
+    private void appendRecurrenceEventUpserts(
+            List<NormalizedItem> normalizedItems,
+            List<NormalizedItem> orderedItems
+    ) {
+        normalizedItems.stream()
+                .filter(RecurrenceEventUpsert.class::isInstance)
+                .forEach(orderedItems::add);
+    }
+
+    private void appendEventAndOverrideItems(
+            List<NormalizedItem> normalizedItems,
+            List<NormalizedItem> orderedItems
+    ) {
+        normalizedItems.stream()
+                .filter(item -> !(item instanceof RecurrenceEventUpsert))
+                .filter(item -> !(item instanceof RecurrenceEventCancellation))
+                .forEach(orderedItems::add);
+    }
+
+    private void appendRecurrenceEventCancellations(
+            List<NormalizedItem> normalizedItems,
+            List<NormalizedItem> orderedItems
+    ) {
+        normalizedItems.stream()
+                .filter(RecurrenceEventCancellation.class::isInstance)
+                .forEach(orderedItems::add);
     }
 
     private NormalizedItem normalizeItem(
