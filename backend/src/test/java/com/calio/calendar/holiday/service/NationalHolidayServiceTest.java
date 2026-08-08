@@ -158,8 +158,8 @@ class NationalHolidayServiceTest {
     }
 
     @Test
-    @DisplayName("잘못된 locdate는 provider snapshot 전체를 적용하지 않고 기존 데이터를 보존한다")
-    void givenInvalidLocdate_whenSyncYear_thenSkipsCommand() {
+    @DisplayName("잘못된 provider localDate는 snapshot 전체를 적용하지 않고 기존 데이터를 보존한다")
+    void givenInvalidProviderLocalDate_whenSyncYear_thenSkipsCommand() {
         // given
         given(holidayApiClient.fetchHolidays(2026)).willReturn(new HolidayApiResponse(
                 "00",

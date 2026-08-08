@@ -100,7 +100,7 @@ public class NationalHolidayService {
 
     private NationalHolidayProviderRow toHolidayRow(HolidayApiItem item) {
         return new NationalHolidayProviderRow(
-                LocalDate.parse(item.locdate(), PROVIDER_DATE_FORMAT),
+                LocalDate.parse(item.localDate(), PROVIDER_DATE_FORMAT),
                 item.dateName()
         );
     }
