@@ -5,6 +5,7 @@ import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.event.controller.dto.EventResponse;
 import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.event.repository.EventRepository;
+import com.calio.calendar.integration.repository.GoogleCalendarEventMappingRepository;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceOccurrence;
@@ -23,10 +24,8 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@Transactional(readOnly = true)
 public class EventQueryService {
 
     private static final Duration MAX_EVENT_QUERY_RANGE = Duration.ofDays(366);
@@ -35,21 +34,30 @@ public class EventQueryService {
     private final RecurrenceEventRepository recurrenceEventRepository;
     private final RecurrenceEventOverrideRepository recurrenceEventOverrideRepository;
     private final Rfc5545RecurrenceEngine recurrenceEngine;
+    private final GoogleCalendarEventMappingRepository googleCalendarEventMappingRepository;
 
     public EventQueryService(
             EventRepository eventRepository,
             RecurrenceEventRepository recurrenceEventRepository,
             RecurrenceEventOverrideRepository recurrenceEventOverrideRepository,
-            Rfc5545RecurrenceEngine recurrenceEngine
+            Rfc5545RecurrenceEngine recurrenceEngine,
+            GoogleCalendarEventMappingRepository googleCalendarEventMappingRepository
     ) {
         this.eventRepository = eventRepository;
         this.recurrenceEventRepository = recurrenceEventRepository;
         this.recurrenceEventOverrideRepository = recurrenceEventOverrideRepository;
         this.recurrenceEngine = recurrenceEngine;
+        this.googleCalendarEventMappingRepository = googleCalendarEventMappingRepository;
     }
 
-    public EventResponse getEvent(Long accountId, Long eventId) {
-        return EventResponse.from(findEvent(accountId, eventId));
+    public Event findEvent(Long accountId, Long eventId) {
+        return eventRepository.findByIdAndAccount_Id(eventId, accountId)
+                .orElseThrow(() -> new CalioException(ErrorCode.EVENT_NOT_FOUND));
+    }
+
+    public boolean hasExternalEventMapping(Long accountId, Long eventId) {
+        return googleCalendarEventMappingRepository
+                .existsByEvent_IdAndIntegration_AccountId(eventId, accountId);
     }
 
     public List<EventResponse> listEvents(Long accountId, Instant from, Instant to) {
@@ -145,11 +153,6 @@ public class EventQueryService {
 
     private boolean overlaps(EventResponse response, Instant from, Instant to) {
         return response.startAt().isBefore(to) && response.endAt().isAfter(from);
-    }
-
-    private Event findEvent(Long accountId, Long eventId) {
-        return eventRepository.findByIdAndAccount_Id(eventId, accountId)
-                .orElseThrow(() -> new CalioException(ErrorCode.EVENT_NOT_FOUND));
     }
 
     private void validateListTimeRange(Instant from, Instant to) {
