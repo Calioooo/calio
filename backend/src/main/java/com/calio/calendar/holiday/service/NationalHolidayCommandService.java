@@ -1,7 +1,7 @@
 package com.calio.calendar.holiday.service;
 
-import com.calio.calendar.holiday.repository.NationalHolidayRepository;
 import com.calio.calendar.holiday.domain.NationalHoliday;
+import com.calio.calendar.holiday.repository.NationalHolidayRepository;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
@@ -14,14 +14,14 @@ import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
-public class NationalHolidayPersistenceService {
+public class NationalHolidayCommandService {
 
-    private static final Logger log = LoggerFactory.getLogger(NationalHolidayPersistenceService.class);
+    private static final Logger log = LoggerFactory.getLogger(NationalHolidayCommandService.class);
 
     private final NationalHolidayRepository nationalHolidayRepository;
     private final TransactionTemplate transactionTemplate;
 
-    public NationalHolidayPersistenceService(
+    public NationalHolidayCommandService(
             NationalHolidayRepository nationalHolidayRepository,
             PlatformTransactionManager transactionManager
     ) {

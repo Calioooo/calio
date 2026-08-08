@@ -6,7 +6,7 @@ import com.calio.calendar.holiday.client.HolidayApiClient;
 import com.calio.calendar.holiday.client.HolidayApiProperties;
 import com.calio.calendar.holiday.client.dto.HolidayApiResponse;
 import com.calio.calendar.holiday.repository.NationalHolidayRepository;
-import com.calio.calendar.holiday.service.NationalHolidayPersistenceService;
+import com.calio.calendar.holiday.service.NationalHolidayCommandService;
 import com.calio.calendar.holiday.service.NationalHolidaySyncService;
 import java.lang.reflect.Proxy;
 import java.time.Clock;
@@ -122,7 +122,7 @@ class NationalHolidaySyncSchedulerTest {
         private FakeNationalHolidaySyncService() {
             super(
                     new FakeHolidayApiClient(),
-                    new NationalHolidayPersistenceService(
+                    new NationalHolidayCommandService(
                             fakeRepository(),
                             new NoOpTransactionManager()
                     )

@@ -20,14 +20,14 @@ public class NationalHolidaySyncService {
     private static final DateTimeFormatter PROVIDER_DATE_FORMAT = DateTimeFormatter.BASIC_ISO_DATE;
 
     private final HolidayApiClient holidayApiClient;
-    private final NationalHolidayPersistenceService nationalHolidayPersistenceService;
+    private final NationalHolidayCommandService nationalHolidayCommandService;
 
     public NationalHolidaySyncService(
             HolidayApiClient holidayApiClient,
-            NationalHolidayPersistenceService nationalHolidayPersistenceService
+            NationalHolidayCommandService nationalHolidayCommandService
     ) {
         this.holidayApiClient = holidayApiClient;
-        this.nationalHolidayPersistenceService = nationalHolidayPersistenceService;
+        this.nationalHolidayCommandService = nationalHolidayCommandService;
     }
 
     public void syncYearRange(int startYear, int endYear) {
@@ -51,7 +51,7 @@ public class NationalHolidaySyncService {
                 return;
             }
 
-            nationalHolidayPersistenceService.applySnapshot(year, providerRows);
+            nationalHolidayCommandService.applySnapshot(year, providerRows);
         } catch (Exception exception) {
             log.warn(
                     "National holiday sync failed. year={} resultCode={} errorCode={} message={}",
