@@ -822,7 +822,11 @@ class GoogleCalendarEventPagePersistenceServiceTest {
     }
 
     private void acquireLease(Long accountId, String runId) {
-        assertThat(integrationRepository.acquireSyncLease(accountId, runId)).isOne();
+        assertThat(integrationRepository.acquireSyncLease(
+                accountId,
+                runId,
+                300L
+        )).isOne();
     }
 
     private void persistProviderPage(

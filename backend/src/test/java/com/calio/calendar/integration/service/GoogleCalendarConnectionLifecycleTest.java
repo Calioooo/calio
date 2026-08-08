@@ -201,21 +201,33 @@ class GoogleCalendarConnectionLifecycleTest {
 
     private void preparePreviousSyncState(Long accountId, Long integrationId) {
         new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
-            assertThat(integrationRepository.acquireSyncLease(accountId, "cursor-run"))
+            assertThat(integrationRepository.acquireSyncLease(
+                    accountId,
+                    "cursor-run",
+                    300L
+            ))
                     .isOne();
             assertThat(integrationRepository.finalizeSync(
                     integrationId,
                     "cursor-run",
                     "saved-cursor"
             )).isOne();
-            assertThat(integrationRepository.acquireSyncLease(accountId, "old-run"))
+            assertThat(integrationRepository.acquireSyncLease(
+                    accountId,
+                    "old-run",
+                    300L
+            ))
                     .isOne();
         });
     }
 
     private void assertPreviousLeaseInvalid(Long integrationId) {
         new TransactionTemplate(transactionManager).executeWithoutResult(status ->
-                assertThat(integrationRepository.extendSyncLease(integrationId, "old-run"))
+                assertThat(integrationRepository.extendSyncLease(
+                        integrationId,
+                        "old-run",
+                        300L
+                ))
                         .isZero());
     }
 

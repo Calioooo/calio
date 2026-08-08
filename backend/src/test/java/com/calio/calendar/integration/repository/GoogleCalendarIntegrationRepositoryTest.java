@@ -23,6 +23,8 @@ import org.springframework.transaction.annotation.Transactional;
 })
 class GoogleCalendarIntegrationRepositoryTest {
 
+    private static final long SYNC_LEASE_DURATION_SECONDS = 300L;
+
     @Autowired
     private AccountRepository accountRepository;
 
@@ -72,11 +74,13 @@ class GoogleCalendarIntegrationRepositoryTest {
         // when, then
         assertThat(googleCalendarIntegrationRepository.acquireSyncLease(
                 account.getId(),
-                "first-run"
+                "first-run",
+                SYNC_LEASE_DURATION_SECONDS
         )).isOne();
         assertThat(googleCalendarIntegrationRepository.acquireSyncLease(
                 account.getId(),
-                "second-run"
+                "second-run",
+                SYNC_LEASE_DURATION_SECONDS
         )).isZero();
         assertThat(googleCalendarIntegrationRepository.releaseSyncLease(
                 integration.getId(),
