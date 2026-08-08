@@ -4,7 +4,7 @@ import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.external.google.GoogleCalendarEventsClient;
 import com.calio.calendar.external.google.GoogleCalendarUnauthorizedException;
-import com.calio.calendar.external.google.dto.GoogleCalendarEventItem;
+import com.calio.calendar.external.google.dto.GoogleCalendarEventResponse;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventPage;
 import com.calio.calendar.integration.domain.GoogleCalendarSyncMode;
 import java.util.Optional;
@@ -43,7 +43,7 @@ public class GoogleCalendarEventRequestService {
         }
     }
 
-    public Optional<GoogleCalendarEventItem> getEvent(
+    public Optional<GoogleCalendarEventResponse> getEvent(
             Long integrationId,
             String externalEventId,
             GoogleCalendarSyncRunContext context

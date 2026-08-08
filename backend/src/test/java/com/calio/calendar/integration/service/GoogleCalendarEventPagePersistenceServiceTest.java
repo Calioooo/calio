@@ -9,9 +9,9 @@ import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.event.repository.EventRepository;
-import com.calio.calendar.external.google.dto.GoogleCalendarEventItem;
+import com.calio.calendar.external.google.dto.GoogleCalendarEventResponse;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventPage;
-import com.calio.calendar.external.google.dto.GoogleCalendarEventTime;
+import com.calio.calendar.external.google.dto.GoogleCalendarEventTimeResponse;
 import com.calio.calendar.external.google.service.dto.NormalizedEventSchedule;
 import com.calio.calendar.integration.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.domain.GoogleCalendarIntegration;
@@ -159,7 +159,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
     void givenOffsetlessTimedItemAndPageZone_whenPersistPage_thenStoresCanonicalSchedule() {
         // given
         tagRepository.saveAndFlush(new Tag(TagType.DEFAULT, "기타", "#64748B"));
-        GoogleCalendarEventItem item = new GoogleCalendarEventItem(
+        GoogleCalendarEventResponse item = new GoogleCalendarEventResponse(
                 "page-zone-event",
                 "confirmed",
                 null,
@@ -168,8 +168,8 @@ class GoogleCalendarEventPagePersistenceServiceTest {
                 null,
                 List.of(),
                 null,
-                new GoogleCalendarEventTime(null, "2026-07-01T09:00:00", null),
-                new GoogleCalendarEventTime(null, "2026-07-01T10:00:00", null)
+                new GoogleCalendarEventTimeResponse(null, "2026-07-01T09:00:00", null),
+                new GoogleCalendarEventTimeResponse(null, "2026-07-01T10:00:00", null)
         );
         acquireLease(account.getId(), "page-zone-run");
 
@@ -274,7 +274,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
         // given
         tagRepository.saveAndFlush(new Tag(TagType.DEFAULT, "기타", "#64748B"));
         acquireLease(account.getId(), "invalid-range-run");
-        GoogleCalendarEventItem item = new GoogleCalendarEventItem(
+        GoogleCalendarEventResponse item = new GoogleCalendarEventResponse(
                 "external-invalid-range",
                 "confirmed",
                 null,
@@ -283,8 +283,8 @@ class GoogleCalendarEventPagePersistenceServiceTest {
                 null,
                 List.of(),
                 null,
-                new GoogleCalendarEventTime(null, "2026-07-01T10:00:00Z", "UTC"),
-                new GoogleCalendarEventTime(null, "2026-07-01T10:00:00Z", "UTC")
+                new GoogleCalendarEventTimeResponse(null, "2026-07-01T10:00:00Z", "UTC"),
+                new GoogleCalendarEventTimeResponse(null, "2026-07-01T10:00:00Z", "UTC")
         );
 
         // when, then
@@ -306,7 +306,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
         // given
         tagRepository.saveAndFlush(new Tag(TagType.DEFAULT, "기타", "#64748B"));
         acquireLease(account.getId(), "duplicate-run");
-        GoogleCalendarEventItem item = timedItem("external-1", "Event");
+        GoogleCalendarEventResponse item = timedItem("external-1", "Event");
         GoogleCalendarEventPage page = new GoogleCalendarEventPage(
                 List.of(item, item),
                 null,
@@ -342,7 +342,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
 
         // when
         acquireLease(account.getId(), "second-run");
-        GoogleCalendarEventItem recurringItem = new GoogleCalendarEventItem(
+        GoogleCalendarEventResponse recurringItem = new GoogleCalendarEventResponse(
                 "external-1",
                 "confirmed",
                 null,
@@ -822,22 +822,22 @@ class GoogleCalendarEventPagePersistenceServiceTest {
     }
 
     private GoogleCalendarEventPage page(
-            GoogleCalendarEventItem item,
+            GoogleCalendarEventResponse item,
             String nextSyncToken
     ) {
         return new GoogleCalendarEventPage(List.of(item), null, nextSyncToken, "UTC");
     }
 
-    private GoogleCalendarEventItem timedItem(String id, String summary) {
+    private GoogleCalendarEventResponse timedItem(String id, String summary) {
         return timedItem(id, summary, "\"etag-1\"");
     }
 
-    private GoogleCalendarEventItem timedItem(
+    private GoogleCalendarEventResponse timedItem(
             String id,
             String summary,
             String googleEtag
     ) {
-        return new GoogleCalendarEventItem(
+        return new GoogleCalendarEventResponse(
                 id,
                 "confirmed",
                 googleEtag,
@@ -851,8 +851,8 @@ class GoogleCalendarEventPagePersistenceServiceTest {
         );
     }
 
-    private GoogleCalendarEventItem allDayItem(String id, String summary) {
-        return new GoogleCalendarEventItem(
+    private GoogleCalendarEventResponse allDayItem(String id, String summary) {
+        return new GoogleCalendarEventResponse(
                 id,
                 "confirmed",
                 "\"etag-2\"",
@@ -861,13 +861,13 @@ class GoogleCalendarEventPagePersistenceServiceTest {
                 "Changed description",
                 List.of(),
                 null,
-                new GoogleCalendarEventTime("2026-07-03", null, null),
-                new GoogleCalendarEventTime("2026-07-05", null, null)
+                new GoogleCalendarEventTimeResponse("2026-07-03", null, null),
+                new GoogleCalendarEventTimeResponse("2026-07-05", null, null)
         );
     }
 
-    private GoogleCalendarEventItem cancelledItem(String id) {
-        return new GoogleCalendarEventItem(
+    private GoogleCalendarEventResponse cancelledItem(String id) {
+        return new GoogleCalendarEventResponse(
                 id,
                 "cancelled",
                 null,
@@ -881,11 +881,11 @@ class GoogleCalendarEventPagePersistenceServiceTest {
         );
     }
 
-    private GoogleCalendarEventItem deletedRecurrenceOccurrence(
+    private GoogleCalendarEventResponse deletedRecurrenceOccurrence(
             String id,
             String recurrenceEventId
     ) {
-        return new GoogleCalendarEventItem(
+        return new GoogleCalendarEventResponse(
                 id,
                 "cancelled",
                 null,
@@ -894,7 +894,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
                 null,
                 List.of(),
                 recurrenceEventId,
-                new GoogleCalendarEventTime(null, "2026-07-02T09:00:00Z", "UTC"),
+                new GoogleCalendarEventTimeResponse(null, "2026-07-02T09:00:00Z", "UTC"),
                 null,
                 null
         );
@@ -921,16 +921,16 @@ class GoogleCalendarEventPagePersistenceServiceTest {
         );
     }
 
-    private GoogleCalendarEventTime timedStart() {
-        return new GoogleCalendarEventTime(
+    private GoogleCalendarEventTimeResponse timedStart() {
+        return new GoogleCalendarEventTimeResponse(
                 null,
                 "2026-07-01T09:00:00Z",
                 "UTC"
         );
     }
 
-    private GoogleCalendarEventTime timedEnd() {
-        return new GoogleCalendarEventTime(
+    private GoogleCalendarEventTimeResponse timedEnd() {
+        return new GoogleCalendarEventTimeResponse(
                 null,
                 "2026-07-01T10:00:00Z",
                 "UTC"

@@ -2,7 +2,7 @@ package com.calio.calendar.integration.service;
 
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
-import com.calio.calendar.external.google.dto.GoogleCalendarEventItem;
+import com.calio.calendar.external.google.dto.GoogleCalendarEventResponse;
 import com.calio.calendar.integration.service.dto.GoogleCalendarNormalizedPage.RecurrenceEventUpsert;
 import com.calio.calendar.integration.service.dto.GoogleCalendarRecurrenceEventLookup;
 import com.calio.calendar.integration.service.dto.GoogleCalendarRecurrenceEventLookup.FoundRecurrenceEvent;
@@ -45,7 +45,7 @@ public class GoogleCalendarRecurrenceEventLoader {
             String recurrenceEventExternalId,
             GoogleCalendarSyncRunContext context
     ) {
-        Optional<GoogleCalendarEventItem> response = eventRequestService.getEvent(
+        Optional<GoogleCalendarEventResponse> response = eventRequestService.getEvent(
                 integrationId,
                 recurrenceEventExternalId,
                 context
@@ -70,7 +70,7 @@ public class GoogleCalendarRecurrenceEventLoader {
 
     private RecurrenceEventUpsert mapRecurrenceEvent(
             String requestedExternalId,
-            GoogleCalendarEventItem response
+            GoogleCalendarEventResponse response
     ) {
         boolean isInvalid = !requestedExternalId.equals(response.id())
                 || response.isCancelled()

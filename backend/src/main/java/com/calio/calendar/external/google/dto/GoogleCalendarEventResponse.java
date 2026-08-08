@@ -8,7 +8,7 @@ import java.time.Instant;
 import java.util.List;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public record GoogleCalendarEventItem(
+public record GoogleCalendarEventResponse(
         String id,
         String status,
         String etag,
@@ -17,12 +17,12 @@ public record GoogleCalendarEventItem(
         String description,
         List<String> recurrence,
         String recurringEventId,
-        GoogleCalendarEventTime originalStartTime,
-        GoogleCalendarEventTime start,
-        GoogleCalendarEventTime end
+        GoogleCalendarEventTimeResponse originalStartTime,
+        GoogleCalendarEventTimeResponse start,
+        GoogleCalendarEventTimeResponse end
 ) {
 
-    public GoogleCalendarEventItem {
+    public GoogleCalendarEventResponse {
         recurrence = recurrence == null
                 ? List.of()
                 : List.copyOf(recurrence);
@@ -31,7 +31,7 @@ public record GoogleCalendarEventItem(
         }
     }
 
-    public GoogleCalendarEventItem(
+    public GoogleCalendarEventResponse(
             String id,
             String status,
             String etag,
@@ -40,8 +40,8 @@ public record GoogleCalendarEventItem(
             String description,
             List<String> recurrence,
             String recurringEventId,
-            GoogleCalendarEventTime start,
-            GoogleCalendarEventTime end
+            GoogleCalendarEventTimeResponse start,
+            GoogleCalendarEventTimeResponse end
     ) {
         this(
                 id,
@@ -75,8 +75,8 @@ public record GoogleCalendarEventItem(
     }
 
     private static boolean hasValidSchedulePair(
-            GoogleCalendarEventTime start,
-            GoogleCalendarEventTime end
+            GoogleCalendarEventTimeResponse start,
+            GoogleCalendarEventTimeResponse end
     ) {
         if (start == null || end == null) {
             return false;

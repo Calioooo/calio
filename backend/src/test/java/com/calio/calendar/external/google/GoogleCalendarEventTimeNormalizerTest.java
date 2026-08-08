@@ -7,7 +7,7 @@ import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.external.google.service.dto.NormalizedEventSchedule;
 import com.calio.calendar.external.google.service.dto.NormalizedEventTime;
-import com.calio.calendar.external.google.dto.GoogleCalendarEventTime;
+import com.calio.calendar.external.google.dto.GoogleCalendarEventTimeResponse;
 import java.time.Instant;
 import java.util.TimeZone;
 import org.junit.jupiter.api.DisplayName;
@@ -27,7 +27,7 @@ class GoogleCalendarEventTimeNormalizerTest {
         try {
             // when
             NormalizedEventTime result = normalizer.normalize(
-                    new GoogleCalendarEventTime("2026-07-20", null, "Asia/Seoul")
+                    new GoogleCalendarEventTimeResponse("2026-07-20", null, "Asia/Seoul")
             );
 
             // then
@@ -44,7 +44,7 @@ class GoogleCalendarEventTimeNormalizerTest {
     void givenOffsetlessOverlap_whenNormalize_thenUsesEarlierOffset() {
         // when
         NormalizedEventTime result = normalizer.normalize(
-                new GoogleCalendarEventTime(
+                new GoogleCalendarEventTimeResponse(
                         null,
                         "2026-11-01T01:30:00",
                         "America/New_York"
@@ -60,7 +60,7 @@ class GoogleCalendarEventTimeNormalizerTest {
     void givenMatchingOffsetAndZone_whenNormalize_thenUsesSuppliedOffset() {
         // when
         NormalizedEventTime result = normalizer.normalize(
-                new GoogleCalendarEventTime(
+                new GoogleCalendarEventTimeResponse(
                         null,
                         "2026-07-20T09:00:00+09:00",
                         "Asia/Seoul"
@@ -76,12 +76,12 @@ class GoogleCalendarEventTimeNormalizerTest {
     void givenDifferentTimedZones_whenNormalizeSchedule_thenRejectsProviderResponse() {
         // when, then
         assertInvalidResponse(() -> normalizer.normalizeSchedule(
-                new GoogleCalendarEventTime(
+                new GoogleCalendarEventTimeResponse(
                         null,
                         "2026-07-20T09:00:00+09:00",
                         "Asia/Seoul"
                 ),
-                new GoogleCalendarEventTime(
+                new GoogleCalendarEventTimeResponse(
                         null,
                         "2026-07-20T01:00:00Z",
                         "UTC"
@@ -94,12 +94,12 @@ class GoogleCalendarEventTimeNormalizerTest {
     void givenExplicitAndMissingBoundaryZones_whenNormalizePageSchedule_thenResolvesSingleZone() {
         // when
         NormalizedEventSchedule result = normalizer.normalizeSchedule(
-                new GoogleCalendarEventTime(
+                new GoogleCalendarEventTimeResponse(
                         null,
                         "2026-07-20T09:00:00+09:00",
                         "Asia/Seoul"
                 ),
-                new GoogleCalendarEventTime(
+                new GoogleCalendarEventTimeResponse(
                         null,
                         "2026-07-20T10:00:00+09:00",
                         null
@@ -118,8 +118,8 @@ class GoogleCalendarEventTimeNormalizerTest {
     void givenOffsetlessOverlapAndPageZone_whenNormalizePageSchedule_thenUsesEarlierOffset() {
         // when
         NormalizedEventSchedule result = normalizer.normalizeSchedule(
-                new GoogleCalendarEventTime(null, "2026-11-01T01:30:00", null),
-                new GoogleCalendarEventTime(null, "2026-11-01T02:30:00", null),
+                new GoogleCalendarEventTimeResponse(null, "2026-11-01T01:30:00", null),
+                new GoogleCalendarEventTimeResponse(null, "2026-11-01T02:30:00", null),
                 "America/New_York"
         );
 
@@ -132,10 +132,10 @@ class GoogleCalendarEventTimeNormalizerTest {
     @Test
     @DisplayName("page timezone fallback도 zone mismatch, invalid zone, offset mismatch를 거부한다")
     void givenInvalidPageTimeZoneResolution_whenNormalizePageSchedule_thenRejectsProviderResponse() {
-        GoogleCalendarEventTime explicitUtc =
-                new GoogleCalendarEventTime(null, "2026-07-20T09:00:00Z", "UTC");
-        GoogleCalendarEventTime fallbackBoundary =
-                new GoogleCalendarEventTime(null, "2026-07-20T10:00:00+09:00", null);
+        GoogleCalendarEventTimeResponse explicitUtc =
+                new GoogleCalendarEventTimeResponse(null, "2026-07-20T09:00:00Z", "UTC");
+        GoogleCalendarEventTimeResponse fallbackBoundary =
+                new GoogleCalendarEventTimeResponse(null, "2026-07-20T10:00:00+09:00", null);
 
         assertInvalidResponse(() -> normalizer.normalizeSchedule(
                 explicitUtc,
@@ -143,13 +143,13 @@ class GoogleCalendarEventTimeNormalizerTest {
                 "Asia/Seoul"
         ));
         assertInvalidResponse(() -> normalizer.normalizeSchedule(
-                new GoogleCalendarEventTime(null, "2026-07-20T09:00:00", null),
-                new GoogleCalendarEventTime(null, "2026-07-20T10:00:00", null),
+                new GoogleCalendarEventTimeResponse(null, "2026-07-20T09:00:00", null),
+                new GoogleCalendarEventTimeResponse(null, "2026-07-20T10:00:00", null),
                 "Invalid/Zone"
         ));
         assertInvalidResponse(() -> normalizer.normalizeSchedule(
-                new GoogleCalendarEventTime(null, "2026-07-20T09:00:00Z", null),
-                new GoogleCalendarEventTime(null, "2026-07-20T10:00:00Z", null),
+                new GoogleCalendarEventTimeResponse(null, "2026-07-20T09:00:00Z", null),
+                new GoogleCalendarEventTimeResponse(null, "2026-07-20T10:00:00Z", null),
                 "Asia/Seoul"
         ));
     }
@@ -159,8 +159,8 @@ class GoogleCalendarEventTimeNormalizerTest {
     void givenAllDayRange_whenNormalizeSchedule_thenPreservesExclusiveEnd() {
         // when
         NormalizedEventSchedule result = normalizer.normalizeSchedule(
-                new GoogleCalendarEventTime("2026-07-20", null, null),
-                new GoogleCalendarEventTime("2026-07-23", null, null)
+                new GoogleCalendarEventTimeResponse("2026-07-20", null, null),
+                new GoogleCalendarEventTimeResponse("2026-07-23", null, null)
         );
 
         // then
@@ -173,21 +173,21 @@ class GoogleCalendarEventTimeNormalizerTest {
     @DisplayName("date/dateTime union, offset-zone mismatch와 DST gap은 invalid response다")
     void givenKnownInvalidTimes_whenNormalize_thenReturnsProviderInvalidResponse() {
         assertInvalidResponse(() -> normalizer.normalize(
-                new GoogleCalendarEventTime(
+                new GoogleCalendarEventTimeResponse(
                         "2026-07-20",
                         "2026-07-20T09:00:00+09:00",
                         "Asia/Seoul"
                 )
         ));
         assertInvalidResponse(() -> normalizer.normalize(
-                new GoogleCalendarEventTime(
+                new GoogleCalendarEventTimeResponse(
                         null,
                         "2026-07-20T09:00:00Z",
                         "Asia/Seoul"
                 )
         ));
         assertInvalidResponse(() -> normalizer.normalize(
-                new GoogleCalendarEventTime(
+                new GoogleCalendarEventTimeResponse(
                         null,
                         "2026-03-08T02:30:00",
                         "America/New_York"
@@ -199,7 +199,7 @@ class GoogleCalendarEventTimeNormalizerTest {
     @DisplayName("date와 dateTime이 모두 없으면 invalid response다")
     void givenEmptyTimeUnion_whenNormalize_thenReturnsProviderInvalidResponse() {
         assertInvalidResponse(() -> normalizer.normalize(
-                new GoogleCalendarEventTime(null, null, null)
+                new GoogleCalendarEventTimeResponse(null, null, null)
         ));
     }
 
@@ -208,7 +208,7 @@ class GoogleCalendarEventTimeNormalizerTest {
     void givenOffsetTimedValueWithoutTimeZone_whenNormalize_thenUsesSuppliedOffset() {
         // when
         NormalizedEventTime result = normalizer.normalize(
-                new GoogleCalendarEventTime(null, "2026-07-20T09:00:00Z", null)
+                new GoogleCalendarEventTimeResponse(null, "2026-07-20T09:00:00Z", null)
         );
 
         // then
@@ -221,7 +221,7 @@ class GoogleCalendarEventTimeNormalizerTest {
     @DisplayName("offsetless timed 값에 timezone이 없으면 invalid response다")
     void givenOffsetlessTimedValueWithoutTimeZone_whenNormalize_thenReturnsProviderInvalidResponse() {
         assertInvalidResponse(() -> normalizer.normalize(
-                new GoogleCalendarEventTime(null, "2026-07-20T09:00:00", null)
+                new GoogleCalendarEventTimeResponse(null, "2026-07-20T09:00:00", null)
         ));
     }
 
@@ -229,7 +229,7 @@ class GoogleCalendarEventTimeNormalizerTest {
     @DisplayName("유효하지 않은 IANA timezone은 invalid response다")
     void givenInvalidIanaTimeZone_whenNormalize_thenReturnsProviderInvalidResponse() {
         assertInvalidResponse(() -> normalizer.normalize(
-                new GoogleCalendarEventTime(
+                new GoogleCalendarEventTimeResponse(
                         null,
                         "2026-07-20T09:00:00",
                         "Invalid/TimeZone"
@@ -240,16 +240,16 @@ class GoogleCalendarEventTimeNormalizerTest {
     @Test
     @DisplayName("endAt이 startAt과 같거나 이전이면 invalid response다")
     void givenNonIncreasingSchedule_whenNormalizeSchedule_thenReturnsProviderInvalidResponse() {
-        GoogleCalendarEventTime start =
-                new GoogleCalendarEventTime("2026-07-20", null, null);
+        GoogleCalendarEventTimeResponse start =
+                new GoogleCalendarEventTimeResponse("2026-07-20", null, null);
 
         assertInvalidResponse(() -> normalizer.normalizeSchedule(
                 start,
-                new GoogleCalendarEventTime("2026-07-20", null, null)
+                new GoogleCalendarEventTimeResponse("2026-07-20", null, null)
         ));
         assertInvalidResponse(() -> normalizer.normalizeSchedule(
                 start,
-                new GoogleCalendarEventTime("2026-07-19", null, null)
+                new GoogleCalendarEventTimeResponse("2026-07-19", null, null)
         ));
     }
 

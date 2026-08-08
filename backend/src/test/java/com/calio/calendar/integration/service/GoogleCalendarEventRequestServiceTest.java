@@ -10,7 +10,7 @@ import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.external.google.GoogleCalendarEventsClient;
 import com.calio.calendar.external.google.GoogleCalendarUnauthorizedException;
-import com.calio.calendar.external.google.dto.GoogleCalendarEventItem;
+import com.calio.calendar.external.google.dto.GoogleCalendarEventResponse;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventPage;
 import com.calio.calendar.integration.domain.GoogleCalendarSyncMode;
 import java.util.List;
@@ -120,14 +120,14 @@ class GoogleCalendarEventRequestServiceTest {
     void givenUnauthorizedEventRequest_whenGetEvent_thenRefreshesTokenAndRetries() {
         // given
         GoogleCalendarSyncRunContext context = new GoogleCalendarSyncRunContext("old-token");
-        GoogleCalendarEventItem expected = mock(GoogleCalendarEventItem.class);
+        GoogleCalendarEventResponse expected = mock(GoogleCalendarEventResponse.class);
         when(eventsClient.getEvent("old-token", "event-1")).thenThrow(unauthorized());
         when(accessTokenService.forceRefresh(10L)).thenReturn("new-token");
         when(eventsClient.getEvent("new-token", "event-1"))
                 .thenReturn(Optional.of(expected));
 
         // when
-        Optional<GoogleCalendarEventItem> actual = requestService.getEvent(
+        Optional<GoogleCalendarEventResponse> actual = requestService.getEvent(
                 10L,
                 "event-1",
                 context

@@ -3,7 +3,7 @@ package com.calio.calendar.integration.service;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.external.google.GoogleCalendarEventTimeNormalizer;
-import com.calio.calendar.external.google.dto.GoogleCalendarEventItem;
+import com.calio.calendar.external.google.dto.GoogleCalendarEventResponse;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventPage;
 import com.calio.calendar.integration.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.domain.GoogleCalendarRecurrenceEventMapping;
@@ -69,7 +69,7 @@ public class GoogleCalendarPageNormalizer {
         LinkedHashMap<String, RecurrenceEventUpsert> fetchedRecurrenceEvents =
                 new LinkedHashMap<>();
         List<NormalizedItem> normalizedItems = new ArrayList<>();
-        for (GoogleCalendarEventItem item : page.items()) {
+        for (GoogleCalendarEventResponse item : page.items()) {
             NormalizedItem normalized = normalizeItem(
                     integrationId,
                     item,
@@ -148,7 +148,7 @@ public class GoogleCalendarPageNormalizer {
 
     private NormalizedItem normalizeItem(
             Long integrationId,
-            GoogleCalendarEventItem item,
+            GoogleCalendarEventResponse item,
             String pageTimeZone,
             Map<String, GoogleCalendarEventMapping> eventMappings,
             Map<String, GoogleCalendarRecurrenceEventMapping> recurrenceEventMappings,
@@ -186,7 +186,7 @@ public class GoogleCalendarPageNormalizer {
 
     private NormalizedItem normalizeCancelledItem(
             Long integrationId,
-            GoogleCalendarEventItem item,
+            GoogleCalendarEventResponse item,
             Map<String, GoogleCalendarEventMapping> eventMappings,
             Map<String, GoogleCalendarRecurrenceEventMapping> recurrenceEventMappings,
             Set<String> pageRecurrenceEventIds,
@@ -214,7 +214,7 @@ public class GoogleCalendarPageNormalizer {
 
     private RecurrenceEventOverrideUpsert normalizeRecurrenceEventOverride(
             Long integrationId,
-            GoogleCalendarEventItem item,
+            GoogleCalendarEventResponse item,
             Map<String, GoogleCalendarRecurrenceEventMapping> recurrenceEventMappings,
             Set<String> pageRecurrenceEventIds,
             Map<String, RecurrenceEventUpsert> fetchedRecurrenceEvents,
@@ -246,7 +246,7 @@ public class GoogleCalendarPageNormalizer {
     }
 
     private EventUpsert normalizeEvent(
-            GoogleCalendarEventItem item,
+            GoogleCalendarEventResponse item,
             String pageTimeZone
     ) {
         var schedule = timeNormalizer.normalizeSchedule(
@@ -273,7 +273,7 @@ public class GoogleCalendarPageNormalizer {
                 || pageRecurrenceEventIds.contains(recurrenceEventExternalId);
     }
 
-    private void validateActiveShape(GoogleCalendarEventItem item) {
+    private void validateActiveShape(GoogleCalendarEventResponse item) {
         boolean isMixedRecurrenceShape = item.isRecurrenceEvent()
                 && item.isRecurrenceOverride();
         boolean hasOrphanOrigin = item.originalStartTime() != null
@@ -283,15 +283,15 @@ public class GoogleCalendarPageNormalizer {
         }
     }
 
-    private boolean isDeletedRecurrenceOccurrence(GoogleCalendarEventItem item) {
+    private boolean isDeletedRecurrenceOccurrence(GoogleCalendarEventResponse item) {
         return item.isCancelled()
                 && hasText(item.recurringEventId())
                 && item.originalStartTime() != null;
     }
 
-    private Set<String> uniqueExternalEventIds(List<GoogleCalendarEventItem> items) {
+    private Set<String> uniqueExternalEventIds(List<GoogleCalendarEventResponse> items) {
         Set<String> externalEventIds = new HashSet<>();
-        for (GoogleCalendarEventItem item : items) {
+        for (GoogleCalendarEventResponse item : items) {
             if (!externalEventIds.add(item.id())) {
                 throw invalidResponse();
             }
@@ -299,19 +299,19 @@ public class GoogleCalendarPageNormalizer {
         return externalEventIds;
     }
 
-    private Set<String> recurrenceEventReferenceIds(List<GoogleCalendarEventItem> items) {
+    private Set<String> recurrenceEventReferenceIds(List<GoogleCalendarEventResponse> items) {
         return items.stream()
-                .map(GoogleCalendarEventItem::recurringEventId)
+                .map(GoogleCalendarEventResponse::recurringEventId)
                 .filter(this::hasText)
                 .collect(Collectors.toSet());
     }
 
-    private Set<String> activePageRecurrenceEventIds(List<GoogleCalendarEventItem> items) {
+    private Set<String> activePageRecurrenceEventIds(List<GoogleCalendarEventResponse> items) {
         return items.stream()
                 .filter(item -> !item.isCancelled())
-                .filter(GoogleCalendarEventItem::isRecurrenceEvent)
+                .filter(GoogleCalendarEventResponse::isRecurrenceEvent)
                 .filter(item -> !item.isRecurrenceOverride())
-                .map(GoogleCalendarEventItem::id)
+                .map(GoogleCalendarEventResponse::id)
                 .collect(Collectors.toSet());
     }
 

@@ -10,8 +10,8 @@ import static org.mockito.Mockito.when;
 
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
-import com.calio.calendar.external.google.dto.GoogleCalendarEventItem;
-import com.calio.calendar.external.google.dto.GoogleCalendarEventTime;
+import com.calio.calendar.external.google.dto.GoogleCalendarEventResponse;
+import com.calio.calendar.external.google.dto.GoogleCalendarEventTimeResponse;
 import com.calio.calendar.external.google.service.dto.NormalizedEventSchedule;
 import com.calio.calendar.integration.service.dto.GoogleCalendarNormalizedPage.RecurrenceEventUpsert;
 import com.calio.calendar.integration.service.dto.GoogleCalendarRecurrenceEventLookup.FoundRecurrenceEvent;
@@ -80,7 +80,7 @@ class GoogleCalendarRecurrenceEventLoaderTest {
     void givenDifferentExternalId_whenLoad_thenRejectsResponse() {
         // given
         GoogleCalendarSyncRunContext context = new GoogleCalendarSyncRunContext("token");
-        GoogleCalendarEventItem response = recurrenceEvent("different-event");
+        GoogleCalendarEventResponse response = recurrenceEvent("different-event");
         when(eventRequestService.getEvent(10L, "recurrence-event-1", context))
                 .thenReturn(Optional.of(response));
 
@@ -100,7 +100,7 @@ class GoogleCalendarRecurrenceEventLoaderTest {
     void givenValidRecurrenceEvent_whenLoadTwice_thenMapsAndCachesOnce() {
         // given
         GoogleCalendarSyncRunContext context = new GoogleCalendarSyncRunContext("token");
-        GoogleCalendarEventItem response = recurrenceEvent("recurrence-event-1");
+        GoogleCalendarEventResponse response = recurrenceEvent("recurrence-event-1");
         RecurrenceEventUpsert expected = recurrenceEventUpsert("recurrence-event-1");
         when(eventRequestService.getEvent(10L, "recurrence-event-1", context))
                 .thenReturn(Optional.of(response));
@@ -121,8 +121,8 @@ class GoogleCalendarRecurrenceEventLoaderTest {
         verify(recurrenceMapper).mapRecurrenceEvent(response);
     }
 
-    private GoogleCalendarEventItem recurrenceEvent(String externalEventId) {
-        return new GoogleCalendarEventItem(
+    private GoogleCalendarEventResponse recurrenceEvent(String externalEventId) {
+        return new GoogleCalendarEventResponse(
                 externalEventId,
                 "confirmed",
                 null,
@@ -132,8 +132,8 @@ class GoogleCalendarRecurrenceEventLoaderTest {
                 List.of("RRULE:FREQ=DAILY"),
                 null,
                 null,
-                new GoogleCalendarEventTime(null, "2026-07-01T09:00:00Z", "UTC"),
-                new GoogleCalendarEventTime(null, "2026-07-01T10:00:00Z", "UTC")
+                new GoogleCalendarEventTimeResponse(null, "2026-07-01T09:00:00Z", "UTC"),
+                new GoogleCalendarEventTimeResponse(null, "2026-07-01T10:00:00Z", "UTC")
         );
     }
 

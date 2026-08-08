@@ -2,7 +2,7 @@ package com.calio.calendar.external.google;
 
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
-import com.calio.calendar.external.google.dto.GoogleCalendarEventItem;
+import com.calio.calendar.external.google.dto.GoogleCalendarEventResponse;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventPage;
 import com.calio.calendar.integration.domain.GoogleCalendarSyncMode;
 import java.net.URI;
@@ -67,7 +67,7 @@ public class GoogleCalendarEventsClient {
         }
     }
 
-    public Optional<GoogleCalendarEventItem> getEvent(
+    public Optional<GoogleCalendarEventResponse> getEvent(
             String accessToken,
             String externalEventId
     ) {
@@ -75,7 +75,7 @@ public class GoogleCalendarEventsClient {
             throw new CalioException(ErrorCode.GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID);
         }
         try {
-            GoogleCalendarEventItem response = requestEvent(accessToken, externalEventId);
+            GoogleCalendarEventResponse response = requestEvent(accessToken, externalEventId);
             return Optional.of(response);
         } catch (RestClientResponseException exception) {
             if (exception.getStatusCode().value() == HttpStatus.NOT_FOUND.value()) {
@@ -92,12 +92,12 @@ public class GoogleCalendarEventsClient {
         }
     }
 
-    private GoogleCalendarEventItem requestEvent(String accessToken, String externalEventId) {
-        GoogleCalendarEventItem response = restClient.get()
+    private GoogleCalendarEventResponse requestEvent(String accessToken, String externalEventId) {
+        GoogleCalendarEventResponse response = restClient.get()
                 .uri(eventUri(externalEventId))
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                 .retrieve()
-                .body(GoogleCalendarEventItem.class);
+                .body(GoogleCalendarEventResponse.class);
         if (response == null) {
             throw new CalioException(ErrorCode.GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID);
         }

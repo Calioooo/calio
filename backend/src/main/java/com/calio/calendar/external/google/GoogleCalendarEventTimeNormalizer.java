@@ -3,7 +3,7 @@ package com.calio.calendar.external.google;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.common.time.IanaTimeZones;
-import com.calio.calendar.external.google.dto.GoogleCalendarEventTime;
+import com.calio.calendar.external.google.dto.GoogleCalendarEventTimeResponse;
 import com.calio.calendar.external.google.service.dto.NormalizedEventTime;
 import com.calio.calendar.external.google.service.dto.NormalizedEventSchedule;
 import java.time.DateTimeException;
@@ -21,12 +21,12 @@ import org.springframework.stereotype.Component;
 @Component
 public class GoogleCalendarEventTimeNormalizer {
 
-    public NormalizedEventTime normalize(GoogleCalendarEventTime eventTime) {
+    public NormalizedEventTime normalize(GoogleCalendarEventTimeResponse eventTime) {
         return normalize(eventTime, null, false);
     }
 
     private NormalizedEventTime normalize(
-            GoogleCalendarEventTime eventTime,
+            GoogleCalendarEventTimeResponse eventTime,
             String fallbackTimeZone,
             boolean allowsFallback
     ) {
@@ -44,23 +44,23 @@ public class GoogleCalendarEventTimeNormalizer {
     }
 
     public NormalizedEventSchedule normalizeSchedule(
-            GoogleCalendarEventTime start,
-            GoogleCalendarEventTime end
+            GoogleCalendarEventTimeResponse start,
+            GoogleCalendarEventTimeResponse end
     ) {
         return normalizeSchedule(start, end, null, false);
     }
 
     public NormalizedEventSchedule normalizeSchedule(
-            GoogleCalendarEventTime start,
-            GoogleCalendarEventTime end,
+            GoogleCalendarEventTimeResponse start,
+            GoogleCalendarEventTimeResponse end,
             String fallbackTimeZone
     ) {
         return normalizeSchedule(start, end, fallbackTimeZone, true);
     }
 
     private NormalizedEventSchedule normalizeSchedule(
-            GoogleCalendarEventTime start,
-            GoogleCalendarEventTime end,
+            GoogleCalendarEventTimeResponse start,
+            GoogleCalendarEventTimeResponse end,
             String fallbackTimeZone,
             boolean allowsFallback
     ) {
@@ -86,7 +86,7 @@ public class GoogleCalendarEventTimeNormalizer {
     }
 
     private NormalizedEventTime normalizeTimed(
-            GoogleCalendarEventTime eventTime,
+            GoogleCalendarEventTimeResponse eventTime,
             String fallbackTimeZone,
             boolean allowsFallback
     ) {
@@ -178,7 +178,7 @@ public class GoogleCalendarEventTimeNormalizer {
         }
     }
 
-    private boolean hasExactlyOneTimeValue(GoogleCalendarEventTime eventTime) {
+    private boolean hasExactlyOneTimeValue(GoogleCalendarEventTimeResponse eventTime) {
         return hasText(eventTime.date()) ^ hasText(eventTime.dateTime());
     }
 

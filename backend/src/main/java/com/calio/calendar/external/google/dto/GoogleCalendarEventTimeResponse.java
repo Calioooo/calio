@@ -3,7 +3,7 @@ package com.calio.calendar.external.google.dto;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public record GoogleCalendarEventTime(
+public record GoogleCalendarEventTimeResponse(
         String date,
         String dateTime,
         String timeZone

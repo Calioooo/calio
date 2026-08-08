@@ -9,9 +9,9 @@ import static org.mockito.Mockito.when;
 
 import com.calio.calendar.external.google.GoogleCalendarEventTimeNormalizer;
 import com.calio.calendar.external.google.service.dto.NormalizedEventSchedule;
-import com.calio.calendar.external.google.dto.GoogleCalendarEventItem;
+import com.calio.calendar.external.google.dto.GoogleCalendarEventResponse;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventPage;
-import com.calio.calendar.external.google.dto.GoogleCalendarEventTime;
+import com.calio.calendar.external.google.dto.GoogleCalendarEventTimeResponse;
 import com.calio.calendar.integration.domain.GoogleCalendarRecurrenceEventMapping;
 import com.calio.calendar.integration.service.dto.GoogleCalendarNormalizedPage;
 import com.calio.calendar.integration.service.dto.GoogleCalendarNormalizedPage.CancelledRecurrenceEventOverrideUpsert;
@@ -57,7 +57,7 @@ class GoogleCalendarPageNormalizerTest {
     @DisplayName("삭제된 recurrence-occurrence는 active schedule 검증 없이 override로 분류한다")
     void givenDeletedRecurrenceOccurrence_whenNormalize_thenClassifiesAsOverride() {
         // given
-        GoogleCalendarEventItem item =
+        GoogleCalendarEventResponse item =
                 deletedRecurrenceOccurrence("override-1", "recurrence-event-1");
         GoogleCalendarRecurrenceEventMapping recurrenceEventMapping =
                 mock(GoogleCalendarRecurrenceEventMapping.class);
@@ -89,7 +89,7 @@ class GoogleCalendarPageNormalizerTest {
     @DisplayName("조회한 recurrence-event는 관련 override보다 먼저 정규화한다")
     void givenOverrideBeforeRecurrenceEvent_whenNormalize_thenOrdersRecurrenceEventFirst() {
         // given
-        GoogleCalendarEventItem deletedOccurrence =
+        GoogleCalendarEventResponse deletedOccurrence =
                 deletedRecurrenceOccurrence("override-1", "recurrence-event-1");
         RecurrenceEventUpsert recurrenceEvent = new RecurrenceEventUpsert(
                 "recurrence-event-1",
@@ -129,8 +129,8 @@ class GoogleCalendarPageNormalizerTest {
     @DisplayName("같은 page의 recurrence-event cancellation은 관련 override 뒤에 정규화한다")
     void givenCancellationBeforeOverride_whenNormalize_thenOrdersCancellationLast() {
         // given
-        GoogleCalendarEventItem cancellation = cancelledItem("recurrence-event-1");
-        GoogleCalendarEventItem deletedOccurrence =
+        GoogleCalendarEventResponse cancellation = cancelledItem("recurrence-event-1");
+        GoogleCalendarEventResponse deletedOccurrence =
                 deletedRecurrenceOccurrence("override-1", "recurrence-event-1");
         GoogleCalendarRecurrenceEventMapping recurrenceEventMapping =
                 mock(GoogleCalendarRecurrenceEventMapping.class);
@@ -160,16 +160,16 @@ class GoogleCalendarPageNormalizerTest {
         );
     }
 
-    private GoogleCalendarEventPage page(GoogleCalendarEventItem item) {
+    private GoogleCalendarEventPage page(GoogleCalendarEventResponse item) {
         return page(List.of(item));
     }
 
-    private GoogleCalendarEventPage page(List<GoogleCalendarEventItem> items) {
+    private GoogleCalendarEventPage page(List<GoogleCalendarEventResponse> items) {
         return new GoogleCalendarEventPage(items, null, "cursor", "UTC");
     }
 
-    private GoogleCalendarEventItem cancelledItem(String id) {
-        return new GoogleCalendarEventItem(
+    private GoogleCalendarEventResponse cancelledItem(String id) {
+        return new GoogleCalendarEventResponse(
                 id,
                 "cancelled",
                 null,
@@ -184,11 +184,11 @@ class GoogleCalendarPageNormalizerTest {
         );
     }
 
-    private GoogleCalendarEventItem deletedRecurrenceOccurrence(
+    private GoogleCalendarEventResponse deletedRecurrenceOccurrence(
             String id,
             String recurrenceEventId
     ) {
-        return new GoogleCalendarEventItem(
+        return new GoogleCalendarEventResponse(
                 id,
                 "cancelled",
                 null,
@@ -197,7 +197,7 @@ class GoogleCalendarPageNormalizerTest {
                 null,
                 List.of(),
                 recurrenceEventId,
-                new GoogleCalendarEventTime(null, "2026-07-01T09:00:00Z", "UTC"),
+                new GoogleCalendarEventTimeResponse(null, "2026-07-01T09:00:00Z", "UTC"),
                 null,
                 null
         );

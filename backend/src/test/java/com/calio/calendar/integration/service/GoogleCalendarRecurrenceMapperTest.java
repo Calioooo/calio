@@ -6,8 +6,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.external.google.GoogleCalendarEventTimeNormalizer;
-import com.calio.calendar.external.google.dto.GoogleCalendarEventItem;
-import com.calio.calendar.external.google.dto.GoogleCalendarEventTime;
+import com.calio.calendar.external.google.dto.GoogleCalendarEventResponse;
+import com.calio.calendar.external.google.dto.GoogleCalendarEventTimeResponse;
 import com.calio.calendar.integration.service.dto.GoogleCalendarNormalizedPage.ActiveRecurrenceEventOverrideUpsert;
 import com.calio.calendar.integration.service.dto.GoogleCalendarNormalizedPage.CancelledRecurrenceEventOverrideUpsert;
 import com.calio.calendar.integration.service.dto.GoogleCalendarNormalizedPage.RecurrenceEventUpsert;
@@ -31,7 +31,7 @@ class GoogleCalendarRecurrenceMapperTest {
     @DisplayName("recurrence event는 canonical title, schedule과 engine-normalized recurrence를 만든다")
     void givenRecurrenceEvent_whenMap_thenReturnsPersistenceIndependentCanonicalInput() {
         // given
-        GoogleCalendarEventItem item = item(
+        GoogleCalendarEventResponse item = item(
                 "recurrence-event-id",
                 "confirmed",
                 " ",
@@ -69,14 +69,14 @@ class GoogleCalendarRecurrenceMapperTest {
     @DisplayName("active recurrence override는 original identity와 cross-type final snapshot을 독립 계산한다")
     void givenAllDayOriginAndTimedFinal_whenMapRecurrenceOverride_thenPreservesBothShapes() {
         // given
-        GoogleCalendarEventItem item = item(
+        GoogleCalendarEventResponse item = item(
                 "recurrence-override-id",
                 "confirmed",
                 null,
                 null,
                 List.of(),
                 "recurrence-event-id",
-                new GoogleCalendarEventTime("2026-07-21", null, "ignored/provider-zone"),
+                new GoogleCalendarEventTimeResponse("2026-07-21", null, "ignored/provider-zone"),
                 timed("2026-07-21T15:00:00+09:00", "Asia/Seoul"),
                 timed("2026-07-21T16:00:00+09:00", "Asia/Seoul")
         );
@@ -98,7 +98,7 @@ class GoogleCalendarRecurrenceMapperTest {
     @DisplayName("timed origin과 all-day final schedule을 독립적으로 정규화한다")
     void givenTimedOriginAndAllDayFinal_whenMapRecurrenceOverride_thenPreservesBothShapes() {
         // given
-        GoogleCalendarEventItem item = item(
+        GoogleCalendarEventResponse item = item(
                 "recurrence-override-id",
                 "confirmed",
                 "All-day override",
@@ -106,8 +106,8 @@ class GoogleCalendarRecurrenceMapperTest {
                 List.of(),
                 "recurrence-event-id",
                 timed("2026-07-21T09:00:00+09:00", null),
-                new GoogleCalendarEventTime("2026-07-22", null, "ignored/provider-zone"),
-                new GoogleCalendarEventTime("2026-07-24", null, "ignored/provider-zone")
+                new GoogleCalendarEventTimeResponse("2026-07-22", null, "ignored/provider-zone"),
+                new GoogleCalendarEventTimeResponse("2026-07-24", null, "ignored/provider-zone")
         );
 
         // when
@@ -128,7 +128,7 @@ class GoogleCalendarRecurrenceMapperTest {
     @DisplayName("cancelled minimum recurrence override는 식별 정보만으로 정규화한다")
     void givenCancelledMinimumRecurrenceOverride_whenMap_thenDoesNotRequireFinalSchedule() {
         // given
-        GoogleCalendarEventItem item = item(
+        GoogleCalendarEventResponse item = item(
                 "recurrence-override-id",
                 "cancelled",
                 null,
@@ -154,7 +154,7 @@ class GoogleCalendarRecurrenceMapperTest {
     @DisplayName("provider recurrence validation 실패는 Google invalid response로 변환한다")
     void givenInvalidProviderRecurrence_whenMapRecurrenceEvent_thenTranslatesOnlyKnownFailure() {
         // given
-        GoogleCalendarEventItem item = item(
+        GoogleCalendarEventResponse item = item(
                 "recurrence-event-id",
                 "confirmed",
                 "Title",
@@ -177,7 +177,7 @@ class GoogleCalendarRecurrenceMapperTest {
     @DisplayName("recurrence event와 override identity가 혼합된 provider item은 invalid response다")
     void givenMixedRecurrenceEventAndOverride_whenMapOverride_thenReturnsProviderInvalidResponse() {
         // given
-        GoogleCalendarEventItem item = item(
+        GoogleCalendarEventResponse item = item(
                 "recurrence-override-id",
                 "confirmed",
                 "Invalid mixed item",
@@ -196,15 +196,15 @@ class GoogleCalendarRecurrenceMapperTest {
     @Test
     @DisplayName("recurrence override의 recurrence-event ID 또는 originalStartTime 누락은 invalid response다")
     void givenMissingRecurrenceOverrideIdentity_whenMap_thenReturnsProviderInvalidResponse() {
-        GoogleCalendarEventTime start = timed(
+        GoogleCalendarEventTimeResponse start = timed(
                 "2026-07-21T10:00:00+09:00",
                 "Asia/Seoul"
         );
-        GoogleCalendarEventTime end = timed(
+        GoogleCalendarEventTimeResponse end = timed(
                 "2026-07-21T11:00:00+09:00",
                 "Asia/Seoul"
         );
-        GoogleCalendarEventItem missingRecurrenceEventId = item(
+        GoogleCalendarEventResponse missingRecurrenceEventId = item(
                 "recurrence-override-id",
                 "confirmed",
                 "Override",
@@ -215,7 +215,7 @@ class GoogleCalendarRecurrenceMapperTest {
                 start,
                 end
         );
-        GoogleCalendarEventItem missingOriginalStartTime = item(
+        GoogleCalendarEventResponse missingOriginalStartTime = item(
                 "recurrence-override-id",
                 "confirmed",
                 "Override",
@@ -240,7 +240,7 @@ class GoogleCalendarRecurrenceMapperTest {
                 new GoogleCalendarEventTimeNormalizer(),
                 failingEngine(failure)
         );
-        GoogleCalendarEventItem item = item(
+        GoogleCalendarEventResponse item = item(
                 "recurrence-event-id",
                 "confirmed",
                 "Title",
@@ -256,18 +256,18 @@ class GoogleCalendarRecurrenceMapperTest {
         assertThatThrownBy(() -> failingMapper.mapRecurrenceEvent(item)).isSameAs(failure);
     }
 
-    private GoogleCalendarEventItem item(
+    private GoogleCalendarEventResponse item(
             String id,
             String status,
             String summary,
             String description,
             List<String> recurrence,
             String recurringEventId,
-            GoogleCalendarEventTime originalStartTime,
-            GoogleCalendarEventTime start,
-            GoogleCalendarEventTime end
+            GoogleCalendarEventTimeResponse originalStartTime,
+            GoogleCalendarEventTimeResponse start,
+            GoogleCalendarEventTimeResponse end
     ) {
-        return new GoogleCalendarEventItem(
+        return new GoogleCalendarEventResponse(
                 id,
                 status,
                 "\"etag\"",
@@ -282,8 +282,8 @@ class GoogleCalendarRecurrenceMapperTest {
         );
     }
 
-    private GoogleCalendarEventTime timed(String dateTime, String timeZone) {
-        return new GoogleCalendarEventTime(null, dateTime, timeZone);
+    private GoogleCalendarEventTimeResponse timed(String dateTime, String timeZone) {
+        return new GoogleCalendarEventTimeResponse(null, dateTime, timeZone);
     }
 
     private void assertInvalidResponse(Runnable action) {

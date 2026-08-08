@@ -4,7 +4,7 @@ import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.external.google.GoogleCalendarEventTimeNormalizer;
 import com.calio.calendar.external.google.service.dto.NormalizedEventSchedule;
-import com.calio.calendar.external.google.dto.GoogleCalendarEventItem;
+import com.calio.calendar.external.google.dto.GoogleCalendarEventResponse;
 import com.calio.calendar.integration.service.dto.GoogleCalendarNormalizedPage.ActiveRecurrenceEventOverrideUpsert;
 import com.calio.calendar.integration.service.dto.GoogleCalendarNormalizedPage.CancelledRecurrenceEventOverrideUpsert;
 import com.calio.calendar.integration.service.dto.GoogleCalendarNormalizedPage.RecurrenceEventOverrideUpsert;
@@ -31,7 +31,7 @@ public class GoogleCalendarRecurrenceMapper {
         this.recurrenceEngine = recurrenceEngine;
     }
 
-    public RecurrenceEventUpsert mapRecurrenceEvent(GoogleCalendarEventItem item) {
+    public RecurrenceEventUpsert mapRecurrenceEvent(GoogleCalendarEventResponse item) {
         validateRecurrenceEvent(item);
         NormalizedEventSchedule schedule = timeNormalizer.normalizeSchedule(item.start(), item.end());
         RecurrenceSchedule recurrenceSchedule = toRecurrenceSchedule(schedule);
@@ -47,7 +47,7 @@ public class GoogleCalendarRecurrenceMapper {
         );
     }
 
-    public RecurrenceEventOverrideUpsert mapRecurrenceOverride(GoogleCalendarEventItem item) {
+    public RecurrenceEventOverrideUpsert mapRecurrenceOverride(GoogleCalendarEventResponse item) {
         validateRecurrenceEventOverride(item);
         Instant originStartAt = timeNormalizer.normalize(item.originalStartTime()).instant();
         if (item.isCancelled()) {
@@ -110,7 +110,7 @@ public class GoogleCalendarRecurrenceMapper {
         return exception;
     }
 
-    private void validateRecurrenceEvent(GoogleCalendarEventItem item) {
+    private void validateRecurrenceEvent(GoogleCalendarEventResponse item) {
         boolean isInvalid = item == null
                 || item.isCancelled()
                 || !item.isRecurrenceEvent()
@@ -120,7 +120,7 @@ public class GoogleCalendarRecurrenceMapper {
         }
     }
 
-    private void validateRecurrenceEventOverride(GoogleCalendarEventItem item) {
+    private void validateRecurrenceEventOverride(GoogleCalendarEventResponse item) {
         boolean isInvalid = item == null
                 || !hasText(item.id())
                 || !hasText(item.recurringEventId())
