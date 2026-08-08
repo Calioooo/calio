@@ -75,7 +75,7 @@ class GoogleCalendarSyncServiceTest {
         );
 
         // when
-        GoogleCalendarSyncMode completedMode = executeOwned(service);
+        GoogleCalendarSyncMode completedMode = synchronize(service);
 
         // then
         assertThat(completedMode).isEqualTo(GoogleCalendarSyncMode.FULL);
@@ -116,7 +116,7 @@ class GoogleCalendarSyncServiceTest {
         );
 
         // when
-        GoogleCalendarSyncMode completedMode = executeOwned(service);
+        GoogleCalendarSyncMode completedMode = synchronize(service);
 
         // then
         assertThat(completedMode).isEqualTo(GoogleCalendarSyncMode.FULL);
@@ -146,7 +146,7 @@ class GoogleCalendarSyncServiceTest {
         );
 
         // when, then
-        assertThatThrownBy(() -> executeOwned(service))
+        assertThatThrownBy(() -> synchronize(service))
                 .isSameAs(ownershipService.failure);
         assertThat(eventsClient.requestedModes).isEmpty();
         assertThat(providerDataService.releaseCount).isOne();
@@ -169,7 +169,7 @@ class GoogleCalendarSyncServiceTest {
         );
 
         // when, then
-        assertThatThrownBy(() -> executeOwned(service))
+        assertThatThrownBy(() -> synchronize(service))
                 .isInstanceOfSatisfying(CalioException.class, exception ->
                         assertThat(exception.getErrorCode())
                                 .isEqualTo(ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED));
@@ -190,7 +190,7 @@ class GoogleCalendarSyncServiceTest {
         );
 
         // when, then
-        assertThatThrownBy(() -> executeOwned(service))
+        assertThatThrownBy(() -> synchronize(service))
                 .isInstanceOfSatisfying(CalioException.class, exception ->
                         assertThat(exception.getErrorCode())
                                 .isEqualTo(ErrorCode.GOOGLE_CALENDAR_SYNC_FAILED));
@@ -214,7 +214,7 @@ class GoogleCalendarSyncServiceTest {
         );
 
         // when
-        Throwable thrown = catchThrowable(() -> executeOwned(service));
+        Throwable thrown = catchThrowable(() -> synchronize(service));
 
         // then
         assertThat(thrown).isSameAs(syncFailure);
@@ -234,7 +234,7 @@ class GoogleCalendarSyncServiceTest {
         );
 
         // when, then
-        assertThatThrownBy(() -> executeOwned(service))
+        assertThatThrownBy(() -> synchronize(service))
                 .isInstanceOf(CalioException.class);
         assertThat(providerDataService.releaseCount).isOne();
     }
@@ -256,7 +256,7 @@ class GoogleCalendarSyncServiceTest {
         );
 
         // when
-        Throwable thrown = catchThrowable(() -> executeOwned(service));
+        Throwable thrown = catchThrowable(() -> synchronize(service));
 
         // then
         assertThat(thrown).isSameAs(syncFailure);
@@ -281,7 +281,7 @@ class GoogleCalendarSyncServiceTest {
         );
 
         // when
-        GoogleCalendarSyncMode completedMode = executeOwned(service);
+        GoogleCalendarSyncMode completedMode = synchronize(service);
 
         // then
         assertThat(completedMode).isEqualTo(GoogleCalendarSyncMode.INCREMENTAL);
@@ -326,7 +326,7 @@ class GoogleCalendarSyncServiceTest {
         );
 
         // when
-        GoogleCalendarSyncMode completedMode = executeOwned(service);
+        GoogleCalendarSyncMode completedMode = synchronize(service);
 
         // then
         assertThat(completedMode).isEqualTo(GoogleCalendarSyncMode.FULL);
@@ -368,8 +368,8 @@ class GoogleCalendarSyncServiceTest {
         );
     }
 
-    private GoogleCalendarSyncMode executeOwned(GoogleCalendarSyncService service) {
-        return service.executeOwned(JOB_ID, ACCOUNT_ID, WORKER_TOKEN);
+    private GoogleCalendarSyncMode synchronize(GoogleCalendarSyncService service) {
+        return service.synchronize(JOB_ID, ACCOUNT_ID, WORKER_TOKEN);
     }
 
     private GoogleCalendarSyncService service(
@@ -464,7 +464,7 @@ class GoogleCalendarSyncServiceTest {
         }
 
         @Override
-        public void releaseOwnedLease(Long integrationId, String runId) {
+        public void releaseSyncLease(Long integrationId, String runId) {
             releaseCount++;
             if (releaseFailure != null) {
                 throw releaseFailure;
@@ -472,7 +472,7 @@ class GoogleCalendarSyncServiceTest {
         }
 
         @Override
-        public void finalizeOwnedReconciliation(
+        public void completeSyncRun(
                 Long jobId,
                 Long accountId,
                 Long integrationId,
@@ -590,7 +590,7 @@ class GoogleCalendarSyncServiceTest {
         }
 
         @Override
-        public void persistOwnedNormalizedPage(
+        public void persistSyncPage(
                 Long jobId,
                 Long integrationId,
                 Long accountId,

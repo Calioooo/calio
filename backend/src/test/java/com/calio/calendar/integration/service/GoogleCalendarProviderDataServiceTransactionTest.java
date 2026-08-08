@@ -97,7 +97,7 @@ class GoogleCalendarProviderDataServiceTransactionTest {
         );
 
         // when, then
-        assertThatThrownBy(() -> providerDataService.finalizeOwnedReconciliation(
+        assertThatThrownBy(() -> providerDataService.completeSyncRun(
                 1L,
                 account.getId(),
                 integration.getId(),

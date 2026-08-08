@@ -58,7 +58,7 @@ public class GoogleOperationProcessor {
 
     private JobExecutionResult executeSync(GoogleOperationJob job, String workerToken) {
         try {
-            syncService.executeOwned(job.getId(), job.getAccountId(), workerToken);
+            syncService.synchronize(job.getId(), job.getAccountId(), workerToken);
             return JobExecutionResult.CONTINUE_WITH_NEXT_JOB;
         } catch (RuntimeException failure) {
             return persistFailure(

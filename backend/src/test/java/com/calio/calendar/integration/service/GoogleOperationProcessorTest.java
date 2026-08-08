@@ -52,8 +52,8 @@ class GoogleOperationProcessorTest {
 
         // then
         InOrder executionOrder = inOrder(syncService);
-        executionOrder.verify(syncService).executeOwned(eq(1L), eq(10L), anyString());
-        executionOrder.verify(syncService).executeOwned(eq(2L), eq(10L), anyString());
+        executionOrder.verify(syncService).synchronize(eq(1L), eq(10L), anyString());
+        executionOrder.verify(syncService).synchronize(eq(2L), eq(10L), anyString());
         verify(jobPersistenceService).releaseLease(eq(10L), anyString());
     }
 
@@ -65,7 +65,7 @@ class GoogleOperationProcessorTest {
         RuntimeException failure = new RuntimeException("temporary failure");
         when(jobPersistenceService.acquireLease(eq(10L), anyString())).thenReturn(true);
         when(jobPersistenceService.claimHead(eq(10L), anyString())).thenReturn(job);
-        doThrow(failure).when(syncService).executeOwned(eq(1L), eq(10L), anyString());
+        doThrow(failure).when(syncService).synchronize(eq(1L), eq(10L), anyString());
         when(failureClassifier.classify(failure))
                 .thenReturn(GoogleOperationFailureDecision.retry("temporary"));
 
@@ -90,7 +90,7 @@ class GoogleOperationProcessorTest {
         when(jobPersistenceService.claimHead(eq(10L), anyString()))
                 .thenReturn(job)
                 .thenReturn(null);
-        doThrow(failure).when(syncService).executeOwned(eq(1L), eq(10L), anyString());
+        doThrow(failure).when(syncService).synchronize(eq(1L), eq(10L), anyString());
         when(failureClassifier.classify(failure))
                 .thenReturn(GoogleOperationFailureDecision.terminal("permanent"));
 
@@ -112,7 +112,7 @@ class GoogleOperationProcessorTest {
         RuntimeException failure = new RuntimeException("ownership lost");
         when(jobPersistenceService.acquireLease(eq(10L), anyString())).thenReturn(true);
         when(jobPersistenceService.claimHead(eq(10L), anyString())).thenReturn(job);
-        doThrow(failure).when(syncService).executeOwned(eq(1L), eq(10L), anyString());
+        doThrow(failure).when(syncService).synchronize(eq(1L), eq(10L), anyString());
         when(failureClassifier.classify(failure))
                 .thenReturn(GoogleOperationFailureDecision.abandon());
 
@@ -143,7 +143,7 @@ class GoogleOperationProcessorTest {
         verify(jobPersistenceService).terminate(
                 eq(1L), eq(10L), anyString(), eq("UNSUPPORTED_JOB_KIND")
         );
-        verify(syncService, never()).executeOwned(eq(1L), eq(10L), anyString());
+        verify(syncService, never()).synchronize(eq(1L), eq(10L), anyString());
         verifyNoInteractions(failureClassifier);
     }
 

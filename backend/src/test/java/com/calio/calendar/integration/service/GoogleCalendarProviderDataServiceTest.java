@@ -70,7 +70,7 @@ class GoogleCalendarProviderDataServiceTest {
         );
 
         // when
-        service.finalizeOwnedReconciliation(
+        service.completeSyncRun(
                 9L,
                 2L,
                 1L,

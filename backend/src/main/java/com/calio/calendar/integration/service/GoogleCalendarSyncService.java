@@ -40,7 +40,7 @@ public class GoogleCalendarSyncService {
         this.operationJobPersistenceService = operationJobPersistenceService;
     }
 
-    public GoogleCalendarSyncMode executeOwned(
+    public GoogleCalendarSyncMode synchronize(
             Long jobId,
             Long accountId,
             String workerToken
@@ -51,32 +51,32 @@ public class GoogleCalendarSyncService {
             GoogleCalendarSyncRunContext context = new GoogleCalendarSyncRunContext(
                     accessTokenService.getAccessToken(lease.integrationId())
             );
-            return synchronizeOwned(jobId, lease, context);
+            return synchronize(jobId, lease, context);
         } catch (RuntimeException exception) {
-            throw releaseOwnedLeasePreservingFailure(lease, exception);
+            throw releaseSyncLeasePreservingFailure(lease, exception);
         }
     }
 
-    private GoogleCalendarSyncMode synchronizeOwned(
+    private GoogleCalendarSyncMode synchronize(
             Long jobId,
             GoogleCalendarSyncLease lease,
             GoogleCalendarSyncRunContext context
     ) {
         if (modeFor(lease.nextSyncToken()) == GoogleCalendarSyncMode.FULL) {
-            synchronizeOwnedPages(jobId, lease, GoogleCalendarSyncMode.FULL, context);
+            synchronizePages(jobId, lease, GoogleCalendarSyncMode.FULL, context);
             return GoogleCalendarSyncMode.FULL;
         }
         try {
-            synchronizeOwnedPages(jobId, lease, GoogleCalendarSyncMode.INCREMENTAL, context);
+            synchronizePages(jobId, lease, GoogleCalendarSyncMode.INCREMENTAL, context);
             return GoogleCalendarSyncMode.INCREMENTAL;
         } catch (GoogleCalendarSyncTokenExpiredException exception) {
             context.resetSeenIdentities();
-            synchronizeOwnedPages(jobId, lease, GoogleCalendarSyncMode.FULL, context);
+            synchronizePages(jobId, lease, GoogleCalendarSyncMode.FULL, context);
             return GoogleCalendarSyncMode.FULL;
         }
     }
 
-    private void synchronizeOwnedPages(
+    private void synchronizePages(
             Long jobId,
             GoogleCalendarSyncLease lease,
             GoogleCalendarSyncMode mode,
@@ -97,13 +97,13 @@ public class GoogleCalendarSyncService {
             GoogleCalendarNormalizedPage normalizedPage = pageNormalizer.normalize(
                     lease.integrationId(), page, context);
             assertOwned(jobId, lease.accountId(), lease.runId());
-            pagePersistenceService.persistOwnedNormalizedPage(
+            pagePersistenceService.persistSyncPage(
                     jobId, lease.integrationId(), lease.accountId(), lease.runId(), normalizedPage);
             nextSyncToken = page.nextSyncToken();
             pageToken = nextPageToken(page, seenPageTokens);
         } while (pageToken != null);
         assertOwned(jobId, lease.accountId(), lease.runId());
-        providerDataService.finalizeOwnedReconciliation(
+        providerDataService.completeSyncRun(
                 jobId, lease.accountId(), lease.integrationId(), lease.runId(), mode,
                 context.seenEventIds(), context.seenRecurrenceEventIds(),
                 context.seenRecurrenceEventOverrideIds(), nextSyncToken);
@@ -121,12 +121,12 @@ public class GoogleCalendarSyncService {
         return nextPageToken;
     }
 
-    private RuntimeException releaseOwnedLeasePreservingFailure(
+    private RuntimeException releaseSyncLeasePreservingFailure(
             GoogleCalendarSyncLease lease,
             RuntimeException failure
     ) {
         try {
-            providerDataService.releaseOwnedLease(lease.integrationId(), lease.runId());
+            providerDataService.releaseSyncLease(lease.integrationId(), lease.runId());
         } catch (RuntimeException releaseException) {
             failure.addSuppressed(releaseException);
         }

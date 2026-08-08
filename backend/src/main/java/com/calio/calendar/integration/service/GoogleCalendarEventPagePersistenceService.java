@@ -83,7 +83,7 @@ public class GoogleCalendarEventPagePersistenceService {
     }
 
     @Transactional
-    public void persistOwnedNormalizedPage(
+    public void persistSyncPage(
             Long jobId,
             Long integrationId,
             Long accountId,

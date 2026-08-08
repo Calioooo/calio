@@ -20,7 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class GoogleCalendarProviderDataService {
 
-    private static final int RECONCILIATION_BATCH_SIZE = 500;
+    private static final int SYNC_CLEANUP_BATCH_SIZE = 500;
     private static final long FIRST_MAPPING_ID = 0L;
 
     private final GoogleCalendarIntegrationCommandService integrationCommandService;
@@ -65,7 +65,13 @@ public class GoogleCalendarProviderDataService {
     }
 
     @Transactional
-    public void finalizeOwnedReconciliation(
+    /**
+     * Completes one sync run atomically.
+     *
+     * <p>FULL sync cleanup, the next sync token, and operation job completion must commit
+     * together so a sync token never represents a partial provider data update.</p>
+     */
+    public void completeSyncRun(
             Long jobId,
             Long accountId,
             Long integrationId,
@@ -78,31 +84,41 @@ public class GoogleCalendarProviderDataService {
     ) {
         OperationOwnership ownership = new OperationOwnership(jobId, accountId, workerToken);
         renewOperationOwnership(ownership);
-        if (!hasText(nextSyncToken)) {
-            throw new CalioException(ErrorCode.GOOGLE_CALENDAR_SYNC_TOKEN_MISSING);
-        }
-        if (syncMode == GoogleCalendarSyncMode.FULL) {
-            deleteUnseenProviderData(
-                    integrationId, ownership, seenEventIds,
-                    seenRecurrenceEventIds, seenOverrideIds);
-        }
-        finalizeSync(integrationId, workerToken, nextSyncToken);
-        renewOperationOwnership(ownership);
-        operationJobPersistenceService.succeed(jobId, accountId, workerToken);
+        requireNextSyncToken(nextSyncToken);
+        removeProviderDataMissingFromFullSync(
+                integrationId,
+                ownership,
+                syncMode,
+                seenEventIds,
+                seenRecurrenceEventIds,
+                seenOverrideIds
+        );
+        completeIntegrationSync(integrationId, workerToken, nextSyncToken);
+        completeOperationJob(ownership);
     }
 
     @Transactional
-    public void releaseOwnedLease(Long integrationId, String runId) {
+    public void releaseSyncLease(Long integrationId, String runId) {
         integrationCommandService.releaseSyncLease(integrationId, runId);
     }
 
-    private void deleteUnseenProviderData(
+    private void requireNextSyncToken(String nextSyncToken) {
+        if (!hasText(nextSyncToken)) {
+            throw new CalioException(ErrorCode.GOOGLE_CALENDAR_SYNC_TOKEN_MISSING);
+        }
+    }
+
+    private void removeProviderDataMissingFromFullSync(
             Long integrationId,
             OperationOwnership ownership,
+            GoogleCalendarSyncMode syncMode,
             Set<String> seenEventIds,
             Set<String> seenRecurrenceEventIds,
             Set<GoogleCalendarRecurrenceOverrideExternalKey> seenOverrideIds
     ) {
+        if (syncMode != GoogleCalendarSyncMode.FULL) {
+            return;
+        }
         deleteUnseenOverridesInBatches(integrationId, ownership, seenOverrideIds);
         deleteUnseenEventsInBatches(integrationId, ownership, seenEventIds);
         deleteUnseenRecurrenceEventsInBatches(
@@ -138,12 +154,12 @@ public class GoogleCalendarProviderDataService {
             Set<GoogleCalendarRecurrenceOverrideExternalKey> seenOverrideIds,
             long afterId
     ) {
-        renewReconciliationLeases(integrationId, ownership);
+        renewSyncRunLeases(integrationId, ownership);
         List<GoogleCalendarRecurrenceOverrideMapping> mappings =
                 recurrenceMappingQueryService.listOverrideMappingBatch(
                         integrationId,
                         afterId,
-                        RECONCILIATION_BATCH_SIZE
+                        SYNC_CLEANUP_BATCH_SIZE
                 );
         if (mappings.isEmpty()) {
             return null;
@@ -193,12 +209,12 @@ public class GoogleCalendarProviderDataService {
             Set<String> seenEventIds,
             long afterId
     ) {
-        renewReconciliationLeases(integrationId, ownership);
+        renewSyncRunLeases(integrationId, ownership);
         List<GoogleCalendarEventMapping> mappings =
                 eventMappingQueryService.listEventMappingBatch(
                         integrationId,
                         afterId,
-                        RECONCILIATION_BATCH_SIZE
+                        SYNC_CLEANUP_BATCH_SIZE
                 );
         if (mappings.isEmpty()) {
             return null;
@@ -244,12 +260,12 @@ public class GoogleCalendarProviderDataService {
             Set<String> seenRecurrenceEventIds,
             long afterId
     ) {
-        renewReconciliationLeases(integrationId, ownership);
+        renewSyncRunLeases(integrationId, ownership);
         List<GoogleCalendarRecurrenceEventMapping> mappings =
                 recurrenceMappingQueryService.listRecurrenceEventMappingBatch(
                         integrationId,
                         afterId,
-                        RECONCILIATION_BATCH_SIZE
+                        SYNC_CLEANUP_BATCH_SIZE
                 );
         if (mappings.isEmpty()) {
             return null;
@@ -276,16 +292,25 @@ public class GoogleCalendarProviderDataService {
         return mappings.getLast().getId();
     }
 
-    private void finalizeSync(Long integrationId, String runId, String nextSyncToken) {
+    private void completeIntegrationSync(Long integrationId, String runId, String nextSyncToken) {
         integrationCommandService.renewSyncLease(integrationId, runId);
         integrationCommandService.completeSync(integrationId, runId, nextSyncToken);
+    }
+
+    private void completeOperationJob(OperationOwnership ownership) {
+        renewOperationOwnership(ownership);
+        operationJobPersistenceService.succeed(
+                ownership.jobId(),
+                ownership.accountId(),
+                ownership.workerToken()
+        );
     }
 
     private void extendSyncLeaseOrThrow(Long integrationId, String runId) {
         integrationCommandService.renewSyncLease(integrationId, runId);
     }
 
-    private void renewReconciliationLeases(
+    private void renewSyncRunLeases(
             Long integrationId,
             OperationOwnership ownership
     ) {

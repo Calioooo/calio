@@ -708,7 +708,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
         );
 
         // when
-        providerDataService.finalizeOwnedReconciliation(
+        providerDataService.completeSyncRun(
                 1L,
                 account.getId(),
                 integration.getId(),
@@ -808,7 +808,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
         if (page.hasNextPage()) {
             return;
         }
-        providerDataService.finalizeOwnedReconciliation(
+        providerDataService.completeSyncRun(
                 1L,
                 accountId,
                 integrationId,
