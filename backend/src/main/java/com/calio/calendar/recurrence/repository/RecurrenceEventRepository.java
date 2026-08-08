@@ -48,7 +48,7 @@ public interface RecurrenceEventRepository extends JpaRepository<RecurrenceEvent
             set recurrenceEvent.tag = :fallbackTag
             where recurrenceEvent.tag = :sourceTag and recurrenceEvent.account.id = :accountId
             """)
-    void reassignAllByTagAndAccountId(
+    int reassignAllByTagAndAccountId(
             @Param("sourceTag") Tag sourceTag,
             @Param("fallbackTag") Tag fallbackTag,
             @Param("accountId") Long accountId
@@ -56,5 +56,5 @@ public interface RecurrenceEventRepository extends JpaRepository<RecurrenceEvent
 
     @Modifying(flushAutomatically = true)
     @Query("delete from RecurrenceEvent recurrenceEvent where recurrenceEvent.id in :ids")
-    void deleteAllByIds(@Param("ids") Collection<Long> ids);
+    int deleteAllByIds(@Param("ids") Collection<Long> ids);
 }
