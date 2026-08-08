@@ -160,8 +160,8 @@ class NationalHolidaySyncServiceTest {
     }
 
     @Test
-    @DisplayName("provider localDate parsing 실패는 snapshot 실패로 보고 기존 DB row를 보존한다")
-    void givenInvalidProviderLocalDate_whenSyncYear_thenPreservesExistingRows() {
+    @DisplayName("locdate parsing 실패는 provider snapshot 실패로 보고 기존 DB row를 보존한다")
+    void givenInvalidLocdate_whenSyncYear_thenPreservesExistingRows() {
         // given
         holidayApiClient.addResponse(2026, new HolidayApiResponse(
                 "00",

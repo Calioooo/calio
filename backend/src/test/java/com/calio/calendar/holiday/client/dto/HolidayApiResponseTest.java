@@ -48,7 +48,7 @@ class HolidayApiResponseTest {
         // then
         assertThat(response.resultCode()).isEqualTo("00");
         assertThat(response.items()).hasSize(2);
-        assertThat(response.items().getFirst().localDate()).isEqualTo("20260101");
+        assertThat(response.items().getFirst().locdate()).isEqualTo("20260101");
         assertThat(response.items().getFirst().dateName()).isEqualTo("신정");
         assertThat(response.items().getFirst().isHoliday()).isEqualTo("Y");
     }
@@ -82,7 +82,7 @@ class HolidayApiResponseTest {
         // then
         assertThat(response.items()).singleElement()
                 .satisfies(item -> {
-                    assertThat(item.localDate()).isEqualTo("20261003");
+                    assertThat(item.locdate()).isEqualTo("20261003");
                     assertThat(item.dateName()).isEqualTo("개천절");
                     assertThat(item.isHoliday()).isEqualTo("Y");
                 });
