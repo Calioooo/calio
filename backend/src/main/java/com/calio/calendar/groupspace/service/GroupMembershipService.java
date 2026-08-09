@@ -5,7 +5,7 @@ import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.groupinvitation.domain.GroupInvitation;
 import com.calio.calendar.groupinvitation.domain.InvitationCredentialType;
 import com.calio.calendar.groupinvitation.repository.GroupInvitationRepository;
-import com.calio.calendar.groupinvitation.service.GroupInvitationService;
+import com.calio.calendar.groupinvitation.service.GroupInvitationCommandService;
 import com.calio.calendar.groupinvitation.service.InvitationCredentialService;
 import com.calio.calendar.groupspace.controller.dto.AcceptGroupInvitationRequest;
 import com.calio.calendar.groupspace.controller.dto.AcceptGroupInvitationResponse;
@@ -33,7 +33,7 @@ public class GroupMembershipService {
     private final GroupSpaceRepository groupSpaceRepository;
     private final GroupMemberRepository groupMemberRepository;
     private final GroupInvitationRepository groupInvitationRepository;
-    private final GroupInvitationService invitationService;
+    private final GroupInvitationCommandService invitationCommandService;
     private final InvitationCredentialService credentialService;
     private final GroupScheduleShareCleanupPort groupScheduleShareCleanupPort;
     private final Clock clock;
@@ -42,7 +42,7 @@ public class GroupMembershipService {
             GroupSpaceRepository groupSpaceRepository,
             GroupMemberRepository groupMemberRepository,
             GroupInvitationRepository groupInvitationRepository,
-            GroupInvitationService invitationService,
+            GroupInvitationCommandService invitationCommandService,
             InvitationCredentialService credentialService,
             GroupScheduleShareCleanupPort groupScheduleShareCleanupPort,
             Clock clock
@@ -50,7 +50,7 @@ public class GroupMembershipService {
         this.groupSpaceRepository = groupSpaceRepository;
         this.groupMemberRepository = groupMemberRepository;
         this.groupInvitationRepository = groupInvitationRepository;
-        this.invitationService = invitationService;
+        this.invitationCommandService = invitationCommandService;
         this.credentialService = credentialService;
         this.groupScheduleShareCleanupPort = groupScheduleShareCleanupPort;
         this.clock = clock;
@@ -247,7 +247,7 @@ public class GroupMembershipService {
 
     private void deleteSoleOwnerGroup(GroupSpace groupSpace) {
         groupScheduleShareCleanupPort.cleanupGroupShares(groupSpace.getId());
-        invitationService.deleteAllByGroupSpaceId(groupSpace.getId());
+        invitationCommandService.deleteAllByGroupSpaceId(groupSpace.getId());
         groupMemberRepository.deleteAllByGroupSpaceId(groupSpace.getId());
         groupSpaceRepository.delete(groupSpace);
     }

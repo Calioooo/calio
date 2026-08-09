@@ -3,7 +3,7 @@ package com.calio.calendar.groupspace.service;
 import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
-import com.calio.calendar.groupinvitation.service.GroupInvitationService;
+import com.calio.calendar.groupinvitation.service.GroupInvitationCommandService;
 import com.calio.calendar.groupspace.controller.dto.CreateGroupSpaceRequest;
 import com.calio.calendar.groupspace.controller.dto.GroupSpaceDetailResponse;
 import com.calio.calendar.groupspace.controller.dto.GroupSpaceListResponse;
@@ -28,7 +28,7 @@ public class GroupSpaceService {
     private final GroupSpaceRepository groupSpaceRepository;
     private final GroupMemberRepository groupMemberRepository;
     private final AccountRepository accountRepository;
-    private final GroupInvitationService invitationService;
+    private final GroupInvitationCommandService invitationCommandService;
     private final GroupScheduleShareCleanupPort groupScheduleShareCleanupPort;
     private final Clock clock;
 
@@ -37,14 +37,14 @@ public class GroupSpaceService {
             GroupSpaceRepository groupSpaceRepository,
             GroupMemberRepository groupMemberRepository,
             AccountRepository accountRepository,
-            GroupInvitationService invitationService,
+            GroupInvitationCommandService invitationCommandService,
             GroupScheduleShareCleanupPort groupScheduleShareCleanupPort,
             Clock clock
     ) {
         this.groupSpaceRepository = groupSpaceRepository;
         this.groupMemberRepository = groupMemberRepository;
         this.accountRepository = accountRepository;
-        this.invitationService = invitationService;
+        this.invitationCommandService = invitationCommandService;
         this.groupScheduleShareCleanupPort = groupScheduleShareCleanupPort;
         this.clock = clock;
     }
@@ -105,7 +105,7 @@ public class GroupSpaceService {
 
         groupMemberRepository.findAllByGroupSpaceIdForUpdateOrderById(groupSpaceId);
         groupScheduleShareCleanupPort.cleanupGroupShares(groupSpaceId);
-        invitationService.deleteAllByGroupSpaceId(groupSpaceId);
+        invitationCommandService.deleteAllByGroupSpaceId(groupSpaceId);
         groupMemberRepository.deleteAllByGroupSpaceId(groupSpaceId);
         groupSpaceRepository.delete(groupSpace);
     }

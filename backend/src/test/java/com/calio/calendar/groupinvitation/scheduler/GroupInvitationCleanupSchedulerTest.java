@@ -5,7 +5,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.calio.calendar.groupinvitation.config.GroupInvitationProperties;
-import com.calio.calendar.groupinvitation.service.GroupInvitationService;
+import com.calio.calendar.groupinvitation.service.GroupInvitationCommandService;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -20,7 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class GroupInvitationCleanupSchedulerTest {
 
     @Mock
-    private GroupInvitationService invitationService;
+    private GroupInvitationCommandService commandService;
 
     @Test
     @DisplayName("cleanup은 retention cutoff로 batch가 가득 찬 동안 독립 batch 삭제를 반복한다")
@@ -30,17 +30,17 @@ class GroupInvitationCleanupSchedulerTest {
         Instant cutoff = Instant.parse("2026-07-27T08:00:00Z");
         GroupInvitationProperties properties = properties(2, 10);
         GroupInvitationCleanupScheduler scheduler = new GroupInvitationCleanupScheduler(
-                invitationService,
+                commandService,
                 properties,
                 Clock.fixed(now, ZoneOffset.UTC)
         );
-        when(invitationService.deleteExpiredBatch(cutoff)).thenReturn(2, 2, 1);
+        when(commandService.deleteExpiredBatch(cutoff)).thenReturn(2, 2, 1);
 
         // when
         scheduler.deleteRetainedExpiredInvitations();
 
         // then
-        verify(invitationService, times(3)).deleteExpiredBatch(cutoff);
+        verify(commandService, times(3)).deleteExpiredBatch(cutoff);
     }
 
     @Test
@@ -51,17 +51,17 @@ class GroupInvitationCleanupSchedulerTest {
         Instant cutoff = Instant.parse("2026-07-27T08:00:00Z");
         GroupInvitationProperties properties = properties(2, 3);
         GroupInvitationCleanupScheduler scheduler = new GroupInvitationCleanupScheduler(
-                invitationService,
+                commandService,
                 properties,
                 Clock.fixed(now, ZoneOffset.UTC)
         );
-        when(invitationService.deleteExpiredBatch(cutoff)).thenReturn(2);
+        when(commandService.deleteExpiredBatch(cutoff)).thenReturn(2);
 
         // when
         scheduler.deleteRetainedExpiredInvitations();
 
         // then
-        verify(invitationService, times(3)).deleteExpiredBatch(cutoff);
+        verify(commandService, times(3)).deleteExpiredBatch(cutoff);
     }
 
     private GroupInvitationProperties properties(int batchSize, int maxBatches) {
