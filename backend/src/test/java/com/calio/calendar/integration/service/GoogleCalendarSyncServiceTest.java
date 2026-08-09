@@ -509,17 +509,14 @@ class GoogleCalendarSyncServiceTest {
                     mock(AccountQueryService.class),
                     mock(TagQueryService.class),
                     mock(RecurrenceEventRepository.class),
-                    mock(RecurrenceEventOverrideRepository.class),
-                    mock(GoogleOperationLeaseService.class)
+                    mock(RecurrenceEventOverrideRepository.class)
             );
         }
 
         @Override
-        public void persistSyncPage(
-                Long jobId,
+        public void persistNormalizedPage(
                 Long integrationId,
                 Long accountId,
-                String workerToken,
                 GoogleCalendarNormalizedPage page
         ) {
             normalizedPersistCount++;

@@ -97,11 +97,9 @@ public class GoogleCalendarSyncService {
             GoogleCalendarNormalizedPage normalizedPage = pageNormalizer.normalize(
                     execution.integrationId(), page, context);
             operationLeaseService.extend(jobId, execution.accountId(), execution.workerToken());
-            pagePersistenceService.persistSyncPage(
-                    jobId,
+            pagePersistenceService.persistNormalizedPage(
                     execution.integrationId(),
                     execution.accountId(),
-                    execution.workerToken(),
                     normalizedPage
             );
             nextSyncToken = page.nextSyncToken();

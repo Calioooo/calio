@@ -51,7 +51,6 @@ public class GoogleCalendarEventPagePersistenceService {
     private final TagQueryService tagQueryService;
     private final RecurrenceEventRepository recurrenceEventRepository;
     private final RecurrenceEventOverrideRepository overrideRepository;
-    private final GoogleOperationLeaseService operationLeaseService;
 
     public GoogleCalendarEventPagePersistenceService(
             GoogleCalendarIntegrationQueryService integrationQueryService,
@@ -63,8 +62,7 @@ public class GoogleCalendarEventPagePersistenceService {
             AccountQueryService accountQueryService,
             TagQueryService tagQueryService,
             RecurrenceEventRepository recurrenceEventRepository,
-            RecurrenceEventOverrideRepository overrideRepository,
-            GoogleOperationLeaseService operationLeaseService
+            RecurrenceEventOverrideRepository overrideRepository
     ) {
         this.integrationQueryService = integrationQueryService;
         this.eventMappingQueryService = eventMappingQueryService;
@@ -76,20 +74,6 @@ public class GoogleCalendarEventPagePersistenceService {
         this.tagQueryService = tagQueryService;
         this.recurrenceEventRepository = recurrenceEventRepository;
         this.overrideRepository = overrideRepository;
-        this.operationLeaseService = operationLeaseService;
-    }
-
-    @Transactional
-    public void persistSyncPage(
-            Long jobId,
-            Long integrationId,
-            Long accountId,
-            String workerToken,
-            GoogleCalendarNormalizedPage page
-    ) {
-        operationLeaseService.extend(jobId, accountId, workerToken);
-        GoogleCalendarIntegration integration = integrationQueryService.getIntegrationById(integrationId);
-        applyEventChanges(integration, accountId, page.items());
     }
 
     @Transactional
