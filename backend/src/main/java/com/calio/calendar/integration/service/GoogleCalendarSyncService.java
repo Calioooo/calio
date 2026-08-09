@@ -15,7 +15,7 @@ import org.springframework.stereotype.Service;
 public class GoogleCalendarSyncService {
 
     private final GoogleCalendarIntegrationQueryService integrationQueryService;
-    private final GoogleCalendarProviderDataService providerDataService;
+    private final GoogleCalendarIntegrationDataService integrationDataService;
     private final GoogleCalendarAccessTokenService accessTokenService;
     private final GoogleCalendarEventRequestService eventRequestService;
     private final GoogleCalendarPageChangeService pageChangeService;
@@ -24,7 +24,7 @@ public class GoogleCalendarSyncService {
 
     public GoogleCalendarSyncService(
             GoogleCalendarIntegrationQueryService integrationQueryService,
-            GoogleCalendarProviderDataService providerDataService,
+            GoogleCalendarIntegrationDataService integrationDataService,
             GoogleCalendarAccessTokenService accessTokenService,
             GoogleCalendarEventRequestService eventRequestService,
             GoogleCalendarPageChangeService pageChangeService,
@@ -32,7 +32,7 @@ public class GoogleCalendarSyncService {
             GoogleOperationLeaseService operationLeaseService
     ) {
         this.integrationQueryService = integrationQueryService;
-        this.providerDataService = providerDataService;
+        this.integrationDataService = integrationDataService;
         this.accessTokenService = accessTokenService;
         this.eventRequestService = eventRequestService;
         this.pageChangeService = pageChangeService;
@@ -106,7 +106,7 @@ public class GoogleCalendarSyncService {
             pageToken = nextPageToken(page, seenPageTokens);
         } while (pageToken != null);
         operationLeaseService.extend(jobId, execution.accountId(), execution.workerToken());
-        providerDataService.completeSyncRun(
+        integrationDataService.completeSyncRun(
                 jobId,
                 execution.accountId(),
                 execution.integrationId(),

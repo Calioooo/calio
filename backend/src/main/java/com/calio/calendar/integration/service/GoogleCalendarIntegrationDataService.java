@@ -18,7 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-public class GoogleCalendarProviderDataService {
+public class GoogleCalendarIntegrationDataService {
 
     private static final int SYNC_CLEANUP_BATCH_SIZE = 500;
     private static final long FIRST_MAPPING_ID = 0L;
@@ -35,7 +35,7 @@ public class GoogleCalendarProviderDataService {
     private final GoogleOperationLeaseService operationLeaseService;
     private final GoogleOperationJobPersistenceService operationJobPersistenceService;
 
-    public GoogleCalendarProviderDataService(
+    public GoogleCalendarIntegrationDataService(
             GoogleCalendarIntegrationCommandService integrationCommandService,
             GoogleCalendarEventMappingQueryService eventMappingQueryService,
             GoogleCalendarEventMappingCommandService eventMappingCommandService,
@@ -62,9 +62,9 @@ public class GoogleCalendarProviderDataService {
     }
 
     @Transactional
-    public void deleteProviderData(Long integrationId) {
-        deleteAllRecurrenceProviderData(integrationId);
-        deleteAllEventProviderData(integrationId);
+    public void deleteIntegrationData(Long integrationId) {
+        deleteAllMappedRecurrenceData(integrationId);
+        deleteAllMappedEventData(integrationId);
     }
 
     @Transactional
@@ -88,7 +88,7 @@ public class GoogleCalendarProviderDataService {
         OperationOwnership ownership = new OperationOwnership(jobId, accountId, workerToken);
         operationLeaseService.extend(ownership.jobId(), ownership.accountId(), ownership.workerToken());
         requireNextSyncToken(nextSyncToken);
-        removeProviderDataMissingFromFullSync(
+        removeDataMissingFromFullSync(
                 integrationId,
                 ownership,
                 syncMode,
@@ -106,7 +106,7 @@ public class GoogleCalendarProviderDataService {
         }
     }
 
-    private void removeProviderDataMissingFromFullSync(
+    private void removeDataMissingFromFullSync(
             Long integrationId,
             OperationOwnership ownership,
             GoogleCalendarSyncMode syncMode,
@@ -299,13 +299,13 @@ public class GoogleCalendarProviderDataService {
         );
     }
 
-    private void deleteAllRecurrenceProviderData(Long integrationId) {
+    private void deleteAllMappedRecurrenceData(Long integrationId) {
         deleteOverrides(recurrenceMappingQueryService.listOverrideMappings(integrationId));
         recurrenceMappingQueryService.listRecurrenceEventMappings(integrationId)
                 .forEach(recurrenceChangeService::deleteRecurrenceEvent);
     }
 
-    private void deleteAllEventProviderData(Long integrationId) {
+    private void deleteAllMappedEventData(Long integrationId) {
         deleteEventMappings(
                 eventMappingQueryService.listEventMappings(integrationId)
         );

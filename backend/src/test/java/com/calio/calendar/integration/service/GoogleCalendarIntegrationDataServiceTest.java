@@ -18,7 +18,7 @@ import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-class GoogleCalendarProviderDataServiceTest {
+class GoogleCalendarIntegrationDataServiceTest {
 
     private final GoogleCalendarIntegrationCommandService integrationCommandService =
             mock(GoogleCalendarIntegrationCommandService.class);
@@ -59,7 +59,7 @@ class GoogleCalendarProviderDataServiceTest {
         when(recurrenceMappingQueryService.listRecurrenceEventMappingBatch(1L, 0L, 500))
                 .thenReturn(List.of());
 
-        GoogleCalendarProviderDataService service = new GoogleCalendarProviderDataService(
+        GoogleCalendarIntegrationDataService service = new GoogleCalendarIntegrationDataService(
                 integrationCommandService,
                 eventMappingQueryService,
                 eventMappingCommandService,

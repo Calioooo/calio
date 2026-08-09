@@ -372,7 +372,7 @@ class GoogleCalendarSyncServiceTest {
     }
 
     private static final class FakeProviderDataService
-            extends GoogleCalendarProviderDataService {
+            extends GoogleCalendarIntegrationDataService {
 
         private int finalizeCount;
         private GoogleCalendarSyncMode finalizedMode;

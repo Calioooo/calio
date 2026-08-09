@@ -60,7 +60,7 @@ class GoogleCalendarPageChangeServiceTest {
     private GoogleCalendarPageNormalizer pageNormalizer;
 
     @Autowired
-    private GoogleCalendarProviderDataService providerDataService;
+    private GoogleCalendarIntegrationDataService integrationDataService;
 
     @Autowired
     private GoogleCalendarIntegrationRepository integrationRepository;
@@ -672,7 +672,7 @@ class GoogleCalendarPageChangeServiceTest {
         );
 
         // when
-        providerDataService.completeSyncRun(
+        integrationDataService.completeSyncRun(
                 1L,
                 account.getId(),
                 integration.getId(),
@@ -758,7 +758,7 @@ class GoogleCalendarPageChangeServiceTest {
         if (page.hasNextPage()) {
             return;
         }
-        providerDataService.completeSyncRun(
+        integrationDataService.completeSyncRun(
                 1L,
                 accountId,
                 integrationId,

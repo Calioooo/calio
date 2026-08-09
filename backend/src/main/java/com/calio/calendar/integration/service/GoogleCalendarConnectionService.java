@@ -30,7 +30,7 @@ public class GoogleCalendarConnectionService {
     private final TokenEncryptor tokenEncryptor;
     private final GoogleCalendarIntegrationQueryService integrationQueryService;
     private final GoogleCalendarIntegrationCommandService integrationCommandService;
-    private final GoogleCalendarProviderDataService providerDataService;
+    private final GoogleCalendarIntegrationDataService integrationDataService;
     private final GoogleOperationJobCommandService jobCommandService;
     private final TransactionTemplate registrationTransaction;
     private final TransactionTemplate removalTransaction;
@@ -42,7 +42,7 @@ public class GoogleCalendarConnectionService {
             TokenEncryptor tokenEncryptor,
             GoogleCalendarIntegrationQueryService integrationQueryService,
             GoogleCalendarIntegrationCommandService integrationCommandService,
-            GoogleCalendarProviderDataService providerDataService,
+            GoogleCalendarIntegrationDataService integrationDataService,
             GoogleOperationJobCommandService jobCommandService,
             PlatformTransactionManager transactionManager,
             Clock clock
@@ -52,7 +52,7 @@ public class GoogleCalendarConnectionService {
         this.tokenEncryptor = tokenEncryptor;
         this.integrationQueryService = integrationQueryService;
         this.integrationCommandService = integrationCommandService;
-        this.providerDataService = providerDataService;
+        this.integrationDataService = integrationDataService;
         this.jobCommandService = jobCommandService;
         this.registrationTransaction = new TransactionTemplate(transactionManager);
         this.registrationTransaction.setPropagationBehavior(
@@ -203,7 +203,7 @@ public class GoogleCalendarConnectionService {
             GoogleCalendarIntegration integration,
             GoogleCalendarConnectionCredentials credentials
     ) {
-        providerDataService.deleteProviderData(integration.getId());
+        integrationDataService.deleteIntegrationData(integration.getId());
         return integrationCommandService.replaceIntegration(
                 integration,
                 credentials.googleSubject(),
@@ -223,7 +223,7 @@ public class GoogleCalendarConnectionService {
 
     private void removeConnection(GoogleCalendarIntegration integration) {
         jobCommandService.deleteJobsForIntegration(integration.getId());
-        providerDataService.deleteProviderData(integration.getId());
+        integrationDataService.deleteIntegrationData(integration.getId());
         integrationCommandService.deleteIntegration(integration);
     }
 

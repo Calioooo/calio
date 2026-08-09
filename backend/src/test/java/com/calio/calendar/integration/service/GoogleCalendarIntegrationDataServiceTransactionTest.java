@@ -34,10 +34,10 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
         "spring.datasource.password=",
         "spring.jpa.hibernate.ddl-auto=create-drop"
 })
-class GoogleCalendarProviderDataServiceTransactionTest {
+class GoogleCalendarIntegrationDataServiceTransactionTest {
 
     @Autowired
-    private GoogleCalendarProviderDataService providerDataService;
+    private GoogleCalendarIntegrationDataService integrationDataService;
 
     @MockitoBean
     private GoogleOperationLeaseService operationLeaseService;
@@ -95,7 +95,7 @@ class GoogleCalendarProviderDataServiceTransactionTest {
         );
 
         // when, then
-        assertThatThrownBy(() -> providerDataService.completeSyncRun(
+        assertThatThrownBy(() -> integrationDataService.completeSyncRun(
                 1L,
                 account.getId(),
                 integration.getId(),
