@@ -40,7 +40,7 @@ public class GoogleOperationProcessor {
     }
 
     private JobExecutionResult processHead(Long accountId, String workerToken) {
-        GoogleOperationJob job = jobPersistenceService.claimHead(accountId, workerToken);
+        GoogleOperationJob job = jobPersistenceService.claimNextJob(accountId, workerToken);
         if (job == null) {
             return JobExecutionResult.STOP_ACCOUNT_PROCESSING;
         }

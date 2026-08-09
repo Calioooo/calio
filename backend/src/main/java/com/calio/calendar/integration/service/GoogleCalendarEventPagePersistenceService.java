@@ -90,7 +90,7 @@ public class GoogleCalendarEventPagePersistenceService {
             String workerToken,
             GoogleCalendarNormalizedPage page
     ) {
-        operationJobPersistenceService.renewAndAssertOwned(jobId, accountId, workerToken);
+        operationJobPersistenceService.extendOperationLease(jobId, accountId, workerToken);
         extendSyncLeaseOrThrow(integrationId, workerToken);
         GoogleCalendarIntegration integration = integrationQueryService.getIntegrationById(integrationId);
         applyEventChanges(integration, accountId, page.items());

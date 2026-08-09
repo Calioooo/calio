@@ -319,7 +319,7 @@ public class GoogleCalendarProviderDataService {
     }
 
     private void renewOperationOwnership(OperationOwnership ownership) {
-        operationJobPersistenceService.renewAndAssertOwned(
+        operationJobPersistenceService.extendOperationLease(
                 ownership.jobId(),
                 ownership.accountId(),
                 ownership.workerToken()

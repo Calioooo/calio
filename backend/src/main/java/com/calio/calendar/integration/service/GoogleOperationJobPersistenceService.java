@@ -49,7 +49,7 @@ public class GoogleOperationJobPersistenceService {
     }
 
     @Transactional
-    public GoogleOperationJob claimHead(Long accountId, String workerToken) {
+    public GoogleOperationJob claimNextJob(Long accountId, String workerToken) {
         GoogleOperationJob head = jobCommandService.tryLockNextOperationJob(accountId).orElse(null);
         if (head == null) {
             log.debug("Google operation head not found. accountId={} state=EMPTY", accountId);
@@ -70,9 +70,9 @@ public class GoogleOperationJobPersistenceService {
     }
 
     @Transactional
-    public void renewAndAssertOwned(Long jobId, Long accountId, String workerToken) {
+    public void extendOperationLease(Long jobId, Long accountId, String workerToken) {
         try {
-            integrationCommandService.renewOperationLease(jobId, accountId, workerToken);
+            integrationCommandService.extendOperationLease(jobId, accountId, workerToken);
         } catch (GoogleOperationOwnershipLostException exception) {
             log.warn("Google operation ownership lost. accountId={} jobId={} state=PROCESSING", accountId, jobId);
             throw exception;

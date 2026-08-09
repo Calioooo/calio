@@ -128,7 +128,7 @@ public class GoogleCalendarIntegrationCommandService {
         return integrationRepository.acquireGoogleOperationLease(accountId, ownerToken) == 1;
     }
 
-    public void renewOperationLease(Long jobId, Long accountId, String ownerToken) {
+    public void extendOperationLease(Long jobId, Long accountId, String ownerToken) {
         if (integrationRepository.renewOwnedGoogleOperationLease(
                 jobId,
                 accountId,

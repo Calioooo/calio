@@ -41,8 +41,8 @@ class GoogleOperationJobPersistenceServiceIntegrationTest {
     private AccountRepository accountRepository;
 
     @Test
-    @DisplayName("실행 시각이 남은 FIFO head는 뒤의 실행 가능한 Job 선점을 차단한다")
-    void givenDelayedAccountHead_whenClaiming_thenDoesNotSkipToLaterJob() {
+    @DisplayName("앞선 Job의 실행 시각이 남아 있으면 뒤의 실행 가능한 Job을 먼저 실행하지 않는다")
+    void givenEarlierJobScheduledForLater_whenLaterJobIsRunnable_thenDoesNotRunLaterJob() {
         // given
         JobFixture fixture = jobs(
                 Instant.now().plusSeconds(3_600),
@@ -51,7 +51,7 @@ class GoogleOperationJobPersistenceServiceIntegrationTest {
         assertThat(persistenceService.acquireLease(fixture.accountId(), "worker-a")).isTrue();
 
         // when
-        GoogleOperationJob claimed = persistenceService.claimHead(
+        GoogleOperationJob claimed = persistenceService.claimNextJob(
                 fixture.accountId(),
                 "worker-a"
         );
@@ -69,7 +69,7 @@ class GoogleOperationJobPersistenceServiceIntegrationTest {
     }
 
     @Test
-    @DisplayName("선두 Job 성공 삭제 후에만 다음 account sequence Job을 선점한다")
+    @DisplayName("앞선 Job의 성공 후에만 다음 순서의 Job을 실행할 수 있다")
     void givenTwoRunnableJobs_whenFirstSucceeds_thenClaimsNextInSequence() {
         // given
         JobFixture fixture = jobs(
@@ -79,12 +79,12 @@ class GoogleOperationJobPersistenceServiceIntegrationTest {
         assertThat(persistenceService.acquireLease(fixture.accountId(), "worker-a")).isTrue();
 
         // when
-        GoogleOperationJob first = persistenceService.claimHead(
+        GoogleOperationJob first = persistenceService.claimNextJob(
                 fixture.accountId(),
                 "worker-a"
         );
         persistenceService.succeed(first.getId(), fixture.accountId(), "worker-a");
-        GoogleOperationJob second = persistenceService.claimHead(
+        GoogleOperationJob second = persistenceService.claimNextJob(
                 fixture.accountId(),
                 "worker-a"
         );
@@ -98,12 +98,12 @@ class GoogleOperationJobPersistenceServiceIntegrationTest {
     }
 
     @Test
-    @DisplayName("retry는 소유한 PROCESSING Job을 지연된 PENDING으로 되돌리고 횟수를 증가시킨다")
+    @DisplayName("retry 시 현재 진행중인 Job을 PENDING 상태로 변경하고 retry count를 증가시킨다")
     void givenOwnedProcessingJob_whenRetrying_thenSchedulesPendingRetry() {
         // given
         JobFixture fixture = jobs(Instant.now().minusSeconds(60));
         assertThat(persistenceService.acquireLease(fixture.accountId(), "worker-a")).isTrue();
-        GoogleOperationJob claimed = persistenceService.claimHead(
+        GoogleOperationJob claimed = persistenceService.claimNextJob(
                 fixture.accountId(),
                 "worker-a"
         );
@@ -125,12 +125,12 @@ class GoogleOperationJobPersistenceServiceIntegrationTest {
     }
 
     @Test
-    @DisplayName("소유하지 않은 worker는 retry, terminal, 성공 삭제 상태 전이를 수행할 수 없다")
+    @DisplayName("lease를 얻지 않은 worker가 retry, terminal, succecd 요청 시 OwnershipLostException 예외를 반환한다")
     void givenDifferentWorkerToken_whenTransitioning_thenRejectsStaleOwner() {
         // given
         JobFixture fixture = jobs(Instant.now().minusSeconds(60));
         assertThat(persistenceService.acquireLease(fixture.accountId(), "worker-a")).isTrue();
-        GoogleOperationJob claimed = persistenceService.claimHead(
+        GoogleOperationJob claimed = persistenceService.claimNextJob(
                 fixture.accountId(),
                 "worker-a"
         );
@@ -161,16 +161,16 @@ class GoogleOperationJobPersistenceServiceIntegrationTest {
     }
 
     @Test
-    @DisplayName("operation lease를 해제한 worker는 기존 Job ownership을 갱신할 수 없다")
+    @DisplayName("lease를 해제한 worker는 기존 lease을 갱신할 수 없다")
     void givenReleasedOperationLease_whenRenewingOwnership_thenRejectsWorker() {
         // given
         JobFixture fixture = jobs(Instant.now().minusSeconds(60));
         assertThat(persistenceService.acquireLease(fixture.accountId(), "worker-a")).isTrue();
-        GoogleOperationJob claimed = persistenceService.claimHead(
+        GoogleOperationJob claimed = persistenceService.claimNextJob(
                 fixture.accountId(),
                 "worker-a"
         );
-        persistenceService.renewAndAssertOwned(
+        persistenceService.extendOperationLease(
                 claimed.getId(),
                 fixture.accountId(),
                 "worker-a"
@@ -178,7 +178,7 @@ class GoogleOperationJobPersistenceServiceIntegrationTest {
         persistenceService.releaseLease(fixture.accountId(), "worker-a");
 
         // when, then
-        assertThatThrownBy(() -> persistenceService.renewAndAssertOwned(
+        assertThatThrownBy(() -> persistenceService.extendOperationLease(
                 claimed.getId(),
                 fixture.accountId(),
                 "worker-a"
@@ -186,12 +186,12 @@ class GoogleOperationJobPersistenceServiceIntegrationTest {
     }
 
     @Test
-    @DisplayName("소유한 PROCESSING Job은 terminal 상태와 실패 사유를 저장한다")
+    @DisplayName("terminal 요청 시 해당 job에 terminal 상태와 실패 사유를 저장한다")
     void givenOwnedProcessingJob_whenTerminating_thenStoresTerminalState() {
         // given
         JobFixture fixture = jobs(Instant.now().minusSeconds(60));
         assertThat(persistenceService.acquireLease(fixture.accountId(), "worker-a")).isTrue();
-        GoogleOperationJob claimed = persistenceService.claimHead(
+        GoogleOperationJob claimed = persistenceService.claimNextJob(
                 fixture.accountId(),
                 "worker-a"
         );

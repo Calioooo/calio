@@ -35,7 +35,7 @@ public class GoogleCalendarRecurrenceMapper {
         validateRecurrenceEvent(item);
         NormalizedEventSchedule schedule = timeNormalizer.normalizeSchedule(item.start(), item.end());
         RecurrenceSchedule recurrenceSchedule = toRecurrenceSchedule(schedule);
-        List<String> recurrenceRules = validateRecurrence(recurrenceSchedule, item.recurrence());
+        List<String> recurrenceRules = validateRecurrenceRules(recurrenceSchedule, item.recurrence());
         return new RecurrenceEventUpsert(
                 item.id(),
                 item.etag(),
@@ -85,7 +85,7 @@ public class GoogleCalendarRecurrenceMapper {
         }
     }
 
-    private List<String> validateRecurrence(
+    private List<String> validateRecurrenceRules(
             RecurrenceSchedule schedule,
             List<String> recurrenceRules
     ) {

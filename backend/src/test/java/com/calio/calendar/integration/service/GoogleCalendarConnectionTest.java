@@ -47,7 +47,7 @@ import org.springframework.transaction.support.TransactionTemplate;
         "external.google.oauth.client-secret=test-client-secret",
         "external.google.oauth.redirect-uri=https://example.com/oauth/callback"
 })
-class GoogleCalendarConnectionLifecycleTest {
+class GoogleCalendarConnectionTest {
 
     @Autowired
     private GoogleCalendarConnectionService connectionService;
@@ -89,7 +89,7 @@ class GoogleCalendarConnectionLifecycleTest {
     private PlatformTransactionManager transactionManager;
 
     @Test
-    @DisplayName("reconnect는 같은 integration row에서 provider data와 이전 lease를 무효화한다")
+    @DisplayName("기존 Google 연결에 다시 connect하면 기존 data와 sync 상태를 초기화하고 연결 정보(lease)를 교체한다")
     void givenConnectedProviderData_whenReconnect_thenReplacesIdentityAndInvalidatesOldRun() {
         // given
         Account account = accountRepository.saveAndFlush(new Account());
@@ -118,7 +118,7 @@ class GoogleCalendarConnectionLifecycleTest {
     }
 
     @Test
-    @DisplayName("disconnect local delete는 mapping, import Event, integration을 함께 제거한다")
+    @DisplayName("disconnect시 계정과 연결된 mapping data, integration data를 함께 제거한다")
     void givenConnectedProviderData_whenDeleteIntegration_thenDeletesProviderDataFirst() {
         // given
         Account account = accountRepository.saveAndFlush(new Account());
@@ -138,7 +138,7 @@ class GoogleCalendarConnectionLifecycleTest {
     }
 
     @Test
-    @DisplayName("disconnect는 provider recurrence aggregate를 child-first로 지우고 local recurrence는 보존한다")
+    @DisplayName("disconnect시 recurrence event의 override를 먼저 삭제하고 (recurrence event도 삭제), local recurrence는 삭제하지 않는다")
     void givenProviderAndLocalRecurrence_whenDisconnect_thenDeletesOnlyProviderAggregate() {
         // given
         Account account = accountRepository.saveAndFlush(new Account());

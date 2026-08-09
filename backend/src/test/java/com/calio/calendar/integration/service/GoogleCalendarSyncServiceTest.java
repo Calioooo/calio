@@ -525,7 +525,7 @@ class GoogleCalendarSyncServiceTest {
         }
 
         @Override
-        public void renewAndAssertOwned(Long jobId, Long accountId, String workerToken) {
+        public void extendOperationLease(Long jobId, Long accountId, String workerToken) {
             assertionCount++;
             if (failure != null) {
                 throw failure;

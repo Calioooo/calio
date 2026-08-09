@@ -110,7 +110,7 @@ public class GoogleCalendarSyncService {
     }
 
     private void assertOwned(Long jobId, Long accountId, String workerToken) {
-        operationJobPersistenceService.renewAndAssertOwned(jobId, accountId, workerToken);
+        operationJobPersistenceService.extendOperationLease(jobId, accountId, workerToken);
     }
 
     private String nextPageToken(GoogleCalendarEventPage page, Set<String> seenPageTokens) {

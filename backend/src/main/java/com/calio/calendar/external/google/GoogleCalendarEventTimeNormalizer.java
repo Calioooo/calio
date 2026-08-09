@@ -14,6 +14,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.time.zone.ZoneRules;
 import java.util.List;
 import org.springframework.stereotype.Component;
@@ -105,7 +106,7 @@ public class GoogleCalendarEventTimeNormalizer {
                     false,
                     resolvedTimeZone == null ? null : resolvedTimeZone.id()
             );
-        } catch (java.time.format.DateTimeParseException ignored) {
+        } catch (DateTimeParseException ignored) {
             ResolvedTimeZone resolvedTimeZone =
                     resolveTimeZone(eventTime.timeZone(), fallbackTimeZone, allowsFallback);
             if (resolvedTimeZone == null) {

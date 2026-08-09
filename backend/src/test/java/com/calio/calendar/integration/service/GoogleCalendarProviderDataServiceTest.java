@@ -90,7 +90,7 @@ class GoogleCalendarProviderDataServiceTest {
         verify(integrationCommandService, times(5)).renewSyncLease(1L, "run-1");
         verify(integrationCommandService).completeSync(1L, "run-1", "next-token");
         verify(operationJobPersistenceService, times(6))
-                .renewAndAssertOwned(9L, 2L, "run-1");
+                .extendOperationLease(9L, 2L, "run-1");
         verify(operationJobPersistenceService).succeed(9L, 2L, "run-1");
     }
 }

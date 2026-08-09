@@ -44,7 +44,7 @@ class GoogleOperationProcessorTest {
         GoogleOperationJob firstJob = syncJob(1L, 10L);
         GoogleOperationJob secondJob = syncJob(2L, 10L);
         when(jobPersistenceService.acquireLease(eq(10L), anyString())).thenReturn(true);
-        when(jobPersistenceService.claimHead(eq(10L), anyString()))
+        when(jobPersistenceService.claimNextJob(eq(10L), anyString()))
                 .thenReturn(firstJob, secondJob, null);
 
         // when
@@ -64,7 +64,7 @@ class GoogleOperationProcessorTest {
         GoogleOperationJob job = syncJob(1L, 10L);
         RuntimeException failure = new RuntimeException("temporary failure");
         when(jobPersistenceService.acquireLease(eq(10L), anyString())).thenReturn(true);
-        when(jobPersistenceService.claimHead(eq(10L), anyString())).thenReturn(job);
+        when(jobPersistenceService.claimNextJob(eq(10L), anyString())).thenReturn(job);
         doThrow(failure).when(syncService).synchronize(eq(1L), eq(10L), anyString());
         when(failureClassifier.classify(failure))
                 .thenReturn(GoogleOperationFailureDecision.retry("temporary"));
@@ -74,7 +74,7 @@ class GoogleOperationProcessorTest {
 
         // then
         verify(jobPersistenceService).retry(eq(job), anyString(), eq("temporary"));
-        verify(jobPersistenceService).claimHead(eq(10L), anyString());
+        verify(jobPersistenceService).claimNextJob(eq(10L), anyString());
         verify(jobPersistenceService, never()).terminate(
                 eq(1L), eq(10L), anyString(), anyString()
         );
@@ -87,7 +87,7 @@ class GoogleOperationProcessorTest {
         GoogleOperationJob job = syncJob(1L, 10L);
         RuntimeException failure = new RuntimeException("permanent failure");
         when(jobPersistenceService.acquireLease(eq(10L), anyString())).thenReturn(true);
-        when(jobPersistenceService.claimHead(eq(10L), anyString()))
+        when(jobPersistenceService.claimNextJob(eq(10L), anyString()))
                 .thenReturn(job)
                 .thenReturn(null);
         doThrow(failure).when(syncService).synchronize(eq(1L), eq(10L), anyString());
@@ -101,7 +101,7 @@ class GoogleOperationProcessorTest {
         verify(jobPersistenceService).terminate(
                 eq(1L), eq(10L), anyString(), eq("permanent")
         );
-        verify(jobPersistenceService, times(2)).claimHead(eq(10L), anyString());
+        verify(jobPersistenceService, times(2)).claimNextJob(eq(10L), anyString());
     }
 
     @Test
@@ -111,7 +111,7 @@ class GoogleOperationProcessorTest {
         GoogleOperationJob job = syncJob(1L, 10L);
         RuntimeException failure = new RuntimeException("ownership lost");
         when(jobPersistenceService.acquireLease(eq(10L), anyString())).thenReturn(true);
-        when(jobPersistenceService.claimHead(eq(10L), anyString())).thenReturn(job);
+        when(jobPersistenceService.claimNextJob(eq(10L), anyString())).thenReturn(job);
         doThrow(failure).when(syncService).synchronize(eq(1L), eq(10L), anyString());
         when(failureClassifier.classify(failure))
                 .thenReturn(GoogleOperationFailureDecision.abandon());
@@ -132,7 +132,7 @@ class GoogleOperationProcessorTest {
         // given
         GoogleOperationJob job = job(1L, 10L, "EVENT_UPSERT");
         when(jobPersistenceService.acquireLease(eq(10L), anyString())).thenReturn(true);
-        when(jobPersistenceService.claimHead(eq(10L), anyString()))
+        when(jobPersistenceService.claimNextJob(eq(10L), anyString()))
                 .thenReturn(job)
                 .thenReturn(null);
 
@@ -158,7 +158,7 @@ class GoogleOperationProcessorTest {
 
         // then
         verify(jobPersistenceService).releaseLease(eq(10L), anyString());
-        verify(jobPersistenceService, never()).claimHead(eq(10L), anyString());
+        verify(jobPersistenceService, never()).claimNextJob(eq(10L), anyString());
     }
 
     private GoogleOperationJob syncJob(Long jobId, Long accountId) {
