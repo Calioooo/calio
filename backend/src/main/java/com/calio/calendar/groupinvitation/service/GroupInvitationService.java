@@ -49,7 +49,7 @@ public class GroupInvitationService {
             } catch (DataIntegrityViolationException exception) {
                 // A failed attempt is fully rolled back by TransactionTemplate.
                 if (!isCredentialCollision(exception)) {
-                    throw exception;
+                    throw new CalioException(ErrorCode.GROUP_INVITATION_ISSUE_FAILED, exception);
                 }
             }
         }

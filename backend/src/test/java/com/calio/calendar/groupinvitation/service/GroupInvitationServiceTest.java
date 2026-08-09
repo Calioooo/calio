@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.calio.calendar.common.error.CalioException;
+import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.groupinvitation.controller.dto.IssueGroupInvitationResponse;
 import com.calio.calendar.groupinvitation.service.dto.InvitationCredentialPair;
 import java.time.Instant;
@@ -107,8 +108,8 @@ class GroupInvitationServiceTest {
     }
 
     @Test
-    @DisplayName("credential unique constraint와 무관한 무결성 오류는 재시도하거나 변환하지 않는다")
-    void propagatesUnrelatedDataIntegrityViolation() {
+    @DisplayName("credential unique constraint와 무관한 무결성 오류는 재시도하지 않고 issue failure로 변환한다")
+    void mapsUnrelatedDataIntegrityViolationToIssueFailure() {
         // given
         InvitationCredentialPair credentials = pair("A");
         DataIntegrityViolationException expected =
@@ -118,7 +119,12 @@ class GroupInvitationServiceTest {
                 .thenThrow(expected);
 
         // when, then
-        assertThatThrownBy(() -> service.issue(ACCOUNT_ID, GROUP_SPACE_ID)).isSameAs(expected);
+        assertThatThrownBy(() -> service.issue(ACCOUNT_ID, GROUP_SPACE_ID))
+                .isInstanceOfSatisfying(CalioException.class, exception -> {
+                    assertThat(exception.getErrorCode())
+                            .isEqualTo(ErrorCode.GROUP_INVITATION_ISSUE_FAILED);
+                    assertThat(exception.getCause()).isSameAs(expected);
+                });
         verify(credentialService).generatePair();
         verify(commandService).issueOnce(ACCOUNT_ID, GROUP_SPACE_ID, credentials);
     }
