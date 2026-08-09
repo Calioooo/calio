@@ -35,7 +35,10 @@ public class GroupInvitationCleanupScheduler {
             int deletedCount = deleteBatches(cutoff);
             log.info("Group invitation cleanup finished. deletedCount={}", deletedCount);
         } catch (Exception exception) {
-            log.error("Group invitation cleanup failed. errorCode=GROUP_INVITATION_CLEANUP_FAILED");
+            log.error(
+                    "Group invitation cleanup failed. errorCode=GROUP_INVITATION_CLEANUP_FAILED",
+                    exception
+            );
         }
     }
 
