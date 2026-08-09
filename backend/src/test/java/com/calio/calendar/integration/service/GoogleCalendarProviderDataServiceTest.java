@@ -37,10 +37,12 @@ class GoogleCalendarProviderDataServiceTest {
             mock(RecurrenceEventOverrideRepository.class);
     private final GoogleOperationJobPersistenceService operationJobPersistenceService =
             mock(GoogleOperationJobPersistenceService.class);
+    private final GoogleOperationLeaseService operationLeaseService =
+            mock(GoogleOperationLeaseService.class);
     private final GoogleCalendarEventMapping eventMapping = mock(GoogleCalendarEventMapping.class);
 
     @Test
-    @DisplayName("FULL SYNC시 각 mapping batch에서 sync lease와 operation ownership을 갱신한다")
+    @DisplayName("FULL SYNC시 각 mapping batch에서 operation lease를 갱신한다")
     void givenUnseenMappings_whenFinalizeFullSync_thenDeletesByBatchAndRenewsLease() {
         // given
         Event event = mock(Event.class);
@@ -67,6 +69,7 @@ class GoogleCalendarProviderDataServiceTest {
                 recurrenceEventRepository,
                 overrideRepository,
                 null,
+                operationLeaseService,
                 operationJobPersistenceService
         );
 
@@ -88,10 +91,8 @@ class GoogleCalendarProviderDataServiceTest {
         verify(eventRepository).deleteAllByIds(List.of(20L));
         verify(eventMappingQueryService, times(2))
                 .listEventMappingBatch(eq(1L), any(Long.class), eq(500));
-        verify(integrationCommandService, times(5)).renewSyncLease(1L, "run-1");
-        verify(integrationCommandService).completeSync(1L, "run-1", "next-token");
-        verify(operationJobPersistenceService, times(6))
-                .extendOperationLease(9L, 2L, "run-1");
+        verify(integrationCommandService).saveNextSyncToken(1L, "next-token");
+        verify(operationLeaseService, times(6)).extend(9L, 2L, "run-1");
         verify(operationJobPersistenceService).succeed(9L, 2L, "run-1");
     }
 }

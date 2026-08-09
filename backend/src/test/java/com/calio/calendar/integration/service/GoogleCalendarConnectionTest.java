@@ -89,7 +89,7 @@ class GoogleCalendarConnectionTest {
     private PlatformTransactionManager transactionManager;
 
     @Test
-    @DisplayName("기존 Google 연결에 다시 connect하면 기존 data와 sync 상태를 초기화하고 연결 정보(lease)를 교체한다")
+    @DisplayName("기존 Google 연결에 다시 connect하면 기존 data와 cursor를 초기화하고 연결 정보를 교체한다")
     void givenConnectedProviderData_whenReconnect_thenReplacesIdentityAndInvalidatesOldRun() {
         // given
         Account account = accountRepository.saveAndFlush(new Account());
@@ -110,11 +110,8 @@ class GoogleCalendarConnectionTest {
         assertThat(reconnected.getId()).isEqualTo(integration.getId());
         assertThat(reconnected.getGoogleSubject()).isEqualTo("new-google-subject");
         assertThat(reconnected.getNextSyncToken()).isNull();
-        assertThat(reconnected.getActiveSyncRunId()).isNull();
-        assertThat(reconnected.getSyncLeaseExpiresAt()).isNull();
         assertThat(mappingRepository.findEventIdsByIntegrationId(integration.getId())).isEmpty();
         assertThat(eventRepository.findById(importedEvent.getId())).isEmpty();
-        assertPreviousLeaseInvalid(integration.getId());
     }
 
     @Test
@@ -201,34 +198,11 @@ class GoogleCalendarConnectionTest {
 
     private void preparePreviousSyncState(Long accountId, Long integrationId) {
         new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
-            assertThat(integrationRepository.acquireSyncLease(
-                    accountId,
-                    "cursor-run",
-                    300L
-            ))
-                    .isOne();
-            assertThat(integrationRepository.finalizeSync(
+            assertThat(integrationRepository.updateNextSyncToken(
                     integrationId,
-                    "cursor-run",
                     "saved-cursor"
             )).isOne();
-            assertThat(integrationRepository.acquireSyncLease(
-                    accountId,
-                    "old-run",
-                    300L
-            ))
-                    .isOne();
         });
-    }
-
-    private void assertPreviousLeaseInvalid(Long integrationId) {
-        new TransactionTemplate(transactionManager).executeWithoutResult(status ->
-                assertThat(integrationRepository.extendSyncLease(
-                        integrationId,
-                        "old-run",
-                        300L
-                ))
-                        .isZero());
     }
 
     private void stubGoogleRevocation() {

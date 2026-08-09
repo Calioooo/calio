@@ -4,7 +4,6 @@ import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.integration.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.repository.GoogleCalendarIntegrationRepository;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
@@ -13,8 +12,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @Transactional
 public class GoogleCalendarIntegrationCommandService {
-
-    private static final Duration SYNC_LEASE_DURATION = Duration.ofMinutes(5);
 
     private final GoogleCalendarIntegrationRepository integrationRepository;
 
@@ -94,45 +91,35 @@ public class GoogleCalendarIntegrationCommandService {
         }
     }
 
-    public void acquireSyncLease(Long accountId, String runId) {
-        if (integrationRepository.acquireSyncLease(
+    public void saveNextSyncToken(Long integrationId, String nextSyncToken) {
+        if (integrationRepository.updateNextSyncToken(integrationId, nextSyncToken) != 1) {
+            throw new CalioException(ErrorCode.GOOGLE_CALENDAR_SYNC_CONFLICT);
+        }
+    }
+
+    public boolean acquireOperationLease(
+            Long accountId,
+            String ownerToken,
+            long leaseDurationSeconds
+    ) {
+        return integrationRepository.acquireGoogleOperationLease(
                 accountId,
-                runId,
-                SYNC_LEASE_DURATION.toSeconds()
-        ) != 1) {
-            throw new CalioException(ErrorCode.GOOGLE_CALENDAR_SYNC_CONFLICT);
-        }
+                ownerToken,
+                leaseDurationSeconds
+        ) == 1;
     }
 
-    public void renewSyncLease(Long integrationId, String runId) {
-        if (integrationRepository.extendSyncLease(
-                integrationId,
-                runId,
-                SYNC_LEASE_DURATION.toSeconds()
-        ) != 1) {
-            throw new CalioException(ErrorCode.GOOGLE_CALENDAR_SYNC_CONFLICT);
-        }
-    }
-
-    public void releaseSyncLease(Long integrationId, String runId) {
-        integrationRepository.releaseSyncLease(integrationId, runId);
-    }
-
-    public void completeSync(Long integrationId, String runId, String nextSyncToken) {
-        if (integrationRepository.finalizeSync(integrationId, runId, nextSyncToken) != 1) {
-            throw new CalioException(ErrorCode.GOOGLE_CALENDAR_SYNC_CONFLICT);
-        }
-    }
-
-    public boolean acquireOperationLease(Long accountId, String ownerToken) {
-        return integrationRepository.acquireGoogleOperationLease(accountId, ownerToken) == 1;
-    }
-
-    public void extendOperationLease(Long jobId, Long accountId, String ownerToken) {
+    public void extendOperationLease(
+            Long jobId,
+            Long accountId,
+            String ownerToken,
+            long leaseDurationSeconds
+    ) {
         if (integrationRepository.renewOwnedGoogleOperationLease(
                 jobId,
                 accountId,
-                ownerToken
+                ownerToken,
+                leaseDurationSeconds
         ) != 1) {
             throw new GoogleOperationOwnershipLostException();
         }

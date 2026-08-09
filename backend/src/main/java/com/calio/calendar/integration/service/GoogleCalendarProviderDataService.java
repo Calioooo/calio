@@ -32,6 +32,7 @@ public class GoogleCalendarProviderDataService {
     private final RecurrenceEventRepository recurrenceEventRepository;
     private final RecurrenceEventOverrideRepository overrideRepository;
     private final GoogleCalendarEventPagePersistenceService pagePersistenceService;
+    private final GoogleOperationLeaseService operationLeaseService;
     private final GoogleOperationJobPersistenceService operationJobPersistenceService;
 
     public GoogleCalendarProviderDataService(
@@ -44,6 +45,7 @@ public class GoogleCalendarProviderDataService {
             RecurrenceEventRepository recurrenceEventRepository,
             RecurrenceEventOverrideRepository overrideRepository,
             GoogleCalendarEventPagePersistenceService pagePersistenceService,
+            GoogleOperationLeaseService operationLeaseService,
             GoogleOperationJobPersistenceService operationJobPersistenceService
     ) {
         this.integrationCommandService = integrationCommandService;
@@ -55,6 +57,7 @@ public class GoogleCalendarProviderDataService {
         this.recurrenceEventRepository = recurrenceEventRepository;
         this.overrideRepository = overrideRepository;
         this.pagePersistenceService = pagePersistenceService;
+        this.operationLeaseService = operationLeaseService;
         this.operationJobPersistenceService = operationJobPersistenceService;
     }
 
@@ -83,7 +86,7 @@ public class GoogleCalendarProviderDataService {
             String nextSyncToken
     ) {
         OperationOwnership ownership = new OperationOwnership(jobId, accountId, workerToken);
-        renewOperationOwnership(ownership);
+        operationLeaseService.extend(ownership.jobId(), ownership.accountId(), ownership.workerToken());
         requireNextSyncToken(nextSyncToken);
         removeProviderDataMissingFromFullSync(
                 integrationId,
@@ -93,13 +96,8 @@ public class GoogleCalendarProviderDataService {
                 seenRecurrenceEventIds,
                 seenOverrideIds
         );
-        completeIntegrationSync(integrationId, workerToken, nextSyncToken);
+        integrationCommandService.saveNextSyncToken(integrationId, nextSyncToken);
         completeOperationJob(ownership);
-    }
-
-    @Transactional
-    public void releaseSyncLease(Long integrationId, String runId) {
-        integrationCommandService.releaseSyncLease(integrationId, runId);
     }
 
     private void requireNextSyncToken(String nextSyncToken) {
@@ -154,7 +152,7 @@ public class GoogleCalendarProviderDataService {
             Set<GoogleCalendarRecurrenceOverrideExternalKey> seenOverrideIds,
             long afterId
     ) {
-        renewSyncRunLeases(integrationId, ownership);
+        operationLeaseService.extend(ownership.jobId(), ownership.accountId(), ownership.workerToken());
         List<GoogleCalendarRecurrenceOverrideMapping> mappings =
                 recurrenceMappingQueryService.listOverrideMappingBatch(
                         integrationId,
@@ -209,7 +207,7 @@ public class GoogleCalendarProviderDataService {
             Set<String> seenEventIds,
             long afterId
     ) {
-        renewSyncRunLeases(integrationId, ownership);
+        operationLeaseService.extend(ownership.jobId(), ownership.accountId(), ownership.workerToken());
         List<GoogleCalendarEventMapping> mappings =
                 eventMappingQueryService.listEventMappingBatch(
                         integrationId,
@@ -260,7 +258,7 @@ public class GoogleCalendarProviderDataService {
             Set<String> seenRecurrenceEventIds,
             long afterId
     ) {
-        renewSyncRunLeases(integrationId, ownership);
+        operationLeaseService.extend(ownership.jobId(), ownership.accountId(), ownership.workerToken());
         List<GoogleCalendarRecurrenceEventMapping> mappings =
                 recurrenceMappingQueryService.listRecurrenceEventMappingBatch(
                         integrationId,
@@ -292,34 +290,9 @@ public class GoogleCalendarProviderDataService {
         return mappings.getLast().getId();
     }
 
-    private void completeIntegrationSync(Long integrationId, String runId, String nextSyncToken) {
-        integrationCommandService.renewSyncLease(integrationId, runId);
-        integrationCommandService.completeSync(integrationId, runId, nextSyncToken);
-    }
-
     private void completeOperationJob(OperationOwnership ownership) {
-        renewOperationOwnership(ownership);
+        operationLeaseService.extend(ownership.jobId(), ownership.accountId(), ownership.workerToken());
         operationJobPersistenceService.succeed(
-                ownership.jobId(),
-                ownership.accountId(),
-                ownership.workerToken()
-        );
-    }
-
-    private void extendSyncLeaseOrThrow(Long integrationId, String runId) {
-        integrationCommandService.renewSyncLease(integrationId, runId);
-    }
-
-    private void renewSyncRunLeases(
-            Long integrationId,
-            OperationOwnership ownership
-    ) {
-        renewOperationOwnership(ownership);
-        extendSyncLeaseOrThrow(integrationId, ownership.workerToken());
-    }
-
-    private void renewOperationOwnership(OperationOwnership ownership) {
-        operationJobPersistenceService.extendOperationLease(
                 ownership.jobId(),
                 ownership.accountId(),
                 ownership.workerToken()

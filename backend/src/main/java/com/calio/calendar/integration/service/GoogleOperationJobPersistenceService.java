@@ -20,32 +20,18 @@ public class GoogleOperationJobPersistenceService {
     private static final List<Duration> RETRY_DELAYS = List.of(
             Duration.ofMinutes(10), Duration.ofMinutes(30), Duration.ofHours(1), Duration.ofHours(6));
 
-    private final GoogleCalendarIntegrationCommandService integrationCommandService;
     private final GoogleOperationJobQueryService jobQueryService;
     private final GoogleOperationJobCommandService jobCommandService;
     private final Clock clock;
 
     public GoogleOperationJobPersistenceService(
-            GoogleCalendarIntegrationCommandService integrationCommandService,
             GoogleOperationJobQueryService jobQueryService,
             GoogleOperationJobCommandService jobCommandService,
             Clock clock
     ) {
-        this.integrationCommandService = integrationCommandService;
         this.jobQueryService = jobQueryService;
         this.jobCommandService = jobCommandService;
         this.clock = clock;
-    }
-
-    @Transactional
-    public boolean acquireLease(Long accountId, String workerToken) {
-        boolean acquired = integrationCommandService.acquireOperationLease(accountId, workerToken);
-        if (acquired) {
-            log.info("Google operation lease acquired. accountId={} state=ACQUIRED", accountId);
-        } else {
-            log.warn("Google operation lease acquisition failed. accountId={} state=NOT_ACQUIRED", accountId);
-        }
-        return acquired;
     }
 
     @Transactional
@@ -67,16 +53,6 @@ public class GoogleOperationJobPersistenceService {
         log.info("Google operation job claimed. accountId={} jobId={} state={} previousState={}",
                 accountId, head.getId(), head.getState().name(), previousState);
         return head;
-    }
-
-    @Transactional
-    public void extendOperationLease(Long jobId, Long accountId, String workerToken) {
-        try {
-            integrationCommandService.extendOperationLease(jobId, accountId, workerToken);
-        } catch (GoogleOperationOwnershipLostException exception) {
-            log.warn("Google operation ownership lost. accountId={} jobId={} state=PROCESSING", accountId, jobId);
-            throw exception;
-        }
     }
 
     @Transactional
@@ -121,16 +97,6 @@ public class GoogleOperationJobPersistenceService {
         }
         log.info("Google operation job deleted after success. accountId={} jobId={} state=PROCESSING transition=DELETE",
                 accountId, jobId);
-    }
-
-    @Transactional
-    public void releaseLease(Long accountId, String workerToken) {
-        boolean released = integrationCommandService.releaseOperationLease(accountId, workerToken);
-        if (released) {
-            log.info("Google operation lease released. accountId={} state=RELEASED", accountId);
-        } else {
-            log.warn("Google operation lease release skipped. accountId={} state=NOT_OWNED", accountId);
-        }
     }
 
     @Transactional(readOnly = true)

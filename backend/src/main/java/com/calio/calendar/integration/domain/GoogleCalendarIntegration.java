@@ -48,12 +48,6 @@ public class GoogleCalendarIntegration extends BaseEntity {
     @Column(name = "next_sync_token", columnDefinition = "TEXT")
     private String nextSyncToken;
 
-    @Column(name = "active_sync_run_id", length = 36)
-    private String activeSyncRunId;
-
-    @Column(name = "sync_lease_expires_at")
-    private Instant syncLeaseExpiresAt;
-
     @Column(name = "next_google_operation_sequence", nullable = false)
     private long nextGoogleOperationSequence = 1L;
 
@@ -100,13 +94,11 @@ public class GoogleCalendarIntegration extends BaseEntity {
         this.encryptedAccessToken = encryptedAccessToken;
         this.accessTokenExpiresAt = accessTokenExpiresAt;
         this.connectedAt = connectedAt;
-        clearSyncState();
+        clearSyncCursor();
     }
 
-    public void clearSyncState() {
+    public void clearSyncCursor() {
         this.nextSyncToken = null;
-        this.activeSyncRunId = null;
-        this.syncLeaseExpiresAt = null;
     }
 
     public Long getId() {
@@ -143,14 +135,6 @@ public class GoogleCalendarIntegration extends BaseEntity {
 
     public String getNextSyncToken() {
         return nextSyncToken;
-    }
-
-    public String getActiveSyncRunId() {
-        return activeSyncRunId;
-    }
-
-    public Instant getSyncLeaseExpiresAt() {
-        return syncLeaseExpiresAt;
     }
 
     public long allocateGoogleOperationSequence() {

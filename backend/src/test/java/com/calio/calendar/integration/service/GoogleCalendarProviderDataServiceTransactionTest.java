@@ -39,8 +39,8 @@ class GoogleCalendarProviderDataServiceTransactionTest {
     @Autowired
     private GoogleCalendarProviderDataService providerDataService;
 
-    @Autowired
-    private GoogleCalendarSyncLeaseService leaseService;
+    @MockitoBean
+    private GoogleOperationLeaseService operationLeaseService;
 
     @MockitoSpyBean
     private GoogleCalendarIntegrationRepository integrationRepository;
@@ -89,10 +89,8 @@ class GoogleCalendarProviderDataServiceTransactionTest {
                         null
                 )
         );
-        leaseService.acquire(account.getId(), "full-run");
-        doReturn(0).when(integrationRepository).finalizeSync(
+        doReturn(0).when(integrationRepository).updateNextSyncToken(
                 integration.getId(),
-                "full-run",
                 "next-token"
         );
 
@@ -116,7 +114,6 @@ class GoogleCalendarProviderDataServiceTransactionTest {
                 .get()
                 .satisfies(savedIntegration -> {
                     assertThat(savedIntegration.getNextSyncToken()).isNull();
-                    assertThat(savedIntegration.getActiveSyncRunId()).isEqualTo("full-run");
                 });
     }
 

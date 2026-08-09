@@ -90,6 +90,9 @@ class GoogleCalendarEventPagePersistenceServiceTest {
     private TagRepository tagRepository;
 
     @MockitoBean
+    private GoogleOperationLeaseService operationLeaseService;
+
+    @MockitoBean
     private GoogleOperationJobPersistenceService operationJobPersistenceService;
 
     private Account account;
@@ -112,7 +115,6 @@ class GoogleCalendarEventPagePersistenceServiceTest {
                 "#64748B"
         ));
 
-        acquireLease(account.getId(), "first-run");
         persistProviderPage(
                 integration.getId(),
                 account.getId(),
@@ -129,7 +131,6 @@ class GoogleCalendarEventPagePersistenceServiceTest {
         eventRepository.flush();
 
         // when
-        acquireLease(account.getId(), "second-run");
         persistProviderPage(
                 integration.getId(),
                 account.getId(),
@@ -149,8 +150,6 @@ class GoogleCalendarEventPagePersistenceServiceTest {
         GoogleCalendarIntegration finalized = integrationRepository.findById(integration.getId())
                 .orElseThrow();
         assertThat(finalized.getNextSyncToken()).isEqualTo("cursor-2");
-        assertThat(finalized.getActiveSyncRunId()).isNull();
-        assertThat(finalized.getSyncLeaseExpiresAt()).isNull();
     }
 
     @Test
@@ -171,7 +170,6 @@ class GoogleCalendarEventPagePersistenceServiceTest {
                 new GoogleCalendarEventTimeResponse(null, "2026-07-01T09:00:00", null),
                 new GoogleCalendarEventTimeResponse(null, "2026-07-01T10:00:00", null)
         );
-        acquireLease(account.getId(), "page-zone-run");
 
         // when
         persistProviderPage(
@@ -206,7 +204,6 @@ class GoogleCalendarEventPagePersistenceServiceTest {
         tagRepository.saveAndFlush(new Tag(TagType.DEFAULT, "기타", "#64748B"));
         String externalEventId = "a".repeat(1024);
         String googleEtag = "e".repeat(1024);
-        acquireLease(account.getId(), "maximum-id-run");
 
         // when
         persistProviderPage(
@@ -227,24 +224,6 @@ class GoogleCalendarEventPagePersistenceServiceTest {
         });
     }
 
-    @Test
-    @Transactional
-    @DisplayName("lease를 소유하지 않은 run은 page를 저장할 수 없다")
-    void givenDifferentRunId_whenPersistPage_thenReturnsSyncConflict() {
-        // given
-        acquireLease(account.getId(), "lease-owner");
-
-        // when, then
-        assertThatThrownBy(() -> persistProviderPage(
-                integration.getId(),
-                account.getId(),
-                "different-run",
-                new GoogleCalendarEventPage(List.of(), "next-page", null, "UTC")
-        )).isInstanceOfSatisfying(CalioException.class, exception ->
-                assertThat(exception.getErrorCode())
-                        .isEqualTo(ErrorCode.GOOGLE_CALENDAR_SYNC_CONFLICT));
-    }
-
     @ParameterizedTest
     @NullSource
     @ValueSource(strings = {"", " "})
@@ -254,7 +233,6 @@ class GoogleCalendarEventPagePersistenceServiceTest {
             String nextSyncToken
     ) {
         // given
-        acquireLease(account.getId(), "token-run");
 
         // when, then
         assertThatThrownBy(() -> persistProviderPage(
@@ -273,7 +251,6 @@ class GoogleCalendarEventPagePersistenceServiceTest {
     void givenInvalidGoogleEventRange_whenPersistPage_thenRejectsResponse() {
         // given
         tagRepository.saveAndFlush(new Tag(TagType.DEFAULT, "기타", "#64748B"));
-        acquireLease(account.getId(), "invalid-range-run");
         GoogleCalendarEventResponse item = new GoogleCalendarEventResponse(
                 "external-invalid-range",
                 "confirmed",
@@ -305,7 +282,6 @@ class GoogleCalendarEventPagePersistenceServiceTest {
     void givenDuplicateExternalEventIds_whenPersistPage_thenRejectsResponse() {
         // given
         tagRepository.saveAndFlush(new Tag(TagType.DEFAULT, "기타", "#64748B"));
-        acquireLease(account.getId(), "duplicate-run");
         GoogleCalendarEventResponse item = timedItem("external-1", "Event");
         GoogleCalendarEventPage page = new GoogleCalendarEventPage(
                 List.of(item, item),
@@ -332,7 +308,6 @@ class GoogleCalendarEventPagePersistenceServiceTest {
     void givenMappedItemBecomesRecurring_whenPersistPage_thenDeletesStaleProviderData() {
         // given
         tagRepository.saveAndFlush(new Tag(TagType.DEFAULT, "기타", "#64748B"));
-        acquireLease(account.getId(), "first-run");
         persistProviderPage(
                 integration.getId(),
                 account.getId(),
@@ -341,7 +316,6 @@ class GoogleCalendarEventPagePersistenceServiceTest {
         );
 
         // when
-        acquireLease(account.getId(), "second-run");
         GoogleCalendarEventResponse recurringItem = new GoogleCalendarEventResponse(
                 "external-1",
                 "confirmed",
@@ -377,7 +351,6 @@ class GoogleCalendarEventPagePersistenceServiceTest {
     void givenNormalizedRecurrenceReplay_whenPersistPages_thenUpsertsCanonicalAggregate() {
         // given
         Tag defaultTag = tagRepository.saveAndFlush(new Tag(TagType.DEFAULT, "기타", "#64748B"));
-        acquireLease(account.getId(), "recurrence-run");
         NormalizedEventSchedule recurrenceSchedule = new NormalizedEventSchedule(
                 Instant.parse("2026-07-01T09:00:00Z"),
                 Instant.parse("2026-07-01T10:00:00Z"),
@@ -412,7 +385,6 @@ class GoogleCalendarEventPagePersistenceServiceTest {
         pagePersistenceService.persistNormalizedPage(
                 integration.getId(),
                 account.getId(),
-                "recurrence-run",
                 new GoogleCalendarNormalizedPage(
                         List.of(recurrenceEvent, activeOverride),
                         null,
@@ -441,7 +413,6 @@ class GoogleCalendarEventPagePersistenceServiceTest {
         pagePersistenceService.persistNormalizedPage(
                 integration.getId(),
                 account.getId(),
-                "recurrence-run",
                 new GoogleCalendarNormalizedPage(
                         List.of(
                                 updatedRecurrenceEvent,
@@ -485,7 +456,6 @@ class GoogleCalendarEventPagePersistenceServiceTest {
     void givenOverrideExternalIdMappedToDifferentRecurrenceEvent_whenPersistPage_thenRejectsResponse() {
         // given
         tagRepository.saveAndFlush(new Tag(TagType.DEFAULT, "기타", "#64748B"));
-        acquireLease(account.getId(), "cross-parent-run");
         NormalizedEventSchedule recurrenceSchedule = new NormalizedEventSchedule(
                 Instant.parse("2026-07-01T09:00:00Z"),
                 Instant.parse("2026-07-01T10:00:00Z"),
@@ -515,7 +485,6 @@ class GoogleCalendarEventPagePersistenceServiceTest {
         pagePersistenceService.persistNormalizedPage(
                 integration.getId(),
                 account.getId(),
-                "cross-parent-run",
                 new GoogleCalendarNormalizedPage(
                         List.of(firstRecurrenceEvent, secondRecurrenceEvent, firstOverride),
                         null,
@@ -529,7 +498,6 @@ class GoogleCalendarEventPagePersistenceServiceTest {
         assertThatThrownBy(() -> pagePersistenceService.persistNormalizedPage(
                 integration.getId(),
                 account.getId(),
-                "cross-parent-run",
                 new GoogleCalendarNormalizedPage(
                         List.of(conflictingOverride),
                         null,
@@ -554,7 +522,6 @@ class GoogleCalendarEventPagePersistenceServiceTest {
     void givenCancellationBeforeOverride_whenPersistPage_thenDeletesRecurrenceAggregate() {
         // given
         tagRepository.saveAndFlush(new Tag(TagType.DEFAULT, "기타", "#64748B"));
-        acquireLease(account.getId(), "recurrence-cancellation-run");
         RecurrenceEventUpsert recurrenceEvent = new RecurrenceEventUpsert(
                 "recurrence-event-1",
                 null,
@@ -588,7 +555,6 @@ class GoogleCalendarEventPagePersistenceServiceTest {
         pagePersistenceService.persistNormalizedPage(
                 integration.getId(),
                 account.getId(),
-                "recurrence-cancellation-run",
                 new GoogleCalendarNormalizedPage(
                         List.of(recurrenceEvent, override),
                         null,
@@ -616,7 +582,6 @@ class GoogleCalendarEventPagePersistenceServiceTest {
         pagePersistenceService.persistNormalizedPage(
                 integration.getId(),
                 account.getId(),
-                "recurrence-cancellation-run",
                 normalizedPage
         );
 
@@ -635,7 +600,6 @@ class GoogleCalendarEventPagePersistenceServiceTest {
         Tag defaultTag = tagRepository.saveAndFlush(
                 new Tag(TagType.DEFAULT, "기타", "#64748B")
         );
-        acquireLease(account.getId(), "full-reconciliation-run");
         NormalizedEventSchedule eventSchedule = new NormalizedEventSchedule(
                 Instant.parse("2026-07-01T09:00:00Z"),
                 Instant.parse("2026-07-01T10:00:00Z"),
@@ -696,7 +660,6 @@ class GoogleCalendarEventPagePersistenceServiceTest {
         pagePersistenceService.persistNormalizedPage(
                 integration.getId(),
                 account.getId(),
-                "full-reconciliation-run",
                 new GoogleCalendarNormalizedPage(
                         List.of(
                                 recurrenceEvent,
@@ -731,8 +694,6 @@ class GoogleCalendarEventPagePersistenceServiceTest {
                 .get()
                 .satisfies(completed -> {
                     assertThat(completed.getNextSyncToken()).isEqualTo("next-sync-token");
-                    assertThat(completed.getActiveSyncRunId()).isNull();
-                    assertThat(completed.getSyncLeaseExpiresAt()).isNull();
                 });
     }
 
@@ -742,7 +703,6 @@ class GoogleCalendarEventPagePersistenceServiceTest {
     void givenBlankAllDayItemThenCancellation_whenPersistPages_thenImportsAndHardDeletesIdempotently() {
         // given
         tagRepository.saveAndFlush(new Tag(TagType.DEFAULT, "기타", "#64748B"));
-        acquireLease(account.getId(), "first-run");
         persistProviderPage(
                 integration.getId(),
                 account.getId(),
@@ -759,14 +719,12 @@ class GoogleCalendarEventPagePersistenceServiceTest {
         assertThat(imported.isAllDay()).isTrue();
 
         // when
-        acquireLease(account.getId(), "second-run");
         persistProviderPage(
                 integration.getId(),
                 account.getId(),
                 "second-run",
                 page(cancelledItem("external-blank"), "cursor-2")
         );
-        acquireLease(account.getId(), "third-run");
         persistProviderPage(
                 integration.getId(),
                 account.getId(),
@@ -777,14 +735,6 @@ class GoogleCalendarEventPagePersistenceServiceTest {
         // then
         assertThat(mappingRepository.findEventIdsByIntegrationId(integration.getId())).isEmpty();
         assertThat(eventRepository.findById(imported.getId())).isEmpty();
-    }
-
-    private void acquireLease(Long accountId, String runId) {
-        assertThat(integrationRepository.acquireSyncLease(
-                accountId,
-                runId,
-                300L
-        )).isOne();
     }
 
     private void persistProviderPage(
@@ -802,7 +752,6 @@ class GoogleCalendarEventPagePersistenceServiceTest {
         pagePersistenceService.persistNormalizedPage(
                 integrationId,
                 accountId,
-                runId,
                 normalizedPage
         );
         if (page.hasNextPage()) {

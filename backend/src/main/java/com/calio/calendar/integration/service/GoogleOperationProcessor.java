@@ -11,15 +11,18 @@ public class GoogleOperationProcessor {
     private static final String UNSUPPORTED_JOB_KIND = "UNSUPPORTED_JOB_KIND";
 
     private final GoogleOperationJobPersistenceService jobPersistenceService;
+    private final GoogleOperationLeaseService operationLeaseService;
     private final GoogleCalendarSyncService syncService;
     private final GoogleOperationFailureClassifier failureClassifier;
 
     public GoogleOperationProcessor(
             GoogleOperationJobPersistenceService jobPersistenceService,
+            GoogleOperationLeaseService operationLeaseService,
             GoogleCalendarSyncService syncService,
             GoogleOperationFailureClassifier failureClassifier
     ) {
         this.jobPersistenceService = jobPersistenceService;
+        this.operationLeaseService = operationLeaseService;
         this.syncService = syncService;
         this.failureClassifier = failureClassifier;
     }
@@ -27,7 +30,7 @@ public class GoogleOperationProcessor {
     public void processAccount(Long accountId) {
         String workerToken = UUID.randomUUID().toString();
         try {
-            if (!jobPersistenceService.acquireLease(accountId, workerToken)) {
+            if (!operationLeaseService.acquire(accountId, workerToken)) {
                 return;
             }
             while (processHead(accountId, workerToken)
@@ -35,7 +38,7 @@ public class GoogleOperationProcessor {
                 // Drain the ordered Account queue while ownership remains valid.
             }
         } finally {
-            jobPersistenceService.releaseLease(accountId, workerToken);
+            operationLeaseService.release(accountId, workerToken);
         }
     }
 

@@ -21,6 +21,7 @@ import org.mockito.InOrder;
 class GoogleOperationProcessorTest {
 
     private GoogleOperationJobPersistenceService jobPersistenceService;
+    private GoogleOperationLeaseService operationLeaseService;
     private GoogleCalendarSyncService syncService;
     private GoogleOperationFailureClassifier failureClassifier;
     private GoogleOperationProcessor processor;
@@ -28,10 +29,12 @@ class GoogleOperationProcessorTest {
     @BeforeEach
     void setUp() {
         jobPersistenceService = mock(GoogleOperationJobPersistenceService.class);
+        operationLeaseService = mock(GoogleOperationLeaseService.class);
         syncService = mock(GoogleCalendarSyncService.class);
         failureClassifier = mock(GoogleOperationFailureClassifier.class);
         processor = new GoogleOperationProcessor(
                 jobPersistenceService,
+                operationLeaseService,
                 syncService,
                 failureClassifier
         );
@@ -43,7 +46,7 @@ class GoogleOperationProcessorTest {
         // given
         GoogleOperationJob firstJob = syncJob(1L, 10L);
         GoogleOperationJob secondJob = syncJob(2L, 10L);
-        when(jobPersistenceService.acquireLease(eq(10L), anyString())).thenReturn(true);
+        when(operationLeaseService.acquire(eq(10L), anyString())).thenReturn(true);
         when(jobPersistenceService.claimNextJob(eq(10L), anyString()))
                 .thenReturn(firstJob, secondJob, null);
 
@@ -54,7 +57,7 @@ class GoogleOperationProcessorTest {
         InOrder executionOrder = inOrder(syncService);
         executionOrder.verify(syncService).synchronize(eq(1L), eq(10L), anyString());
         executionOrder.verify(syncService).synchronize(eq(2L), eq(10L), anyString());
-        verify(jobPersistenceService).releaseLease(eq(10L), anyString());
+        verify(operationLeaseService).release(eq(10L), anyString());
     }
 
     @Test
@@ -63,7 +66,7 @@ class GoogleOperationProcessorTest {
         // given
         GoogleOperationJob job = syncJob(1L, 10L);
         RuntimeException failure = new RuntimeException("temporary failure");
-        when(jobPersistenceService.acquireLease(eq(10L), anyString())).thenReturn(true);
+        when(operationLeaseService.acquire(eq(10L), anyString())).thenReturn(true);
         when(jobPersistenceService.claimNextJob(eq(10L), anyString())).thenReturn(job);
         doThrow(failure).when(syncService).synchronize(eq(1L), eq(10L), anyString());
         when(failureClassifier.classify(failure))
@@ -86,7 +89,7 @@ class GoogleOperationProcessorTest {
         // given
         GoogleOperationJob job = syncJob(1L, 10L);
         RuntimeException failure = new RuntimeException("permanent failure");
-        when(jobPersistenceService.acquireLease(eq(10L), anyString())).thenReturn(true);
+        when(operationLeaseService.acquire(eq(10L), anyString())).thenReturn(true);
         when(jobPersistenceService.claimNextJob(eq(10L), anyString()))
                 .thenReturn(job)
                 .thenReturn(null);
@@ -110,7 +113,7 @@ class GoogleOperationProcessorTest {
         // given
         GoogleOperationJob job = syncJob(1L, 10L);
         RuntimeException failure = new RuntimeException("ownership lost");
-        when(jobPersistenceService.acquireLease(eq(10L), anyString())).thenReturn(true);
+        when(operationLeaseService.acquire(eq(10L), anyString())).thenReturn(true);
         when(jobPersistenceService.claimNextJob(eq(10L), anyString())).thenReturn(job);
         doThrow(failure).when(syncService).synchronize(eq(1L), eq(10L), anyString());
         when(failureClassifier.classify(failure))
@@ -131,7 +134,7 @@ class GoogleOperationProcessorTest {
     void givenUnsupportedJobKind_whenProcess_thenTerminatesWithoutSync() {
         // given
         GoogleOperationJob job = job(1L, 10L, "EVENT_UPSERT");
-        when(jobPersistenceService.acquireLease(eq(10L), anyString())).thenReturn(true);
+        when(operationLeaseService.acquire(eq(10L), anyString())).thenReturn(true);
         when(jobPersistenceService.claimNextJob(eq(10L), anyString()))
                 .thenReturn(job)
                 .thenReturn(null);
@@ -151,13 +154,13 @@ class GoogleOperationProcessorTest {
     @DisplayName("Account lease를 획득하지 못해도 현재 worker token의 lease 해제를 시도한다")
     void givenLeaseNotAcquired_whenProcess_thenReleasesCurrentWorkerToken() {
         // given
-        when(jobPersistenceService.acquireLease(eq(10L), anyString())).thenReturn(false);
+        when(operationLeaseService.acquire(eq(10L), anyString())).thenReturn(false);
 
         // when
         processor.processAccount(10L);
 
         // then
-        verify(jobPersistenceService).releaseLease(eq(10L), anyString());
+        verify(operationLeaseService).release(eq(10L), anyString());
         verify(jobPersistenceService, never()).claimNextJob(eq(10L), anyString());
     }
 

@@ -7,7 +7,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.calio.calendar.integration.repository.GoogleCalendarIntegrationRepository;
 import com.calio.calendar.integration.repository.GoogleOperationJobRepository;
 import java.time.Clock;
 import java.time.Instant;
@@ -23,14 +22,11 @@ class GoogleOperationJobPersistenceServiceTest {
     void givenRecoverableJobs_whenFindingAccountIds_thenRequestsFirstBoundedBatch() {
         // given
         Instant now = Instant.parse("2026-08-04T00:00:00Z");
-        GoogleCalendarIntegrationRepository integrationRepository =
-                mock(GoogleCalendarIntegrationRepository.class);
         GoogleOperationJobRepository jobRepository = mock(GoogleOperationJobRepository.class);
         when(jobRepository.findRecoverableAccountIds(eq(now), argThat(
                 pageable -> pageable.getPageNumber() == 0 && pageable.getPageSize() == 500
         ))).thenReturn(List.of(1L, 2L));
         GoogleOperationJobPersistenceService service = new GoogleOperationJobPersistenceService(
-                new GoogleCalendarIntegrationCommandService(integrationRepository),
                 new GoogleOperationJobQueryService(jobRepository),
                 new GoogleOperationJobCommandService(jobRepository),
                 Clock.fixed(now, ZoneOffset.UTC)

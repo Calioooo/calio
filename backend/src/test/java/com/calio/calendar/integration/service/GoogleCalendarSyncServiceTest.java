@@ -2,8 +2,8 @@ package com.calio.calendar.integration.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
@@ -15,11 +15,11 @@ import com.calio.calendar.external.google.GoogleCalendarUnauthorizedException;
 import com.calio.calendar.external.google.GoogleOAuthProperties;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventPage;
 import com.calio.calendar.integration.domain.GoogleCalendarSyncMode;
+import com.calio.calendar.integration.domain.GoogleCalendarIntegration;
 import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.integration.service.dto.GoogleCalendarNormalizedPage;
 import com.calio.calendar.integration.service.dto.GoogleCalendarRecurrenceOverrideExternalKey;
-import com.calio.calendar.integration.service.dto.GoogleCalendarSyncLease;
 import com.calio.calendar.tag.service.TagQueryService;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -41,7 +41,8 @@ class GoogleCalendarSyncServiceTest {
     @DisplayName("INCREMENTAL 두 번째 page 요청이 410이면 FULL sync를 처음부터 다시 실행하고 이전 처리 결과를 사용하지 않는다")
     void givenExpiredIncrementalSecondPage_whenSync_thenRestartsFullSyncWithoutIncrementalResults() {
         // given
-        FakeLeaseService leaseService = new FakeLeaseService("saved-cursor");
+        FakeIntegrationQueryService integrationQueryService =
+                new FakeIntegrationQueryService("saved-cursor");
         FakeProviderDataService providerDataService = new FakeProviderDataService();
         FakeEventsClient eventsClient = new FakeEventsClient(
                 pageWithNextPageToken("incremental-page-2"), // incremental-sync
@@ -52,7 +53,7 @@ class GoogleCalendarSyncServiceTest {
                 new FakePagePersistenceService();
         FakeAccessTokenService accessTokenService = new FakeAccessTokenService();
         GoogleCalendarSyncService service = new GoogleCalendarSyncService(
-                leaseService,
+                integrationQueryService,
                 providerDataService,
                 accessTokenService,
                 eventRequestService(eventsClient, accessTokenService),
@@ -71,7 +72,7 @@ class GoogleCalendarSyncServiceTest {
                                 "full-recurrence-event"
                         )
                 ),
-                new FakeOperationJobPersistenceService()
+                new FakeOperationLeaseService()
         );
 
         // when
@@ -107,7 +108,7 @@ class GoogleCalendarSyncServiceTest {
                 terminalPage("full-cursor")
         );
         GoogleCalendarSyncService service = service(
-                new FakeLeaseService(null),
+                new FakeIntegrationQueryService(null),
                 new FakeProviderDataService(),
                 accessTokenService,
                 eventsClient,
@@ -124,17 +125,16 @@ class GoogleCalendarSyncServiceTest {
     }
 
     @Test
-    @DisplayName("ownership를 잃으면 provider를 호출하지 않고 현재 lease를 해제한다")
+    @DisplayName("operation ownership을 잃으면 provider를 호출하지 않는다")
     void givenOwnershipLostBeforeExecution_whenExecuteOwned_thenAbandonsRun() {
         // given
         FakeProviderDataService providerDataService = new FakeProviderDataService();
         FakeEventsClient eventsClient = new FakeEventsClient(terminalPage("full-cursor"));
-        FakeOperationJobPersistenceService ownershipService =
-                new FakeOperationJobPersistenceService();
+        FakeOperationLeaseService ownershipService = new FakeOperationLeaseService();
         ownershipService.failure = new GoogleOperationOwnershipLostException();
         FakeAccessTokenService accessTokenService = new FakeAccessTokenService();
         GoogleCalendarSyncService service = new GoogleCalendarSyncService(
-                new FakeLeaseService(null),
+                new FakeIntegrationQueryService(null),
                 providerDataService,
                 accessTokenService,
                 eventRequestService(eventsClient, accessTokenService),
@@ -147,7 +147,6 @@ class GoogleCalendarSyncServiceTest {
         assertThatThrownBy(() -> synchronize(service))
                 .isSameAs(ownershipService.failure);
         assertThat(eventsClient.requestedModes).isEmpty();
-        assertThat(providerDataService.releaseCount).isOne();
     }
 
     @Test
@@ -159,7 +158,7 @@ class GoogleCalendarSyncServiceTest {
         GoogleCalendarUnauthorizedException unauthorized =
                 new GoogleCalendarUnauthorizedException(new RuntimeException());
         GoogleCalendarSyncService service = service(
-                new FakeLeaseService(null),
+                new FakeIntegrationQueryService(null),
                 providerDataService,
                 accessTokenService,
                 new FakeEventsClient(unauthorized, unauthorized),
@@ -172,16 +171,15 @@ class GoogleCalendarSyncServiceTest {
                         assertThat(exception.getErrorCode())
                                 .isEqualTo(ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED));
         assertThat(accessTokenService.forceRefreshCount).isOne();
-        assertThat(providerDataService.releaseCount).isOne();
     }
 
     @Test
-    @DisplayName("FULL 실패는 partial provider data를 보존하고 현재 run lease만 해제한다")
+    @DisplayName("FULL 실패는 partial provider data를 보존하고 sync를 완료하지 않는다")
     void givenFullSyncFailure_whenSync_thenPreservesPartialProviderData() {
         // given
         FakeProviderDataService providerDataService = new FakeProviderDataService();
         GoogleCalendarSyncService service = service(
-                new FakeLeaseService(null),
+                new FakeIntegrationQueryService(null),
                 providerDataService,
                 new FakeEventsClient(new CalioException(ErrorCode.GOOGLE_CALENDAR_SYNC_FAILED)),
                 new FakePagePersistenceService()
@@ -192,73 +190,6 @@ class GoogleCalendarSyncServiceTest {
                 .isInstanceOfSatisfying(CalioException.class, exception ->
                         assertThat(exception.getErrorCode())
                                 .isEqualTo(ErrorCode.GOOGLE_CALENDAR_SYNC_FAILED));
-        assertThat(providerDataService.releaseCount).isOne();
-    }
-
-    @Test
-    @DisplayName("FULL SYNC 시 lease 해제 실패는 sync 실패 예외에 해제 실패를 suppressed로 남겨서 반환한다")
-    void givenFullSyncAndLeaseReleaseFailures_whenSync_thenPreservesOriginalFailure() {
-        // given
-        CalioException syncFailure =
-                new CalioException(ErrorCode.GOOGLE_CALENDAR_SYNC_FAILED);
-        RuntimeException releaseFailure = new RuntimeException("release failed");
-        FakeProviderDataService providerDataService = new FakeProviderDataService();
-        providerDataService.releaseFailure = releaseFailure;
-        GoogleCalendarSyncService service = service(
-                new FakeLeaseService(null),
-                providerDataService,
-                new FakeEventsClient(syncFailure),
-                new FakePagePersistenceService()
-        );
-
-        // when
-        Throwable thrown = catchThrowable(() -> synchronize(service));
-
-        // then
-        assertThat(thrown).isSameAs(syncFailure);
-        assertThat(thrown.getSuppressed()).containsExactly(releaseFailure);
-    }
-
-    @Test
-    @DisplayName("INCREMENTAL SYNC 시 lease 해제 실패는 sync 실패 예외에 해제 실패를 suppressed로 남겨서 반환한다")
-    void givenIncrementalAndLeaseReleaseFailures_whenSync_thenPreservesOriginalFailure() {
-        // given
-        CalioException syncFailure =
-                new CalioException(ErrorCode.GOOGLE_CALENDAR_SYNC_FAILED);
-        RuntimeException releaseFailure = new RuntimeException("release failed");
-        FakeProviderDataService providerDataService = new FakeProviderDataService();
-        providerDataService.releaseFailure = releaseFailure;
-        GoogleCalendarSyncService service = service(
-                new FakeLeaseService("saved-cursor"),
-                providerDataService,
-                new FakeEventsClient(syncFailure),
-                new FakePagePersistenceService()
-        );
-
-        // when
-        Throwable thrown = catchThrowable(() -> synchronize(service));
-
-        // then
-        assertThat(thrown).isSameAs(syncFailure);
-        assertThat(thrown.getSuppressed()).containsExactly(releaseFailure);
-    }
-
-    @Test
-    @DisplayName("Google 일정 요청 시 SYNC 과정에서 실패하면 sync를 완료하지 않고 sync lease를 해제한다")
-    void givenEventRequestFailure_whenSync_thenReleasesSyncLease() {
-        // given
-        FakeProviderDataService providerDataService = new FakeProviderDataService();
-        GoogleCalendarSyncService service = service(
-                new FakeLeaseService("saved-cursor"),
-                providerDataService,
-                new FakeEventsClient(new CalioException(ErrorCode.GOOGLE_CALENDAR_SYNC_FAILED)),
-                new FakePagePersistenceService()
-        );
-
-        // when, then
-        assertThatThrownBy(() -> synchronize(service))
-                .isInstanceOf(CalioException.class);
-        assertThat(providerDataService.releaseCount).isOne();
     }
 
     @Test
@@ -273,7 +204,7 @@ class GoogleCalendarSyncServiceTest {
         FakePagePersistenceService pagePersistenceService =
                 new FakePagePersistenceService();
         GoogleCalendarSyncService service = service(
-                new FakeLeaseService("saved-cursor"),
+                new FakeIntegrationQueryService("saved-cursor"),
                 providerDataService,
                 eventsClient,
                 pagePersistenceService
@@ -298,15 +229,14 @@ class GoogleCalendarSyncServiceTest {
         // given
         FakeProviderDataService providerDataService = new FakeProviderDataService();
         FakePagePersistenceService pagePersistenceService = new FakePagePersistenceService();
-        FakeOperationJobPersistenceService ownershipService =
-                new FakeOperationJobPersistenceService();
+        FakeOperationLeaseService ownershipService = new FakeOperationLeaseService();
         FakeAccessTokenService accessTokenService = new FakeAccessTokenService();
         FakeEventsClient eventsClient = new FakeEventsClient(
                 pageWithNextPageToken("page-2"),
                 terminalPage("next-cursor")
         );
         GoogleCalendarSyncService service = new GoogleCalendarSyncService(
-                new FakeLeaseService(null),
+                new FakeIntegrationQueryService(null),
                 providerDataService,
                 accessTokenService,
                 eventRequestService(eventsClient, accessTokenService),
@@ -375,13 +305,13 @@ class GoogleCalendarSyncServiceTest {
     }
 
     private GoogleCalendarSyncService service(
-            FakeLeaseService leaseService,
+            FakeIntegrationQueryService integrationQueryService,
             FakeProviderDataService providerDataService,
             FakeEventsClient eventsClient,
             FakePagePersistenceService pagePersistenceService
     ) {
         return service(
-                leaseService,
+                integrationQueryService,
                 providerDataService,
                 new FakeAccessTokenService(),
                 eventsClient,
@@ -390,20 +320,20 @@ class GoogleCalendarSyncServiceTest {
     }
 
     private GoogleCalendarSyncService service(
-            FakeLeaseService leaseService,
+            FakeIntegrationQueryService integrationQueryService,
             FakeProviderDataService providerDataService,
             FakeAccessTokenService accessTokenService,
             FakeEventsClient eventsClient,
             FakePagePersistenceService pagePersistenceService
     ) {
         return new GoogleCalendarSyncService(
-                leaseService,
+                integrationQueryService,
                 providerDataService,
                 accessTokenService,
                 eventRequestService(eventsClient, accessTokenService),
                 pagePersistenceService,
                 new FakePageNormalizer(),
-                new FakeOperationJobPersistenceService()
+                new FakeOperationLeaseService()
         );
     }
 
@@ -422,25 +352,28 @@ class GoogleCalendarSyncServiceTest {
         return new GoogleCalendarEventPage(List.of(), null, nextSyncToken, "UTC");
     }
 
-    private static final class FakeLeaseService extends GoogleCalendarSyncLeaseService {
+    private static final class FakeIntegrationQueryService
+            extends GoogleCalendarIntegrationQueryService {
 
-        private final String nextSyncToken;
+        private final GoogleCalendarIntegration integration;
 
-        private FakeLeaseService(String nextSyncToken) {
-            super(null, null);
-            this.nextSyncToken = nextSyncToken;
+        private FakeIntegrationQueryService(String nextSyncToken) {
+            super(null);
+            integration = mock(GoogleCalendarIntegration.class);
+            when(integration.getId()).thenReturn(20L);
+            when(integration.getAccountId()).thenReturn(ACCOUNT_ID);
+            when(integration.getNextSyncToken()).thenReturn(nextSyncToken);
         }
 
         @Override
-        public GoogleCalendarSyncLease acquire(Long accountId, String runId) {
-            return new GoogleCalendarSyncLease(20L, accountId, nextSyncToken, runId);
+        public GoogleCalendarIntegration getIntegration(Long accountId) {
+            return integration;
         }
     }
 
     private static final class FakeProviderDataService
             extends GoogleCalendarProviderDataService {
 
-        private int releaseCount;
         private int finalizeCount;
         private GoogleCalendarSyncMode finalizedMode;
         private String finalizedCursor;
@@ -448,7 +381,6 @@ class GoogleCalendarSyncServiceTest {
         private Set<String> finalizedSeenRecurrenceEventIds = Set.of();
         private Set<GoogleCalendarRecurrenceOverrideExternalKey>
                 finalizedSeenOverrideIds = Set.of();
-        private RuntimeException releaseFailure;
 
         private FakeProviderDataService() {
             super(
@@ -461,16 +393,9 @@ class GoogleCalendarSyncServiceTest {
                     null,
                     null,
                     null,
+                    mock(GoogleOperationLeaseService.class),
                     mock(GoogleOperationJobPersistenceService.class)
             );
-        }
-
-        @Override
-        public void releaseSyncLease(Long integrationId, String runId) {
-            releaseCount++;
-            if (releaseFailure != null) {
-                throw releaseFailure;
-            }
         }
 
         @Override
@@ -516,18 +441,17 @@ class GoogleCalendarSyncServiceTest {
         }
     }
 
-    private static final class FakeOperationJobPersistenceService
-            extends GoogleOperationJobPersistenceService {
+    private static final class FakeOperationLeaseService extends GoogleOperationLeaseService {
 
         private RuntimeException failure;
         private int assertionCount;
 
-        private FakeOperationJobPersistenceService() {
-            super(null, null, null, null);
+        private FakeOperationLeaseService() {
+            super(null);
         }
 
         @Override
-        public void extendOperationLease(Long jobId, Long accountId, String workerToken) {
+        public void extend(Long jobId, Long accountId, String workerToken) {
             assertionCount++;
             if (failure != null) {
                 throw failure;
@@ -577,7 +501,6 @@ class GoogleCalendarSyncServiceTest {
         private FakePagePersistenceService() {
             super(
                     mock(GoogleCalendarIntegrationQueryService.class),
-                    mock(GoogleCalendarIntegrationCommandService.class),
                     mock(GoogleCalendarEventMappingQueryService.class),
                     mock(GoogleCalendarEventMappingCommandService.class),
                     mock(GoogleCalendarRecurrenceMappingQueryService.class),
@@ -587,7 +510,7 @@ class GoogleCalendarSyncServiceTest {
                     mock(TagQueryService.class),
                     mock(RecurrenceEventRepository.class),
                     mock(RecurrenceEventOverrideRepository.class),
-                    mock(GoogleOperationJobPersistenceService.class)
+                    mock(GoogleOperationLeaseService.class)
             );
         }
 

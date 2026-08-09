@@ -23,8 +23,6 @@ import org.springframework.transaction.annotation.Transactional;
 })
 class GoogleCalendarIntegrationRepositoryTest {
 
-    private static final long SYNC_LEASE_DURATION_SECONDS = 300L;
-
     @Autowired
     private AccountRepository accountRepository;
 
@@ -59,37 +57,6 @@ class GoogleCalendarIntegrationRepositoryTest {
         assertThatThrownBy(() ->
                 googleCalendarIntegrationRepository.saveAndFlush(integration(account.getId(), "second-subject")))
                 .isInstanceOf(DataIntegrityViolationException.class);
-    }
-
-    @Test
-    @Transactional
-    @DisplayName("active lease가 있으면 다른 run의 획득과 해제가 차단된다")
-    void givenActiveLease_whenDifferentRunAcquiresOrReleases_thenPreservesOwner() {
-        // given
-        Account account = accountRepository.saveAndFlush(new Account());
-        GoogleCalendarIntegration integration = googleCalendarIntegrationRepository.saveAndFlush(
-                integration(account.getId(), "google-subject")
-        );
-
-        // when, then
-        assertThat(googleCalendarIntegrationRepository.acquireSyncLease(
-                account.getId(),
-                "first-run",
-                SYNC_LEASE_DURATION_SECONDS
-        )).isOne();
-        assertThat(googleCalendarIntegrationRepository.acquireSyncLease(
-                account.getId(),
-                "second-run",
-                SYNC_LEASE_DURATION_SECONDS
-        )).isZero();
-        assertThat(googleCalendarIntegrationRepository.releaseSyncLease(
-                integration.getId(),
-                "second-run"
-        )).isZero();
-        assertThat(googleCalendarIntegrationRepository.releaseSyncLease(
-                integration.getId(),
-                "first-run"
-        )).isOne();
     }
 
     @Test

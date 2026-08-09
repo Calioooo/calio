@@ -42,7 +42,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class GoogleCalendarEventPagePersistenceService {
 
     private final GoogleCalendarIntegrationQueryService integrationQueryService;
-    private final GoogleCalendarIntegrationCommandService integrationCommandService;
     private final GoogleCalendarEventMappingQueryService eventMappingQueryService;
     private final GoogleCalendarEventMappingCommandService eventMappingCommandService;
     private final GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService;
@@ -52,11 +51,10 @@ public class GoogleCalendarEventPagePersistenceService {
     private final TagQueryService tagQueryService;
     private final RecurrenceEventRepository recurrenceEventRepository;
     private final RecurrenceEventOverrideRepository overrideRepository;
-    private final GoogleOperationJobPersistenceService operationJobPersistenceService;
+    private final GoogleOperationLeaseService operationLeaseService;
 
     public GoogleCalendarEventPagePersistenceService(
             GoogleCalendarIntegrationQueryService integrationQueryService,
-            GoogleCalendarIntegrationCommandService integrationCommandService,
             GoogleCalendarEventMappingQueryService eventMappingQueryService,
             GoogleCalendarEventMappingCommandService eventMappingCommandService,
             GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService,
@@ -66,10 +64,9 @@ public class GoogleCalendarEventPagePersistenceService {
             TagQueryService tagQueryService,
             RecurrenceEventRepository recurrenceEventRepository,
             RecurrenceEventOverrideRepository overrideRepository,
-            GoogleOperationJobPersistenceService operationJobPersistenceService
+            GoogleOperationLeaseService operationLeaseService
     ) {
         this.integrationQueryService = integrationQueryService;
-        this.integrationCommandService = integrationCommandService;
         this.eventMappingQueryService = eventMappingQueryService;
         this.eventMappingCommandService = eventMappingCommandService;
         this.recurrenceMappingQueryService = recurrenceMappingQueryService;
@@ -79,7 +76,7 @@ public class GoogleCalendarEventPagePersistenceService {
         this.tagQueryService = tagQueryService;
         this.recurrenceEventRepository = recurrenceEventRepository;
         this.overrideRepository = overrideRepository;
-        this.operationJobPersistenceService = operationJobPersistenceService;
+        this.operationLeaseService = operationLeaseService;
     }
 
     @Transactional
@@ -90,8 +87,7 @@ public class GoogleCalendarEventPagePersistenceService {
             String workerToken,
             GoogleCalendarNormalizedPage page
     ) {
-        operationJobPersistenceService.extendOperationLease(jobId, accountId, workerToken);
-        extendSyncLeaseOrThrow(integrationId, workerToken);
+        operationLeaseService.extend(jobId, accountId, workerToken);
         GoogleCalendarIntegration integration = integrationQueryService.getIntegrationById(integrationId);
         applyEventChanges(integration, accountId, page.items());
     }
@@ -100,10 +96,8 @@ public class GoogleCalendarEventPagePersistenceService {
     public void persistNormalizedPage(
             Long integrationId,
             Long accountId,
-            String runId,
             GoogleCalendarNormalizedPage page
     ) {
-        extendSyncLeaseOrThrow(integrationId, runId);
         GoogleCalendarIntegration integration = integrationQueryService.getIntegrationById(integrationId);
         applyEventChanges(integration, accountId, page.items());
     }
@@ -650,10 +644,6 @@ public class GoogleCalendarEventPagePersistenceService {
             eventRepository.flush();
         }
         recurrenceEventRepository.delete(recurrenceEventMapping.getRecurrenceEvent());
-    }
-
-    private void extendSyncLeaseOrThrow(Long integrationId, String runId) {
-        integrationCommandService.renewSyncLease(integrationId, runId);
     }
 
     private record ExistingMappingsAndOverrides(

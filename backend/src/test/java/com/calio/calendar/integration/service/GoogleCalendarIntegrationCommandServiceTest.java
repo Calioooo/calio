@@ -1,17 +1,17 @@
 package com.calio.calendar.integration.service;
 
-import static org.mockito.ArgumentMatchers.eq;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.calio.calendar.common.error.CalioException;
+import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.integration.repository.GoogleCalendarIntegrationRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class GoogleCalendarIntegrationCommandServiceTest {
-
-    private static final long SYNC_LEASE_DURATION_SECONDS = 300L;
 
     private final GoogleCalendarIntegrationRepository integrationRepository =
             mock(GoogleCalendarIntegrationRepository.class);
@@ -19,38 +19,28 @@ class GoogleCalendarIntegrationCommandServiceTest {
             new GoogleCalendarIntegrationCommandService(integrationRepository);
 
     @Test
-    @DisplayName("sync lease 획득은 Command Service가 소유한 유효 기간을 Repository에 전달한다")
-    void givenAvailableSyncLease_whenAcquire_thenPassesCommandOwnedDuration() {
+    @DisplayName("동기화 cursor 저장은 Integration Repository에 전달한다")
+    void givenNextSyncToken_whenSaving_thenUpdatesIntegrationCursor() {
         // given
-        when(integrationRepository.acquireSyncLease(1L, "sync-run", SYNC_LEASE_DURATION_SECONDS))
-                .thenReturn(1);
+        when(integrationRepository.updateNextSyncToken(1L, "next-token")).thenReturn(1);
 
         // when
-        commandService.acquireSyncLease(1L, "sync-run");
+        commandService.saveNextSyncToken(1L, "next-token");
 
         // then
-        verify(integrationRepository).acquireSyncLease(
-                eq(1L),
-                eq("sync-run"),
-                eq(SYNC_LEASE_DURATION_SECONDS)
-        );
+        verify(integrationRepository).updateNextSyncToken(1L, "next-token");
     }
 
     @Test
-    @DisplayName("sync lease 연장은 Command Service가 소유한 유효 기간을 Repository에 전달한다")
-    void givenOwnedSyncLease_whenRenew_thenPassesCommandOwnedDuration() {
+    @DisplayName("동기화 cursor를 저장하지 못하면 sync conflict 예외를 반환한다")
+    void givenMissingIntegration_whenSavingCursor_thenThrowsSyncConflict() {
         // given
-        when(integrationRepository.extendSyncLease(10L, "sync-run", SYNC_LEASE_DURATION_SECONDS))
-                .thenReturn(1);
+        when(integrationRepository.updateNextSyncToken(1L, "next-token")).thenReturn(0);
 
-        // when
-        commandService.renewSyncLease(10L, "sync-run");
-
-        // then
-        verify(integrationRepository).extendSyncLease(
-                eq(10L),
-                eq("sync-run"),
-                eq(SYNC_LEASE_DURATION_SECONDS)
-        );
+        // when, then
+        assertThatThrownBy(() -> commandService.saveNextSyncToken(1L, "next-token"))
+                .isInstanceOfSatisfying(CalioException.class, exception ->
+                        org.assertj.core.api.Assertions.assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.GOOGLE_CALENDAR_SYNC_CONFLICT));
     }
 }

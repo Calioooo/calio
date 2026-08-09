@@ -41,17 +41,29 @@ public interface GoogleCalendarIntegrationRepository extends JpaRepository<Googl
     @Query(value = """
             UPDATE google_calendar_integrations
             SET google_operation_lease_owner = :owner,
-                google_operation_lease_expires_at = TIMESTAMPADD(MINUTE, 5, CURRENT_TIMESTAMP)
+                google_operation_lease_expires_at = TIMESTAMPADD(
+                    SECOND,
+                    :leaseDurationSeconds,
+                    CURRENT_TIMESTAMP
+                )
             WHERE account_id = :accountId
               AND (google_operation_lease_owner IS NULL
                    OR google_operation_lease_expires_at < CURRENT_TIMESTAMP)
             """, nativeQuery = true)
-    int acquireGoogleOperationLease(@Param("accountId") Long accountId, @Param("owner") String owner);
+    int acquireGoogleOperationLease(
+            @Param("accountId") Long accountId,
+            @Param("owner") String owner,
+            @Param("leaseDurationSeconds") long leaseDurationSeconds
+    );
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(value = """
             UPDATE google_calendar_integrations
-            SET google_operation_lease_expires_at = TIMESTAMPADD(MINUTE, 5, CURRENT_TIMESTAMP)
+            SET google_operation_lease_expires_at = TIMESTAMPADD(
+                SECOND,
+                :leaseDurationSeconds,
+                CURRENT_TIMESTAMP
+            )
             WHERE account_id = :accountId
               AND google_operation_lease_owner = :owner
               AND google_operation_lease_expires_at >= CURRENT_TIMESTAMP
@@ -66,7 +78,8 @@ public interface GoogleCalendarIntegrationRepository extends JpaRepository<Googl
     int renewOwnedGoogleOperationLease(
             @Param("jobId") Long jobId,
             @Param("accountId") Long accountId,
-            @Param("owner") String owner
+            @Param("owner") String owner,
+            @Param("leaseDurationSeconds") long leaseDurationSeconds
     );
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
@@ -80,85 +93,14 @@ public interface GoogleCalendarIntegrationRepository extends JpaRepository<Googl
     int releaseGoogleOperationLease(@Param("accountId") Long accountId, @Param("owner") String owner);
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query(value = """
-            UPDATE google_calendar_integrations
-            SET active_sync_run_id = :runId,
-                sync_lease_expires_at = TIMESTAMPADD(
-                    SECOND,
-                    :leaseDurationSeconds,
-                    CURRENT_TIMESTAMP
-                )
-            WHERE account_id = :accountId
-              AND (
-                  active_sync_run_id IS NULL
-                  OR sync_lease_expires_at < CURRENT_TIMESTAMP
-              )
-            """, nativeQuery = true)
-    int acquireSyncLease(
-            @Param("accountId") Long accountId,
-            @Param("runId") String runId,
-            @Param("leaseDurationSeconds") long leaseDurationSeconds
-    );
-
-    @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query(value = """
-            UPDATE google_calendar_integrations
-            SET sync_lease_expires_at = TIMESTAMPADD(
-                SECOND,
-                :leaseDurationSeconds,
-                CURRENT_TIMESTAMP
-            )
-            WHERE id = :integrationId
-              AND active_sync_run_id = :runId
-              AND sync_lease_expires_at >= CURRENT_TIMESTAMP
-            """, nativeQuery = true)
-    int extendSyncLease(
-            @Param("integrationId") Long integrationId,
-            @Param("runId") String runId,
-            @Param("leaseDurationSeconds") long leaseDurationSeconds
-    );
-
-    @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Transactional
     @Query("""
             update GoogleCalendarIntegration integration
-            set integration.activeSyncRunId = null,
-                integration.syncLeaseExpiresAt = null
+            set integration.nextSyncToken = :nextSyncToken
             where integration.id = :integrationId
-              and integration.activeSyncRunId = :runId
             """)
-    int releaseSyncLease(
+    int updateNextSyncToken(
             @Param("integrationId") Long integrationId,
-            @Param("runId") String runId
-    );
-
-    @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query("""
-            update GoogleCalendarIntegration integration
-            set integration.nextSyncToken = :nextSyncToken,
-                integration.activeSyncRunId = null,
-                integration.syncLeaseExpiresAt = null
-            where integration.id = :integrationId
-              and integration.activeSyncRunId = :runId
-              and integration.syncLeaseExpiresAt >= CURRENT_TIMESTAMP
-            """)
-    int finalizeSync(
-            @Param("integrationId") Long integrationId,
-            @Param("runId") String runId,
             @Param("nextSyncToken") String nextSyncToken
-    );
-
-    @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query("""
-            update GoogleCalendarIntegration integration
-            set integration.nextSyncToken = null
-            where integration.id = :integrationId
-              and integration.activeSyncRunId = :runId
-              and integration.syncLeaseExpiresAt >= CURRENT_TIMESTAMP
-            """)
-    int clearCursorUnderLease(
-            @Param("integrationId") Long integrationId,
-            @Param("runId") String runId
     );
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
