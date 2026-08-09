@@ -61,9 +61,9 @@ class GroupInvitationServiceTest {
                 Instant.parse("2026-07-29T08:00:00Z")
         );
         when(commandService.issueOnce(ACCOUNT_ID, GROUP_SPACE_ID, first))
-                .thenThrow(new DataIntegrityViolationException("collision"));
+                .thenThrow(credentialCollision("uk_group_invitations_link_token_hash"));
         when(commandService.issueOnce(ACCOUNT_ID, GROUP_SPACE_ID, second))
-                .thenThrow(new DataIntegrityViolationException("collision"));
+                .thenThrow(credentialCollision("uk_group_invitations_invite_code_hash"));
         when(commandService.issueOnce(ACCOUNT_ID, GROUP_SPACE_ID, third)).thenReturn(expected);
 
         // when
@@ -90,11 +90,11 @@ class GroupInvitationServiceTest {
         InvitationCredentialPair third = pair("C");
         when(credentialService.generatePair()).thenReturn(first, second, third);
         when(commandService.issueOnce(ACCOUNT_ID, GROUP_SPACE_ID, first))
-                .thenThrow(new DataIntegrityViolationException("collision"));
+                .thenThrow(credentialCollision("uk_group_invitations_link_token_hash"));
         when(commandService.issueOnce(ACCOUNT_ID, GROUP_SPACE_ID, second))
-                .thenThrow(new DataIntegrityViolationException("collision"));
+                .thenThrow(credentialCollision("uk_group_invitations_link_token_hash"));
         when(commandService.issueOnce(ACCOUNT_ID, GROUP_SPACE_ID, third))
-                .thenThrow(new DataIntegrityViolationException("collision"));
+                .thenThrow(credentialCollision("uk_group_invitations_link_token_hash"));
 
         // when, then
         assertThatThrownBy(() -> service.issue(ACCOUNT_ID, GROUP_SPACE_ID))
@@ -104,6 +104,30 @@ class GroupInvitationServiceTest {
                     assertThat(exception.getMessage()).doesNotContain("token");
                 });
         verify(credentialService, times(3)).generatePair();
+    }
+
+    @Test
+    @DisplayName("credential unique constraint와 무관한 무결성 오류는 재시도하거나 변환하지 않는다")
+    void propagatesUnrelatedDataIntegrityViolation() {
+        // given
+        InvitationCredentialPair credentials = pair("A");
+        DataIntegrityViolationException expected =
+                new DataIntegrityViolationException("foreign key constraint violation");
+        when(credentialService.generatePair()).thenReturn(credentials);
+        when(commandService.issueOnce(ACCOUNT_ID, GROUP_SPACE_ID, credentials))
+                .thenThrow(expected);
+
+        // when, then
+        assertThatThrownBy(() -> service.issue(ACCOUNT_ID, GROUP_SPACE_ID)).isSameAs(expected);
+        verify(credentialService).generatePair();
+        verify(commandService).issueOnce(ACCOUNT_ID, GROUP_SPACE_ID, credentials);
+    }
+
+    private DataIntegrityViolationException credentialCollision(String constraintName) {
+        return new DataIntegrityViolationException(
+                "insert failed",
+                new IllegalStateException("Duplicate entry for key '" + constraintName + "'")
+        );
     }
 
     private InvitationCredentialPair pair(String seed) {

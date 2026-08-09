@@ -4,6 +4,8 @@ import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.groupinvitation.controller.dto.IssueGroupInvitationResponse;
 import com.calio.calendar.groupinvitation.service.dto.InvitationCredentialPair;
+import java.util.Locale;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -17,6 +19,10 @@ public class GroupInvitationService {
 
     private static final Logger log = LoggerFactory.getLogger(GroupInvitationService.class);
     private static final int MAX_ISSUE_ATTEMPTS = 3;
+    private static final Set<String> CREDENTIAL_UNIQUE_CONSTRAINTS = Set.of(
+            "uk_group_invitations_link_token_hash",
+            "uk_group_invitations_invite_code_hash"
+    );
 
     private final InvitationCredentialService credentialService;
     private final GroupInvitationCommandService commandService;
@@ -42,11 +48,31 @@ public class GroupInvitationService {
                 );
             } catch (DataIntegrityViolationException exception) {
                 // A failed attempt is fully rolled back by TransactionTemplate.
+                if (!isCredentialCollision(exception)) {
+                    throw exception;
+                }
             }
         }
 
         log.error("Group invitation generation failed. errorCode={}",
                 ErrorCode.GROUP_INVITATION_GENERATION_FAILED.name());
         throw new CalioException(ErrorCode.GROUP_INVITATION_GENERATION_FAILED);
+    }
+
+    private boolean isCredentialCollision(Throwable throwable) {
+        Throwable current = throwable;
+        while (current != null) {
+            String message = current.getMessage();
+            if (message != null && containsCredentialConstraint(message)) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+
+    private boolean containsCredentialConstraint(String message) {
+        String normalizedMessage = message.toLowerCase(Locale.ROOT);
+        return CREDENTIAL_UNIQUE_CONSTRAINTS.stream().anyMatch(normalizedMessage::contains);
     }
 }
