@@ -61,34 +61,42 @@ public class GoogleOperationProcessor {
             syncService.synchronize(job.getId(), job.getAccountId(), workerToken);
             return JobExecutionResult.CONTINUE_WITH_NEXT_JOB;
         } catch (RuntimeException failure) {
-            return persistFailure(
+
+            GoogleOperationFailureDecision failureDecision = failureClassifier.classify(failure);
+
+            persistFailureAction(
                     job,
                     workerToken,
-                    failureClassifier.classify(failure)
+                    failureDecision
             );
+
+            return mapExecutionResult(failureDecision);
         }
     }
 
-    private JobExecutionResult persistFailure(
+    private void persistFailureAction(
             GoogleOperationJob job,
             String workerToken,
             GoogleOperationFailureDecision decision
     ) {
+        switch (decision.action()) {
+            case RETRY -> jobPersistenceService.retry(job, workerToken, decision.reason());
+            case FAIL -> jobPersistenceService.terminate(
+                    job.getId(),
+                    job.getAccountId(),
+                    workerToken,
+                    decision.reason()
+            );
+        }
+    }
+
+    private JobExecutionResult mapExecutionResult(
+            GoogleOperationFailureDecision decision
+    ) {
         return switch (decision.action()) {
-            case ABANDON -> JobExecutionResult.STOP_ACCOUNT_PROCESSING;
-            case RETRY -> {
-                jobPersistenceService.retry(job, workerToken, decision.reason());
-                yield JobExecutionResult.STOP_ACCOUNT_PROCESSING;
-            }
-            case TERMINAL -> {
-                jobPersistenceService.terminate(
-                        job.getId(),
-                        job.getAccountId(),
-                        workerToken,
-                        decision.reason()
-                );
-                yield JobExecutionResult.CONTINUE_WITH_NEXT_JOB;
-            }
+            case SKIP -> JobExecutionResult.STOP_ACCOUNT_PROCESSING;
+            case RETRY -> JobExecutionResult.STOP_ACCOUNT_PROCESSING;
+            case FAIL -> JobExecutionResult.CONTINUE_WITH_NEXT_JOB;
         };
     }
 

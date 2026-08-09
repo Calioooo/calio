@@ -38,15 +38,15 @@ class GoogleCalendarSyncServiceTest {
     private static final String WORKER_TOKEN = "worker-token";
 
     @Test
-    @DisplayName("INCREMENTAL 410 이후 FULL 재시도는 앞선 INCREMENTAL seen identity를 제거한다")
-    void givenExpiredIncrementalCursor_whenSync_thenRetriesInPlaceAndReturnsFullMode() {
+    @DisplayName("INCREMENTAL 두 번째 page 요청이 410이면 FULL sync를 처음부터 다시 실행하고 이전 처리 결과를 사용하지 않는다")
+    void givenExpiredIncrementalSecondPage_whenSync_thenRestartsFullSyncWithoutIncrementalResults() {
         // given
         FakeLeaseService leaseService = new FakeLeaseService("saved-cursor");
         FakeProviderDataService providerDataService = new FakeProviderDataService();
         FakeEventsClient eventsClient = new FakeEventsClient(
-                pageWithNextPage("incremental-page-2"),
-                new GoogleCalendarSyncTokenExpiredException(),
-                terminalPage("full-cursor")
+                pageWithNextPageToken("incremental-page-2"), // incremental-sync
+                new GoogleCalendarSyncTokenExpiredException(), // sync token expired exception
+                terminalPage("full-cursor") // full-sync
         );
         FakePagePersistenceService pagePersistenceService =
                 new FakePagePersistenceService();
@@ -75,10 +75,9 @@ class GoogleCalendarSyncServiceTest {
         );
 
         // when
-        GoogleCalendarSyncMode completedMode = synchronize(service);
+        synchronize(service);
 
         // then
-        assertThat(completedMode).isEqualTo(GoogleCalendarSyncMode.FULL);
         assertThat(eventsClient.requestedModes)
                 .containsExactly(
                         GoogleCalendarSyncMode.INCREMENTAL,
@@ -99,7 +98,7 @@ class GoogleCalendarSyncServiceTest {
     }
 
     @Test
-    @DisplayName("Events API 401은 access token을 강제 갱신하고 동일 page를 한 번 재시도한다")
+    @DisplayName("Events API 401은 access token을 강제 갱신하고 동일 page 요청을 재시도한다")
     void givenUnauthorizedResponse_whenSync_thenRefreshesAndRetriesOnce() {
         // given
         FakeAccessTokenService accessTokenService = new FakeAccessTokenService();
@@ -116,10 +115,9 @@ class GoogleCalendarSyncServiceTest {
         );
 
         // when
-        GoogleCalendarSyncMode completedMode = synchronize(service);
+        synchronize(service);
 
         // then
-        assertThat(completedMode).isEqualTo(GoogleCalendarSyncMode.FULL);
         assertThat(accessTokenService.forceRefreshCount).isOne();
         assertThat(eventsClient.requestedAccessTokens)
                 .containsExactly("access-token", "refreshed-access-token");
@@ -153,7 +151,7 @@ class GoogleCalendarSyncServiceTest {
     }
 
     @Test
-    @DisplayName("Events API가 재시도에도 401이면 partial data cleanup 없이 reconnect required로 종료한다")
+    @DisplayName("Events API가 재시도에도 401이면 reconnect required로 종료한다")
     void givenRepeatedUnauthorizedResponses_whenSync_thenRequiresReconnect() {
         // given
         FakeProviderDataService providerDataService = new FakeProviderDataService();
@@ -198,7 +196,7 @@ class GoogleCalendarSyncServiceTest {
     }
 
     @Test
-    @DisplayName("FULL lease 해제 실패는 원본 sync 실패를 유지하고 해제 실패를 suppressed로 남긴다")
+    @DisplayName("FULL SYNC 시 lease 해제 실패는 sync 실패 예외에 해제 실패를 suppressed로 남겨서 반환한다")
     void givenFullSyncAndLeaseReleaseFailures_whenSync_thenPreservesOriginalFailure() {
         // given
         CalioException syncFailure =
@@ -222,25 +220,7 @@ class GoogleCalendarSyncServiceTest {
     }
 
     @Test
-    @DisplayName("INCREMENTAL 실패는 전체 cleanup 없이 기존 cursor와 앞선 page 결과를 유지한다")
-    void givenIncrementalFailure_whenSync_thenOnlyReleasesOwnedLease() {
-        // given
-        FakeProviderDataService providerDataService = new FakeProviderDataService();
-        GoogleCalendarSyncService service = service(
-                new FakeLeaseService("saved-cursor"),
-                providerDataService,
-                new FakeEventsClient(new CalioException(ErrorCode.GOOGLE_CALENDAR_SYNC_FAILED)),
-                new FakePagePersistenceService()
-        );
-
-        // when, then
-        assertThatThrownBy(() -> synchronize(service))
-                .isInstanceOf(CalioException.class);
-        assertThat(providerDataService.releaseCount).isOne();
-    }
-
-    @Test
-    @DisplayName("INCREMENTAL lease 해제 실패는 원본 sync 실패를 유지하고 해제 실패를 suppressed로 남긴다")
+    @DisplayName("INCREMENTAL SYNC 시 lease 해제 실패는 sync 실패 예외에 해제 실패를 suppressed로 남겨서 반환한다")
     void givenIncrementalAndLeaseReleaseFailures_whenSync_thenPreservesOriginalFailure() {
         // given
         CalioException syncFailure =
@@ -264,33 +244,56 @@ class GoogleCalendarSyncServiceTest {
     }
 
     @Test
-    @DisplayName("multi-page INCREMENTAL은 중간 page를 반영하고 마지막 page에서 finalize한다")
+    @DisplayName("Google 일정 요청 시 SYNC 과정에서 실패하면 sync를 완료하지 않고 sync lease를 해제한다")
+    void givenEventRequestFailure_whenSync_thenReleasesSyncLease() {
+        // given
+        FakeProviderDataService providerDataService = new FakeProviderDataService();
+        GoogleCalendarSyncService service = service(
+                new FakeLeaseService("saved-cursor"),
+                providerDataService,
+                new FakeEventsClient(new CalioException(ErrorCode.GOOGLE_CALENDAR_SYNC_FAILED)),
+                new FakePagePersistenceService()
+        );
+
+        // when, then
+        assertThatThrownBy(() -> synchronize(service))
+                .isInstanceOf(CalioException.class);
+        assertThat(providerDataService.releaseCount).isOne();
+    }
+
+    @Test
+    @DisplayName("INCREMENTAL 시 여러 page를 응답하면 마지막 page 에서 finalize 한다")
     void givenMultipleIncrementalPages_whenSync_thenPersistsAndFinalizesByPage() {
         // given
+        FakeProviderDataService providerDataService = new FakeProviderDataService();
         FakeEventsClient eventsClient = new FakeEventsClient(
-                pageWithNextPage("page-2"),
+                pageWithNextPageToken("page-2"),
                 terminalPage("next-cursor")
         );
         FakePagePersistenceService pagePersistenceService =
                 new FakePagePersistenceService();
         GoogleCalendarSyncService service = service(
                 new FakeLeaseService("saved-cursor"),
-                new FakeProviderDataService(),
+                providerDataService,
                 eventsClient,
                 pagePersistenceService
         );
 
         // when
-        GoogleCalendarSyncMode completedMode = synchronize(service);
+        synchronize(service);
 
         // then
-        assertThat(completedMode).isEqualTo(GoogleCalendarSyncMode.INCREMENTAL);
         assertThat(eventsClient.requestedPageTokens).containsExactly(null, "page-2");
         assertThat(pagePersistenceService.normalizedPersistCount).isEqualTo(2);
+        assertThat(providerDataService.finalizeCount).isOne();
+        assertThat(providerDataService.finalizedMode)
+                .isEqualTo(GoogleCalendarSyncMode.INCREMENTAL);
+        assertThat(providerDataService.finalizedCursor)
+                .isEqualTo("next-cursor");
     }
 
     @Test
-    @DisplayName("activation FULL은 page별 commit 후 별도 final transaction에서 cleanup과 cursor를 완료한다")
+    @DisplayName("FULL SYNC는 page별 저장 후 별도의 트랜잭션에서 cleanup과 cursor를 변경한다")
     void givenActivationFullPages_whenSync_thenPersistsPagesBeforeFinalReconciliation() {
         // given
         FakeProviderDataService providerDataService = new FakeProviderDataService();
@@ -299,7 +302,7 @@ class GoogleCalendarSyncServiceTest {
                 new FakeOperationJobPersistenceService();
         FakeAccessTokenService accessTokenService = new FakeAccessTokenService();
         FakeEventsClient eventsClient = new FakeEventsClient(
-                pageWithNextPage("page-2"),
+                pageWithNextPageToken("page-2"),
                 terminalPage("next-cursor")
         );
         GoogleCalendarSyncService service = new GoogleCalendarSyncService(
@@ -326,10 +329,9 @@ class GoogleCalendarSyncServiceTest {
         );
 
         // when
-        GoogleCalendarSyncMode completedMode = synchronize(service);
+        synchronize(service);
 
         // then
-        assertThat(completedMode).isEqualTo(GoogleCalendarSyncMode.FULL);
         assertThat(pagePersistenceService.normalizedPersistCount).isEqualTo(2);
         assertThat(providerDataService.finalizeCount).isOne();
         assertThat(providerDataService.finalizedMode).isEqualTo(GoogleCalendarSyncMode.FULL);
@@ -368,8 +370,8 @@ class GoogleCalendarSyncServiceTest {
         );
     }
 
-    private GoogleCalendarSyncMode synchronize(GoogleCalendarSyncService service) {
-        return service.synchronize(JOB_ID, ACCOUNT_ID, WORKER_TOKEN);
+    private void synchronize(GoogleCalendarSyncService service) {
+        service.synchronize(JOB_ID, ACCOUNT_ID, WORKER_TOKEN);
     }
 
     private GoogleCalendarSyncService service(
@@ -412,7 +414,7 @@ class GoogleCalendarSyncServiceTest {
         return new GoogleCalendarEventRequestService(eventsClient, accessTokenService);
     }
 
-    private GoogleCalendarEventPage pageWithNextPage(String nextPageToken) {
+    private GoogleCalendarEventPage pageWithNextPageToken(String nextPageToken) {
         return new GoogleCalendarEventPage(List.of(), nextPageToken, null, "UTC");
     }
 

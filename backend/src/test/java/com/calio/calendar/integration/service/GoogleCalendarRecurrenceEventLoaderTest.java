@@ -54,8 +54,8 @@ class GoogleCalendarRecurrenceEventLoaderTest {
     }
 
     @Test
-    @DisplayName("존재하지 않는 recurrence-event는 run 전체에 cache한다")
-    void givenMissingRecurrenceEvent_whenLoadTwice_thenRequestsOnce() {
+    @DisplayName("존재하지 않는 recurrence-event는 cache 하여 동일한 조회 결과를 유지한다")
+    void givenMissingRecurrenceEvent_whenLoadedAgain_thenKeepsMissingResult(){
         // given
         GoogleCalendarSyncRunContext context = new GoogleCalendarSyncRunContext("token");
         when(eventRequestService.getEvent(10L, "recurrence-event-1", context))
@@ -76,27 +76,7 @@ class GoogleCalendarRecurrenceEventLoaderTest {
     }
 
     @Test
-    @DisplayName("요청한 recurrence-event와 다른 Google 응답은 거부한다")
-    void givenDifferentExternalId_whenLoad_thenRejectsResponse() {
-        // given
-        GoogleCalendarSyncRunContext context = new GoogleCalendarSyncRunContext("token");
-        GoogleCalendarEventResponse response = recurrenceEvent("different-event");
-        when(eventRequestService.getEvent(10L, "recurrence-event-1", context))
-                .thenReturn(Optional.of(response));
-
-        // when, then
-        assertThatThrownBy(() -> loader.loadRecurrenceEvent(
-                10L,
-                "recurrence-event-1",
-                context
-        )).isInstanceOfSatisfying(CalioException.class, exception ->
-                assertThat(exception.getErrorCode())
-                        .isEqualTo(ErrorCode.GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID));
-        verify(recurrenceMapper, never()).mapRecurrenceEvent(response);
-    }
-
-    @Test
-    @DisplayName("유효한 recurrence-event 응답은 변환하여 run 전체에 cache한다")
+    @DisplayName("유효한 recurrence-event 응답은 cache 하여 동일한 조회 결과를 유지한다")
     void givenValidRecurrenceEvent_whenLoadTwice_thenMapsAndCachesOnce() {
         // given
         GoogleCalendarSyncRunContext context = new GoogleCalendarSyncRunContext("token");

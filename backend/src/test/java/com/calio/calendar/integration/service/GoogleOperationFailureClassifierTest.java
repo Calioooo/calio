@@ -17,15 +17,15 @@ class GoogleOperationFailureClassifierTest {
             new GoogleOperationFailureClassifier();
 
     @Test
-    @DisplayName("operation ownership 상실은 상태 변경 없이 abandon한다")
-    void givenOwnershipLost_whenClassify_thenAbandons() {
+    @DisplayName("operation ownership 상실은 상태 변경 없이 skip한다")
+    void givenOwnershipLost_whenClassify_thenSkips() {
         // when
         GoogleOperationFailureDecision decision = classifier.classify(
                 new GoogleOperationOwnershipLostException()
         );
 
         // then
-        assertThat(decision.action()).isEqualTo(Action.ABANDON);
+        assertThat(decision.action()).isEqualTo(Action.SKIP);
         assertThat(decision.reason()).isNull();
     }
 
@@ -44,7 +44,7 @@ class GoogleOperationFailureClassifierTest {
     }
 
     @Test
-    @DisplayName("원인 체인에 일시적인 SQL 오류가 있으면 root cause를 이유로 retry한다")
+    @DisplayName("일시적인 SQL 오류가 있으면 retry한다")
     void givenNestedTransientSqlFailure_whenClassify_thenRetries() {
         // given
         RuntimeException failure = new RuntimeException(
@@ -61,15 +61,15 @@ class GoogleOperationFailureClassifierTest {
     }
 
     @Test
-    @DisplayName("재연결이 필요한 Google 오류는 terminal 처리한다")
-    void givenPermanentCalioFailure_whenClassify_thenTerminates() {
+    @DisplayName("재연결이 필요한 Google 오류는 fail 처리한다")
+    void givenPermanentCalioFailure_whenClassify_thenFails() {
         // when
         GoogleOperationFailureDecision decision = classifier.classify(
                 new CalioException(ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED)
         );
 
         // then
-        assertThat(decision.action()).isEqualTo(Action.TERMINAL);
+        assertThat(decision.action()).isEqualTo(Action.FAIL);
         assertThat(decision.reason())
                 .isEqualTo(ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED.name());
     }
@@ -93,15 +93,15 @@ class GoogleOperationFailureClassifierTest {
     }
 
     @Test
-    @DisplayName("분류되지 않은 내부 오류는 terminal 처리한다")
-    void givenUnknownFailure_whenClassify_thenTerminatesAsInternalError() {
+    @DisplayName("분류되지 않은 내부 오류는 fail 처리한다")
+    void givenUnknownFailure_whenClassify_thenFailsAsInternalError() {
         // when
         GoogleOperationFailureDecision decision = classifier.classify(
                 new IllegalStateException("unknown")
         );
 
         // then
-        assertThat(decision.action()).isEqualTo(Action.TERMINAL);
+        assertThat(decision.action()).isEqualTo(Action.FAIL);
         assertThat(decision.reason()).isEqualTo(ErrorCode.INTERNAL_SERVER_ERROR.name());
     }
 }

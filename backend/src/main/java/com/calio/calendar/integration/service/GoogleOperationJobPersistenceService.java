@@ -81,7 +81,7 @@ public class GoogleOperationJobPersistenceService {
 
     @Transactional
     public void retry(GoogleOperationJob job, String workerToken, String reason) {
-        Duration delay = RETRY_DELAYS.get(Math.min(job.getRetryCount(), RETRY_DELAYS.size() - 1));
+        Duration delay = getDelayByRetryCount(job);
         try {
             jobCommandService.retryOperationJob(
                     job,
@@ -149,5 +149,9 @@ public class GoogleOperationJobPersistenceService {
         );
         jobCommandService.deleteOperationJobs(ids);
         return ids.size();
+    }
+
+    private Duration getDelayByRetryCount(GoogleOperationJob job) {
+        return RETRY_DELAYS.get(Math.min(job.getRetryCount(), RETRY_DELAYS.size() - 1));
     }
 }

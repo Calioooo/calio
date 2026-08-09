@@ -40,7 +40,7 @@ public class GoogleCalendarSyncService {
         this.operationJobPersistenceService = operationJobPersistenceService;
     }
 
-    public GoogleCalendarSyncMode synchronize(
+    public void synchronize(
             Long jobId,
             Long accountId,
             String workerToken
@@ -51,28 +51,26 @@ public class GoogleCalendarSyncService {
             GoogleCalendarSyncRunContext context = new GoogleCalendarSyncRunContext(
                     accessTokenService.getAccessToken(lease.integrationId())
             );
-            return synchronize(jobId, lease, context);
+            synchronize(jobId, lease, context);
         } catch (RuntimeException exception) {
-            throw releaseSyncLeasePreservingFailure(lease, exception);
+            throw releaseSyncLeaseAfterFailure(lease, exception);
         }
     }
 
-    private GoogleCalendarSyncMode synchronize(
+    private void synchronize(
             Long jobId,
             GoogleCalendarSyncLease lease,
             GoogleCalendarSyncRunContext context
     ) {
         if (modeFor(lease.nextSyncToken()) == GoogleCalendarSyncMode.FULL) {
             synchronizePages(jobId, lease, GoogleCalendarSyncMode.FULL, context);
-            return GoogleCalendarSyncMode.FULL;
+            return;
         }
         try {
             synchronizePages(jobId, lease, GoogleCalendarSyncMode.INCREMENTAL, context);
-            return GoogleCalendarSyncMode.INCREMENTAL;
         } catch (GoogleCalendarSyncTokenExpiredException exception) {
             context.resetSeenIdentities();
             synchronizePages(jobId, lease, GoogleCalendarSyncMode.FULL, context);
-            return GoogleCalendarSyncMode.FULL;
         }
     }
 
@@ -121,7 +119,7 @@ public class GoogleCalendarSyncService {
         return nextPageToken;
     }
 
-    private RuntimeException releaseSyncLeasePreservingFailure(
+    private RuntimeException releaseSyncLeaseAfterFailure(
             GoogleCalendarSyncLease lease,
             RuntimeException failure
     ) {

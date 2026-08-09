@@ -13,7 +13,7 @@ public class GoogleOperationFailureClassifier {
 
     public GoogleOperationFailureDecision classify(RuntimeException failure) {
         if (failure instanceof GoogleOperationOwnershipLostException) {
-            return GoogleOperationFailureDecision.abandon();
+            return GoogleOperationFailureDecision.skip();
         }
         if (failure instanceof CalioException calioException) {
             return classifyCalioFailure(calioException);
@@ -23,22 +23,22 @@ public class GoogleOperationFailureClassifier {
                     failure.getClass().getSimpleName()
             );
         }
-        if (isTransientDatabaseFailure(failure)) {
+        if (isRetryableDatabaseFailure(failure)) {
             return GoogleOperationFailureDecision.retry(rootCauseType(failure));
         }
-        return GoogleOperationFailureDecision.terminal(
+        return GoogleOperationFailureDecision.fail(
                 ErrorCode.INTERNAL_SERVER_ERROR.name()
         );
     }
 
     private GoogleOperationFailureDecision classifyCalioFailure(CalioException failure) {
         ErrorCode errorCode = failure.getErrorCode();
-        return isPermanent(errorCode)
-                ? GoogleOperationFailureDecision.terminal(errorCode.name())
-                : GoogleOperationFailureDecision.retry(causalReason(failure));
+        return isNonRetryable(errorCode)
+                ? GoogleOperationFailureDecision.fail(errorCode.name())
+                : GoogleOperationFailureDecision.retry(failureReason(failure));
     }
 
-    private String causalReason(CalioException failure) {
+    private String failureReason(CalioException failure) {
         if (failure.getErrorCode() != ErrorCode.GOOGLE_CALENDAR_SYNC_FAILED
                 || failure.getCause() == null) {
             return failure.getErrorCode().name();
@@ -46,7 +46,7 @@ public class GoogleOperationFailureClassifier {
         return failure.getErrorCode().name() + ":" + rootCauseType(failure);
     }
 
-    private boolean isTransientDatabaseFailure(Throwable failure) {
+    private boolean isRetryableDatabaseFailure(Throwable failure) {
         Throwable cause = failure;
         while (cause != null) {
             if (cause instanceof SQLTransientException
@@ -67,7 +67,7 @@ public class GoogleOperationFailureClassifier {
         return cause.getClass().getSimpleName();
     }
 
-    private boolean isPermanent(ErrorCode errorCode) {
+    private boolean isNonRetryable(ErrorCode errorCode) {
         return errorCode == ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED
                 || errorCode == ErrorCode.GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID
                 || errorCode == ErrorCode.GOOGLE_CALENDAR_SYNC_TOKEN_MISSING;

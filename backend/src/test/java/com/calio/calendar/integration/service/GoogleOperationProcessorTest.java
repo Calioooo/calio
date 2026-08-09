@@ -81,8 +81,8 @@ class GoogleOperationProcessorTest {
     }
 
     @Test
-    @DisplayName("terminal로 판단된 Sync 실패는 종료 상태로 변경하고 다음 Job을 확인한다")
-    void givenTerminalFailure_whenProcess_thenTerminatesAndContinuesAccount() {
+    @DisplayName("fail로 판단된 Sync 실패는 종료 상태로 변경하고 다음 Job을 확인한다")
+    void givenFailure_whenProcess_thenTerminatesAndContinuesAccount() {
         // given
         GoogleOperationJob job = syncJob(1L, 10L);
         RuntimeException failure = new RuntimeException("permanent failure");
@@ -92,7 +92,7 @@ class GoogleOperationProcessorTest {
                 .thenReturn(null);
         doThrow(failure).when(syncService).synchronize(eq(1L), eq(10L), anyString());
         when(failureClassifier.classify(failure))
-                .thenReturn(GoogleOperationFailureDecision.terminal("permanent"));
+                .thenReturn(GoogleOperationFailureDecision.fail("permanent"));
 
         // when
         processor.processAccount(10L);
@@ -105,8 +105,8 @@ class GoogleOperationProcessorTest {
     }
 
     @Test
-    @DisplayName("abandon으로 판단된 Sync 실패는 Job 상태를 변경하지 않고 처리를 중단한다")
-    void givenAbandonedFailure_whenProcess_thenStopsWithoutTransition() {
+    @DisplayName("skip으로 판단된 Sync 실패는 Job 상태를 변경하지 않고 처리를 중단한다")
+    void givenSkippedFailure_whenProcess_thenStopsWithoutTransition() {
         // given
         GoogleOperationJob job = syncJob(1L, 10L);
         RuntimeException failure = new RuntimeException("ownership lost");
@@ -114,7 +114,7 @@ class GoogleOperationProcessorTest {
         when(jobPersistenceService.claimNextJob(eq(10L), anyString())).thenReturn(job);
         doThrow(failure).when(syncService).synchronize(eq(1L), eq(10L), anyString());
         when(failureClassifier.classify(failure))
-                .thenReturn(GoogleOperationFailureDecision.abandon());
+                .thenReturn(GoogleOperationFailureDecision.skip());
 
         // when
         processor.processAccount(10L);

@@ -2,21 +2,21 @@ package com.calio.calendar.integration.service.dto;
 
 public record GoogleOperationFailureDecision(Action action, String reason) {
 
-    public static GoogleOperationFailureDecision abandon() {
-        return new GoogleOperationFailureDecision(Action.ABANDON, null);
+    public static GoogleOperationFailureDecision skip() {
+        return new GoogleOperationFailureDecision(Action.SKIP, null);
     }
 
     public static GoogleOperationFailureDecision retry(String reason) {
         return new GoogleOperationFailureDecision(Action.RETRY, reason);
     }
 
-    public static GoogleOperationFailureDecision terminal(String reason) {
-        return new GoogleOperationFailureDecision(Action.TERMINAL, reason);
+    public static GoogleOperationFailureDecision fail(String reason) {
+        return new GoogleOperationFailureDecision(Action.FAIL, reason);
     }
 
     public enum Action {
-        ABANDON,
+        SKIP,
         RETRY,
-        TERMINAL
+        FAIL
     }
 }

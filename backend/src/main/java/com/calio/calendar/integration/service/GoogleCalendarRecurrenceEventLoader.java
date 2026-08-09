@@ -1,7 +1,5 @@
 package com.calio.calendar.integration.service;
 
-import com.calio.calendar.common.error.CalioException;
-import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventResponse;
 import com.calio.calendar.integration.service.dto.GoogleCalendarNormalizedPage.RecurrenceEventUpsert;
 import com.calio.calendar.integration.service.dto.GoogleCalendarRecurrenceEventLookup;
@@ -57,28 +55,11 @@ public class GoogleCalendarRecurrenceEventLoader {
             );
             return Optional.empty();
         }
-        RecurrenceEventUpsert recurrenceEvent = mapRecurrenceEvent(
-                recurrenceEventExternalId,
-                response.get()
-        );
+        RecurrenceEventUpsert recurrenceEvent = recurrenceMapper.mapRecurrenceEvent(response.get());
         context.rememberRecurrenceEvent(
                 recurrenceEventExternalId,
                 new FoundRecurrenceEvent(recurrenceEvent)
         );
         return Optional.of(recurrenceEvent);
-    }
-
-    private RecurrenceEventUpsert mapRecurrenceEvent(
-            String requestedExternalId,
-            GoogleCalendarEventResponse response
-    ) {
-        boolean isInvalid = !requestedExternalId.equals(response.id())
-                || response.isCancelled()
-                || !response.isRecurrenceEvent()
-                || response.isRecurrenceOverride();
-        if (isInvalid) {
-            throw new CalioException(ErrorCode.GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID);
-        }
-        return recurrenceMapper.mapRecurrenceEvent(response);
     }
 }
