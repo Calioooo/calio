@@ -8,7 +8,7 @@ import static org.mockito.Mockito.when;
 
 import com.calio.calendar.integration.service.GoogleCalendarIntegrationQueryService;
 import com.calio.calendar.integration.service.GoogleOperationJobEnqueueService;
-import com.calio.calendar.integration.service.GoogleOperationJobPersistenceService;
+import com.calio.calendar.integration.service.GoogleOperationJobService;
 import com.calio.calendar.integration.service.GoogleOperationWorker;
 import java.time.Clock;
 import java.time.Instant;
@@ -24,8 +24,8 @@ class GoogleOperationSchedulerTest {
             mock(GoogleCalendarIntegrationQueryService.class);
     private final GoogleOperationJobEnqueueService enqueueService =
             mock(GoogleOperationJobEnqueueService.class);
-    private final GoogleOperationJobPersistenceService persistenceService =
-            mock(GoogleOperationJobPersistenceService.class);
+    private final GoogleOperationJobService persistenceService =
+            mock(GoogleOperationJobService.class);
     private final GoogleOperationWorker worker = mock(GoogleOperationWorker.class);
     private final GoogleOperationScheduler scheduler = new GoogleOperationScheduler(
             integrationQueryService,

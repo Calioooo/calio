@@ -10,18 +10,18 @@ public class GoogleOperationProcessor {
 
     private static final String UNSUPPORTED_JOB_KIND = "UNSUPPORTED_JOB_KIND";
 
-    private final GoogleOperationJobPersistenceService jobPersistenceService;
+    private final GoogleOperationJobService jobService;
     private final GoogleOperationLeaseService operationLeaseService;
     private final GoogleCalendarSyncService syncService;
     private final GoogleOperationFailureClassifier failureClassifier;
 
     public GoogleOperationProcessor(
-            GoogleOperationJobPersistenceService jobPersistenceService,
+            GoogleOperationJobService jobService,
             GoogleOperationLeaseService operationLeaseService,
             GoogleCalendarSyncService syncService,
             GoogleOperationFailureClassifier failureClassifier
     ) {
-        this.jobPersistenceService = jobPersistenceService;
+        this.jobService = jobService;
         this.operationLeaseService = operationLeaseService;
         this.syncService = syncService;
         this.failureClassifier = failureClassifier;
@@ -43,12 +43,12 @@ public class GoogleOperationProcessor {
     }
 
     private JobExecutionResult processHead(Long accountId, String workerToken) {
-        GoogleOperationJob job = jobPersistenceService.claimNextJob(accountId, workerToken);
+        GoogleOperationJob job = jobService.claimNextJob(accountId, workerToken);
         if (job == null) {
             return JobExecutionResult.STOP_ACCOUNT_PROCESSING;
         }
         if (!GoogleOperationJob.SYNC_KIND.equals(job.getKind())) {
-            jobPersistenceService.terminate(
+            jobService.terminate(
                     job.getId(),
                     job.getAccountId(),
                     workerToken,
@@ -83,8 +83,8 @@ public class GoogleOperationProcessor {
             GoogleOperationFailureDecision decision
     ) {
         switch (decision.action()) {
-            case RETRY -> jobPersistenceService.retry(job, workerToken, decision.reason());
-            case FAIL -> jobPersistenceService.terminate(
+            case RETRY -> jobService.retry(job, workerToken, decision.reason());
+            case FAIL -> jobService.terminate(
                     job.getId(),
                     job.getAccountId(),
                     workerToken,

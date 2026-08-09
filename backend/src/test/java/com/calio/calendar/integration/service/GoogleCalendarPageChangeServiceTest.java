@@ -93,7 +93,7 @@ class GoogleCalendarPageChangeServiceTest {
     private GoogleOperationLeaseService operationLeaseService;
 
     @MockitoBean
-    private GoogleOperationJobPersistenceService operationJobPersistenceService;
+    private GoogleOperationJobService operationJobPersistenceService;
 
     private Account account;
     private GoogleCalendarIntegration integration;

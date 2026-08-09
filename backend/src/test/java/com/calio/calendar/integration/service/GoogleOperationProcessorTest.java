@@ -20,7 +20,7 @@ import org.mockito.InOrder;
 
 class GoogleOperationProcessorTest {
 
-    private GoogleOperationJobPersistenceService jobPersistenceService;
+    private GoogleOperationJobService jobPersistenceService;
     private GoogleOperationLeaseService operationLeaseService;
     private GoogleCalendarSyncService syncService;
     private GoogleOperationFailureClassifier failureClassifier;
@@ -28,7 +28,7 @@ class GoogleOperationProcessorTest {
 
     @BeforeEach
     void setUp() {
-        jobPersistenceService = mock(GoogleOperationJobPersistenceService.class);
+        jobPersistenceService = mock(GoogleOperationJobService.class);
         operationLeaseService = mock(GoogleOperationLeaseService.class);
         syncService = mock(GoogleCalendarSyncService.class);
         failureClassifier = mock(GoogleOperationFailureClassifier.class);

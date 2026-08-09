@@ -394,7 +394,7 @@ class GoogleCalendarSyncServiceTest {
                     null,
                     null,
                     mock(GoogleOperationLeaseService.class),
-                    mock(GoogleOperationJobPersistenceService.class)
+                    mock(GoogleOperationJobService.class)
             );
         }
 

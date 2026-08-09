@@ -35,8 +35,8 @@ class GoogleCalendarIntegrationDataServiceTest {
             mock(RecurrenceEventRepository.class);
     private final RecurrenceEventOverrideRepository overrideRepository =
             mock(RecurrenceEventOverrideRepository.class);
-    private final GoogleOperationJobPersistenceService operationJobPersistenceService =
-            mock(GoogleOperationJobPersistenceService.class);
+    private final GoogleOperationJobService operationJobPersistenceService =
+            mock(GoogleOperationJobService.class);
     private final GoogleOperationLeaseService operationLeaseService =
             mock(GoogleOperationLeaseService.class);
     private final GoogleCalendarEventMapping eventMapping = mock(GoogleCalendarEventMapping.class);

@@ -26,10 +26,10 @@ import org.springframework.transaction.annotation.Transactional;
         "spring.jpa.hibernate.ddl-auto=create-drop"
 })
 @Transactional
-class GoogleOperationJobPersistenceServiceIntegrationTest {
+class GoogleOperationJobServiceIntegrationTest {
 
     @Autowired
-    private GoogleOperationJobPersistenceService persistenceService;
+    private GoogleOperationJobService jobService;
 
     @Autowired
     private GoogleOperationLeaseService leaseService;
@@ -54,7 +54,7 @@ class GoogleOperationJobPersistenceServiceIntegrationTest {
         assertThat(leaseService.acquire(fixture.accountId(), "worker-a")).isTrue();
 
         // when
-        GoogleOperationJob claimed = persistenceService.claimNextJob(
+        GoogleOperationJob claimed = jobService.claimNextJob(
                 fixture.accountId(),
                 "worker-a"
         );
@@ -82,12 +82,12 @@ class GoogleOperationJobPersistenceServiceIntegrationTest {
         assertThat(leaseService.acquire(fixture.accountId(), "worker-a")).isTrue();
 
         // when
-        GoogleOperationJob first = persistenceService.claimNextJob(
+        GoogleOperationJob first = jobService.claimNextJob(
                 fixture.accountId(),
                 "worker-a"
         );
-        persistenceService.succeed(first.getId(), fixture.accountId(), "worker-a");
-        GoogleOperationJob second = persistenceService.claimNextJob(
+        jobService.succeed(first.getId(), fixture.accountId(), "worker-a");
+        GoogleOperationJob second = jobService.claimNextJob(
                 fixture.accountId(),
                 "worker-a"
         );
@@ -106,14 +106,14 @@ class GoogleOperationJobPersistenceServiceIntegrationTest {
         // given
         JobFixture fixture = jobs(Instant.now().minusSeconds(60));
         assertThat(leaseService.acquire(fixture.accountId(), "worker-a")).isTrue();
-        GoogleOperationJob claimed = persistenceService.claimNextJob(
+        GoogleOperationJob claimed = jobService.claimNextJob(
                 fixture.accountId(),
                 "worker-a"
         );
         Instant beforeRetry = Instant.now();
 
         // when
-        persistenceService.retry(claimed, "worker-a", "TRANSIENT_FAILURE");
+        jobService.retry(claimed, "worker-a", "TRANSIENT_FAILURE");
 
         // then
         assertThat(jobRepository.findById(claimed.getId()))
@@ -133,24 +133,24 @@ class GoogleOperationJobPersistenceServiceIntegrationTest {
         // given
         JobFixture fixture = jobs(Instant.now().minusSeconds(60));
         assertThat(leaseService.acquire(fixture.accountId(), "worker-a")).isTrue();
-        GoogleOperationJob claimed = persistenceService.claimNextJob(
+        GoogleOperationJob claimed = jobService.claimNextJob(
                 fixture.accountId(),
                 "worker-a"
         );
 
         // when, then
-        assertThatThrownBy(() -> persistenceService.retry(
+        assertThatThrownBy(() -> jobService.retry(
                 claimed,
                 "worker-b",
                 "TRANSIENT_FAILURE"
         )).isInstanceOf(GoogleOperationOwnershipLostException.class);
-        assertThatThrownBy(() -> persistenceService.terminate(
+        assertThatThrownBy(() -> jobService.terminate(
                 claimed.getId(),
                 fixture.accountId(),
                 "worker-b",
                 "PERMANENT_FAILURE"
         )).isInstanceOf(GoogleOperationOwnershipLostException.class);
-        assertThatThrownBy(() -> persistenceService.succeed(
+        assertThatThrownBy(() -> jobService.succeed(
                 claimed.getId(),
                 fixture.accountId(),
                 "worker-b"
@@ -169,7 +169,7 @@ class GoogleOperationJobPersistenceServiceIntegrationTest {
         // given
         JobFixture fixture = jobs(Instant.now().minusSeconds(60));
         assertThat(leaseService.acquire(fixture.accountId(), "worker-a")).isTrue();
-        GoogleOperationJob claimed = persistenceService.claimNextJob(
+        GoogleOperationJob claimed = jobService.claimNextJob(
                 fixture.accountId(),
                 "worker-a"
         );
@@ -194,13 +194,13 @@ class GoogleOperationJobPersistenceServiceIntegrationTest {
         // given
         JobFixture fixture = jobs(Instant.now().minusSeconds(60));
         assertThat(leaseService.acquire(fixture.accountId(), "worker-a")).isTrue();
-        GoogleOperationJob claimed = persistenceService.claimNextJob(
+        GoogleOperationJob claimed = jobService.claimNextJob(
                 fixture.accountId(),
                 "worker-a"
         );
 
         // when
-        persistenceService.terminate(
+        jobService.terminate(
                 claimed.getId(),
                 fixture.accountId(),
                 "worker-a",

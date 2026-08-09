@@ -11,10 +11,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-public class GoogleOperationJobPersistenceService {
+public class GoogleOperationJobService {
 
     private static final Logger log =
-            LoggerFactory.getLogger(GoogleOperationJobPersistenceService.class);
+            LoggerFactory.getLogger(GoogleOperationJobService.class);
     private static final int RECOVERY_BATCH_SIZE = 500;
     private static final int TERMINAL_CLEANUP_BATCH_SIZE = 500;
     private static final List<Duration> RETRY_DELAYS = List.of(
@@ -24,7 +24,7 @@ public class GoogleOperationJobPersistenceService {
     private final GoogleOperationJobCommandService jobCommandService;
     private final Clock clock;
 
-    public GoogleOperationJobPersistenceService(
+    public GoogleOperationJobService(
             GoogleOperationJobQueryService jobQueryService,
             GoogleOperationJobCommandService jobCommandService,
             Clock clock

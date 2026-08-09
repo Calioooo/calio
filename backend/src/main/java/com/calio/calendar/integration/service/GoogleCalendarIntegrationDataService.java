@@ -33,7 +33,7 @@ public class GoogleCalendarIntegrationDataService {
     private final RecurrenceEventOverrideRepository overrideRepository;
     private final GoogleCalendarRecurrenceChangeService recurrenceChangeService;
     private final GoogleOperationLeaseService operationLeaseService;
-    private final GoogleOperationJobPersistenceService operationJobPersistenceService;
+    private final GoogleOperationJobService operationJobService;
 
     public GoogleCalendarIntegrationDataService(
             GoogleCalendarIntegrationCommandService integrationCommandService,
@@ -46,7 +46,7 @@ public class GoogleCalendarIntegrationDataService {
             RecurrenceEventOverrideRepository overrideRepository,
             GoogleCalendarRecurrenceChangeService recurrenceChangeService,
             GoogleOperationLeaseService operationLeaseService,
-            GoogleOperationJobPersistenceService operationJobPersistenceService
+            GoogleOperationJobService operationJobService
     ) {
         this.integrationCommandService = integrationCommandService;
         this.eventMappingQueryService = eventMappingQueryService;
@@ -58,7 +58,7 @@ public class GoogleCalendarIntegrationDataService {
         this.overrideRepository = overrideRepository;
         this.recurrenceChangeService = recurrenceChangeService;
         this.operationLeaseService = operationLeaseService;
-        this.operationJobPersistenceService = operationJobPersistenceService;
+        this.operationJobService = operationJobService;
     }
 
     @Transactional
@@ -292,7 +292,7 @@ public class GoogleCalendarIntegrationDataService {
 
     private void completeOperationJob(OperationOwnership ownership) {
         operationLeaseService.extend(ownership.jobId(), ownership.accountId(), ownership.workerToken());
-        operationJobPersistenceService.succeed(
+        operationJobService.succeed(
                 ownership.jobId(),
                 ownership.accountId(),
                 ownership.workerToken()

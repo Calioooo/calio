@@ -58,7 +58,7 @@ class GoogleCalendarIntegrationDataServiceTransactionTest {
     private TagRepository tagRepository;
 
     @MockitoBean
-    private GoogleOperationJobPersistenceService operationJobPersistenceService;
+    private GoogleOperationJobService operationJobPersistenceService;
 
     @Test
     @DisplayName("FULL SYNC중 nextToken 저장이 실패하면 이전에 가지고온 page의 data 삭제도 rollback한다")

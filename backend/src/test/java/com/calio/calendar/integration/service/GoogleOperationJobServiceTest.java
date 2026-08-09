@@ -15,7 +15,7 @@ import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-class GoogleOperationJobPersistenceServiceTest {
+class GoogleOperationJobServiceTest {
 
     @Test
     @DisplayName("복구 대상 Account 조회는 한 번에 500개로 제한한다")
@@ -26,7 +26,7 @@ class GoogleOperationJobPersistenceServiceTest {
         when(jobRepository.findRecoverableAccountIds(eq(now), argThat(
                 pageable -> pageable.getPageNumber() == 0 && pageable.getPageSize() == 500
         ))).thenReturn(List.of(1L, 2L));
-        GoogleOperationJobPersistenceService service = new GoogleOperationJobPersistenceService(
+        GoogleOperationJobService service = new GoogleOperationJobService(
                 new GoogleOperationJobQueryService(jobRepository),
                 new GoogleOperationJobCommandService(jobRepository),
                 Clock.fixed(now, ZoneOffset.UTC)
