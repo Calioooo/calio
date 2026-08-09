@@ -1,6 +1,6 @@
-package com.calio.calendar.groupinvitation.service;
+package com.calio.calendar.groupinvitation.service.dto;
 
-record InvitationCredentialPair(
+public record InvitationCredentialPair(
         String linkToken,
         String inviteCode,
         byte[] linkTokenHash,

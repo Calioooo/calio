@@ -12,6 +12,7 @@ import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.groupinvitation.config.GroupInvitationProperties;
 import com.calio.calendar.groupinvitation.domain.GroupInvitation;
 import com.calio.calendar.groupinvitation.repository.GroupInvitationRepository;
+import com.calio.calendar.groupinvitation.service.dto.InvitationCredentialPair;
 import com.calio.calendar.groupspace.domain.GroupMember;
 import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.repository.GroupMemberRepository;

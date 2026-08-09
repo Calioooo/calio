@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.groupinvitation.config.GroupInvitationProperties;
 import com.calio.calendar.groupinvitation.domain.InvitationCredentialType;
+import com.calio.calendar.groupinvitation.service.dto.InvitationCredentialPair;
 import java.security.SecureRandom;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

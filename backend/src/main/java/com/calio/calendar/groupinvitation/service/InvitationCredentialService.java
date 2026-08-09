@@ -4,6 +4,7 @@ import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.groupinvitation.config.GroupInvitationProperties;
 import com.calio.calendar.groupinvitation.domain.InvitationCredentialType;
+import com.calio.calendar.groupinvitation.service.dto.InvitationCredentialPair;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -45,7 +46,7 @@ public class InvitationCredentialService {
         );
     }
 
-    InvitationCredentialPair generatePair() {
+    public InvitationCredentialPair generatePair() {
         String linkToken = generateLinkToken();
         String inviteCode = generateInviteCode();
         return new InvitationCredentialPair(
@@ -63,7 +64,7 @@ public class InvitationCredentialService {
         };
     }
 
-    String inviteUrl(String linkToken) {
+    public String inviteUrl(String linkToken) {
         String canonicalToken = validateLinkToken(linkToken);
         return UriComponentsBuilder.fromUri(baseUri)
                 .pathSegment(canonicalToken)
