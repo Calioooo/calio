@@ -6,10 +6,10 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.calio.calendar.integration.service.GoogleCalendarIntegrationQueryService;
-import com.calio.calendar.integration.service.GoogleOperationJobEnqueueService;
-import com.calio.calendar.integration.service.GoogleOperationJobService;
-import com.calio.calendar.integration.service.GoogleOperationWorker;
+import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrationQueryService;
+import com.calio.calendar.integration.sync.operation.GoogleOperationJobEnqueueService;
+import com.calio.calendar.integration.sync.operation.GoogleOperationJobService;
+import com.calio.calendar.integration.sync.operation.GoogleOperationWorker;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;

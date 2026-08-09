@@ -4,7 +4,7 @@ import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventResponse;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventPage;
-import com.calio.calendar.integration.domain.GoogleCalendarSyncMode;
+import com.calio.calendar.integration.sync.GoogleCalendarSyncMode;
 import java.net.URI;
 import java.util.Optional;
 import org.slf4j.Logger;

@@ -11,7 +11,7 @@ import com.calio.calendar.event.controller.dto.UpdateEventRequest;
 import com.calio.calendar.event.controller.dto.UpdateImportantEventRequest;
 import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.event.repository.EventRepository;
-import com.calio.calendar.integration.service.GoogleCalendarEventMappingQueryService;
+import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingQueryService;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceOccurrence;

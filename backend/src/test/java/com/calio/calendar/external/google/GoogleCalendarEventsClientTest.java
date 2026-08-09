@@ -14,7 +14,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import com.calio.calendar.external.google.dto.GoogleCalendarEventPage;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
-import com.calio.calendar.integration.domain.GoogleCalendarSyncMode;
+import com.calio.calendar.integration.sync.GoogleCalendarSyncMode;
 import java.io.IOException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
