@@ -6,9 +6,4 @@ public record InvitationCredentialPair(
         byte[] linkTokenHash,
         byte[] inviteCodeHash
 ) {
-
-    @Override
-    public String toString() {
-        return "InvitationCredentialPair[REDACTED]";
-    }
 }

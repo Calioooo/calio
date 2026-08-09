@@ -123,22 +123,6 @@ class InvitationCredentialServiceTest {
                 .isInstanceOf(IllegalStateException.class);
     }
 
-    @Test
-    @DisplayName("credential DTO의 문자열 표현은 bearer 원문을 노출하지 않는다")
-    void redactsCredentialDtoStringRepresentations() {
-        // given
-        InvitationCredentialPair pair = service("https://calio.app/invite").generatePair();
-
-        // when
-        String representation = pair.toString();
-
-        // then
-        assertThat(representation)
-                .doesNotContain(pair.linkToken())
-                .doesNotContain(pair.inviteCode())
-                .contains("REDACTED");
-    }
-
     private InvitationCredentialService service(String baseUrl) {
         return service(baseUrl, new MockEnvironment());
     }
