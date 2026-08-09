@@ -28,7 +28,7 @@ class GoogleCalendarEventRequestServiceTest {
             new GoogleCalendarEventRequestService(eventsClient, accessTokenService);
 
     @Test
-    @DisplayName("일정 페이지 조회가 401이면 access token을 갱신하고 같은 페이지를 재요청한다")
+    @DisplayName("일정 페이지 조회가 401이면 access token을 갱신하고 페이지 조회를 재요청한다")
     void givenUnauthorizedPageRequest_whenListEvents_thenRefreshesTokenAndRetries() {
         // given
         GoogleCalendarSyncRunContext context = new GoogleCalendarSyncRunContext("old-token");
@@ -93,7 +93,7 @@ class GoogleCalendarEventRequestServiceTest {
     }
 
     @Test
-    @DisplayName("토큰 갱신 후 일정 페이지 재요청도 401이면 재연결 오류를 던진다")
+    @DisplayName("토큰 갱신 후에도 요청이 401이면 RECONNECT_REQUIRED 예외를 반환한다")
     void givenRepeatedUnauthorizedPageRequest_whenListEvents_thenRequiresReconnect() {
         // given
         GoogleCalendarSyncRunContext context = new GoogleCalendarSyncRunContext("old-token");

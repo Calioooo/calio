@@ -103,7 +103,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
 
     @Test
     @Transactional
-    @DisplayName("동일 external identity 재반영은 내부 Event를 유지하며 provider schedule만 갱신한다")
+    @DisplayName("동일 ExternalId 재요청은 내부 Event를 유지하며 schedule만 갱신한다")
     void givenRepeatedExternalIdentity_whenPersistPages_thenUpsertsAndPreservesLocalFields() {
         // given
         Tag fallbackTag = tagRepository.saveAndFlush(new Tag(
@@ -249,7 +249,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
     @NullSource
     @ValueSource(strings = {"", " "})
     @Transactional
-    @DisplayName("마지막 page에 유효한 nextSyncToken이 없으면 sync를 완료할 수 없다")
+    @DisplayName("마지막 page에 유효한 nextSyncToken이 없으면 sync token missing 예외를 반환한다")
     void givenMissingNextSyncToken_whenPersistLastPage_thenReturnsTokenMissing(
             String nextSyncToken
     ) {
@@ -269,7 +269,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
 
     @Test
     @Transactional
-    @DisplayName("Google 일정의 시작 시각이 종료 시각보다 빠르지 않으면 저장하지 않는다")
+    @DisplayName("Google 일정의 시작 시각이 종료 시각보다 늦으면 invalid response 예외를 반환한다.")
     void givenInvalidGoogleEventRange_whenPersistPage_thenRejectsResponse() {
         // given
         tagRepository.saveAndFlush(new Tag(TagType.DEFAULT, "기타", "#64748B"));
@@ -301,7 +301,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
 
     @Test
     @Transactional
-    @DisplayName("동일 page에 external event id가 중복되면 partial 저장 없이 invalid response로 거부한다")
+    @DisplayName("동일 page에 external event id가 중복되면 partial 저장 없이 invalid response 예외를 반환한다")
     void givenDuplicateExternalEventIds_whenPersistPage_thenRejectsResponse() {
         // given
         tagRepository.saveAndFlush(new Tag(TagType.DEFAULT, "기타", "#64748B"));
@@ -328,7 +328,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
 
     @Test
     @Transactional
-    @DisplayName("recurring으로 바뀐 기존 일반 mapping은 mapping-first로 Event와 함께 제거한다")
+    @DisplayName("Event를 RecurrenceEvent으로 바뀐 기존 Event 데이터는 mapping 데이터를 먼저 삭제한 후, Event를 제거한다")
     void givenMappedItemBecomesRecurring_whenPersistPage_thenDeletesStaleProviderData() {
         // given
         tagRepository.saveAndFlush(new Tag(TagType.DEFAULT, "기타", "#64748B"));
@@ -373,7 +373,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
 
     @Test
     @Transactional
-    @DisplayName("recurrence-event와 active/cancelled override 재처리는 하나의 aggregate로 수렴한다")
+    @DisplayName("recurrence-event와 override를 수정에 성공한다.")
     void givenNormalizedRecurrenceReplay_whenPersistPages_thenUpsertsCanonicalAggregate() {
         // given
         Tag defaultTag = tagRepository.saveAndFlush(new Tag(TagType.DEFAULT, "기타", "#64748B"));
@@ -421,14 +421,6 @@ class GoogleCalendarEventPagePersistenceServiceTest {
         );
 
         // when
-        CancelledRecurrenceEventOverrideUpsert cancelledOverride =
-                new CancelledRecurrenceEventOverrideUpsert(
-                "exception-1",
-                "recurrence-event-1",
-                Instant.parse("2026-07-02T09:00:00Z"),
-                "override-etag-2",
-                Instant.parse("2026-07-02T08:00:00Z")
-        );
         RecurrenceEventUpsert updatedRecurrenceEvent = new RecurrenceEventUpsert(
                 "recurrence-event-1",
                 "recurrence-etag-2",
@@ -437,6 +429,14 @@ class GoogleCalendarEventPagePersistenceServiceTest {
                 "Google description",
                 recurrenceSchedule,
                 List.of("RRULE:FREQ=WEEKLY")
+        );
+        CancelledRecurrenceEventOverrideUpsert cancelledOverride =
+                new CancelledRecurrenceEventOverrideUpsert(
+                "exception-1",
+                "recurrence-event-1",
+                Instant.parse("2026-07-02T09:00:00Z"),
+                "override-etag-2",
+                Instant.parse("2026-07-02T08:00:00Z")
         );
         pagePersistenceService.persistNormalizedPage(
                 integration.getId(),
@@ -481,7 +481,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
 
     @Test
     @Transactional
-    @DisplayName("동일 override external ID가 다른 recurrence-event를 참조하면 저장하지 않는다")
+    @DisplayName("동일 override external ID가 서로 다른 recurrence-event를 참조하는 요청이 오면 invalid response 예외를 반환한다")
     void givenOverrideExternalIdMappedToDifferentRecurrenceEvent_whenPersistPage_thenRejectsResponse() {
         // given
         tagRepository.saveAndFlush(new Tag(TagType.DEFAULT, "기타", "#64748B"));
@@ -550,7 +550,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
 
     @Test
     @Transactional
-    @DisplayName("같은 page에서 override보다 먼저 온 recurrence-event cancellation도 aggregate를 삭제한다")
+    @DisplayName("같은 page에서 recurrence-event 삭제 요청이 연관된 override 요청보다 먼저 와도 정상적으로 관련된 override가 삭제된다")
     void givenCancellationBeforeOverride_whenPersistPage_thenDeletesRecurrenceAggregate() {
         // given
         tagRepository.saveAndFlush(new Tag(TagType.DEFAULT, "기타", "#64748B"));
@@ -629,7 +629,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
 
     @Test
     @Transactional
-    @DisplayName("FULL reconciliation은 unseen provider aggregate를 batch로 삭제하고 sync를 완료한다")
+    @DisplayName("FULL Sync시 sync 목록에 없는 기존 데이터를 batch로 삭제하고 sync를 완료한다")
     void givenUnseenProviderData_whenFinalizeFullSync_thenDeletesInBatches() {
         // given
         Tag defaultTag = tagRepository.saveAndFlush(
@@ -714,7 +714,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
                 integration.getId(),
                 "full-reconciliation-run",
                 GoogleCalendarSyncMode.FULL,
-                Set.of(),
+                Set.of(), // empty seen events
                 Set.of(),
                 Set.of(),
                 "next-sync-token"
@@ -738,7 +738,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
 
     @Test
     @Transactional
-    @DisplayName("blank title의 all-day import는 canonical title을 사용하고 cancelled delta로 hard delete된다")
+    @DisplayName("blank title의 all-day import는 기본값 title을 사용하고 cancelled delta로 hard delete된다")
     void givenBlankAllDayItemThenCancellation_whenPersistPages_thenImportsAndHardDeletesIdempotently() {
         // given
         tagRepository.saveAndFlush(new Tag(TagType.DEFAULT, "기타", "#64748B"));

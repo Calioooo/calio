@@ -61,7 +61,7 @@ class GoogleCalendarProviderDataServiceTransactionTest {
     private GoogleOperationJobPersistenceService operationJobPersistenceService;
 
     @Test
-    @DisplayName("FULL reconciliation의 cursor 저장이 실패하면 앞선 provider data 삭제도 rollback한다")
+    @DisplayName("FULL SYNC중 nextToken 저장이 실패하면 이전에 가지고온 page의 data 삭제도 rollback한다")
     void givenCursorFinalizationFailure_whenFinalizeFullSync_thenRollsBackCleanup() {
         // given
         Account account = accountRepository.saveAndFlush(new Account());

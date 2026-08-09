@@ -114,7 +114,7 @@ class GoogleCalendarEventTimeNormalizerTest {
     }
 
     @Test
-    @DisplayName("오프셋 정보가 없는 중복 시간대 일정은 페이지 타임존 기준 더 빠른 오프셋을 우선 사용한다")
+    @DisplayName("오프셋 정보가 없는 중복 시간대 일정은 페이지 타임존 기준 가장 빠른 오프셋을 우선 사용한다")
     void givenOffsetlessOverlapAndPageZone_whenNormalizePageSchedule_thenUsesEarlierOffset() {
         // when
         NormalizedEventSchedule result = normalizer.normalizeSchedule(
@@ -130,7 +130,7 @@ class GoogleCalendarEventTimeNormalizerTest {
     }
 
     @Test
-    @DisplayName("page timezone fallback도 zone mismatch, invalid zone, offset mismatch를 거부한다")
+    @DisplayName("page timezone fallback 요청 시 zone mismatch, invalid zone, offset mismatch 이면 예외를 반환한다")
     void givenInvalidPageTimeZoneResolution_whenNormalizePageSchedule_thenRejectsProviderResponse() {
         GoogleCalendarEventTimeResponse explicitUtc =
                 new GoogleCalendarEventTimeResponse(null, "2026-07-20T09:00:00Z", "UTC");
@@ -155,7 +155,7 @@ class GoogleCalendarEventTimeNormalizerTest {
     }
 
     @Test
-    @DisplayName("all-day exclusive end는 start와 별도로 같은 UTC identity 규칙을 적용한다")
+    @DisplayName("all-day 일정은 시작일과 종료일을 각각 UTC 자정으로 변환한다")
     void givenAllDayRange_whenNormalizeSchedule_thenPreservesExclusiveEnd() {
         // when
         NormalizedEventSchedule result = normalizer.normalizeSchedule(
@@ -170,7 +170,7 @@ class GoogleCalendarEventTimeNormalizerTest {
     }
 
     @Test
-    @DisplayName("date/dateTime union, offset-zone mismatch와 DST gap은 invalid response다")
+    @DisplayName("date/dateTime 두 가지 모두 있는 경우, offset-zone 불일치 및 DST 차이는 invalid response 예외를 반환한다")
     void givenKnownInvalidTimes_whenNormalize_thenReturnsProviderInvalidResponse() {
         assertInvalidResponse(() -> normalizer.normalize(
                 new GoogleCalendarEventTimeResponse(
@@ -196,7 +196,7 @@ class GoogleCalendarEventTimeNormalizerTest {
     }
 
     @Test
-    @DisplayName("date와 dateTime이 모두 없으면 invalid response다")
+    @DisplayName("date와 dateTime이 모두 없으면 invalid response 예외를 반환한다")
     void givenEmptyTimeUnion_whenNormalize_thenReturnsProviderInvalidResponse() {
         assertInvalidResponse(() -> normalizer.normalize(
                 new GoogleCalendarEventTimeResponse(null, null, null)
@@ -204,7 +204,7 @@ class GoogleCalendarEventTimeNormalizerTest {
     }
 
     @Test
-    @DisplayName("offset이 있는 timed 값은 timezone 없이 supplied offset으로 정규화한다")
+    @DisplayName("offset이 있는 timed 값은 timezone 없이 제공된 offset으로 정규화한다")
     void givenOffsetTimedValueWithoutTimeZone_whenNormalize_thenUsesSuppliedOffset() {
         // when
         NormalizedEventTime result = normalizer.normalize(
@@ -218,7 +218,7 @@ class GoogleCalendarEventTimeNormalizerTest {
     }
 
     @Test
-    @DisplayName("offsetless timed 값에 timezone이 없으면 invalid response다")
+    @DisplayName("offset이 없는 timed 값에 timezone이 없으면 invalid response 예외를 반환한다")
     void givenOffsetlessTimedValueWithoutTimeZone_whenNormalize_thenReturnsProviderInvalidResponse() {
         assertInvalidResponse(() -> normalizer.normalize(
                 new GoogleCalendarEventTimeResponse(null, "2026-07-20T09:00:00", null)
@@ -226,7 +226,7 @@ class GoogleCalendarEventTimeNormalizerTest {
     }
 
     @Test
-    @DisplayName("유효하지 않은 IANA timezone은 invalid response다")
+    @DisplayName("유효하지 않은 IANA timezone은 invalid response를 반환한다")
     void givenInvalidIanaTimeZone_whenNormalize_thenReturnsProviderInvalidResponse() {
         assertInvalidResponse(() -> normalizer.normalize(
                 new GoogleCalendarEventTimeResponse(
@@ -238,7 +238,7 @@ class GoogleCalendarEventTimeNormalizerTest {
     }
 
     @Test
-    @DisplayName("endAt이 startAt과 같거나 이전이면 invalid response다")
+    @DisplayName("endAt이 startAt과 같거나 이전이면 invalid response 예외를 반환한다")
     void givenNonIncreasingSchedule_whenNormalizeSchedule_thenReturnsProviderInvalidResponse() {
         GoogleCalendarEventTimeResponse start =
                 new GoogleCalendarEventTimeResponse("2026-07-20", null, null);

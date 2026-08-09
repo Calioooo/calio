@@ -105,7 +105,7 @@ class CustomTagControllerTest {
     }
 
     @Test
-    @DisplayName("custom tag 생성은 공백 제목을 VALIDATION_FAILED로 거부한다")
+    @DisplayName("custom tag 생성 시 제목이 공백이면 VALIDATION_FAILED 예외를 반환한다")
     void givenBlankTitle_whenCreateCustomTag_thenReturnsValidationFailed() throws Exception {
         // when
         mockMvc.perform(post("/api/custom-tags")
@@ -117,7 +117,7 @@ class CustomTagControllerTest {
     }
 
     @Test
-    @DisplayName("custom tag 생성은 공백 colorCode를 VALIDATION_FAILED로 거부한다")
+    @DisplayName("custom tag 생성 시 colorCode가 공백이면 VALIDATION_FAILED 예외를 반환한다")
     void givenBlankColorCode_whenCreateCustomTag_thenReturnsValidationFailed() throws Exception {
         // when
         mockMvc.perform(post("/api/custom-tags")
@@ -129,7 +129,7 @@ class CustomTagControllerTest {
     }
 
     @Test
-    @DisplayName("custom tag 생성은 잘못된 colorCode를 INVALID_TAG_COLOR_CODE로 거부한다")
+    @DisplayName("custom tag 생성 시 잘못된 colorCode는 INVALID_TAG_COLOR_CODE 예외를 반환한다")
     void givenInvalidColorCode_whenCreateCustomTag_thenReturnsInvalidTagColorCode() throws Exception {
         // when
         mockMvc.perform(post("/api/custom-tags")
@@ -141,7 +141,7 @@ class CustomTagControllerTest {
     }
 
     @Test
-    @DisplayName("사용자는 custom tag만 수정할 수 있고 DEFAULT tagId는 TAG_NOT_FOUND를 받는다")
+    @DisplayName("사용자가 CUSTOM 태그를 수정하면 성공하고, DEFAULT 태그를 수정하면 TAG_NOT_FOUND 예외를 반환한다")
     void givenCustomAndDefaultTagIds_whenUpdateCustomTag_thenOnlyCustomTagIsUpdated() throws Exception {
         // given
         Tag customTag = tagRepository.save(new Tag(TagType.CUSTOM, "기존", "#111111", currentAccountReference()));
@@ -166,7 +166,7 @@ class CustomTagControllerTest {
     }
 
     @Test
-    @DisplayName("custom tag 삭제는 ordinary event, recurrence rule, occurrence event를 fallback 기타 태그로 재할당한다")
+    @DisplayName("custom tag를 삭제하면 event, recurrence event, occurrence event 모두 fallback 기타 태그로 재할당한다")
     void givenCustomTagInUse_whenDeleteCustomTag_thenReassignsAllUsagesToFallbackTag() throws Exception {
         // given
         Tag fallbackTag = tagRepository.save(new Tag(TagType.DEFAULT, "기타", "#64748B"));

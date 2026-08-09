@@ -9,7 +9,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.calio.calendar.external.google.GoogleCalendarSyncTokenExpiredException;
 import com.calio.calendar.external.google.GoogleOAuthClient;
 import com.calio.calendar.external.google.GoogleOAuthProperties;
 import com.calio.calendar.external.google.GoogleCalendarEventsClient;
@@ -79,9 +78,6 @@ class GoogleCalendarIntegrationControllerTest {
     @Autowired
     private GoogleOperationJobRepository googleOperationJobRepository;
 
-    @Autowired
-    private GoogleCalendarSyncLeaseService googleCalendarSyncLeaseService;
-
     @MockitoBean
     private GoogleOperationWorker googleOperationWorker;
 
@@ -102,7 +98,7 @@ class GoogleCalendarIntegrationControllerTest {
     }
 
     @Test
-    @DisplayName("연결 row가 없으면 GET은 token 정보를 포함하지 않는 disconnected 상태를 반환한다")
+    @DisplayName("구글 연동 데이터가 없으면 GET은 token 정보를 포함하지 않는 disconnected 상태를 반환한다")
     void givenNoIntegration_whenGetConnection_thenReturnsDisconnectedState() throws Exception {
         // when, then
         mockMvc.perform(get("/api/integrations/google-calendar"))
@@ -117,8 +113,8 @@ class GoogleCalendarIntegrationControllerTest {
     }
 
     @Test
-    @DisplayName("POST는 authorizationCode로 Google 계정을 연결하고 token 값을 응답하지 않는다")
-    void givenAuthorizationCode_whenConnect_thenReturnsConnectedStateWithoutTokens() throws Exception {
+    @DisplayName("POST는 authorizationCode로 Google 계정을 연결하고 정상 응답을 반환한다")
+    void givenAuthorizationCode_whenConnect_thenReturnsConnectedState() throws Exception {
         // given
         googleOAuthClient.tokenResponse = new GoogleTokenResponse("access-token", "refresh-token", 3600);
         googleOAuthClient.userInfoResponse = new GoogleUserInfoResponse("google-subject", "user@example.com");
@@ -142,7 +138,7 @@ class GoogleCalendarIntegrationControllerTest {
     }
 
     @Test
-    @DisplayName("DELETE는 연결 row가 없어도 204 No Content를 반환한다")
+    @DisplayName("DELETE는 구글 연결 데이터가 없어도 204 No Content를 반환한다")
     void givenNoIntegration_whenDisconnect_thenReturnsNoContent() throws Exception {
         // when, then
         mockMvc.perform(delete("/api/integrations/google-calendar"))
@@ -150,7 +146,7 @@ class GoogleCalendarIntegrationControllerTest {
     }
 
     @Test
-    @DisplayName("연결되지 않은 Account가 sync를 요청하면 GOOGLE_CALENDAR_NOT_CONNECTED 409를 반환한다")
+    @DisplayName("연결되지 않은 Account가 sync를 요청하면 GOOGLE_CALENDAR_NOT_CONNECTED 409 예외를 반환한다")
     void givenNoIntegration_whenSync_thenReturnsNotConnected() throws Exception {
         // when, then
         mockMvc.perform(post("/api/integrations/google-calendar/sync"))

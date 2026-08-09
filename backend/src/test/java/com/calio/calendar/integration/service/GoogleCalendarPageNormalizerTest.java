@@ -54,7 +54,7 @@ class GoogleCalendarPageNormalizerTest {
     }
 
     @Test
-    @DisplayName("삭제된 recurrence-occurrence는 active schedule 검증 없이 override로 분류한다")
+    @DisplayName("취소된 recurrence override는 시간이나 schedule을 검증하지 않는다")
     void givenDeletedRecurrenceOccurrence_whenNormalize_thenClassifiesAsOverride() {
         // given
         GoogleCalendarEventResponse item =
@@ -64,6 +64,7 @@ class GoogleCalendarPageNormalizerTest {
         when(recurrenceEventMapping.getExternalEventId()).thenReturn("recurrence-event-1");
         when(recurrenceMappingQueryService.listRecurrenceEventMappings(any(), any(), any()))
                 .thenReturn(List.of(recurrenceEventMapping));
+
         var override = new CancelledRecurrenceEventOverrideUpsert(
                 "override-1",
                 "recurrence-event-1",
@@ -86,7 +87,7 @@ class GoogleCalendarPageNormalizerTest {
     }
 
     @Test
-    @DisplayName("조회한 recurrence-event는 관련 override보다 먼저 정규화한다")
+    @DisplayName("recurrence override를 정규화할 때 연결된 recurrence event를 함께 조회한다")
     void givenOverrideBeforeRecurrenceEvent_whenNormalize_thenOrdersRecurrenceEventFirst() {
         // given
         GoogleCalendarEventResponse deletedOccurrence =

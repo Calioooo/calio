@@ -57,7 +57,7 @@ class GoogleOperationSchedulerTest {
     }
 
     @Test
-    @DisplayName("복구 대상 Account는 제한된 조회 결과만 worker에 전달한다")
+    @DisplayName("복구 대상(runableAt) Account는 제한된 조회 결과만 worker에 전달한다")
     void givenRecoverableAccounts_whenRecoveringAndEnqueuing_thenWakesReturnedBatch() {
         // given
         when(persistenceService.findRecoverableAccountIds()).thenReturn(List.of(10L, 20L));

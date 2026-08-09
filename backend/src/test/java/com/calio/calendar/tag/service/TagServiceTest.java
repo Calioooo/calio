@@ -28,7 +28,7 @@ class TagServiceTest {
     private TagQueryService tagQueryService;
 
     @Test
-    @DisplayName("explicit tagId는 DEFAULT 또는 CUSTOM 태그를 resolve한다")
+    @DisplayName("예외적인 tagId는 DEFAULT 또는 CUSTOM 태그를 resolve한다")
     void givenExistingTagId_whenResolveTag_thenReturnsTag() {
         // given
         Tag defaultTag = new Tag(TagType.DEFAULT, "업무", "#2563eb");
@@ -52,7 +52,7 @@ class TagServiceTest {
     }
 
     @Test
-    @DisplayName("missing tagId는 TAG_NOT_FOUND로 실패한다")
+    @DisplayName("올바르지 않은 tagId는 TAG_NOT_FOUND 예외를 반환한다")
     void givenMissingTagId_whenResolveTag_thenThrowsTagNotFound() {
         // given
         when(tagRepository.findByIdAndTagTypeAndAccountIsNull(1L, TagType.DEFAULT))

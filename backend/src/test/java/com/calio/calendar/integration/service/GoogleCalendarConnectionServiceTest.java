@@ -2,6 +2,7 @@ package com.calio.calendar.integration.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
@@ -58,7 +59,7 @@ class GoogleCalendarConnectionServiceTest {
     private final Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
 
     @Test
-    @DisplayName("connect는 Google token을 암호화한 뒤 새 연결을 등록한다")
+    @DisplayName("connect는 Google token을 암호화한 뒤 새 연결을 저장한다")
     void givenValidAuthorizationCode_whenConnect_thenCreatesEncryptedConnection() {
         // given
         FakeGoogleOAuthClient googleOAuthClient = connectedGoogleOAuthClient();
@@ -68,8 +69,8 @@ class GoogleCalendarConnectionServiceTest {
                 eq(ACCOUNT_ID),
                 eq("google-subject"),
                 eq("user@example.com"),
-                org.mockito.ArgumentMatchers.anyString(),
-                org.mockito.ArgumentMatchers.anyString(),
+                anyString(),
+                anyString(),
                 eq(NOW.plusSeconds(3600)),
                 eq(NOW)
         )).thenReturn(new GoogleCalendarIntegration(
@@ -138,8 +139,8 @@ class GoogleCalendarConnectionServiceTest {
                 eq(ACCOUNT_ID),
                 eq("google-subject"),
                 eq("user@example.com"),
-                org.mockito.ArgumentMatchers.anyString(),
-                org.mockito.ArgumentMatchers.anyString(),
+                anyString(),
+                anyString(),
                 eq(NOW.plusSeconds(3600)),
                 eq(NOW)
         )).thenThrow(new DataIntegrityViolationException("registration race"));
@@ -147,8 +148,8 @@ class GoogleCalendarConnectionServiceTest {
                 eq(existingIntegration),
                 eq("google-subject"),
                 eq("user@example.com"),
-                org.mockito.ArgumentMatchers.anyString(),
-                org.mockito.ArgumentMatchers.anyString(),
+                anyString(),
+                anyString(),
                 eq(NOW.plusSeconds(3600)),
                 eq(NOW)
         )).thenReturn(existingIntegration);

@@ -20,28 +20,29 @@ import org.junit.jupiter.api.Test;
 
 class GoogleCalendarProviderDataServiceTest {
 
+    private final GoogleCalendarIntegrationCommandService integrationCommandService =
+            mock(GoogleCalendarIntegrationCommandService.class);
+    private final GoogleCalendarEventMappingQueryService eventMappingQueryService =
+            mock(GoogleCalendarEventMappingQueryService.class);
+    private final GoogleCalendarEventMappingCommandService eventMappingCommandService =
+            mock(GoogleCalendarEventMappingCommandService.class);
+    private final GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService =
+            mock(GoogleCalendarRecurrenceMappingQueryService.class);
+    private final GoogleCalendarRecurrenceMappingCommandService recurrenceMappingCommandService =
+            mock(GoogleCalendarRecurrenceMappingCommandService.class);
+    private final EventRepository eventRepository = mock(EventRepository.class);
+    private final RecurrenceEventRepository recurrenceEventRepository =
+            mock(RecurrenceEventRepository.class);
+    private final RecurrenceEventOverrideRepository overrideRepository =
+            mock(RecurrenceEventOverrideRepository.class);
+    private final GoogleOperationJobPersistenceService operationJobPersistenceService =
+            mock(GoogleOperationJobPersistenceService.class);
+    private final GoogleCalendarEventMapping eventMapping = mock(GoogleCalendarEventMapping.class);
+
     @Test
-    @DisplayName("FULL reconciliation은 각 mapping batch에서 sync lease와 operation ownership을 갱신한다")
+    @DisplayName("FULL SYNC시 각 mapping batch에서 sync lease와 operation ownership을 갱신한다")
     void givenUnseenMappings_whenFinalizeFullSync_thenDeletesByBatchAndRenewsLease() {
         // given
-        GoogleCalendarIntegrationCommandService integrationCommandService =
-                mock(GoogleCalendarIntegrationCommandService.class);
-        GoogleCalendarEventMappingQueryService eventMappingQueryService =
-                mock(GoogleCalendarEventMappingQueryService.class);
-        GoogleCalendarEventMappingCommandService eventMappingCommandService =
-                mock(GoogleCalendarEventMappingCommandService.class);
-        GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService =
-                mock(GoogleCalendarRecurrenceMappingQueryService.class);
-        GoogleCalendarRecurrenceMappingCommandService recurrenceMappingCommandService =
-                mock(GoogleCalendarRecurrenceMappingCommandService.class);
-        EventRepository eventRepository = mock(EventRepository.class);
-        RecurrenceEventRepository recurrenceEventRepository =
-                mock(RecurrenceEventRepository.class);
-        RecurrenceEventOverrideRepository overrideRepository =
-                mock(RecurrenceEventOverrideRepository.class);
-        GoogleOperationJobPersistenceService operationJobPersistenceService =
-                mock(GoogleOperationJobPersistenceService.class);
-        GoogleCalendarEventMapping eventMapping = mock(GoogleCalendarEventMapping.class);
         Event event = mock(Event.class);
         when(eventMapping.getId()).thenReturn(10L);
         when(eventMapping.getExternalEventId()).thenReturn("unseen-event");
