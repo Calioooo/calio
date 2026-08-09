@@ -5,7 +5,7 @@ import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.event.repository.EventRepository;
 import com.calio.calendar.integration.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.domain.GoogleCalendarIntegration;
-import com.calio.calendar.integration.service.dto.GoogleCalendarPageChangeState;
+import com.calio.calendar.integration.service.dto.GoogleCalendarPageRecordCache;
 import com.calio.calendar.integration.service.dto.GoogleCalendarNormalizedPage.EventUpsert;
 import com.calio.calendar.tag.domain.Tag;
 import org.springframework.stereotype.Service;
@@ -27,11 +27,11 @@ public class GoogleCalendarEventChangeService {
     public void applyUpsert(
             GoogleCalendarIntegration integration,
             EventUpsert item,
-            GoogleCalendarPageChangeState state,
+            GoogleCalendarPageRecordCache cache,
             Account account,
             Tag defaultTag
     ) {
-        var eventMappings = state.eventMappings();
+        var eventMappings = cache.eventMappings();
         GoogleCalendarEventMapping existingMapping = eventMappings.get(item.externalEventId());
         if (existingMapping != null) {
             existingMapping.getEvent().replace(
@@ -70,9 +70,9 @@ public class GoogleCalendarEventChangeService {
 
     public void applyCancellation(
             String externalEventId,
-            GoogleCalendarPageChangeState state
+            GoogleCalendarPageRecordCache cache
     ) {
-        var eventMappings = state.eventMappings();
+        var eventMappings = cache.eventMappings();
         GoogleCalendarEventMapping eventMapping = eventMappings.remove(externalEventId);
         if (eventMapping == null) {
             return;

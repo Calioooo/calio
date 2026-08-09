@@ -8,9 +8,9 @@ import java.time.Instant;
 import java.util.Map;
 
 /**
- * Existing local records loaded before applying one normalized Google Calendar page.
+ * Local records indexed for one normalized Google Calendar page.
  */
-public record GoogleCalendarPageChangeState(
+public record GoogleCalendarPageRecordCache(
         Map<String, GoogleCalendarEventMapping> eventMappings,
         Map<String, GoogleCalendarRecurrenceEventMapping> recurrenceEventMappings,
         Map<GoogleCalendarRecurrenceOverrideKey, GoogleCalendarRecurrenceOverrideMapping>
