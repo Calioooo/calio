@@ -18,7 +18,7 @@ public class GoogleCalendarSyncService {
     private final GoogleCalendarProviderDataService providerDataService;
     private final GoogleCalendarAccessTokenService accessTokenService;
     private final GoogleCalendarEventRequestService eventRequestService;
-    private final GoogleCalendarEventPagePersistenceService pagePersistenceService;
+    private final GoogleCalendarPageChangeService pageChangeService;
     private final GoogleCalendarPageNormalizer pageNormalizer;
     private final GoogleOperationLeaseService operationLeaseService;
 
@@ -27,7 +27,7 @@ public class GoogleCalendarSyncService {
             GoogleCalendarProviderDataService providerDataService,
             GoogleCalendarAccessTokenService accessTokenService,
             GoogleCalendarEventRequestService eventRequestService,
-            GoogleCalendarEventPagePersistenceService pagePersistenceService,
+            GoogleCalendarPageChangeService pageChangeService,
             GoogleCalendarPageNormalizer pageNormalizer,
             GoogleOperationLeaseService operationLeaseService
     ) {
@@ -35,7 +35,7 @@ public class GoogleCalendarSyncService {
         this.providerDataService = providerDataService;
         this.accessTokenService = accessTokenService;
         this.eventRequestService = eventRequestService;
-        this.pagePersistenceService = pagePersistenceService;
+        this.pageChangeService = pageChangeService;
         this.pageNormalizer = pageNormalizer;
         this.operationLeaseService = operationLeaseService;
     }
@@ -97,7 +97,7 @@ public class GoogleCalendarSyncService {
             GoogleCalendarNormalizedPage normalizedPage = pageNormalizer.normalize(
                     execution.integrationId(), page, context);
             operationLeaseService.extend(jobId, execution.accountId(), execution.workerToken());
-            pagePersistenceService.persistNormalizedPage(
+            pageChangeService.applyNormalizedPage(
                     execution.integrationId(),
                     execution.accountId(),
                     normalizedPage

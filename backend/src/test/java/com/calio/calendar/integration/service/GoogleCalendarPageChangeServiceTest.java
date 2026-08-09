@@ -51,10 +51,10 @@ import org.springframework.transaction.annotation.Transactional;
         "spring.datasource.password=",
         "spring.jpa.hibernate.ddl-auto=create-drop"
 })
-class GoogleCalendarEventPagePersistenceServiceTest {
+class GoogleCalendarPageChangeServiceTest {
 
     @Autowired
-    private GoogleCalendarEventPagePersistenceService pagePersistenceService;
+    private GoogleCalendarPageChangeService pagePersistenceService;
 
     @Autowired
     private GoogleCalendarPageNormalizer pageNormalizer;
@@ -106,7 +106,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
 
     @Test
     @Transactional
-    @DisplayName("동일 ExternalId 재요청은 내부 Event를 유지하며 schedule만 갱신한다")
+    @DisplayName("동일한 ExternalId 로 sync 응답이 오면 해당 Event의 데이터를 수정한다")
     void givenRepeatedExternalIdentity_whenPersistPages_thenUpsertsAndPreservesLocalFields() {
         // given
         Tag fallbackTag = tagRepository.saveAndFlush(new Tag(
@@ -154,7 +154,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
 
     @Test
     @Transactional
-    @DisplayName("normal Event는 page timezone fallback으로 정규화한 schedule과 timezone을 저장한다")
+    @DisplayName("Event의 timezone이 null이면 page에 설정한 timezone으로 정규화한 schedule과 timezone을 저장한다")
     void givenOffsetlessTimedItemAndPageZone_whenPersistPage_thenStoresCanonicalSchedule() {
         // given
         tagRepository.saveAndFlush(new Tag(TagType.DEFAULT, "기타", "#64748B"));
@@ -198,7 +198,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
 
     @Test
     @Transactional
-    @DisplayName("Google이 허용하는 최대 1024자 event id를 손실 없이 저장한다")
+    @DisplayName("Google이 허용하는 최대 1024자 event id를 저장한다")
     void givenMaximumLengthExternalEventId_whenPersistPage_thenStoresCompleteId() {
         // given
         tagRepository.saveAndFlush(new Tag(TagType.DEFAULT, "기타", "#64748B"));
@@ -233,6 +233,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
             String nextSyncToken
     ) {
         // given
+        tagRepository.saveAndFlush(new Tag(TagType.DEFAULT, "기타", "#64748B"));
 
         // when, then
         assertThatThrownBy(() -> persistProviderPage(
@@ -382,7 +383,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
                         "UTC"
                 )
         );
-        pagePersistenceService.persistNormalizedPage(
+        pagePersistenceService.applyNormalizedPage(
                 integration.getId(),
                 account.getId(),
                 new GoogleCalendarNormalizedPage(
@@ -410,7 +411,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
                 "override-etag-2",
                 Instant.parse("2026-07-02T08:00:00Z")
         );
-        pagePersistenceService.persistNormalizedPage(
+        pagePersistenceService.applyNormalizedPage(
                 integration.getId(),
                 account.getId(),
                 new GoogleCalendarNormalizedPage(
@@ -482,7 +483,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
         );
         ActiveRecurrenceEventOverrideUpsert firstOverride =
                 recurrenceOverride("shared-override", "recurrence-event-a");
-        pagePersistenceService.persistNormalizedPage(
+        pagePersistenceService.applyNormalizedPage(
                 integration.getId(),
                 account.getId(),
                 new GoogleCalendarNormalizedPage(
@@ -495,7 +496,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
                 recurrenceOverride("shared-override", "recurrence-event-b");
 
         // when, then
-        assertThatThrownBy(() -> pagePersistenceService.persistNormalizedPage(
+        assertThatThrownBy(() -> pagePersistenceService.applyNormalizedPage(
                 integration.getId(),
                 account.getId(),
                 new GoogleCalendarNormalizedPage(
@@ -552,7 +553,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
                                 "UTC"
                         )
                 );
-        pagePersistenceService.persistNormalizedPage(
+        pagePersistenceService.applyNormalizedPage(
                 integration.getId(),
                 account.getId(),
                 new GoogleCalendarNormalizedPage(
@@ -579,7 +580,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
                 ),
                 new GoogleCalendarSyncRunContext("access-token")
         );
-        pagePersistenceService.persistNormalizedPage(
+        pagePersistenceService.applyNormalizedPage(
                 integration.getId(),
                 account.getId(),
                 normalizedPage
@@ -657,7 +658,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
                                 "UTC"
                         )
                 );
-        pagePersistenceService.persistNormalizedPage(
+        pagePersistenceService.applyNormalizedPage(
                 integration.getId(),
                 account.getId(),
                 new GoogleCalendarNormalizedPage(
@@ -749,7 +750,7 @@ class GoogleCalendarEventPagePersistenceServiceTest {
                 page,
                 context
         );
-        pagePersistenceService.persistNormalizedPage(
+        pagePersistenceService.applyNormalizedPage(
                 integrationId,
                 accountId,
                 normalizedPage

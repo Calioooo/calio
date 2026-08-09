@@ -31,7 +31,7 @@ public class GoogleCalendarProviderDataService {
     private final EventRepository eventRepository;
     private final RecurrenceEventRepository recurrenceEventRepository;
     private final RecurrenceEventOverrideRepository overrideRepository;
-    private final GoogleCalendarEventPagePersistenceService pagePersistenceService;
+    private final GoogleCalendarRecurrenceChangeService recurrenceChangeService;
     private final GoogleOperationLeaseService operationLeaseService;
     private final GoogleOperationJobPersistenceService operationJobPersistenceService;
 
@@ -44,7 +44,7 @@ public class GoogleCalendarProviderDataService {
             EventRepository eventRepository,
             RecurrenceEventRepository recurrenceEventRepository,
             RecurrenceEventOverrideRepository overrideRepository,
-            GoogleCalendarEventPagePersistenceService pagePersistenceService,
+            GoogleCalendarRecurrenceChangeService recurrenceChangeService,
             GoogleOperationLeaseService operationLeaseService,
             GoogleOperationJobPersistenceService operationJobPersistenceService
     ) {
@@ -56,7 +56,7 @@ public class GoogleCalendarProviderDataService {
         this.eventRepository = eventRepository;
         this.recurrenceEventRepository = recurrenceEventRepository;
         this.overrideRepository = overrideRepository;
-        this.pagePersistenceService = pagePersistenceService;
+        this.recurrenceChangeService = recurrenceChangeService;
         this.operationLeaseService = operationLeaseService;
         this.operationJobPersistenceService = operationJobPersistenceService;
     }
@@ -302,7 +302,7 @@ public class GoogleCalendarProviderDataService {
     private void deleteAllRecurrenceProviderData(Long integrationId) {
         deleteOverrides(recurrenceMappingQueryService.listOverrideMappings(integrationId));
         recurrenceMappingQueryService.listRecurrenceEventMappings(integrationId)
-                .forEach(pagePersistenceService::deleteRecurrenceEvent);
+                .forEach(recurrenceChangeService::deleteRecurrenceEvent);
     }
 
     private void deleteAllEventProviderData(Long integrationId) {

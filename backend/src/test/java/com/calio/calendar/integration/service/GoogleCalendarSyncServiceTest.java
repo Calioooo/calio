@@ -494,7 +494,7 @@ class GoogleCalendarSyncServiceTest {
     }
 
     private static final class FakePagePersistenceService
-            extends GoogleCalendarEventPagePersistenceService {
+            extends GoogleCalendarPageChangeService {
 
         private int normalizedPersistCount;
 
@@ -502,19 +502,17 @@ class GoogleCalendarSyncServiceTest {
             super(
                     mock(GoogleCalendarIntegrationQueryService.class),
                     mock(GoogleCalendarEventMappingQueryService.class),
-                    mock(GoogleCalendarEventMappingCommandService.class),
+                    mock(GoogleCalendarEventChangeService.class),
                     mock(GoogleCalendarRecurrenceMappingQueryService.class),
-                    mock(GoogleCalendarRecurrenceMappingCommandService.class),
-                    mock(EventRepository.class),
                     mock(AccountQueryService.class),
                     mock(TagQueryService.class),
-                    mock(RecurrenceEventRepository.class),
-                    mock(RecurrenceEventOverrideRepository.class)
+                    mock(RecurrenceEventOverrideRepository.class),
+                    mock(GoogleCalendarRecurrenceChangeService.class)
             );
         }
 
         @Override
-        public void persistNormalizedPage(
+        public void applyNormalizedPage(
                 Long integrationId,
                 Long accountId,
                 GoogleCalendarNormalizedPage page
