@@ -1,4 +1,4 @@
-package com.calio.calendar.integration.repository;
+package com.calio.calendar.integration.sync.operation.repository;
 
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJob;
 import java.time.Instant;

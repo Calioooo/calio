@@ -1,4 +1,4 @@
-package com.calio.calendar.integration.domain;
+package com.calio.calendar.integration.sync.operation.domain;
 
 public enum GoogleOperationJobTrigger {
     MANUAL,

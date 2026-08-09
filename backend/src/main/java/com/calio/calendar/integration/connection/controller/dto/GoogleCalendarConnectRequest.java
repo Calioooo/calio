@@ -1,4 +1,4 @@
-package com.calio.calendar.integration.controller.dto;
+package com.calio.calendar.integration.connection.controller.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.validation.constraints.NotBlank;

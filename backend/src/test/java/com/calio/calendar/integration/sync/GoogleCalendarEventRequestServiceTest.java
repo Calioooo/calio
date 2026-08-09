@@ -12,7 +12,7 @@ import com.calio.calendar.external.google.GoogleCalendarEventsClient;
 import com.calio.calendar.external.google.GoogleCalendarUnauthorizedException;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventResponse;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventPage;
-import com.calio.calendar.integration.sync.GoogleCalendarSyncMode;
+import com.calio.calendar.integration.connection.service.GoogleCalendarAccessTokenService;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;

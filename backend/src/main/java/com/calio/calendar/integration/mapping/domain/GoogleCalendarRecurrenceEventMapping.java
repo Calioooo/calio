@@ -1,6 +1,7 @@
-package com.calio.calendar.integration.domain;
+package com.calio.calendar.integration.mapping.domain;
 
 import com.calio.calendar.common.domain.BaseEntity;
+import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

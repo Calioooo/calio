@@ -1,4 +1,4 @@
-package com.calio.calendar.integration.repository;
+package com.calio.calendar.integration.connection.repository;
 
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
 import jakarta.persistence.LockModeType;

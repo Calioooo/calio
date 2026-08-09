@@ -1,4 +1,4 @@
-package com.calio.calendar.integration.service;
+package com.calio.calendar.integration.sync;
 
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;

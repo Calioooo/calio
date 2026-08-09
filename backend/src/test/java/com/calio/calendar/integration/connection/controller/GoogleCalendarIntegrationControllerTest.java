@@ -1,4 +1,4 @@
-package com.calio.calendar.integration.controller;
+package com.calio.calendar.integration.connection.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;

@@ -1,4 +1,4 @@
-package com.calio.calendar.integration.repository;
+package com.calio.calendar.integration.mapping.repository;
 
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarEventMapping;
 import java.util.Collection;

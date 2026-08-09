@@ -1,25 +1,33 @@
-package com.calio.calendar.integration.service;
+package com.calio.calendar.integration.sync;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.calio.calendar.account.service.AccountQueryService;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
-import com.calio.calendar.account.service.AccountQueryService;
-import com.calio.calendar.event.repository.EventRepository;
 import com.calio.calendar.external.google.GoogleCalendarEventsClient;
 import com.calio.calendar.external.google.GoogleCalendarSyncTokenExpiredException;
 import com.calio.calendar.external.google.GoogleCalendarUnauthorizedException;
 import com.calio.calendar.external.google.GoogleOAuthProperties;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventPage;
-import com.calio.calendar.integration.sync.GoogleCalendarSyncMode;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
-import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
-import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
+import com.calio.calendar.integration.connection.service.GoogleCalendarAccessTokenService;
+import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrationQueryService;
+import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingQueryService;
+import com.calio.calendar.integration.mapping.service.GoogleCalendarRecurrenceMappingQueryService;
+import com.calio.calendar.integration.sync.operation.GoogleOperationJobService;
+import com.calio.calendar.integration.sync.operation.GoogleOperationLeaseService;
+import com.calio.calendar.integration.sync.operation.GoogleOperationOwnershipLostException;
+import com.calio.calendar.integration.sync.page.GoogleCalendarEventChangeService;
+import com.calio.calendar.integration.sync.page.GoogleCalendarPageChangeService;
+import com.calio.calendar.integration.sync.page.GoogleCalendarPageNormalizer;
+import com.calio.calendar.integration.sync.page.GoogleCalendarRecurrenceChangeService;
 import com.calio.calendar.integration.sync.page.dto.GoogleCalendarNormalizedPage;
 import com.calio.calendar.integration.sync.page.dto.GoogleCalendarRecurrenceOverrideExternalKey;
+import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
 import com.calio.calendar.tag.service.TagQueryService;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -167,9 +175,11 @@ class GoogleCalendarSyncServiceTest {
 
         // when, then
         assertThatThrownBy(() -> synchronize(service))
-                .isInstanceOfSatisfying(CalioException.class, exception ->
-                        assertThat(exception.getErrorCode())
-                                .isEqualTo(ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED));
+                .isInstanceOfSatisfying(
+                        CalioException.class, exception ->
+                                assertThat(exception.getErrorCode())
+                                        .isEqualTo(ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED)
+                );
         assertThat(accessTokenService.forceRefreshCount).isOne();
     }
 
@@ -187,9 +197,11 @@ class GoogleCalendarSyncServiceTest {
 
         // when, then
         assertThatThrownBy(() -> synchronize(service))
-                .isInstanceOfSatisfying(CalioException.class, exception ->
-                        assertThat(exception.getErrorCode())
-                                .isEqualTo(ErrorCode.GOOGLE_CALENDAR_SYNC_FAILED));
+                .isInstanceOfSatisfying(
+                        CalioException.class, exception ->
+                                assertThat(exception.getErrorCode())
+                                        .isEqualTo(ErrorCode.GOOGLE_CALENDAR_SYNC_FAILED)
+                );
     }
 
     @Test

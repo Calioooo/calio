@@ -1,4 +1,4 @@
-package com.calio.calendar.integration.controller.dto;
+package com.calio.calendar.integration.connection.controller.dto;
 
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
 import java.time.Instant;

@@ -1,5 +1,6 @@
 package com.calio.calendar.integration.sync.operation;
 
+import com.calio.calendar.integration.sync.GoogleCalendarSyncService;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJob;
 import com.calio.calendar.integration.sync.operation.dto.GoogleOperationFailureDecision;
 import java.util.UUID;

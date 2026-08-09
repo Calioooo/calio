@@ -1,4 +1,4 @@
-package com.calio.calendar.integration.scheduler;
+package com.calio.calendar.integration.sync.operation.scheduler;
 
 import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrationQueryService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobEnqueueService;

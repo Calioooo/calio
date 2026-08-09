@@ -1,4 +1,4 @@
-package com.calio.calendar.integration.repository;
+package com.calio.calendar.integration.connection.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

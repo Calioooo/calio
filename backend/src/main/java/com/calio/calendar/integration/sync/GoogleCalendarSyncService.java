@@ -1,11 +1,15 @@
-package com.calio.calendar.integration.service;
+package com.calio.calendar.integration.sync;
 
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.external.google.GoogleCalendarSyncTokenExpiredException;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventPage;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
-import com.calio.calendar.integration.sync.GoogleCalendarSyncMode;
+import com.calio.calendar.integration.connection.service.GoogleCalendarAccessTokenService;
+import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrationQueryService;
+import com.calio.calendar.integration.sync.operation.GoogleOperationLeaseService;
+import com.calio.calendar.integration.sync.page.GoogleCalendarPageChangeService;
+import com.calio.calendar.integration.sync.page.GoogleCalendarPageNormalizer;
 import com.calio.calendar.integration.sync.page.dto.GoogleCalendarNormalizedPage;
 import java.util.HashSet;
 import java.util.Set;

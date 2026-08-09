@@ -1,4 +1,4 @@
-package com.calio.calendar.integration.domain;
+package com.calio.calendar.integration.connection.domain;
 
 import com.calio.calendar.common.domain.BaseEntity;
 import jakarta.persistence.Column;

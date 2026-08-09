@@ -1,5 +1,6 @@
 package com.calio.calendar.integration.sync.operation;
 
+import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrationCommandService;
 import java.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

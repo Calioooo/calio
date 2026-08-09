@@ -1,4 +1,4 @@
-package com.calio.calendar.integration.service;
+package com.calio.calendar.integration.connection.service;
 
 import com.calio.calendar.external.google.GoogleOAuthClient;
 import com.calio.calendar.external.google.dto.GoogleAccessTokenRefreshResponse;

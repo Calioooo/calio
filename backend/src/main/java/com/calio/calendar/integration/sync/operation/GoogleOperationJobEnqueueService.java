@@ -1,6 +1,7 @@
-package com.calio.calendar.integration.service;
+package com.calio.calendar.integration.sync.operation;
 
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
+import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrationCommandService;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJob;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobTrigger;
 import java.time.Clock;

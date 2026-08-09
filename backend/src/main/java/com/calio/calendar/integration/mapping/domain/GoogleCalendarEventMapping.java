@@ -1,7 +1,8 @@
-package com.calio.calendar.integration.domain;
+package com.calio.calendar.integration.mapping.domain;
 
 import com.calio.calendar.common.domain.BaseEntity;
 import com.calio.calendar.event.domain.Event;
+import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;

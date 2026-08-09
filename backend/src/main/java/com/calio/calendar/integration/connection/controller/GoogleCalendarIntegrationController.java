@@ -1,4 +1,4 @@
-package com.calio.calendar.integration.controller;
+package com.calio.calendar.integration.connection.controller;
 
 import com.calio.calendar.integration.connection.controller.dto.GoogleCalendarConnectRequest;
 import com.calio.calendar.integration.connection.controller.dto.GoogleCalendarIntegrationResponse;

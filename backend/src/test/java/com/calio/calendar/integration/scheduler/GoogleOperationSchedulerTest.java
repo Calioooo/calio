@@ -10,6 +10,7 @@ import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrati
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobEnqueueService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationWorker;
+import com.calio.calendar.integration.sync.operation.scheduler.GoogleOperationScheduler;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;

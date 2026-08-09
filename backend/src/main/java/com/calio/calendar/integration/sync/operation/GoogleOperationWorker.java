@@ -1,4 +1,4 @@
-package com.calio.calendar.integration.service;
+package com.calio.calendar.integration.sync.operation;
 
 import jakarta.annotation.PreDestroy;
 import java.util.Set;
