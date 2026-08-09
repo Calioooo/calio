@@ -93,10 +93,6 @@ public class GoogleCalendarRecurrenceEventMapping extends BaseEntity {
         return recurrenceEvent;
     }
 
-    public String getCalendarKey() {
-        return calendarKey;
-    }
-
     public String getExternalEventId() {
         return externalEventId;
     }

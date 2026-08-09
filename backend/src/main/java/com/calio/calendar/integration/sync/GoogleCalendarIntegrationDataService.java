@@ -15,6 +15,7 @@ import com.calio.calendar.integration.mapping.service.GoogleCalendarRecurrenceMa
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationLeaseService;
 import com.calio.calendar.integration.sync.page.GoogleCalendarRecurrenceChangeService;
+import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
@@ -284,7 +285,7 @@ public class GoogleCalendarIntegrationDataService {
                     .toList();
             List<Long> recurrenceEventIds = unseenMappings.stream()
                     .map(GoogleCalendarRecurrenceEventMapping::getRecurrenceEvent)
-                    .map(recurrenceEvent -> recurrenceEvent.getId())
+                    .map(RecurrenceEvent::getId)
                     .toList();
             recurrenceMappingCommandService.deleteOverrideMappingsForRecurrenceMappings(
                     mappingIds

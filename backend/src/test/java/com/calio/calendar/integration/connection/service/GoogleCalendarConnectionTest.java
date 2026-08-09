@@ -97,7 +97,7 @@ class GoogleCalendarConnectionTest {
                 integration(account.getId())
         );
         Event importedEvent = createMappedEvent(account, integration, "external-before-reconnect");
-        preparePreviousSyncState(account.getId(), integration.getId());
+        preparePreviousSyncState(integration.getId());
         stubGoogleConnection();
 
         // when
@@ -196,7 +196,7 @@ class GoogleCalendarConnectionTest {
                 .thenReturn("new-encrypted-access-token");
     }
 
-    private void preparePreviousSyncState(Long accountId, Long integrationId) {
+    private void preparePreviousSyncState(Long integrationId) {
         new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
             assertThat(integrationRepository.updateNextSyncToken(
                     integrationId,

@@ -92,19 +92,11 @@ public class GoogleCalendarEventMapping extends BaseEntity {
         return event;
     }
 
-    public String getCalendarKey() {
-        return calendarKey;
-    }
-
     public String getExternalEventId() {
         return externalEventId;
     }
 
     public String getProviderEtag() {
         return providerEtag;
-    }
-
-    public Instant getProviderUpdatedAt() {
-        return providerUpdatedAt;
     }
 }

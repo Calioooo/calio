@@ -35,20 +35,6 @@ public interface GoogleCalendarRecurrenceOverrideMappingRepository
             from GoogleCalendarRecurrenceOverrideMapping overrideMapping
             join overrideMapping.recurrenceEventMapping recurrenceEventMapping
             where recurrenceEventMapping.id in :recurrenceEventMappingIds
-              and overrideMapping.externalEventId in :externalEventIds
-            """)
-    List<GoogleCalendarRecurrenceOverrideMapping>
-    findAllWithRecurrenceEventMappingAndRecurrenceEventOverrideByExternalIdentity(
-            @Param("recurrenceEventMappingIds") Collection<Long> recurrenceEventMappingIds,
-            @Param("externalEventIds") Collection<String> externalEventIds
-    );
-
-    @EntityGraph(attributePaths = {"recurrenceEventMapping", "recurrenceEventOverride"})
-    @Query("""
-            select overrideMapping
-            from GoogleCalendarRecurrenceOverrideMapping overrideMapping
-            join overrideMapping.recurrenceEventMapping recurrenceEventMapping
-            where recurrenceEventMapping.id in :recurrenceEventMappingIds
             """)
     List<GoogleCalendarRecurrenceOverrideMapping>
     findAllWithRecurrenceEventMappingAndRecurrenceEventOverrideByRecurrenceEventMappingIds(

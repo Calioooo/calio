@@ -254,7 +254,6 @@ class GoogleCalendarIntegrationControllerTest {
     static class FakeGoogleCalendarEventsClient extends GoogleCalendarEventsClient {
 
         private int listCount;
-        private GoogleCalendarSyncMode lastMode;
         private final List<GoogleCalendarSyncMode> requestedModes = new ArrayList<>();
         private RuntimeException nextFailure;
 
@@ -273,7 +272,6 @@ class GoogleCalendarIntegrationControllerTest {
                 String pageToken
         ) {
             listCount++;
-            lastMode = mode;
             requestedModes.add(mode);
             if (nextFailure != null) {
                 RuntimeException failure = nextFailure;
@@ -285,7 +283,6 @@ class GoogleCalendarIntegrationControllerTest {
 
         private void reset() {
             listCount = 0;
-            lastMode = null;
             requestedModes.clear();
             nextFailure = null;
         }
