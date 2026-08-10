@@ -18,7 +18,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.annotation.Transactional;
 
 @ExtendWith(MockitoExtension.class)
 class EventCommandServiceTest {
@@ -28,6 +30,20 @@ class EventCommandServiceTest {
 
     @InjectMocks
     private EventCommandService eventCommandService;
+
+    @Test
+    @DisplayName("CommandService의 모든 상태 변경은 트랜잭션 경계 안에서 실행한다")
+    void commandServiceUsesTransactionBoundary() {
+        // when
+        Transactional transactional = AnnotatedElementUtils.findMergedAnnotation(
+                EventCommandService.class,
+                Transactional.class
+        );
+
+        // then
+        assertThat(transactional).isNotNull();
+        assertThat(transactional.readOnly()).isFalse();
+    }
 
     @Test
     @DisplayName("일정 생성은 전달받은 Event를 저장하고 저장 결과를 반환한다")
