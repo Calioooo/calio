@@ -104,6 +104,9 @@ struct RecurrenceEventDetails: Equatable {
     let recurrenceEndTime: Date
     let recurrenceFrequency: RecurrenceFrequency
     let isAllDay: Bool
+    let timeZone: String?
+    let canUpdateSeries: Bool
+    let isRuleEditable: Bool
     let tagId: Int64?
 
     init(
@@ -116,6 +119,9 @@ struct RecurrenceEventDetails: Equatable {
         recurrenceEndTime: Date,
         recurrenceFrequency: RecurrenceFrequency,
         isAllDay: Bool = false,
+        timeZone: String? = nil,
+        canUpdateSeries: Bool = false,
+        isRuleEditable: Bool = false,
         tagId: Int64? = nil
     ) {
         self.recurrenceId = recurrenceId
@@ -127,6 +133,9 @@ struct RecurrenceEventDetails: Equatable {
         self.recurrenceEndTime = recurrenceEndTime
         self.recurrenceFrequency = recurrenceFrequency
         self.isAllDay = isAllDay
+        self.timeZone = timeZone
+        self.canUpdateSeries = canUpdateSeries
+        self.isRuleEditable = isRuleEditable
         self.tagId = tagId
     }
 }
@@ -140,6 +149,7 @@ struct RecurrenceEventSeriesEditInput: Equatable {
     let recurrenceEndTime: Date
     let recurrenceFrequency: RecurrenceFrequency
     let isAllDay: Bool
+    let timeZone: String?
     let tagId: Int64?
 
     init(
@@ -151,6 +161,7 @@ struct RecurrenceEventSeriesEditInput: Equatable {
         recurrenceEndTime: Date,
         recurrenceFrequency: RecurrenceFrequency,
         isAllDay: Bool = false,
+        timeZone: String? = nil,
         tagId: Int64? = nil
     ) {
         self.title = title
@@ -161,6 +172,7 @@ struct RecurrenceEventSeriesEditInput: Equatable {
         self.recurrenceEndTime = recurrenceEndTime
         self.recurrenceFrequency = recurrenceFrequency
         self.isAllDay = isAllDay
+        self.timeZone = timeZone
         self.tagId = tagId
     }
 }
@@ -174,6 +186,7 @@ struct RecurrenceEventUpdateInput: Equatable {
     let recurrenceEndTime: Date
     let recurrenceFrequency: RecurrenceFrequency
     let isAllDay: Bool
+    let timeZone: String?
     let tagId: Int64?
 
     init(
@@ -185,6 +198,7 @@ struct RecurrenceEventUpdateInput: Equatable {
         recurrenceEndTime: Date,
         recurrenceFrequency: RecurrenceFrequency,
         isAllDay: Bool = false,
+        timeZone: String? = nil,
         tagId: Int64? = nil
     ) {
         self.title = title
@@ -195,19 +209,33 @@ struct RecurrenceEventUpdateInput: Equatable {
         self.recurrenceEndTime = recurrenceEndTime
         self.recurrenceFrequency = recurrenceFrequency
         self.isAllDay = isAllDay
+        self.timeZone = timeZone
         self.tagId = tagId
     }
 }
 
 struct RecurrenceOccurrenceUpdateInput: Equatable {
+    let title: String
+    let description: String
     let startAt: Date
     let endAt: Date
     let isAllDay: Bool
+    let timeZone: String?
 
-    init(startAt: Date, endAt: Date, isAllDay: Bool = false) {
+    init(
+        title: String = "",
+        description: String = "",
+        startAt: Date,
+        endAt: Date,
+        isAllDay: Bool = false,
+        timeZone: String? = nil
+    ) {
+        self.title = title
+        self.description = description
         self.startAt = startAt
         self.endAt = endAt
         self.isAllDay = isAllDay
+        self.timeZone = timeZone
     }
 }
 

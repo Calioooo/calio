@@ -105,14 +105,23 @@ struct EventService {
         recurrenceId: Int64,
         input: RecurrenceEventUpdateInput
     ) async throws -> RecurrenceEventDetails {
+        let schedule = try recurrenceSchedule(
+            startDate: input.recurrenceStartDate,
+            endDate: input.recurrenceEndDate,
+            startTime: input.recurrenceStartTime,
+            endTime: input.recurrenceEndTime,
+            frequency: input.recurrenceFrequency,
+            isAllDay: input.isAllDay,
+            timeZone: input.timeZone
+        )
         let request = UpdateRecurrenceEventRequestDTO(
             title: input.title,
             description: backendDescription(from: input.description),
-            startDate: recurrenceDateString(from: input.recurrenceStartDate, isAllDay: input.isAllDay),
-            endDate: recurrenceDateString(from: input.recurrenceEndDate, isAllDay: input.isAllDay),
-            startTime: input.isAllDay ? Self.allDayRecurrenceStartTime : CalendarDateService.utcTimeString(from: input.recurrenceStartTime),
-            endTime: input.isAllDay ? Self.allDayRecurrenceEndTime : CalendarDateService.utcTimeString(from: input.recurrenceEndTime),
-            recurrenceFrequency: input.recurrenceFrequency,
+            allDay: input.isAllDay,
+            firstOccurrenceStartAt: schedule.firstOccurrenceStartAt,
+            firstOccurrenceEndAt: schedule.firstOccurrenceEndAt,
+            timeZone: schedule.timeZone,
+            recurrence: schedule.recurrence,
             tagId: input.tagId
         )
 
@@ -143,8 +152,12 @@ struct EventService {
         )
         let request = UpdateRecurrenceOccurrenceRequestDTO(
             originStartAt: originStartAt,
+            title: input.title,
+            description: backendDescription(from: input.description),
             startAt: range.startAt,
-            endAt: range.endAt
+            endAt: range.endAt,
+            allDay: input.isAllDay,
+            timeZone: input.isAllDay ? nil : input.timeZone ?? deviceTimeZone.identifier
         )
 
         do {
@@ -196,14 +209,23 @@ struct EventService {
     }
 
     func createRecurrenceEvent(_ input: RecurrenceEventCreateInput) async throws {
+        let schedule = try recurrenceSchedule(
+            startDate: input.recurrenceStartDate,
+            endDate: input.recurrenceEndDate,
+            startTime: input.recurrenceStartTime,
+            endTime: input.recurrenceEndTime,
+            frequency: input.recurrenceFrequency,
+            isAllDay: input.isAllDay,
+            timeZone: nil
+        )
         let request = CreateRecurrenceEventRequestDTO(
-            recurrenceTitle: input.title,
-            recurrenceDescription: backendDescription(from: input.description),
-            recurrenceStartDate: recurrenceDateString(from: input.recurrenceStartDate, isAllDay: input.isAllDay),
-            recurrenceEndDate: recurrenceDateString(from: input.recurrenceEndDate, isAllDay: input.isAllDay),
-            recurrenceStartTime: input.isAllDay ? Self.allDayRecurrenceStartTime : CalendarDateService.utcTimeString(from: input.recurrenceStartTime),
-            recurrenceEndTime: input.isAllDay ? Self.allDayRecurrenceEndTime : CalendarDateService.utcTimeString(from: input.recurrenceEndTime),
-            recurrenceFrequency: input.recurrenceFrequency,
+            title: input.title,
+            description: backendDescription(from: input.description),
+            allDay: input.isAllDay,
+            firstOccurrenceStartAt: schedule.firstOccurrenceStartAt,
+            firstOccurrenceEndAt: schedule.firstOccurrenceEndAt,
+            timeZone: schedule.timeZone,
+            recurrence: schedule.recurrence,
             tagId: input.tagId
         )
 
@@ -243,29 +265,28 @@ struct EventService {
     }
 
     private func mapToRecurrenceEventDetails(_ dto: RecurrenceEventResponseDTO) throws -> RecurrenceEventDetails {
-        do {
-            let isAllDay = dto.recurrenceStartTime == Self.allDayRecurrenceStartTime
-                && dto.recurrenceEndTime == Self.allDayRecurrenceEndTime
-            let startDate = try recurrenceDate(from: dto.recurrenceStartDate, isAllDay: isAllDay)
-            let endDate = try recurrenceDate(from: dto.recurrenceEndDate, isAllDay: isAllDay)
-            let startTime = try CalendarDateService.utcTime(from: dto.recurrenceStartTime)
-            let endTime = try CalendarDateService.utcTime(from: dto.recurrenceEndTime)
-
-            return RecurrenceEventDetails(
-                recurrenceId: dto.recurrenceId,
-                title: dto.recurrenceTitle,
-                description: dto.recurrenceDescription ?? "",
-                recurrenceStartDate: startDate,
-                recurrenceEndDate: endDate,
-                recurrenceStartTime: startTime,
-                recurrenceEndTime: endTime,
-                recurrenceFrequency: dto.recurrenceFrequency,
-                isAllDay: isAllDay,
-                tagId: dto.tag.id
+        let editableRule = RecurrenceRule.editableRule(from: dto.recurrence, allDay: dto.allDay)
+        let allDayRange = dto.allDay
+            ? try CalendarDateService.localAllDayDisplayRange(
+                utcStartAt: dto.firstOccurrenceStartAt,
+                utcEndAt: dto.firstOccurrenceEndAt
             )
-        } catch {
-            throw EventServiceError.decoding
-        }
+            : nil
+        return RecurrenceEventDetails(
+            recurrenceId: dto.recurrenceId,
+            title: dto.title,
+            description: dto.description ?? "",
+            recurrenceStartDate: allDayRange?.startAt ?? dto.firstOccurrenceStartAt,
+            recurrenceEndDate: editableRule?.until ?? allDayRange?.startAt ?? dto.firstOccurrenceStartAt,
+            recurrenceStartTime: dto.firstOccurrenceStartAt,
+            recurrenceEndTime: dto.firstOccurrenceEndAt,
+            recurrenceFrequency: editableRule?.frequency ?? .daily,
+            isAllDay: dto.allDay,
+            timeZone: dto.timeZone,
+            canUpdateSeries: dto.canUpdateSeries == true,
+            isRuleEditable: editableRule != nil,
+            tagId: dto.tag.id
+        )
     }
 
     private func mapToCalendarTag(_ dto: TagResponseDTO) -> CalendarTag {
@@ -292,21 +313,27 @@ struct EventService {
         return try CalendarDateService.utcAllDayRange(startAt: startAt, endAt: endAt)
     }
 
-    private func recurrenceDateString(from date: Date, isAllDay: Bool) -> String {
-        isAllDay
-            ? CalendarDateService.localDateString(from: date)
-            : CalendarDateService.utcDateString(from: date)
+    private func recurrenceSchedule(
+        startDate: Date,
+        endDate: Date,
+        startTime: Date,
+        endTime: Date,
+        frequency: RecurrenceFrequency,
+        isAllDay: Bool,
+        timeZone: String?
+    ) throws -> RecurrenceScheduleRequest {
+        let zone = timeZone.flatMap(TimeZone.init(identifier:)) ?? deviceTimeZone
+        return try RecurrenceScheduleBuilder.make(
+            startDate: startDate,
+            endDate: endDate,
+            startTime: startTime,
+            endTime: endTime,
+            frequency: frequency,
+            allDay: isAllDay,
+            timeZone: zone,
+            formTimeZone: deviceTimeZone
+        )
     }
-
-    private func recurrenceDate(from string: String, isAllDay: Bool) throws -> Date {
-        if isAllDay {
-            return try CalendarDateService.localDate(from: string)
-        }
-        return try CalendarDateService.utcDate(from: string)
-    }
-
-    private static let allDayRecurrenceStartTime = "00:00:00"
-    private static let allDayRecurrenceEndTime = "23:59:59"
 
     private func mapToServiceError(_ error: APIError) -> EventServiceError {
         switch error {
@@ -318,6 +345,8 @@ struct EventService {
                 return .recurrenceEventNotFound
             case "RECURRENCE_OCCURRENCE_NOT_FOUND":
                 return .recurrenceOccurrenceNotFound
+            case "EXTERNAL_EVENT_MUTATION_NOT_SUPPORTED":
+                return .seriesMutationNotAllowed
             case "VALIDATION_FAILED", "INVALID_ALL_DAY_SCHEDULE", "INVALID_TIME_ZONE":
                 return .validationFailed
             case "INVALID_TIME_RANGE", "RECURRENCE_UPDATE_TIME_RANGE_INVALID":
@@ -342,6 +371,7 @@ enum EventServiceError: Error, Equatable {
     case eventNotFound
     case recurrenceEventNotFound
     case recurrenceOccurrenceNotFound
+    case seriesMutationNotAllowed
     case validationFailed
     case invalidTimeRange
     case network

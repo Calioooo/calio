@@ -140,6 +140,7 @@ enum CalendarMonthEventFailure: Equatable {
         case .eventNotFound,
              .recurrenceEventNotFound,
              .recurrenceOccurrenceNotFound,
+             .seriesMutationNotAllowed,
              .validationFailed,
              .invalidTimeRange,
              .decoding,

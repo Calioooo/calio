@@ -104,6 +104,7 @@ class RecurrenceEventControllerTest {
                 .andExpect(jsonPath("$.firstOccurrenceEndAt").value("2026-08-01T01:00:00Z"))
                 .andExpect(jsonPath("$.timeZone").value("Asia/Seoul"))
                 .andExpect(jsonPath("$.recurrence[0]").value("RRULE:FREQ=DAILY;COUNT=3"))
+                .andExpect(jsonPath("$.canUpdateSeries").value(true))
                 .andExpect(jsonPath("$.tag.title").value("기타"));
 
         mockMvc.perform(get("/api/events")

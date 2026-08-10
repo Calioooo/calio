@@ -248,35 +248,29 @@ final class RecordingEventRepository: EventRepository {
         shouldSuspendCreate: Bool = false,
         recurrenceCreateResponse: RecurrenceEventResponseDTO = RecurrenceEventResponseDTO(
             recurrenceId: 1,
-            recurrenceTitle: "반복 일정",
-            recurrenceDescription: "",
-            recurrenceStartDate: "1970-01-01",
-            recurrenceEndDate: "1970-01-01",
-            recurrenceStartTime: "00:00:00",
-            recurrenceEndTime: "01:00:00",
-            recurrenceFrequency: .daily
+            title: "반복 일정", description: "", allDay: false,
+            firstOccurrenceStartAt: Date(timeIntervalSince1970: 0), firstOccurrenceEndAt: Date(timeIntervalSince1970: 3600),
+            timeZone: "UTC", recurrence: ["RRULE:FREQ=DAILY;UNTIL=19700101T000000Z"],
+            tag: .init(id: 0, title: "기타", colorCode: "#64748B", tagType: .defaultTag),
+            createdAt: Date(timeIntervalSince1970: 0), updatedAt: Date(timeIntervalSince1970: 0), canUpdateSeries: true
         ),
         recurrenceCreateError: Error? = nil,
         fetchRecurrenceResponse: RecurrenceEventResponseDTO = RecurrenceEventResponseDTO(
             recurrenceId: 1,
-            recurrenceTitle: "반복 일정",
-            recurrenceDescription: "",
-            recurrenceStartDate: "1970-01-01",
-            recurrenceEndDate: "1970-01-01",
-            recurrenceStartTime: "00:00:00",
-            recurrenceEndTime: "01:00:00",
-            recurrenceFrequency: .daily
+            title: "반복 일정", description: "", allDay: false,
+            firstOccurrenceStartAt: Date(timeIntervalSince1970: 0), firstOccurrenceEndAt: Date(timeIntervalSince1970: 3600),
+            timeZone: "UTC", recurrence: ["RRULE:FREQ=DAILY;UNTIL=19700101T000000Z"],
+            tag: .init(id: 0, title: "기타", colorCode: "#64748B", tagType: .defaultTag),
+            createdAt: Date(timeIntervalSince1970: 0), updatedAt: Date(timeIntervalSince1970: 0), canUpdateSeries: true
         ),
         fetchRecurrenceError: Error? = nil,
         updateRecurrenceResponse: RecurrenceEventResponseDTO = RecurrenceEventResponseDTO(
             recurrenceId: 1,
-            recurrenceTitle: "수정된 반복 일정",
-            recurrenceDescription: "",
-            recurrenceStartDate: "1970-01-01",
-            recurrenceEndDate: "1970-01-01",
-            recurrenceStartTime: "00:00:00",
-            recurrenceEndTime: "01:00:00",
-            recurrenceFrequency: .daily
+            title: "수정된 반복 일정", description: "", allDay: false,
+            firstOccurrenceStartAt: Date(timeIntervalSince1970: 0), firstOccurrenceEndAt: Date(timeIntervalSince1970: 3600),
+            timeZone: "UTC", recurrence: ["RRULE:FREQ=DAILY;UNTIL=19700101T000000Z"],
+            tag: .init(id: 0, title: "기타", colorCode: "#64748B", tagType: .defaultTag),
+            createdAt: Date(timeIntervalSince1970: 0), updatedAt: Date(timeIntervalSince1970: 0), canUpdateSeries: true
         ),
         updateRecurrenceError: Error? = nil,
         updateRecurrenceOccurrenceResponse: EventResponseDTO = EventResponseDTO(

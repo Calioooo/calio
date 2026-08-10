@@ -35,6 +35,9 @@ struct CalendarEventDetailView: View {
     @State private var isShowingRecurrenceDeleteScope = false
     @State private var editInput: EventInput
     @State private var recurrenceInput: RecurrenceInput
+    @State private var seriesTimeZone: String?
+    @State private var seriesMutationMessage: String?
+    @State private var recurrenceDetails: RecurrenceEventDetails?
 
     init(
         event: Event,
@@ -92,6 +95,7 @@ struct CalendarEventDetailView: View {
                 frequency: .daily
             )
         )
+        _seriesTimeZone = State(initialValue: event.timeZone)
     }
 
     var body: some View {
@@ -110,8 +114,10 @@ struct CalendarEventDetailView: View {
                 Button("이 일정만 수정") {
                     startEditingRecurrenceOccurrence()
                 }
-                Button("전체 반복 일정 수정") {
-                    fetchRecurrenceEventForSeriesEdit()
+                if canUpdateSeries {
+                    Button("전체 반복 일정 수정") {
+                        startEditingRecurrenceSeries()
+                    }
                 }
                 Button("취소", role: .cancel) {}
             }
@@ -133,8 +139,10 @@ struct CalendarEventDetailView: View {
                 Button("이 일정만 삭제", role: .destructive) {
                     deleteRecurrenceOccurrence()
                 }
-                Button("전체 반복 일정 삭제", role: .destructive) {
-                    deleteRecurrenceSeries()
+                if canUpdateSeries {
+                    Button("전체 반복 일정 삭제", role: .destructive) {
+                        deleteRecurrenceSeries()
+                    }
                 }
                 Button("취소", role: .cancel) {}
             }
@@ -203,7 +211,7 @@ struct CalendarEventDetailView: View {
             ToolbarItemGroup(placement: .topBarTrailing) {
                 if canUpdateRecurringEvent {
                     Button("수정") {
-                        isShowingRecurrenceEditScope = true
+                        fetchRecurrenceEventForAction(.edit)
                     }
                     .disabled(isEventActionInProgress)
                 }
@@ -224,7 +232,7 @@ struct CalendarEventDetailView: View {
 
                 if canDeleteRecurringEvent {
                     Button("삭제", role: .destructive) {
-                        isShowingRecurrenceDeleteScope = true
+                        fetchRecurrenceEventForAction(.delete)
                     }
                     .disabled(isEventActionInProgress)
                 }
@@ -234,7 +242,7 @@ struct CalendarEventDetailView: View {
 
     @ViewBuilder
     private var mutationFailureSection: some View {
-        if let mutationFailureMessage {
+        if let mutationFailureMessage = mutationFailureMessage ?? seriesMutationMessage {
             Section {
                 HStack(alignment: .top, spacing: 10) {
                     Image(systemName: "exclamationmark.circle.fill")
@@ -415,7 +423,16 @@ struct CalendarEventDetailView: View {
         formMode = .editRecurrenceOccurrence
     }
 
-    private func fetchRecurrenceEventForSeriesEdit() {
+    private var canUpdateSeries: Bool {
+        recurrenceDetails?.canUpdateSeries == true && recurrenceDetails?.isRuleEditable == true
+    }
+
+    private enum RecurrenceAction {
+        case edit
+        case delete
+    }
+
+    private func fetchRecurrenceEventForAction(_ action: RecurrenceAction) {
         guard let recurrenceId = event.recurrenceId else {
             return
         }
@@ -430,21 +447,39 @@ struct CalendarEventDetailView: View {
                 return
             }
 
-            editInput.title = details.title
-            editInput.description = details.description
-            editInput.startAt = details.recurrenceStartDate
-            editInput.endAt = details.recurrenceEndDate
-            editInput.isAllDay = details.isAllDay
-            recurrenceInput = RecurrenceInput(
-                isEnabled: true,
-                startDate: details.recurrenceStartDate,
-                endDate: details.recurrenceEndDate,
-                startTime: details.recurrenceStartTime,
-                endTime: details.recurrenceEndTime,
-                frequency: details.recurrenceFrequency
-            )
-            formMode = .editRecurrenceSeries
+            recurrenceDetails = details
+            switch action {
+            case .edit:
+                isShowingRecurrenceEditScope = true
+            case .delete:
+                isShowingRecurrenceDeleteScope = true
+            }
         }
+    }
+
+    private func startEditingRecurrenceSeries() {
+        guard let details = recurrenceDetails,
+              details.canUpdateSeries,
+              details.isRuleEditable else {
+            seriesMutationMessage = "이 반복 일정은 전체 수정할 수 없습니다."
+            return
+        }
+
+        editInput.title = details.title
+        editInput.description = details.description
+        editInput.startAt = details.recurrenceStartDate
+        editInput.endAt = details.recurrenceEndDate
+        editInput.isAllDay = details.isAllDay
+        seriesTimeZone = details.timeZone
+        recurrenceInput = RecurrenceInput(
+            isEnabled: true,
+            startDate: details.recurrenceStartDate,
+            endDate: details.recurrenceEndDate,
+            startTime: details.recurrenceStartTime,
+            endTime: details.recurrenceEndTime,
+            frequency: details.recurrenceFrequency
+        )
+        formMode = .editRecurrenceSeries
     }
 
     private func resetEditInputFromEvent() {
@@ -500,7 +535,7 @@ struct CalendarEventDetailView: View {
         Task {
             let didUpdate = await onUpdateRecurrenceOccurrence(event, input)
 
-            if didUpdate {
+            if didUpdate || shouldDismissStaleOccurrence {
                 dismiss()
             }
         }
@@ -523,6 +558,7 @@ struct CalendarEventDetailView: View {
                     recurrenceEndTime: recurrenceInput.endTime,
                     recurrenceFrequency: recurrenceInput.frequency,
                     isAllDay: editInput.isAllDay,
+                    timeZone: seriesTimeZone,
                     tagId: editInput.tag?.id
                 )
             )
@@ -547,10 +583,15 @@ struct CalendarEventDetailView: View {
         Task {
             let didDelete = await onDeleteRecurrenceOccurrence(event)
 
-            if didDelete {
+            if didDelete || shouldDismissStaleOccurrence {
                 dismiss()
             }
         }
+    }
+
+    private var shouldDismissStaleOccurrence: Bool {
+        mutationFailureMessage == "반복 일정을 찾을 수 없습니다."
+            || mutationFailureMessage == "반복 일정 항목을 찾을 수 없습니다."
     }
 
     private func deleteRecurrenceSeries() {

@@ -8,28 +8,23 @@ struct RecurrenceTests {
 
     @Test func createRecurrenceEventRequestDTOEncodesOnlyBackendContractFields() async throws {
         let request = CreateRecurrenceEventRequestDTO(
-            recurrenceTitle: "매일 스탠드업",
-            recurrenceDescription: "팀 동기화",
-            recurrenceStartDate: "2026-08-01",
-            recurrenceEndDate: "2026-08-31",
-            recurrenceStartTime: "00:00:00",
-            recurrenceEndTime: "00:30:00",
-            recurrenceFrequency: .daily
+            title: "매일 스탠드업",
+            description: "팀 동기화",
+            allDay: false,
+            firstOccurrenceStartAt: Date(timeIntervalSince1970: 1_785_638_400),
+            firstOccurrenceEndAt: Date(timeIntervalSince1970: 1_785_640_200),
+            timeZone: "Asia/Seoul",
+            recurrence: ["RRULE:FREQ=DAILY;UNTIL=20260831T000000Z"],
+            tagId: 4
         )
 
         let data = try APIJSONCoding.makeEncoder().encode(request)
         let object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
 
         #expect(Set(object.keys) == [
-            "recurrenceTitle",
-            "recurrenceDescription",
-            "recurrenceStartDate",
-            "recurrenceEndDate",
-            "recurrenceStartTime",
-            "recurrenceEndTime",
-            "recurrenceFrequency"
+            "title", "description", "allDay", "firstOccurrenceStartAt", "firstOccurrenceEndAt", "timeZone", "recurrence", "tagId"
         ])
-        #expect(object["recurrenceFrequency"] as? String == "DAILY")
+        #expect(object["recurrence"] as? [String] == ["RRULE:FREQ=DAILY;UNTIL=20260831T000000Z"])
         #expect(object["colorCode"] == nil)
         #expect(object["selectedColorCode"] == nil)
     }
@@ -38,21 +33,21 @@ struct RecurrenceTests {
         let request = UpdateRecurrenceEventRequestDTO(
             title: "수정 반복 일정",
             description: "수정 설명",
-            startDate: "2026-08-01",
-            endDate: "2026-08-31",
-            startTime: "09:00:00",
-            endTime: "10:00:00",
-            recurrenceFrequency: .weekly
+            allDay: false,
+            firstOccurrenceStartAt: Date(timeIntervalSince1970: 1_785_638_400),
+            firstOccurrenceEndAt: Date(timeIntervalSince1970: 1_785_642_000),
+            timeZone: "Asia/Seoul",
+            recurrence: ["RRULE:FREQ=WEEKLY;UNTIL=20260831T000000Z"],
+            tagId: nil
         )
 
         let data = try APIJSONCoding.makeEncoder().encode(request)
         let object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
 
-        #expect(Set(object.keys) == ["title", "description", "startDate", "endDate", "startTime", "endTime", "recurrenceFrequency"])
+        #expect(Set(object.keys) == ["title", "description", "allDay", "firstOccurrenceStartAt", "firstOccurrenceEndAt", "timeZone", "recurrence"])
         #expect(object["title"] as? String == "수정 반복 일정")
-        #expect(object["startDate"] as? String == "2026-08-01")
-        #expect(object["startTime"] as? String == "09:00:00")
-        #expect(object["recurrenceFrequency"] as? String == "WEEKLY")
+        #expect(object["timeZone"] as? String == "Asia/Seoul")
+        #expect(object["recurrence"] as? [String] == ["RRULE:FREQ=WEEKLY;UNTIL=20260831T000000Z"])
         #expect(object["isImportant"] == nil)
         #expect(object["colorCode"] == nil)
     }
@@ -63,19 +58,57 @@ struct RecurrenceTests {
         let endAt = startAt.addingTimeInterval(3600)
         let request = UpdateRecurrenceOccurrenceRequestDTO(
             originStartAt: originStartAt,
+            title: "수정 제목",
+            description: "수정 설명",
             startAt: startAt,
-            endAt: endAt
+            endAt: endAt,
+            allDay: false,
+            timeZone: "Asia/Seoul"
         )
 
         let data = try APIJSONCoding.makeEncoder().encode(request)
         let object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
 
-        #expect(Set(object.keys) == ["originStartAt", "startAt", "endAt"])
+        #expect(Set(object.keys) == ["originStartAt", "title", "description", "startAt", "endAt", "allDay", "timeZone"])
         #expect(object["originStartAt"] as? String == APIJSONCoding.string(from: originStartAt))
-        #expect(object["title"] == nil)
+        #expect(object["title"] as? String == "수정 제목")
         #expect(object["isImportant"] == nil)
         #expect(object["importantEvent"] == nil)
         #expect(object["recurrenceFrequency"] == nil)
+    }
+
+    @Test func recurrenceRuleKeepsOnlyBoundedSimpleRulesEditable() async throws {
+        let until = Date(timeIntervalSince1970: 1_788_480_000)
+        let line = RecurrenceRule.make(frequency: .weekly, until: until, allDay: false)
+
+        #expect(RecurrenceRule.editableRule(from: [line], allDay: false)?.frequency == .weekly)
+        #expect(RecurrenceRule.editableRule(from: ["RRULE:FREQ=WEEKLY;COUNT=4"], allDay: false) == nil)
+        #expect(RecurrenceRule.editableRule(from: ["RRULE:FREQ=WEEKLY;UNTIL=20260831T000000Z", "EXDATE:20260817T000000Z"], allDay: false) == nil)
+    }
+
+    @Test func recurrenceScheduleUsesSeriesZoneForDstAndInclusiveUntil() throws {
+        let utc = TimeZone(secondsFromGMT: 0)!
+        let newYork = try #require(TimeZone(identifier: "America/New_York"))
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = utc
+        let startDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 3, day: 1)))
+        let endDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 3, day: 15)))
+        let startTime = try #require(calendar.date(from: DateComponents(year: 2001, month: 1, day: 1, hour: 9)))
+        let endTime = try #require(calendar.date(from: DateComponents(year: 2001, month: 1, day: 1, hour: 10)))
+
+        let schedule = try RecurrenceScheduleBuilder.make(
+            startDate: startDate,
+            endDate: endDate,
+            startTime: startTime,
+            endTime: endTime,
+            frequency: .weekly,
+            allDay: false,
+            timeZone: newYork,
+            formTimeZone: utc
+        )
+
+        #expect(APIJSONCoding.string(from: schedule.firstOccurrenceStartAt) == "2026-03-01T14:00:00Z")
+        #expect(schedule.recurrence == ["RRULE:FREQ=WEEKLY;UNTIL=20260315T130000Z"])
     }
     @Test func eventServiceCreatesAllDayRecurrenceWithClientOwnedTimeConvention() async throws {
         let calendar = Calendar.current

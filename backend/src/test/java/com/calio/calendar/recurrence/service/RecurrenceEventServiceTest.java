@@ -16,6 +16,7 @@ import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.event.controller.dto.EventResponse;
 import com.calio.calendar.event.service.EventCommandService;
+import com.calio.calendar.integration.mapping.service.GoogleCalendarRecurrenceMappingQueryService;
 import com.calio.calendar.recurrence.controller.dto.CreateRecurrenceEventRequest;
 import com.calio.calendar.recurrence.controller.dto.RecurrenceEventResponse;
 import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceEventRequest;
@@ -66,6 +67,9 @@ class RecurrenceEventServiceTest {
     @Mock
     private Clock clock;
 
+    @Mock
+    private GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService;
+
     private RecurrenceEventService recurrenceEventService;
 
     @BeforeEach
@@ -85,7 +89,8 @@ class RecurrenceEventServiceTest {
                 tagQueryService,
                 eventCommandService,
                 recurrenceEngine,
-                clock
+                clock,
+                recurrenceMappingQueryService
         );
     }
 
@@ -105,7 +110,7 @@ class RecurrenceEventServiceTest {
         CreateRecurrenceEventRequest request = timedCreateRequest();
 
         // when
-        recurrenceEventService.createRecurrenceEvent(1L, request);
+        var response = recurrenceEventService.createRecurrenceEvent(1L, request);
 
         // then
         ArgumentCaptor<RecurrenceEvent> captor = ArgumentCaptor.forClass(RecurrenceEvent.class);
@@ -117,6 +122,7 @@ class RecurrenceEventServiceTest {
         assertThat(captor.getValue().getTimeZone()).isEqualTo("Asia/Seoul");
         assertThat(captor.getValue().getRecurrenceRules()).containsExactlyElementsOf(normalized);
         verifyNoInteractions(eventCommandService);
+        assertThat(response.canUpdateSeries()).isTrue();
     }
 
     @Test
@@ -171,6 +177,32 @@ class RecurrenceEventServiceTest {
     }
 
     @Test
+    @DisplayName("외부 반복 일정의 전체 수정은 정책 오류로 거절하고 master를 보존한다")
+    void givenExternalRecurrence_whenUpdateSeries_thenRejectsMutation() {
+        RecurrenceEvent recurrenceEvent = recurrenceEvent();
+        when(recurrenceEventRepository.findByIdAndAccountIdForUpdate(10L, 1L))
+                .thenReturn(Optional.of(recurrenceEvent));
+        when(recurrenceMappingQueryService.hasExternalRecurrenceEventMapping(10L, 1L))
+                .thenReturn(true);
+
+        assertThatThrownBy(() -> recurrenceEventService.updateRecurrenceEvent(
+                1L,
+                10L,
+                new UpdateRecurrenceEventRequest(
+                        "Updated", null, false,
+                        Instant.parse("2027-01-02T00:00:00Z"),
+                        Instant.parse("2027-01-02T01:00:00Z"),
+                        "Asia/Seoul", List.of("RRULE:FREQ=DAILY;COUNT=2"), null
+                )
+        )).isInstanceOf(CalioException.class)
+                .extracting(exception -> ((CalioException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.EXTERNAL_EVENT_MUTATION_NOT_SUPPORTED);
+
+        assertThat(recurrenceEvent.getTitle()).isEqualTo("Rule");
+        verify(recurrenceEngine, never()).validate(any(), any());
+    }
+
+    @Test
     @DisplayName("전체 recurrence 삭제는 override와 account legacy Event를 master보다 먼저 제거한다")
     void givenRecurrenceChildren_whenDeleteMaster_thenDeletesChildrenBeforeMaster() {
         // given
@@ -191,6 +223,25 @@ class RecurrenceEventServiceTest {
         deletionOrder.verify(recurrenceEventOverrideRepository).deleteAllByRecurrenceEventIds(List.of(10L));
         deletionOrder.verify(eventCommandService).deleteEventsByRecurrenceEventIds(List.of(10L));
         deletionOrder.verify(recurrenceEventRepository).deleteAllByIds(List.of(10L));
+    }
+
+    @Test
+    @DisplayName("외부 반복 일정의 전체 삭제는 정책 오류로 거절하고 child를 보존한다")
+    void givenExternalRecurrence_whenDeleteSeries_thenRejectsMutation() {
+        RecurrenceEvent recurrenceEvent = recurrenceEvent();
+        when(recurrenceEventRepository.findByIdAndAccountIdForUpdate(10L, 1L))
+                .thenReturn(Optional.of(recurrenceEvent));
+        when(recurrenceMappingQueryService.hasExternalRecurrenceEventMapping(10L, 1L))
+                .thenReturn(true);
+
+        assertThatThrownBy(() -> recurrenceEventService.deleteRecurrenceEvent(1L, 10L))
+                .isInstanceOf(CalioException.class)
+                .extracting(exception -> ((CalioException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.EXTERNAL_EVENT_MUTATION_NOT_SUPPORTED);
+
+        verify(recurrenceEventOverrideRepository, never()).deleteAllByRecurrenceEventIds(any());
+        verify(eventCommandService, never()).deleteEventsByRecurrenceEventIds(any());
+        verify(recurrenceEventRepository, never()).deleteAllByIds(any());
     }
 
     @Test
