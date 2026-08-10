@@ -7,7 +7,6 @@ import static org.mockito.Mockito.when;
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
-import com.calio.calendar.recurrence.controller.dto.RecurrenceEventResponse;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
 import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
@@ -23,7 +22,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.annotation.Transactional;
 
 @ExtendWith(MockitoExtension.class)
 class RecurrenceEventQueryServiceTest {
@@ -38,21 +39,32 @@ class RecurrenceEventQueryServiceTest {
     private RecurrenceEventQueryService recurrenceEventQueryService;
 
     @Test
-    @DisplayName("계정 소유 반복 일정은 응답으로 변환해 조회한다")
-    void givenOwnedRecurrenceEvent_whenGet_thenReturnsResponse() {
+    @DisplayName("QueryService의 모든 조회는 readOnly 트랜잭션 경계 안에서 실행한다")
+    void queryServiceUsesReadOnlyTransactionBoundary() {
+        // when
+        Transactional transactional = AnnotatedElementUtils.findMergedAnnotation(
+                RecurrenceEventQueryService.class,
+                Transactional.class
+        );
+
+        // then
+        assertThat(transactional).isNotNull();
+        assertThat(transactional.readOnly()).isTrue();
+    }
+
+    @Test
+    @DisplayName("계정 소유 반복 일정은 DTO 변환 없이 domain entity로 조회한다")
+    void givenOwnedRecurrenceEvent_whenGet_thenReturnsEntity() {
         // given
         RecurrenceEvent recurrenceEvent = recurrenceEvent();
         when(recurrenceEventRepository.findByIdAndAccount_Id(10L, 1L))
                 .thenReturn(Optional.of(recurrenceEvent));
 
         // when
-        RecurrenceEventResponse response = recurrenceEventQueryService.getRecurrenceEvent(1L, 10L);
+        RecurrenceEvent result = recurrenceEventQueryService.getRecurrenceEvent(1L, 10L);
 
         // then
-        assertThat(response.recurrenceId()).isEqualTo(10L);
-        assertThat(response.title()).isEqualTo("Rule");
-        assertThat(response.description()).isEqualTo("memo");
-        assertThat(response.recurrence()).containsExactly("RRULE:FREQ=DAILY;COUNT=3");
+        assertThat(result).isSameAs(recurrenceEvent);
     }
 
     @Test

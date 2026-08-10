@@ -24,7 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Transactional(readOnly = true)
-public class RecurrenceService {
+public class RecurrenceEventService {
 
     private final RecurrenceEventQueryService recurrenceEventQueryService;
     private final RecurrenceEventCommandService recurrenceEventCommandService;
@@ -33,7 +33,7 @@ public class RecurrenceService {
     private final Rfc5545RecurrenceEngine recurrenceEngine;
     private final Clock clock;
 
-    public RecurrenceService(
+    public RecurrenceEventService(
             RecurrenceEventQueryService recurrenceEventQueryService,
             RecurrenceEventCommandService recurrenceEventCommandService,
             AccountRepository accountRepository,
@@ -67,7 +67,9 @@ public class RecurrenceService {
     }
 
     public RecurrenceEventResponse getRecurrenceEvent(Long accountId, Long recurrenceId) {
-        return recurrenceEventQueryService.getRecurrenceEvent(accountId, recurrenceId);
+        return RecurrenceEventResponse.from(
+                recurrenceEventQueryService.getRecurrenceEvent(accountId, recurrenceId)
+        );
     }
 
     @Transactional
@@ -105,11 +107,8 @@ public class RecurrenceService {
                 request.allDay(),
                 request.timeZone()
         );
-        Optional<RecurrenceEventOverride> existingOverride =
-                findOverrideOrRejectIneligible(recurrenceEvent, request.originStartAt());
         RecurrenceEventOverride override = recurrenceEventCommandService.updateRecurrenceOccurrence(
                 recurrenceEvent,
-                existingOverride,
                 request,
                 schedule
         );
@@ -129,12 +128,14 @@ public class RecurrenceService {
                 .findRecurrenceEventForUpdate(accountId, recurrenceId);
         Optional<RecurrenceEventOverride> existingOverride =
                 findOverrideOrRejectIneligible(recurrenceEvent, originStartAt);
-        recurrenceEventCommandService.deleteRecurrenceOccurrence(
-                recurrenceEvent,
-                existingOverride,
-                originStartAt,
-                Instant.now(clock)
+        Instant deletedAt = Instant.now(clock);
+        RecurrenceEventOverride override = existingOverride.orElseGet(() ->
+                RecurrenceEventOverride.deleted(recurrenceEvent, originStartAt, deletedAt)
         );
+        if (existingOverride.isPresent()) {
+            override.markDeleted(deletedAt);
+        }
+        recurrenceEventCommandService.deleteRecurrenceOccurrence(override);
     }
 
     private RecurrenceSchedule createSchedule(CreateRecurrenceEventRequest request) {

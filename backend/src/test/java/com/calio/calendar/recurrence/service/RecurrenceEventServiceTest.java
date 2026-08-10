@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.inOrder;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -17,6 +16,7 @@ import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.event.controller.dto.EventResponse;
 import com.calio.calendar.event.repository.EventRepository;
 import com.calio.calendar.recurrence.controller.dto.CreateRecurrenceEventRequest;
+import com.calio.calendar.recurrence.controller.dto.RecurrenceEventResponse;
 import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceEventRequest;
 import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceOccurrenceRequest;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
@@ -42,7 +42,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
-class RecurrenceServiceTest {
+class RecurrenceEventServiceTest {
 
     @Mock
     private RecurrenceEventRepository recurrenceEventRepository;
@@ -65,7 +65,7 @@ class RecurrenceServiceTest {
     @Mock
     private Clock clock;
 
-    private RecurrenceService recurrenceService;
+    private RecurrenceEventService recurrenceEventService;
 
     @BeforeEach
     void setUp() {
@@ -76,9 +76,10 @@ class RecurrenceServiceTest {
         RecurrenceEventCommandService commandService = new RecurrenceEventCommandService(
                 recurrenceEventRepository,
                 eventRepository,
-                recurrenceEventOverrideRepository
+                recurrenceEventOverrideRepository,
+                recurrenceEngine
         );
-        recurrenceService = new RecurrenceService(
+        recurrenceEventService = new RecurrenceEventService(
                 queryService,
                 commandService,
                 accountRepository,
@@ -104,7 +105,7 @@ class RecurrenceServiceTest {
         CreateRecurrenceEventRequest request = timedCreateRequest();
 
         // when
-        recurrenceService.createRecurrenceEvent(1L, request);
+        recurrenceEventService.createRecurrenceEvent(1L, request);
 
         // then
         ArgumentCaptor<RecurrenceEvent> captor = ArgumentCaptor.forClass(RecurrenceEvent.class);
@@ -116,6 +117,24 @@ class RecurrenceServiceTest {
         assertThat(captor.getValue().getTimeZone()).isEqualTo("Asia/Seoul");
         assertThat(captor.getValue().getRecurrenceRules()).containsExactlyElementsOf(normalized);
         verify(eventRepository, never()).saveAll(any());
+    }
+
+    @Test
+    @DisplayName("반복 일정 조회는 QueryService의 domain entity를 응답 DTO로 변환한다")
+    void givenOwnedRecurrenceEvent_whenGet_thenCreatesResponse() {
+        // given
+        RecurrenceEvent recurrenceEvent = recurrenceEvent();
+        when(recurrenceEventRepository.findByIdAndAccount_Id(10L, 1L))
+                .thenReturn(Optional.of(recurrenceEvent));
+
+        // when
+        RecurrenceEventResponse response = recurrenceEventService.getRecurrenceEvent(1L, 10L);
+
+        // then
+        assertThat(response.recurrenceId()).isEqualTo(10L);
+        assertThat(response.title()).isEqualTo("Rule");
+        assertThat(response.description()).isEqualTo("memo");
+        assertThat(response.recurrence()).containsExactly("RRULE:FREQ=DAILY;COUNT=3");
     }
 
     @Test
@@ -141,7 +160,7 @@ class RecurrenceServiceTest {
         );
 
         // when
-        recurrenceService.updateRecurrenceEvent(1L, 10L, request);
+        recurrenceEventService.updateRecurrenceEvent(1L, 10L, request);
 
         // then
         assertThat(recurrenceEvent.getTitle()).isEqualTo("Updated");
@@ -160,7 +179,7 @@ class RecurrenceServiceTest {
                 .thenReturn(Optional.of(recurrenceEvent));
 
         // when
-        recurrenceService.deleteRecurrenceEvent(1L, 10L);
+        recurrenceEventService.deleteRecurrenceEvent(1L, 10L);
 
         // then
         InOrder deletionOrder = inOrder(
@@ -197,7 +216,7 @@ class RecurrenceServiceTest {
         );
 
         // when
-        EventResponse response = recurrenceService.updateRecurrenceOccurrence(1L, 10L, request);
+        EventResponse response = recurrenceEventService.updateRecurrenceOccurrence(1L, 10L, request);
 
         // then
         ArgumentCaptor<RecurrenceEventOverride> captor = ArgumentCaptor.forClass(RecurrenceEventOverride.class);
@@ -257,7 +276,7 @@ class RecurrenceServiceTest {
         );
 
         // when
-        recurrenceService.updateRecurrenceOccurrence(1L, 10L, request);
+        recurrenceEventService.updateRecurrenceOccurrence(1L, 10L, request);
 
         // then
         verify(recurrenceEngine, never()).containsOrigin(any(), any(), any());
@@ -297,7 +316,7 @@ class RecurrenceServiceTest {
         when(clock.instant()).thenReturn(deletedAt);
 
         // when
-        recurrenceService.deleteRecurrenceOccurrence(1L, 10L, originStartAt);
+        recurrenceEventService.deleteRecurrenceOccurrence(1L, 10L, originStartAt);
 
         // then
         verify(recurrenceEngine, never()).containsOrigin(any(), any(), any());
@@ -321,7 +340,7 @@ class RecurrenceServiceTest {
 
         // when, then
         assertThatThrownBy(() ->
-                recurrenceService.deleteRecurrenceOccurrence(1L, 10L, originStartAt)
+                recurrenceEventService.deleteRecurrenceOccurrence(1L, 10L, originStartAt)
         )
                 .isInstanceOf(CalioException.class)
                 .extracting(exception -> ((CalioException) exception).getErrorCode())

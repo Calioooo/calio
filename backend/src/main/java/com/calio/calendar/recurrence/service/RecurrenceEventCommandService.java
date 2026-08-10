@@ -1,6 +1,8 @@
 package com.calio.calendar.recurrence.service;
 
 import com.calio.calendar.common.domain.CanonicalSchedule;
+import com.calio.calendar.common.error.CalioException;
+import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.event.repository.EventRepository;
 import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceEventRequest;
 import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceOccurrenceRequest;
@@ -14,22 +16,27 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@Transactional
 public class RecurrenceEventCommandService {
 
     private final RecurrenceEventRepository recurrenceEventRepository;
     private final EventRepository eventRepository;
     private final RecurrenceEventOverrideRepository recurrenceEventOverrideRepository;
+    private final Rfc5545RecurrenceEngine recurrenceEngine;
 
     public RecurrenceEventCommandService(
             RecurrenceEventRepository recurrenceEventRepository,
             EventRepository eventRepository,
-            RecurrenceEventOverrideRepository recurrenceEventOverrideRepository
+            RecurrenceEventOverrideRepository recurrenceEventOverrideRepository,
+            Rfc5545RecurrenceEngine recurrenceEngine
     ) {
         this.recurrenceEventRepository = recurrenceEventRepository;
         this.eventRepository = eventRepository;
         this.recurrenceEventOverrideRepository = recurrenceEventOverrideRepository;
+        this.recurrenceEngine = recurrenceEngine;
     }
 
     public RecurrenceEvent createRecurrenceEvent(RecurrenceEvent recurrenceEvent) {
@@ -49,10 +56,14 @@ public class RecurrenceEventCommandService {
 
     public RecurrenceEventOverride updateRecurrenceOccurrence(
             RecurrenceEvent recurrenceEvent,
-            Optional<RecurrenceEventOverride> existingOverride,
             UpdateRecurrenceOccurrenceRequest request,
             CanonicalSchedule schedule
     ) {
+        Optional<RecurrenceEventOverride> existingOverride = recurrenceEventOverrideRepository
+                .findByRecurrenceEvent_IdAndOriginStartAt(recurrenceEvent.getId(), request.originStartAt());
+        if (existingOverride.isEmpty() && !recurrenceContainsOrigin(recurrenceEvent, request.originStartAt())) {
+            throw new CalioException(ErrorCode.RECURRENCE_OCCURRENCE_NOT_FOUND);
+        }
         RecurrenceEventOverride override = existingOverride.orElseGet(() -> RecurrenceEventOverride.active(
                 recurrenceEvent,
                 request.originStartAt(),
@@ -73,18 +84,15 @@ public class RecurrenceEventCommandService {
         recurrenceEventRepository.delete(recurrenceEvent);
     }
 
-    public void deleteRecurrenceOccurrence(
-            RecurrenceEvent recurrenceEvent,
-            Optional<RecurrenceEventOverride> existingOverride,
-            Instant originStartAt,
-            Instant deletedAt
-    ) {
-        RecurrenceEventOverride override = existingOverride.orElseGet(() ->
-                RecurrenceEventOverride.deleted(recurrenceEvent, originStartAt, deletedAt)
-        );
-        if (existingOverride.isPresent()) {
-            override.markDeleted(deletedAt);
-        }
+    public void deleteRecurrenceOccurrence(RecurrenceEventOverride override) {
         recurrenceEventOverrideRepository.saveAndFlush(override);
+    }
+
+    private boolean recurrenceContainsOrigin(RecurrenceEvent recurrenceEvent, Instant originStartAt) {
+        return recurrenceEngine.containsOrigin(
+                RecurrenceSchedule.from(recurrenceEvent),
+                recurrenceEvent.getRecurrenceRules(),
+                originStartAt
+        );
     }
 }
