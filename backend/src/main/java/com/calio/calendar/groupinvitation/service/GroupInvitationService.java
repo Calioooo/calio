@@ -24,6 +24,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
@@ -90,6 +92,7 @@ public class GroupInvitationService {
         );
     }
 
+    @Transactional
     public void revoke(Long accountId, Long groupSpaceId, Long invitationId) {
         queryService.getGroupSpaceForUpdate(groupSpaceId);
         GroupMember member = queryService.getActiveMemberForUpdate(groupSpaceId, accountId);
@@ -103,6 +106,7 @@ public class GroupInvitationService {
         commandService.delete(invitation);
     }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public int deleteExpiredBatch(Instant cutoff) {
         List<GroupInvitation> invitations = queryService.listExpiredBefore(
                 cutoff,

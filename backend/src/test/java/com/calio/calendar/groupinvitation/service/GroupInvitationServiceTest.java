@@ -36,6 +36,9 @@ import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.AbstractPlatformTransactionManager;
 import org.springframework.transaction.support.DefaultTransactionStatus;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.core.annotation.AnnotatedElementUtils;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 @ExtendWith(MockitoExtension.class)
 class GroupInvitationServiceTest {
@@ -159,6 +162,26 @@ class GroupInvitationServiceTest {
         assertThat(pageable.getValue().getPageSize()).isEqualTo(1000);
         verify(commandService).delete(invitations);
         assertThat(deletedCount).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("revoke lock과 cleanup batch는 유스케이스에 맞는 쓰기 트랜잭션을 유지한다")
+    void mutationUseCasesDefineRequiredTransactionScopes() throws NoSuchMethodException {
+        // when
+        Transactional revokeTransaction = AnnotatedElementUtils.findMergedAnnotation(
+                GroupInvitationService.class.getMethod("revoke", Long.class, Long.class, Long.class),
+                Transactional.class
+        );
+        Transactional cleanupTransaction = AnnotatedElementUtils.findMergedAnnotation(
+                GroupInvitationService.class.getMethod("deleteExpiredBatch", Instant.class),
+                Transactional.class
+        );
+
+        // then
+        assertThat(revokeTransaction).isNotNull();
+        assertThat(revokeTransaction.readOnly()).isFalse();
+        assertThat(cleanupTransaction).isNotNull();
+        assertThat(cleanupTransaction.propagation()).isEqualTo(Propagation.REQUIRES_NEW);
     }
 
     @Test
