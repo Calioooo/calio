@@ -20,4 +20,11 @@ public class NationalHolidayQueryService {
     public List<NationalHoliday> getNationalHolidays(LocalDate from, LocalDate to) {
         return nationalHolidayRepository.findByHolidayDateBetweenOrderByHolidayDateAscHolidayTitleAsc(from, to);
     }
+
+    public List<NationalHoliday> findExistingHolidays(int year) {
+        return nationalHolidayRepository.findByHolidayDateBetween(
+                LocalDate.of(year, 1, 1),
+                LocalDate.of(year, 12, 31)
+        );
+    }
 }

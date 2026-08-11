@@ -4,8 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.groups.Tuple.tuple;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.ArgumentMatchers.anySet;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -22,11 +20,9 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.InOrder;
 import org.mockito.Mock;
@@ -97,28 +93,32 @@ class NationalHolidayServiceTest {
     }
 
     @Test
-    @DisplayName("성공한 연도 동기화는 공휴일만 중복 없이 정규화해 CommandService에 전달한다")
-    void givenSuccessfulProviderResponse_whenSyncYear_thenDelegatesCanonicalSnapshot() {
+    @DisplayName("성공한 연도 동기화는 provider와 DB snapshot을 비교해 신규 공휴일 추가와 stale 삭제를 분리한다")
+    void givenSuccessfulProviderResponse_whenSyncYear_thenReconcilesCanonicalSnapshot() {
         // given
+        NationalHoliday staleHoliday = new NationalHoliday(LocalDate.of(2026, 5, 5), "어린이날");
+        NationalHoliday retainedHoliday = new NationalHoliday(LocalDate.of(2026, 6, 6), "현충일");
         given(holidayApiClient.fetchHolidays(2026)).willReturn(new HolidayApiResponse(
                 "00",
                 List.of(
                         new HolidayApiItem("20260101", "신정", "Y"),
                         new HolidayApiItem("20260101", "신정", "Y"),
+                        new HolidayApiItem("20260606", "현충일", "Y"),
                         new HolidayApiItem("20260214", "기념일", "N")
                 )
         ));
+        given(nationalHolidayQueryService.findExistingHolidays(2026))
+                .willReturn(List.of(staleHoliday, retainedHoliday));
 
         // when
         nationalHolidayService.syncYearRange(2026, 2026);
 
         // then
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<Set<NationalHolidayProviderRow>> providerRows = ArgumentCaptor.forClass(Set.class);
-        verify(nationalHolidayCommandService).applySnapshot(eq(2026), providerRows.capture());
-        assertThat(providerRows.getValue()).containsExactly(
+        verify(nationalHolidayQueryService).findExistingHolidays(2026);
+        verify(nationalHolidayCommandService).insertIfMissing(List.of(
                 new NationalHolidayProviderRow(LocalDate.of(2026, 1, 1), "신정")
-        );
+        ));
+        verify(nationalHolidayCommandService).deleteStaleHolidays(List.of(staleHoliday));
     }
 
     @Test
@@ -161,6 +161,7 @@ class NationalHolidayServiceTest {
                 "00",
                 List.of(new HolidayApiItem("20270101", "신정", "Y"))
         ));
+        given(nationalHolidayQueryService.findExistingHolidays(2027)).willReturn(List.of());
 
         // when
         nationalHolidayService.syncYearRange(2026, 2027);
@@ -169,11 +170,12 @@ class NationalHolidayServiceTest {
         InOrder requests = inOrder(holidayApiClient);
         requests.verify(holidayApiClient).fetchHolidays(2026);
         requests.verify(holidayApiClient).fetchHolidays(2027);
-        verify(nationalHolidayCommandService, never()).applySnapshot(eq(2026), anySet());
-        verify(nationalHolidayCommandService).applySnapshot(
-                2027,
-                Set.of(new NationalHolidayProviderRow(LocalDate.of(2027, 1, 1), "신정"))
-        );
+        verify(nationalHolidayQueryService, never()).findExistingHolidays(2026);
+        verify(nationalHolidayQueryService).findExistingHolidays(2027);
+        verify(nationalHolidayCommandService).insertIfMissing(List.of(
+                new NationalHolidayProviderRow(LocalDate.of(2027, 1, 1), "신정")
+        ));
+        verify(nationalHolidayCommandService).deleteStaleHolidays(List.of());
     }
 
     @Test

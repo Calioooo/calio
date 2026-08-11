@@ -61,4 +61,22 @@ class NationalHolidayQueryServiceTest {
         verify(nationalHolidayRepository)
                 .findByHolidayDateBetweenOrderByHolidayDateAscHolidayTitleAsc(from, to);
     }
+
+    @Test
+    @DisplayName("snapshot 비교용 기존 공휴일은 요청 연도의 첫날부터 마지막 날까지 조회한다")
+    void givenYear_whenFindExistingHolidays_thenQueriesExactYearRange() {
+        // given
+        LocalDate firstDay = LocalDate.of(2026, 1, 1);
+        LocalDate lastDay = LocalDate.of(2026, 12, 31);
+        List<NationalHoliday> holidays = List.of(new NationalHoliday(firstDay, "신정"));
+        given(nationalHolidayRepository.findByHolidayDateBetween(firstDay, lastDay))
+                .willReturn(holidays);
+
+        // when
+        List<NationalHoliday> result = nationalHolidayQueryService.findExistingHolidays(2026);
+
+        // then
+        assertThat(result).isSameAs(holidays);
+        verify(nationalHolidayRepository).findByHolidayDateBetween(firstDay, lastDay);
+    }
 }

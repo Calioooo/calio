@@ -6,6 +6,7 @@ import com.calio.calendar.holiday.client.HolidayApiClient;
 import com.calio.calendar.holiday.client.dto.HolidayApiItem;
 import com.calio.calendar.holiday.client.dto.HolidayApiResponse;
 import com.calio.calendar.holiday.controller.dto.NationalHolidayResponse;
+import com.calio.calendar.holiday.domain.NationalHoliday;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -66,7 +67,7 @@ public class NationalHolidayService {
                 return;
             }
 
-            nationalHolidayCommandService.applySnapshot(year, providerRows);
+            applySnapshot(year, providerRows);
         } catch (Exception exception) {
             log.warn(
                     "National holiday sync failed. year={} resultCode={} errorCode={} message={}",
@@ -85,6 +86,23 @@ public class NationalHolidayService {
         }
 
         throw new CalioException(ErrorCode.INVALID_TIME_RANGE);
+    }
+
+    private void applySnapshot(int year, Set<NationalHolidayProviderRow> providerRows) {
+        List<NationalHoliday> existingHolidays = nationalHolidayQueryService.findExistingHolidays(year);
+        Set<NationalHolidayProviderRow> existingRows = existingHolidays.stream()
+                .map(NationalHolidayProviderRow::from)
+                .collect(Collectors.toSet());
+
+        List<NationalHolidayProviderRow> missingProviderRows = providerRows.stream()
+                .filter(providerRow -> !existingRows.contains(providerRow))
+                .toList();
+        nationalHolidayCommandService.insertIfMissing(missingProviderRows);
+
+        List<NationalHoliday> staleHolidays = existingHolidays.stream()
+                .filter(holiday -> !providerRows.contains(NationalHolidayProviderRow.from(holiday)))
+                .toList();
+        nationalHolidayCommandService.deleteStaleHolidays(staleHolidays);
     }
 
     private String errorCode(Exception exception) {
