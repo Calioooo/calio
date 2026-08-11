@@ -2,12 +2,15 @@ package com.calio.calendar.recurrence.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
+import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
 import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
@@ -79,6 +82,64 @@ class RecurrenceEventQueryServiceTest {
                 .isInstanceOfSatisfying(CalioException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.RECURRENCE_EVENT_NOT_FOUND)
                 );
+    }
+
+    @Test
+    @DisplayName("반복 일정 확장 후보 조회는 계정과 종료 시각을 repository에 그대로 위임한다")
+    void givenExpansionRange_whenFindCandidates_thenReturnsRepositoryResult() {
+        // given
+        Instant to = Instant.parse("2027-01-02T00:00:00Z");
+        List<RecurrenceEvent> recurrenceEvents = List.of(recurrenceEvent());
+        when(recurrenceEventRepository.findExpansionCandidatesStartedBefore(1L, to))
+                .thenReturn(recurrenceEvents);
+
+        // when
+        List<RecurrenceEvent> result = recurrenceEventQueryService
+                .findExpansionCandidatesStartedBefore(1L, to);
+
+        // then
+        assertThat(result).isSameAs(recurrenceEvents);
+        verify(recurrenceEventRepository).findExpansionCandidatesStartedBefore(1L, to);
+    }
+
+    @Test
+    @DisplayName("반복 회차 override 조회는 반복 일정과 origin 목록을 repository에 그대로 위임한다")
+    void givenOccurrenceOrigins_whenFindOverrides_thenReturnsRepositoryResult() {
+        // given
+        List<Instant> originStartAts = List.of(Instant.parse("2027-01-01T00:00:00Z"));
+        List<RecurrenceEventOverride> overrides = List.of(mock(RecurrenceEventOverride.class));
+        when(recurrenceEventOverrideRepository.findByRecurrenceEvent_IdAndOriginStartAtIn(
+                10L,
+                originStartAts
+        )).thenReturn(overrides);
+
+        // when
+        List<RecurrenceEventOverride> result = recurrenceEventQueryService
+                .findOverrides(10L, originStartAts);
+
+        // then
+        assertThat(result).isSameAs(overrides);
+        verify(recurrenceEventOverrideRepository)
+                .findByRecurrenceEvent_IdAndOriginStartAtIn(10L, originStartAts);
+    }
+
+    @Test
+    @DisplayName("범위에 이동해 들어온 활성 override 조회는 조회 범위를 repository에 그대로 위임한다")
+    void givenTimeRange_whenFindActiveOverrides_thenReturnsRepositoryResult() {
+        // given
+        Instant from = Instant.parse("2027-01-01T00:00:00Z");
+        Instant to = Instant.parse("2027-01-02T00:00:00Z");
+        List<RecurrenceEventOverride> overrides = List.of(mock(RecurrenceEventOverride.class));
+        when(recurrenceEventOverrideRepository.findActiveOverlappingOverrides(1L, from, to))
+                .thenReturn(overrides);
+
+        // when
+        List<RecurrenceEventOverride> result = recurrenceEventQueryService
+                .findActiveOverlappingOverrides(1L, from, to);
+
+        // then
+        assertThat(result).isSameAs(overrides);
+        verify(recurrenceEventOverrideRepository).findActiveOverlappingOverrides(1L, from, to);
     }
 
     private RecurrenceEvent recurrenceEvent() {

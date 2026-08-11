@@ -7,6 +7,8 @@ import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import java.time.Instant;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,5 +41,22 @@ public class RecurrenceEventQueryService {
     public Optional<RecurrenceEventOverride> findOverride(Long recurrenceId, Instant originStartAt) {
         return recurrenceEventOverrideRepository
                 .findByRecurrenceEvent_IdAndOriginStartAt(recurrenceId, originStartAt);
+    }
+
+    public List<RecurrenceEvent> findExpansionCandidatesStartedBefore(Long accountId, Instant to) {
+        return recurrenceEventRepository.findExpansionCandidatesStartedBefore(accountId, to);
+    }
+
+    public List<RecurrenceEventOverride> findOverrides(Long recurrenceId, Collection<Instant> originStartAts) {
+        return recurrenceEventOverrideRepository
+                .findByRecurrenceEvent_IdAndOriginStartAtIn(recurrenceId, originStartAts);
+    }
+
+    public List<RecurrenceEventOverride> findActiveOverlappingOverrides(
+            Long accountId,
+            Instant from,
+            Instant to
+    ) {
+        return recurrenceEventOverrideRepository.findActiveOverlappingOverrides(accountId, from, to);
     }
 }

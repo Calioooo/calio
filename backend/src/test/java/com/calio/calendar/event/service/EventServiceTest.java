@@ -30,6 +30,7 @@ import com.calio.calendar.recurrence.domain.RecurrenceOccurrence;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
 import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
+import com.calio.calendar.recurrence.service.RecurrenceEventQueryService;
 import com.calio.calendar.recurrence.service.Rfc5545RecurrenceEngine;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.domain.TagType;
@@ -387,13 +388,16 @@ class EventServiceTest {
                 eventRepository,
                 googleCalendarEventMappingRepository
         );
+        RecurrenceEventQueryService recurrenceQueryService = new RecurrenceEventQueryService(
+                recurrenceEventRepository,
+                recurrenceEventOverrideRepository
+        );
         return new EventService(
                 queryService,
                 eventCommandService,
                 accountRepository,
                 tagService,
-                recurrenceEventRepository,
-                recurrenceEventOverrideRepository,
+                recurrenceQueryService,
                 recurrenceEngine
         );
     }
