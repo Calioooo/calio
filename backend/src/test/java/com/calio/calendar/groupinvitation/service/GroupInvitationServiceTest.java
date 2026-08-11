@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.groupinvitation.controller.dto.IssueGroupInvitationResponse;
+import com.calio.calendar.groupinvitation.domain.GroupInvitation;
 import com.calio.calendar.groupinvitation.service.dto.InvitationCredentialPair;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
@@ -34,6 +35,9 @@ class GroupInvitationServiceTest {
     private InvitationCredentialService credentialService;
 
     @Mock
+    private GroupInvitationQueryService queryService;
+
+    @Mock
     private GroupInvitationCommandService commandService;
 
     private GroupInvitationService service;
@@ -42,9 +46,33 @@ class GroupInvitationServiceTest {
     void setUp() {
         service = new GroupInvitationService(
                 credentialService,
+                queryService,
                 commandService,
                 new NoOpTransactionManager()
         );
+    }
+
+    @Test
+    @DisplayName("초대장 목록은 Query의 domain 결과를 summary 응답으로 변환한다")
+    void listMapsQueryResultsToSummaryResponse() {
+        // given
+        GroupInvitation invitation = new GroupInvitation(
+                GROUP_SPACE_ID,
+                30L,
+                new byte[32],
+                new byte[32],
+                Instant.parse("2026-07-29T08:00:00Z")
+        );
+        when(queryService.list(ACCOUNT_ID, GROUP_SPACE_ID)).thenReturn(java.util.List.of(invitation));
+
+        // when
+        var response = service.list(ACCOUNT_ID, GROUP_SPACE_ID);
+
+        // then
+        assertThat(response.invitations()).hasSize(1);
+        assertThat(response.invitations().getFirst().expiresAt())
+                .isEqualTo(Instant.parse("2026-07-29T08:00:00Z"));
+        verify(queryService).list(ACCOUNT_ID, GROUP_SPACE_ID);
     }
 
     @Test

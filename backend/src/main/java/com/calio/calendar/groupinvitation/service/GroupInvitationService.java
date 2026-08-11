@@ -2,6 +2,8 @@ package com.calio.calendar.groupinvitation.service;
 
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
+import com.calio.calendar.groupinvitation.controller.dto.GroupInvitationListResponse;
+import com.calio.calendar.groupinvitation.controller.dto.GroupInvitationSummaryResponse;
 import com.calio.calendar.groupinvitation.controller.dto.IssueGroupInvitationResponse;
 import com.calio.calendar.groupinvitation.service.dto.InvitationCredentialPair;
 import java.util.Locale;
@@ -25,18 +27,29 @@ public class GroupInvitationService {
     );
 
     private final InvitationCredentialService credentialService;
+    private final GroupInvitationQueryService queryService;
     private final GroupInvitationCommandService commandService;
     private final TransactionTemplate issueTransaction;
 
     public GroupInvitationService(
             InvitationCredentialService credentialService,
+            GroupInvitationQueryService queryService,
             GroupInvitationCommandService commandService,
             PlatformTransactionManager transactionManager
     ) {
         this.credentialService = credentialService;
+        this.queryService = queryService;
         this.commandService = commandService;
         this.issueTransaction = new TransactionTemplate(transactionManager);
         this.issueTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+    }
+
+    public GroupInvitationListResponse list(Long accountId, Long groupSpaceId) {
+        var invitations = queryService.list(accountId, groupSpaceId)
+                .stream()
+                .map(GroupInvitationSummaryResponse::from)
+                .toList();
+        return new GroupInvitationListResponse(invitations);
     }
 
     public IssueGroupInvitationResponse issue(Long accountId, Long groupSpaceId) {

@@ -3,7 +3,6 @@ package com.calio.calendar.groupinvitation.controller;
 import com.calio.calendar.groupinvitation.controller.dto.GroupInvitationListResponse;
 import com.calio.calendar.groupinvitation.controller.dto.IssueGroupInvitationResponse;
 import com.calio.calendar.groupinvitation.service.GroupInvitationCommandService;
-import com.calio.calendar.groupinvitation.service.GroupInvitationQueryService;
 import com.calio.calendar.groupinvitation.service.GroupInvitationService;
 import com.calio.calendar.security.AuthenticatedAccount;
 import java.net.URI;
@@ -24,16 +23,13 @@ public class GroupInvitationController {
 
     private final GroupInvitationService groupInvitationService;
     private final GroupInvitationCommandService commandService;
-    private final GroupInvitationQueryService queryService;
 
     public GroupInvitationController(
             GroupInvitationService groupInvitationService,
-            GroupInvitationCommandService commandService,
-            GroupInvitationQueryService queryService
+            GroupInvitationCommandService commandService
     ) {
         this.groupInvitationService = groupInvitationService;
         this.commandService = commandService;
-        this.queryService = queryService;
     }
 
     @PostMapping
@@ -55,7 +51,7 @@ public class GroupInvitationController {
             @AuthenticationPrincipal AuthenticatedAccount account,
             @PathVariable("groupSpaceId") Long groupSpaceId
     ) {
-        return queryService.list(account.accountId(), groupSpaceId);
+        return groupInvitationService.list(account.accountId(), groupSpaceId);
     }
 
     @DeleteMapping("/{invitationId}")

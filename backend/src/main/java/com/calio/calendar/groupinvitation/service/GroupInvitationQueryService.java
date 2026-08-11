@@ -2,8 +2,6 @@ package com.calio.calendar.groupinvitation.service;
 
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
-import com.calio.calendar.groupinvitation.controller.dto.GroupInvitationListResponse;
-import com.calio.calendar.groupinvitation.controller.dto.GroupInvitationSummaryResponse;
 import com.calio.calendar.groupinvitation.controller.dto.PreviewGroupInvitationRequest;
 import com.calio.calendar.groupinvitation.controller.dto.PreviewGroupInvitationResponse;
 import com.calio.calendar.groupinvitation.domain.GroupInvitation;
@@ -15,6 +13,7 @@ import com.calio.calendar.groupspace.repository.GroupMemberRepository;
 import com.calio.calendar.groupspace.repository.GroupSpaceRepository;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,15 +41,10 @@ public class GroupInvitationQueryService {
         this.clock = clock;
     }
 
-    public GroupInvitationListResponse list(Long accountId, Long groupSpaceId) {
+    public List<GroupInvitation> list(Long accountId, Long groupSpaceId) {
         GroupMember member = findActiveMember(groupSpaceId, accountId);
         Instant now = clock.instant();
-        var invitations = invitationRepository
-                .findActiveInvitations(groupSpaceId, member.getId(), now)
-                .stream()
-                .map(GroupInvitationSummaryResponse::from)
-                .toList();
-        return new GroupInvitationListResponse(invitations);
+        return invitationRepository.findActiveInvitations(groupSpaceId, member.getId(), now);
     }
 
     public PreviewGroupInvitationResponse preview(PreviewGroupInvitationRequest request) {
