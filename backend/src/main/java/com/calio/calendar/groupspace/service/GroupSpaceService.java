@@ -67,7 +67,10 @@ public class GroupSpaceService {
     @Transactional(readOnly = true)
     public GroupSpaceListResponse list(Long accountId) {
         List<GroupSpaceSummaryResponse> groupSpaces = groupMemberRepository
-                .findByAccountIdAndStatusOrderByStatusChangedAtDesc(accountId, GroupMemberStatus.ACTIVE)
+                .findByAccountIdAndStatusOrderByStatusChangedAtDescGroupSpaceIdDesc(
+                        accountId,
+                        GroupMemberStatus.ACTIVE
+                )
                 .stream()
                 .map(this::toSummary)
                 .toList();
