@@ -14,6 +14,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.core.annotation.AnnotatedElementUtils;
+import org.springframework.transaction.annotation.Transactional;
 
 @ExtendWith(MockitoExtension.class)
 class TaskCommandServiceTest {
@@ -23,6 +25,20 @@ class TaskCommandServiceTest {
 
     @InjectMocks
     private TaskCommandService taskCommandService;
+
+    @Test
+    @DisplayName("CommandService의 모든 상태 변경은 트랜잭션 경계 안에서 실행한다")
+    void commandServiceUsesTransactionBoundary() {
+        // when
+        Transactional transactional = AnnotatedElementUtils.findMergedAnnotation(
+                TaskCommandService.class,
+                Transactional.class
+        );
+
+        // then
+        assertThat(transactional).isNotNull();
+        assertThat(transactional.readOnly()).isFalse();
+    }
 
     @Test
     @DisplayName("Task 생성은 전달받은 domain을 저장한다")

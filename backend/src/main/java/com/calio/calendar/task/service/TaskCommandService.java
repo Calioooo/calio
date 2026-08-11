@@ -4,8 +4,10 @@ import com.calio.calendar.task.domain.Task;
 import com.calio.calendar.task.repository.TaskRepository;
 import java.time.Instant;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@Transactional
 public class TaskCommandService {
 
     private final TaskRepository taskRepository;
