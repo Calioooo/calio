@@ -19,6 +19,17 @@ spring:
     init:
       mode: never
 
+logging:
+  structured:
+    format:
+      console: logstash
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+
 external:
   holiday:
     base-url: http://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/getRestDeInfo
