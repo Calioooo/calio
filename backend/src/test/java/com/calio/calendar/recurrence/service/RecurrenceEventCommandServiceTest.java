@@ -1,19 +1,13 @@
 package com.calio.calendar.recurrence.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.inOrder;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.common.domain.CanonicalSchedule;
-import com.calio.calendar.common.error.CalioException;
-import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.event.repository.EventRepository;
-import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceOccurrenceRequest;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
@@ -23,11 +17,9 @@ import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.domain.TagType;
 import java.time.Instant;
 import java.util.List;
-import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -47,9 +39,6 @@ class RecurrenceEventCommandServiceTest {
     @Mock
     private RecurrenceEventOverrideRepository recurrenceEventOverrideRepository;
 
-    @Mock
-    private Rfc5545RecurrenceEngine recurrenceEngine;
-
     @InjectMocks
     private RecurrenceEventCommandService recurrenceEventCommandService;
 
@@ -68,89 +57,32 @@ class RecurrenceEventCommandServiceTest {
     }
 
     @Test
-    @DisplayName("occurrence 수정은 기존 override를 직접 조회해 활성 상태로 전환하고 저장한다")
-    void givenExistingOverride_whenUpdateOccurrence_thenActivatesAndSavesExactOverride() {
+    @DisplayName("occurrence 수정 command는 전달받은 override를 변경하지 않고 저장한다")
+    void givenActiveOverride_whenUpdateOccurrence_thenOnlySavesExactOverride() {
         // given
         RecurrenceEvent recurrenceEvent = recurrenceEvent();
         Instant originStartAt = Instant.parse("2027-01-01T00:00:00Z");
-        RecurrenceEventOverride existingOverride = RecurrenceEventOverride.deleted(
+        RecurrenceEventOverride override = RecurrenceEventOverride.active(
                 recurrenceEvent,
                 originStartAt,
-                Instant.parse("2027-01-02T00:00:00Z")
+                "Updated occurrence",
+                null,
+                CanonicalSchedule.recurrenceOverride(
+                        Instant.parse("2027-01-03T02:00:00Z"),
+                        Instant.parse("2027-01-03T03:00:00Z"),
+                        false,
+                        "Asia/Seoul"
+                )
         );
-        UpdateRecurrenceOccurrenceRequest request = updateRequest(originStartAt);
-        CanonicalSchedule schedule = schedule(request);
-        when(recurrenceEventOverrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(10L, originStartAt))
-                .thenReturn(Optional.of(existingOverride));
-        when(recurrenceEventOverrideRepository.saveAndFlush(existingOverride)).thenReturn(existingOverride);
+        when(recurrenceEventOverrideRepository.saveAndFlush(override)).thenReturn(override);
 
         // when
-        RecurrenceEventOverride result = recurrenceEventCommandService.updateRecurrenceOccurrence(
-                recurrenceEvent,
-                request,
-                schedule
-        );
+        RecurrenceEventOverride result = recurrenceEventCommandService.updateRecurrenceOccurrence(override);
 
         // then
-        InOrder order = inOrder(recurrenceEventOverrideRepository);
-        order.verify(recurrenceEventOverrideRepository)
-                .findByRecurrenceEvent_IdAndOriginStartAt(10L, originStartAt);
-        order.verify(recurrenceEventOverrideRepository).saveAndFlush(existingOverride);
-        verify(recurrenceEngine, never()).containsOrigin(any(), any(), any());
-        assertThat(result).isSameAs(existingOverride);
-        assertThat(existingOverride.isDeleted()).isFalse();
-        assertThat(existingOverride.getOverrideTitle()).isEqualTo("Updated occurrence");
-    }
-
-    @Test
-    @DisplayName("기존 override가 없으면 현재 recurrence 회차인지 확인한 뒤 활성 override를 생성한다")
-    void givenMissingOverrideForCurrentOrigin_whenUpdateOccurrence_thenCreatesActiveOverride() {
-        // given
-        RecurrenceEvent recurrenceEvent = recurrenceEvent();
-        Instant originStartAt = Instant.parse("2027-01-01T00:00:00Z");
-        UpdateRecurrenceOccurrenceRequest request = updateRequest(originStartAt);
-        CanonicalSchedule schedule = schedule(request);
-        when(recurrenceEventOverrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(10L, originStartAt))
-                .thenReturn(Optional.empty());
-        when(recurrenceEngine.containsOrigin(any(), any(), any())).thenReturn(true);
-        when(recurrenceEventOverrideRepository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
-
-        // when
-        RecurrenceEventOverride result = recurrenceEventCommandService.updateRecurrenceOccurrence(
-                recurrenceEvent,
-                request,
-                schedule
-        );
-
-        // then
-        verify(recurrenceEventOverrideRepository).saveAndFlush(result);
-        assertThat(result.getRecurrenceEvent()).isSameAs(recurrenceEvent);
-        assertThat(result.getOriginStartAt()).isEqualTo(originStartAt);
-        assertThat(result.getOverrideTitle()).isEqualTo("Updated occurrence");
-        assertThat(result.isDeleted()).isFalse();
-    }
-
-    @Test
-    @DisplayName("기존 override와 현재 recurrence 회차가 모두 없으면 상태를 생성하지 않는다")
-    void givenMissingOverrideForUnknownOrigin_whenUpdateOccurrence_thenRejectsWithoutSaving() {
-        // given
-        RecurrenceEvent recurrenceEvent = recurrenceEvent();
-        Instant originStartAt = Instant.parse("2027-01-01T00:00:01Z");
-        UpdateRecurrenceOccurrenceRequest request = updateRequest(originStartAt);
-        when(recurrenceEventOverrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(10L, originStartAt))
-                .thenReturn(Optional.empty());
-        when(recurrenceEngine.containsOrigin(any(), any(), any())).thenReturn(false);
-
-        // when, then
-        assertThatThrownBy(() -> recurrenceEventCommandService.updateRecurrenceOccurrence(
-                recurrenceEvent,
-                request,
-                schedule(request)
-        ))
-                .isInstanceOf(CalioException.class)
-                .extracting(exception -> ((CalioException) exception).getErrorCode())
-                .isEqualTo(ErrorCode.RECURRENCE_OCCURRENCE_NOT_FOUND);
-        verify(recurrenceEventOverrideRepository, never()).saveAndFlush(any());
+        verify(recurrenceEventOverrideRepository).saveAndFlush(override);
+        assertThat(result).isSameAs(override);
+        assertThat(override.isDeleted()).isFalse();
     }
 
     @Test
@@ -169,27 +101,6 @@ class RecurrenceEventCommandServiceTest {
         // then
         verify(recurrenceEventOverrideRepository).saveAndFlush(override);
         assertThat(override.isDeleted()).isTrue();
-    }
-
-    private UpdateRecurrenceOccurrenceRequest updateRequest(Instant originStartAt) {
-        return new UpdateRecurrenceOccurrenceRequest(
-                originStartAt,
-                "Updated occurrence",
-                null,
-                Instant.parse("2027-01-03T02:00:00Z"),
-                Instant.parse("2027-01-03T03:00:00Z"),
-                false,
-                "Asia/Seoul"
-        );
-    }
-
-    private CanonicalSchedule schedule(UpdateRecurrenceOccurrenceRequest request) {
-        return CanonicalSchedule.recurrenceOverride(
-                request.startAt(),
-                request.endAt(),
-                request.allDay(),
-                request.timeZone()
-        );
     }
 
     private RecurrenceEvent recurrenceEvent() {

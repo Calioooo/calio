@@ -76,8 +76,7 @@ class RecurrenceEventServiceTest {
         RecurrenceEventCommandService commandService = new RecurrenceEventCommandService(
                 recurrenceEventRepository,
                 eventRepository,
-                recurrenceEventOverrideRepository,
-                recurrenceEngine
+                recurrenceEventOverrideRepository
         );
         recurrenceEventService = new RecurrenceEventService(
                 queryService,
@@ -227,6 +226,35 @@ class RecurrenceEventServiceTest {
         assertThat(response.title()).isEqualTo("Final title");
         assertThat(response.description()).isNull();
         assertThat(response.originStartAt()).isEqualTo(originStartAt);
+    }
+
+    @Test
+    @DisplayName("기존 override와 현재 recurrence 회차가 모두 없으면 PATCH 상태를 생성하지 않는다")
+    void givenUnknownOriginWithoutOverride_whenUpdate_thenRejectsWithoutStateChange() {
+        // given
+        RecurrenceEvent recurrenceEvent = recurrenceEvent();
+        Instant originStartAt = Instant.parse("2027-01-01T00:00:01Z");
+        when(recurrenceEventRepository.findByIdAndAccountIdForUpdate(10L, 1L))
+                .thenReturn(Optional.of(recurrenceEvent));
+        when(recurrenceEventOverrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(10L, originStartAt))
+                .thenReturn(Optional.empty());
+        when(recurrenceEngine.containsOrigin(any(), any(), any())).thenReturn(false);
+        UpdateRecurrenceOccurrenceRequest request = new UpdateRecurrenceOccurrenceRequest(
+                originStartAt,
+                "Unknown occurrence",
+                null,
+                Instant.parse("2027-01-03T02:00:00Z"),
+                Instant.parse("2027-01-03T03:00:00Z"),
+                false,
+                "Asia/Seoul"
+        );
+
+        // when, then
+        assertThatThrownBy(() -> recurrenceEventService.updateRecurrenceOccurrence(1L, 10L, request))
+                .isInstanceOf(CalioException.class)
+                .extracting(exception -> ((CalioException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.RECURRENCE_OCCURRENCE_NOT_FOUND);
+        verify(recurrenceEventOverrideRepository, never()).saveAndFlush(any());
     }
 
     @Test

@@ -107,11 +107,19 @@ public class RecurrenceEventService {
                 request.allDay(),
                 request.timeZone()
         );
-        RecurrenceEventOverride override = recurrenceEventCommandService.updateRecurrenceOccurrence(
+        Optional<RecurrenceEventOverride> existingOverride =
+                findOverrideOrRejectIneligible(recurrenceEvent, request.originStartAt());
+        RecurrenceEventOverride override = existingOverride.orElseGet(() -> RecurrenceEventOverride.active(
                 recurrenceEvent,
-                request,
+                request.originStartAt(),
+                request.title(),
+                request.description(),
                 schedule
-        );
+        ));
+        if (existingOverride.isPresent()) {
+            override.activate(request.title(), request.description(), schedule);
+        }
+        recurrenceEventCommandService.updateRecurrenceOccurrence(override);
         return EventResponse.recurrenceOverride(override);
     }
 
