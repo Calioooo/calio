@@ -1,6 +1,5 @@
 package com.calio.calendar.groupspace.service;
 
-import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.groupinvitation.service.GroupInvitationCommandService;
@@ -24,7 +23,6 @@ public class GroupSpaceService {
 
     private final GroupSpaceQueryService queryService;
     private final GroupSpaceCommandService commandService;
-    private final AccountRepository accountRepository;
     private final GroupInvitationCommandService invitationCommandService;
     private final GroupScheduleShareCleanupPort groupScheduleShareCleanupPort;
     private final Clock clock;
@@ -33,14 +31,12 @@ public class GroupSpaceService {
     public GroupSpaceService(
             GroupSpaceQueryService queryService,
             GroupSpaceCommandService commandService,
-            AccountRepository accountRepository,
             GroupInvitationCommandService invitationCommandService,
             GroupScheduleShareCleanupPort groupScheduleShareCleanupPort,
             Clock clock
     ) {
         this.queryService = queryService;
         this.commandService = commandService;
-        this.accountRepository = accountRepository;
         this.invitationCommandService = invitationCommandService;
         this.groupScheduleShareCleanupPort = groupScheduleShareCleanupPort;
         this.clock = clock;
@@ -109,7 +105,7 @@ public class GroupSpaceService {
     }
 
     private void ensureAccountExists(Long accountId) {
-        if (!accountRepository.existsById(accountId)) {
+        if (!queryService.hasAccount(accountId)) {
             throw new CalioException(ErrorCode.INTERNAL_SERVER_ERROR);
         }
     }
