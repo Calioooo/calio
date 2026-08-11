@@ -39,7 +39,10 @@ public class NationalHolidayService {
     @Transactional(readOnly = true)
     public List<NationalHolidayResponse> getNationalHolidays(LocalDate from, LocalDate to) {
         validateDateRange(from, to);
-        return nationalHolidayQueryService.getNationalHolidays(from, to);
+        return nationalHolidayQueryService.getNationalHolidays(from, to)
+                .stream()
+                .map(NationalHolidayResponse::from)
+                .toList();
     }
 
     public void syncYearRange(int startYear, int endYear) {

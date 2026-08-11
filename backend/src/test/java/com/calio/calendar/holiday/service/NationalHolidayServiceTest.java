@@ -2,6 +2,7 @@ package com.calio.calendar.holiday.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.groups.Tuple.tuple;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.eq;
@@ -16,6 +17,7 @@ import com.calio.calendar.holiday.client.HolidayApiClient;
 import com.calio.calendar.holiday.client.dto.HolidayApiItem;
 import com.calio.calendar.holiday.client.dto.HolidayApiResponse;
 import com.calio.calendar.holiday.controller.dto.NationalHolidayResponse;
+import com.calio.calendar.holiday.domain.NationalHoliday;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.time.LocalDate;
@@ -61,17 +63,22 @@ class NationalHolidayServiceTest {
         // given
         LocalDate from = LocalDate.of(2026, 5, 5);
         LocalDate to = LocalDate.of(2026, 6, 6);
-        List<NationalHolidayResponse> expected = List.of(
-                new NationalHolidayResponse(1L, from, "어린이날"),
-                new NationalHolidayResponse(2L, to, "현충일")
+        List<NationalHoliday> holidays = List.of(
+                new NationalHoliday(from, "어린이날"),
+                new NationalHoliday(to, "현충일")
         );
-        given(nationalHolidayQueryService.getNationalHolidays(from, to)).willReturn(expected);
+        given(nationalHolidayQueryService.getNationalHolidays(from, to)).willReturn(holidays);
 
         // when
         List<NationalHolidayResponse> actual = nationalHolidayService.getNationalHolidays(from, to);
 
         // then
-        assertThat(actual).isEqualTo(expected);
+        assertThat(actual)
+                .extracting(NationalHolidayResponse::holidayDate, NationalHolidayResponse::holidayTitle)
+                .containsExactly(
+                        tuple(from, "어린이날"),
+                        tuple(to, "현충일")
+                );
         verify(nationalHolidayQueryService).getNationalHolidays(from, to);
     }
 
