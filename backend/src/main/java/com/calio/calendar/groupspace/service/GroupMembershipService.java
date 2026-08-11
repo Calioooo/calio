@@ -4,8 +4,8 @@ import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.groupinvitation.domain.GroupInvitation;
 import com.calio.calendar.groupinvitation.domain.InvitationCredentialType;
-import com.calio.calendar.groupinvitation.repository.GroupInvitationRepository;
 import com.calio.calendar.groupinvitation.service.GroupInvitationCommandService;
+import com.calio.calendar.groupinvitation.service.GroupInvitationQueryService;
 import com.calio.calendar.groupinvitation.service.InvitationCredentialService;
 import com.calio.calendar.groupspace.controller.dto.AcceptGroupInvitationRequest;
 import com.calio.calendar.groupspace.controller.dto.AcceptGroupInvitationResponse;
@@ -31,7 +31,7 @@ public class GroupMembershipService {
     private final GroupMembershipQueryService queryService;
     private final GroupMembershipCommandService commandService;
     private final GroupSpaceCommandService groupSpaceCommandService;
-    private final GroupInvitationRepository groupInvitationRepository;
+    private final GroupInvitationQueryService invitationQueryService;
     private final GroupInvitationCommandService invitationCommandService;
     private final InvitationCredentialService credentialService;
     private final GroupScheduleShareCleanupPort groupScheduleShareCleanupPort;
@@ -41,7 +41,7 @@ public class GroupMembershipService {
             GroupMembershipQueryService queryService,
             GroupMembershipCommandService commandService,
             GroupSpaceCommandService groupSpaceCommandService,
-            GroupInvitationRepository groupInvitationRepository,
+            GroupInvitationQueryService invitationQueryService,
             GroupInvitationCommandService invitationCommandService,
             InvitationCredentialService credentialService,
             GroupScheduleShareCleanupPort groupScheduleShareCleanupPort,
@@ -50,7 +50,7 @@ public class GroupMembershipService {
         this.queryService = queryService;
         this.commandService = commandService;
         this.groupSpaceCommandService = groupSpaceCommandService;
-        this.groupInvitationRepository = groupInvitationRepository;
+        this.invitationQueryService = invitationQueryService;
         this.invitationCommandService = invitationCommandService;
         this.credentialService = credentialService;
         this.groupScheduleShareCleanupPort = groupScheduleShareCleanupPort;
@@ -65,7 +65,11 @@ public class GroupMembershipService {
                 locatedInvitation.getGroupSpaceId()
         );
         List<GroupMember> lockedMembers = queryService.lockMembers(groupSpace.getId());
-        GroupInvitation invitation = lockInvitation(locatedInvitation.getId(), request, credentialHash);
+        GroupInvitation invitation = invitationQueryService.lockInvitation(
+                locatedInvitation.getId(),
+                invitationCredentialType(request.credentialType()),
+                credentialHash
+        );
         Instant now = clock.instant();
         validateInvitation(invitation, lockedMembers, now);
 
@@ -164,34 +168,27 @@ public class GroupMembershipService {
 
     private byte[] credentialHash(AcceptGroupInvitationRequest request) {
         return credentialService.hashValidated(
-                request.credentialType() == GroupInvitationAcceptCredentialType.LINK_TOKEN
-                        ? InvitationCredentialType.LINK_TOKEN
-                        : InvitationCredentialType.CODE,
+                invitationCredentialType(request.credentialType()),
                 request.credential()
         );
+    }
+
+    private InvitationCredentialType invitationCredentialType(
+            GroupInvitationAcceptCredentialType credentialType
+    ) {
+        return credentialType == GroupInvitationAcceptCredentialType.LINK_TOKEN
+                ? InvitationCredentialType.LINK_TOKEN
+                : InvitationCredentialType.CODE;
     }
 
     private GroupInvitation locateInvitation(
             GroupInvitationAcceptCredentialType credentialType,
             byte[] credentialHash
     ) {
-        return (credentialType == GroupInvitationAcceptCredentialType.LINK_TOKEN
-                ? groupInvitationRepository.findByLinkTokenHash(credentialHash)
-                : groupInvitationRepository.findByInviteCodeHash(credentialHash))
-                .orElseThrow(GroupMembershipService::invitationNotFound);
-    }
-
-    private GroupInvitation lockInvitation(
-            Long invitationId,
-            AcceptGroupInvitationRequest request,
-            byte[] credentialHash
-    ) {
-        return groupInvitationRepository.findByIdAndCredentialHashForUpdate(
-                        invitationId,
-                        request.credentialType().name(),
-                        credentialHash
-                )
-                .orElseThrow(GroupMembershipService::invitationNotFound);
+        return invitationQueryService.getInvitationByCredentialHash(
+                invitationCredentialType(credentialType),
+                credentialHash
+        );
     }
 
     private void validateInvitation(
@@ -250,9 +247,9 @@ public class GroupMembershipService {
     }
 
     private void deleteIssuerInvitations(Long memberId) {
-        List<GroupInvitation> invitations =
-                groupInvitationRepository.findAllByCreatedByMemberIdForUpdateOrderById(memberId);
-        groupInvitationRepository.deleteAllInBatch(invitations);
+        List<GroupInvitation> invitations = invitationQueryService
+                .lockInvitationsCreatedBy(memberId);
+        invitationCommandService.delete(invitations);
     }
 
     private GroupMember requireActiveMembership(Long groupSpaceId, Long accountId) {

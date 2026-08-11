@@ -55,6 +55,23 @@ public class GroupInvitationQueryService {
         }).orElseThrow(GroupInvitationQueryService::invitationNotFound);
     }
 
+    public GroupInvitation lockInvitation(
+            Long invitationId,
+            InvitationCredentialType credentialType,
+            byte[] credentialHash
+    ) {
+        return invitationRepository.findByIdAndCredentialHashForUpdate(
+                        invitationId,
+                        credentialType.name(),
+                        credentialHash
+                )
+                .orElseThrow(GroupInvitationQueryService::invitationNotFound);
+    }
+
+    public List<GroupInvitation> lockInvitationsCreatedBy(Long memberId) {
+        return invitationRepository.findAllByCreatedByMemberIdForUpdateOrderById(memberId);
+    }
+
     public GroupSpace getGroupSpace(Long groupSpaceId) {
         return groupSpaceRepository.findById(groupSpaceId)
                 .orElseThrow(GroupInvitationQueryService::invitationNotFound);
