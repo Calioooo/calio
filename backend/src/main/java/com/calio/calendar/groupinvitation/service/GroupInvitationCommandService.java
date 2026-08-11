@@ -1,6 +1,5 @@
 package com.calio.calendar.groupinvitation.service;
 
-import com.calio.calendar.groupinvitation.controller.dto.IssueGroupInvitationResponse;
 import com.calio.calendar.groupinvitation.domain.GroupInvitation;
 import com.calio.calendar.groupinvitation.repository.GroupInvitationRepository;
 import com.calio.calendar.groupinvitation.service.dto.InvitationCredentialPair;
@@ -14,23 +13,18 @@ import org.springframework.transaction.annotation.Transactional;
 public class GroupInvitationCommandService {
 
     private final GroupInvitationRepository invitationRepository;
-    private final InvitationCredentialService credentialService;
 
-    public GroupInvitationCommandService(
-            GroupInvitationRepository invitationRepository,
-            InvitationCredentialService credentialService
-    ) {
+    public GroupInvitationCommandService(GroupInvitationRepository invitationRepository) {
         this.invitationRepository = invitationRepository;
-        this.credentialService = credentialService;
     }
 
-    public IssueGroupInvitationResponse create(
+    public GroupInvitation create(
             Long groupSpaceId,
             Long createdByMemberId,
             InvitationCredentialPair credentials,
             Instant expiresAt
     ) {
-        GroupInvitation invitation = invitationRepository.saveAndFlush(
+        return invitationRepository.saveAndFlush(
                 new GroupInvitation(
                         groupSpaceId,
                         createdByMemberId,
@@ -38,11 +32,6 @@ public class GroupInvitationCommandService {
                         credentials.inviteCodeHash(),
                         expiresAt
                 )
-        );
-        return IssueGroupInvitationResponse.from(
-                invitation,
-                credentialService.inviteUrl(credentials.linkToken()),
-                credentials.inviteCode()
         );
     }
 

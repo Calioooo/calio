@@ -11,7 +11,6 @@ import static org.mockito.Mockito.lenient;
 
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
-import com.calio.calendar.groupinvitation.controller.dto.IssueGroupInvitationResponse;
 import com.calio.calendar.groupinvitation.controller.dto.PreviewGroupInvitationRequest;
 import com.calio.calendar.groupinvitation.config.GroupInvitationProperties;
 import com.calio.calendar.groupinvitation.domain.GroupInvitation;
@@ -215,18 +214,22 @@ class GroupInvitationServiceTest {
         InvitationCredentialPair second = pair("B");
         InvitationCredentialPair third = pair("C");
         when(credentialService.generatePair()).thenReturn(first, second, third);
-        IssueGroupInvitationResponse expected = new IssueGroupInvitationResponse(
-                99L,
-                "https://calio.app/invite/" + third.linkToken(),
-                third.inviteCode(),
-                Instant.parse("2026-07-29T08:00:00Z")
+        GroupInvitation created = new GroupInvitation(
+                GROUP_SPACE_ID,
+                MEMBER_ID,
+                third.linkTokenHash(),
+                third.inviteCodeHash(),
+                NOW.plus(properties().getTtl())
         );
+        ReflectionTestUtils.setField(created, "id", 99L);
         when(commandService.create(GROUP_SPACE_ID, MEMBER_ID, first, NOW.plus(properties().getTtl())))
                 .thenThrow(credentialCollision("uk_group_invitations_link_token_hash"));
         when(commandService.create(GROUP_SPACE_ID, MEMBER_ID, second, NOW.plus(properties().getTtl())))
                 .thenThrow(credentialCollision("uk_group_invitations_invite_code_hash"));
         when(commandService.create(GROUP_SPACE_ID, MEMBER_ID, third, NOW.plus(properties().getTtl())))
-                .thenReturn(expected);
+                .thenReturn(created);
+        when(credentialService.inviteUrl(third.linkToken()))
+                .thenReturn("https://calio.app/invite/" + third.linkToken());
 
         // when
         var response = service.issue(ACCOUNT_ID, GROUP_SPACE_ID);

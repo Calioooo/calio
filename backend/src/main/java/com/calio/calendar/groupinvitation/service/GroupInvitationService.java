@@ -142,11 +142,17 @@ public class GroupInvitationService {
     ) {
         queryService.getGroupSpaceForUpdate(groupSpaceId);
         GroupMember issuer = queryService.getActiveMemberForUpdate(groupSpaceId, accountId);
-        return commandService.create(
+        Instant expiresAt = clock.instant().plus(properties.getTtl());
+        GroupInvitation invitation = commandService.create(
                 groupSpaceId,
                 issuer.getId(),
                 credentials,
-                clock.instant().plus(properties.getTtl())
+                expiresAt
+        );
+        return IssueGroupInvitationResponse.from(
+                invitation,
+                credentialService.inviteUrl(credentials.linkToken()),
+                credentials.inviteCode()
         );
     }
 
