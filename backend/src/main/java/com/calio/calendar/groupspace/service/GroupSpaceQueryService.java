@@ -55,6 +55,10 @@ public class GroupSpaceQueryService {
                 .orElseThrow(GroupSpaceQueryService::groupSpaceNotFound);
     }
 
+    public List<GroupMember> lockMembers(Long groupSpaceId) {
+        return groupMemberRepository.findAllByGroupSpaceIdForUpdateOrderById(groupSpaceId);
+    }
+
     private static CalioException groupSpaceNotFound() {
         return new CalioException(ErrorCode.GROUP_SPACE_NOT_FOUND);
     }

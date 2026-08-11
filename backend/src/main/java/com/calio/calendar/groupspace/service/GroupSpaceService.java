@@ -12,8 +12,6 @@ import com.calio.calendar.groupspace.controller.dto.UpdateGroupSpaceRequest;
 import com.calio.calendar.groupspace.domain.GroupMember;
 import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.domain.GroupSpaceFields;
-import com.calio.calendar.groupspace.repository.GroupMemberRepository;
-import com.calio.calendar.groupspace.repository.GroupSpaceRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -24,9 +22,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class GroupSpaceService {
 
-    private final GroupSpaceRepository groupSpaceRepository;
-    private final GroupMemberRepository groupMemberRepository;
     private final GroupSpaceQueryService queryService;
+    private final GroupSpaceCommandService commandService;
     private final AccountRepository accountRepository;
     private final GroupInvitationCommandService invitationCommandService;
     private final GroupScheduleShareCleanupPort groupScheduleShareCleanupPort;
@@ -34,17 +31,15 @@ public class GroupSpaceService {
 
     @Autowired
     public GroupSpaceService(
-            GroupSpaceRepository groupSpaceRepository,
-            GroupMemberRepository groupMemberRepository,
             GroupSpaceQueryService queryService,
+            GroupSpaceCommandService commandService,
             AccountRepository accountRepository,
             GroupInvitationCommandService invitationCommandService,
             GroupScheduleShareCleanupPort groupScheduleShareCleanupPort,
             Clock clock
     ) {
-        this.groupSpaceRepository = groupSpaceRepository;
-        this.groupMemberRepository = groupMemberRepository;
         this.queryService = queryService;
+        this.commandService = commandService;
         this.accountRepository = accountRepository;
         this.invitationCommandService = invitationCommandService;
         this.groupScheduleShareCleanupPort = groupScheduleShareCleanupPort;
@@ -59,10 +54,13 @@ public class GroupSpaceService {
         String emoji = GroupSpaceFields.canonicalizeEmoji(request.emoji());
         Instant now = clock.instant();
 
-        GroupSpace groupSpace = groupSpaceRepository.saveAndFlush(
-                new GroupSpace(accountId, name, emoji)
+        GroupSpace groupSpace = commandService.create(accountId, name, emoji);
+        GroupMember membership = commandService.createOwnerMembership(
+                groupSpace,
+                accountId,
+                nickname,
+                now
         );
-        GroupMember membership = saveOwnerMembership(groupSpace, accountId, nickname, now);
         return GroupSpaceDetailResponse.from(groupSpace, membership, 1);
     }
 
@@ -94,8 +92,7 @@ public class GroupSpaceService {
 
         String name = GroupSpaceFields.normalizeName(request.name());
         String emoji = GroupSpaceFields.canonicalizeEmoji(request.emoji());
-        groupSpace.update(name, emoji);
-        groupSpaceRepository.flush();
+        commandService.update(groupSpace, name, emoji);
         return GroupSpaceDetailResponse.from(groupSpace, membership, activeMemberCount(groupSpaceId));
     }
 
@@ -105,22 +102,10 @@ public class GroupSpaceService {
         GroupMember membership = queryService.getActiveMembership(groupSpaceId, accountId);
         requireOwner(groupSpace, membership);
 
-        groupMemberRepository.findAllByGroupSpaceIdForUpdateOrderById(groupSpaceId);
+        queryService.lockMembers(groupSpaceId);
         groupScheduleShareCleanupPort.cleanupGroupShares(groupSpaceId);
         invitationCommandService.deleteAllByGroupSpaceId(groupSpaceId);
-        groupMemberRepository.deleteAllByGroupSpaceId(groupSpaceId);
-        groupSpaceRepository.delete(groupSpace);
-    }
-
-    private GroupMember saveOwnerMembership(
-            GroupSpace groupSpace,
-            Long accountId,
-            String nickname,
-            Instant now
-    ) {
-        return groupMemberRepository.saveAndFlush(
-                new GroupMember(groupSpace, accountId, nickname, now)
-        );
+        commandService.delete(groupSpace);
     }
 
     private void ensureAccountExists(Long accountId) {
