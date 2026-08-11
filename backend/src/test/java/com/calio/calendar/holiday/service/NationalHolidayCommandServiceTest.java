@@ -1,11 +1,12 @@
 package com.calio.calendar.holiday.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import com.calio.calendar.holiday.domain.NationalHoliday;
@@ -18,10 +19,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.transaction.TransactionDefinition;
-import org.springframework.transaction.TransactionException;
-import org.springframework.transaction.support.AbstractPlatformTransactionManager;
-import org.springframework.transaction.support.DefaultTransactionStatus;
+import org.springframework.core.annotation.AnnotatedElementUtils;
+import org.springframework.transaction.annotation.Transactional;
 
 class NationalHolidayCommandServiceTest {
 
@@ -31,10 +30,21 @@ class NationalHolidayCommandServiceTest {
     @BeforeEach
     void setUp() {
         nationalHolidayRepository = mock(NationalHolidayRepository.class);
-        nationalHolidayCommandService = new NationalHolidayCommandService(
-                nationalHolidayRepository,
-                new NoOpTransactionManager()
+        nationalHolidayCommandService = new NationalHolidayCommandService(nationalHolidayRepository);
+    }
+
+    @Test
+    @DisplayName("CommandService의 모든 상태 변경은 선언적 트랜잭션 경계 안에서 실행한다")
+    void commandServiceUsesTransactionBoundary() {
+        // when
+        Transactional transactional = AnnotatedElementUtils.findMergedAnnotation(
+                NationalHolidayCommandService.class,
+                Transactional.class
         );
+
+        // then
+        assertThat(transactional).isNotNull();
+        assertThat(transactional.readOnly()).isFalse();
     }
 
     @Test
@@ -70,8 +80,8 @@ class NationalHolidayCommandServiceTest {
     }
 
     @Test
-    @DisplayName("insert 중 DataIntegrityViolationException이 발생해도 중복 경합으로 처리하고 snapshot 반영을 계속한다")
-    void givenIntegrityConflict_whenApplySnapshot_thenContinuesReconciliation() {
+    @DisplayName("공휴일 추가가 실패하면 stale 삭제를 진행하지 않고 예외를 전파한다")
+    void givenIntegrityConflict_whenApplySnapshot_thenStopsBeforeDeletion() {
         // given
         LocalDate holidayDate = LocalDate.of(2026, 1, 1);
         NationalHoliday staleHoliday = new NationalHoliday(LocalDate.of(2026, 5, 5), "어린이날");
@@ -86,30 +96,10 @@ class NationalHolidayCommandServiceTest {
                 .saveAndFlush(any(NationalHoliday.class));
 
         // when, then
-        assertThatCode(() -> nationalHolidayCommandService.applySnapshot(
+        assertThatThrownBy(() -> nationalHolidayCommandService.applySnapshot(
                 2026,
                 Set.of(new NationalHolidayProviderRow(holidayDate, "신정"))
-        )).doesNotThrowAnyException();
-        verify(nationalHolidayRepository).deleteAll(List.of(staleHoliday));
-    }
-
-    private static class NoOpTransactionManager extends AbstractPlatformTransactionManager {
-
-        @Override
-        protected Object doGetTransaction() throws TransactionException {
-            return new Object();
-        }
-
-        @Override
-        protected void doBegin(Object transaction, TransactionDefinition definition) throws TransactionException {
-        }
-
-        @Override
-        protected void doCommit(DefaultTransactionStatus status) throws TransactionException {
-        }
-
-        @Override
-        protected void doRollback(DefaultTransactionStatus status) throws TransactionException {
-        }
+        )).isInstanceOf(DataIntegrityViolationException.class);
+        verify(nationalHolidayRepository, never()).deleteAll(List.of(staleHoliday));
     }
 }
