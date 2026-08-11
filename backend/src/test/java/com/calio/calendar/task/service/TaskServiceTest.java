@@ -2,7 +2,9 @@ package com.calio.calendar.task.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.groups.Tuple.tuple;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -28,6 +30,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -81,17 +85,27 @@ class TaskServiceTest {
     }
 
     @Test
-    @DisplayName("Task 목록 조회는 account 범위를 Query에 그대로 위임한다")
-    void givenAccountId_whenListTasks_thenDelegatesToQueryService() {
+    @DisplayName("Task 목록 조회는 미완료 첫 20개 조건을 Query에 전달하고 domain 결과를 DTO로 변환한다")
+    void givenAccountId_whenListTasks_thenQueriesCanonicalPageAndMapsResponses() {
         // given
-        List<TaskResponse> expected = List.of(taskResponse(10L, "할 일"));
-        when(taskQueryService.listTasks(1L)).thenReturn(expected);
+        List<Task> tasks = List.of(task("할 일"));
+        when(taskQueryService.listTasks(eq(1L), any(Pageable.class))).thenReturn(tasks);
 
         // when
         List<TaskResponse> responses = taskService.listTasks(1L);
 
         // then
-        assertThat(responses).isSameAs(expected);
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(taskQueryService).listTasks(eq(1L), pageableCaptor.capture());
+        Pageable pageable = pageableCaptor.getValue();
+        assertThat(pageable.getPageNumber()).isZero();
+        assertThat(pageable.getPageSize()).isEqualTo(20);
+        assertThat(pageable.getSort().getOrderFor("taskId"))
+                .extracting(Sort.Order::getDirection)
+                .isEqualTo(Sort.Direction.ASC);
+        assertThat(responses)
+                .extracting(TaskResponse::taskId, TaskResponse::taskTitle)
+                .containsExactly(tuple(10L, "할 일"));
     }
 
     @Test
@@ -202,9 +216,5 @@ class TaskServiceTest {
         Task task = new Task(title, new Account());
         ReflectionTestUtils.setField(task, "taskId", 10L);
         return task;
-    }
-
-    private TaskResponse taskResponse(Long taskId, String title) {
-        return new TaskResponse(taskId, title, false, null, null, null);
     }
 }

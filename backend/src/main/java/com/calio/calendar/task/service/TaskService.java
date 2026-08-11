@@ -12,12 +12,17 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Transactional(readOnly = true)
 public class TaskService {
+
+    private static final int FIRST_PAGE = 0;
+    private static final int DEFAULT_PAGE_SIZE = 20;
 
     private final TaskQueryService taskQueryService;
     private final TaskCommandService taskCommandService;
@@ -44,7 +49,15 @@ public class TaskService {
     }
 
     public List<TaskResponse> listTasks(Long accountId) {
-        return taskQueryService.listTasks(accountId);
+        PageRequest pageRequest = PageRequest.of(
+                FIRST_PAGE,
+                DEFAULT_PAGE_SIZE,
+                Sort.by(Sort.Direction.ASC, "taskId")
+        );
+        return taskQueryService.listTasks(accountId, pageRequest)
+                .stream()
+                .map(TaskResponse::from)
+                .toList();
     }
 
     @Transactional
