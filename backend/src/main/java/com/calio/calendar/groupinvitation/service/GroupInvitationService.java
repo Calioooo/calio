@@ -5,7 +5,12 @@ import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.groupinvitation.controller.dto.GroupInvitationListResponse;
 import com.calio.calendar.groupinvitation.controller.dto.GroupInvitationSummaryResponse;
 import com.calio.calendar.groupinvitation.controller.dto.IssueGroupInvitationResponse;
+import com.calio.calendar.groupinvitation.controller.dto.PreviewGroupInvitationRequest;
+import com.calio.calendar.groupinvitation.controller.dto.PreviewGroupInvitationResponse;
+import com.calio.calendar.groupinvitation.domain.GroupInvitation;
 import com.calio.calendar.groupinvitation.service.dto.InvitationCredentialPair;
+import com.calio.calendar.groupspace.domain.GroupSpace;
+import java.time.Clock;
 import java.util.Locale;
 import java.util.Set;
 import org.slf4j.Logger;
@@ -30,16 +35,19 @@ public class GroupInvitationService {
     private final GroupInvitationQueryService queryService;
     private final GroupInvitationCommandService commandService;
     private final TransactionTemplate issueTransaction;
+    private final Clock clock;
 
     public GroupInvitationService(
             InvitationCredentialService credentialService,
             GroupInvitationQueryService queryService,
             GroupInvitationCommandService commandService,
-            PlatformTransactionManager transactionManager
+            PlatformTransactionManager transactionManager,
+            Clock clock
     ) {
         this.credentialService = credentialService;
         this.queryService = queryService;
         this.commandService = commandService;
+        this.clock = clock;
         this.issueTransaction = new TransactionTemplate(transactionManager);
         this.issueTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
@@ -50,6 +58,28 @@ public class GroupInvitationService {
                 .map(GroupInvitationSummaryResponse::from)
                 .toList();
         return new GroupInvitationListResponse(invitations);
+    }
+
+    public PreviewGroupInvitationResponse preview(PreviewGroupInvitationRequest request) {
+        byte[] credentialHash = credentialService.hashValidated(
+                request.credentialType(),
+                request.credential()
+        );
+        GroupInvitation invitation = queryService.getInvitationByCredentialHash(
+                request.credentialType(),
+                credentialHash
+        );
+        if (invitation.isExpiredAt(clock.instant())) {
+            throw new CalioException(ErrorCode.GROUP_INVITATION_EXPIRED);
+        }
+
+        GroupSpace groupSpace = queryService.getGroupSpace(invitation.getGroupSpaceId());
+        int activeMemberCount = queryService.getActiveMemberCount(groupSpace.getId());
+        return PreviewGroupInvitationResponse.from(
+                groupSpace,
+                activeMemberCount,
+                invitation.getExpiresAt()
+        );
     }
 
     public IssueGroupInvitationResponse issue(Long accountId, Long groupSpaceId) {

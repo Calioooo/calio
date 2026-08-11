@@ -2,9 +2,8 @@ package com.calio.calendar.groupinvitation.service;
 
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
-import com.calio.calendar.groupinvitation.controller.dto.PreviewGroupInvitationRequest;
-import com.calio.calendar.groupinvitation.controller.dto.PreviewGroupInvitationResponse;
 import com.calio.calendar.groupinvitation.domain.GroupInvitation;
+import com.calio.calendar.groupinvitation.domain.InvitationCredentialType;
 import com.calio.calendar.groupinvitation.repository.GroupInvitationRepository;
 import com.calio.calendar.groupspace.domain.GroupMember;
 import com.calio.calendar.groupspace.domain.GroupMemberStatus;
@@ -24,20 +23,17 @@ public class GroupInvitationQueryService {
     private final GroupInvitationRepository invitationRepository;
     private final GroupSpaceRepository groupSpaceRepository;
     private final GroupMemberRepository groupMemberRepository;
-    private final InvitationCredentialService credentialService;
     private final Clock clock;
 
     public GroupInvitationQueryService(
             GroupInvitationRepository invitationRepository,
             GroupSpaceRepository groupSpaceRepository,
             GroupMemberRepository groupMemberRepository,
-            InvitationCredentialService credentialService,
             Clock clock
     ) {
         this.invitationRepository = invitationRepository;
         this.groupSpaceRepository = groupSpaceRepository;
         this.groupMemberRepository = groupMemberRepository;
-        this.credentialService = credentialService;
         this.clock = clock;
     }
 
@@ -47,30 +43,25 @@ public class GroupInvitationQueryService {
         return invitationRepository.findActiveInvitations(groupSpaceId, member.getId(), now);
     }
 
-    public PreviewGroupInvitationResponse preview(PreviewGroupInvitationRequest request) {
-        byte[] credentialHash = credentialService.hashValidated(
-                request.credentialType(),
-                request.credential()
-        );
-        GroupInvitation invitation = (switch (request.credentialType()) {
+    public GroupInvitation getInvitationByCredentialHash(
+            InvitationCredentialType credentialType,
+            byte[] credentialHash
+    ) {
+        return (switch (credentialType) {
             case LINK_TOKEN -> invitationRepository.findByLinkTokenHash(credentialHash);
             case CODE -> invitationRepository.findByInviteCodeHash(credentialHash);
         }).orElseThrow(GroupInvitationQueryService::invitationNotFound);
+    }
 
-        if (invitation.isExpiredAt(clock.instant())) {
-            throw new CalioException(ErrorCode.GROUP_INVITATION_EXPIRED);
-        }
-
-        GroupSpace groupSpace = groupSpaceRepository.findById(invitation.getGroupSpaceId())
+    public GroupSpace getGroupSpace(Long groupSpaceId) {
+        return groupSpaceRepository.findById(groupSpaceId)
                 .orElseThrow(GroupInvitationQueryService::invitationNotFound);
-        int activeMemberCount = groupMemberRepository.countByGroupSpace_IdAndStatus(
-                groupSpace.getId(),
+    }
+
+    public int getActiveMemberCount(Long groupSpaceId) {
+        return groupMemberRepository.countByGroupSpace_IdAndStatus(
+                groupSpaceId,
                 GroupMemberStatus.ACTIVE
-        );
-        return PreviewGroupInvitationResponse.from(
-                groupSpace,
-                activeMemberCount,
-                invitation.getExpiresAt()
         );
     }
 

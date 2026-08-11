@@ -11,9 +11,14 @@ import static org.mockito.Mockito.when;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.groupinvitation.controller.dto.IssueGroupInvitationResponse;
+import com.calio.calendar.groupinvitation.controller.dto.PreviewGroupInvitationRequest;
 import com.calio.calendar.groupinvitation.domain.GroupInvitation;
+import com.calio.calendar.groupinvitation.domain.InvitationCredentialType;
 import com.calio.calendar.groupinvitation.service.dto.InvitationCredentialPair;
+import com.calio.calendar.groupspace.domain.GroupSpace;
+import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -30,6 +35,7 @@ class GroupInvitationServiceTest {
 
     private static final Long ACCOUNT_ID = 10L;
     private static final Long GROUP_SPACE_ID = 20L;
+    private static final Instant NOW = Instant.parse("2026-07-28T08:00:00Z");
 
     @Mock
     private InvitationCredentialService credentialService;
@@ -48,8 +54,44 @@ class GroupInvitationServiceTest {
                 credentialService,
                 queryService,
                 commandService,
-                new NoOpTransactionManager()
+                new NoOpTransactionManager(),
+                Clock.fixed(NOW, ZoneOffset.UTC)
         );
+    }
+
+    @Test
+    @DisplayName("초대 미리보기는 credential을 해싱하고 유효한 초대의 그룹과 active member 수를 조합한다")
+    void previewCombinesValidatedInvitationQueries() {
+        // given
+        byte[] credentialHash = new byte[32];
+        PreviewGroupInvitationRequest request = new PreviewGroupInvitationRequest(
+                InvitationCredentialType.LINK_TOKEN,
+                "A".repeat(43)
+        );
+        GroupInvitation invitation = new GroupInvitation(
+                GROUP_SPACE_ID,
+                30L,
+                new byte[32],
+                new byte[32],
+                NOW.plusSeconds(3600)
+        );
+        GroupSpace groupSpace = new GroupSpace(ACCOUNT_ID, "Calio", "📅");
+        org.springframework.test.util.ReflectionTestUtils.setField(groupSpace, "id", GROUP_SPACE_ID);
+        when(credentialService.hashValidated(request.credentialType(), request.credential()))
+                .thenReturn(credentialHash);
+        when(queryService.getInvitationByCredentialHash(request.credentialType(), credentialHash))
+                .thenReturn(invitation);
+        when(queryService.getGroupSpace(GROUP_SPACE_ID)).thenReturn(groupSpace);
+        when(queryService.getActiveMemberCount(GROUP_SPACE_ID)).thenReturn(4);
+
+        // when
+        var response = service.preview(request);
+
+        // then
+        assertThat(response.name()).isEqualTo("Calio");
+        assertThat(response.emoji()).isEqualTo("📅");
+        assertThat(response.memberCount()).isEqualTo(4);
+        assertThat(response.expiresAt()).isEqualTo(NOW.plusSeconds(3600));
     }
 
     @Test
