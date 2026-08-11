@@ -17,8 +17,6 @@ import com.calio.calendar.groupspace.domain.GroupMember;
 import com.calio.calendar.groupspace.domain.GroupMemberStatus;
 import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.domain.GroupSpaceFields;
-import com.calio.calendar.groupspace.repository.GroupMemberRepository;
-import com.calio.calendar.groupspace.repository.GroupSpaceRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -31,8 +29,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class GroupMembershipService {
 
     private final GroupMembershipQueryService queryService;
-    private final GroupSpaceRepository groupSpaceRepository;
-    private final GroupMemberRepository groupMemberRepository;
+    private final GroupMembershipCommandService commandService;
+    private final GroupSpaceCommandService groupSpaceCommandService;
     private final GroupInvitationRepository groupInvitationRepository;
     private final GroupInvitationCommandService invitationCommandService;
     private final InvitationCredentialService credentialService;
@@ -41,8 +39,8 @@ public class GroupMembershipService {
 
     public GroupMembershipService(
             GroupMembershipQueryService queryService,
-            GroupSpaceRepository groupSpaceRepository,
-            GroupMemberRepository groupMemberRepository,
+            GroupMembershipCommandService commandService,
+            GroupSpaceCommandService groupSpaceCommandService,
             GroupInvitationRepository groupInvitationRepository,
             GroupInvitationCommandService invitationCommandService,
             InvitationCredentialService credentialService,
@@ -50,8 +48,8 @@ public class GroupMembershipService {
             Clock clock
     ) {
         this.queryService = queryService;
-        this.groupSpaceRepository = groupSpaceRepository;
-        this.groupMemberRepository = groupMemberRepository;
+        this.commandService = commandService;
+        this.groupSpaceCommandService = groupSpaceCommandService;
         this.groupInvitationRepository = groupInvitationRepository;
         this.invitationCommandService = invitationCommandService;
         this.credentialService = credentialService;
@@ -93,7 +91,7 @@ public class GroupMembershipService {
         }
         requireFreshInvitation(invitation, membership);
         requireAvailableNickname(groupSpace.getId(), nickname, membership.getId());
-        membership.reactivate(nickname, now);
+        commandService.changeToActive(membership, nickname, now);
         return AcceptGroupInvitationResponse.from(
                 GroupJoinResult.REJOINED,
                 groupSpace,
@@ -129,7 +127,7 @@ public class GroupMembershipService {
             throw new CalioException(ErrorCode.GROUP_OWNER_TRANSFER_INVALID);
         }
 
-        groupSpace.transferOwnershipTo(target.getAccountId());
+        commandService.changeOwnership(groupSpace, target.getAccountId());
         return TransferGroupOwnerResponse.from(groupSpace, actor, target);
     }
 
@@ -219,9 +217,7 @@ public class GroupMembershipService {
             String nickname,
             Instant now
     ) {
-        return groupMemberRepository.saveAndFlush(
-                new GroupMember(groupSpace, accountId, nickname, now)
-        );
+        return commandService.create(groupSpace, accountId, nickname, now);
     }
 
     private void requireFreshInvitation(GroupInvitation invitation, GroupMember membership) {
@@ -244,14 +240,13 @@ public class GroupMembershipService {
     ) {
         groupScheduleShareCleanupPort.cleanupMemberShares(groupSpaceId, member.getId());
         deleteIssuerInvitations(member.getId());
-        member.deactivate(inactiveStatus, now);
+        commandService.changeStatus(member, inactiveStatus, now);
     }
 
     private void deleteSoleOwnerGroup(GroupSpace groupSpace) {
         groupScheduleShareCleanupPort.cleanupGroupShares(groupSpace.getId());
         invitationCommandService.deleteAllByGroupSpaceId(groupSpace.getId());
-        groupMemberRepository.deleteAllByGroupSpaceId(groupSpace.getId());
-        groupSpaceRepository.delete(groupSpace);
+        groupSpaceCommandService.delete(groupSpace);
     }
 
     private void deleteIssuerInvitations(Long memberId) {
