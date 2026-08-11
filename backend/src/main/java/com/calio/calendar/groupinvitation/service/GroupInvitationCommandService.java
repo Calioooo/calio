@@ -46,18 +46,16 @@ public class GroupInvitationCommandService {
         this.clock = clock;
     }
 
-    IssueGroupInvitationResponse issueOnce(
-            Long accountId,
+    public IssueGroupInvitationResponse create(
             Long groupSpaceId,
-            InvitationCredentialPair credentials
+            Long createdByMemberId,
+            InvitationCredentialPair credentials,
+            Instant expiresAt
     ) {
-        lockGroupSpace(groupSpaceId);
-        GroupMember issuer = lockActiveMember(groupSpaceId, accountId);
-        Instant expiresAt = clock.instant().plus(properties.getTtl());
         GroupInvitation invitation = invitationRepository.saveAndFlush(
                 new GroupInvitation(
                         groupSpaceId,
-                        issuer.getId(),
+                        createdByMemberId,
                         credentials.linkTokenHash(),
                         credentials.inviteCodeHash(),
                         expiresAt

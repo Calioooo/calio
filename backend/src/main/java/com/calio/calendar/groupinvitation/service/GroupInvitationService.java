@@ -7,9 +7,11 @@ import com.calio.calendar.groupinvitation.controller.dto.GroupInvitationSummaryR
 import com.calio.calendar.groupinvitation.controller.dto.IssueGroupInvitationResponse;
 import com.calio.calendar.groupinvitation.controller.dto.PreviewGroupInvitationRequest;
 import com.calio.calendar.groupinvitation.controller.dto.PreviewGroupInvitationResponse;
+import com.calio.calendar.groupinvitation.config.GroupInvitationProperties;
 import com.calio.calendar.groupinvitation.domain.GroupInvitation;
 import com.calio.calendar.groupinvitation.service.dto.InvitationCredentialPair;
 import com.calio.calendar.groupspace.domain.GroupSpace;
+import com.calio.calendar.groupspace.domain.GroupMember;
 import java.time.Clock;
 import java.util.Locale;
 import java.util.Set;
@@ -36,18 +38,21 @@ public class GroupInvitationService {
     private final GroupInvitationCommandService commandService;
     private final TransactionTemplate issueTransaction;
     private final Clock clock;
+    private final GroupInvitationProperties properties;
 
     public GroupInvitationService(
             InvitationCredentialService credentialService,
             GroupInvitationQueryService queryService,
             GroupInvitationCommandService commandService,
             PlatformTransactionManager transactionManager,
-            Clock clock
+            Clock clock,
+            GroupInvitationProperties properties
     ) {
         this.credentialService = credentialService;
         this.queryService = queryService;
         this.commandService = commandService;
         this.clock = clock;
+        this.properties = properties;
         this.issueTransaction = new TransactionTemplate(transactionManager);
         this.issueTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
@@ -87,7 +92,7 @@ public class GroupInvitationService {
             InvitationCredentialPair credentials = credentialService.generatePair();
             try {
                 return issueTransaction.execute(
-                        status -> commandService.issueOnce(accountId, groupSpaceId, credentials)
+                        status -> issueOnce(accountId, groupSpaceId, credentials)
                 );
             } catch (DataIntegrityViolationException exception) {
                 // A failed attempt is fully rolled back by TransactionTemplate.
@@ -100,6 +105,21 @@ public class GroupInvitationService {
         log.error("Group invitation generation failed. errorCode={}",
                 ErrorCode.GROUP_INVITATION_GENERATION_FAILED.name());
         throw new CalioException(ErrorCode.GROUP_INVITATION_GENERATION_FAILED);
+    }
+
+    private IssueGroupInvitationResponse issueOnce(
+            Long accountId,
+            Long groupSpaceId,
+            InvitationCredentialPair credentials
+    ) {
+        queryService.getGroupSpaceForUpdate(groupSpaceId);
+        GroupMember issuer = queryService.getActiveMemberForUpdate(groupSpaceId, accountId);
+        return commandService.create(
+                groupSpaceId,
+                issuer.getId(),
+                credentials,
+                clock.instant().plus(properties.getTtl())
+        );
     }
 
     private boolean isCredentialCollision(Throwable throwable) {

@@ -65,6 +65,23 @@ public class GroupInvitationQueryService {
         );
     }
 
+    public GroupSpace getGroupSpaceForUpdate(Long groupSpaceId) {
+        return groupSpaceRepository.findByIdForUpdate(groupSpaceId)
+                .orElseThrow(GroupInvitationQueryService::groupSpaceNotFound);
+    }
+
+    public GroupMember getActiveMemberForUpdate(Long groupSpaceId, Long accountId) {
+        GroupMember member = groupMemberRepository.findByGroupSpaceIdAndAccountIdForUpdate(
+                        groupSpaceId,
+                        accountId
+                )
+                .orElseThrow(GroupInvitationQueryService::groupSpaceNotFound);
+        if (member.getStatus() != GroupMemberStatus.ACTIVE) {
+            throw groupSpaceNotFound();
+        }
+        return member;
+    }
+
     private GroupMember findActiveMember(Long groupSpaceId, Long accountId) {
         return groupMemberRepository.findByGroupSpaceIdAndAccountIdAndStatus(
                         groupSpaceId,

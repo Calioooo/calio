@@ -7,15 +7,18 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.lenient;
 
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.groupinvitation.controller.dto.IssueGroupInvitationResponse;
 import com.calio.calendar.groupinvitation.controller.dto.PreviewGroupInvitationRequest;
+import com.calio.calendar.groupinvitation.config.GroupInvitationProperties;
 import com.calio.calendar.groupinvitation.domain.GroupInvitation;
 import com.calio.calendar.groupinvitation.domain.InvitationCredentialType;
 import com.calio.calendar.groupinvitation.service.dto.InvitationCredentialPair;
 import com.calio.calendar.groupspace.domain.GroupSpace;
+import com.calio.calendar.groupspace.domain.GroupMember;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -29,12 +32,14 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.AbstractPlatformTransactionManager;
 import org.springframework.transaction.support.DefaultTransactionStatus;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class GroupInvitationServiceTest {
 
     private static final Long ACCOUNT_ID = 10L;
     private static final Long GROUP_SPACE_ID = 20L;
+    private static final Long MEMBER_ID = 30L;
     private static final Instant NOW = Instant.parse("2026-07-28T08:00:00Z");
 
     @Mock
@@ -50,13 +55,21 @@ class GroupInvitationServiceTest {
 
     @BeforeEach
     void setUp() {
+        GroupInvitationProperties properties = new GroupInvitationProperties();
         service = new GroupInvitationService(
                 credentialService,
                 queryService,
                 commandService,
                 new NoOpTransactionManager(),
-                Clock.fixed(NOW, ZoneOffset.UTC)
+                Clock.fixed(NOW, ZoneOffset.UTC),
+                properties
         );
+        GroupSpace groupSpace = new GroupSpace(ACCOUNT_ID, "Calio", "📅");
+        ReflectionTestUtils.setField(groupSpace, "id", GROUP_SPACE_ID);
+        GroupMember member = new GroupMember(groupSpace, ACCOUNT_ID, "member", NOW);
+        ReflectionTestUtils.setField(member, "id", MEMBER_ID);
+        lenient().when(queryService.getGroupSpaceForUpdate(GROUP_SPACE_ID)).thenReturn(groupSpace);
+        lenient().when(queryService.getActiveMemberForUpdate(GROUP_SPACE_ID, ACCOUNT_ID)).thenReturn(member);
     }
 
     @Test
@@ -131,11 +144,12 @@ class GroupInvitationServiceTest {
                 third.inviteCode(),
                 Instant.parse("2026-07-29T08:00:00Z")
         );
-        when(commandService.issueOnce(ACCOUNT_ID, GROUP_SPACE_ID, first))
+        when(commandService.create(GROUP_SPACE_ID, MEMBER_ID, first, NOW.plus(properties().getTtl())))
                 .thenThrow(credentialCollision("uk_group_invitations_link_token_hash"));
-        when(commandService.issueOnce(ACCOUNT_ID, GROUP_SPACE_ID, second))
+        when(commandService.create(GROUP_SPACE_ID, MEMBER_ID, second, NOW.plus(properties().getTtl())))
                 .thenThrow(credentialCollision("uk_group_invitations_invite_code_hash"));
-        when(commandService.issueOnce(ACCOUNT_ID, GROUP_SPACE_ID, third)).thenReturn(expected);
+        when(commandService.create(GROUP_SPACE_ID, MEMBER_ID, third, NOW.plus(properties().getTtl())))
+                .thenReturn(expected);
 
         // when
         var response = service.issue(ACCOUNT_ID, GROUP_SPACE_ID);
@@ -145,10 +159,11 @@ class GroupInvitationServiceTest {
         assertThat(response.inviteCode()).isEqualTo(third.inviteCode());
         assertThat(response.expiresAt()).isEqualTo(Instant.parse("2026-07-29T08:00:00Z"));
         verify(credentialService, times(3)).generatePair();
-        verify(commandService, times(3)).issueOnce(
-                eq(ACCOUNT_ID),
+        verify(commandService, times(3)).create(
                 eq(GROUP_SPACE_ID),
-                any(InvitationCredentialPair.class)
+                eq(MEMBER_ID),
+                any(InvitationCredentialPair.class),
+                eq(NOW.plus(properties().getTtl()))
         );
     }
 
@@ -160,11 +175,11 @@ class GroupInvitationServiceTest {
         InvitationCredentialPair second = pair("B");
         InvitationCredentialPair third = pair("C");
         when(credentialService.generatePair()).thenReturn(first, second, third);
-        when(commandService.issueOnce(ACCOUNT_ID, GROUP_SPACE_ID, first))
+        when(commandService.create(GROUP_SPACE_ID, MEMBER_ID, first, NOW.plus(properties().getTtl())))
                 .thenThrow(credentialCollision("uk_group_invitations_link_token_hash"));
-        when(commandService.issueOnce(ACCOUNT_ID, GROUP_SPACE_ID, second))
+        when(commandService.create(GROUP_SPACE_ID, MEMBER_ID, second, NOW.plus(properties().getTtl())))
                 .thenThrow(credentialCollision("uk_group_invitations_link_token_hash"));
-        when(commandService.issueOnce(ACCOUNT_ID, GROUP_SPACE_ID, third))
+        when(commandService.create(GROUP_SPACE_ID, MEMBER_ID, third, NOW.plus(properties().getTtl())))
                 .thenThrow(credentialCollision("uk_group_invitations_link_token_hash"));
 
         // when, then
@@ -185,7 +200,7 @@ class GroupInvitationServiceTest {
         DataIntegrityViolationException expected =
                 new DataIntegrityViolationException("foreign key constraint violation");
         when(credentialService.generatePair()).thenReturn(credentials);
-        when(commandService.issueOnce(ACCOUNT_ID, GROUP_SPACE_ID, credentials))
+        when(commandService.create(GROUP_SPACE_ID, MEMBER_ID, credentials, NOW.plus(properties().getTtl())))
                 .thenThrow(expected);
 
         // when, then
@@ -196,7 +211,12 @@ class GroupInvitationServiceTest {
                     assertThat(exception.getCause()).isSameAs(expected);
                 });
         verify(credentialService).generatePair();
-        verify(commandService).issueOnce(ACCOUNT_ID, GROUP_SPACE_ID, credentials);
+        verify(commandService).create(
+                GROUP_SPACE_ID,
+                MEMBER_ID,
+                credentials,
+                NOW.plus(properties().getTtl())
+        );
     }
 
     private DataIntegrityViolationException credentialCollision(String constraintName) {
@@ -213,6 +233,10 @@ class GroupInvitationServiceTest {
                 new byte[32],
                 new byte[32]
         );
+    }
+
+    private GroupInvitationProperties properties() {
+        return new GroupInvitationProperties();
     }
 
     private static final class NoOpTransactionManager extends AbstractPlatformTransactionManager {
