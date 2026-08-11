@@ -87,6 +87,19 @@ public class GroupInvitationService {
         );
     }
 
+    public void revoke(Long accountId, Long groupSpaceId, Long invitationId) {
+        queryService.getGroupSpaceForUpdate(groupSpaceId);
+        GroupMember member = queryService.getActiveMemberForUpdate(groupSpaceId, accountId);
+        GroupInvitation invitation = queryService.getRevocableInvitationIfExists(
+                        groupSpaceId,
+                        invitationId,
+                        member.getId(),
+                        clock.instant()
+                )
+                .orElseThrow(GroupInvitationService::invitationNotFound);
+        commandService.delete(invitation);
+    }
+
     public IssueGroupInvitationResponse issue(Long accountId, Long groupSpaceId) {
         for (int attempt = 0; attempt < MAX_ISSUE_ATTEMPTS; attempt++) {
             InvitationCredentialPair credentials = credentialService.generatePair();
@@ -132,6 +145,10 @@ public class GroupInvitationService {
             current = current.getCause();
         }
         return false;
+    }
+
+    private static CalioException invitationNotFound() {
+        return new CalioException(ErrorCode.GROUP_INVITATION_NOT_FOUND);
     }
 
     private boolean containsCredentialConstraint(String message) {

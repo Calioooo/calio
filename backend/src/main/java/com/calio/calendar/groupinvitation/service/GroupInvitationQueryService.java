@@ -13,6 +13,7 @@ import com.calio.calendar.groupspace.repository.GroupSpaceRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -80,6 +81,20 @@ public class GroupInvitationQueryService {
             throw groupSpaceNotFound();
         }
         return member;
+    }
+
+    public Optional<GroupInvitation> getRevocableInvitationIfExists(
+            Long groupSpaceId,
+            Long invitationId,
+            Long createdByMemberId,
+            Instant now
+    ) {
+        return invitationRepository.findScopedForUpdate(
+                groupSpaceId,
+                invitationId,
+                createdByMemberId,
+                now
+        );
     }
 
     private GroupMember findActiveMember(Long groupSpaceId, Long accountId) {

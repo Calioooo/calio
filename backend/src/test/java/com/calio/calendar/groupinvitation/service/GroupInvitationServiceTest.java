@@ -108,6 +108,34 @@ class GroupInvitationServiceTest {
     }
 
     @Test
+    @DisplayName("초대 취소는 그룹과 active member를 잠근 뒤 취소 가능한 초대장을 삭제한다")
+    void revokeLocksScopeAndDeletesRevocableInvitation() {
+        // given
+        GroupInvitation invitation = new GroupInvitation(
+                GROUP_SPACE_ID,
+                MEMBER_ID,
+                new byte[32],
+                new byte[32],
+                NOW.plusSeconds(3600)
+        );
+        when(queryService.getRevocableInvitationIfExists(
+                GROUP_SPACE_ID,
+                40L,
+                MEMBER_ID,
+                NOW
+        )).thenReturn(java.util.Optional.of(invitation));
+
+        // when
+        service.revoke(ACCOUNT_ID, GROUP_SPACE_ID, 40L);
+
+        // then
+        verify(queryService).getGroupSpaceForUpdate(GROUP_SPACE_ID);
+        verify(queryService).getActiveMemberForUpdate(GROUP_SPACE_ID, ACCOUNT_ID);
+        verify(queryService).getRevocableInvitationIfExists(GROUP_SPACE_ID, 40L, MEMBER_ID, NOW);
+        verify(commandService).delete(invitation);
+    }
+
+    @Test
     @DisplayName("초대장 목록은 Query의 domain 결과를 summary 응답으로 변환한다")
     void listMapsQueryResultsToSummaryResponse() {
         // given

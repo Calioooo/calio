@@ -2,7 +2,6 @@ package com.calio.calendar.groupinvitation.controller;
 
 import com.calio.calendar.groupinvitation.controller.dto.GroupInvitationListResponse;
 import com.calio.calendar.groupinvitation.controller.dto.IssueGroupInvitationResponse;
-import com.calio.calendar.groupinvitation.service.GroupInvitationCommandService;
 import com.calio.calendar.groupinvitation.service.GroupInvitationService;
 import com.calio.calendar.security.AuthenticatedAccount;
 import java.net.URI;
@@ -22,14 +21,9 @@ import org.springframework.web.bind.annotation.RestController;
 public class GroupInvitationController {
 
     private final GroupInvitationService groupInvitationService;
-    private final GroupInvitationCommandService commandService;
 
-    public GroupInvitationController(
-            GroupInvitationService groupInvitationService,
-            GroupInvitationCommandService commandService
-    ) {
+    public GroupInvitationController(GroupInvitationService groupInvitationService) {
         this.groupInvitationService = groupInvitationService;
-        this.commandService = commandService;
     }
 
     @PostMapping
@@ -60,7 +54,7 @@ public class GroupInvitationController {
             @PathVariable("groupSpaceId") Long groupSpaceId,
             @PathVariable("invitationId") Long invitationId
     ) {
-        commandService.revoke(account.accountId(), groupSpaceId, invitationId);
+        groupInvitationService.revoke(account.accountId(), groupSpaceId, invitationId);
         return ResponseEntity.noContent().build();
     }
 }
