@@ -48,7 +48,7 @@ public class NationalHolidayService {
         }
     }
 
-    public void syncYear(int year) {
+    private void syncYear(int year) {
         HolidayApiResponse response = null;
         try {
             response = holidayApiClient.fetchHolidays(year);

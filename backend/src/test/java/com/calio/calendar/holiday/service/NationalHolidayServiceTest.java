@@ -16,6 +16,8 @@ import com.calio.calendar.holiday.client.HolidayApiClient;
 import com.calio.calendar.holiday.client.dto.HolidayApiItem;
 import com.calio.calendar.holiday.client.dto.HolidayApiResponse;
 import com.calio.calendar.holiday.controller.dto.NationalHolidayResponse;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
@@ -42,6 +44,16 @@ class NationalHolidayServiceTest {
 
     @InjectMocks
     private NationalHolidayService nationalHolidayService;
+
+    @Test
+    @DisplayName("단일 연도 동기화는 연도 범위 유스케이스 내부에서만 실행한다")
+    void syncYearIsPrivate() throws NoSuchMethodException {
+        // when
+        Method syncYear = NationalHolidayService.class.getDeclaredMethod("syncYear", int.class);
+
+        // then
+        assertThat(Modifier.isPrivate(syncYear.getModifiers())).isTrue();
+    }
 
     @Test
     @DisplayName("유효한 날짜 범위의 공휴일 조회는 QueryService에 위임한다")
@@ -91,7 +103,7 @@ class NationalHolidayServiceTest {
         ));
 
         // when
-        nationalHolidayService.syncYear(2026);
+        nationalHolidayService.syncYearRange(2026, 2026);
 
         // then
         @SuppressWarnings("unchecked")
@@ -110,7 +122,7 @@ class NationalHolidayServiceTest {
                 .willReturn(new HolidayApiResponse("99", List.of()));
 
         // when
-        nationalHolidayService.syncYear(2026);
+        nationalHolidayService.syncYearRange(2026, 2026);
 
         // then
         verifyNoInteractions(nationalHolidayCommandService);
@@ -126,7 +138,7 @@ class NationalHolidayServiceTest {
         ));
 
         // when
-        nationalHolidayService.syncYear(2026);
+        nationalHolidayService.syncYearRange(2026, 2026);
 
         // then
         verifyNoInteractions(nationalHolidayCommandService);
@@ -167,7 +179,7 @@ class NationalHolidayServiceTest {
         ));
 
         // when
-        nationalHolidayService.syncYear(2026);
+        nationalHolidayService.syncYearRange(2026, 2026);
 
         // then
         verifyNoInteractions(nationalHolidayCommandService);
