@@ -10,7 +10,6 @@ import com.calio.calendar.groupspace.controller.dto.GroupSpaceListResponse;
 import com.calio.calendar.groupspace.controller.dto.GroupSpaceSummaryResponse;
 import com.calio.calendar.groupspace.controller.dto.UpdateGroupSpaceRequest;
 import com.calio.calendar.groupspace.domain.GroupMember;
-import com.calio.calendar.groupspace.domain.GroupMemberStatus;
 import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.domain.GroupSpaceFields;
 import com.calio.calendar.groupspace.repository.GroupMemberRepository;
@@ -27,6 +26,7 @@ public class GroupSpaceService {
 
     private final GroupSpaceRepository groupSpaceRepository;
     private final GroupMemberRepository groupMemberRepository;
+    private final GroupSpaceQueryService queryService;
     private final AccountRepository accountRepository;
     private final GroupInvitationCommandService invitationCommandService;
     private final GroupScheduleShareCleanupPort groupScheduleShareCleanupPort;
@@ -36,6 +36,7 @@ public class GroupSpaceService {
     public GroupSpaceService(
             GroupSpaceRepository groupSpaceRepository,
             GroupMemberRepository groupMemberRepository,
+            GroupSpaceQueryService queryService,
             AccountRepository accountRepository,
             GroupInvitationCommandService invitationCommandService,
             GroupScheduleShareCleanupPort groupScheduleShareCleanupPort,
@@ -43,6 +44,7 @@ public class GroupSpaceService {
     ) {
         this.groupSpaceRepository = groupSpaceRepository;
         this.groupMemberRepository = groupMemberRepository;
+        this.queryService = queryService;
         this.accountRepository = accountRepository;
         this.invitationCommandService = invitationCommandService;
         this.groupScheduleShareCleanupPort = groupScheduleShareCleanupPort;
@@ -66,11 +68,8 @@ public class GroupSpaceService {
 
     @Transactional(readOnly = true)
     public GroupSpaceListResponse list(Long accountId) {
-        List<GroupSpaceSummaryResponse> groupSpaces = groupMemberRepository
-                .findByAccountIdAndStatusOrderByStatusChangedAtDescGroupSpaceIdDesc(
-                        accountId,
-                        GroupMemberStatus.ACTIVE
-                )
+        List<GroupSpaceSummaryResponse> groupSpaces = queryService
+                .listActiveMemberships(accountId)
                 .stream()
                 .map(this::toSummary)
                 .toList();
@@ -89,8 +88,8 @@ public class GroupSpaceService {
             Long groupSpaceId,
             UpdateGroupSpaceRequest request
     ) {
-        GroupSpace groupSpace = findLockedGroupSpace(groupSpaceId);
-        GroupMember membership = findActiveMembership(groupSpaceId, accountId);
+        GroupSpace groupSpace = queryService.lockGroupSpace(groupSpaceId);
+        GroupMember membership = queryService.getActiveMembership(groupSpaceId, accountId);
         requireOwner(groupSpace, membership);
 
         String name = GroupSpaceFields.normalizeName(request.name());
@@ -102,8 +101,8 @@ public class GroupSpaceService {
 
     @Transactional
     public void delete(Long accountId, Long groupSpaceId) {
-        GroupSpace groupSpace = findLockedGroupSpace(groupSpaceId);
-        GroupMember membership = findActiveMembership(groupSpaceId, accountId);
+        GroupSpace groupSpace = queryService.lockGroupSpace(groupSpaceId);
+        GroupMember membership = queryService.getActiveMembership(groupSpaceId, accountId);
         requireOwner(groupSpace, membership);
 
         groupMemberRepository.findAllByGroupSpaceIdForUpdateOrderById(groupSpaceId);
@@ -130,18 +129,8 @@ public class GroupSpaceService {
         }
     }
 
-    private GroupSpace findLockedGroupSpace(Long groupSpaceId) {
-        return groupSpaceRepository.findByIdForUpdate(groupSpaceId)
-                .orElseThrow(GroupSpaceService::groupSpaceNotFound);
-    }
-
     private GroupMember findActiveMembership(Long groupSpaceId, Long accountId) {
-        return groupMemberRepository.findByGroupSpaceIdAndAccountIdAndStatus(
-                        groupSpaceId,
-                        accountId,
-                        GroupMemberStatus.ACTIVE
-                )
-                .orElseThrow(GroupSpaceService::groupSpaceNotFound);
+        return queryService.getActiveMembership(groupSpaceId, accountId);
     }
 
     private void requireOwner(GroupSpace groupSpace, GroupMember membership) {
@@ -169,10 +158,7 @@ public class GroupSpaceService {
     }
 
     private int activeMemberCount(Long groupSpaceId) {
-        return groupMemberRepository.countByGroupSpace_IdAndStatus(
-                groupSpaceId,
-                GroupMemberStatus.ACTIVE
-        );
+        return queryService.getActiveMemberCount(groupSpaceId);
     }
 
     private static CalioException groupSpaceNotFound() {
