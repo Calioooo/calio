@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@Transactional
 public class GroupInvitationCommandService {
 
     private final GroupInvitationRepository invitationRepository;
@@ -69,7 +70,6 @@ public class GroupInvitationCommandService {
         );
     }
 
-    @Transactional
     public void revoke(Long accountId, Long groupSpaceId, Long invitationId) {
         lockGroupSpace(groupSpaceId);
         GroupMember member = lockActiveMember(groupSpaceId, accountId);
@@ -95,7 +95,6 @@ public class GroupInvitationCommandService {
         return invitations.size();
     }
 
-    @Transactional
     public void deleteAllByGroupSpaceId(Long groupSpaceId) {
         List<GroupInvitation> invitations =
                 invitationRepository.findAllByGroupSpaceIdForUpdateOrderById(groupSpaceId);
