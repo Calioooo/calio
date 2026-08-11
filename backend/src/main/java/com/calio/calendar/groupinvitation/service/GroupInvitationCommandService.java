@@ -1,15 +1,12 @@
 package com.calio.calendar.groupinvitation.service;
 
-import com.calio.calendar.groupinvitation.config.GroupInvitationProperties;
 import com.calio.calendar.groupinvitation.controller.dto.IssueGroupInvitationResponse;
 import com.calio.calendar.groupinvitation.domain.GroupInvitation;
 import com.calio.calendar.groupinvitation.repository.GroupInvitationRepository;
 import com.calio.calendar.groupinvitation.service.dto.InvitationCredentialPair;
 import java.time.Instant;
 import java.util.List;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -18,16 +15,13 @@ public class GroupInvitationCommandService {
 
     private final GroupInvitationRepository invitationRepository;
     private final InvitationCredentialService credentialService;
-    private final GroupInvitationProperties properties;
 
     public GroupInvitationCommandService(
             GroupInvitationRepository invitationRepository,
-            InvitationCredentialService credentialService,
-            GroupInvitationProperties properties
+            InvitationCredentialService credentialService
     ) {
         this.invitationRepository = invitationRepository;
         this.credentialService = credentialService;
-        this.properties = properties;
     }
 
     public IssueGroupInvitationResponse create(
@@ -57,12 +51,7 @@ public class GroupInvitationCommandService {
         invitationRepository.flush();
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public int deleteExpiredBatch(Instant cutoff) {
-        List<GroupInvitation> invitations = invitationRepository.findCleanupBatch(
-                cutoff,
-                PageRequest.of(0, properties.getCleanupBatchSize())
-        );
+    public int delete(List<GroupInvitation> invitations) {
         invitationRepository.deleteAllInBatch(invitations);
         return invitations.size();
     }

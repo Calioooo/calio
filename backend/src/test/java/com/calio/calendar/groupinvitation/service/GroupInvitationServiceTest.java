@@ -22,12 +22,15 @@ import com.calio.calendar.groupspace.domain.GroupMember;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Pageable;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.AbstractPlatformTransactionManager;
@@ -133,6 +136,29 @@ class GroupInvitationServiceTest {
         verify(queryService).getActiveMemberForUpdate(GROUP_SPACE_ID, ACCOUNT_ID);
         verify(queryService).getRevocableInvitationIfExists(GROUP_SPACE_ID, 40L, MEMBER_ID, NOW);
         verify(commandService).delete(invitation);
+    }
+
+    @Test
+    @DisplayName("만료 초대장 batch 삭제는 configured 크기로 조회한 목록의 삭제 개수를 반환한다")
+    void deleteExpiredBatchQueriesConfiguredPageAndReturnsDeletedCount() {
+        // given
+        Instant cutoff = NOW.minusSeconds(3600);
+        List<GroupInvitation> invitations = List.of(
+                new GroupInvitation(GROUP_SPACE_ID, MEMBER_ID, new byte[32], new byte[32], cutoff)
+        );
+        when(queryService.listExpiredBefore(eq(cutoff), any(Pageable.class))).thenReturn(invitations);
+        when(commandService.delete(invitations)).thenReturn(1);
+
+        // when
+        int deletedCount = service.deleteExpiredBatch(cutoff);
+
+        // then
+        ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
+        verify(queryService).listExpiredBefore(eq(cutoff), pageable.capture());
+        assertThat(pageable.getValue().getPageNumber()).isZero();
+        assertThat(pageable.getValue().getPageSize()).isEqualTo(1000);
+        verify(commandService).delete(invitations);
+        assertThat(deletedCount).isEqualTo(1);
     }
 
     @Test

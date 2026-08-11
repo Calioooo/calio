@@ -20,7 +20,6 @@ import com.calio.calendar.auth.service.AccessTokenEncoder;
 import com.calio.calendar.groupinvitation.domain.GroupInvitation;
 import com.calio.calendar.groupinvitation.domain.InvitationCredentialType;
 import com.calio.calendar.groupinvitation.repository.GroupInvitationRepository;
-import com.calio.calendar.groupinvitation.service.GroupInvitationCommandService;
 import com.calio.calendar.groupinvitation.service.GroupInvitationService;
 import com.calio.calendar.groupinvitation.service.InvitationCredentialService;
 import com.calio.calendar.groupspace.controller.dto.CreateGroupSpaceRequest;
@@ -102,9 +101,6 @@ class GroupInvitationControllerTest {
 
     @Autowired
     private GroupInvitationService invitationService;
-
-    @Autowired
-    private GroupInvitationCommandService invitationCommandService;
 
     @Autowired
     private GroupMembershipService groupMembershipService;
@@ -368,7 +364,7 @@ class GroupInvitationControllerTest {
                 .andExpect(jsonPath("$.errorCode").value("GROUP_INVITATION_EXPIRED"));
 
         // when
-        invitationCommandService.deleteExpiredBatch(NOW.minus(Duration.ofHours(24)));
+        invitationService.deleteExpiredBatch(NOW.minus(Duration.ofHours(24)));
 
         // then
         assertThat(invitationRepository.existsById(invitation.getId())).isFalse();

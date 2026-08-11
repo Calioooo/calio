@@ -14,6 +14,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -95,6 +96,10 @@ public class GroupInvitationQueryService {
                 createdByMemberId,
                 now
         );
+    }
+
+    public List<GroupInvitation> listExpiredBefore(Instant cutoff, Pageable pageable) {
+        return invitationRepository.findCleanupBatch(cutoff, pageable);
     }
 
     private GroupMember findActiveMember(Long groupSpaceId, Long accountId) {

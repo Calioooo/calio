@@ -9,7 +9,7 @@ import static org.mockito.Mockito.when;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.groupinvitation.config.GroupInvitationProperties;
-import com.calio.calendar.groupinvitation.service.GroupInvitationCommandService;
+import com.calio.calendar.groupinvitation.service.GroupInvitationService;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -24,7 +24,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class GroupInvitationCleanupSchedulerTest {
 
     @Mock
-    private GroupInvitationCommandService commandService;
+    private GroupInvitationService groupInvitationService;
 
     @Test
     @DisplayName("cleanup은 retention cutoff로 batch가 가득 찬 동안 독립 batch 삭제를 반복한다")
@@ -34,17 +34,17 @@ class GroupInvitationCleanupSchedulerTest {
         Instant cutoff = Instant.parse("2026-07-27T08:00:00Z");
         GroupInvitationProperties properties = properties(2, 10);
         GroupInvitationCleanupScheduler scheduler = new GroupInvitationCleanupScheduler(
-                commandService,
+                groupInvitationService,
                 properties,
                 Clock.fixed(now, ZoneOffset.UTC)
         );
-        when(commandService.deleteExpiredBatch(cutoff)).thenReturn(2, 2, 1);
+        when(groupInvitationService.deleteExpiredBatch(cutoff)).thenReturn(2, 2, 1);
 
         // when
         scheduler.deleteRetainedExpiredInvitations();
 
         // then
-        verify(commandService, times(3)).deleteExpiredBatch(cutoff);
+        verify(groupInvitationService, times(3)).deleteExpiredBatch(cutoff);
     }
 
     @Test
@@ -55,17 +55,17 @@ class GroupInvitationCleanupSchedulerTest {
         Instant cutoff = Instant.parse("2026-07-27T08:00:00Z");
         GroupInvitationProperties properties = properties(2, 3);
         GroupInvitationCleanupScheduler scheduler = new GroupInvitationCleanupScheduler(
-                commandService,
+                groupInvitationService,
                 properties,
                 Clock.fixed(now, ZoneOffset.UTC)
         );
-        when(commandService.deleteExpiredBatch(cutoff)).thenReturn(2);
+        when(groupInvitationService.deleteExpiredBatch(cutoff)).thenReturn(2);
 
         // when
         scheduler.deleteRetainedExpiredInvitations();
 
         // then
-        verify(commandService, times(3)).deleteExpiredBatch(cutoff);
+        verify(groupInvitationService, times(3)).deleteExpiredBatch(cutoff);
     }
 
     @Test
@@ -76,11 +76,11 @@ class GroupInvitationCleanupSchedulerTest {
         Instant cutoff = Instant.parse("2026-07-27T08:00:00Z");
         IllegalStateException cause = new IllegalStateException("cleanup failed");
         GroupInvitationCleanupScheduler scheduler = new GroupInvitationCleanupScheduler(
-                commandService,
+                groupInvitationService,
                 properties(2, 3),
                 Clock.fixed(now, ZoneOffset.UTC)
         );
-        when(commandService.deleteExpiredBatch(cutoff)).thenThrow(cause);
+        when(groupInvitationService.deleteExpiredBatch(cutoff)).thenThrow(cause);
 
         // when, then
         assertThatThrownBy(scheduler::deleteRetainedExpiredInvitations)

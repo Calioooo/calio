@@ -13,11 +13,14 @@ import com.calio.calendar.groupinvitation.service.dto.InvitationCredentialPair;
 import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.domain.GroupMember;
 import java.time.Clock;
+import java.time.Instant;
 import java.util.Locale;
 import java.util.Set;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
@@ -98,6 +101,14 @@ public class GroupInvitationService {
                 )
                 .orElseThrow(GroupInvitationService::invitationNotFound);
         commandService.delete(invitation);
+    }
+
+    public int deleteExpiredBatch(Instant cutoff) {
+        List<GroupInvitation> invitations = queryService.listExpiredBefore(
+                cutoff,
+                PageRequest.of(0, properties.getCleanupBatchSize())
+        );
+        return commandService.delete(invitations);
     }
 
     public IssueGroupInvitationResponse issue(Long accountId, Long groupSpaceId) {
