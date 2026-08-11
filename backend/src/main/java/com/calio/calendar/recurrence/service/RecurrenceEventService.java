@@ -125,9 +125,8 @@ public class RecurrenceEventService {
 
     @Transactional
     public void deleteRecurrenceEvent(Long accountId, Long recurrenceId) {
-        RecurrenceEvent recurrenceEvent = recurrenceEventQueryService
-                .findRecurrenceEventForUpdate(accountId, recurrenceId);
-        recurrenceEventCommandService.deleteRecurrenceEvent(recurrenceEvent);
+        recurrenceEventQueryService.findRecurrenceEventForUpdate(accountId, recurrenceId);
+        recurrenceEventCommandService.deleteRecurrenceEvent(recurrenceId);
     }
 
     @Transactional

@@ -189,7 +189,7 @@ class RecurrenceEventServiceTest {
         deletionOrder.verify(recurrenceEventRepository).findByIdAndAccountIdForUpdate(10L, 1L);
         deletionOrder.verify(recurrenceEventOverrideRepository).deleteAllByRecurrenceEventIds(List.of(10L));
         deletionOrder.verify(eventRepository).deleteAllByRecurrenceEventIds(List.of(10L));
-        deletionOrder.verify(recurrenceEventRepository).delete(recurrenceEvent);
+        deletionOrder.verify(recurrenceEventRepository).deleteAllByIds(List.of(10L));
     }
 
     @Test

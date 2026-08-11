@@ -2,6 +2,7 @@ package com.calio.calendar.recurrence.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -20,6 +21,7 @@ import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -83,6 +85,23 @@ class RecurrenceEventCommandServiceTest {
         verify(recurrenceEventOverrideRepository).saveAndFlush(override);
         assertThat(result).isSameAs(override);
         assertThat(override.isDeleted()).isFalse();
+    }
+
+    @Test
+    @DisplayName("반복 일정 삭제 command는 전달받은 ID의 자식 상태를 master보다 먼저 삭제한다")
+    void givenRecurrenceId_whenDeleteRecurrenceEvent_thenDeletesChildrenBeforeMaster() {
+        // when
+        recurrenceEventCommandService.deleteRecurrenceEvent(10L);
+
+        // then
+        InOrder deletionOrder = inOrder(
+                recurrenceEventOverrideRepository,
+                eventRepository,
+                recurrenceEventRepository
+        );
+        deletionOrder.verify(recurrenceEventOverrideRepository).deleteAllByRecurrenceEventIds(List.of(10L));
+        deletionOrder.verify(eventRepository).deleteAllByRecurrenceEventIds(List.of(10L));
+        deletionOrder.verify(recurrenceEventRepository).deleteAllByIds(List.of(10L));
     }
 
     @Test

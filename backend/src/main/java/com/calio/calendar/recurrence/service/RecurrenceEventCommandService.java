@@ -50,11 +50,10 @@ public class RecurrenceEventCommandService {
         return recurrenceEventOverrideRepository.saveAndFlush(override);
     }
 
-    public void deleteRecurrenceEvent(RecurrenceEvent recurrenceEvent) {
-        Long recurrenceId = recurrenceEvent.getId();
+    public void deleteRecurrenceEvent(Long recurrenceId) {
         recurrenceEventOverrideRepository.deleteAllByRecurrenceEventIds(List.of(recurrenceId));
         eventRepository.deleteAllByRecurrenceEventIds(List.of(recurrenceId));
-        recurrenceEventRepository.delete(recurrenceEvent);
+        recurrenceEventRepository.deleteAllByIds(List.of(recurrenceId));
     }
 
     public void deleteRecurrenceOccurrence(RecurrenceEventOverride override) {
