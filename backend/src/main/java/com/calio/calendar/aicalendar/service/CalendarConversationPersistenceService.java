@@ -11,6 +11,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class CalendarConversationPersistenceService {
 
+    private static final int MAX_HISTORY_SIZE = 20;
+
     private final CalendarConversationQueryService conversationQueryService;
     private final CalendarConversationCommandService conversationCommandService;
     private final Clock clock;
@@ -49,7 +51,7 @@ public class CalendarConversationPersistenceService {
         );
         return new CalendarConversationTurn(
                 conversation.getConversationId(),
-                conversationQueryService.getRecentHistory(conversation.getId())
+                conversationQueryService.getRecentHistory(conversation.getId(), MAX_HISTORY_SIZE)
         );
     }
 
