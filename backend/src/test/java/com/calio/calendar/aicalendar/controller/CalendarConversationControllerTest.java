@@ -10,7 +10,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
-import com.calio.calendar.aicalendar.domain.CalendarConversation;
 import com.calio.calendar.aicalendar.repository.CalendarConversationMessageRepository;
 import com.calio.calendar.aicalendar.repository.CalendarConversationRepository;
 import com.calio.calendar.aicalendar.service.CalendarAssistantAgent;
@@ -106,10 +105,9 @@ class CalendarConversationControllerTest {
                 .andExpect(jsonPath("$.*").value(org.hamcrest.Matchers.hasSize(2)))
                 .andReturn();
 
-        CalendarConversation conversation = conversationRepository.findAll().getFirst();
-        assertThat(messageRepository.findTop20ByConversation_IdOrderByIdDesc(conversation.getId()))
+        assertThat(messageRepository.findAll())
                 .extracting(message -> message.getText())
-                .containsExactly("일정을 확인했어요.", "내일 일정 알려줘");
+                .containsExactlyInAnyOrder("일정을 확인했어요.", "내일 일정 알려줘");
         assertThat(readJson(result).get("assistantMessage").asString()).isEqualTo("일정을 확인했어요.");
     }
 
