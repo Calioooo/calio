@@ -105,6 +105,7 @@ public enum ErrorCode {
             HttpStatus.CONFLICT,
             "External event mutation is not supported."
     ),
+    AI_CALENDAR_CONVERSATION_NOT_FOUND(HttpStatus.NOT_FOUND, "AI calendar conversation not found."),
 
     HOLIDAY_API_CONFIGURATION_MISSING(
             HttpStatus.INTERNAL_SERVER_ERROR,
