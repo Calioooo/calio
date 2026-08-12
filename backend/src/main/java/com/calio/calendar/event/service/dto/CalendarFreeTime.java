@@ -1,4 +1,4 @@
-package com.calio.calendar.aicalendar.service.tool.dto;
+package com.calio.calendar.event.service.dto;
 
 import java.util.List;
 

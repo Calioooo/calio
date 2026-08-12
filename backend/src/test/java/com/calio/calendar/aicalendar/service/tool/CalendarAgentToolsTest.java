@@ -1,22 +1,26 @@
 package com.calio.calendar.aicalendar.service.tool;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.calio.calendar.aicalendar.config.CalendarAIProperties;
 import com.calio.calendar.aicalendar.service.CalendarAgentObservationService;
+import com.calio.calendar.aicalendar.service.tool.dto.CalendarAgentToolRequestContext;
 import com.calio.calendar.aicalendar.service.tool.dto.CalendarLookupToolRequest;
 import com.calio.calendar.aicalendar.service.tool.dto.FreeTimeSearchToolRequest;
 import com.calio.calendar.event.controller.dto.EventResponse;
 import com.calio.calendar.event.service.EventService;
+import com.calio.calendar.event.service.dto.CalendarFreeTime;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.ai.chat.model.ToolContext;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -37,10 +41,10 @@ class CalendarAgentToolsTest {
         CalendarAgentTools tools = tools();
 
         // when
-        var result = tools.lookupCalendarEvents(new CalendarLookupToolRequest(
-                "2026-07-01",
-                "2026-07-01"
-        ));
+        var result = tools.lookupCalendarEvents(
+                new CalendarLookupToolRequest("2026-07-01", "2026-07-01"),
+                toolContext(tools)
+        );
 
         // then
         assertThat(result).singleElement().satisfies(event -> {
@@ -53,23 +57,35 @@ class CalendarAgentToolsTest {
     }
 
     @Test
-    @DisplayName("free-time tool은 timed event만 half-open interval로 차단하고 all-day event는 notice로 남긴다")
-    void givenTimedAndAllDayEvents_whenFindFreeTime_thenReturnsFreeSlotsWithAllDayNotice() {
+    @DisplayName("free-time tool은 EventService가 계산한 빈 시간을 반환한다")
+    void givenAvailableTimes_whenFindFreeTime_thenReturnsEventServiceResult() {
         // given
-        when(eventService.listEvents(any(), any(), any())).thenReturn(List.of(
-                timedEvent(),
-                allDayEvent()
-        ));
+        when(eventService.findAvailableTimes(any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(List.of(
+                        new CalendarFreeTime(
+                                "2026-07-01T09:00:00Z",
+                                "2026-07-01T10:00:00Z",
+                                List.of("Holiday")
+                        ),
+                        new CalendarFreeTime(
+                                "2026-07-01T11:00:00Z",
+                                "2026-07-01T12:00:00Z",
+                                List.of("Holiday")
+                        )
+                ));
         CalendarAgentTools tools = tools();
 
         // when
-        var result = tools.findCalendarFreeTime(new FreeTimeSearchToolRequest(
-                "2026-07-01",
-                "2026-07-01",
-                "09:00",
-                "12:00",
-                60
-        ));
+        var result = tools.findCalendarFreeTime(
+                new FreeTimeSearchToolRequest(
+                        "2026-07-01",
+                        "2026-07-01",
+                        "09:00",
+                        "12:00",
+                        60
+                ),
+                toolContext(tools)
+        );
 
         // then
         assertThat(result.freeTimes()).hasSize(2);
@@ -78,17 +94,41 @@ class CalendarAgentToolsTest {
         assertThat(result.freeTimes().getFirst().allDayNotices()).containsExactly("Holiday");
         assertThat(result.freeTimes().get(1).start()).isEqualTo("2026-07-01T11:00:00Z");
         assertThat(result.freeTimes().get(1).end()).isEqualTo("2026-07-01T12:00:00Z");
+        verify(eventService).findAvailableTimes(any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("tool 호출 제한은 다른 요청의 ToolContext와 공유하지 않는다")
+    void givenSeparateToolContexts_whenOneRequestExceedsCallLimit_thenAnotherRequestCanCallTool() {
+        // given
+        when(eventService.listEvents(any(), any(), any())).thenReturn(List.of(timedEvent()));
+        CalendarAIProperties properties = new CalendarAIProperties();
+        properties.setMaxToolCalls(1);
+        CalendarAgentTools tools = new CalendarAgentTools(eventService, properties, observationService);
+        CalendarLookupToolRequest request = new CalendarLookupToolRequest("2026-07-01", "2026-07-01");
+        ToolContext firstRequest = toolContext(tools);
+
+        // when, then
+        tools.lookupCalendarEvents(request, firstRequest);
+        assertThatThrownBy(() -> tools.lookupCalendarEvents(request, firstRequest))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Calendar agent tool call limit exceeded.");
+
+        assertThat(tools.lookupCalendarEvents(request, toolContext(tools))).isNotEmpty();
     }
 
     private CalendarAgentTools tools() {
         return new CalendarAgentTools(
-                1L,
-                "conversation-id",
-                ZoneId.of("UTC"),
                 eventService,
                 new CalendarAIProperties(),
                 observationService
         );
+    }
+
+    private ToolContext toolContext(CalendarAgentTools tools) {
+        return new ToolContext(tools.createToolContext(
+                new CalendarAgentToolRequestContext(1L, "conversation-id", ZoneId.of("UTC"))
+        ));
     }
 
     private EventResponse timedEvent() {
@@ -110,22 +150,4 @@ class CalendarAgentToolsTest {
         );
     }
 
-    private EventResponse allDayEvent() {
-        return new EventResponse(
-                2L,
-                "Holiday",
-                "Holiday details",
-                Instant.parse("2026-07-01T00:00:00Z"),
-                Instant.parse("2026-07-02T00:00:00Z"),
-                true,
-                null,
-                false,
-                null,
-                false,
-                null,
-                null,
-                Instant.parse("2026-07-01T00:00:00Z"),
-                Instant.parse("2026-07-01T00:00:00Z")
-        );
-    }
 }
