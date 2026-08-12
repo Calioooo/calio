@@ -6,7 +6,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.aicalendar.domain.CalendarConversation;
-import com.calio.calendar.aicalendar.domain.CalendarConversationMessageRole;
 import com.calio.calendar.aicalendar.repository.CalendarConversationMessageRepository;
 import com.calio.calendar.aicalendar.repository.CalendarConversationRepository;
 import com.calio.calendar.aicalendar.service.dto.CalendarConversationHistoryMessage;
@@ -95,7 +94,7 @@ class CalendarConversationPersistenceServiceTest {
     }
 
     @Test
-    @DisplayName("30일보다 오래 활동하지 않은 대화는 내부 message와 함께 삭제한다")
+    @DisplayName("30일 동안 활동하지 않은 대화는 내부 message와 함께 삭제한다")
     void givenInactiveConversation_whenDeleteInactiveConversations_thenDeletesConversationAndMessages() {
         // given
         Account account = accountRepository.saveAndFlush(new Account());
@@ -109,7 +108,7 @@ class CalendarConversationPersistenceServiceTest {
 
         // when
         int deletedCount = persistenceService.deleteInactiveConversations(
-                Instant.parse("2026-07-01T00:00:00Z")
+                Instant.parse("2026-07-01T00:00:01Z")
         );
 
         // then
