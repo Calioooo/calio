@@ -223,9 +223,9 @@ class GroupInvitationServiceTest {
         );
         ReflectionTestUtils.setField(created, "id", 99L);
         when(commandService.create(GROUP_SPACE_ID, MEMBER_ID, first, NOW.plus(properties().getTtl())))
-                .thenThrow(credentialCollision("uk_group_invitations_link_token_hash"));
+                .thenThrow(retryableCredentialCollision());
         when(commandService.create(GROUP_SPACE_ID, MEMBER_ID, second, NOW.plus(properties().getTtl())))
-                .thenThrow(credentialCollision("uk_group_invitations_invite_code_hash"));
+                .thenThrow(retryableCredentialCollision());
         when(commandService.create(GROUP_SPACE_ID, MEMBER_ID, third, NOW.plus(properties().getTtl())))
                 .thenReturn(created);
         when(credentialService.inviteUrl(third.linkToken()))
@@ -256,11 +256,11 @@ class GroupInvitationServiceTest {
         InvitationCredentialPair third = pair("C");
         when(credentialService.generatePair()).thenReturn(first, second, third);
         when(commandService.create(GROUP_SPACE_ID, MEMBER_ID, first, NOW.plus(properties().getTtl())))
-                .thenThrow(credentialCollision("uk_group_invitations_link_token_hash"));
+                .thenThrow(retryableCredentialCollision());
         when(commandService.create(GROUP_SPACE_ID, MEMBER_ID, second, NOW.plus(properties().getTtl())))
-                .thenThrow(credentialCollision("uk_group_invitations_link_token_hash"));
+                .thenThrow(retryableCredentialCollision());
         when(commandService.create(GROUP_SPACE_ID, MEMBER_ID, third, NOW.plus(properties().getTtl())))
-                .thenThrow(credentialCollision("uk_group_invitations_link_token_hash"));
+                .thenThrow(retryableCredentialCollision());
 
         // when, then
         assertThatThrownBy(() -> service.issue(ACCOUNT_ID, GROUP_SPACE_ID))
@@ -299,10 +299,10 @@ class GroupInvitationServiceTest {
         );
     }
 
-    private DataIntegrityViolationException credentialCollision(String constraintName) {
-        return new DataIntegrityViolationException(
-                "insert failed",
-                new IllegalStateException("Duplicate entry for key '" + constraintName + "'")
+    private CalioException retryableCredentialCollision() {
+        return new CalioException(
+                ErrorCode.GROUP_INVITATION_CREDENTIAL_COLLISION,
+                new DataIntegrityViolationException("credential collision")
         );
     }
 

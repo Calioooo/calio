@@ -14,8 +14,6 @@ import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.domain.GroupMember;
 import java.time.Clock;
 import java.time.Instant;
-import java.util.Locale;
-import java.util.Set;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,11 +31,6 @@ public class GroupInvitationService {
 
     private static final Logger log = LoggerFactory.getLogger(GroupInvitationService.class);
     private static final int MAX_ISSUE_ATTEMPTS = 3;
-    private static final Set<String> CREDENTIAL_UNIQUE_CONSTRAINTS = Set.of(
-            "uk_group_invitations_link_token_hash",
-            "uk_group_invitations_invite_code_hash"
-    );
-
     private final InvitationCredentialService credentialService;
     private final GroupInvitationQueryService queryService;
     private final GroupInvitationCommandService commandService;
@@ -122,11 +115,13 @@ public class GroupInvitationService {
                 return issueTransaction.execute(
                         status -> issueOnce(accountId, groupSpaceId, credentials)
                 );
-            } catch (DataIntegrityViolationException exception) {
-                // A failed attempt is fully rolled back by TransactionTemplate.
-                if (!isCredentialCollision(exception)) {
-                    throw new CalioException(ErrorCode.GROUP_INVITATION_ISSUE_FAILED, exception);
+            } catch (CalioException exception) {
+                if (exception.getErrorCode() != ErrorCode.GROUP_INVITATION_CREDENTIAL_COLLISION) {
+                    throw exception;
                 }
+                // A credential collision attempt is fully rolled back by TransactionTemplate.
+            } catch (DataIntegrityViolationException exception) {
+                throw new CalioException(ErrorCode.GROUP_INVITATION_ISSUE_FAILED, exception);
             }
         }
 
@@ -156,24 +151,8 @@ public class GroupInvitationService {
         );
     }
 
-    private boolean isCredentialCollision(Throwable throwable) {
-        Throwable current = throwable;
-        while (current != null) {
-            String message = current.getMessage();
-            if (message != null && containsCredentialConstraint(message)) {
-                return true;
-            }
-            current = current.getCause();
-        }
-        return false;
-    }
-
     private static CalioException invitationNotFound() {
         return new CalioException(ErrorCode.GROUP_INVITATION_NOT_FOUND);
     }
 
-    private boolean containsCredentialConstraint(String message) {
-        String normalizedMessage = message.toLowerCase(Locale.ROOT);
-        return CREDENTIAL_UNIQUE_CONSTRAINTS.stream().anyMatch(normalizedMessage::contains);
-    }
 }

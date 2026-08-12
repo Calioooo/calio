@@ -35,6 +35,10 @@ public enum ErrorCode {
             HttpStatus.INTERNAL_SERVER_ERROR,
             "Group invitation generation failed."
     ),
+    GROUP_INVITATION_CREDENTIAL_COLLISION(
+            HttpStatus.INTERNAL_SERVER_ERROR,
+            "Group invitation credential collision."
+    ),
     GROUP_INVITATION_ISSUE_FAILED(
             HttpStatus.INTERNAL_SERVER_ERROR,
             "Group invitation issue failed."
