@@ -1,6 +1,6 @@
 package com.calio.calendar.aicalendar.service;
 
-import com.calio.calendar.aicalendar.config.CalendarAiProperties;
+import com.calio.calendar.aicalendar.config.CalendarAIProperties;
 import com.calio.calendar.aicalendar.service.dto.CalendarConversationHistoryMessage;
 import com.calio.calendar.aicalendar.service.tool.CalendarAgentTools;
 import com.calio.calendar.common.error.CalioException;
@@ -32,7 +32,7 @@ public class SpringAiCalendarAssistantAgent implements CalendarAssistantAgent, A
 
     private final ObjectProvider<ChatModel> chatModelProvider;
     private final EventService eventService;
-    private final CalendarAiProperties properties;
+    private final CalendarAIProperties properties;
     private final CalendarAssistantRequestPolicy requestPolicy;
     private final CalendarAgentObservationService observationService;
     private final Clock clock;
@@ -42,7 +42,7 @@ public class SpringAiCalendarAssistantAgent implements CalendarAssistantAgent, A
     public SpringAiCalendarAssistantAgent(
             ObjectProvider<ChatModel> chatModelProvider,
             EventService eventService,
-            CalendarAiProperties properties,
+            CalendarAIProperties properties,
             CalendarAssistantRequestPolicy requestPolicy,
             CalendarAgentObservationService observationService,
             Clock clock,

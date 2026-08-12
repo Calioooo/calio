@@ -10,7 +10,7 @@ public class CalendarAiOpenAiConfiguration {
 
     @Bean
     OpenAiHttpClientBuilderCustomizer calendarAiOpenAiHttpClientBuilderCustomizer(
-            CalendarAiProperties properties
+            CalendarAIProperties properties
     ) {
         return builder -> builder.timeout(Timeout.builder()
                 .connect(properties.getConnectionTimeout())

@@ -1,6 +1,6 @@
 package com.calio.calendar.aicalendar.service.tool;
 
-import com.calio.calendar.aicalendar.config.CalendarAiProperties;
+import com.calio.calendar.aicalendar.config.CalendarAIProperties;
 import com.calio.calendar.aicalendar.service.CalendarAgentObservationService;
 import com.calio.calendar.aicalendar.service.tool.dto.CalendarFreeTime;
 import com.calio.calendar.aicalendar.service.tool.dto.CalendarLookupToolRequest;
@@ -33,7 +33,7 @@ public class CalendarAgentTools {
     private final String conversationId;
     private final ZoneId timeZone;
     private final EventService eventService;
-    private final CalendarAiProperties properties;
+    private final CalendarAIProperties properties;
     private final CalendarAgentObservationService observationService;
     private final AtomicInteger callCount = new AtomicInteger();
 
@@ -42,7 +42,7 @@ public class CalendarAgentTools {
             String conversationId,
             ZoneId timeZone,
             EventService eventService,
-            CalendarAiProperties properties,
+            CalendarAIProperties properties,
             CalendarAgentObservationService observationService
     ) {
         this.accountId = accountId;

@@ -5,7 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.calio.calendar.aicalendar.config.CalendarAiProperties;
+import com.calio.calendar.aicalendar.config.CalendarAIProperties;
 import com.calio.calendar.aicalendar.service.CalendarAgentObservationService;
 import com.calio.calendar.aicalendar.service.tool.dto.CalendarLookupToolRequest;
 import com.calio.calendar.aicalendar.service.tool.dto.FreeTimeSearchToolRequest;
@@ -86,7 +86,7 @@ class CalendarAgentToolsTest {
                 "conversation-id",
                 ZoneId.of("UTC"),
                 eventService,
-                new CalendarAiProperties(),
+                new CalendarAIProperties(),
                 observationService
         );
     }

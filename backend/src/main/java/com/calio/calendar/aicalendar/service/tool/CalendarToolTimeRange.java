@@ -1,6 +1,6 @@
 package com.calio.calendar.aicalendar.service.tool;
 
-import com.calio.calendar.aicalendar.config.CalendarAiProperties;
+import com.calio.calendar.aicalendar.config.CalendarAIProperties;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import java.time.LocalDate;
@@ -23,7 +23,7 @@ final class CalendarToolTimeRange {
             String startDate,
             String endDate,
             ZoneId timeZone,
-            CalendarAiProperties properties
+            CalendarAIProperties properties
     ) {
         LocalDate start = LocalDate.parse(startDate);
         LocalDate end = LocalDate.parse(endDate);

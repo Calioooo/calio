@@ -6,7 +6,7 @@ import org.springframework.stereotype.Component;
 
 @Component
 @ConfigurationProperties(prefix = "ai-calendar.agent")
-public class CalendarAiProperties {
+public class CalendarAIProperties {
 
     private Duration runTimeout = Duration.ofSeconds(30);
     private Duration connectionTimeout = Duration.ofSeconds(5);
