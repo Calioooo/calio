@@ -9,10 +9,12 @@ import com.calio.calendar.aicalendar.domain.CalendarConversation;
 import com.calio.calendar.aicalendar.domain.CalendarConversationMessageRole;
 import com.calio.calendar.aicalendar.repository.CalendarConversationMessageRepository;
 import com.calio.calendar.aicalendar.repository.CalendarConversationRepository;
+import com.calio.calendar.aicalendar.service.dto.CalendarConversationHistoryMessage;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import java.time.Instant;
 import java.util.List;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -55,26 +57,26 @@ class CalendarConversationPersistenceServiceTest {
         String conversationId = persistenceService.createConversation(account.getId());
 
         // when
-        List<String> histories = java.util.stream.IntStream.rangeClosed(1, 21)
+        List<String> histories = IntStream.rangeClosed(1, 21)
                 .mapToObj(index -> persistenceService.recordUserMessage(
                         account.getId(),
                         conversationId,
                         "message-" + index
                 ))
-                .map(turn -> turn.history().stream().map(message -> message.text()).toList())
+                .map(turn -> turn.history().stream().map(CalendarConversationHistoryMessage::text).toList())
                 .toList()
                 .getLast();
 
         // then
         assertThat(histories).containsExactlyElementsOf(
-                java.util.stream.IntStream.rangeClosed(2, 21)
+                IntStream.rangeClosed(2, 21)
                         .mapToObj(index -> "message-" + index)
                         .toList()
         );
     }
 
     @Test
-    @DisplayName("다른 계정은 대화를 읽거나 메시지를 저장할 수 없다")
+    @DisplayName("다른 계정은 대화에 메시지를 저장할 수 없다")
     void givenConversationOwnedByAnotherAccount_whenRecordUserMessage_thenRejectsBeforePersisting() {
         // given
         Account owner = accountRepository.saveAndFlush(new Account());
@@ -93,7 +95,7 @@ class CalendarConversationPersistenceServiceTest {
     }
 
     @Test
-    @DisplayName("30일보다 오래 활동하지 않은 대화는 child message와 함께 삭제한다")
+    @DisplayName("30일보다 오래 활동하지 않은 대화는 내부 message와 함께 삭제한다")
     void givenInactiveConversation_whenDeleteInactiveConversations_thenDeletesConversationAndMessages() {
         // given
         Account account = accountRepository.saveAndFlush(new Account());
