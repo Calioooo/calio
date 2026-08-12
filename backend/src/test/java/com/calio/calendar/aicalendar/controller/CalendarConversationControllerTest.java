@@ -90,7 +90,7 @@ class CalendarConversationControllerTest {
             throws Exception {
         // given
         String conversationId = createConversation();
-        when(assistantAgent.answer(any(), any(), any(), any())).thenReturn("일정을 확인했어요.");
+        when(assistantAgent.answer(any())).thenReturn("일정을 확인했어요.");
 
         // when
         MvcResult result = mockMvc.perform(post("/api/ai/calendar/conversations/{conversationId}/messages", conversationId)
@@ -153,7 +153,7 @@ class CalendarConversationControllerTest {
     void givenProviderFailure_whenSendMessage_thenKeepsOnlyUserMessage() throws Exception {
         // given
         String conversationId = createConversation();
-        when(assistantAgent.answer(any(), any(), any(), any())).thenThrow(
+        when(assistantAgent.answer(any())).thenThrow(
                 new CalioException(ErrorCode.AI_CALENDAR_PROVIDER_UNAVAILABLE)
         );
 

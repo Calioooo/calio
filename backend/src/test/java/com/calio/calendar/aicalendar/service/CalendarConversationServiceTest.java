@@ -1,7 +1,6 @@
 package com.calio.calendar.aicalendar.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
@@ -10,8 +9,6 @@ import com.calio.calendar.aicalendar.domain.CalendarConversationMessageRole;
 import com.calio.calendar.aicalendar.repository.CalendarConversationMessageRepository;
 import com.calio.calendar.aicalendar.repository.CalendarConversationRepository;
 import com.calio.calendar.aicalendar.service.dto.CalendarConversationHistoryMessage;
-import com.calio.calendar.common.error.CalioException;
-import com.calio.calendar.common.error.ErrorCode;
 import java.time.Instant;
 import java.util.List;
 import java.util.stream.IntStream;
@@ -55,15 +52,15 @@ class CalendarConversationServiceTest {
         // given
         Account account = accountRepository.saveAndFlush(new Account());
         String conversationId = conversationService.createConversation(account.getId());
+        Long conversationRecordId = conversationRecordId(account.getId(), conversationId);
 
         // when
         List<String> histories = IntStream.rangeClosed(1, 21)
-                .mapToObj(index -> conversationService.recordUserMessage(
-                        account.getId(),
-                        conversationId,
+                .mapToObj(index -> conversationService.recordUserMessageAndGetRecentHistory(
+                        conversationRecordId,
                         "message-" + index
                 ))
-                .map(turn -> turn.history().stream().map(CalendarConversationHistoryMessage::text).toList())
+                .map(history -> history.stream().map(CalendarConversationHistoryMessage::text).toList())
                 .toList()
                 .getLast();
 
@@ -76,33 +73,15 @@ class CalendarConversationServiceTest {
     }
 
     @Test
-    @DisplayName("다른 계정은 대화에 메시지를 저장할 수 없다")
-    void givenConversationOwnedByAnotherAccount_whenRecordUserMessage_thenRejectsBeforePersisting() {
-        // given
-        Account owner = accountRepository.saveAndFlush(new Account());
-        Account otherAccount = accountRepository.saveAndFlush(new Account());
-        String conversationId = conversationService.createConversation(owner.getId());
-
-        // when, then
-        assertThatThrownBy(() -> conversationService.recordUserMessage(
-                otherAccount.getId(),
-                conversationId,
-                "다른 계정의 메시지"
-        )).isInstanceOfSatisfying(CalioException.class, exception ->
-                assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.AI_CALENDAR_CONVERSATION_NOT_FOUND)
-        );
-        assertThat(messageRepository.count()).isZero();
-    }
-
-    @Test
     @DisplayName("assistant 메시지를 기록하면 ASSISTANT 역할로 저장한다")
     void givenConversation_whenRecordAssistantMessage_thenSavesAssistantRole() {
         // given
         Account account = accountRepository.saveAndFlush(new Account());
         String conversationId = conversationService.createConversation(account.getId());
+        Long conversationRecordId = conversationRecordId(account.getId(), conversationId);
 
         // when
-        conversationService.recordAssistantMessage(account.getId(), conversationId, "일정을 확인했어요.");
+        conversationService.recordAssistantMessage(conversationRecordId, "일정을 확인했어요.");
 
         // then
         assertThat(messageRepository.findAll()).singleElement().satisfies(message -> {
@@ -117,7 +96,8 @@ class CalendarConversationServiceTest {
         // given
         Account account = accountRepository.saveAndFlush(new Account());
         String conversationId = conversationService.createConversation(account.getId());
-        conversationService.recordUserMessage(account.getId(), conversationId, "오래된 메시지");
+        Long conversationRecordId = conversationRecordId(account.getId(), conversationId);
+        conversationService.recordUserMessageAndGetRecentHistory(conversationRecordId, "오래된 메시지");
         CalendarConversation conversation = conversationRepository
                 .findByConversationIdAndAccount_Id(conversationId, account.getId())
                 .orElseThrow();
@@ -133,5 +113,11 @@ class CalendarConversationServiceTest {
         assertThat(deletedCount).isOne();
         assertThat(conversationRepository.count()).isZero();
         assertThat(messageRepository.count()).isZero();
+    }
+
+    private Long conversationRecordId(Long accountId, String conversationId) {
+        return conversationRepository.findByConversationIdAndAccount_Id(conversationId, accountId)
+                .orElseThrow()
+                .getId();
     }
 }

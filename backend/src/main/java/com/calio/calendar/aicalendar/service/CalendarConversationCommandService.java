@@ -35,11 +35,12 @@ public class CalendarConversationCommandService {
     }
 
     public void recordMessage(
-            CalendarConversation conversation,
+            Long conversationId,
             CalendarConversationMessageRole role,
             String message,
             Instant recordedAt
     ) {
+        CalendarConversation conversation = conversationRepository.getReferenceById(conversationId);
         messageRepository.save(new CalendarConversationMessage(conversation, role, message));
         conversation.touch(recordedAt);
     }
