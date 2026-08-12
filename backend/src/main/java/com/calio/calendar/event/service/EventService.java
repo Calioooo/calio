@@ -80,7 +80,7 @@ public class EventService {
 
     @Transactional
     public EventResponse updateEvent(Long accountId, Long eventId, UpdateEventRequest request) {
-        Event event = eventQueryService.findEvent(accountId, eventId);
+        Event event = eventCommandService.findEventForUpdate(accountId, eventId);
         rejectExternalEventMutation(accountId, eventId);
         CanonicalSchedule schedule = CanonicalSchedule.event(
                 request.startAt(),
@@ -95,14 +95,14 @@ public class EventService {
 
     @Transactional
     public EventResponse updateImportantEvent(Long accountId, Long eventId, UpdateImportantEventRequest request) {
-        Event event = eventQueryService.findEvent(accountId, eventId);
+        Event event = eventCommandService.findEventForUpdate(accountId, eventId);
         eventCommandService.updateImportantEvent(event, request.importantEvent());
         return EventResponse.from(event);
     }
 
     @Transactional
     public void deleteEvent(Long accountId, Long eventId) {
-        Event event = eventQueryService.findEvent(accountId, eventId);
+        Event event = eventCommandService.findEventForUpdate(accountId, eventId);
         rejectExternalEventMutation(accountId, eventId);
         eventCommandService.deleteEvent(event);
     }

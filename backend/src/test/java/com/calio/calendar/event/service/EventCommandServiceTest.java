@@ -1,17 +1,21 @@
 package com.calio.calendar.event.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.common.domain.CanonicalSchedule;
+import com.calio.calendar.common.error.CalioException;
+import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.event.controller.dto.UpdateEventRequest;
 import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.event.repository.EventRepository;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.domain.TagType;
 import java.time.Instant;
+import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -58,6 +62,36 @@ class EventCommandServiceTest {
         // then
         verify(eventRepository).save(event);
         assertThat(savedEvent).isSameAs(event);
+    }
+
+    @Test
+    @DisplayName("일정 잠금 조회는 계정과 일정 ID를 repository에 정확히 전달한다")
+    void givenOwnedEvent_whenFindForUpdate_thenReturnsLockedEvent() {
+        // given
+        Event event = event();
+        when(eventRepository.findByIdAndAccountIdForUpdate(10L, 1L))
+                .thenReturn(Optional.of(event));
+
+        // when
+        Event result = eventCommandService.findEventForUpdate(1L, 10L);
+
+        // then
+        assertThat(result).isSameAs(event);
+        verify(eventRepository).findByIdAndAccountIdForUpdate(10L, 1L);
+    }
+
+    @Test
+    @DisplayName("잠금 조회할 계정 소유 일정이 없으면 EVENT_NOT_FOUND를 반환한다")
+    void givenMissingOwnedEvent_whenFindForUpdate_thenThrowsEventNotFound() {
+        // given
+        when(eventRepository.findByIdAndAccountIdForUpdate(10L, 1L))
+                .thenReturn(Optional.empty());
+
+        // when, then
+        assertThatThrownBy(() -> eventCommandService.findEventForUpdate(1L, 10L))
+                .isInstanceOfSatisfying(CalioException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.EVENT_NOT_FOUND)
+                );
     }
 
     @Test

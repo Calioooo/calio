@@ -78,7 +78,7 @@ public class RecurrenceEventService {
             Long recurrenceId,
             UpdateRecurrenceEventRequest request
     ) {
-        RecurrenceEvent recurrenceEvent = recurrenceEventQueryService
+        RecurrenceEvent recurrenceEvent = recurrenceEventCommandService
                 .findRecurrenceEventForUpdate(accountId, recurrenceId);
         RecurrenceSchedule schedule = createSchedule(request);
         List<String> recurrenceRules = recurrenceEngine.validate(schedule, request.recurrence());
@@ -99,7 +99,7 @@ public class RecurrenceEventService {
             Long recurrenceId,
             UpdateRecurrenceOccurrenceRequest request
     ) {
-        RecurrenceEvent recurrenceEvent = recurrenceEventQueryService
+        RecurrenceEvent recurrenceEvent = recurrenceEventCommandService
                 .findRecurrenceEventForUpdate(accountId, recurrenceId);
         CanonicalSchedule schedule = CanonicalSchedule.recurrenceOverride(
                 request.startAt(),
@@ -125,13 +125,13 @@ public class RecurrenceEventService {
 
     @Transactional
     public void deleteRecurrenceEvent(Long accountId, Long recurrenceId) {
-        recurrenceEventQueryService.findRecurrenceEventForUpdate(accountId, recurrenceId);
+        recurrenceEventCommandService.findRecurrenceEventForUpdate(accountId, recurrenceId);
         recurrenceEventCommandService.deleteRecurrenceEvent(recurrenceId);
     }
 
     @Transactional
     public void deleteRecurrenceOccurrence(Long accountId, Long recurrenceId, Instant originStartAt) {
-        RecurrenceEvent recurrenceEvent = recurrenceEventQueryService
+        RecurrenceEvent recurrenceEvent = recurrenceEventCommandService
                 .findRecurrenceEventForUpdate(accountId, recurrenceId);
         Optional<RecurrenceEventOverride> existingOverride =
                 findOverrideOrRejectIneligible(recurrenceEvent, originStartAt);

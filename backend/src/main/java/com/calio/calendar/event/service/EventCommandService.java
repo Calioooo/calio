@@ -1,6 +1,8 @@
 package com.calio.calendar.event.service;
 
 import com.calio.calendar.common.domain.CanonicalSchedule;
+import com.calio.calendar.common.error.CalioException;
+import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.event.controller.dto.UpdateEventRequest;
 import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.event.repository.EventRepository;
@@ -20,6 +22,11 @@ public class EventCommandService {
 
     public Event createEvent(Event event) {
         return eventRepository.save(event);
+    }
+
+    public Event findEventForUpdate(Long accountId, Long eventId) {
+        return eventRepository.findByIdAndAccountIdForUpdate(eventId, accountId)
+                .orElseThrow(() -> new CalioException(ErrorCode.EVENT_NOT_FOUND));
     }
 
     public void updateEvent(Event event, UpdateEventRequest request, CanonicalSchedule schedule, Tag tag) {

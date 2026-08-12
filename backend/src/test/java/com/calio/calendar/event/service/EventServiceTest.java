@@ -136,7 +136,7 @@ class EventServiceTest {
                 "UTC",
                 30L
         );
-        when(eventQueryService.findEvent(1L, 10L)).thenReturn(event);
+        when(eventCommandService.findEventForUpdate(1L, 10L)).thenReturn(event);
         when(eventQueryService.hasExternalEventMapping(1L, 10L)).thenReturn(false);
         when(tagService.getTagOrDefault(1L, 30L)).thenReturn(updatedTag);
         doAnswer(invocation -> {
@@ -161,7 +161,7 @@ class EventServiceTest {
 
         // then
         InOrder order = inOrder(eventQueryService, tagService, eventCommandService);
-        order.verify(eventQueryService).findEvent(1L, 10L);
+        order.verify(eventCommandService).findEventForUpdate(1L, 10L);
         order.verify(eventQueryService).hasExternalEventMapping(1L, 10L);
         order.verify(tagService).getTagOrDefault(1L, 30L);
         order.verify(eventCommandService).updateEvent(any(), any(), any(), any());
@@ -175,7 +175,7 @@ class EventServiceTest {
     void givenExternalEvent_whenUpdateEvent_thenRejectsBeforeMutation() {
         // given
         Event event = event("External", tag("기타"));
-        when(eventQueryService.findEvent(1L, 10L)).thenReturn(event);
+        when(eventCommandService.findEventForUpdate(1L, 10L)).thenReturn(event);
         when(eventQueryService.hasExternalEventMapping(1L, 10L)).thenReturn(true);
         UpdateEventRequest request = new UpdateEventRequest(
                 "Blocked",
@@ -203,7 +203,7 @@ class EventServiceTest {
     void givenExternalEvent_whenDeleteEvent_thenRejectsBeforeCommand() {
         // given
         Event event = event("External", tag("기타"));
-        when(eventQueryService.findEvent(1L, 10L)).thenReturn(event);
+        when(eventCommandService.findEventForUpdate(1L, 10L)).thenReturn(event);
         when(eventQueryService.hasExternalEventMapping(1L, 10L)).thenReturn(true);
 
         // when, then
@@ -220,7 +220,7 @@ class EventServiceTest {
     void givenExternalEvent_whenUpdateImportantEvent_thenAllowsImportantStateChange() {
         // given
         Event event = event("External", tag("기타"));
-        when(eventQueryService.findEvent(1L, 10L)).thenReturn(event);
+        when(eventCommandService.findEventForUpdate(1L, 10L)).thenReturn(event);
         doAnswer(invocation -> {
             Event target = invocation.getArgument(0);
             target.changeImportantEvent(invocation.getArgument(1));

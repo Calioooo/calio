@@ -1,6 +1,7 @@
 package com.calio.calendar.recurrence.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
@@ -8,6 +9,8 @@ import static org.mockito.Mockito.when;
 
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.common.domain.CanonicalSchedule;
+import com.calio.calendar.common.error.CalioException;
+import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.event.repository.EventRepository;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
@@ -18,6 +21,7 @@ import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.domain.TagType;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -56,6 +60,36 @@ class RecurrenceEventCommandServiceTest {
         // then
         assertThat(transactional).isNotNull();
         assertThat(transactional.readOnly()).isFalse();
+    }
+
+    @Test
+    @DisplayName("반복 일정 잠금 조회는 계정과 반복 일정 ID를 repository에 정확히 전달한다")
+    void givenOwnedRecurrenceEvent_whenFindForUpdate_thenReturnsLockedEvent() {
+        // given
+        RecurrenceEvent recurrenceEvent = recurrenceEvent();
+        when(recurrenceEventRepository.findByIdAndAccountIdForUpdate(10L, 1L))
+                .thenReturn(Optional.of(recurrenceEvent));
+
+        // when
+        RecurrenceEvent result = recurrenceEventCommandService.findRecurrenceEventForUpdate(1L, 10L);
+
+        // then
+        assertThat(result).isSameAs(recurrenceEvent);
+        verify(recurrenceEventRepository).findByIdAndAccountIdForUpdate(10L, 1L);
+    }
+
+    @Test
+    @DisplayName("잠금 조회할 계정 소유 반복 일정이 없으면 RECURRENCE_EVENT_NOT_FOUND를 반환한다")
+    void givenMissingRecurrenceEvent_whenFindForUpdate_thenThrowsNotFound() {
+        // given
+        when(recurrenceEventRepository.findByIdAndAccountIdForUpdate(10L, 1L))
+                .thenReturn(Optional.empty());
+
+        // when, then
+        assertThatThrownBy(() -> recurrenceEventCommandService.findRecurrenceEventForUpdate(1L, 10L))
+                .isInstanceOfSatisfying(CalioException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.RECURRENCE_EVENT_NOT_FOUND)
+                );
     }
 
     @Test

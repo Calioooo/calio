@@ -1,6 +1,8 @@
 package com.calio.calendar.recurrence.service;
 
 import com.calio.calendar.common.domain.CanonicalSchedule;
+import com.calio.calendar.common.error.CalioException;
+import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.event.repository.EventRepository;
 import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceEventRequest;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
@@ -33,6 +35,11 @@ public class RecurrenceEventCommandService {
 
     public RecurrenceEvent createRecurrenceEvent(RecurrenceEvent recurrenceEvent) {
         return recurrenceEventRepository.save(recurrenceEvent);
+    }
+
+    public RecurrenceEvent findRecurrenceEventForUpdate(Long accountId, Long recurrenceId) {
+        return recurrenceEventRepository.findByIdAndAccountIdForUpdate(recurrenceId, accountId)
+                .orElseThrow(() -> new CalioException(ErrorCode.RECURRENCE_EVENT_NOT_FOUND));
     }
 
     public void updateRecurrenceEvent(

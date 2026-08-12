@@ -66,6 +66,23 @@ class EventQueryServiceTest {
     }
 
     @Test
+    @DisplayName("외부 일정 매핑 여부 조회는 일정과 계정 ID를 repository에 정확히 전달한다")
+    void givenExternalEventMapping_whenCheckMapping_thenReturnsRepositoryResult() {
+        // given
+        when(googleCalendarEventMappingRepository
+                .existsByEvent_IdAndIntegration_AccountId(10L, 1L))
+                .thenReturn(true);
+
+        // when
+        boolean result = eventQueryService.hasExternalEventMapping(1L, 10L);
+
+        // then
+        assertThat(result).isTrue();
+        verify(googleCalendarEventMappingRepository)
+                .existsByEvent_IdAndIntegration_AccountId(10L, 1L);
+    }
+
+    @Test
     @DisplayName("일반 일정 조회는 범위 인수를 그대로 repository에 위임한다")
     void givenTimeRange_whenListEvents_thenReturnsRepositoryResult() {
         // given
