@@ -9,6 +9,7 @@ import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import java.util.Comparator;
 import java.util.List;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,8 +33,11 @@ public class CalendarConversationQueryService {
                 .orElseThrow(() -> new CalioException(ErrorCode.AI_CALENDAR_CONVERSATION_NOT_FOUND));
     }
 
-    public List<CalendarConversationHistoryMessage> getRecentHistory(Long conversationId) {
-        return messageRepository.findTop20ByConversation_IdOrderByIdDesc(conversationId)
+    public List<CalendarConversationHistoryMessage> getRecentHistory(Long conversationId, int limit) {
+        return messageRepository.findByConversation_IdOrderByIdDesc(
+                        conversationId,
+                        PageRequest.of(0, limit)
+                )
                 .stream()
                 .sorted(Comparator.comparing(CalendarConversationMessage::getId))
                 .map(message -> new CalendarConversationHistoryMessage(
