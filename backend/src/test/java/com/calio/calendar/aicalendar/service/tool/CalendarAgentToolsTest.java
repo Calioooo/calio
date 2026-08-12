@@ -30,8 +30,8 @@ class CalendarAgentToolsTest {
     private CalendarAgentObservationService observationService;
 
     @Test
-    @DisplayName("agenda tool은 EventResponse를 유지하고 description을 명시 요청한 경우에만 노출한다")
-    void givenCalendarEvents_whenLookupWithoutDetails_thenHidesDescription() {
+    @DisplayName("agenda tool은 EventResponse를 그대로 반환한다")
+    void givenCalendarEvents_whenLookup_thenReturnsEventResponse() {
         // given
         when(eventService.listEvents(any(), any(), any())).thenReturn(List.of(timedEvent()));
         CalendarAgentTools tools = tools();
@@ -39,14 +39,13 @@ class CalendarAgentToolsTest {
         // when
         var result = tools.lookupCalendarEvents(new CalendarLookupToolRequest(
                 "2026-07-01",
-                "2026-07-01",
-                false
+                "2026-07-01"
         ));
 
         // then
         assertThat(result).singleElement().satisfies(event -> {
             assertThat(event.title()).isEqualTo("Planning");
-            assertThat(event.description()).isNull();
+            assertThat(event.description()).isEqualTo("Planning details");
             assertThat(event.allDay()).isFalse();
             assertThat(event.id()).isEqualTo(1L);
         });

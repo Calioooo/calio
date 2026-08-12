@@ -65,7 +65,7 @@ public class CalendarAgentTools {
                     timeZone,
                     properties
             );
-            List<EventResponse> events = getCalendarEvents(range, request.includeDescriptions());
+            List<EventResponse> events = getCalendarEvents(range);
             observationService.recordTool(
                     conversationId,
                     LOOKUP_TOOL_NAME,
@@ -134,34 +134,10 @@ public class CalendarAgentTools {
         }
     }
 
-    private List<EventResponse> getCalendarEvents(
-            CalendarToolTimeRange range,
-            boolean includeDescriptions
-    ) {
+    private List<EventResponse> getCalendarEvents(CalendarToolTimeRange range) {
         Instant from = range.startDate().atStartOfDay(range.timeZone()).toInstant();
         Instant to = range.endDate().plusDays(1).atStartOfDay(range.timeZone()).toInstant();
-        return eventService.listEvents(accountId, from, to).stream()
-                .map(event -> includeDescriptions ? event : withoutDescription(event))
-                .toList();
-    }
-
-    private EventResponse withoutDescription(EventResponse event) {
-        return new EventResponse(
-                event.id(),
-                event.title(),
-                null,
-                event.startAt(),
-                event.endAt(),
-                event.allDay(),
-                event.timeZone(),
-                event.importantEvent(),
-                event.recurrenceId(),
-                event.isRecurrenceOccurrence(),
-                event.tag(),
-                event.originStartAt(),
-                event.createdAt(),
-                event.updatedAt()
-        );
+        return eventService.listEvents(accountId, from, to);
     }
 
     private List<CalendarFreeTime> findFreeTimes(
@@ -173,7 +149,7 @@ public class CalendarAgentTools {
         if (!windowStart.isBefore(windowEnd) || minimumDuration.isZero() || minimumDuration.isNegative()) {
             throw new IllegalArgumentException("Availability window and duration must be positive.");
         }
-        List<EventResponse> events = getCalendarEvents(range, false);
+        List<EventResponse> events = getCalendarEvents(range);
         List<CalendarFreeTime> freeTimes = new ArrayList<>();
         for (LocalDate date = range.startDate(); !date.isAfter(range.endDate()); date = date.plusDays(1)) {
             addFreeTimesForDate(events, date, windowStart, windowEnd, minimumDuration, freeTimes);

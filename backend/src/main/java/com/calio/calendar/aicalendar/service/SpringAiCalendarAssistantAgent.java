@@ -197,7 +197,7 @@ public class SpringAiCalendarAssistantAgent implements CalendarAssistantAgent, A
                 + "Never request more than 14 calendar days. Mention an inferred day-part window in the answer. "
                 + "For an agenda with no explicit date range, look up today through the next 14 calendar days, "
                 + "present an ongoing event first, then at most three nearest upcoming events. "
-                + "For agenda answers, include title, time, and all-day state; include descriptions only when explicitly requested. "
+                + "For agenda answers, include title, time, all-day state, and relevant details. "
                 + "All-day events are notices and do not block a free-time window.";
     }
 
