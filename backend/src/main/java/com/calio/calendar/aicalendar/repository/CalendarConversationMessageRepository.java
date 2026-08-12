@@ -12,7 +12,7 @@ import org.springframework.data.repository.query.Param;
 public interface CalendarConversationMessageRepository
         extends JpaRepository<CalendarConversationMessage, Long> {
 
-    List<CalendarConversationMessage> findByConversation_IdOrderByIdDesc(
+    List<CalendarConversationMessage> findByConversation_IdOrderByCreatedAtDescIdDesc(
             Long conversationId,
             Pageable pageable
     );
