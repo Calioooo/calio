@@ -19,7 +19,7 @@ final class CalendarToolTimeRange {
         this.timeZone = timeZone;
     }
 
-    static CalendarToolTimeRange from(
+    public static CalendarToolTimeRange from(
             String startDate,
             String endDate,
             ZoneId timeZone,
@@ -34,15 +34,15 @@ final class CalendarToolTimeRange {
         return new CalendarToolTimeRange(start, end, timeZone);
     }
 
-    LocalDate startDate() {
+    public LocalDate startDate() {
         return startDate;
     }
 
-    LocalDate endDate() {
+    public LocalDate endDate() {
         return endDate;
     }
 
-    ZoneId timeZone() {
+    public ZoneId timeZone() {
         return timeZone;
     }
 }
