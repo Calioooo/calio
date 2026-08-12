@@ -34,12 +34,13 @@ public class CalendarConversationQueryService {
     }
 
     public List<CalendarConversationHistoryMessage> getRecentHistory(Long conversationId, int limit) {
-        return messageRepository.findByConversation_IdOrderByIdDesc(
+        return messageRepository.findByConversation_IdOrderByCreatedAtDescIdDesc(
                         conversationId,
                         PageRequest.of(0, limit)
                 )
                 .stream()
-                .sorted(Comparator.comparing(CalendarConversationMessage::getId))
+                .sorted(Comparator.comparing(CalendarConversationMessage::getCreatedAt)
+                        .thenComparing(CalendarConversationMessage::getId))
                 .map(message -> new CalendarConversationHistoryMessage(
                         message.getRole(),
                         message.getText()
