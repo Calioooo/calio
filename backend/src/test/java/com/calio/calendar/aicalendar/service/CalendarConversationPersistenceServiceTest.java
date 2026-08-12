@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.aicalendar.domain.CalendarConversation;
+import com.calio.calendar.aicalendar.domain.CalendarConversationMessageRole;
 import com.calio.calendar.aicalendar.repository.CalendarConversationMessageRepository;
 import com.calio.calendar.aicalendar.repository.CalendarConversationRepository;
 import com.calio.calendar.aicalendar.service.dto.CalendarConversationHistoryMessage;
@@ -91,6 +92,23 @@ class CalendarConversationPersistenceServiceTest {
                 assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.AI_CALENDAR_CONVERSATION_NOT_FOUND)
         );
         assertThat(messageRepository.count()).isZero();
+    }
+
+    @Test
+    @DisplayName("assistant 메시지를 기록하면 ASSISTANT 역할로 저장한다")
+    void givenConversation_whenRecordAssistantMessage_thenSavesAssistantRole() {
+        // given
+        Account account = accountRepository.saveAndFlush(new Account());
+        String conversationId = persistenceService.createConversation(account.getId());
+
+        // when
+        persistenceService.recordAssistantMessage(account.getId(), conversationId, "일정을 확인했어요.");
+
+        // then
+        assertThat(messageRepository.findAll()).singleElement().satisfies(message -> {
+            assertThat(message.getRole()).isEqualTo(CalendarConversationMessageRole.ASSISTANT);
+            assertThat(message.getText()).isEqualTo("일정을 확인했어요.");
+        });
     }
 
     @Test
