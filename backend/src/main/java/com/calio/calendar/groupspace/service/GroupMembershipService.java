@@ -61,11 +61,11 @@ public class GroupMembershipService {
     public AcceptGroupInvitationResponse accept(Long accountId, AcceptGroupInvitationRequest request) {
         byte[] credentialHash = credentialHash(request);
         GroupInvitation locatedInvitation = locateInvitation(request.credentialType(), credentialHash);
-        GroupSpace groupSpace = queryService.lockGroupSpaceForInvitation(
+        GroupSpace groupSpace = commandService.lockGroupSpaceForInvitation(
                 locatedInvitation.getGroupSpaceId()
         );
-        List<GroupMember> lockedMembers = queryService.lockMembers(groupSpace.getId());
-        GroupInvitation invitation = invitationQueryService.lockInvitation(
+        List<GroupMember> lockedMembers = commandService.lockMembers(groupSpace.getId());
+        GroupInvitation invitation = invitationCommandService.lockInvitation(
                 locatedInvitation.getId(),
                 invitationCredentialType(request.credentialType()),
                 credentialHash
@@ -121,8 +121,8 @@ public class GroupMembershipService {
             Long groupSpaceId,
             Long targetMemberId
     ) {
-        GroupSpace groupSpace = queryService.lockGroupSpace(groupSpaceId);
-        List<GroupMember> lockedMembers = queryService.lockMembers(groupSpaceId);
+        GroupSpace groupSpace = commandService.lockGroupSpace(groupSpaceId);
+        List<GroupMember> lockedMembers = commandService.lockMembers(groupSpaceId);
         GroupMember actor = requireActiveMembership(lockedMembers, accountId);
         requireOwner(groupSpace, actor);
         GroupMember target = findActiveMember(lockedMembers, targetMemberId)
@@ -137,8 +137,8 @@ public class GroupMembershipService {
 
     @Transactional
     public void leave(Long accountId, Long groupSpaceId) {
-        GroupSpace groupSpace = queryService.lockGroupSpace(groupSpaceId);
-        List<GroupMember> lockedMembers = queryService.lockMembers(groupSpaceId);
+        GroupSpace groupSpace = commandService.lockGroupSpace(groupSpaceId);
+        List<GroupMember> lockedMembers = commandService.lockMembers(groupSpaceId);
         GroupMember actor = requireActiveMembership(lockedMembers, accountId);
         Instant now = clock.instant();
         if (actor.roleIn(groupSpace).isOwner() && activeCount(lockedMembers) > 1) {
@@ -153,8 +153,8 @@ public class GroupMembershipService {
 
     @Transactional
     public void kick(Long accountId, Long groupSpaceId, Long targetMemberId) {
-        GroupSpace groupSpace = queryService.lockGroupSpace(groupSpaceId);
-        List<GroupMember> lockedMembers = queryService.lockMembers(groupSpaceId);
+        GroupSpace groupSpace = commandService.lockGroupSpace(groupSpaceId);
+        List<GroupMember> lockedMembers = commandService.lockMembers(groupSpaceId);
         GroupMember actor = requireActiveMembership(lockedMembers, accountId);
         Instant now = clock.instant();
         requireOwner(groupSpace, actor);
@@ -247,7 +247,7 @@ public class GroupMembershipService {
     }
 
     private void deleteIssuerInvitations(Long memberId) {
-        List<GroupInvitation> invitations = invitationQueryService
+        List<GroupInvitation> invitations = invitationCommandService
                 .lockInvitationsCreatedBy(memberId);
         invitationCommandService.delete(invitations);
     }

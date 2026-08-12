@@ -94,9 +94,9 @@ public class GroupInvitationService {
 
     @Transactional
     public void revoke(Long accountId, Long groupSpaceId, Long invitationId) {
-        queryService.getGroupSpaceForUpdate(groupSpaceId);
-        GroupMember member = queryService.getActiveMemberForUpdate(groupSpaceId, accountId);
-        GroupInvitation invitation = queryService.getRevocableInvitationIfExists(
+        commandService.lockGroupSpace(groupSpaceId);
+        GroupMember member = commandService.lockActiveMember(groupSpaceId, accountId);
+        GroupInvitation invitation = commandService.findRevocableInvitationForUpdate(
                         groupSpaceId,
                         invitationId,
                         member.getId(),
@@ -140,8 +140,8 @@ public class GroupInvitationService {
             Long groupSpaceId,
             InvitationCredentialPair credentials
     ) {
-        queryService.getGroupSpaceForUpdate(groupSpaceId);
-        GroupMember issuer = queryService.getActiveMemberForUpdate(groupSpaceId, accountId);
+        commandService.lockGroupSpace(groupSpaceId);
+        GroupMember issuer = commandService.lockActiveMember(groupSpaceId, accountId);
         Instant expiresAt = clock.instant().plus(properties.getTtl());
         GroupInvitation invitation = commandService.create(
                 groupSpaceId,

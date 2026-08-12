@@ -73,8 +73,8 @@ class GroupInvitationServiceTest {
         ReflectionTestUtils.setField(groupSpace, "id", GROUP_SPACE_ID);
         GroupMember member = new GroupMember(groupSpace, ACCOUNT_ID, "member", NOW);
         ReflectionTestUtils.setField(member, "id", MEMBER_ID);
-        lenient().when(queryService.getGroupSpaceForUpdate(GROUP_SPACE_ID)).thenReturn(groupSpace);
-        lenient().when(queryService.getActiveMemberForUpdate(GROUP_SPACE_ID, ACCOUNT_ID)).thenReturn(member);
+        lenient().when(commandService.lockGroupSpace(GROUP_SPACE_ID)).thenReturn(groupSpace);
+        lenient().when(commandService.lockActiveMember(GROUP_SPACE_ID, ACCOUNT_ID)).thenReturn(member);
     }
 
     @Test
@@ -123,7 +123,7 @@ class GroupInvitationServiceTest {
                 new byte[32],
                 NOW.plusSeconds(3600)
         );
-        when(queryService.getRevocableInvitationIfExists(
+        when(commandService.findRevocableInvitationForUpdate(
                 GROUP_SPACE_ID,
                 40L,
                 MEMBER_ID,
@@ -134,9 +134,9 @@ class GroupInvitationServiceTest {
         service.revoke(ACCOUNT_ID, GROUP_SPACE_ID, 40L);
 
         // then
-        verify(queryService).getGroupSpaceForUpdate(GROUP_SPACE_ID);
-        verify(queryService).getActiveMemberForUpdate(GROUP_SPACE_ID, ACCOUNT_ID);
-        verify(queryService).getRevocableInvitationIfExists(GROUP_SPACE_ID, 40L, MEMBER_ID, NOW);
+        verify(commandService).lockGroupSpace(GROUP_SPACE_ID);
+        verify(commandService).lockActiveMember(GROUP_SPACE_ID, ACCOUNT_ID);
+        verify(commandService).findRevocableInvitationForUpdate(GROUP_SPACE_ID, 40L, MEMBER_ID, NOW);
         verify(commandService).delete(invitation);
     }
 

@@ -82,7 +82,7 @@ public class GroupSpaceService {
             Long groupSpaceId,
             UpdateGroupSpaceRequest request
     ) {
-        GroupSpace groupSpace = queryService.lockGroupSpace(groupSpaceId);
+        GroupSpace groupSpace = commandService.lockGroupSpace(groupSpaceId);
         GroupMember membership = queryService.getActiveMembership(groupSpaceId, accountId);
         requireOwner(groupSpace, membership);
 
@@ -94,11 +94,11 @@ public class GroupSpaceService {
 
     @Transactional
     public void delete(Long accountId, Long groupSpaceId) {
-        GroupSpace groupSpace = queryService.lockGroupSpace(groupSpaceId);
+        GroupSpace groupSpace = commandService.lockGroupSpace(groupSpaceId);
         GroupMember membership = queryService.getActiveMembership(groupSpaceId, accountId);
         requireOwner(groupSpace, membership);
 
-        queryService.lockMembers(groupSpaceId);
+        commandService.lockMembers(groupSpaceId);
         groupScheduleShareCleanupPort.cleanupGroupShares(groupSpaceId);
         invitationCommandService.deleteAllByGroupSpaceId(groupSpaceId);
         commandService.delete(groupSpace);

@@ -58,15 +58,6 @@ public class GroupSpaceQueryService {
         );
     }
 
-    public GroupSpace lockGroupSpace(Long groupSpaceId) {
-        return groupSpaceRepository.findByIdForUpdate(groupSpaceId)
-                .orElseThrow(GroupSpaceQueryService::groupSpaceNotFound);
-    }
-
-    public List<GroupMember> lockMembers(Long groupSpaceId) {
-        return groupMemberRepository.findAllByGroupSpaceIdForUpdateOrderById(groupSpaceId);
-    }
-
     private static CalioException groupSpaceNotFound() {
         return new CalioException(ErrorCode.GROUP_SPACE_NOT_FOUND);
     }
