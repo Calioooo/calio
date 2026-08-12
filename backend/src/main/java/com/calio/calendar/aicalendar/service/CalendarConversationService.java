@@ -19,7 +19,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Service
 public class CalendarConversationService {
 
-    private static final int MAX_MESSAGE_CODE_POINTS = 2_000;
+    private static final int MAX_MESSAGE_LENGTH = 2_000;
     private static final int MAX_HISTORY_SIZE = 20;
 
     private final CalendarConversationQueryService conversationQueryService;
@@ -112,7 +112,7 @@ public class CalendarConversationService {
     }
 
     private void validateMessage(String message) {
-        if (message == null || message.isBlank() || message.codePointCount(0, message.length()) > MAX_MESSAGE_CODE_POINTS) {
+        if (message == null || message.isBlank() || message.codePointCount(0, message.length()) > MAX_MESSAGE_LENGTH) {
             throw new CalioException(ErrorCode.VALIDATION_FAILED);
         }
     }
