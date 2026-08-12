@@ -90,6 +90,10 @@ public enum ErrorCode {
             "External event mutation is not supported."
     ),
     AI_CALENDAR_CONVERSATION_NOT_FOUND(HttpStatus.NOT_FOUND, "AI calendar conversation not found."),
+    AI_CALENDAR_PROVIDER_UNAVAILABLE(
+            HttpStatus.SERVICE_UNAVAILABLE,
+            "AI calendar provider is temporarily unavailable."
+    ),
 
     EXTERNAL_API_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "External API is temporarily unavailable."),
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error.");

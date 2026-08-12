@@ -19,6 +19,7 @@ repositories {
 }
 
 dependencies {
+    implementation platform('org.springframework.ai:spring-ai-bom:2.0.0')
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'org.springframework.boot:spring-boot-starter-restclient'
@@ -26,6 +27,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
     implementation 'org.springframework.boot:spring-boot-flyway'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'org.springframework.ai:spring-ai-starter-model-openai'
     implementation 'org.flywaydb:flyway-core'
     runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
     implementation 'org.mnode.ical4j:ical4j:4.3.0'
