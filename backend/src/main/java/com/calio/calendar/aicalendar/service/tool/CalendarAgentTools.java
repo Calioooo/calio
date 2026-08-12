@@ -4,8 +4,6 @@ import com.calio.calendar.aicalendar.config.CalendarAIProperties;
 import com.calio.calendar.aicalendar.service.CalendarAgentObservationService;
 import com.calio.calendar.aicalendar.service.tool.dto.CalendarFreeTime;
 import com.calio.calendar.aicalendar.service.tool.dto.CalendarLookupToolRequest;
-import com.calio.calendar.aicalendar.service.tool.dto.CalendarLookupToolResult;
-import com.calio.calendar.aicalendar.service.tool.dto.CalendarToolEvent;
 import com.calio.calendar.aicalendar.service.tool.dto.FreeTimeSearchToolRequest;
 import com.calio.calendar.aicalendar.service.tool.dto.FreeTimeSearchToolResult;
 import com.calio.calendar.event.controller.dto.EventResponse;
@@ -57,7 +55,7 @@ public class CalendarAgentTools {
             name = LOOKUP_TOOL_NAME,
             description = "Look up the authenticated user's current Calio calendar events for an inclusive ISO date range."
     )
-    public CalendarLookupToolResult lookupCalendarEvents(CalendarLookupToolRequest request) {
+    public List<EventResponse> lookupCalendarEvents(CalendarLookupToolRequest request) {
         assertToolCallAvailable();
         Instant startedAt = Instant.now();
         try {
@@ -67,9 +65,7 @@ public class CalendarAgentTools {
                     timeZone,
                     properties
             );
-            List<CalendarToolEvent> events = findEvents(range).stream()
-                    .map(event -> toToolEvent(event, request.includeDescriptions()))
-                    .toList();
+            List<EventResponse> events = getCalendarEvents(range, request.includeDescriptions());
             observationService.recordTool(
                     conversationId,
                     LOOKUP_TOOL_NAME,
@@ -77,7 +73,7 @@ public class CalendarAgentTools {
                     Duration.between(startedAt, Instant.now()),
                     events.size()
             );
-            return new CalendarLookupToolResult(events);
+            return events;
         } catch (RuntimeException exception) {
             observationService.recordTool(
                     conversationId,
@@ -138,19 +134,33 @@ public class CalendarAgentTools {
         }
     }
 
-    private List<EventResponse> findEvents(CalendarToolTimeRange range) {
+    private List<EventResponse> getCalendarEvents(
+            CalendarToolTimeRange range,
+            boolean includeDescriptions
+    ) {
         Instant from = range.startDate().atStartOfDay(range.timeZone()).toInstant();
         Instant to = range.endDate().plusDays(1).atStartOfDay(range.timeZone()).toInstant();
-        return eventService.listEvents(accountId, from, to);
+        return eventService.listEvents(accountId, from, to).stream()
+                .map(event -> includeDescriptions ? event : withoutDescription(event))
+                .toList();
     }
 
-    private CalendarToolEvent toToolEvent(EventResponse event, boolean includeDescriptions) {
-        return new CalendarToolEvent(
+    private EventResponse withoutDescription(EventResponse event) {
+        return new EventResponse(
+                event.id(),
                 event.title(),
-                formatEventTime(event.startAt(), event.allDay()),
-                formatEventTime(event.endAt(), event.allDay()),
+                null,
+                event.startAt(),
+                event.endAt(),
                 event.allDay(),
-                includeDescriptions ? event.description() : null
+                event.timeZone(),
+                event.importantEvent(),
+                event.recurrenceId(),
+                event.isRecurrenceOccurrence(),
+                event.tag(),
+                event.originStartAt(),
+                event.createdAt(),
+                event.updatedAt()
         );
     }
 
@@ -163,7 +173,7 @@ public class CalendarAgentTools {
         if (!windowStart.isBefore(windowEnd) || minimumDuration.isZero() || minimumDuration.isNegative()) {
             throw new IllegalArgumentException("Availability window and duration must be positive.");
         }
-        List<EventResponse> events = findEvents(range);
+        List<EventResponse> events = getCalendarEvents(range, false);
         List<CalendarFreeTime> freeTimes = new ArrayList<>();
         for (LocalDate date = range.startDate(); !date.isAfter(range.endDate()); date = date.plusDays(1)) {
             addFreeTimesForDate(events, date, windowStart, windowEnd, minimumDuration, freeTimes);

@@ -30,7 +30,7 @@ class CalendarAgentToolsTest {
     private CalendarAgentObservationService observationService;
 
     @Test
-    @DisplayName("agenda tool은 기존 Calendar 조회 결과에서 description을 명시 요청한 경우에만 노출한다")
+    @DisplayName("agenda tool은 EventResponse를 유지하고 description을 명시 요청한 경우에만 노출한다")
     void givenCalendarEvents_whenLookupWithoutDetails_thenHidesDescription() {
         // given
         when(eventService.listEvents(any(), any(), any())).thenReturn(List.of(timedEvent()));
@@ -44,10 +44,11 @@ class CalendarAgentToolsTest {
         ));
 
         // then
-        assertThat(result.events()).singleElement().satisfies(event -> {
+        assertThat(result).singleElement().satisfies(event -> {
             assertThat(event.title()).isEqualTo("Planning");
             assertThat(event.description()).isNull();
             assertThat(event.allDay()).isFalse();
+            assertThat(event.id()).isEqualTo(1L);
         });
         verify(eventService).listEvents(any(), any(), any());
     }
