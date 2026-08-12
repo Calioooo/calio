@@ -1,7 +1,5 @@
 package com.calio.calendar.groupinvitation.scheduler;
 
-import com.calio.calendar.common.error.CalioException;
-import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.groupinvitation.config.GroupInvitationProperties;
 import com.calio.calendar.groupinvitation.service.GroupInvitationService;
 import java.time.Clock;
@@ -37,7 +35,7 @@ public class GroupInvitationCleanupScheduler {
             int deletedCount = deleteBatches(cutoff);
             log.info("Group invitation cleanup finished. deletedCount={}", deletedCount);
         } catch (Exception exception) {
-            throw new CalioException(ErrorCode.GROUP_INVITATION_CLEANUP_FAILED, exception);
+            log.error("Group invitation cleanup failed. message={}", exception.getMessage(), exception);
         }
     }
 

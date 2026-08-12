@@ -1,10 +1,13 @@
 package com.calio.calendar.groupinvitation.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.calio.calendar.common.error.CalioException;
+import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.groupinvitation.domain.GroupInvitation;
 import com.calio.calendar.groupinvitation.repository.GroupInvitationRepository;
 import com.calio.calendar.groupinvitation.service.dto.InvitationCredentialPair;
@@ -23,6 +26,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.annotation.AnnotatedElementUtils;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.annotation.Transactional;
 
 @ExtendWith(MockitoExtension.class)
@@ -139,5 +143,59 @@ class GroupInvitationCommandServiceTest {
         // then
         assertThat(result).isSameAs(member);
         verify(groupMemberRepository).findByGroupSpaceIdAndAccountIdForUpdate(20L, 10L);
+    }
+
+    @Test
+    @DisplayName("credential unique constraint 충돌은 재시도 가능한 credential 충돌로 변환한다")
+    void mapsCredentialConstraintViolationToRetryableCollision() {
+        // given
+        DataIntegrityViolationException cause = credentialCollision(
+                "UK_GROUP_INVITATIONS_INVITE_CODE_HASH"
+        );
+        when(invitationRepository.saveAndFlush(any(GroupInvitation.class))).thenThrow(cause);
+
+        // when, then
+        assertThatThrownBy(() -> commandService.create(20L, 30L, credentials(), expiresAt()))
+                .isInstanceOfSatisfying(
+                        CalioException.class,
+                        exception -> {
+                            assertThat(exception.getErrorCode())
+                                    .isEqualTo(ErrorCode.GROUP_INVITATION_CREDENTIAL_COLLISION);
+                            assertThat(exception.getCause()).isSameAs(cause);
+                        }
+                );
+    }
+
+    @Test
+    @DisplayName("credential constraint와 무관한 무결성 오류는 원본 예외를 그대로 전파한다")
+    void propagatesUnrelatedDataIntegrityViolation() {
+        // given
+        DataIntegrityViolationException cause =
+                new DataIntegrityViolationException("foreign key constraint violation");
+        when(invitationRepository.saveAndFlush(any(GroupInvitation.class))).thenThrow(cause);
+
+        // when, then
+        assertThatThrownBy(() -> commandService.create(20L, 30L, credentials(), expiresAt()))
+                .isSameAs(cause);
+    }
+
+    private DataIntegrityViolationException credentialCollision(String constraintName) {
+        return new DataIntegrityViolationException(
+                "insert failed",
+                new IllegalStateException("Duplicate entry for key '" + constraintName + "'")
+        );
+    }
+
+    private InvitationCredentialPair credentials() {
+        return new InvitationCredentialPair(
+                "A".repeat(43),
+                "AAAA-BBBB-CCCC-DDDD",
+                new byte[32],
+                new byte[32]
+        );
+    }
+
+    private Instant expiresAt() {
+        return Instant.parse("2026-07-29T08:00:00Z");
     }
 }

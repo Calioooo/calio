@@ -13,13 +13,21 @@ import com.calio.calendar.groupspace.repository.GroupMemberRepository;
 import com.calio.calendar.groupspace.repository.GroupSpaceRepository;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Transactional
 public class GroupInvitationCommandService {
+
+    private static final Set<String> CREDENTIAL_UNIQUE_CONSTRAINTS = Set.of(
+            "uk_group_invitations_link_token_hash",
+            "uk_group_invitations_invite_code_hash"
+    );
 
     private final GroupInvitationRepository invitationRepository;
     private final GroupSpaceRepository groupSpaceRepository;
@@ -89,15 +97,22 @@ public class GroupInvitationCommandService {
             InvitationCredentialPair credentials,
             Instant expiresAt
     ) {
-        return invitationRepository.saveAndFlush(
-                new GroupInvitation(
-                        groupSpaceId,
-                        createdByMemberId,
-                        credentials.linkTokenHash(),
-                        credentials.inviteCodeHash(),
-                        expiresAt
-                )
-        );
+        try {
+            return invitationRepository.saveAndFlush(
+                    new GroupInvitation(
+                            groupSpaceId,
+                            createdByMemberId,
+                            credentials.linkTokenHash(),
+                            credentials.inviteCodeHash(),
+                            expiresAt
+                    )
+            );
+        } catch (DataIntegrityViolationException exception) {
+            if (isCredentialCollision(exception)) {
+                throw new CalioException(ErrorCode.GROUP_INVITATION_CREDENTIAL_COLLISION, exception);
+            }
+            throw exception;
+        }
     }
 
     public void delete(GroupInvitation invitation) {
@@ -124,4 +139,20 @@ public class GroupInvitationCommandService {
         return new CalioException(ErrorCode.GROUP_INVITATION_NOT_FOUND);
     }
 
+    private boolean isCredentialCollision(Throwable throwable) {
+        Throwable current = throwable;
+        while (current != null) {
+            String message = current.getMessage();
+            if (message != null && containsCredentialConstraint(message)) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+
+    private boolean containsCredentialConstraint(String message) {
+        String normalizedMessage = message.toLowerCase(Locale.ROOT);
+        return CREDENTIAL_UNIQUE_CONSTRAINTS.stream().anyMatch(normalizedMessage::contains);
+    }
 }

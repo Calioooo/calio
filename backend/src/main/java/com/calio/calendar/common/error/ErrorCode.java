@@ -35,13 +35,13 @@ public enum ErrorCode {
             HttpStatus.INTERNAL_SERVER_ERROR,
             "Group invitation generation failed."
     ),
+    GROUP_INVITATION_CREDENTIAL_COLLISION(
+            HttpStatus.INTERNAL_SERVER_ERROR,
+            "Group invitation credential collision."
+    ),
     GROUP_INVITATION_ISSUE_FAILED(
             HttpStatus.INTERNAL_SERVER_ERROR,
             "Group invitation issue failed."
-    ),
-    GROUP_INVITATION_CLEANUP_FAILED(
-            HttpStatus.INTERNAL_SERVER_ERROR,
-            "Group invitation cleanup failed."
     ),
     DEFAULT_TAG_NOT_FOUND(HttpStatus.INTERNAL_SERVER_ERROR, "Default tag not found."),
     INVALID_TAG_COLOR_CODE(HttpStatus.BAD_REQUEST, "Invalid tag color code."),
