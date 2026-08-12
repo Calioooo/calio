@@ -20,7 +20,7 @@ public interface CalendarConversationMessageRepository
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""
             delete from CalendarConversationMessage message
-            where message.conversation.lastActivityAt < :cutoff
+            where message.conversation.lastActivityAt <= :cutoff
             """)
     int deleteByConversationInactiveBefore(@Param("cutoff") Instant cutoff);
 }

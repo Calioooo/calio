@@ -13,6 +13,6 @@ public interface CalendarConversationRepository extends JpaRepository<CalendarCo
     Optional<CalendarConversation> findByConversationIdAndAccount_Id(String conversationId, Long accountId);
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query("delete from CalendarConversation conversation where conversation.lastActivityAt < :cutoff")
+    @Query("delete from CalendarConversation conversation where conversation.lastActivityAt <= :cutoff")
     int deleteInactiveBefore(@Param("cutoff") Instant cutoff);
 }
