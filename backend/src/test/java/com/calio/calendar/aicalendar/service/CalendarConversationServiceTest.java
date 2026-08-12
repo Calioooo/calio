@@ -22,16 +22,16 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest(properties = {
-        "spring.datasource.url=jdbc:h2:mem:ai-calendar-conversation-persistence-test;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE",
+        "spring.datasource.url=jdbc:h2:mem:ai-calendar-conversation-service-test;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE",
         "spring.datasource.driver-class-name=org.h2.Driver",
         "spring.datasource.username=sa",
         "spring.datasource.password=",
         "spring.jpa.hibernate.ddl-auto=create-drop"
 })
-class CalendarConversationPersistenceServiceTest {
+class CalendarConversationServiceTest {
 
     @Autowired
-    private CalendarConversationPersistenceService persistenceService;
+    private CalendarConversationService conversationService;
 
     @Autowired
     private AccountRepository accountRepository;
@@ -54,11 +54,11 @@ class CalendarConversationPersistenceServiceTest {
     void givenTwentyOneMessages_whenRecordUserMessage_thenReturnsNewestTwentyInChronologicalOrder() {
         // given
         Account account = accountRepository.saveAndFlush(new Account());
-        String conversationId = persistenceService.createConversation(account.getId());
+        String conversationId = conversationService.createConversation(account.getId());
 
         // when
         List<String> histories = IntStream.rangeClosed(1, 21)
-                .mapToObj(index -> persistenceService.recordUserMessage(
+                .mapToObj(index -> conversationService.recordUserMessage(
                         account.getId(),
                         conversationId,
                         "message-" + index
@@ -81,10 +81,10 @@ class CalendarConversationPersistenceServiceTest {
         // given
         Account owner = accountRepository.saveAndFlush(new Account());
         Account otherAccount = accountRepository.saveAndFlush(new Account());
-        String conversationId = persistenceService.createConversation(owner.getId());
+        String conversationId = conversationService.createConversation(owner.getId());
 
         // when, then
-        assertThatThrownBy(() -> persistenceService.recordUserMessage(
+        assertThatThrownBy(() -> conversationService.recordUserMessage(
                 otherAccount.getId(),
                 conversationId,
                 "다른 계정의 메시지"
@@ -99,10 +99,10 @@ class CalendarConversationPersistenceServiceTest {
     void givenConversation_whenRecordAssistantMessage_thenSavesAssistantRole() {
         // given
         Account account = accountRepository.saveAndFlush(new Account());
-        String conversationId = persistenceService.createConversation(account.getId());
+        String conversationId = conversationService.createConversation(account.getId());
 
         // when
-        persistenceService.recordAssistantMessage(account.getId(), conversationId, "일정을 확인했어요.");
+        conversationService.recordAssistantMessage(account.getId(), conversationId, "일정을 확인했어요.");
 
         // then
         assertThat(messageRepository.findAll()).singleElement().satisfies(message -> {
@@ -116,8 +116,8 @@ class CalendarConversationPersistenceServiceTest {
     void givenInactiveConversation_whenDeleteInactiveConversations_thenDeletesConversationAndMessages() {
         // given
         Account account = accountRepository.saveAndFlush(new Account());
-        String conversationId = persistenceService.createConversation(account.getId());
-        persistenceService.recordUserMessage(account.getId(), conversationId, "오래된 메시지");
+        String conversationId = conversationService.createConversation(account.getId());
+        conversationService.recordUserMessage(account.getId(), conversationId, "오래된 메시지");
         CalendarConversation conversation = conversationRepository
                 .findByConversationIdAndAccount_Id(conversationId, account.getId())
                 .orElseThrow();
@@ -125,8 +125,8 @@ class CalendarConversationPersistenceServiceTest {
         conversationRepository.saveAndFlush(conversation);
 
         // when
-        int deletedCount = persistenceService.deleteInactiveConversations(
-                Instant.parse("2026-07-01T00:00:01Z")
+        int deletedCount = conversationService.deleteInactiveConversations(
+                Instant.parse("2026-07-01T00:00:00Z")
         );
 
         // then

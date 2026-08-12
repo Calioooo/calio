@@ -13,7 +13,7 @@ import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.aicalendar.repository.CalendarConversationMessageRepository;
 import com.calio.calendar.aicalendar.repository.CalendarConversationRepository;
 import com.calio.calendar.aicalendar.service.CalendarAssistantAgent;
-import com.calio.calendar.aicalendar.service.CalendarConversationPersistenceService;
+import com.calio.calendar.aicalendar.service.CalendarConversationService;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.security.AuthenticatedAccountMockMvcTestConfig;
@@ -61,7 +61,7 @@ class CalendarConversationControllerTest {
     private CalendarConversationMessageRepository messageRepository;
 
     @Autowired
-    private CalendarConversationPersistenceService persistenceService;
+    private CalendarConversationService conversationService;
 
     @MockitoBean
     private CalendarAssistantAgent assistantAgent;
@@ -134,7 +134,7 @@ class CalendarConversationControllerTest {
     void givenConversationOwnedByAnotherAccount_whenSendMessage_thenRejectsWithoutAgentCall() throws Exception {
         // given
         Account otherAccount = accountRepository.saveAndFlush(new Account());
-        String conversationId = persistenceService.createConversation(otherAccount.getId());
+        String conversationId = conversationService.createConversation(otherAccount.getId());
 
         // when, then
         mockMvc.perform(post("/api/ai/calendar/conversations/{conversationId}/messages", conversationId)
