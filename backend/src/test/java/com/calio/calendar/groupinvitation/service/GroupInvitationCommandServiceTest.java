@@ -12,6 +12,7 @@ import com.calio.calendar.groupinvitation.domain.GroupInvitation;
 import com.calio.calendar.groupinvitation.repository.GroupInvitationRepository;
 import com.calio.calendar.groupinvitation.service.dto.InvitationCredentialPair;
 import java.time.Instant;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -104,6 +105,29 @@ class GroupInvitationCommandServiceTest {
         // when, then
         assertThatThrownBy(() -> commandService.create(20L, 30L, credentials(), expiresAt()))
                 .isSameAs(cause);
+    }
+
+    @Test
+    @DisplayName("member가 발급한 초대장 삭제 command는 잠금 조회 후 일괄 삭제한다")
+    void deleteAllByCreatedByMemberIdDeletesLockedInvitations() {
+        // given
+        GroupInvitation invitation = new GroupInvitation(
+                20L,
+                30L,
+                new byte[32],
+                new byte[32],
+                Instant.parse("2026-08-15T00:00:00Z")
+        );
+        List<GroupInvitation> invitations = List.of(invitation);
+        when(invitationRepository.findAllByCreatedByMemberIdForUpdateOrderById(30L))
+                .thenReturn(invitations);
+
+        // when
+        commandService.deleteAllByCreatedByMemberId(30L);
+
+        // then
+        verify(invitationRepository).findAllByCreatedByMemberIdForUpdateOrderById(30L);
+        verify(invitationRepository).deleteAllInBatch(invitations);
     }
 
     private DataIntegrityViolationException credentialCollision(String constraintName) {
