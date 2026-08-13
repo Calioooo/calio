@@ -4,8 +4,8 @@ import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.groupinvitation.domain.GroupInvitation;
 import com.calio.calendar.groupinvitation.domain.InvitationCredentialType;
-import com.calio.calendar.groupinvitation.repository.GroupInvitationRepository;
 import com.calio.calendar.groupinvitation.service.GroupInvitationCommandService;
+import com.calio.calendar.groupinvitation.service.GroupInvitationQueryService;
 import com.calio.calendar.groupinvitation.service.InvitationCredentialService;
 import com.calio.calendar.groupspace.controller.dto.AcceptGroupInvitationRequest;
 import com.calio.calendar.groupspace.controller.dto.AcceptGroupInvitationResponse;
@@ -32,8 +32,8 @@ public class GroupMembershipService {
 
     private final GroupSpaceRepository groupSpaceRepository;
     private final GroupMemberRepository groupMemberRepository;
-    private final GroupInvitationRepository groupInvitationRepository;
     private final GroupInvitationCommandService invitationCommandService;
+    private final GroupInvitationQueryService invitationQueryService;
     private final InvitationCredentialService credentialService;
     private final GroupScheduleShareCleanupPort groupScheduleShareCleanupPort;
     private final Clock clock;
@@ -41,16 +41,16 @@ public class GroupMembershipService {
     public GroupMembershipService(
             GroupSpaceRepository groupSpaceRepository,
             GroupMemberRepository groupMemberRepository,
-            GroupInvitationRepository groupInvitationRepository,
             GroupInvitationCommandService invitationCommandService,
+            GroupInvitationQueryService invitationQueryService,
             InvitationCredentialService credentialService,
             GroupScheduleShareCleanupPort groupScheduleShareCleanupPort,
             Clock clock
     ) {
         this.groupSpaceRepository = groupSpaceRepository;
         this.groupMemberRepository = groupMemberRepository;
-        this.groupInvitationRepository = groupInvitationRepository;
         this.invitationCommandService = invitationCommandService;
+        this.invitationQueryService = invitationQueryService;
         this.credentialService = credentialService;
         this.groupScheduleShareCleanupPort = groupScheduleShareCleanupPort;
         this.clock = clock;
@@ -175,10 +175,10 @@ public class GroupMembershipService {
             GroupInvitationAcceptCredentialType credentialType,
             byte[] credentialHash
     ) {
-        return (credentialType == GroupInvitationAcceptCredentialType.LINK_TOKEN
-                ? groupInvitationRepository.findByLinkTokenHash(credentialHash)
-                : groupInvitationRepository.findByInviteCodeHash(credentialHash))
-                .orElseThrow(GroupMembershipService::invitationNotFound);
+        return invitationQueryService.getInvitationByCredentialHash(
+                invitationCredentialType(credentialType),
+                credentialHash
+        );
     }
 
     private GroupInvitation lockInvitation(
@@ -186,12 +186,11 @@ public class GroupMembershipService {
             AcceptGroupInvitationRequest request,
             byte[] credentialHash
     ) {
-        return groupInvitationRepository.findByIdAndCredentialHashForUpdate(
-                        invitationId,
-                        request.credentialType().name(),
-                        credentialHash
-                )
-                .orElseThrow(GroupMembershipService::invitationNotFound);
+        return invitationQueryService.getInvitationForUpdate(
+                invitationId,
+                invitationCredentialType(request.credentialType()),
+                credentialHash
+        );
     }
 
     private void validateInvitation(
@@ -253,9 +252,15 @@ public class GroupMembershipService {
     }
 
     private void deleteIssuerInvitations(Long memberId) {
-        List<GroupInvitation> invitations =
-                groupInvitationRepository.findAllByCreatedByMemberIdForUpdateOrderById(memberId);
-        groupInvitationRepository.deleteAllInBatch(invitations);
+        invitationCommandService.deleteAllByCreatedByMemberId(memberId);
+    }
+
+    private InvitationCredentialType invitationCredentialType(
+            GroupInvitationAcceptCredentialType credentialType
+    ) {
+        return credentialType == GroupInvitationAcceptCredentialType.LINK_TOKEN
+                ? InvitationCredentialType.LINK_TOKEN
+                : InvitationCredentialType.CODE;
     }
 
     private GroupSpace lockGroupSpace(Long groupSpaceId, boolean invitationScoped) {

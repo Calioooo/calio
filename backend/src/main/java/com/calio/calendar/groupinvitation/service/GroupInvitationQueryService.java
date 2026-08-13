@@ -55,6 +55,19 @@ public class GroupInvitationQueryService {
         }).orElseThrow(GroupInvitationQueryService::invitationNotFound);
     }
 
+    public GroupInvitation getInvitationForUpdate(
+            Long invitationId,
+            InvitationCredentialType credentialType,
+            byte[] credentialHash
+    ) {
+        return invitationRepository.findByIdAndCredentialHashForUpdate(
+                        invitationId,
+                        credentialQueryType(credentialType),
+                        credentialHash
+                )
+                .orElseThrow(GroupInvitationQueryService::invitationNotFound);
+    }
+
     public GroupSpace getGroupSpace(Long groupSpaceId) {
         return groupSpaceRepository.findById(groupSpaceId)
                 .orElseThrow(GroupInvitationQueryService::invitationNotFound);
@@ -117,5 +130,11 @@ public class GroupInvitationQueryService {
 
     private static CalioException invitationNotFound() {
         return new CalioException(ErrorCode.GROUP_INVITATION_NOT_FOUND);
+    }
+
+    private static String credentialQueryType(InvitationCredentialType credentialType) {
+        return credentialType == InvitationCredentialType.LINK_TOKEN
+                ? "LINK_TOKEN"
+                : "INVITE_CODE";
     }
 }

@@ -68,6 +68,12 @@ public class GroupInvitationCommandService {
         invitationRepository.deleteAllInBatch(invitations);
     }
 
+    public void deleteAllByCreatedByMemberId(Long memberId) {
+        List<GroupInvitation> invitations =
+                invitationRepository.findAllByCreatedByMemberIdForUpdateOrderById(memberId);
+        invitationRepository.deleteAllInBatch(invitations);
+    }
+
     private boolean isCredentialCollision(Throwable throwable) {
         Throwable current = throwable;
         while (current != null) {
