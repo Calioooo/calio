@@ -33,7 +33,7 @@ class GoogleOAuthClientTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
-    @DisplayName("GoogleOAuthClient는 authorization_code grant를 form encoding으로 token endpoint에 보낸다")
+    @DisplayName("GoogleOAuthClient는 authorization_code를 form encoding 방식으로 token endpoint에 보낸다")
     void givenAuthorizationCode_whenExchangeToken_thenSendsFormEncodedGrantRequest() {
         // given
         RestClient.Builder restClientBuilder = RestClient.builder();

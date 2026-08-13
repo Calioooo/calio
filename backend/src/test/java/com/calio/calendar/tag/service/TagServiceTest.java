@@ -6,9 +6,6 @@ import static org.mockito.Mockito.when;
 
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
-import com.calio.calendar.account.repository.AccountRepository;
-import com.calio.calendar.event.repository.EventRepository;
-import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.tag.repository.TagRepository;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.domain.TagType;
@@ -27,20 +24,11 @@ class TagServiceTest {
     @Mock
     private TagRepository tagRepository;
 
-    @Mock
-    private AccountRepository accountRepository;
-
-    @Mock
-    private EventRepository eventRepository;
-
-    @Mock
-    private RecurrenceEventRepository recurrenceEventRepository;
-
     @InjectMocks
-    private TagService tagService;
+    private TagQueryService tagQueryService;
 
     @Test
-    @DisplayName("explicit tagId는 DEFAULT 또는 CUSTOM 태그를 resolve한다")
+    @DisplayName("예외적인 tagId는 DEFAULT 또는 CUSTOM 태그를 resolve한다")
     void givenExistingTagId_whenResolveTag_thenReturnsTag() {
         // given
         Tag defaultTag = new Tag(TagType.DEFAULT, "업무", "#2563eb");
@@ -53,8 +41,8 @@ class TagServiceTest {
                 .thenReturn(Optional.of(customTag));
 
         // when
-        Tag resolvedDefaultTag = tagService.getTagOrDefault(1L, 1L);
-        Tag resolvedCustomTag = tagService.getTagOrDefault(1L, 2L);
+        Tag resolvedDefaultTag = tagQueryService.getTagOrDefault(1L, 1L);
+        Tag resolvedCustomTag = tagQueryService.getTagOrDefault(1L, 2L);
 
         // then
         assertThat(resolvedDefaultTag).isSameAs(defaultTag);
@@ -64,7 +52,7 @@ class TagServiceTest {
     }
 
     @Test
-    @DisplayName("missing tagId는 TAG_NOT_FOUND로 실패한다")
+    @DisplayName("올바르지 않은 tagId는 TAG_NOT_FOUND 예외를 반환한다")
     void givenMissingTagId_whenResolveTag_thenThrowsTagNotFound() {
         // given
         when(tagRepository.findByIdAndTagTypeAndAccountIsNull(1L, TagType.DEFAULT))
@@ -73,7 +61,7 @@ class TagServiceTest {
                 .thenReturn(Optional.empty());
 
         // when, then
-        assertThatThrownBy(() -> tagService.getTagOrDefault(1L, 1L))
+        assertThatThrownBy(() -> tagQueryService.getTagOrDefault(1L, 1L))
                 .isInstanceOfSatisfying(CalioException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.TAG_NOT_FOUND)
                 );
@@ -88,7 +76,7 @@ class TagServiceTest {
                 .thenReturn(Optional.of(fallbackTag));
 
         // when
-        Tag resolvedTag = tagService.getTagOrDefault(1L, null);
+        Tag resolvedTag = tagQueryService.getTagOrDefault(1L, null);
 
         // then
         assertThat(resolvedTag).isSameAs(fallbackTag);
@@ -102,7 +90,7 @@ class TagServiceTest {
                 .thenReturn(Optional.empty());
 
         // when, then
-        assertThatThrownBy(() -> tagService.getTagOrDefault(1L, null))
+        assertThatThrownBy(() -> tagQueryService.getTagOrDefault(1L, null))
                 .isInstanceOfSatisfying(CalioException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.DEFAULT_TAG_NOT_FOUND)
                 );

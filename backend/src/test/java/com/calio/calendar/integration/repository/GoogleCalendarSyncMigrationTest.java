@@ -246,6 +246,28 @@ class GoogleCalendarSyncMigrationTest {
         }
     }
 
+    @Test
+    @DisplayName("V17은 Operation lease로 실행 소유권을 통일하고 Sync lease 컬럼을 제거한다")
+    void givenV16Schema_whenMigrateToV17_thenRemovesSyncLeaseColumns() throws Exception {
+        // given
+        String url = "jdbc:h2:mem:google-operation-only-lease;MODE=MySQL;DB_CLOSE_DELAY=-1";
+        migrateTo(url, MigrationVersion.fromVersion("16"));
+
+        // when
+        migrateTo(url, MigrationVersion.fromVersion("17"));
+
+        // then
+        try (Connection connection = DriverManager.getConnection(url, "sa", "")) {
+            assertThat(columnNames(connection, "GOOGLE_CALENDAR_INTEGRATIONS"))
+                    .contains(
+                            "NEXT_SYNC_TOKEN",
+                            "GOOGLE_OPERATION_LEASE_OWNER",
+                            "GOOGLE_OPERATION_LEASE_EXPIRES_AT"
+                    )
+                    .doesNotContain("ACTIVE_SYNC_RUN_ID", "SYNC_LEASE_EXPIRES_AT");
+        }
+    }
+
     private void migrateTo(String url, MigrationVersion target) {
         Flyway.configure()
                 .dataSource(url, "sa", "")
