@@ -16,8 +16,6 @@ import com.calio.calendar.holiday.client.dto.HolidayApiItem;
 import com.calio.calendar.holiday.client.dto.HolidayApiResponse;
 import com.calio.calendar.holiday.controller.dto.NationalHolidayResponse;
 import com.calio.calendar.holiday.domain.NationalHoliday;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
 import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -42,16 +40,6 @@ class NationalHolidayServiceTest {
 
     @InjectMocks
     private NationalHolidayService nationalHolidayService;
-
-    @Test
-    @DisplayName("단일 연도 동기화는 연도 범위 유스케이스 내부에서만 실행한다")
-    void syncYearIsPrivate() throws NoSuchMethodException {
-        // when
-        Method syncYear = NationalHolidayService.class.getDeclaredMethod("syncYear", int.class);
-
-        // then
-        assertThat(Modifier.isPrivate(syncYear.getModifiers())).isTrue();
-    }
 
     @Test
     @DisplayName("유효한 날짜 범위의 공휴일 조회는 QueryService에 위임한다")
@@ -107,18 +95,18 @@ class NationalHolidayServiceTest {
                         new HolidayApiItem("20260214", "기념일", "N")
                 )
         ));
-        given(nationalHolidayQueryService.findExistingHolidays(2026))
+        given(nationalHolidayQueryService.getHolidaysInYear(2026))
                 .willReturn(List.of(staleHoliday, retainedHoliday));
 
         // when
         nationalHolidayService.syncYearRange(2026, 2026);
 
         // then
-        verify(nationalHolidayQueryService).findExistingHolidays(2026);
-        verify(nationalHolidayCommandService).insertIfMissing(List.of(
-                new NationalHolidayProviderRow(LocalDate.of(2026, 1, 1), "신정")
-        ));
-        verify(nationalHolidayCommandService).deleteStaleHolidays(List.of(staleHoliday));
+        verify(nationalHolidayQueryService).getHolidaysInYear(2026);
+        verify(nationalHolidayCommandService).replaceSnapshot(
+                List.of(new NationalHolidayProviderRow(LocalDate.of(2026, 1, 1), "신정")),
+                List.of(staleHoliday)
+        );
     }
 
     @Test
@@ -161,7 +149,7 @@ class NationalHolidayServiceTest {
                 "00",
                 List.of(new HolidayApiItem("20270101", "신정", "Y"))
         ));
-        given(nationalHolidayQueryService.findExistingHolidays(2027)).willReturn(List.of());
+        given(nationalHolidayQueryService.getHolidaysInYear(2027)).willReturn(List.of());
 
         // when
         nationalHolidayService.syncYearRange(2026, 2027);
@@ -170,12 +158,12 @@ class NationalHolidayServiceTest {
         InOrder requests = inOrder(holidayApiClient);
         requests.verify(holidayApiClient).fetchHolidays(2026);
         requests.verify(holidayApiClient).fetchHolidays(2027);
-        verify(nationalHolidayQueryService, never()).findExistingHolidays(2026);
-        verify(nationalHolidayQueryService).findExistingHolidays(2027);
-        verify(nationalHolidayCommandService).insertIfMissing(List.of(
-                new NationalHolidayProviderRow(LocalDate.of(2027, 1, 1), "신정")
-        ));
-        verify(nationalHolidayCommandService).deleteStaleHolidays(List.of());
+        verify(nationalHolidayQueryService, never()).getHolidaysInYear(2026);
+        verify(nationalHolidayQueryService).getHolidaysInYear(2027);
+        verify(nationalHolidayCommandService).replaceSnapshot(
+                List.of(new NationalHolidayProviderRow(LocalDate.of(2027, 1, 1), "신정")),
+                List.of()
+        );
     }
 
     @Test
@@ -192,5 +180,21 @@ class NationalHolidayServiceTest {
 
         // then
         verifyNoInteractions(nationalHolidayCommandService);
+    }
+
+    @Test
+    @DisplayName("요청 연도 밖 provider 날짜가 포함되면 기존 snapshot을 변경하지 않는다")
+    void givenProviderRowOutsideRequestedYear_whenSyncYear_thenSkipsCommand() {
+        // given
+        given(holidayApiClient.fetchHolidays(2026)).willReturn(new HolidayApiResponse(
+                "00",
+                List.of(new HolidayApiItem("20270101", "신정", "Y"))
+        ));
+
+        // when
+        nationalHolidayService.syncYearRange(2026, 2026);
+
+        // then
+        verifyNoInteractions(nationalHolidayQueryService, nationalHolidayCommandService);
     }
 }

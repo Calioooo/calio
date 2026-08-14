@@ -3,6 +3,7 @@ package com.calio.calendar.event.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
@@ -216,28 +217,27 @@ class EventServiceTest {
     }
 
     @Test
-    @DisplayName("중요 일정 PATCH는 외부 매핑 정책과 독립적으로 중요 상태를 변경한다")
-    void givenExternalEvent_whenUpdateImportantEvent_thenAllowsImportantStateChange() {
+    @DisplayName("외부 캘린더 일정의 중요 상태 변경은 Command를 실행하지 않고 거절한다")
+    void givenExternalEvent_whenUpdateImportantEvent_thenRejectsBeforeCommand() {
         // given
         Event event = event("External", tag("기타"));
         when(eventCommandService.findEventForUpdate(1L, 10L)).thenReturn(event);
-        doAnswer(invocation -> {
-            Event target = invocation.getArgument(0);
-            target.changeImportantEvent(invocation.getArgument(1));
-            return null;
-        }).when(eventCommandService).updateImportantEvent(event, true);
+        when(eventQueryService.hasExternalEventMapping(1L, 10L)).thenReturn(true);
 
         // when
-        EventResponse response = eventService.updateImportantEvent(
+        assertThatThrownBy(() -> eventService.updateImportantEvent(
                 1L,
                 10L,
                 new UpdateImportantEventRequest(true)
+        )).isInstanceOfSatisfying(CalioException.class, exception ->
+                assertThat(exception.getErrorCode())
+                        .isEqualTo(ErrorCode.EXTERNAL_EVENT_MUTATION_NOT_SUPPORTED)
         );
 
         // then
-        verify(eventQueryService, never()).hasExternalEventMapping(any(), any());
-        verify(eventCommandService).updateImportantEvent(event, true);
-        assertThat(response.importantEvent()).isTrue();
+        verify(eventQueryService).hasExternalEventMapping(1L, 10L);
+        verify(eventCommandService, never()).updateImportantEvent(any(), anyBoolean());
+        assertThat(event.importantEvent()).isFalse();
     }
 
     @Test

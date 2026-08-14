@@ -20,6 +20,7 @@ import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.domain.GroupMember;
 import com.calio.calendar.groupspace.service.GroupMembershipCommandService;
 import com.calio.calendar.groupspace.service.GroupSpaceCommandService;
+import com.calio.calendar.groupspace.service.GroupSpaceQueryService;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -64,17 +65,23 @@ class GroupInvitationServiceTest {
     @Mock
     private GroupMembershipCommandService membershipCommandService;
 
+    @Mock
+    private GroupSpaceQueryService groupSpaceQueryService;
+
     private GroupInvitationService service;
+
+    private GroupInvitationProperties properties;
 
     @BeforeEach
     void setUp() {
-        GroupInvitationProperties properties = new GroupInvitationProperties();
+        properties = new GroupInvitationProperties();
         service = new GroupInvitationService(
                 credentialService,
                 queryService,
                 commandService,
                 groupSpaceCommandService,
                 membershipCommandService,
+                groupSpaceQueryService,
                 new NoOpTransactionManager(),
                 Clock.fixed(NOW, ZoneOffset.UTC),
                 properties
@@ -110,8 +117,8 @@ class GroupInvitationServiceTest {
                 .thenReturn(credentialHash);
         when(queryService.getInvitationByCredentialHash(request.credentialType(), credentialHash))
                 .thenReturn(invitation);
-        when(queryService.getGroupSpace(GROUP_SPACE_ID)).thenReturn(groupSpace);
-        when(queryService.getActiveMemberCount(GROUP_SPACE_ID)).thenReturn(4);
+        when(groupSpaceQueryService.getGroupSpace(GROUP_SPACE_ID)).thenReturn(groupSpace);
+        when(groupSpaceQueryService.getActiveMemberCount(GROUP_SPACE_ID)).thenReturn(4);
 
         // when
         var response = service.preview(request);
@@ -121,6 +128,34 @@ class GroupInvitationServiceTest {
         assertThat(response.emoji()).isEqualTo("📅");
         assertThat(response.memberCount()).isEqualTo(4);
         assertThat(response.expiresAt()).isEqualTo(NOW.plusSeconds(3600));
+    }
+
+    @Test
+    @DisplayName("만료된 초대 미리보기는 만료 오류 코드로 실패한다")
+    void previewRejectsExpiredInvitation() {
+        // given
+        byte[] credentialHash = new byte[32];
+        PreviewGroupInvitationRequest request = new PreviewGroupInvitationRequest(
+                InvitationCredentialType.LINK_TOKEN,
+                "A".repeat(43)
+        );
+        GroupInvitation invitation = new GroupInvitation(
+                GROUP_SPACE_ID,
+                MEMBER_ID,
+                new byte[32],
+                new byte[32],
+                NOW.minusSeconds(1)
+        );
+        when(credentialService.hashValidated(request.credentialType(), request.credential()))
+                .thenReturn(credentialHash);
+        when(queryService.getInvitationByCredentialHash(request.credentialType(), credentialHash))
+                .thenReturn(invitation);
+
+        // when, then
+        assertThatThrownBy(() -> service.preview(request))
+                .isInstanceOfSatisfying(CalioException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.GROUP_INVITATION_EXPIRED)
+                );
     }
 
     @Test
@@ -134,7 +169,7 @@ class GroupInvitationServiceTest {
                 new byte[32],
                 NOW.plusSeconds(3600)
         );
-        when(commandService.findRevocableInvitationForUpdate(
+        when(commandService.lockRevocableInvitationIfExists(
                 GROUP_SPACE_ID,
                 40L,
                 MEMBER_ID,
@@ -147,7 +182,7 @@ class GroupInvitationServiceTest {
         // then
         verify(groupSpaceCommandService).lockGroupSpace(GROUP_SPACE_ID);
         verify(membershipCommandService).lockActiveMember(GROUP_SPACE_ID, ACCOUNT_ID);
-        verify(commandService).findRevocableInvitationForUpdate(GROUP_SPACE_ID, 40L, MEMBER_ID, NOW);
+        verify(commandService).lockRevocableInvitationIfExists(GROUP_SPACE_ID, 40L, MEMBER_ID, NOW);
         verify(commandService).delete(invitation);
     }
 
@@ -169,7 +204,7 @@ class GroupInvitationServiceTest {
         ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
         verify(queryService).listExpiredBefore(eq(cutoff), pageable.capture());
         assertThat(pageable.getValue().getPageNumber()).isZero();
-        assertThat(pageable.getValue().getPageSize()).isEqualTo(1000);
+        assertThat(pageable.getValue().getPageSize()).isEqualTo(properties.getCleanupBatchSize());
         verify(commandService).delete(invitations);
         assertThat(deletedCount).isEqualTo(1);
     }
@@ -327,7 +362,7 @@ class GroupInvitationServiceTest {
     }
 
     private GroupInvitationProperties properties() {
-        return new GroupInvitationProperties();
+        return properties;
     }
 
     private static final class NoOpTransactionManager extends AbstractPlatformTransactionManager {

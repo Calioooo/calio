@@ -52,6 +52,7 @@ class TaskCommandServiceTest {
 
         // then
         assertThat(created).isSameAs(task);
+        verify(taskRepository).save(task);
     }
 
     @Test
@@ -62,7 +63,7 @@ class TaskCommandServiceTest {
         Instant completedAt = Instant.parse("2026-08-09T01:00:00Z");
 
         // when
-        taskCommandService.completeTask(task, completedAt);
+        taskCommandService.changeTaskCompleted(task, completedAt);
 
         // then
         assertThat(task.isCompleted()).isTrue();
@@ -78,7 +79,7 @@ class TaskCommandServiceTest {
         task.changeCompleted(Instant.parse("2026-08-09T01:00:00Z"));
 
         // when
-        taskCommandService.uncompleteTask(task);
+        taskCommandService.changeTaskUncompleted(task);
 
         // then
         assertThat(task.isCompleted()).isFalse();
@@ -112,6 +113,7 @@ class TaskCommandServiceTest {
 
         // then
         assertThat(deletedCount).isEqualTo(3);
+        verify(taskRepository).deleteCompletedTasksBefore(cutoff);
     }
 
     private Task task(String title) {

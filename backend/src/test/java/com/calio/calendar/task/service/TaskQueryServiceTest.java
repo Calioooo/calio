@@ -75,7 +75,7 @@ class TaskQueryServiceTest {
         when(taskRepository.findByTaskIdAndAccount_Id(10L, 1L)).thenReturn(Optional.of(task));
 
         // when
-        Task found = taskQueryService.findTask(1L, 10L);
+        Task found = taskQueryService.getTask(1L, 10L);
 
         // then
         assertThat(found).isSameAs(task);
@@ -88,7 +88,7 @@ class TaskQueryServiceTest {
         when(taskRepository.findByTaskIdAndAccount_Id(10L, 1L)).thenReturn(Optional.empty());
 
         // when, then
-        assertThatThrownBy(() -> taskQueryService.findTask(1L, 10L))
+        assertThatThrownBy(() -> taskQueryService.getTask(1L, 10L))
                 .isInstanceOfSatisfying(CalioException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.TASK_NOT_FOUND)
                 );

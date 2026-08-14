@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
+
+import com.calio.calendar.common.domain.CanonicalSchedule;
 import static org.mockito.Mockito.when;
 
 import com.calio.calendar.account.domain.Account;
@@ -139,17 +141,31 @@ class RecurrenceEventCommandServiceTest {
     }
 
     @Test
-    @DisplayName("occurrence 삭제 command는 전달받은 override를 변경하지 않고 저장한다")
-    void givenDeletedOverride_whenDeleteOccurrence_thenOnlySavesExactOverride() {
+    @DisplayName("occurrence 삭제 command는 override를 삭제 상태로 전이한 뒤 저장한다")
+    void givenExistingOverride_whenDeleteOccurrence_thenMarksDeletedAndSaves() {
         // given
-        RecurrenceEventOverride override = RecurrenceEventOverride.deleted(
-                recurrenceEvent(),
+        RecurrenceEvent recurrenceEvent = recurrenceEvent();
+        RecurrenceEventOverride override = RecurrenceEventOverride.active(
+                recurrenceEvent,
                 Instant.parse("2027-01-01T00:00:00Z"),
-                Instant.parse("2027-01-02T00:00:00Z")
+                "title",
+                null,
+                CanonicalSchedule.event(
+                        Instant.parse("2027-01-01T00:00:00Z"),
+                        Instant.parse("2027-01-01T01:00:00Z"),
+                        false,
+                        "UTC"
+                )
         );
+        Instant deletedAt = Instant.parse("2027-01-02T00:00:00Z");
 
         // when
-        recurrenceEventCommandService.deleteRecurrenceOccurrence(override);
+        recurrenceEventCommandService.deleteRecurrenceOccurrence(
+                recurrenceEvent,
+                Optional.of(override),
+                override.getOriginStartAt(),
+                deletedAt
+        );
 
         // then
         verify(recurrenceEventOverrideRepository).saveAndFlush(override);

@@ -188,6 +188,24 @@ class GroupInvitationCommandServiceTest {
         );
     }
 
+    @Test
+    @DisplayName("초대 잠금 조회 command는 대상을 찾지 못하면 초대 없음 오류로 실패한다")
+    void lockInvitationRejectsMissingInvitation() {
+        // given
+        byte[] credentialHash = new byte[32];
+        when(invitationRepository.findByIdAndCredentialHashForUpdate(40L, "LINK_TOKEN", credentialHash))
+                .thenReturn(Optional.empty());
+
+        // when, then
+        assertThatThrownBy(() -> commandService.lockInvitation(
+                40L,
+                InvitationCredentialType.LINK_TOKEN,
+                credentialHash
+        )).isInstanceOfSatisfying(CalioException.class, exception ->
+                assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.GROUP_INVITATION_NOT_FOUND)
+        );
+    }
+
     private DataIntegrityViolationException credentialCollision(String constraintName) {
         return new DataIntegrityViolationException(
                 "insert failed",

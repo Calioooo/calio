@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.calio.calendar.groupspace.domain.GroupMember;
 import com.calio.calendar.groupspace.domain.GroupMemberStatus;
 import com.calio.calendar.groupspace.domain.GroupSpace;
+import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import java.time.Instant;
 import java.util.List;
@@ -33,6 +34,9 @@ class GroupMemberRepositoryTest {
     @Autowired
     private EntityManagerFactory entityManagerFactory;
 
+    @Autowired
+    private EntityManager entityManager;
+
     @Test
     @DisplayName("그룹 목록 membership 조회는 GroupSpace를 함께 조회하고 동률이면 최신 그룹부터 정렬한다")
     void listMembershipsLoadsGroupSpaceAndPreservesTieBreakOrder() {
@@ -48,6 +52,7 @@ class GroupMemberRepositoryTest {
                 new GroupMember(firstGroup, 1L, "first", now),
                 new GroupMember(secondGroup, 1L, "second", now)
         ));
+        entityManager.clear();
 
         // when
         List<GroupMember> memberships = groupMemberRepository
@@ -78,6 +83,7 @@ class GroupMemberRepositoryTest {
                 "owner",
                 Instant.parse("2026-08-12T00:00:00Z")
         ));
+        entityManager.clear();
 
         // when
         GroupMember membership = groupMemberRepository

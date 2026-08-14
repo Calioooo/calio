@@ -73,7 +73,7 @@ class NationalHolidayQueryServiceTest {
                 .willReturn(holidays);
 
         // when
-        List<NationalHoliday> result = nationalHolidayQueryService.findExistingHolidays(2026);
+        List<NationalHoliday> result = nationalHolidayQueryService.getHolidaysInYear(2026);
 
         // then
         assertThat(result).isSameAs(holidays);

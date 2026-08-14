@@ -12,7 +12,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.calio.calendar.account.domain.Account;
-import com.calio.calendar.account.repository.AccountRepository;
+import com.calio.calendar.account.service.AccountQueryService;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.task.controller.dto.CreateTaskRequest;
@@ -46,7 +46,7 @@ class TaskServiceTest {
     private TaskCommandService taskCommandService;
 
     @Mock
-    private AccountRepository accountRepository;
+    private AccountQueryService accountQueryService;
 
     private TaskService taskService;
 
@@ -55,7 +55,7 @@ class TaskServiceTest {
         taskService = new TaskService(
                 taskQueryService,
                 taskCommandService,
-                accountRepository,
+                accountQueryService,
                 Clock.fixed(NOW, ZoneOffset.UTC)
         );
     }
@@ -65,7 +65,7 @@ class TaskServiceTest {
     void givenCreateRequest_whenCreateTask_thenDelegatesCanonicalTaskToCommand() {
         // given
         Account account = new Account();
-        when(accountRepository.getReferenceById(1L)).thenReturn(account);
+        when(accountQueryService.getAccount(1L)).thenReturn(account);
         when(taskCommandService.createTask(any(Task.class))).thenAnswer(invocation -> {
             Task task = invocation.getArgument(0);
             ReflectionTestUtils.setField(task, "taskId", 10L);
@@ -113,19 +113,19 @@ class TaskServiceTest {
     void givenOwnedTask_whenCompleteTask_thenDelegatesWithCanonicalPersistenceTime() {
         // given
         Task task = task("할 일");
-        when(taskQueryService.findTask(1L, 10L)).thenReturn(task);
+        when(taskQueryService.getTask(1L, 10L)).thenReturn(task);
         doAnswer(invocation -> {
             Task target = invocation.getArgument(0);
             target.changeCompleted(invocation.getArgument(1));
             return null;
-        }).when(taskCommandService).completeTask(any(Task.class), any(Instant.class));
+        }).when(taskCommandService).changeTaskCompleted(any(Task.class), any(Instant.class));
 
         // when
         TaskResponse response = taskService.completeTask(1L, 10L);
 
         // then
         Instant expectedCompletedAt = Instant.parse("2026-08-09T01:02:03.123456Z");
-        verify(taskCommandService).completeTask(task, expectedCompletedAt);
+        verify(taskCommandService).changeTaskCompleted(task, expectedCompletedAt);
         assertThat(response.isCompleted()).isTrue();
         assertThat(response.completedAt()).isEqualTo(expectedCompletedAt);
     }
@@ -136,18 +136,18 @@ class TaskServiceTest {
         // given
         Task task = task("할 일");
         task.changeCompleted(Instant.parse("2026-08-01T00:00:00Z"));
-        when(taskQueryService.findTask(1L, 10L)).thenReturn(task);
+        when(taskQueryService.getTask(1L, 10L)).thenReturn(task);
         doAnswer(invocation -> {
             Task target = invocation.getArgument(0);
             target.changeUncompleted();
             return null;
-        }).when(taskCommandService).uncompleteTask(task);
+        }).when(taskCommandService).changeTaskUncompleted(task);
 
         // when
         TaskResponse response = taskService.uncompleteTask(1L, 10L);
 
         // then
-        verify(taskCommandService).uncompleteTask(task);
+        verify(taskCommandService).changeTaskUncompleted(task);
         assertThat(response.isCompleted()).isFalse();
         assertThat(response.completedAt()).isNull();
     }
@@ -158,7 +158,7 @@ class TaskServiceTest {
         // given
         Task task = task("기존 제목");
         task.changeCompleted(Instant.parse("2026-08-01T00:00:00Z"));
-        when(taskQueryService.findTask(1L, 10L)).thenReturn(task);
+        when(taskQueryService.getTask(1L, 10L)).thenReturn(task);
 
         // when, then
         assertThatThrownBy(() -> taskService.updateTaskTitle(
@@ -177,7 +177,7 @@ class TaskServiceTest {
     void givenUncompletedTask_whenUpdateTitle_thenDelegatesToCommand() {
         // given
         Task task = task("기존 제목");
-        when(taskQueryService.findTask(1L, 10L)).thenReturn(task);
+        when(taskQueryService.getTask(1L, 10L)).thenReturn(task);
         doAnswer(invocation -> {
             Task target = invocation.getArgument(0);
             target.updateTitle(invocation.getArgument(1));

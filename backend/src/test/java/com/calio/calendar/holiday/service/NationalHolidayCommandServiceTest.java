@@ -42,16 +42,20 @@ class NationalHolidayCommandServiceTest {
     }
 
     @Test
-    @DisplayName("누락된 provider 공휴일 목록은 추가할 entity로 변환해 한 번만 저장한다")
-    void givenMissingProviderRows_whenInsertIfMissing_thenOnlyInsertsHolidays() {
+    @DisplayName("snapshot 교체는 누락 공휴일을 저장하고 stale 공휴일을 같은 Command 안에서 삭제한다")
+    void givenSnapshotChanges_whenReplaceSnapshot_thenWritesBothChanges() {
         // given
         List<NationalHolidayProviderRow> missingProviderRows = List.of(
                 new NationalHolidayProviderRow(LocalDate.of(2026, 1, 1), "신정"),
                 new NationalHolidayProviderRow(LocalDate.of(2026, 5, 5), "어린이날")
         );
 
+        List<NationalHoliday> staleHolidays = List.of(
+                new NationalHoliday(LocalDate.of(2026, 5, 5), "어린이날")
+        );
+
         // when
-        nationalHolidayCommandService.insertIfMissing(missingProviderRows);
+        nationalHolidayCommandService.replaceSnapshot(missingProviderRows, staleHolidays);
 
         // then
         @SuppressWarnings("unchecked")
@@ -63,20 +67,6 @@ class NationalHolidayCommandServiceTest {
                         tuple(LocalDate.of(2026, 1, 1), "신정"),
                         tuple(LocalDate.of(2026, 5, 5), "어린이날")
                 );
-    }
-
-    @Test
-    @DisplayName("stale 공휴일 목록은 추가 판단 없이 그대로 삭제한다")
-    void givenStaleHolidays_whenDeleteStaleHolidays_thenOnlyDeletesHolidays() {
-        // given
-        List<NationalHoliday> staleHolidays = List.of(
-                new NationalHoliday(LocalDate.of(2026, 5, 5), "어린이날")
-        );
-
-        // when
-        nationalHolidayCommandService.deleteStaleHolidays(staleHolidays);
-
-        // then
         verify(nationalHolidayRepository).deleteAll(staleHolidays);
     }
 }
