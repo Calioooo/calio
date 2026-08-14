@@ -2,7 +2,7 @@ package com.calio.calendar.integration.sync.page;
 
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.event.domain.Event;
-import com.calio.calendar.event.repository.EventRepository;
+import com.calio.calendar.event.service.EventCommandService;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingCommandService;
@@ -15,14 +15,14 @@ import org.springframework.stereotype.Service;
 public class GoogleCalendarEventChangeService {
 
     private final GoogleCalendarEventMappingCommandService eventMappingCommandService;
-    private final EventRepository eventRepository;
+    private final EventCommandService eventCommandService;
 
     public GoogleCalendarEventChangeService(
             GoogleCalendarEventMappingCommandService eventMappingCommandService,
-            EventRepository eventRepository
+            EventCommandService eventCommandService
     ) {
         this.eventMappingCommandService = eventMappingCommandService;
-        this.eventRepository = eventRepository;
+        this.eventCommandService = eventCommandService;
     }
 
     public void applyUpsert(
@@ -46,7 +46,7 @@ public class GoogleCalendarEventChangeService {
             existingMapping.updateProviderVersion(item.googleEtag(), item.googleUpdatedAt());
             return;
         }
-        Event event = eventRepository.save(new Event(
+        Event event = eventCommandService.createEvent(new Event(
                 item.title(),
                 item.description(),
                 item.schedule().startAt(),
@@ -79,6 +79,6 @@ public class GoogleCalendarEventChangeService {
             return;
         }
         eventMappingCommandService.deleteEventMapping(eventMapping);
-        eventRepository.delete(eventMapping.getEvent());
+        eventCommandService.deleteEvent(eventMapping.getEvent());
     }
 }

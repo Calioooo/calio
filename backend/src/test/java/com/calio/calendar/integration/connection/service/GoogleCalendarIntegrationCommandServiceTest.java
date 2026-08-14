@@ -25,7 +25,7 @@ class GoogleCalendarIntegrationCommandServiceTest {
         when(integrationRepository.updateNextSyncToken(1L, "next-token")).thenReturn(1);
 
         // when
-        commandService.saveNextSyncToken(1L, "next-token");
+        commandService.changeNextSyncToken(1L, "next-token");
 
         // then
         verify(integrationRepository).updateNextSyncToken(1L, "next-token");
@@ -38,7 +38,7 @@ class GoogleCalendarIntegrationCommandServiceTest {
         when(integrationRepository.updateNextSyncToken(1L, "next-token")).thenReturn(0);
 
         // when, then
-        assertThatThrownBy(() -> commandService.saveNextSyncToken(1L, "next-token"))
+        assertThatThrownBy(() -> commandService.changeNextSyncToken(1L, "next-token"))
                 .isInstanceOfSatisfying(CalioException.class, exception ->
                         org.assertj.core.api.Assertions.assertThat(exception.getErrorCode())
                                 .isEqualTo(ErrorCode.GOOGLE_CALENDAR_SYNC_CONFLICT));

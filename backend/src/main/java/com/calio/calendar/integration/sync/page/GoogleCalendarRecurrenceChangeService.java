@@ -4,8 +4,7 @@ import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.common.domain.CanonicalSchedule;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
-import com.calio.calendar.event.domain.Event;
-import com.calio.calendar.event.repository.EventRepository;
+import com.calio.calendar.event.service.EventCommandService;
 import com.calio.calendar.external.google.service.dto.NormalizedEventSchedule;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarRecurrenceEventMapping;
@@ -22,8 +21,7 @@ import com.calio.calendar.integration.sync.page.dto.GoogleCalendarPageRecordCach
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
-import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
-import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
+import com.calio.calendar.recurrence.service.RecurrenceEventCommandService;
 import com.calio.calendar.tag.domain.Tag;
 import java.time.Instant;
 import java.util.List;
@@ -35,22 +33,19 @@ public class GoogleCalendarRecurrenceChangeService {
 
     private final GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService;
     private final GoogleCalendarRecurrenceMappingCommandService recurrenceMappingCommandService;
-    private final EventRepository eventRepository;
-    private final RecurrenceEventRepository recurrenceEventRepository;
-    private final RecurrenceEventOverrideRepository overrideRepository;
+    private final EventCommandService eventCommandService;
+    private final RecurrenceEventCommandService recurrenceEventCommandService;
 
     public GoogleCalendarRecurrenceChangeService(
             GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService,
             GoogleCalendarRecurrenceMappingCommandService recurrenceMappingCommandService,
-            EventRepository eventRepository,
-            RecurrenceEventRepository recurrenceEventRepository,
-            RecurrenceEventOverrideRepository overrideRepository
+            EventCommandService eventCommandService,
+            RecurrenceEventCommandService recurrenceEventCommandService
     ) {
         this.recurrenceMappingQueryService = recurrenceMappingQueryService;
         this.recurrenceMappingCommandService = recurrenceMappingCommandService;
-        this.eventRepository = eventRepository;
-        this.recurrenceEventRepository = recurrenceEventRepository;
-        this.overrideRepository = overrideRepository;
+        this.eventCommandService = eventCommandService;
+        this.recurrenceEventCommandService = recurrenceEventCommandService;
     }
 
     public void applyUpsert(
@@ -73,7 +68,7 @@ public class GoogleCalendarRecurrenceChangeService {
             existingMapping.updateProviderVersion(item.googleEtag(), item.googleUpdatedAt());
             return;
         }
-        RecurrenceEvent recurrenceEvent = recurrenceEventRepository.save(new RecurrenceEvent(
+        RecurrenceEvent recurrenceEvent = recurrenceEventCommandService.createRecurrenceEvent(new RecurrenceEvent(
                 item.title(),
                 item.description(),
                 schedule,
@@ -199,7 +194,7 @@ public class GoogleCalendarRecurrenceChangeService {
                 recurrenceEventMapping.getRecurrenceEvent(),
                 item
         );
-        overrideRepository.save(recurrenceEventOverride);
+        recurrenceEventCommandService.createOrUpdateRecurrenceOverride(recurrenceEventOverride);
         cache.recurrenceEventOverrides().put(
                 existingOverride.recurrenceEventOverrideKey(),
                 recurrenceEventOverride
@@ -247,20 +242,11 @@ public class GoogleCalendarRecurrenceChangeService {
         if (!overrideMappings.isEmpty()) {
             recurrenceMappingCommandService.deleteOverrideMappings(overrideMappings);
         }
-        overrideRepository.deleteAllByRecurrenceEvent_Id(
-                recurrenceEventMapping.getRecurrenceEvent().getId()
-        );
-        overrideRepository.flush();
         recurrenceMappingCommandService.deleteRecurrenceEventMapping(recurrenceEventMapping);
-        List<Event> occurrences = eventRepository.findByRecurrenceIdAndAccount_IdOrderByStartAtAsc(
-                recurrenceEventMapping.getRecurrenceEvent().getId(),
-                recurrenceEventMapping.getRecurrenceEvent().getAccount().getId()
-        );
-        if (!occurrences.isEmpty()) {
-            eventRepository.deleteAll(occurrences);
-            eventRepository.flush();
-        }
-        recurrenceEventRepository.delete(recurrenceEventMapping.getRecurrenceEvent());
+        Long recurrenceEventId = recurrenceEventMapping.getRecurrenceEvent().getId();
+        recurrenceEventCommandService.deleteRecurrenceOverridesByRecurrenceEventIds(List.of(recurrenceEventId));
+        eventCommandService.deleteEventsByRecurrenceEventIds(List.of(recurrenceEventId));
+        recurrenceEventCommandService.deleteRecurrenceEventsByIds(List.of(recurrenceEventId));
     }
 
     private void validateMappedRecurrenceOverrideKey(

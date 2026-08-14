@@ -92,7 +92,7 @@ public class GoogleCalendarIntegrationCommandService {
         }
     }
 
-    public void saveNextSyncToken(Long integrationId, String nextSyncToken) {
+    public void changeNextSyncToken(Long integrationId, String nextSyncToken) {
         if (integrationRepository.updateNextSyncToken(integrationId, nextSyncToken) != 1) {
             throw new CalioException(ErrorCode.GOOGLE_CALENDAR_SYNC_CONFLICT);
         }

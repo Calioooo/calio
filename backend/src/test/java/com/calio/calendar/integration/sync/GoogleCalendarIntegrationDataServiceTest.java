@@ -8,7 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.calio.calendar.event.domain.Event;
-import com.calio.calendar.event.repository.EventRepository;
+import com.calio.calendar.event.service.EventCommandService;
 import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrationCommandService;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingCommandService;
@@ -17,8 +17,7 @@ import com.calio.calendar.integration.mapping.service.GoogleCalendarRecurrenceMa
 import com.calio.calendar.integration.mapping.service.GoogleCalendarRecurrenceMappingQueryService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationLeaseService;
-import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
-import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
+import com.calio.calendar.recurrence.service.RecurrenceEventCommandService;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
@@ -36,11 +35,9 @@ class GoogleCalendarIntegrationDataServiceTest {
             mock(GoogleCalendarRecurrenceMappingQueryService.class);
     private final GoogleCalendarRecurrenceMappingCommandService recurrenceMappingCommandService =
             mock(GoogleCalendarRecurrenceMappingCommandService.class);
-    private final EventRepository eventRepository = mock(EventRepository.class);
-    private final RecurrenceEventRepository recurrenceEventRepository =
-            mock(RecurrenceEventRepository.class);
-    private final RecurrenceEventOverrideRepository overrideRepository =
-            mock(RecurrenceEventOverrideRepository.class);
+    private final EventCommandService eventCommandService = mock(EventCommandService.class);
+    private final RecurrenceEventCommandService recurrenceEventCommandService =
+            mock(RecurrenceEventCommandService.class);
     private final GoogleOperationJobService operationJobPersistenceService =
             mock(GoogleOperationJobService.class);
     private final GoogleOperationLeaseService operationLeaseService =
@@ -71,9 +68,8 @@ class GoogleCalendarIntegrationDataServiceTest {
                 eventMappingCommandService,
                 recurrenceMappingQueryService,
                 recurrenceMappingCommandService,
-                eventRepository,
-                recurrenceEventRepository,
-                overrideRepository,
+                eventCommandService,
+                recurrenceEventCommandService,
                 null,
                 operationLeaseService,
                 operationJobPersistenceService
@@ -94,10 +90,10 @@ class GoogleCalendarIntegrationDataServiceTest {
 
         // then
         verify(eventMappingCommandService).deleteEventMappingsWithIds(List.of(10L));
-        verify(eventRepository).deleteAllByIds(List.of(20L));
+        verify(eventCommandService).deleteEventsByIds(List.of(20L));
         verify(eventMappingQueryService, times(2))
                 .listEventMappingBatch(eq(1L), any(Long.class), eq(500));
-        verify(integrationCommandService).saveNextSyncToken(1L, "next-token");
+        verify(integrationCommandService).changeNextSyncToken(1L, "next-token");
         verify(operationLeaseService, times(6)).extend(9L, 2L, "run-1");
         verify(operationJobPersistenceService).succeed(9L, 2L, "run-1");
     }
