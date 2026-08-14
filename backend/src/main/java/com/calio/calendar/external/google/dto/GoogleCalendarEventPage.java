@@ -7,7 +7,7 @@ import java.util.List;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GoogleCalendarEventPage(
-        List<GoogleCalendarEventItem> items,
+        List<GoogleCalendarEventResponse> items,
         String nextPageToken,
         String nextSyncToken,
         String timeZone

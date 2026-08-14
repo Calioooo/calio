@@ -2,18 +2,16 @@ package com.calio.calendar.external.google;
 
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
-import com.calio.calendar.external.google.dto.GoogleCalendarEventItem;
+import com.calio.calendar.external.google.dto.GoogleCalendarEventResponse;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventPage;
-import com.calio.calendar.integration.domain.GoogleCalendarSyncMode;
+import com.calio.calendar.integration.sync.GoogleCalendarSyncMode;
 import java.net.URI;
-import java.time.Duration;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -27,8 +25,6 @@ import tools.jackson.databind.ObjectMapper;
 public class GoogleCalendarEventsClient {
 
     private static final Logger log = LoggerFactory.getLogger(GoogleCalendarEventsClient.class);
-    private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
-    private static final Duration READ_TIMEOUT = Duration.ofSeconds(30);
     private static final String EVENT_FIELDS = "id,status,etag,updated,summary,description,"
             + "recurrence,recurringEventId,originalStartTime(date,dateTime,timeZone),"
             + "start(date,dateTime,timeZone),end(date,dateTime,timeZone)";
@@ -40,23 +36,10 @@ public class GoogleCalendarEventsClient {
     private final ObjectMapper objectMapper;
     private final RestClient restClient;
 
-    @Autowired
     public GoogleCalendarEventsClient(
             GoogleOAuthProperties properties,
             ObjectMapper objectMapper,
-            RestClient.Builder restClientBuilder
-    ) {
-        this(
-                properties,
-                objectMapper,
-                createRestClient(restClientBuilder)
-        );
-    }
-
-    GoogleCalendarEventsClient(
-            GoogleOAuthProperties properties,
-            ObjectMapper objectMapper,
-            RestClient restClient
+            @Qualifier("googleCalendarEventsRestClient") RestClient restClient
     ) {
         this.properties = properties;
         this.objectMapper = objectMapper;
@@ -84,7 +67,7 @@ public class GoogleCalendarEventsClient {
         }
     }
 
-    public Optional<GoogleCalendarEventItem> getEvent(
+    public Optional<GoogleCalendarEventResponse> getEvent(
             String accessToken,
             String externalEventId
     ) {
@@ -92,7 +75,7 @@ public class GoogleCalendarEventsClient {
             throw new CalioException(ErrorCode.GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID);
         }
         try {
-            GoogleCalendarEventItem response = requestEvent(accessToken, externalEventId);
+            GoogleCalendarEventResponse response = requestEvent(accessToken, externalEventId);
             return Optional.of(response);
         } catch (RestClientResponseException exception) {
             if (exception.getStatusCode().value() == HttpStatus.NOT_FOUND.value()) {
@@ -109,12 +92,12 @@ public class GoogleCalendarEventsClient {
         }
     }
 
-    private GoogleCalendarEventItem requestEvent(String accessToken, String externalEventId) {
-        GoogleCalendarEventItem response = restClient.get()
+    private GoogleCalendarEventResponse requestEvent(String accessToken, String externalEventId) {
+        GoogleCalendarEventResponse response = restClient.get()
                 .uri(eventUri(externalEventId))
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                 .retrieve()
-                .body(GoogleCalendarEventItem.class);
+                .body(GoogleCalendarEventResponse.class);
         if (response == null) {
             throw new CalioException(ErrorCode.GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID);
         }
@@ -268,14 +251,4 @@ public class GoogleCalendarEventsClient {
                 : null;
     }
 
-    private static RestClient createRestClient(RestClient.Builder restClientBuilder) {
-        return restClientBuilder.requestFactory(createRequestFactory()).build();
-    }
-
-    private static SimpleClientHttpRequestFactory createRequestFactory() {
-        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
-        requestFactory.setConnectTimeout(CONNECT_TIMEOUT);
-        requestFactory.setReadTimeout(READ_TIMEOUT);
-        return requestFactory;
-    }
 }

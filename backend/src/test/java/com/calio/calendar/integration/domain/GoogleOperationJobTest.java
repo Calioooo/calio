@@ -3,6 +3,9 @@ package com.calio.calendar.integration.domain;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJob;
+import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState;
+import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobTrigger;
 import java.time.Instant;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -22,7 +25,7 @@ class GoogleOperationJobTest {
     }
 
     @Test
-    @DisplayName("실행 가능한 Job을 claim하면 상태와 owner token만 변경한다")
+    @DisplayName("실행 가능한 Job을 claim하면 상태와 owner token이 변경된다")
     void givenRunnableJob_whenClaimed_thenChangesStateAndOwner() {
         // given
         GoogleOperationJob job = syncJob(NOW);
@@ -37,7 +40,7 @@ class GoogleOperationJobTest {
     }
 
     @Test
-    @DisplayName("Sync Job은 CANONICAL_MUTATION trigger를 허용하지 않는다")
+    @DisplayName("Sync Job을 CANONICAL_MUTATION trigger로 생성하면 예외를 반환한다")
     void givenCanonicalMutationTrigger_whenCreatingSyncJob_thenRejectsTrigger() {
         assertThatThrownBy(() -> GoogleOperationJob.sync(
                 "operation-id",
@@ -67,7 +70,7 @@ class GoogleOperationJobTest {
     }
 
     @Test
-    @DisplayName("Outbound Job은 실행 대상을 요구한다")
+    @DisplayName("Outbound Job은 실행 대상(resourceScope)을 요구한다")
     void givenMissingResourceScope_whenCreatingOutboundJob_thenRejectsTarget() {
         assertThatThrownBy(() -> GoogleOperationJob.outbound(
                 "operation-id",

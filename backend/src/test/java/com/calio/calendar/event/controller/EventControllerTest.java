@@ -14,10 +14,10 @@ import static com.calio.calendar.security.TestAccountSupport.currentAccountRefer
 import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.event.repository.EventRepository;
-import com.calio.calendar.integration.domain.GoogleCalendarEventMapping;
-import com.calio.calendar.integration.domain.GoogleCalendarIntegration;
-import com.calio.calendar.integration.repository.GoogleCalendarEventMappingRepository;
-import com.calio.calendar.integration.repository.GoogleCalendarIntegrationRepository;
+import com.calio.calendar.integration.mapping.domain.GoogleCalendarEventMapping;
+import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
+import com.calio.calendar.integration.mapping.repository.GoogleCalendarEventMappingRepository;
+import com.calio.calendar.integration.connection.repository.GoogleCalendarIntegrationRepository;
 import com.calio.calendar.tag.repository.TagRepository;
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.tag.domain.Tag;

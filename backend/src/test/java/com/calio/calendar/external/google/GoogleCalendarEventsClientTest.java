@@ -14,7 +14,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import com.calio.calendar.external.google.dto.GoogleCalendarEventPage;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
-import com.calio.calendar.integration.domain.GoogleCalendarSyncMode;
+import com.calio.calendar.integration.sync.GoogleCalendarSyncMode;
 import java.io.IOException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -30,7 +30,7 @@ import tools.jackson.databind.ObjectMapper;
 class GoogleCalendarEventsClientTest {
 
     @Test
-    @DisplayName("FULL 요청은 공통 query만 보내고 syncToken과 range parameter를 보내지 않는다")
+    @DisplayName("FULL SYNC 요청은 공통 query만 보내고 syncToken과 range parameter를 보내지 않는다")
     void givenFullMode_whenListEvents_thenUsesFullQueryContract() {
         // given
         RestClient.Builder restClientBuilder = RestClient.builder();
@@ -67,7 +67,7 @@ class GoogleCalendarEventsClientTest {
     }
 
     @Test
-    @DisplayName("Events API 응답의 일정 형식이 잘못되면 invalid response로 변환한다")
+    @DisplayName("Events API 응답의 일정 형식이 잘못되면 invalid response 예외를 반환한다")
     void givenMalformedEventResponse_whenListEvents_thenReturnsInvalidResponse() {
         // given
         RestClient.Builder restClientBuilder = RestClient.builder();
@@ -102,7 +102,7 @@ class GoogleCalendarEventsClientTest {
     }
 
     @Test
-    @DisplayName("Events API 401은 token 갱신을 수행하지 않고 호출자에게 전달한다")
+    @DisplayName("Events API 401은 token을 갱신하지 않고 401예외를 반환한다")
     void givenUnauthorizedResponse_whenListEvents_thenPropagatesUnauthorized() {
         // given
         RestClient.Builder restClientBuilder = RestClient.builder();
@@ -123,7 +123,7 @@ class GoogleCalendarEventsClientTest {
     }
 
     @Test
-    @DisplayName("Events API 410은 원본 HTTP 실패를 보존한 sync token 만료 예외로 분류한다")
+    @DisplayName("Events API 410은 원본 HTTP 실패를 보존한 sync token 만료 예외로 반환한다")
     void givenGoneResponse_whenListEvents_thenReturnsSyncTokenExpired() {
         // given
         RestClient.Builder restClientBuilder = RestClient.builder();
@@ -147,7 +147,7 @@ class GoogleCalendarEventsClientTest {
     }
 
     @Test
-    @DisplayName("INCREMENTAL 요청에 cursor가 없으면 외부 호출 없이 invalid response로 거부한다")
+    @DisplayName("INCREMENTAL 요청에 cursor가 없으면 외부 호출 없이 invalid response 예외를 반환한다")
     void givenIncrementalModeWithoutCursor_whenListEvents_thenRejectsClosedQueryContract() {
         // given
         RestClient.Builder restClientBuilder = RestClient.builder();
@@ -165,7 +165,7 @@ class GoogleCalendarEventsClientTest {
     }
 
     @Test
-    @DisplayName("calendar scope 부족 403은 reconnect required로 분류한다")
+    @DisplayName("calendar scope 부족 403은 reconnect required 예외를 반환한다")
     void givenInsufficientPermissions_whenListEvents_thenRequiresReconnect() {
         // given
         RestClient.Builder restClientBuilder = RestClient.builder();
@@ -197,7 +197,7 @@ class GoogleCalendarEventsClientTest {
     }
 
     @Test
-    @DisplayName("일시적인 usage-limit 403은 reconnect가 아닌 sync failed로 분류한다")
+    @DisplayName("일시적인 usage-limit 403은 sync failed 예외를 반환한다")
     void givenRateLimitFailure_whenListEvents_thenReturnsSyncFailed() {
         // given
         RestClient.Builder restClientBuilder = RestClient.builder();
@@ -269,7 +269,7 @@ class GoogleCalendarEventsClientTest {
     }
 
     @Test
-    @DisplayName("parent 단건 조회 404는 definitive not-found outcome으로 반환한다")
+    @DisplayName("parent 단건 조회 404는 not-found 예외를 반환한다")
     void givenMissingParent_whenGetEvent_thenReturnsNotFoundOutcome() {
         // given
         RestClient.Builder restClientBuilder = RestClient.builder();
@@ -290,7 +290,7 @@ class GoogleCalendarEventsClientTest {
     }
 
     @Test
-    @DisplayName("parent 단건 조회 401은 token refresh 없이 unauthorized로 전달한다")
+    @DisplayName("parent 단건 조회 401은 token을 refresh 하지 않고 unauthorized 예외를 반환한다")
     void givenUnauthorizedParentLookup_whenGetEvent_thenPropagatesUnauthorized() {
         // given
         RestClient.Builder restClientBuilder = RestClient.builder();
@@ -306,7 +306,7 @@ class GoogleCalendarEventsClientTest {
     }
 
     @Test
-    @DisplayName("parent 단건 조회의 insufficient-scope 403은 기존 reconnect 경계를 재사용한다")
+    @DisplayName("parent 단건 조회의 올바르지 않은 권한 조회 요청은 reconnect 예외를 반환한다")
     void givenInsufficientScopeParentLookup_whenGetEvent_thenRequiresReconnect() {
         // given
         RestClient.Builder restClientBuilder = RestClient.builder();
@@ -334,7 +334,7 @@ class GoogleCalendarEventsClientTest {
     }
 
     @Test
-    @DisplayName("parent 단건 조회의 rate-limit 응답은 기존 sync failed 경계를 재사용한다")
+    @DisplayName("parent 단건 조회의 rate-limit 응답은 sync failed 예외를 반환한다 ")
     void givenRateLimitParentLookup_whenGetEvent_thenReturnsSyncFailed() {
         // given
         RestClient.Builder restClientBuilder = RestClient.builder();
@@ -352,7 +352,7 @@ class GoogleCalendarEventsClientTest {
     }
 
     @Test
-    @DisplayName("parent 단건 조회의 network failure는 기존 sync failed 경계를 재사용한다")
+    @DisplayName("parent 단건 조회의 network failure는 sync failed 예외를 반환한다")
     void givenNetworkFailureParentLookup_whenGetEvent_thenReturnsSyncFailed() {
         // given
         RestClient.Builder restClientBuilder = RestClient.builder();
@@ -372,7 +372,7 @@ class GoogleCalendarEventsClientTest {
     }
 
     @Test
-    @DisplayName("parent 단건 조회 5xx는 기존 sync failed 경계를 재사용한다")
+    @DisplayName("parent 단건 조회 5xx는 sync failed 예외를 반환한다")
     void givenServerFailureParentLookup_whenGetEvent_thenReturnsSyncFailed() {
         // given
         RestClient.Builder restClientBuilder = RestClient.builder();
@@ -390,7 +390,7 @@ class GoogleCalendarEventsClientTest {
     }
 
     @Test
-    @DisplayName("parent 단건 조회의 malformed body는 invalid response로 분류한다")
+    @DisplayName("parent 단건 조회의 잘못된 body는 invalid response 예외로 반환한다")
     void givenMalformedParentBody_whenGetEvent_thenReturnsInvalidResponse() {
         // given
         RestClient.Builder restClientBuilder = RestClient.builder();

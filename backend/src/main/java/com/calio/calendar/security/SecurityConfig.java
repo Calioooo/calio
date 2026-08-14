@@ -36,6 +36,7 @@ public class SecurityConfig {
                 .logout(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/actuator/health", "/actuator/prometheus").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/guest").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/national-holidays").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/group-invitations/preview").authenticated()

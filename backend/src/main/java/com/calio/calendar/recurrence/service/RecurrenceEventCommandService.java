@@ -66,4 +66,8 @@ public class RecurrenceEventCommandService {
     public void deleteRecurrenceOccurrence(RecurrenceEventOverride override) {
         recurrenceEventOverrideRepository.saveAndFlush(override);
     }
+
+    public void changeTagForRecurrenceEvents(Long accountId, Tag sourceTag, Tag targetTag) {
+        recurrenceEventRepository.reassignAllByTagAndAccountId(sourceTag, targetTag, accountId);
+    }
 }

@@ -50,4 +50,8 @@ public class EventCommandService {
     public void deleteEvent(Event event) {
         eventRepository.delete(event);
     }
+
+    public void changeTagForTargetEvents(Long accountId, Tag sourceTag, Tag targetTag) {
+        eventRepository.reassignAllByTagAndAccountId(sourceTag, targetTag, accountId);
+    }
 }

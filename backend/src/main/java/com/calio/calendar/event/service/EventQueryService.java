@@ -4,7 +4,7 @@ import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.event.repository.EventRepository;
-import com.calio.calendar.integration.repository.GoogleCalendarEventMappingRepository;
+import com.calio.calendar.integration.mapping.repository.GoogleCalendarEventMappingRepository;
 import java.time.Instant;
 import java.util.List;
 import org.springframework.stereotype.Service;
