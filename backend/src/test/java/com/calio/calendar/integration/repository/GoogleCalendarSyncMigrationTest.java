@@ -293,6 +293,47 @@ class GoogleCalendarSyncMigrationTest {
         }
     }
 
+    @Test
+    @DisplayName("V18은 mapping hash와 status의 null 또는 잘못된 값을 거부한다")
+    void givenV18Schema_whenInsertInvalidMappingBaseline_thenRejectsIt() throws Exception {
+        String url = "jdbc:h2:mem:google-mapping-conflict-constraints;MODE=MySQL;DB_CLOSE_DELAY=-1";
+        migrateTo(url, MigrationVersion.fromVersion("8"));
+        insertLegacyEventAndIntegration(url);
+        migrateTo(url, MigrationVersion.fromVersion("18"));
+
+        try (Connection connection = DriverManager.getConnection(url, "sa", "");
+             Statement statement = connection.createStatement()) {
+            assertThatThrownBy(() -> statement.executeUpdate("""
+                    INSERT INTO google_calendar_event_mappings (
+                        integration_id, event_id, calendar_key, external_event_id,
+                        sync_status, synced_content_hash, created_at, updated_at
+                    ) VALUES (900, 900, 'primary', 'missing-hash', 'ACTIVE', NULL,
+                              CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    """))
+                    .isInstanceOf(SQLException.class);
+            assertThatThrownBy(() -> statement.executeUpdate("""
+                    INSERT INTO google_calendar_event_mappings (
+                        integration_id, event_id, calendar_key, external_event_id,
+                        sync_status, synced_content_hash, created_at, updated_at
+                    ) VALUES (900, 900, 'primary', 'invalid-status', 'UNKNOWN', '%s',
+                              CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    """.formatted(validHash())))
+                    .isInstanceOf(SQLException.class);
+            assertThatThrownBy(() -> statement.executeUpdate("""
+                    INSERT INTO google_calendar_event_mappings (
+                        integration_id, event_id, calendar_key, external_event_id,
+                        sync_status, synced_content_hash, created_at, updated_at
+                    ) VALUES (900, 900, 'primary', 'invalid-hash', 'ACTIVE', 'v1:invalid',
+                              CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    """))
+                    .isInstanceOf(SQLException.class);
+        }
+    }
+
+    private String validHash() {
+        return "v1:" + "a".repeat(64);
+    }
+
     private void migrateTo(String url, MigrationVersion target) {
         Flyway.configure()
                 .dataSource(url, "sa", "")
