@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.groups.Tuple.tuple;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -19,12 +21,14 @@ import com.calio.calendar.holiday.domain.NationalHoliday;
 import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @ExtendWith(MockitoExtension.class)
 class NationalHolidayServiceTest {
@@ -38,8 +42,19 @@ class NationalHolidayServiceTest {
     @Mock
     private NationalHolidayCommandService nationalHolidayCommandService;
 
+    @Mock
+    private TransactionTemplate transactionTemplate;
+
     @InjectMocks
     private NationalHolidayService nationalHolidayService;
+
+    @BeforeEach
+    void setUp() {
+        lenient().doAnswer(invocation -> {
+            invocation.getArgument(0, java.util.function.Consumer.class).accept(null);
+            return null;
+        }).when(transactionTemplate).executeWithoutResult(org.mockito.ArgumentMatchers.any());
+    }
 
     @Test
     @DisplayName("유효한 날짜 범위의 공휴일 조회는 QueryService에 위임한다")

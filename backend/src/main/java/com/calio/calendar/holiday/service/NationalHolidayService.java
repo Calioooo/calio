@@ -16,6 +16,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 public class NationalHolidayService {
@@ -26,15 +27,18 @@ public class NationalHolidayService {
     private final HolidayApiClient holidayApiClient;
     private final NationalHolidayQueryService nationalHolidayQueryService;
     private final NationalHolidayCommandService nationalHolidayCommandService;
+    private final TransactionTemplate transactionTemplate;
 
     public NationalHolidayService(
             HolidayApiClient holidayApiClient,
             NationalHolidayQueryService nationalHolidayQueryService,
-            NationalHolidayCommandService nationalHolidayCommandService
+            NationalHolidayCommandService nationalHolidayCommandService,
+            TransactionTemplate transactionTemplate
     ) {
         this.holidayApiClient = holidayApiClient;
         this.nationalHolidayQueryService = nationalHolidayQueryService;
         this.nationalHolidayCommandService = nationalHolidayCommandService;
+        this.transactionTemplate = transactionTemplate;
     }
 
     @Transactional(readOnly = true)
@@ -67,7 +71,7 @@ public class NationalHolidayService {
                 return;
             }
 
-            applySnapshot(year, providerRows);
+            transactionTemplate.executeWithoutResult(status -> applySnapshot(year, providerRows));
         } catch (Exception exception) {
             log.warn(
                     "National holiday sync failed. year={} resultCode={} errorCode={} message={}",

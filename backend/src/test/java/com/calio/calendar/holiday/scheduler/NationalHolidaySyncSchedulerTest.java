@@ -116,7 +116,8 @@ class NationalHolidaySyncSchedulerTest {
             super(
                     mock(com.calio.calendar.holiday.client.HolidayApiClient.class),
                     mock(NationalHolidayQueryService.class),
-                    mock(NationalHolidayCommandService.class)
+                    mock(NationalHolidayCommandService.class),
+                    mock(org.springframework.transaction.support.TransactionTemplate.class)
             );
         }
 
