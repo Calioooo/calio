@@ -81,6 +81,18 @@ public interface GoogleCalendarRecurrenceEventMappingRepository
             Pageable pageable
     );
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @EntityGraph(attributePaths = "recurrenceEvent")
+    @Query("""
+            select mapping
+            from GoogleCalendarRecurrenceEventMapping mapping
+            where mapping.id in :mappingIds
+            order by mapping.id
+            """)
+    List<GoogleCalendarRecurrenceEventMapping> findAllWithRecurrenceEventByIdsForUpdate(
+            @Param("mappingIds") Collection<Long> mappingIds
+    );
+
     @Modifying(flushAutomatically = true)
     @Query("""
             delete from GoogleCalendarRecurrenceEventMapping mapping

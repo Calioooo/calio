@@ -88,6 +88,19 @@ public interface GoogleCalendarRecurrenceOverrideMappingRepository
             Pageable pageable
     );
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @EntityGraph(attributePaths = {"recurrenceEventMapping", "recurrenceEventOverride"})
+    @Query("""
+            select mapping
+            from GoogleCalendarRecurrenceOverrideMapping mapping
+            where mapping.id in :mappingIds
+            order by mapping.id
+            """)
+    List<GoogleCalendarRecurrenceOverrideMapping>
+    findAllWithRecurrenceEventMappingAndRecurrenceEventOverrideByIdsForUpdate(
+            @Param("mappingIds") Collection<Long> mappingIds
+    );
+
     @Modifying(flushAutomatically = true)
     @Query("""
             delete from GoogleCalendarRecurrenceOverrideMapping mapping

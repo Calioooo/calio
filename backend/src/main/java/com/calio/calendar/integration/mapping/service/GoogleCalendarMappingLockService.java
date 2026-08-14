@@ -83,6 +83,28 @@ public class GoogleCalendarMappingLockService {
         return new LockedMappingIndex(events, recurrenceEvents, overrides);
     }
 
+    /** Locks an existing reconciliation batch in the same master-before-override order as pages. */
+    public List<GoogleCalendarRecurrenceOverrideMapping> lockOverrideBatch(
+            List<GoogleCalendarRecurrenceOverrideMapping> candidates
+    ) {
+        if (candidates.isEmpty()) {
+            return List.of();
+        }
+        TreeSet<Long> recurrenceMappingIds = candidates.stream()
+                .map(mapping -> mapping.getRecurrenceEventMapping().getId())
+                .collect(Collectors.toCollection(TreeSet::new));
+        recurrenceEventMappingRepository.findAllWithRecurrenceEventByIdsForUpdate(
+                recurrenceMappingIds
+        );
+        TreeSet<Long> overrideMappingIds = candidates.stream()
+                .map(GoogleCalendarRecurrenceOverrideMapping::getId)
+                .collect(Collectors.toCollection(TreeSet::new));
+        return overrideMappingRepository
+                .findAllWithRecurrenceEventMappingAndRecurrenceEventOverrideByIdsForUpdate(
+                        overrideMappingIds
+                );
+    }
+
     private Map<String, String> expectedParentsByOverrideExternalId(List<NormalizedItem> items) {
         Map<String, String> result = new HashMap<>();
         items.stream()

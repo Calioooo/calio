@@ -13,6 +13,7 @@ import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMapping
 import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingQueryService;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarRecurrenceMappingCommandService;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarRecurrenceMappingQueryService;
+import com.calio.calendar.integration.mapping.service.GoogleCalendarMappingLockService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobQueryService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationLeaseService;
@@ -42,6 +43,7 @@ public class GoogleCalendarIntegrationDataService {
     private final GoogleOperationLeaseService operationLeaseService;
     private final GoogleOperationJobService operationJobService;
     private final GoogleOperationJobQueryService operationJobQueryService;
+    private final GoogleCalendarMappingLockService mappingLockService;
 
     public GoogleCalendarIntegrationDataService(
             GoogleCalendarIntegrationCommandService integrationCommandService,
@@ -54,7 +56,8 @@ public class GoogleCalendarIntegrationDataService {
             GoogleCalendarRecurrenceChangeService recurrenceChangeService,
             GoogleOperationLeaseService operationLeaseService,
             GoogleOperationJobService operationJobService,
-            GoogleOperationJobQueryService operationJobQueryService
+            GoogleOperationJobQueryService operationJobQueryService,
+            GoogleCalendarMappingLockService mappingLockService
     ) {
         this.integrationCommandService = integrationCommandService;
         this.eventMappingQueryService = eventMappingQueryService;
@@ -67,6 +70,7 @@ public class GoogleCalendarIntegrationDataService {
         this.operationLeaseService = operationLeaseService;
         this.operationJobService = operationJobService;
         this.operationJobQueryService = operationJobQueryService;
+        this.mappingLockService = mappingLockService;
     }
 
     @Transactional
@@ -167,6 +171,7 @@ public class GoogleCalendarIntegrationDataService {
                         afterId,
                         SYNC_CLEANUP_BATCH_SIZE
                 );
+        mappings = mappingLockService.lockOverrideBatch(mappings);
         if (mappings.isEmpty()) {
             return null;
         }
