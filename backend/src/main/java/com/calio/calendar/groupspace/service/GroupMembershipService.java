@@ -176,9 +176,10 @@ public class GroupMembershipService {
     private InvitationCredentialType invitationCredentialType(
             GroupInvitationAcceptCredentialType credentialType
     ) {
-        return credentialType == GroupInvitationAcceptCredentialType.LINK_TOKEN
-                ? InvitationCredentialType.LINK_TOKEN
-                : InvitationCredentialType.CODE;
+        return switch (credentialType) {
+            case LINK_TOKEN -> InvitationCredentialType.LINK_TOKEN;
+            case INVITE_CODE -> InvitationCredentialType.CODE;
+        };
     }
 
     private GroupInvitation locateInvitation(

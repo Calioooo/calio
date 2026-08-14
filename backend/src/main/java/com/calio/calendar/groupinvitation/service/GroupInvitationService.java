@@ -14,6 +14,7 @@ import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.domain.GroupMember;
 import com.calio.calendar.groupspace.service.GroupMembershipCommandService;
 import com.calio.calendar.groupspace.service.GroupSpaceCommandService;
+import com.calio.calendar.groupspace.service.GroupSpaceQueryService;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -38,6 +39,7 @@ public class GroupInvitationService {
     private final GroupInvitationCommandService commandService;
     private final GroupSpaceCommandService groupSpaceCommandService;
     private final GroupMembershipCommandService membershipCommandService;
+    private final GroupSpaceQueryService groupSpaceQueryService;
     private final TransactionTemplate issueTransaction;
     private final Clock clock;
     private final GroupInvitationProperties properties;
@@ -48,6 +50,7 @@ public class GroupInvitationService {
             GroupInvitationCommandService commandService,
             GroupSpaceCommandService groupSpaceCommandService,
             GroupMembershipCommandService membershipCommandService,
+            GroupSpaceQueryService groupSpaceQueryService,
             PlatformTransactionManager transactionManager,
             Clock clock,
             GroupInvitationProperties properties
@@ -57,12 +60,14 @@ public class GroupInvitationService {
         this.commandService = commandService;
         this.groupSpaceCommandService = groupSpaceCommandService;
         this.membershipCommandService = membershipCommandService;
+        this.groupSpaceQueryService = groupSpaceQueryService;
         this.clock = clock;
         this.properties = properties;
         this.issueTransaction = new TransactionTemplate(transactionManager);
         this.issueTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
+    @Transactional(readOnly = true)
     public GroupInvitationListResponse list(Long accountId, Long groupSpaceId) {
         var invitations = queryService.list(accountId, groupSpaceId)
                 .stream()
@@ -71,6 +76,7 @@ public class GroupInvitationService {
         return new GroupInvitationListResponse(invitations);
     }
 
+    @Transactional(readOnly = true)
     public PreviewGroupInvitationResponse preview(PreviewGroupInvitationRequest request) {
         byte[] credentialHash = credentialService.hashValidated(
                 request.credentialType(),
@@ -84,8 +90,8 @@ public class GroupInvitationService {
             throw new CalioException(ErrorCode.GROUP_INVITATION_EXPIRED);
         }
 
-        GroupSpace groupSpace = queryService.getGroupSpace(invitation.getGroupSpaceId());
-        int activeMemberCount = queryService.getActiveMemberCount(groupSpace.getId());
+        GroupSpace groupSpace = groupSpaceQueryService.getGroupSpace(invitation.getGroupSpaceId());
+        int activeMemberCount = groupSpaceQueryService.getActiveMemberCount(groupSpace.getId());
         return PreviewGroupInvitationResponse.from(
                 groupSpace,
                 activeMemberCount,
@@ -97,7 +103,7 @@ public class GroupInvitationService {
     public void revoke(Long accountId, Long groupSpaceId, Long invitationId) {
         groupSpaceCommandService.lockGroupSpace(groupSpaceId);
         GroupMember member = membershipCommandService.lockActiveMember(groupSpaceId, accountId);
-        GroupInvitation invitation = commandService.findRevocableInvitationForUpdate(
+        GroupInvitation invitation = commandService.lockRevocableInvitationIfExists(
                         groupSpaceId,
                         invitationId,
                         member.getId(),

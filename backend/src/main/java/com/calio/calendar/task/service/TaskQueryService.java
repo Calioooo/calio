@@ -24,7 +24,7 @@ public class TaskQueryService {
                 .getContent();
     }
 
-    public Task findTask(Long accountId, Long taskId) {
+    public Task getTask(Long accountId, Long taskId) {
         return taskRepository.findByTaskIdAndAccount_Id(taskId, accountId)
                 .orElseThrow(() -> new CalioException(ErrorCode.TASK_NOT_FOUND));
     }

@@ -20,12 +20,12 @@ public class TaskCommandService {
         return taskRepository.save(task);
     }
 
-    public void completeTask(Task task, Instant completedAt) {
+    public void changeTaskCompleted(Task task, Instant completedAt) {
         task.changeCompleted(completedAt);
         taskRepository.flush();
     }
 
-    public void uncompleteTask(Task task) {
+    public void changeTaskUncompleted(Task task) {
         task.changeUncompleted();
         taskRepository.flush();
     }

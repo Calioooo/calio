@@ -11,7 +11,9 @@ import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
 import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.tag.domain.Tag;
+import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -63,7 +65,18 @@ public class RecurrenceEventCommandService {
         recurrenceEventRepository.deleteAllByIds(List.of(recurrenceId));
     }
 
-    public void deleteRecurrenceOccurrence(RecurrenceEventOverride override) {
+    public void deleteRecurrenceOccurrence(
+            RecurrenceEvent recurrenceEvent,
+            Optional<RecurrenceEventOverride> existingOverride,
+            Instant originStartAt,
+            Instant deletedAt
+    ) {
+        RecurrenceEventOverride override = existingOverride.orElseGet(() ->
+                RecurrenceEventOverride.deleted(recurrenceEvent, originStartAt, deletedAt)
+        );
+        if (existingOverride.isPresent()) {
+            override.markDeleted(deletedAt);
+        }
         recurrenceEventOverrideRepository.saveAndFlush(override);
     }
 

@@ -61,7 +61,7 @@ public class NationalHolidayService {
                 return;
             }
 
-            Set<NationalHolidayProviderRow> providerRows = toProviderRows(response.items());
+            Set<NationalHolidayProviderRow> providerRows = toProviderRows(year, response.items());
             if (providerRows.isEmpty()) {
                 log.warn("National holiday sync returned empty provider rows. year={}", year);
                 return;
@@ -89,7 +89,7 @@ public class NationalHolidayService {
     }
 
     private void applySnapshot(int year, Set<NationalHolidayProviderRow> providerRows) {
-        List<NationalHoliday> existingHolidays = nationalHolidayQueryService.findExistingHolidays(year);
+        List<NationalHoliday> existingHolidays = nationalHolidayQueryService.getHolidaysInYear(year);
         Set<NationalHolidayProviderRow> existingRows = existingHolidays.stream()
                 .map(NationalHolidayProviderRow::from)
                 .collect(Collectors.toSet());
@@ -97,12 +97,10 @@ public class NationalHolidayService {
         List<NationalHolidayProviderRow> missingProviderRows = providerRows.stream()
                 .filter(providerRow -> !existingRows.contains(providerRow))
                 .toList();
-        nationalHolidayCommandService.insertIfMissing(missingProviderRows);
-
         List<NationalHoliday> staleHolidays = existingHolidays.stream()
                 .filter(holiday -> !providerRows.contains(NationalHolidayProviderRow.from(holiday)))
                 .toList();
-        nationalHolidayCommandService.deleteStaleHolidays(staleHolidays);
+        nationalHolidayCommandService.replaceSnapshot(missingProviderRows, staleHolidays);
     }
 
     private String errorCode(Exception exception) {
@@ -112,11 +110,18 @@ public class NationalHolidayService {
         return null;
     }
 
-    private Set<NationalHolidayProviderRow> toProviderRows(List<HolidayApiItem> items) {
+    private Set<NationalHolidayProviderRow> toProviderRows(int year, List<HolidayApiItem> items) {
         return items.stream()
                 .filter(item -> "Y".equals(item.isHoliday()))
                 .map(this::toHolidayRow)
+                .peek(providerRow -> requireRequestedYear(year, providerRow))
                 .collect(Collectors.toSet());
+    }
+
+    private void requireRequestedYear(int year, NationalHolidayProviderRow providerRow) {
+        if (providerRow.holidayDate().getYear() != year) {
+            throw new CalioException(ErrorCode.INVALID_TIME_RANGE);
+        }
     }
 
     private NationalHolidayProviderRow toHolidayRow(HolidayApiItem item) {

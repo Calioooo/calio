@@ -1,7 +1,7 @@
 package com.calio.calendar.task.service;
 
 import com.calio.calendar.account.domain.Account;
-import com.calio.calendar.account.repository.AccountRepository;
+import com.calio.calendar.account.service.AccountQueryService;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.task.controller.dto.CreateTaskRequest;
@@ -26,24 +26,24 @@ public class TaskService {
 
     private final TaskQueryService taskQueryService;
     private final TaskCommandService taskCommandService;
-    private final AccountRepository accountRepository;
+    private final AccountQueryService accountQueryService;
     private final Clock clock;
 
     public TaskService(
             TaskQueryService taskQueryService,
             TaskCommandService taskCommandService,
-            AccountRepository accountRepository,
+            AccountQueryService accountQueryService,
             Clock clock
     ) {
         this.taskQueryService = taskQueryService;
         this.taskCommandService = taskCommandService;
-        this.accountRepository = accountRepository;
+        this.accountQueryService = accountQueryService;
         this.clock = clock;
     }
 
     @Transactional
     public TaskResponse createTask(Long accountId, CreateTaskRequest request) {
-        Account account = accountRepository.getReferenceById(accountId);
+        Account account = accountQueryService.getAccount(accountId);
         Task task = taskCommandService.createTask(request.toEntity(account));
         return TaskResponse.from(task);
     }
@@ -62,21 +62,21 @@ public class TaskService {
 
     @Transactional
     public TaskResponse completeTask(Long accountId, Long taskId) {
-        Task task = taskQueryService.findTask(accountId, taskId);
-        taskCommandService.completeTask(task, currentPersistenceTime());
+        Task task = taskQueryService.getTask(accountId, taskId);
+        taskCommandService.changeTaskCompleted(task, currentPersistenceTime());
         return TaskResponse.from(task);
     }
 
     @Transactional
     public TaskResponse uncompleteTask(Long accountId, Long taskId) {
-        Task task = taskQueryService.findTask(accountId, taskId);
-        taskCommandService.uncompleteTask(task);
+        Task task = taskQueryService.getTask(accountId, taskId);
+        taskCommandService.changeTaskUncompleted(task);
         return TaskResponse.from(task);
     }
 
     @Transactional
     public TaskResponse updateTaskTitle(Long accountId, Long taskId, UpdateTaskTitleRequest request) {
-        Task task = taskQueryService.findTask(accountId, taskId);
+        Task task = taskQueryService.getTask(accountId, taskId);
         if (task.isCompleted()) {
             throw new CalioException(ErrorCode.COMPLETED_TASK_TITLE_UPDATE_NOT_ALLOWED);
         }

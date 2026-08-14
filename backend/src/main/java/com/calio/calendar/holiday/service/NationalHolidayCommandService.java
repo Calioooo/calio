@@ -16,7 +16,10 @@ public class NationalHolidayCommandService {
         this.nationalHolidayRepository = nationalHolidayRepository;
     }
 
-    public void insertIfMissing(List<NationalHolidayProviderRow> missingProviderRows) {
+    public void replaceSnapshot(
+            List<NationalHolidayProviderRow> missingProviderRows,
+            List<NationalHoliday> staleHolidays
+    ) {
         List<NationalHoliday> missingHolidays = missingProviderRows.stream()
                 .map(providerRow -> new NationalHoliday(
                         providerRow.holidayDate(),
@@ -24,9 +27,6 @@ public class NationalHolidayCommandService {
                 ))
                 .toList();
         nationalHolidayRepository.saveAllAndFlush(missingHolidays);
-    }
-
-    public void deleteStaleHolidays(List<NationalHoliday> staleHolidays) {
         nationalHolidayRepository.deleteAll(staleHolidays);
     }
 }

@@ -136,13 +136,12 @@ public class RecurrenceEventService {
         Optional<RecurrenceEventOverride> existingOverride =
                 findOverrideOrRejectIneligible(recurrenceEvent, originStartAt);
         Instant deletedAt = Instant.now(clock);
-        RecurrenceEventOverride override = existingOverride.orElseGet(() ->
-                RecurrenceEventOverride.deleted(recurrenceEvent, originStartAt, deletedAt)
+        recurrenceEventCommandService.deleteRecurrenceOccurrence(
+                recurrenceEvent,
+                existingOverride,
+                originStartAt,
+                deletedAt
         );
-        if (existingOverride.isPresent()) {
-            override.markDeleted(deletedAt);
-        }
-        recurrenceEventCommandService.deleteRecurrenceOccurrence(override);
     }
 
     private RecurrenceSchedule createSchedule(CreateRecurrenceEventRequest request) {

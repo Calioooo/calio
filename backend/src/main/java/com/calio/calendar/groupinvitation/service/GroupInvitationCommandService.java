@@ -71,7 +71,7 @@ public class GroupInvitationCommandService {
         return invitationRepository.findAllByCreatedByMemberIdForUpdateOrderById(memberId);
     }
 
-    public Optional<GroupInvitation> findRevocableInvitationForUpdate(
+    public Optional<GroupInvitation> lockRevocableInvitationIfExists(
             Long groupSpaceId,
             Long invitationId,
             Long createdByMemberId,
@@ -112,9 +112,10 @@ public class GroupInvitationCommandService {
     }
 
     private static String credentialQueryType(InvitationCredentialType credentialType) {
-        return credentialType == InvitationCredentialType.LINK_TOKEN
-                ? "LINK_TOKEN"
-                : "INVITE_CODE";
+        return switch (credentialType) {
+            case LINK_TOKEN -> "LINK_TOKEN";
+            case CODE -> "INVITE_CODE";
+        };
     }
 
     private boolean isCredentialCollision(Throwable throwable) {

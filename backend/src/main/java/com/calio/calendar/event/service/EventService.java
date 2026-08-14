@@ -96,6 +96,7 @@ public class EventService {
     @Transactional
     public EventResponse updateImportantEvent(Long accountId, Long eventId, UpdateImportantEventRequest request) {
         Event event = eventCommandService.findEventForUpdate(accountId, eventId);
+        rejectExternalEventMutation(accountId, eventId);
         eventCommandService.updateImportantEvent(event, request.importantEvent());
         return EventResponse.from(event);
     }
