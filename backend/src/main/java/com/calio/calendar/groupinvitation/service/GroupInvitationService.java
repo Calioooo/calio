@@ -13,6 +13,7 @@ import com.calio.calendar.groupinvitation.service.dto.InvitationCredentialPair;
 import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.domain.GroupMember;
 import com.calio.calendar.groupspace.service.GroupMembershipCommandService;
+import com.calio.calendar.groupspace.service.GroupMembershipQueryService;
 import com.calio.calendar.groupspace.service.GroupSpaceCommandService;
 import com.calio.calendar.groupspace.service.GroupSpaceQueryService;
 import java.time.Clock;
@@ -39,6 +40,7 @@ public class GroupInvitationService {
     private final GroupInvitationCommandService commandService;
     private final GroupSpaceCommandService groupSpaceCommandService;
     private final GroupMembershipCommandService membershipCommandService;
+    private final GroupMembershipQueryService membershipQueryService;
     private final GroupSpaceQueryService groupSpaceQueryService;
     private final TransactionTemplate issueTransaction;
     private final Clock clock;
@@ -50,6 +52,7 @@ public class GroupInvitationService {
             GroupInvitationCommandService commandService,
             GroupSpaceCommandService groupSpaceCommandService,
             GroupMembershipCommandService membershipCommandService,
+            GroupMembershipQueryService membershipQueryService,
             GroupSpaceQueryService groupSpaceQueryService,
             PlatformTransactionManager transactionManager,
             Clock clock,
@@ -60,6 +63,7 @@ public class GroupInvitationService {
         this.commandService = commandService;
         this.groupSpaceCommandService = groupSpaceCommandService;
         this.membershipCommandService = membershipCommandService;
+        this.membershipQueryService = membershipQueryService;
         this.groupSpaceQueryService = groupSpaceQueryService;
         this.clock = clock;
         this.properties = properties;
@@ -69,7 +73,8 @@ public class GroupInvitationService {
 
     @Transactional(readOnly = true)
     public GroupInvitationListResponse list(Long accountId, Long groupSpaceId) {
-        var invitations = queryService.list(accountId, groupSpaceId)
+        GroupMember member = membershipQueryService.getActiveMembership(groupSpaceId, accountId);
+        var invitations = queryService.list(groupSpaceId, member.getId())
                 .stream()
                 .map(GroupInvitationSummaryResponse::from)
                 .toList();

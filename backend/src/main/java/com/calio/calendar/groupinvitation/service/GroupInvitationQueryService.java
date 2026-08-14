@@ -5,8 +5,6 @@ import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.groupinvitation.domain.GroupInvitation;
 import com.calio.calendar.groupinvitation.domain.InvitationCredentialType;
 import com.calio.calendar.groupinvitation.repository.GroupInvitationRepository;
-import com.calio.calendar.groupspace.domain.GroupMember;
-import com.calio.calendar.groupspace.service.GroupMembershipQueryService;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -19,23 +17,19 @@ import org.springframework.transaction.annotation.Transactional;
 public class GroupInvitationQueryService {
 
     private final GroupInvitationRepository invitationRepository;
-    private final GroupMembershipQueryService membershipQueryService;
     private final Clock clock;
 
     public GroupInvitationQueryService(
             GroupInvitationRepository invitationRepository,
-            GroupMembershipQueryService membershipQueryService,
             Clock clock
     ) {
         this.invitationRepository = invitationRepository;
-        this.membershipQueryService = membershipQueryService;
         this.clock = clock;
     }
 
-    public List<GroupInvitation> list(Long accountId, Long groupSpaceId) {
-        GroupMember member = membershipQueryService.getActiveMembership(groupSpaceId, accountId);
+    public List<GroupInvitation> list(Long groupSpaceId, Long memberId) {
         Instant now = clock.instant();
-        return invitationRepository.findActiveInvitations(groupSpaceId, member.getId(), now);
+        return invitationRepository.findActiveInvitations(groupSpaceId, memberId, now);
     }
 
     public GroupInvitation getInvitationByCredentialHash(

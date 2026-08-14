@@ -19,6 +19,7 @@ import com.calio.calendar.groupinvitation.service.dto.InvitationCredentialPair;
 import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.domain.GroupMember;
 import com.calio.calendar.groupspace.service.GroupMembershipCommandService;
+import com.calio.calendar.groupspace.service.GroupMembershipQueryService;
 import com.calio.calendar.groupspace.service.GroupSpaceCommandService;
 import com.calio.calendar.groupspace.service.GroupSpaceQueryService;
 import java.time.Clock;
@@ -66,6 +67,9 @@ class GroupInvitationServiceTest {
     private GroupMembershipCommandService membershipCommandService;
 
     @Mock
+    private GroupMembershipQueryService membershipQueryService;
+
+    @Mock
     private GroupSpaceQueryService groupSpaceQueryService;
 
     private GroupInvitationService service;
@@ -81,6 +85,7 @@ class GroupInvitationServiceTest {
                 commandService,
                 groupSpaceCommandService,
                 membershipCommandService,
+                membershipQueryService,
                 groupSpaceQueryService,
                 new NoOpTransactionManager(),
                 Clock.fixed(NOW, ZoneOffset.UTC),
@@ -240,7 +245,11 @@ class GroupInvitationServiceTest {
                 new byte[32],
                 Instant.parse("2026-07-29T08:00:00Z")
         );
-        when(queryService.list(ACCOUNT_ID, GROUP_SPACE_ID)).thenReturn(java.util.List.of(invitation));
+        GroupSpace groupSpace = new GroupSpace(ACCOUNT_ID, "Calio", null);
+        GroupMember member = new GroupMember(groupSpace, ACCOUNT_ID, "member", NOW);
+        ReflectionTestUtils.setField(member, "id", MEMBER_ID);
+        when(membershipQueryService.getActiveMembership(GROUP_SPACE_ID, ACCOUNT_ID)).thenReturn(member);
+        when(queryService.list(GROUP_SPACE_ID, MEMBER_ID)).thenReturn(java.util.List.of(invitation));
 
         // when
         var response = service.list(ACCOUNT_ID, GROUP_SPACE_ID);
@@ -249,7 +258,7 @@ class GroupInvitationServiceTest {
         assertThat(response.invitations()).hasSize(1);
         assertThat(response.invitations().getFirst().expiresAt())
                 .isEqualTo(Instant.parse("2026-07-29T08:00:00Z"));
-        verify(queryService).list(ACCOUNT_ID, GROUP_SPACE_ID);
+        verify(queryService).list(GROUP_SPACE_ID, MEMBER_ID);
     }
 
     @Test
