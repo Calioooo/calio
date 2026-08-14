@@ -79,14 +79,6 @@ public class GoogleCalendarEventMapping extends BaseEntity {
         this(integration, event, externalEventId, GoogleCalendarContentHasher.hash(event));
     }
 
-    @Deprecated
-    public GoogleCalendarEventMapping(
-            GoogleCalendarIntegration integration, Event event, String externalEventId,
-            String ignoredProviderEtag, java.time.Instant ignoredProviderUpdatedAt
-    ) {
-        this(integration, event, externalEventId);
-    }
-
     public Long getId() {
         return id;
     }

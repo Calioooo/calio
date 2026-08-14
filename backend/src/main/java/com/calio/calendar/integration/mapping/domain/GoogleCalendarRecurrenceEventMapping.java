@@ -80,14 +80,6 @@ public class GoogleCalendarRecurrenceEventMapping extends BaseEntity {
                 GoogleCalendarContentHasher.hash(recurrenceEvent));
     }
 
-    @Deprecated
-    public GoogleCalendarRecurrenceEventMapping(
-            GoogleCalendarIntegration integration, RecurrenceEvent recurrenceEvent, String externalEventId,
-            String ignoredProviderEtag, java.time.Instant ignoredProviderUpdatedAt
-    ) {
-        this(integration, recurrenceEvent, externalEventId);
-    }
-
     public Long getId() {
         return id;
     }

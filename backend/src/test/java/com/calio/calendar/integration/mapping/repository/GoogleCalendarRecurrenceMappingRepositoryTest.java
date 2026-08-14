@@ -349,9 +349,7 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
         return new GoogleCalendarRecurrenceEventMapping(
                 fixture.integration(),
                 recurrenceEvent,
-                externalEventId,
-                null,
-                null
+                externalEventId
         );
     }
 
@@ -383,9 +381,7 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
         return new GoogleCalendarRecurrenceOverrideMapping(
                 parentMapping,
                 recurrenceOverride,
-                externalEventId,
-                null,
-                null
+                externalEventId
         );
     }
 

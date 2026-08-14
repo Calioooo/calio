@@ -77,15 +77,6 @@ public class GoogleCalendarRecurrenceOverrideMapping extends BaseEntity {
                         recurrenceEventMapping.getExternalEventId(), recurrenceEventOverride));
     }
 
-    @Deprecated
-    public GoogleCalendarRecurrenceOverrideMapping(
-            GoogleCalendarRecurrenceEventMapping recurrenceEventMapping,
-            RecurrenceEventOverride recurrenceEventOverride, String externalEventId,
-            String ignoredProviderEtag, java.time.Instant ignoredProviderUpdatedAt
-    ) {
-        this(recurrenceEventMapping, recurrenceEventOverride, externalEventId);
-    }
-
     public Long getId() {
         return id;
     }
