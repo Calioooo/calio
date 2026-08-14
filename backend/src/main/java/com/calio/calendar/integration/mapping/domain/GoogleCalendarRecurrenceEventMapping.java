@@ -30,8 +30,7 @@ import jakarta.persistence.UniqueConstraint;
                 )
         }
 )
-public class GoogleCalendarRecurrenceEventMapping extends BaseEntity
-        implements GoogleCalendarMappingSyncStateOwner {
+public class GoogleCalendarRecurrenceEventMapping extends BaseEntity {
 
     public static final String PRIMARY_CALENDAR_KEY = "primary";
 
@@ -105,8 +104,19 @@ public class GoogleCalendarRecurrenceEventMapping extends BaseEntity
         return externalEventId;
     }
 
-    @Override
-    public GoogleCalendarMappingSyncState getSyncState() {
-        return syncState;
+    public void updateSyncedContentHash(String syncedContentHash) {
+        syncState.updateSyncedContentHash(syncedContentHash);
+    }
+
+    public void markConflicted() {
+        syncState.markConflicted();
+    }
+
+    public GoogleCalendarMappingSyncStatus getSyncStatus() {
+        return syncState.getStatus();
+    }
+
+    public String getSyncedContentHash() {
+        return syncState.getSyncedContentHash();
     }
 }
