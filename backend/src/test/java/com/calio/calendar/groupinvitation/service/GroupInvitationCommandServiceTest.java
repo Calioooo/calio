@@ -9,12 +9,9 @@ import static org.mockito.Mockito.when;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.groupinvitation.domain.GroupInvitation;
+import com.calio.calendar.groupinvitation.domain.InvitationCredentialType;
 import com.calio.calendar.groupinvitation.repository.GroupInvitationRepository;
 import com.calio.calendar.groupinvitation.service.dto.InvitationCredentialPair;
-import com.calio.calendar.groupspace.domain.GroupMember;
-import com.calio.calendar.groupspace.domain.GroupMemberStatus;
-import com.calio.calendar.groupspace.repository.GroupMemberRepository;
-import com.calio.calendar.groupspace.repository.GroupSpaceRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -34,12 +31,6 @@ class GroupInvitationCommandServiceTest {
 
     @Mock
     private GroupInvitationRepository invitationRepository;
-
-    @Mock
-    private GroupSpaceRepository groupSpaceRepository;
-
-    @Mock
-    private GroupMemberRepository groupMemberRepository;
 
     @InjectMocks
     private GroupInvitationCommandService commandService;
@@ -85,67 +76,6 @@ class GroupInvitationCommandServiceTest {
     }
 
     @Test
-    @DisplayName("초대 잠금 조회는 credential 인수를 repository에 그대로 위임한다")
-    void lockInvitationDelegatesExactCredentialArguments() {
-        // given
-        byte[] credentialHash = new byte[32];
-        GroupInvitation invitation = org.mockito.Mockito.mock(GroupInvitation.class);
-        when(invitationRepository.findByIdAndCredentialHashForUpdate(
-                40L,
-                "LINK_TOKEN",
-                credentialHash
-        )).thenReturn(Optional.of(invitation));
-
-        // when
-        GroupInvitation result = commandService.lockInvitation(
-                40L,
-                com.calio.calendar.groupinvitation.domain.InvitationCredentialType.LINK_TOKEN,
-                credentialHash
-        );
-
-        // then
-        assertThat(result).isSameAs(invitation);
-        verify(invitationRepository).findByIdAndCredentialHashForUpdate(
-                40L,
-                "LINK_TOKEN",
-                credentialHash
-        );
-    }
-
-    @Test
-    @DisplayName("초대 발급자 기준 잠금 조회는 repository 결과를 그대로 반환한다")
-    void lockInvitationsCreatedByReturnsRepositoryResult() {
-        // given
-        List<GroupInvitation> invitations = List.of(org.mockito.Mockito.mock(GroupInvitation.class));
-        when(invitationRepository.findAllByCreatedByMemberIdForUpdateOrderById(30L))
-                .thenReturn(invitations);
-
-        // when
-        List<GroupInvitation> result = commandService.lockInvitationsCreatedBy(30L);
-
-        // then
-        assertThat(result).isSameAs(invitations);
-        verify(invitationRepository).findAllByCreatedByMemberIdForUpdateOrderById(30L);
-    }
-
-    @Test
-    @DisplayName("활성 멤버 잠금 조회는 조회된 ACTIVE 멤버를 반환한다")
-    void lockActiveMemberReturnsActiveMember() {
-        // given
-        GroupMember member = org.mockito.Mockito.mock(GroupMember.class);
-        when(member.getStatus()).thenReturn(GroupMemberStatus.ACTIVE);
-        when(groupMemberRepository.findByGroupSpaceIdAndAccountIdForUpdate(20L, 10L))
-                .thenReturn(Optional.of(member));
-
-        // when
-        GroupMember result = commandService.lockActiveMember(20L, 10L);
-
-        // then
-        assertThat(result).isSameAs(member);
-        verify(groupMemberRepository).findByGroupSpaceIdAndAccountIdForUpdate(20L, 10L);
-    }
-
-    @Test
     @DisplayName("credential unique constraint 충돌은 재시도 가능한 credential 충돌로 변환한다")
     void mapsCredentialConstraintViolationToRetryableCollision() {
         // given
@@ -177,6 +107,85 @@ class GroupInvitationCommandServiceTest {
         // when, then
         assertThatThrownBy(() -> commandService.create(20L, 30L, credentials(), expiresAt()))
                 .isSameAs(cause);
+    }
+
+    @Test
+    @DisplayName("member가 발급한 초대장 삭제 command는 잠금 조회 후 일괄 삭제한다")
+    void deleteAllByCreatedByMemberIdDeletesLockedInvitations() {
+        // given
+        GroupInvitation invitation = new GroupInvitation(
+                20L,
+                30L,
+                new byte[32],
+                new byte[32],
+                Instant.parse("2026-08-15T00:00:00Z")
+        );
+        List<GroupInvitation> invitations = List.of(invitation);
+        when(invitationRepository.findAllByCreatedByMemberIdForUpdateOrderById(30L))
+                .thenReturn(invitations);
+
+        // when
+        commandService.deleteAllByCreatedByMemberId(30L);
+
+        // then
+        verify(invitationRepository).findAllByCreatedByMemberIdForUpdateOrderById(30L);
+        verify(invitationRepository).deleteAllInBatch(invitations);
+    }
+
+    @Test
+    @DisplayName("초대 잠금 조회 command는 credential 인수를 repository에 그대로 위임한다")
+    void lockInvitationDelegatesExactCredentialArguments() {
+        // given
+        byte[] credentialHash = new byte[32];
+        GroupInvitation invitation = org.mockito.Mockito.mock(GroupInvitation.class);
+        when(invitationRepository.findByIdAndCredentialHashForUpdate(
+                40L,
+                "LINK_TOKEN",
+                credentialHash
+        )).thenReturn(Optional.of(invitation));
+
+        // when
+        GroupInvitation result = commandService.lockInvitation(
+                40L,
+                InvitationCredentialType.LINK_TOKEN,
+                credentialHash
+        );
+
+        // then
+        assertThat(result).isSameAs(invitation);
+        verify(invitationRepository).findByIdAndCredentialHashForUpdate(
+                40L,
+                "LINK_TOKEN",
+                credentialHash
+        );
+    }
+
+    @Test
+    @DisplayName("초대 잠금 조회 command는 CODE 자격 증명을 repository의 INVITE_CODE 계약으로 변환한다")
+    void lockInvitationMapsCodeCredentialType() {
+        // given
+        byte[] credentialHash = new byte[32];
+        GroupInvitation invitation = org.mockito.Mockito.mock(GroupInvitation.class);
+        when(invitationRepository.findByIdAndCredentialHashForUpdate(
+                40L,
+                "INVITE_CODE",
+                credentialHash
+        )).thenReturn(Optional.of(invitation));
+
+        // when
+        GroupInvitation result = commandService.lockInvitation(
+                40L,
+                InvitationCredentialType.CODE,
+                credentialHash
+        );
+
+        // then
+        assertThat(result).isSameAs(invitation);
+        verify(invitationRepository).findByIdAndCredentialHashForUpdate(
+                40L,
+                "INVITE_CODE",
+                credentialHash
+        );
     }
 
     private DataIntegrityViolationException credentialCollision(String constraintName) {

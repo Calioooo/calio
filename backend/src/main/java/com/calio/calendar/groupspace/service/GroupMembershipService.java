@@ -247,9 +247,7 @@ public class GroupMembershipService {
     }
 
     private void deleteIssuerInvitations(Long memberId) {
-        List<GroupInvitation> invitations = invitationCommandService
-                .lockInvitationsCreatedBy(memberId);
-        invitationCommandService.delete(invitations);
+        invitationCommandService.deleteAllByCreatedByMemberId(memberId);
     }
 
     private GroupMember requireActiveMembership(Long groupSpaceId, Long accountId) {

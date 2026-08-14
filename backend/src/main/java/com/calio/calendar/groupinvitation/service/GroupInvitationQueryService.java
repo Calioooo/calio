@@ -86,4 +86,5 @@ public class GroupInvitationQueryService {
     private static CalioException invitationNotFound() {
         return new CalioException(ErrorCode.GROUP_INVITATION_NOT_FOUND);
     }
+
 }

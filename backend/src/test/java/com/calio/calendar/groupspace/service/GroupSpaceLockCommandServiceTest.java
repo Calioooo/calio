@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.groupspace.domain.GroupMember;
+import com.calio.calendar.groupspace.domain.GroupMemberStatus;
 import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.repository.GroupMemberRepository;
 import com.calio.calendar.groupspace.repository.GroupSpaceRepository;
@@ -67,6 +68,20 @@ class GroupSpaceLockCommandServiceTest {
 
         assertThat(result).isSameAs(members);
         verify(groupMemberRepository).findAllByGroupSpaceIdForUpdateOrderById(20L);
+    }
+
+    @Test
+    @DisplayName("GroupMembership command는 잠긴 ACTIVE 멤버를 반환한다")
+    void membershipCommandLocksActiveMember() {
+        GroupMember member = org.mockito.Mockito.mock(GroupMember.class);
+        when(member.getStatus()).thenReturn(GroupMemberStatus.ACTIVE);
+        when(groupMemberRepository.findByGroupSpaceIdAndAccountIdForUpdate(20L, 10L))
+                .thenReturn(Optional.of(member));
+
+        GroupMember result = membershipCommandService.lockActiveMember(20L, 10L);
+
+        assertThat(result).isSameAs(member);
+        verify(groupMemberRepository).findByGroupSpaceIdAndAccountIdForUpdate(20L, 10L);
     }
 
     @Test

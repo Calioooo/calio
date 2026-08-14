@@ -52,6 +52,18 @@ public class GroupMembershipCommandService {
         return groupMemberRepository.findAllByGroupSpaceIdForUpdateOrderById(groupSpaceId);
     }
 
+    public GroupMember lockActiveMember(Long groupSpaceId, Long accountId) {
+        GroupMember member = groupMemberRepository.findByGroupSpaceIdAndAccountIdForUpdate(
+                        groupSpaceId,
+                        accountId
+                )
+                .orElseThrow(GroupMembershipCommandService::groupSpaceNotFound);
+        if (member.getStatus() != GroupMemberStatus.ACTIVE) {
+            throw groupSpaceNotFound();
+        }
+        return member;
+    }
+
     public void changeToActive(GroupMember member, String nickname, Instant now) {
         member.reactivate(nickname, now);
         groupMemberRepository.flush();
