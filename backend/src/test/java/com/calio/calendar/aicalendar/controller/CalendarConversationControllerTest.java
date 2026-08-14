@@ -14,6 +14,7 @@ import com.calio.calendar.aicalendar.repository.CalendarConversationMessageRepos
 import com.calio.calendar.aicalendar.repository.CalendarConversationRepository;
 import com.calio.calendar.aicalendar.service.CalendarAssistantAgent;
 import com.calio.calendar.aicalendar.service.CalendarConversationService;
+import com.calio.calendar.aicalendar.service.dto.CalendarAssistantAnswer;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.security.AuthenticatedAccountMockMvcTestConfig;
@@ -90,7 +91,7 @@ class CalendarConversationControllerTest {
             throws Exception {
         // given
         String conversationId = createConversation();
-        when(assistantAgent.answer(any())).thenReturn("일정을 확인했어요.");
+        when(assistantAgent.answer(any())).thenReturn(CalendarAssistantAnswer.withoutBlocks("일정을 확인했어요."));
 
         // when
         MvcResult result = mockMvc.perform(post("/api/ai/calendar/conversations/{conversationId}/messages", conversationId)
@@ -102,7 +103,8 @@ class CalendarConversationControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.conversationId").value(conversationId))
                 .andExpect(jsonPath("$.assistantMessage").value("일정을 확인했어요."))
-                .andExpect(jsonPath("$.*").value(org.hamcrest.Matchers.hasSize(2)))
+                .andExpect(jsonPath("$.blocks").isEmpty())
+                .andExpect(jsonPath("$.*").value(org.hamcrest.Matchers.hasSize(3)))
                 .andReturn();
 
         assertThat(messageRepository.findAll())
@@ -169,6 +171,7 @@ class CalendarConversationControllerTest {
         assertThat(messageRepository.findAll()).extracting(message -> message.getText())
                 .containsExactly("내일 일정 알려줘");
     }
+
 
     private JsonNode readJson(MvcResult result) throws Exception {
         return objectMapper.readTree(result.getResponse().getContentAsString(StandardCharsets.UTF_8));

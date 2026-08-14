@@ -2,7 +2,9 @@ package com.calio.calendar.aicalendar.service;
 
 import com.calio.calendar.aicalendar.config.CalendarAIProperties;
 import com.calio.calendar.aicalendar.service.dto.CalendarAssistantRequest;
+import com.calio.calendar.aicalendar.service.dto.CalendarAssistantAnswer;
 import com.calio.calendar.aicalendar.service.dto.CalendarConversationHistoryMessage;
+import com.calio.calendar.aicalendar.service.tool.CalendarAgentToolResultCollector;
 import com.calio.calendar.aicalendar.service.tool.CalendarAgentTools;
 import com.calio.calendar.aicalendar.service.tool.dto.CalendarAgentToolRequestContext;
 import com.calio.calendar.common.error.CalioException;
@@ -65,10 +67,10 @@ public class SpringAiCalendarAssistantAgent implements CalendarAssistantAgent, A
     }
 
     @Override
-    public String answer(CalendarAssistantRequest request) {
+    public CalendarAssistantAnswer answer(CalendarAssistantRequest request) {
         Instant startedAt = clock.instant();
         try {
-            String answer = requestProviderAnswer(request);
+            CalendarAssistantAnswer answer = requestProviderAnswer(request);
             observationService.recordRun(
                     request.conversationId(),
                     modelName,
@@ -89,19 +91,22 @@ public class SpringAiCalendarAssistantAgent implements CalendarAssistantAgent, A
         }
     }
 
-    private String requestProviderAnswer(CalendarAssistantRequest request) {
+    private CalendarAssistantAnswer requestProviderAnswer(CalendarAssistantRequest request) {
         ChatModel chatModel = chatModelProvider.getIfAvailable();
         if (chatModel == null || modelName.isBlank()) {
             throw new CalioException(ErrorCode.AI_CALENDAR_PROVIDER_UNAVAILABLE);
         }
+        CalendarAgentToolResultCollector resultCollector = new CalendarAgentToolResultCollector();
         Map<String, Object> toolContext = calendarAgentTools.createToolContext(
                 new CalendarAgentToolRequestContext(
                         request.accountId(),
                         request.conversationId(),
                         request.timeZone()
-                )
+                ),
+                resultCollector
         );
-        return requestProviderWithRetry(chatModel, request.timeZone(), request.history(), toolContext);
+        String answer = requestProviderWithRetry(chatModel, request.timeZone(), request.history(), toolContext);
+        return new CalendarAssistantAnswer(answer, resultCollector.events(), resultCollector.freeTimes());
     }
 
     private String requestProviderWithRetry(

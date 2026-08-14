@@ -127,7 +127,8 @@ class CalendarAgentToolsTest {
 
     private ToolContext toolContext(CalendarAgentTools tools) {
         return new ToolContext(tools.createToolContext(
-                new CalendarAgentToolRequestContext(1L, "conversation-id", ZoneId.of("UTC"))
+                new CalendarAgentToolRequestContext(1L, "conversation-id", ZoneId.of("UTC")),
+                new CalendarAgentToolResultCollector()
         ));
     }
 

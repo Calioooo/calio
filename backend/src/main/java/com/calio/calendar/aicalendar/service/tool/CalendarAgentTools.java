@@ -25,6 +25,7 @@ public class CalendarAgentTools {
     private static final String FREE_TIME_TOOL_NAME = "find_calendar_free_time";
     private static final String REQUEST_CONTEXT_KEY = "calendarAgentToolRequestContext";
     private static final String CALL_COUNTER_KEY = "calendarAgentToolCallCounter";
+    private static final String RESULT_COLLECTOR_KEY = "calendarAgentToolResultCollector";
 
     private final EventService eventService;
     private final CalendarAIProperties properties;
@@ -40,10 +41,14 @@ public class CalendarAgentTools {
         this.observationService = observationService;
     }
 
-    public Map<String, Object> createToolContext(CalendarAgentToolRequestContext requestContext) {
+    public Map<String, Object> createToolContext(
+            CalendarAgentToolRequestContext requestContext,
+            CalendarAgentToolResultCollector resultCollector
+    ) {
         return Map.of(
                 REQUEST_CONTEXT_KEY, requestContext,
-                CALL_COUNTER_KEY, new CalendarAgentToolCallCounter()
+                CALL_COUNTER_KEY, new CalendarAgentToolCallCounter(),
+                RESULT_COLLECTOR_KEY, resultCollector
         );
     }
 
@@ -66,6 +71,7 @@ public class CalendarAgentTools {
                     properties
             );
             List<EventResponse> events = getCalendarEvents(requestContext.accountId(), range);
+            getResultCollector(toolContext).recordEvents(events);
             observationService.recordTool(
                     requestContext.conversationId(),
                     LOOKUP_TOOL_NAME,
@@ -115,6 +121,7 @@ public class CalendarAgentTools {
                     windowEnd,
                     Duration.ofMinutes(request.minimumDurationMinutes())
             );
+            getResultCollector(toolContext).recordFreeTimes(freeTimes);
             observationService.recordTool(
                     requestContext.conversationId(),
                     FREE_TIME_TOOL_NAME,
@@ -151,6 +158,14 @@ public class CalendarAgentTools {
         if (!callCounter.incrementWithin(properties.getMaxToolCalls())) {
             throw new IllegalStateException("Calendar agent tool call limit exceeded.");
         }
+    }
+
+    private CalendarAgentToolResultCollector getResultCollector(ToolContext toolContext) {
+        Object collector = toolContext.getContext().get(RESULT_COLLECTOR_KEY);
+        if (collector instanceof CalendarAgentToolResultCollector resultCollector) {
+            return resultCollector;
+        }
+        throw new IllegalStateException("Calendar agent tool result collector is missing.");
     }
 
     private List<EventResponse> getCalendarEvents(

@@ -4,6 +4,7 @@ import com.calio.calendar.aicalendar.controller.dto.SendCalendarConversationMess
 import com.calio.calendar.aicalendar.domain.CalendarConversation;
 import com.calio.calendar.aicalendar.domain.CalendarConversationMessageRole;
 import com.calio.calendar.aicalendar.service.dto.CalendarAssistantRequest;
+import com.calio.calendar.aicalendar.service.dto.CalendarAssistantAnswer;
 import com.calio.calendar.aicalendar.service.dto.CalendarConversationHistoryMessage;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
@@ -65,14 +66,15 @@ public class CalendarConversationService {
                 conversation.getId(),
                 message
         );
-        String assistantMessage = assistantAgent.answer(new CalendarAssistantRequest(
+        CalendarAssistantRequest request = new CalendarAssistantRequest(
                 accountId,
                 conversationId,
                 zoneId,
                 history
-        ));
-        recordAssistantMessage(conversation.getId(), assistantMessage);
-        return new SendCalendarConversationMessageResponse(conversationId, assistantMessage);
+        );
+        CalendarAssistantAnswer answer = assistantAgent.answer(request);
+        recordAssistantMessage(conversation.getId(), answer.message());
+        return SendCalendarConversationMessageResponse.from(conversationId, answer);
     }
 
     List<CalendarConversationHistoryMessage> recordUserMessageAndGetRecentHistory(

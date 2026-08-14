@@ -1,8 +1,9 @@
 package com.calio.calendar.aicalendar.service;
 
 import com.calio.calendar.aicalendar.service.dto.CalendarAssistantRequest;
+import com.calio.calendar.aicalendar.service.dto.CalendarAssistantAnswer;
 
 public interface CalendarAssistantAgent {
 
-    String answer(CalendarAssistantRequest request);
+    CalendarAssistantAnswer answer(CalendarAssistantRequest request);
 }
