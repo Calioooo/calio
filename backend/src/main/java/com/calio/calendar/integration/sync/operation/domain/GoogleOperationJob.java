@@ -1,6 +1,7 @@
 package com.calio.calendar.integration.sync.operation.domain;
 
 import com.calio.calendar.common.domain.BaseEntity;
+import com.calio.calendar.integration.mapping.domain.GoogleCalendarContentHash;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -121,7 +122,8 @@ public class GoogleOperationJob extends BaseEntity {
             String desiredContentHash,
             Instant runnableAt
     ) {
-        validateOutboundFields(kind, resourceScope, resourceKey, desiredPayload, desiredContentHash);
+        validateOutboundFields(kind, resourceScope, resourceKey, desiredPayload);
+        desiredContentHash = GoogleCalendarContentHash.requireValid(desiredContentHash);
         GoogleOperationJob job = new GoogleOperationJob();
         job.operationId = operationId;
         job.integrationId = integrationId;
@@ -150,14 +152,12 @@ public class GoogleOperationJob extends BaseEntity {
             String kind,
             String resourceScope,
             String resourceKey,
-            String desiredPayload,
-            String desiredContentHash
+            String desiredPayload
     ) {
         if (kind == null || kind.isBlank() || SYNC_KIND.equals(kind)
                 || resourceScope == null || resourceScope.isBlank()
                 || resourceKey == null || resourceKey.isBlank()
-                || desiredPayload == null || desiredPayload.isBlank()
-                || desiredContentHash == null || !desiredContentHash.matches("^[0-9a-f]{64}$")) {
+                || desiredPayload == null || desiredPayload.isBlank()) {
             throw new IllegalArgumentException("Outbound Google operation fields are required");
         }
     }

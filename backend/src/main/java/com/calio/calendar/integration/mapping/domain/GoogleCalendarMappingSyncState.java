@@ -31,7 +31,7 @@ public class GoogleCalendarMappingSyncState {
     }
 
     public void updateSyncedContentHash(String syncedContentHash) {
-        this.syncedContentHash = syncedContentHash;
+        this.syncedContentHash = GoogleCalendarContentHash.requireValid(syncedContentHash);
     }
 
     public void markConflicted() {
