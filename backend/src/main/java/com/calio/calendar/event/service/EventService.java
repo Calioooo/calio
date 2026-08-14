@@ -1,7 +1,7 @@
 package com.calio.calendar.event.service;
 
 import com.calio.calendar.account.domain.Account;
-import com.calio.calendar.account.repository.AccountRepository;
+import com.calio.calendar.account.service.AccountQueryService;
 import com.calio.calendar.common.domain.CanonicalSchedule;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
@@ -18,7 +18,7 @@ import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
 import com.calio.calendar.recurrence.service.RecurrenceEventQueryService;
 import com.calio.calendar.recurrence.service.Rfc5545RecurrenceEngine;
 import com.calio.calendar.tag.domain.Tag;
-import com.calio.calendar.tag.service.TagService;
+import com.calio.calendar.tag.service.TagQueryService;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -41,8 +41,8 @@ public class EventService {
     private final EventQueryService eventQueryService;
     private final EventCommandService eventCommandService;
     private final GoogleCalendarEventMappingQueryService eventMappingQueryService;
-    private final AccountRepository accountRepository;
-    private final TagService tagService;
+    private final AccountQueryService accountQueryService;
+    private final TagQueryService tagQueryService;
     private final RecurrenceEventQueryService recurrenceEventQueryService;
     private final Rfc5545RecurrenceEngine recurrenceEngine;
 
@@ -50,16 +50,16 @@ public class EventService {
             EventQueryService eventQueryService,
             EventCommandService eventCommandService,
             GoogleCalendarEventMappingQueryService eventMappingQueryService,
-            AccountRepository accountRepository,
-            TagService tagService,
+            AccountQueryService accountQueryService,
+            TagQueryService tagQueryService,
             RecurrenceEventQueryService recurrenceEventQueryService,
             Rfc5545RecurrenceEngine recurrenceEngine
     ) {
         this.eventQueryService = eventQueryService;
         this.eventCommandService = eventCommandService;
         this.eventMappingQueryService = eventMappingQueryService;
-        this.accountRepository = accountRepository;
-        this.tagService = tagService;
+        this.accountQueryService = accountQueryService;
+        this.tagQueryService = tagQueryService;
         this.recurrenceEventQueryService = recurrenceEventQueryService;
         this.recurrenceEngine = recurrenceEngine;
     }
@@ -72,19 +72,19 @@ public class EventService {
                 request.allDay(),
                 request.timeZone()
         );
-        Account account = accountRepository.getReferenceById(accountId);
-        Tag tag = tagService.getTagOrDefault(accountId, request.tagId());
+        Account account = accountQueryService.getAccount(accountId);
+        Tag tag = tagQueryService.getTagOrDefault(accountId, request.tagId());
         Event event = eventCommandService.createEvent(request.toEntity(tag, account));
         return EventResponse.from(event);
     }
 
     public EventResponse getEvent(Long accountId, Long eventId) {
-        return EventResponse.from(eventQueryService.findEvent(accountId, eventId));
+        return EventResponse.from(eventQueryService.getEvent(accountId, eventId));
     }
 
     @Transactional
     public EventResponse updateEvent(Long accountId, Long eventId, UpdateEventRequest request) {
-        Event event = eventCommandService.findEventForUpdate(accountId, eventId);
+        Event event = eventCommandService.lockEvent(accountId, eventId);
         rejectExternalEventMutation(accountId, eventId);
         CanonicalSchedule schedule = CanonicalSchedule.event(
                 request.startAt(),
@@ -92,14 +92,14 @@ public class EventService {
                 request.allDay(),
                 request.timeZone()
         );
-        Tag tag = tagService.getTagOrDefault(accountId, request.tagId());
+        Tag tag = tagQueryService.getTagOrDefault(accountId, request.tagId());
         eventCommandService.updateEvent(event, request, schedule, tag);
         return EventResponse.from(event);
     }
 
     @Transactional
     public EventResponse updateImportantEvent(Long accountId, Long eventId, UpdateImportantEventRequest request) {
-        Event event = eventCommandService.findEventForUpdate(accountId, eventId);
+        Event event = eventCommandService.lockEvent(accountId, eventId);
         rejectExternalEventMutation(accountId, eventId);
         eventCommandService.updateImportantEvent(event, request.importantEvent());
         return EventResponse.from(event);
@@ -107,7 +107,7 @@ public class EventService {
 
     @Transactional
     public void deleteEvent(Long accountId, Long eventId) {
-        Event event = eventCommandService.findEventForUpdate(accountId, eventId);
+        Event event = eventCommandService.lockEvent(accountId, eventId);
         rejectExternalEventMutation(accountId, eventId);
         eventCommandService.deleteEvent(event);
     }
@@ -127,7 +127,7 @@ public class EventService {
         List<EventResponse> responses = new ArrayList<>();
         Set<OccurrenceKey> responseKeys = new HashSet<>();
         List<RecurrenceEvent> recurrenceEvents =
-                recurrenceEventQueryService.findExpansionCandidatesStartedBefore(accountId, to);
+                recurrenceEventQueryService.listExpansionCandidatesStartedBefore(accountId, to);
         for (RecurrenceEvent recurrenceEvent : recurrenceEvents) {
             addExpandedOccurrences(recurrenceEvent, from, to, responseKeys, responses);
         }
@@ -170,7 +170,7 @@ public class EventService {
             return Map.of();
         }
         return recurrenceEventQueryService
-                .findOverrides(recurrenceEvent.getId(), originStartAts)
+                .listOverrides(recurrenceEvent.getId(), originStartAts)
                 .stream()
                 .collect(Collectors.toMap(
                         RecurrenceEventOverride::getOriginStartAt,
@@ -196,7 +196,7 @@ public class EventService {
             Set<OccurrenceKey> responseKeys,
             List<EventResponse> responses
     ) {
-        recurrenceEventQueryService.findActiveOverlappingOverrides(accountId, from, to)
+        recurrenceEventQueryService.listActiveOverlappingOverrides(accountId, from, to)
                 .stream()
                 .filter(override -> responseKeys.add(OccurrenceKey.from(override)))
                 .map(EventResponse::recurrenceOverride)

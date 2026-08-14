@@ -33,21 +33,21 @@ public class RecurrenceEventQueryService {
                 .orElseThrow(() -> new CalioException(ErrorCode.RECURRENCE_EVENT_NOT_FOUND));
     }
 
-    public Optional<RecurrenceEventOverride> findOverride(Long recurrenceId, Instant originStartAt) {
+    public Optional<RecurrenceEventOverride> getOverrideIfExists(Long recurrenceId, Instant originStartAt) {
         return recurrenceEventOverrideRepository
                 .findByRecurrenceEvent_IdAndOriginStartAt(recurrenceId, originStartAt);
     }
 
-    public List<RecurrenceEvent> findExpansionCandidatesStartedBefore(Long accountId, Instant to) {
+    public List<RecurrenceEvent> listExpansionCandidatesStartedBefore(Long accountId, Instant to) {
         return recurrenceEventRepository.findExpansionCandidatesStartedBefore(accountId, to);
     }
 
-    public List<RecurrenceEventOverride> findOverrides(Long recurrenceId, Collection<Instant> originStartAts) {
+    public List<RecurrenceEventOverride> listOverrides(Long recurrenceId, Collection<Instant> originStartAts) {
         return recurrenceEventOverrideRepository
                 .findByRecurrenceEvent_IdAndOriginStartAtIn(recurrenceId, originStartAts);
     }
 
-    public List<RecurrenceEventOverride> findActiveOverlappingOverrides(
+    public List<RecurrenceEventOverride> listActiveOverlappingOverrides(
             Long accountId,
             Instant from,
             Instant to

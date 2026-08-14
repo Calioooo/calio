@@ -3,7 +3,6 @@ package com.calio.calendar.recurrence.service;
 import com.calio.calendar.common.domain.CanonicalSchedule;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
-import com.calio.calendar.event.repository.EventRepository;
 import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceEventRequest;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
@@ -12,6 +11,7 @@ import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepositor
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.tag.domain.Tag;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
@@ -22,16 +22,13 @@ import org.springframework.transaction.annotation.Transactional;
 public class RecurrenceEventCommandService {
 
     private final RecurrenceEventRepository recurrenceEventRepository;
-    private final EventRepository eventRepository;
     private final RecurrenceEventOverrideRepository recurrenceEventOverrideRepository;
 
     public RecurrenceEventCommandService(
             RecurrenceEventRepository recurrenceEventRepository,
-            EventRepository eventRepository,
             RecurrenceEventOverrideRepository recurrenceEventOverrideRepository
     ) {
         this.recurrenceEventRepository = recurrenceEventRepository;
-        this.eventRepository = eventRepository;
         this.recurrenceEventOverrideRepository = recurrenceEventOverrideRepository;
     }
 
@@ -39,7 +36,7 @@ public class RecurrenceEventCommandService {
         return recurrenceEventRepository.save(recurrenceEvent);
     }
 
-    public RecurrenceEvent findRecurrenceEventForUpdate(Long accountId, Long recurrenceId) {
+    public RecurrenceEvent lockRecurrenceEvent(Long accountId, Long recurrenceId) {
         return recurrenceEventRepository.findByIdAndAccountIdForUpdate(recurrenceId, accountId)
                 .orElseThrow(() -> new CalioException(ErrorCode.RECURRENCE_EVENT_NOT_FOUND));
     }
@@ -55,14 +52,27 @@ public class RecurrenceEventCommandService {
         recurrenceEventRepository.flush();
     }
 
-    public RecurrenceEventOverride updateRecurrenceOccurrence(RecurrenceEventOverride override) {
-        return recurrenceEventOverrideRepository.saveAndFlush(override);
+    public void deleteRecurrenceEventsByIds(Collection<Long> recurrenceEventIds) {
+        if (recurrenceEventIds.isEmpty()) {
+            return;
+        }
+        recurrenceEventRepository.deleteAllByIds(recurrenceEventIds);
     }
 
-    public void deleteRecurrenceEvent(Long recurrenceId) {
-        recurrenceEventOverrideRepository.deleteAllByRecurrenceEventIds(List.of(recurrenceId));
-        eventRepository.deleteAllByRecurrenceEventIds(List.of(recurrenceId));
-        recurrenceEventRepository.deleteAllByIds(List.of(recurrenceId));
+    public void deleteRecurrenceOverridesByRecurrenceEventIds(Collection<Long> recurrenceEventIds) {
+        if (!recurrenceEventIds.isEmpty()) {
+            recurrenceEventOverrideRepository.deleteAllByRecurrenceEventIds(recurrenceEventIds);
+        }
+    }
+
+    public void deleteRecurrenceOverridesByIds(Collection<Long> overrideIds) {
+        if (!overrideIds.isEmpty()) {
+            recurrenceEventOverrideRepository.deleteAllByIds(overrideIds);
+        }
+    }
+
+    public RecurrenceEventOverride createOrUpdateRecurrenceOverride(RecurrenceEventOverride override) {
+        return recurrenceEventOverrideRepository.saveAndFlush(override);
     }
 
     public void deleteRecurrenceOccurrence(

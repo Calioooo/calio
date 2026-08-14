@@ -7,6 +7,7 @@ import com.calio.calendar.event.controller.dto.UpdateEventRequest;
 import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.event.repository.EventRepository;
 import com.calio.calendar.tag.domain.Tag;
+import java.util.Collection;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,7 +25,7 @@ public class EventCommandService {
         return eventRepository.save(event);
     }
 
-    public Event findEventForUpdate(Long accountId, Long eventId) {
+    public Event lockEvent(Long accountId, Long eventId) {
         return eventRepository.findByIdAndAccountIdForUpdate(eventId, accountId)
                 .orElseThrow(() -> new CalioException(ErrorCode.EVENT_NOT_FOUND));
     }
@@ -49,6 +50,18 @@ public class EventCommandService {
 
     public void deleteEvent(Event event) {
         eventRepository.delete(event);
+    }
+
+    public void deleteEventsByIds(Collection<Long> eventIds) {
+        if (!eventIds.isEmpty()) {
+            eventRepository.deleteAllByIds(eventIds.stream().toList());
+        }
+    }
+
+    public void deleteEventsByRecurrenceEventIds(Collection<Long> recurrenceEventIds) {
+        if (!recurrenceEventIds.isEmpty()) {
+            eventRepository.deleteAllByRecurrenceEventIds(recurrenceEventIds);
+        }
     }
 
     public void changeTagForTargetEvents(Long accountId, Tag sourceTag, Tag targetTag) {

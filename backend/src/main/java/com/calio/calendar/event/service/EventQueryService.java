@@ -19,7 +19,7 @@ public class EventQueryService {
         this.eventRepository = eventRepository;
     }
 
-    public Event findEvent(Long accountId, Long eventId) {
+    public Event getEvent(Long accountId, Long eventId) {
         return eventRepository.findByIdAndAccount_Id(eventId, accountId)
                 .orElseThrow(() -> new CalioException(ErrorCode.EVENT_NOT_FOUND));
     }

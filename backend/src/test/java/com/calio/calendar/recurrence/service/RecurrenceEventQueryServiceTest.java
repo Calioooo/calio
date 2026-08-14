@@ -95,7 +95,7 @@ class RecurrenceEventQueryServiceTest {
 
         // when
         List<RecurrenceEvent> result = recurrenceEventQueryService
-                .findExpansionCandidatesStartedBefore(1L, to);
+                .listExpansionCandidatesStartedBefore(1L, to);
 
         // then
         assertThat(result).isSameAs(recurrenceEvents);
@@ -115,7 +115,7 @@ class RecurrenceEventQueryServiceTest {
 
         // when
         List<RecurrenceEventOverride> result = recurrenceEventQueryService
-                .findOverrides(10L, originStartAts);
+                .listOverrides(10L, originStartAts);
 
         // then
         assertThat(result).isSameAs(overrides);
@@ -135,7 +135,7 @@ class RecurrenceEventQueryServiceTest {
 
         // when
         List<RecurrenceEventOverride> result = recurrenceEventQueryService
-                .findActiveOverlappingOverrides(1L, from, to);
+                .listActiveOverlappingOverrides(1L, from, to);
 
         // then
         assertThat(result).isSameAs(overrides);

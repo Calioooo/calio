@@ -6,15 +6,16 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.calio.calendar.account.domain.Account;
-import com.calio.calendar.account.repository.AccountRepository;
+import com.calio.calendar.account.service.AccountQueryService;
 import com.calio.calendar.common.domain.CanonicalSchedule;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.event.controller.dto.EventResponse;
-import com.calio.calendar.event.repository.EventRepository;
+import com.calio.calendar.event.service.EventCommandService;
 import com.calio.calendar.recurrence.controller.dto.CreateRecurrenceEventRequest;
 import com.calio.calendar.recurrence.controller.dto.RecurrenceEventResponse;
 import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceEventRequest;
@@ -26,7 +27,7 @@ import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepositor
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.domain.TagType;
-import com.calio.calendar.tag.service.TagService;
+import com.calio.calendar.tag.service.TagQueryService;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -48,16 +49,16 @@ class RecurrenceEventServiceTest {
     private RecurrenceEventRepository recurrenceEventRepository;
 
     @Mock
-    private EventRepository eventRepository;
-
-    @Mock
     private RecurrenceEventOverrideRepository recurrenceEventOverrideRepository;
 
     @Mock
-    private AccountRepository accountRepository;
+    private AccountQueryService accountQueryService;
 
     @Mock
-    private TagService tagService;
+    private TagQueryService tagQueryService;
+
+    @Mock
+    private EventCommandService eventCommandService;
 
     @Mock
     private Rfc5545RecurrenceEngine recurrenceEngine;
@@ -75,14 +76,14 @@ class RecurrenceEventServiceTest {
         );
         RecurrenceEventCommandService commandService = new RecurrenceEventCommandService(
                 recurrenceEventRepository,
-                eventRepository,
                 recurrenceEventOverrideRepository
         );
         recurrenceEventService = new RecurrenceEventService(
                 queryService,
                 commandService,
-                accountRepository,
-                tagService,
+                accountQueryService,
+                tagQueryService,
+                eventCommandService,
                 recurrenceEngine,
                 clock
         );
@@ -94,7 +95,7 @@ class RecurrenceEventServiceTest {
         // given
         Tag tag = tag();
         List<String> normalized = List.of("RRULE:FREQ=DAILY;COUNT=3");
-        when(tagService.getTagOrDefault(1L, null)).thenReturn(tag);
+        when(tagQueryService.getTagOrDefault(1L, null)).thenReturn(tag);
         when(recurrenceEngine.validate(any(RecurrenceSchedule.class), any())).thenReturn(normalized);
         when(recurrenceEventRepository.save(any(RecurrenceEvent.class))).thenAnswer(invocation -> {
             RecurrenceEvent recurrenceEvent = invocation.getArgument(0);
@@ -115,7 +116,7 @@ class RecurrenceEventServiceTest {
                 .isEqualTo(Instant.parse("2027-01-01T01:00:00Z"));
         assertThat(captor.getValue().getTimeZone()).isEqualTo("Asia/Seoul");
         assertThat(captor.getValue().getRecurrenceRules()).containsExactlyElementsOf(normalized);
-        verify(eventRepository, never()).saveAll(any());
+        verifyNoInteractions(eventCommandService);
     }
 
     @Test
@@ -145,7 +146,7 @@ class RecurrenceEventServiceTest {
         List<String> normalized = List.of("RRULE:FREQ=WEEKLY;COUNT=2");
         when(recurrenceEventRepository.findByIdAndAccountIdForUpdate(10L, 1L))
                 .thenReturn(Optional.of(recurrenceEvent));
-        when(tagService.getTagOrDefault(1L, null)).thenReturn(tag);
+        when(tagQueryService.getTagOrDefault(1L, null)).thenReturn(tag);
         when(recurrenceEngine.validate(any(RecurrenceSchedule.class), any())).thenReturn(normalized);
         UpdateRecurrenceEventRequest request = new UpdateRecurrenceEventRequest(
                 "Updated",
@@ -166,7 +167,7 @@ class RecurrenceEventServiceTest {
         assertThat(recurrenceEvent.isAllDay()).isTrue();
         assertThat(recurrenceEvent.getTimeZone()).isNull();
         verify(recurrenceEventOverrideRepository, never()).deleteAllByRecurrenceEventIds(any());
-        verify(eventRepository, never()).deleteAllByRecurrenceEventIds(any());
+        verify(eventCommandService, never()).deleteEventsByRecurrenceEventIds(any());
     }
 
     @Test
@@ -184,11 +185,11 @@ class RecurrenceEventServiceTest {
         InOrder deletionOrder = inOrder(
                 recurrenceEventRepository,
                 recurrenceEventOverrideRepository,
-                eventRepository
+                eventCommandService
         );
         deletionOrder.verify(recurrenceEventRepository).findByIdAndAccountIdForUpdate(10L, 1L);
         deletionOrder.verify(recurrenceEventOverrideRepository).deleteAllByRecurrenceEventIds(List.of(10L));
-        deletionOrder.verify(eventRepository).deleteAllByRecurrenceEventIds(List.of(10L));
+        deletionOrder.verify(eventCommandService).deleteEventsByRecurrenceEventIds(List.of(10L));
         deletionOrder.verify(recurrenceEventRepository).deleteAllByIds(List.of(10L));
     }
 

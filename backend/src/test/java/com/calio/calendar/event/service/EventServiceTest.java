@@ -14,7 +14,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.calio.calendar.account.domain.Account;
-import com.calio.calendar.account.repository.AccountRepository;
+import com.calio.calendar.account.service.AccountQueryService;
 import com.calio.calendar.common.domain.CanonicalSchedule;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
@@ -35,7 +35,7 @@ import com.calio.calendar.recurrence.service.RecurrenceEventQueryService;
 import com.calio.calendar.recurrence.service.Rfc5545RecurrenceEngine;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.domain.TagType;
-import com.calio.calendar.tag.service.TagService;
+import com.calio.calendar.tag.service.TagQueryService;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -59,10 +59,10 @@ class EventServiceTest {
     private EventCommandService eventCommandService;
 
     @Mock
-    private AccountRepository accountRepository;
+    private AccountQueryService accountQueryService;
 
     @Mock
-    private TagService tagService;
+    private TagQueryService tagQueryService;
 
     @Mock
     private EventRepository eventRepository;
@@ -97,8 +97,8 @@ class EventServiceTest {
                 "Asia/Seoul",
                 20L
         );
-        when(accountRepository.getReferenceById(1L)).thenReturn(account);
-        when(tagService.getTagOrDefault(1L, 20L)).thenReturn(tag);
+        when(accountQueryService.getAccount(1L)).thenReturn(account);
+        when(tagQueryService.getTagOrDefault(1L, 20L)).thenReturn(tag);
         when(eventCommandService.createEvent(any(Event.class))).thenAnswer(invocation -> {
             Event event = invocation.getArgument(0);
             ReflectionTestUtils.setField(event, "id", 10L);
@@ -137,9 +137,9 @@ class EventServiceTest {
                 "UTC",
                 30L
         );
-        when(eventCommandService.findEventForUpdate(1L, 10L)).thenReturn(event);
+        when(eventCommandService.lockEvent(1L, 10L)).thenReturn(event);
         when(eventMappingQueryService.hasExternalEventMapping(10L, 1L)).thenReturn(false);
-        when(tagService.getTagOrDefault(1L, 30L)).thenReturn(updatedTag);
+        when(tagQueryService.getTagOrDefault(1L, 30L)).thenReturn(updatedTag);
         doAnswer(invocation -> {
             Event target = invocation.getArgument(0);
             UpdateEventRequest updateRequest = invocation.getArgument(1);
@@ -161,10 +161,10 @@ class EventServiceTest {
         EventResponse response = eventService.updateEvent(1L, 10L, request);
 
         // then
-        InOrder order = inOrder(eventMappingQueryService, tagService, eventCommandService);
-        order.verify(eventCommandService).findEventForUpdate(1L, 10L);
+        InOrder order = inOrder(eventMappingQueryService, tagQueryService, eventCommandService);
+        order.verify(eventCommandService).lockEvent(1L, 10L);
         order.verify(eventMappingQueryService).hasExternalEventMapping(10L, 1L);
-        order.verify(tagService).getTagOrDefault(1L, 30L);
+        order.verify(tagQueryService).getTagOrDefault(1L, 30L);
         order.verify(eventCommandService).updateEvent(any(), any(), any(), any());
         assertThat(response.title()).isEqualTo("After");
         assertThat(response.startAt()).isEqualTo(request.startAt());
@@ -176,7 +176,7 @@ class EventServiceTest {
     void givenExternalEvent_whenUpdateEvent_thenRejectsBeforeMutation() {
         // given
         Event event = event("External", tag("기타"));
-        when(eventCommandService.findEventForUpdate(1L, 10L)).thenReturn(event);
+        when(eventCommandService.lockEvent(1L, 10L)).thenReturn(event);
         when(eventMappingQueryService.hasExternalEventMapping(10L, 1L)).thenReturn(true);
         UpdateEventRequest request = new UpdateEventRequest(
                 "Blocked",
@@ -194,7 +194,7 @@ class EventServiceTest {
                         assertThat(exception.getErrorCode())
                                 .isEqualTo(ErrorCode.EXTERNAL_EVENT_MUTATION_NOT_SUPPORTED)
                 );
-        verifyNoInteractions(tagService);
+        verifyNoInteractions(tagQueryService);
         verify(eventCommandService, never()).updateEvent(any(), any(), any(), any());
         assertThat(event.getTitle()).isEqualTo("External");
     }
@@ -204,7 +204,7 @@ class EventServiceTest {
     void givenExternalEvent_whenDeleteEvent_thenRejectsBeforeCommand() {
         // given
         Event event = event("External", tag("기타"));
-        when(eventCommandService.findEventForUpdate(1L, 10L)).thenReturn(event);
+        when(eventCommandService.lockEvent(1L, 10L)).thenReturn(event);
         when(eventMappingQueryService.hasExternalEventMapping(10L, 1L)).thenReturn(true);
 
         // when, then
@@ -221,7 +221,7 @@ class EventServiceTest {
     void givenExternalEvent_whenUpdateImportantEvent_thenRejectsBeforeCommand() {
         // given
         Event event = event("External", tag("기타"));
-        when(eventCommandService.findEventForUpdate(1L, 10L)).thenReturn(event);
+        when(eventCommandService.lockEvent(1L, 10L)).thenReturn(event);
         when(eventMappingQueryService.hasExternalEventMapping(10L, 1L)).thenReturn(true);
 
         // when
@@ -393,8 +393,8 @@ class EventServiceTest {
                 queryService,
                 eventCommandService,
                 eventMappingQueryService,
-                accountRepository,
-                tagService,
+                accountQueryService,
+                tagQueryService,
                 recurrenceQueryService,
                 recurrenceEngine
         );

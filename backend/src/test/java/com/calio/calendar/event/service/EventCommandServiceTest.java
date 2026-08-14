@@ -73,7 +73,7 @@ class EventCommandServiceTest {
                 .thenReturn(Optional.of(event));
 
         // when
-        Event result = eventCommandService.findEventForUpdate(1L, 10L);
+        Event result = eventCommandService.lockEvent(1L, 10L);
 
         // then
         assertThat(result).isSameAs(event);
@@ -88,7 +88,7 @@ class EventCommandServiceTest {
                 .thenReturn(Optional.empty());
 
         // when, then
-        assertThatThrownBy(() -> eventCommandService.findEventForUpdate(1L, 10L))
+        assertThatThrownBy(() -> eventCommandService.lockEvent(1L, 10L))
                 .isInstanceOfSatisfying(CalioException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.EVENT_NOT_FOUND)
                 );

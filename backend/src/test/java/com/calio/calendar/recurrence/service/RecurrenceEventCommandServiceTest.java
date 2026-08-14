@@ -3,7 +3,6 @@ package com.calio.calendar.recurrence.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 
 import com.calio.calendar.common.domain.CanonicalSchedule;
@@ -13,7 +12,6 @@ import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.common.domain.CanonicalSchedule;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
-import com.calio.calendar.event.repository.EventRepository;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
@@ -27,7 +25,6 @@ import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -40,9 +37,6 @@ class RecurrenceEventCommandServiceTest {
 
     @Mock
     private RecurrenceEventRepository recurrenceEventRepository;
-
-    @Mock
-    private EventRepository eventRepository;
 
     @Mock
     private RecurrenceEventOverrideRepository recurrenceEventOverrideRepository;
@@ -73,7 +67,7 @@ class RecurrenceEventCommandServiceTest {
                 .thenReturn(Optional.of(recurrenceEvent));
 
         // when
-        RecurrenceEvent result = recurrenceEventCommandService.findRecurrenceEventForUpdate(1L, 10L);
+        RecurrenceEvent result = recurrenceEventCommandService.lockRecurrenceEvent(1L, 10L);
 
         // then
         assertThat(result).isSameAs(recurrenceEvent);
@@ -88,7 +82,7 @@ class RecurrenceEventCommandServiceTest {
                 .thenReturn(Optional.empty());
 
         // when, then
-        assertThatThrownBy(() -> recurrenceEventCommandService.findRecurrenceEventForUpdate(1L, 10L))
+        assertThatThrownBy(() -> recurrenceEventCommandService.lockRecurrenceEvent(1L, 10L))
                 .isInstanceOfSatisfying(CalioException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.RECURRENCE_EVENT_NOT_FOUND)
                 );
@@ -115,29 +109,12 @@ class RecurrenceEventCommandServiceTest {
         when(recurrenceEventOverrideRepository.saveAndFlush(override)).thenReturn(override);
 
         // when
-        RecurrenceEventOverride result = recurrenceEventCommandService.updateRecurrenceOccurrence(override);
+        RecurrenceEventOverride result = recurrenceEventCommandService.createOrUpdateRecurrenceOverride(override);
 
         // then
         verify(recurrenceEventOverrideRepository).saveAndFlush(override);
         assertThat(result).isSameAs(override);
         assertThat(override.isDeleted()).isFalse();
-    }
-
-    @Test
-    @DisplayName("반복 일정 삭제 command는 전달받은 ID의 자식 상태를 master보다 먼저 삭제한다")
-    void givenRecurrenceId_whenDeleteRecurrenceEvent_thenDeletesChildrenBeforeMaster() {
-        // when
-        recurrenceEventCommandService.deleteRecurrenceEvent(10L);
-
-        // then
-        InOrder deletionOrder = inOrder(
-                recurrenceEventOverrideRepository,
-                eventRepository,
-                recurrenceEventRepository
-        );
-        deletionOrder.verify(recurrenceEventOverrideRepository).deleteAllByRecurrenceEventIds(List.of(10L));
-        deletionOrder.verify(eventRepository).deleteAllByRecurrenceEventIds(List.of(10L));
-        deletionOrder.verify(recurrenceEventRepository).deleteAllByIds(List.of(10L));
     }
 
     @Test

@@ -55,7 +55,7 @@ class EventQueryServiceTest {
         when(eventRepository.findByIdAndAccount_Id(10L, 1L)).thenReturn(Optional.empty());
 
         // when, then
-        assertThatThrownBy(() -> eventQueryService.findEvent(1L, 10L))
+        assertThatThrownBy(() -> eventQueryService.getEvent(1L, 10L))
                 .isInstanceOfSatisfying(CalioException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.EVENT_NOT_FOUND)
                 );
