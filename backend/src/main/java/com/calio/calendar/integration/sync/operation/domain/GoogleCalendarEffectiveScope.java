@@ -6,11 +6,11 @@ import java.util.Objects;
 public sealed interface GoogleCalendarEffectiveScope permits GoogleCalendarEffectiveScope.Event,
         GoogleCalendarEffectiveScope.RecurrenceEvent, GoogleCalendarEffectiveScope.RecurrenceOverride {
 
-    String EVENT = "GENERAL_EVENT";
-    String RECURRENCE_EVENT = "RECURRENCE_MASTER";
-    String RECURRENCE_OVERRIDE = "RECURRENCE_OVERRIDE";
+    GoogleCalendarEffectiveScopeType type();
 
-    String storedScope();
+    default String storedScope() {
+        return type().getStoredValue();
+    }
 
     String storedKey();
 
@@ -37,7 +37,7 @@ public sealed interface GoogleCalendarEffectiveScope permits GoogleCalendarEffec
     }
 
     static GoogleCalendarEffectiveScope fromStoredValues(String scope, String key) {
-        return switch (scope) {
+        return switch (GoogleCalendarEffectiveScopeType.fromStoredValue(scope)) {
             case EVENT -> event(parseId(key));
             case RECURRENCE_EVENT -> recurrenceEvent(parseId(key));
             case RECURRENCE_OVERRIDE -> {
@@ -48,7 +48,6 @@ public sealed interface GoogleCalendarEffectiveScope permits GoogleCalendarEffec
                 yield recurrenceOverride(parseId(key.substring(0, separator)),
                         Instant.parse(key.substring(separator + 1)));
             }
-            default -> throw new IllegalArgumentException("Unsupported Google Calendar effective scope: " + scope);
         };
     }
 
@@ -68,18 +67,24 @@ public sealed interface GoogleCalendarEffectiveScope permits GoogleCalendarEffec
     }
 
     record Event(Long eventId) implements GoogleCalendarEffectiveScope {
-        @Override public String storedScope() { return EVENT; }
+        @Override public GoogleCalendarEffectiveScopeType type() {
+            return GoogleCalendarEffectiveScopeType.EVENT;
+        }
         @Override public String storedKey() { return eventId.toString(); }
     }
 
     record RecurrenceEvent(Long recurrenceEventId) implements GoogleCalendarEffectiveScope {
-        @Override public String storedScope() { return RECURRENCE_EVENT; }
+        @Override public GoogleCalendarEffectiveScopeType type() {
+            return GoogleCalendarEffectiveScopeType.RECURRENCE_EVENT;
+        }
         @Override public String storedKey() { return recurrenceEventId.toString(); }
     }
 
     record RecurrenceOverride(Long recurrenceEventId, Instant originStartAt)
             implements GoogleCalendarEffectiveScope {
-        @Override public String storedScope() { return RECURRENCE_OVERRIDE; }
+        @Override public GoogleCalendarEffectiveScopeType type() {
+            return GoogleCalendarEffectiveScopeType.RECURRENCE_OVERRIDE;
+        }
         @Override public String storedKey() { return overrideKeyPrefix(recurrenceEventId) + originStartAt; }
     }
 }

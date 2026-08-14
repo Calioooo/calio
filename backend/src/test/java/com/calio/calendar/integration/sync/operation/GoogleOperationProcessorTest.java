@@ -13,6 +13,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.calio.calendar.integration.sync.GoogleCalendarSyncService;
+import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEffectiveScopeType;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJob;
 import com.calio.calendar.integration.sync.operation.dto.GoogleOperationFailureDecision;
 import org.junit.jupiter.api.BeforeEach;
@@ -176,7 +177,8 @@ class GoogleOperationProcessorTest {
         when(job.getAccountId()).thenReturn(accountId);
         when(job.getKind()).thenReturn(kind);
         when(job.getIntegrationId()).thenReturn(20L);
-        when(job.getEffectiveResourceScope()).thenReturn("GENERAL_EVENT");
+        when(job.getEffectiveResourceScope()).thenReturn(
+                GoogleCalendarEffectiveScopeType.EVENT.getStoredValue());
         when(job.getEffectiveResourceKey()).thenReturn("1");
         return job;
     }

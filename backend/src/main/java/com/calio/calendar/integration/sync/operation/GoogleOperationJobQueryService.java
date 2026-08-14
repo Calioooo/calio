@@ -1,6 +1,7 @@
 package com.calio.calendar.integration.sync.operation;
 
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEffectiveScope;
+import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEffectiveScopeType;
 import com.calio.calendar.integration.sync.operation.repository.GoogleOperationJobRepository;
 import java.time.Instant;
 import java.util.List;
@@ -35,7 +36,9 @@ public class GoogleOperationJobQueryService {
             return jobRepository.findPendingDesiredContentHashesForRecurrenceAggregate(
                     accountId,
                     integrationId,
+                    GoogleCalendarEffectiveScopeType.RECURRENCE_EVENT.getStoredValue(),
                     recurrenceEvent.storedKey(),
+                    GoogleCalendarEffectiveScopeType.RECURRENCE_OVERRIDE.getStoredValue(),
                     GoogleCalendarEffectiveScope.overrideKeyPrefix(
                             recurrenceEvent.recurrenceEventId())
             );

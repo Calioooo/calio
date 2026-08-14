@@ -174,10 +174,10 @@ public interface GoogleOperationJobRepository extends JpaRepository<GoogleOperat
                   com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState.PROCESSING
               )
               and (
-                  (job.effectiveResourceScope = 'RECURRENCE_MASTER'
+                  (job.effectiveResourceScope = :recurrenceEventScope
                    and job.effectiveResourceKey = :recurrenceEventKey)
                   or
-                  (job.effectiveResourceScope = 'RECURRENCE_OVERRIDE'
+                  (job.effectiveResourceScope = :recurrenceOverrideScope
                    and job.effectiveResourceKey like concat(:overrideKeyPrefix, '%'))
               )
             order by job.accountSequence
@@ -185,7 +185,9 @@ public interface GoogleOperationJobRepository extends JpaRepository<GoogleOperat
     List<String> findPendingDesiredContentHashesForRecurrenceAggregate(
             @Param("accountId") Long accountId,
             @Param("integrationId") Long integrationId,
+            @Param("recurrenceEventScope") String recurrenceEventScope,
             @Param("recurrenceEventKey") String recurrenceEventKey,
+            @Param("recurrenceOverrideScope") String recurrenceOverrideScope,
             @Param("overrideKeyPrefix") String overrideKeyPrefix
     );
 
