@@ -5,6 +5,7 @@ import com.calio.calendar.groupspace.domain.GroupMemberStatus;
 import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
@@ -13,31 +14,17 @@ import org.springframework.data.repository.query.Param;
 
 public interface GroupMemberRepository extends JpaRepository<GroupMember, Long> {
 
-    @Query("""
-            select member
-            from GroupMember member
-            join fetch member.groupSpace groupSpace
-            where member.accountId = :accountId
-              and member.status = :status
-            order by member.statusChangedAt desc, groupSpace.id desc
-            """)
-    List<GroupMember> findByAccountIdAndStatusOrderByStatusChangedAtDesc(
-            @Param("accountId") Long accountId,
-            @Param("status") GroupMemberStatus status
+    @EntityGraph(attributePaths = "groupSpace")
+    List<GroupMember> findByAccountIdAndStatusOrderByStatusChangedAtDescGroupSpaceIdDesc(
+            Long accountId,
+            GroupMemberStatus status
     );
 
-    @Query("""
-            select member
-            from GroupMember member
-            join fetch member.groupSpace groupSpace
-            where groupSpace.id = :groupSpaceId
-              and member.accountId = :accountId
-              and member.status = :status
-            """)
+    @EntityGraph(attributePaths = "groupSpace")
     Optional<GroupMember> findByGroupSpaceIdAndAccountIdAndStatus(
-            @Param("groupSpaceId") Long groupSpaceId,
-            @Param("accountId") Long accountId,
-            @Param("status") GroupMemberStatus status
+            Long groupSpaceId,
+            Long accountId,
+            GroupMemberStatus status
     );
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

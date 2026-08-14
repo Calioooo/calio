@@ -8,7 +8,7 @@ import static org.mockito.Mockito.reset;
 
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
-import com.calio.calendar.groupinvitation.service.GroupInvitationService;
+import com.calio.calendar.groupinvitation.service.GroupInvitationCommandService;
 import com.calio.calendar.groupspace.controller.dto.CreateGroupSpaceRequest;
 import com.calio.calendar.groupspace.repository.GroupMemberRepository;
 import com.calio.calendar.groupspace.repository.GroupSpaceRepository;
@@ -45,13 +45,13 @@ class GroupSpaceServiceTest {
     private AccountRepository accountRepository;
 
     @Autowired
-    private GroupInvitationService invitationService;
+    private GroupInvitationCommandService invitationCommandService;
 
     private Account account;
 
     @BeforeEach
     void setUp() {
-        reset(invitationService);
+        reset(invitationCommandService);
         groupMemberRepository.deleteAll();
         groupSpaceRepository.deleteAll();
         account = accountRepository.saveAndFlush(new Account());
@@ -86,7 +86,7 @@ class GroupSpaceServiceTest {
                 new CreateGroupSpaceRequest("Rollback", null, "owner")
         );
         doThrow(new IllegalStateException("simulated cleanup failure"))
-                .when(invitationService)
+                .when(invitationCommandService)
                 .deleteAllByGroupSpaceId(created.groupSpaceId());
 
         // when, then
@@ -118,8 +118,8 @@ class GroupSpaceServiceTest {
 
         @Bean
         @Primary
-        GroupInvitationService groupInvitationService() {
-            return mock(GroupInvitationService.class);
+        GroupInvitationCommandService groupInvitationCommandService() {
+            return mock(GroupInvitationCommandService.class);
         }
     }
 }
