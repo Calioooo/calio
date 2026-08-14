@@ -1,12 +1,12 @@
 package com.calio.calendar.recurrence.controller;
 
-import com.calio.calendar.recurrence.controller.dto.CreateRecurrenceEventRequest;
 import com.calio.calendar.event.controller.dto.EventResponse;
+import com.calio.calendar.recurrence.controller.dto.CreateRecurrenceEventRequest;
 import com.calio.calendar.recurrence.controller.dto.RecurrenceEventResponse;
 import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceEventRequest;
 import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceOccurrenceRequest;
-import com.calio.calendar.security.AuthenticatedAccount;
 import com.calio.calendar.recurrence.service.RecurrenceEventService;
+import com.calio.calendar.security.AuthenticatedAccount;
 import jakarta.validation.Valid;
 import java.time.Instant;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -41,7 +41,9 @@ public class RecurrenceEventController {
             @AuthenticationPrincipal AuthenticatedAccount account,
             @Valid @RequestBody CreateRecurrenceEventRequest request
     ) {
-        RecurrenceEventResponse response = recurrenceEventService.createRecurrenceEvent(account.accountId(), request);
+        RecurrenceEventResponse response = recurrenceEventService.createRecurrenceEvent(
+                account.accountId(), request
+        );
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 

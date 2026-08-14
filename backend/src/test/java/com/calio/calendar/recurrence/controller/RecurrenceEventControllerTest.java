@@ -581,7 +581,7 @@ class RecurrenceEventControllerTest {
 
         // then
         RecurrenceEvent unchangedMaster = recurrenceEventRepository.findById(recurrenceId).orElseThrow();
-        assertThat(unchangedMaster.getRecurrenceTitle()).isEqualTo("Validation master");
+        assertThat(unchangedMaster.getTitle()).isEqualTo("Validation master");
         assertThat(unchangedMaster.getFirstOccurrenceStartAt()).isEqualTo(originStartAt);
         assertThat(unchangedMaster.getFirstOccurrenceEndAt()).isEqualTo(Instant.parse("2028-01-01T10:00:00Z"));
         assertThat(unchangedMaster.getTimeZone()).isEqualTo("UTC");

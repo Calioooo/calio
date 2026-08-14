@@ -62,14 +62,6 @@ public class GroupInvitation extends BaseEntity {
         return createdByMemberId;
     }
 
-    public byte[] getLinkTokenHash() {
-        return Arrays.copyOf(linkTokenHash, linkTokenHash.length);
-    }
-
-    public byte[] getInviteCodeHash() {
-        return Arrays.copyOf(inviteCodeHash, inviteCodeHash.length);
-    }
-
     public Instant getExpiresAt() {
         return expiresAt;
     }

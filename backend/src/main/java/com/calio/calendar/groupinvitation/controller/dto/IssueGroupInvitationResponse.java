@@ -22,10 +22,4 @@ public record IssueGroupInvitationResponse(
                 invitation.getExpiresAt()
         );
     }
-
-    @Override
-    public String toString() {
-        return "IssueGroupInvitationResponse[invitationId=%s, credentials=REDACTED, expiresAt=%s]"
-                .formatted(invitationId, expiresAt);
-    }
 }

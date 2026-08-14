@@ -7,6 +7,7 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
@@ -17,14 +18,14 @@ public interface RecurrenceEventRepository extends JpaRepository<RecurrenceEvent
 
     Optional<RecurrenceEvent> findByIdAndAccount_Id(Long id, Long accountId);
 
+    @EntityGraph(attributePaths = "tag")
     @Query("""
             select recurrenceEvent
             from RecurrenceEvent recurrenceEvent
-            join fetch recurrenceEvent.tag
             where recurrenceEvent.account.id = :accountId
               and recurrenceEvent.firstOccurrenceStartAt < :to
             """)
-    List<RecurrenceEvent> findCandidatesStartedBefore(
+    List<RecurrenceEvent> findExpansionCandidatesStartedBefore(
             @Param("accountId") Long accountId,
             @Param("to") Instant to
     );

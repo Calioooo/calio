@@ -868,7 +868,7 @@ class EventControllerTest {
     }
 
     @Test
-    @DisplayName("Google mapping 일정은 PUT과 DELETE를 차단하지만 important-event PATCH는 허용한다")
+    @DisplayName("Google mapping 일정은 모든 변경 요청을 차단한다")
     void givenGoogleMappedEvent_whenMutate_thenAppliesExternalMutationPolicy() throws Exception {
         // given
         long eventId = createEvent(
@@ -900,9 +900,9 @@ class EventControllerTest {
                         .value("EXTERNAL_EVENT_MUTATION_NOT_SUPPORTED"));
 
         updateImportantEventResult(eventId, true)
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.title").value("Google import"))
-                .andExpect(jsonPath("$.importantEvent").value(true));
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.title")
+                        .value("EXTERNAL_EVENT_MUTATION_NOT_SUPPORTED"));
     }
 
     @Test

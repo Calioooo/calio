@@ -49,8 +49,8 @@ public record EventResponse(
     ) {
         return new EventResponse(
                 null,
-                recurrenceEvent.getRecurrenceTitle(),
-                recurrenceEvent.getRecurrenceDescription(),
+                recurrenceEvent.getTitle(),
+                recurrenceEvent.getDescription(),
                 occurrence.startAt(),
                 occurrence.endAt(),
                 recurrenceEvent.isAllDay(),

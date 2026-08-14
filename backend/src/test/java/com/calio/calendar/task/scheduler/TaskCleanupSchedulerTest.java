@@ -29,13 +29,13 @@ class TaskCleanupSchedulerTest {
         Instant now = Instant.parse("2026-07-06T19:30:00Z");
         Instant expectedCutoff = Instant.parse("2026-06-06T19:30:00Z");
         TaskCleanupScheduler scheduler = scheduler(now);
-        when(taskService.deleteCompletedTasksOlderThan(expectedCutoff)).thenReturn(3);
+        when(taskService.deleteCompletedTasksBefore(expectedCutoff)).thenReturn(3);
 
         // when
         scheduler.deleteOldCompletedTasks();
 
         // then
-        verify(taskService).deleteCompletedTasksOlderThan(expectedCutoff);
+        verify(taskService).deleteCompletedTasksBefore(expectedCutoff);
     }
 
     @Test
@@ -47,7 +47,7 @@ class TaskCleanupSchedulerTest {
         TaskCleanupScheduler scheduler = scheduler(now);
         doThrow(new RuntimeException("cleanup failed"))
                 .when(taskService)
-                .deleteCompletedTasksOlderThan(expectedCutoff);
+                .deleteCompletedTasksBefore(expectedCutoff);
 
         // when, then
         assertDoesNotThrow(scheduler::deleteOldCompletedTasks);

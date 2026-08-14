@@ -247,7 +247,7 @@ public class GoogleCalendarRecurrenceChangeService {
         if (!overrideMappings.isEmpty()) {
             recurrenceMappingCommandService.deleteOverrideMappings(overrideMappings);
         }
-        overrideRepository.deleteByRecurrenceEvent_Id(
+        overrideRepository.deleteAllByRecurrenceEvent_Id(
                 recurrenceEventMapping.getRecurrenceEvent().getId()
         );
         overrideRepository.flush();

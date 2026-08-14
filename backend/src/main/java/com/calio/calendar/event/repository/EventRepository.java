@@ -2,11 +2,13 @@ package com.calio.calendar.event.repository;
 
 import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.tag.domain.Tag;
+import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -14,6 +16,18 @@ import org.springframework.data.repository.query.Param;
 public interface EventRepository extends JpaRepository<Event, Long> {
 
     Optional<Event> findByIdAndAccount_Id(Long id, Long accountId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select event
+            from Event event
+            where event.id = :eventId
+              and event.account.id = :accountId
+            """)
+    Optional<Event> findByIdAndAccountIdForUpdate(
+            @Param("eventId") Long eventId,
+            @Param("accountId") Long accountId
+    );
 
     @Modifying(flushAutomatically = true)
     @Query("delete from Event event where event.id in :eventIds")

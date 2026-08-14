@@ -40,7 +40,7 @@ class RecurrenceEventRepositoryTest {
 
     @Test
     @DisplayName("종료 없는 RFC master도 first occurrence가 조회 종료보다 앞서면 후보에 포함한다")
-    void givenUnboundedRule_whenFindCandidates_thenIncludesMaster() {
+    void givenUnboundedRule_whenFindExpansionCandidates_thenIncludesMaster() {
         // given
         Account account = accountRepository.save(new Account());
         Tag tag = tagRepository.save(new Tag(TagType.DEFAULT, "기타", "#64748B"));
@@ -53,7 +53,7 @@ class RecurrenceEventRepositoryTest {
         entityManager.clear();
 
         // when
-        List<RecurrenceEvent> candidates = recurrenceEventRepository.findCandidatesStartedBefore(
+        List<RecurrenceEvent> candidates = recurrenceEventRepository.findExpansionCandidatesStartedBefore(
                 account.getId(),
                 Instant.parse("2026-01-01T00:00:00Z")
         );
@@ -64,11 +64,14 @@ class RecurrenceEventRepositoryTest {
                 .containsExactly(master.getId());
         assertThat(candidates.getFirst().getRecurrenceRules())
                 .containsExactly("RRULE:FREQ=DAILY");
+        assertThat(entityManager.getEntityManagerFactory().getPersistenceUnitUtil()
+                .isLoaded(candidates.getFirst(), "tag"))
+                .isTrue();
     }
 
     @Test
     @DisplayName("account가 같고 first occurrence가 조회 종료보다 앞선 master만 후보로 조회한다")
-    void givenMastersAcrossAccountsAndTime_whenFindCandidates_thenScopesByAccountAndStart() {
+    void givenMastersAcrossAccountsAndTime_whenFindExpansionCandidates_thenScopesByAccountAndStart() {
         // given
         Account account = accountRepository.save(new Account());
         Account otherAccount = accountRepository.save(new Account());
@@ -84,7 +87,7 @@ class RecurrenceEventRepositoryTest {
         entityManager.clear();
 
         // when
-        List<RecurrenceEvent> candidates = recurrenceEventRepository.findCandidatesStartedBefore(
+        List<RecurrenceEvent> candidates = recurrenceEventRepository.findExpansionCandidatesStartedBefore(
                 account.getId(),
                 Instant.parse("2026-02-20T00:00:00Z")
         );

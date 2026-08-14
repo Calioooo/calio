@@ -1,12 +1,11 @@
 package com.calio.calendar.recurrence.service;
 
 import com.calio.calendar.account.domain.Account;
-import com.calio.calendar.account.service.AccountQueryService;
+import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.common.domain.CanonicalSchedule;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.event.controller.dto.EventResponse;
-import com.calio.calendar.event.repository.EventRepository;
 import com.calio.calendar.recurrence.controller.dto.CreateRecurrenceEventRequest;
 import com.calio.calendar.recurrence.controller.dto.RecurrenceEventResponse;
 import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceEventRequest;
@@ -14,10 +13,9 @@ import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceOccurrenceRe
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
-import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
-import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.tag.domain.Tag;
-import com.calio.calendar.tag.service.TagQueryService;
+import com.calio.calendar.tag.service.TagService;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -28,36 +26,36 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class RecurrenceEventService {
 
-    private final RecurrenceEventRepository recurrenceEventRepository;
-    private final EventRepository eventRepository;
-    private final RecurrenceEventOverrideRepository recurrenceEventOverrideRepository;
-    private final AccountQueryService accountQueryService;
-    private final TagQueryService tagQueryService;
+    private final RecurrenceEventQueryService recurrenceEventQueryService;
+    private final RecurrenceEventCommandService recurrenceEventCommandService;
+    private final AccountRepository accountRepository;
+    private final TagService tagService;
     private final Rfc5545RecurrenceEngine recurrenceEngine;
+    private final Clock clock;
 
     public RecurrenceEventService(
-            RecurrenceEventRepository recurrenceEventRepository,
-            EventRepository eventRepository,
-            RecurrenceEventOverrideRepository recurrenceEventOverrideRepository,
-            AccountQueryService accountQueryService,
-            TagQueryService tagQueryService,
-            Rfc5545RecurrenceEngine recurrenceEngine
+            RecurrenceEventQueryService recurrenceEventQueryService,
+            RecurrenceEventCommandService recurrenceEventCommandService,
+            AccountRepository accountRepository,
+            TagService tagService,
+            Rfc5545RecurrenceEngine recurrenceEngine,
+            Clock clock
     ) {
-        this.recurrenceEventRepository = recurrenceEventRepository;
-        this.eventRepository = eventRepository;
-        this.recurrenceEventOverrideRepository = recurrenceEventOverrideRepository;
-        this.accountQueryService = accountQueryService;
-        this.tagQueryService = tagQueryService;
+        this.recurrenceEventQueryService = recurrenceEventQueryService;
+        this.recurrenceEventCommandService = recurrenceEventCommandService;
+        this.accountRepository = accountRepository;
+        this.tagService = tagService;
         this.recurrenceEngine = recurrenceEngine;
+        this.clock = clock;
     }
 
     @Transactional
     public RecurrenceEventResponse createRecurrenceEvent(Long accountId, CreateRecurrenceEventRequest request) {
         RecurrenceSchedule schedule = createSchedule(request);
         List<String> recurrenceRules = recurrenceEngine.validate(schedule, request.recurrence());
-        Account account = accountQueryService.getAccount(accountId);
-        Tag tag = tagQueryService.getTagOrDefault(accountId, request.tagId());
-        RecurrenceEvent recurrenceEvent = recurrenceEventRepository.save(new RecurrenceEvent(
+        Account account = accountRepository.getReferenceById(accountId);
+        Tag tag = tagService.getTagOrDefault(accountId, request.tagId());
+        RecurrenceEvent recurrenceEvent = recurrenceEventCommandService.createRecurrenceEvent(new RecurrenceEvent(
                 request.title(),
                 request.description(),
                 schedule,
@@ -69,7 +67,9 @@ public class RecurrenceEventService {
     }
 
     public RecurrenceEventResponse getRecurrenceEvent(Long accountId, Long recurrenceId) {
-        return RecurrenceEventResponse.from(findRecurrenceEvent(accountId, recurrenceId));
+        return RecurrenceEventResponse.from(
+                recurrenceEventQueryService.getRecurrenceEvent(accountId, recurrenceId)
+        );
     }
 
     @Transactional
@@ -78,13 +78,18 @@ public class RecurrenceEventService {
             Long recurrenceId,
             UpdateRecurrenceEventRequest request
     ) {
-        RecurrenceEvent recurrenceEvent = findRecurrenceEventForUpdate(accountId, recurrenceId);
+        RecurrenceEvent recurrenceEvent = recurrenceEventCommandService
+                .findRecurrenceEventForUpdate(accountId, recurrenceId);
         RecurrenceSchedule schedule = createSchedule(request);
         List<String> recurrenceRules = recurrenceEngine.validate(schedule, request.recurrence());
-        Tag tag = tagQueryService.getTagOrDefault(accountId, request.tagId());
-
-        recurrenceEvent.update(request.title(), request.description(), schedule, recurrenceRules, tag);
-        recurrenceEventRepository.flush();
+        Tag tag = tagService.getTagOrDefault(accountId, request.tagId());
+        recurrenceEventCommandService.updateRecurrenceEvent(
+                recurrenceEvent,
+                request,
+                schedule,
+                recurrenceRules,
+                tag
+        );
         return RecurrenceEventResponse.from(recurrenceEvent);
     }
 
@@ -94,7 +99,8 @@ public class RecurrenceEventService {
             Long recurrenceId,
             UpdateRecurrenceOccurrenceRequest request
     ) {
-        RecurrenceEvent recurrenceEvent = findRecurrenceEventForUpdate(accountId, recurrenceId);
+        RecurrenceEvent recurrenceEvent = recurrenceEventCommandService
+                .findRecurrenceEventForUpdate(accountId, recurrenceId);
         CanonicalSchedule schedule = CanonicalSchedule.recurrenceOverride(
                 request.startAt(),
                 request.endAt(),
@@ -103,47 +109,39 @@ public class RecurrenceEventService {
         );
         Optional<RecurrenceEventOverride> existingOverride =
                 findOverrideOrRejectIneligible(recurrenceEvent, request.originStartAt());
-        RecurrenceEventOverride override;
+        RecurrenceEventOverride override = existingOverride.orElseGet(() -> RecurrenceEventOverride.active(
+                recurrenceEvent,
+                request.originStartAt(),
+                request.title(),
+                request.description(),
+                schedule
+        ));
         if (existingOverride.isPresent()) {
-            override = existingOverride.get();
             override.activate(request.title(), request.description(), schedule);
-        } else {
-            override = RecurrenceEventOverride.active(
-                    recurrenceEvent,
-                    request.originStartAt(),
-                    request.title(),
-                    request.description(),
-                    schedule
-            );
         }
-        recurrenceEventOverrideRepository.saveAndFlush(override);
+        recurrenceEventCommandService.updateRecurrenceOccurrence(override);
         return EventResponse.recurrenceOverride(override);
     }
 
     @Transactional
     public void deleteRecurrenceEvent(Long accountId, Long recurrenceId) {
-        RecurrenceEvent recurrenceEvent = findRecurrenceEventForUpdate(accountId, recurrenceId);
-        recurrenceEventOverrideRepository.deleteByRecurrenceEvent_Id(recurrenceId);
-        eventRepository.deleteAll(
-                eventRepository.findByRecurrenceIdAndAccount_IdOrderByStartAtAsc(recurrenceId, accountId)
-        );
-        recurrenceEventRepository.delete(recurrenceEvent);
+        recurrenceEventCommandService.findRecurrenceEventForUpdate(accountId, recurrenceId);
+        recurrenceEventCommandService.deleteRecurrenceEvent(recurrenceId);
     }
 
     @Transactional
     public void deleteRecurrenceOccurrence(Long accountId, Long recurrenceId, Instant originStartAt) {
-        RecurrenceEvent recurrenceEvent = findRecurrenceEventForUpdate(accountId, recurrenceId);
+        RecurrenceEvent recurrenceEvent = recurrenceEventCommandService
+                .findRecurrenceEventForUpdate(accountId, recurrenceId);
         Optional<RecurrenceEventOverride> existingOverride =
                 findOverrideOrRejectIneligible(recurrenceEvent, originStartAt);
-        Instant deletedAt = Instant.now();
-        RecurrenceEventOverride override;
-        if (existingOverride.isPresent()) {
-            override = existingOverride.get();
-            override.markDeleted(deletedAt);
-        } else {
-            override = RecurrenceEventOverride.deleted(recurrenceEvent, originStartAt, deletedAt);
-        }
-        recurrenceEventOverrideRepository.saveAndFlush(override);
+        Instant deletedAt = Instant.now(clock);
+        recurrenceEventCommandService.deleteRecurrenceOccurrence(
+                recurrenceEvent,
+                existingOverride,
+                originStartAt,
+                deletedAt
+        );
     }
 
     private RecurrenceSchedule createSchedule(CreateRecurrenceEventRequest request) {
@@ -168,8 +166,8 @@ public class RecurrenceEventService {
             RecurrenceEvent recurrenceEvent,
             Instant originStartAt
     ) {
-        Optional<RecurrenceEventOverride> existingOverride = recurrenceEventOverrideRepository
-                .findByRecurrenceEvent_IdAndOriginStartAt(recurrenceEvent.getId(), originStartAt);
+        Optional<RecurrenceEventOverride> existingOverride =
+                recurrenceEventQueryService.findOverride(recurrenceEvent.getId(), originStartAt);
         if (existingOverride.isEmpty() && !recurrenceContainsOrigin(recurrenceEvent, originStartAt)) {
             throw new CalioException(ErrorCode.RECURRENCE_OCCURRENCE_NOT_FOUND);
         }
@@ -182,15 +180,5 @@ public class RecurrenceEventService {
                 recurrenceEvent.getRecurrenceRules(),
                 originStartAt
         );
-    }
-
-    private RecurrenceEvent findRecurrenceEvent(Long accountId, Long recurrenceId) {
-        return recurrenceEventRepository.findByIdAndAccount_Id(recurrenceId, accountId)
-                .orElseThrow(() -> new CalioException(ErrorCode.RECURRENCE_EVENT_NOT_FOUND));
-    }
-
-    private RecurrenceEvent findRecurrenceEventForUpdate(Long accountId, Long recurrenceId) {
-        return recurrenceEventRepository.findByIdAndAccountIdForUpdate(recurrenceId, accountId)
-                .orElseThrow(() -> new CalioException(ErrorCode.RECURRENCE_EVENT_NOT_FOUND));
     }
 }

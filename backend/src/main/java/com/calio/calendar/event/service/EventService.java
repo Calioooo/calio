@@ -1,7 +1,7 @@
 package com.calio.calendar.event.service;
 
 import com.calio.calendar.account.domain.Account;
-import com.calio.calendar.account.service.AccountQueryService;
+import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.common.domain.CanonicalSchedule;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
@@ -10,17 +10,15 @@ import com.calio.calendar.event.controller.dto.EventResponse;
 import com.calio.calendar.event.controller.dto.UpdateEventRequest;
 import com.calio.calendar.event.controller.dto.UpdateImportantEventRequest;
 import com.calio.calendar.event.domain.Event;
-import com.calio.calendar.event.repository.EventRepository;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingQueryService;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceOccurrence;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
-import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
-import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
+import com.calio.calendar.recurrence.service.RecurrenceEventQueryService;
 import com.calio.calendar.recurrence.service.Rfc5545RecurrenceEngine;
 import com.calio.calendar.tag.domain.Tag;
-import com.calio.calendar.tag.service.TagQueryService;
+import com.calio.calendar.tag.service.TagService;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -35,34 +33,35 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@Transactional(readOnly = true)
 public class EventService {
 
     private static final Duration MAX_EVENT_QUERY_RANGE = Duration.ofDays(366);
 
-    private final EventRepository eventRepository;
-    private final RecurrenceEventRepository recurrenceEventRepository;
-    private final RecurrenceEventOverrideRepository recurrenceEventOverrideRepository;
-    private final AccountQueryService accountQueryService;
-    private final TagQueryService tagQueryService;
+    private final EventQueryService eventQueryService;
+    private final EventCommandService eventCommandService;
+    private final GoogleCalendarEventMappingQueryService eventMappingQueryService;
+    private final AccountRepository accountRepository;
+    private final TagService tagService;
+    private final RecurrenceEventQueryService recurrenceEventQueryService;
     private final Rfc5545RecurrenceEngine recurrenceEngine;
-    private final GoogleCalendarEventMappingQueryService googleCalendarEventMappingQueryService;
 
     public EventService(
-            EventRepository eventRepository,
-            RecurrenceEventRepository recurrenceEventRepository,
-            RecurrenceEventOverrideRepository recurrenceEventOverrideRepository,
-            AccountQueryService accountQueryService,
-            TagQueryService tagQueryService,
-            Rfc5545RecurrenceEngine recurrenceEngine,
-            GoogleCalendarEventMappingQueryService googleCalendarEventMappingQueryService
+            EventQueryService eventQueryService,
+            EventCommandService eventCommandService,
+            GoogleCalendarEventMappingQueryService eventMappingQueryService,
+            AccountRepository accountRepository,
+            TagService tagService,
+            RecurrenceEventQueryService recurrenceEventQueryService,
+            Rfc5545RecurrenceEngine recurrenceEngine
     ) {
-        this.eventRepository = eventRepository;
-        this.recurrenceEventRepository = recurrenceEventRepository;
-        this.recurrenceEventOverrideRepository = recurrenceEventOverrideRepository;
-        this.accountQueryService = accountQueryService;
-        this.tagQueryService = tagQueryService;
+        this.eventQueryService = eventQueryService;
+        this.eventCommandService = eventCommandService;
+        this.eventMappingQueryService = eventMappingQueryService;
+        this.accountRepository = accountRepository;
+        this.tagService = tagService;
+        this.recurrenceEventQueryService = recurrenceEventQueryService;
         this.recurrenceEngine = recurrenceEngine;
-        this.googleCalendarEventMappingQueryService = googleCalendarEventMappingQueryService;
     }
 
     @Transactional
@@ -73,20 +72,19 @@ public class EventService {
                 request.allDay(),
                 request.timeZone()
         );
-        Account account = accountQueryService.getAccount(accountId);
-        Tag tag = tagQueryService.getTagOrDefault(accountId, request.tagId());
-        Event event = eventRepository.save(request.toEntity(tag, account));
+        Account account = accountRepository.getReferenceById(accountId);
+        Tag tag = tagService.getTagOrDefault(accountId, request.tagId());
+        Event event = eventCommandService.createEvent(request.toEntity(tag, account));
         return EventResponse.from(event);
     }
 
-    @Transactional(readOnly = true)
     public EventResponse getEvent(Long accountId, Long eventId) {
-        return EventResponse.from(findEvent(accountId, eventId));
+        return EventResponse.from(eventQueryService.findEvent(accountId, eventId));
     }
 
     @Transactional
     public EventResponse updateEvent(Long accountId, Long eventId, UpdateEventRequest request) {
-        Event event = findEvent(accountId, eventId);
+        Event event = eventCommandService.findEventForUpdate(accountId, eventId);
         rejectExternalEventMutation(accountId, eventId);
         CanonicalSchedule schedule = CanonicalSchedule.event(
                 request.startAt(),
@@ -94,39 +92,29 @@ public class EventService {
                 request.allDay(),
                 request.timeZone()
         );
-        Tag tag = tagQueryService.getTagOrDefault(accountId, request.tagId());
-        event.replace(
-                request.title(),
-                request.description(),
-                schedule.startAt(),
-                schedule.endAt(),
-                schedule.allDay(),
-                schedule.timeZone(),
-                tag
-        );
-        eventRepository.flush();
+        Tag tag = tagService.getTagOrDefault(accountId, request.tagId());
+        eventCommandService.updateEvent(event, request, schedule, tag);
         return EventResponse.from(event);
     }
 
     @Transactional
     public EventResponse updateImportantEvent(Long accountId, Long eventId, UpdateImportantEventRequest request) {
-        Event event = findEvent(accountId, eventId);
-        event.changeImportantEvent(request.importantEvent());
-        eventRepository.flush();
+        Event event = eventCommandService.findEventForUpdate(accountId, eventId);
+        rejectExternalEventMutation(accountId, eventId);
+        eventCommandService.updateImportantEvent(event, request.importantEvent());
         return EventResponse.from(event);
     }
 
     @Transactional
     public void deleteEvent(Long accountId, Long eventId) {
-        Event event = findEvent(accountId, eventId);
+        Event event = eventCommandService.findEventForUpdate(accountId, eventId);
         rejectExternalEventMutation(accountId, eventId);
-        eventRepository.delete(event);
+        eventCommandService.deleteEvent(event);
     }
 
-    @Transactional(readOnly = true)
     public List<EventResponse> listEvents(Long accountId, Instant from, Instant to) {
         validateListTimeRange(from, to);
-        List<EventResponse> responses = eventRepository.findNormalEvents(accountId, from, to)
+        List<EventResponse> responses = eventQueryService.listEvents(accountId, from, to)
                 .stream()
                 .map(EventResponse::from)
                 .collect(Collectors.toCollection(ArrayList::new));
@@ -139,7 +127,7 @@ public class EventService {
         List<EventResponse> responses = new ArrayList<>();
         Set<OccurrenceKey> responseKeys = new HashSet<>();
         List<RecurrenceEvent> recurrenceEvents =
-                recurrenceEventRepository.findCandidatesStartedBefore(accountId, to);
+                recurrenceEventQueryService.findExpansionCandidatesStartedBefore(accountId, to);
         for (RecurrenceEvent recurrenceEvent : recurrenceEvents) {
             addExpandedOccurrences(recurrenceEvent, from, to, responseKeys, responses);
         }
@@ -181,8 +169,8 @@ public class EventService {
         if (originStartAts.isEmpty()) {
             return Map.of();
         }
-        return recurrenceEventOverrideRepository
-                .findByRecurrenceEvent_IdAndOriginStartAtIn(recurrenceEvent.getId(), originStartAts)
+        return recurrenceEventQueryService
+                .findOverrides(recurrenceEvent.getId(), originStartAts)
                 .stream()
                 .collect(Collectors.toMap(
                         RecurrenceEventOverride::getOriginStartAt,
@@ -208,7 +196,7 @@ public class EventService {
             Set<OccurrenceKey> responseKeys,
             List<EventResponse> responses
     ) {
-        recurrenceEventOverrideRepository.findModifiedOverlappingOverrides(accountId, from, to)
+        recurrenceEventQueryService.findActiveOverlappingOverrides(accountId, from, to)
                 .stream()
                 .filter(override -> responseKeys.add(OccurrenceKey.from(override)))
                 .map(EventResponse::recurrenceOverride)
@@ -219,23 +207,18 @@ public class EventService {
         return response.startAt().isBefore(to) && response.endAt().isAfter(from);
     }
 
-    private Event findEvent(Long accountId, Long eventId) {
-        return eventRepository.findByIdAndAccount_Id(eventId, accountId)
-                .orElseThrow(() -> new CalioException(ErrorCode.EVENT_NOT_FOUND));
-    }
-
-    private void rejectExternalEventMutation(Long accountId, Long eventId) {
-        if (googleCalendarEventMappingQueryService.hasExternalEventMapping(eventId, accountId)) {
-            throw new CalioException(ErrorCode.EXTERNAL_EVENT_MUTATION_NOT_SUPPORTED);
-        }
-    }
-
     private void validateListTimeRange(Instant from, Instant to) {
         if (!from.isBefore(to)) {
             throw new CalioException(ErrorCode.INVALID_TIME_RANGE);
         }
         if (Duration.between(from, to).compareTo(MAX_EVENT_QUERY_RANGE) > 0) {
             throw new CalioException(ErrorCode.EVENT_QUERY_RANGE_TOO_LARGE);
+        }
+    }
+
+    private void rejectExternalEventMutation(Long accountId, Long eventId) {
+        if (eventMappingQueryService.hasExternalEventMapping(eventId, accountId)) {
+            throw new CalioException(ErrorCode.EXTERNAL_EVENT_MUTATION_NOT_SUPPORTED);
         }
     }
 
