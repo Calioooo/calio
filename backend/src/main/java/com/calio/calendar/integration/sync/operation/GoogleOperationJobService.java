@@ -114,6 +114,13 @@ public class GoogleOperationJobService {
         jobCommandService.markConflictDetected(jobId, workerToken);
     }
 
+    @Transactional
+    public void skipConflictedScope(Long jobId, Long accountId, String workerToken) {
+        jobCommandService.skipConflictedScope(jobId, workerToken);
+        log.info("Google operation skipped because mapping scope is conflicted. accountId={} jobId={}",
+                accountId, jobId);
+    }
+
     @Transactional(readOnly = true)
     public List<Long> findRecoverableAccountIds() {
         return jobQueryService.listRecoverableAccountIds(

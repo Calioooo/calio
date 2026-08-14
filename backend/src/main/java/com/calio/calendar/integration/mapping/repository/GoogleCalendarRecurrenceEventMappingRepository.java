@@ -93,6 +93,16 @@ public interface GoogleCalendarRecurrenceEventMappingRepository
             @Param("mappingIds") Collection<Long> mappingIds
     );
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @EntityGraph(attributePaths = "recurrenceEvent")
+    @Query("""
+            select mapping from GoogleCalendarRecurrenceEventMapping mapping
+            where mapping.integration.id = :integrationId and mapping.recurrenceEvent.id = :recurrenceEventId
+            """)
+    Optional<GoogleCalendarRecurrenceEventMapping> findWithRecurrenceEventByScopeForUpdate(
+            @Param("integrationId") Long integrationId,
+            @Param("recurrenceEventId") Long recurrenceEventId);
+
     @Modifying(flushAutomatically = true)
     @Query("""
             delete from GoogleCalendarRecurrenceEventMapping mapping

@@ -1,6 +1,8 @@
 package com.calio.calendar.integration.sync.operation;
 
 import com.calio.calendar.integration.sync.GoogleCalendarSyncService;
+import com.calio.calendar.integration.mapping.service.GoogleCalendarMappingLockService;
+import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEffectiveScope;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJob;
 import com.calio.calendar.integration.sync.operation.dto.GoogleOperationFailureDecision;
 import java.util.UUID;
@@ -15,17 +17,20 @@ public class GoogleOperationProcessor {
     private final GoogleOperationLeaseService operationLeaseService;
     private final GoogleCalendarSyncService syncService;
     private final GoogleOperationFailureClassifier failureClassifier;
+    private final GoogleCalendarMappingLockService mappingLockService;
 
     public GoogleOperationProcessor(
             GoogleOperationJobService jobService,
             GoogleOperationLeaseService operationLeaseService,
             GoogleCalendarSyncService syncService,
-            GoogleOperationFailureClassifier failureClassifier
+            GoogleOperationFailureClassifier failureClassifier,
+            GoogleCalendarMappingLockService mappingLockService
     ) {
         this.jobService = jobService;
         this.operationLeaseService = operationLeaseService;
         this.syncService = syncService;
         this.failureClassifier = failureClassifier;
+        this.mappingLockService = mappingLockService;
     }
 
     public void processAccount(Long accountId) {
@@ -49,6 +54,12 @@ public class GoogleOperationProcessor {
             return JobExecutionResult.STOP_ACCOUNT_PROCESSING;
         }
         if (!GoogleOperationJob.SYNC_KIND.equals(job.getKind())) {
+            GoogleCalendarEffectiveScope scope = GoogleCalendarEffectiveScope.fromStoredValues(
+                    job.getEffectiveResourceScope(), job.getEffectiveResourceKey());
+            if (mappingLockService.isScopeConflictedAfterLocking(job.getIntegrationId(), scope)) {
+                jobService.skipConflictedScope(job.getId(), job.getAccountId(), workerToken);
+                return JobExecutionResult.CONTINUE_WITH_NEXT_JOB;
+            }
             jobService.terminate(
                     job.getId(),
                     job.getAccountId(),

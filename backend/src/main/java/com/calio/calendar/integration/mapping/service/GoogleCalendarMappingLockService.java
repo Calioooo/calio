@@ -5,11 +5,13 @@ import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarRecurrenceEventMapping;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarRecurrenceOverrideMapping;
+import com.calio.calendar.integration.mapping.domain.GoogleCalendarMappingSyncStatus;
 import com.calio.calendar.integration.mapping.repository.GoogleCalendarEventMappingRepository;
 import com.calio.calendar.integration.mapping.repository.GoogleCalendarRecurrenceEventMappingRepository;
 import com.calio.calendar.integration.mapping.repository.GoogleCalendarRecurrenceOverrideMappingRepository;
 import com.calio.calendar.integration.sync.page.dto.GoogleCalendarNormalizedPage.NormalizedItem;
 import com.calio.calendar.integration.sync.page.dto.GoogleCalendarNormalizedPage.RecurrenceEventOverrideUpsert;
+import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEffectiveScope;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -103,6 +105,41 @@ public class GoogleCalendarMappingLockService {
                 .findAllWithRecurrenceEventMappingAndRecurrenceEventOverrideByIdsForUpdate(
                         overrideMappingIds
                 );
+    }
+
+    public boolean isScopeConflictedAfterLocking(
+            Long integrationId,
+            GoogleCalendarEffectiveScope scope
+    ) {
+        return switch (scope) {
+            case GoogleCalendarEffectiveScope.Event event -> eventMappingRepository
+                    .findWithEventByScopeForUpdate(integrationId, event.eventId())
+                    .map(mapping -> mapping.getSyncStatus() == GoogleCalendarMappingSyncStatus.CONFLICTED)
+                    .orElse(false);
+            case GoogleCalendarEffectiveScope.RecurrenceEvent recurrenceEvent ->
+                    recurrenceEventMappingRepository
+                            .findWithRecurrenceEventByScopeForUpdate(
+                                    integrationId, recurrenceEvent.recurrenceEventId())
+                            .map(mapping -> mapping.getSyncStatus()
+                                    == GoogleCalendarMappingSyncStatus.CONFLICTED)
+                            .orElse(false);
+            case GoogleCalendarEffectiveScope.RecurrenceOverride override -> {
+                boolean masterConflicted = recurrenceEventMappingRepository
+                        .findWithRecurrenceEventByScopeForUpdate(
+                                integrationId, override.recurrenceEventId())
+                        .map(mapping -> mapping.getSyncStatus()
+                                == GoogleCalendarMappingSyncStatus.CONFLICTED)
+                        .orElse(false);
+                if (masterConflicted) {
+                    yield true;
+                }
+                yield overrideMappingRepository.findByScopeForUpdate(
+                                integrationId, override.recurrenceEventId(), override.originStartAt())
+                        .map(mapping -> mapping.getSyncStatus()
+                                == GoogleCalendarMappingSyncStatus.CONFLICTED)
+                        .orElse(false);
+            }
+        };
     }
 
     private Map<String, String> expectedParentsByOverrideExternalId(List<NormalizedItem> items) {

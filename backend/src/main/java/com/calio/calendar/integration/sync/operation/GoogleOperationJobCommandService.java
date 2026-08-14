@@ -67,6 +67,12 @@ public class GoogleOperationJobCommandService {
         completeOperationJob(jobId, ownerToken);
     }
 
+    public void skipConflictedScope(Long jobId, String ownerToken) {
+        if (jobRepository.skipOwnedConflictedScope(jobId, ownerToken) != 1) {
+            throw new GoogleOperationOwnershipLostException();
+        }
+    }
+
     public void deleteJobsForIntegration(Long integrationId) {
         jobRepository.deleteByIntegrationId(integrationId);
     }

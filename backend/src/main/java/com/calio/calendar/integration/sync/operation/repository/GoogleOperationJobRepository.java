@@ -104,6 +104,23 @@ public interface GoogleOperationJobRepository extends JpaRepository<GoogleOperat
             """, nativeQuery = true)
     int terminateOwnedConflictDetected(@Param("jobId") Long jobId, @Param("owner") String owner);
 
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(value = """
+            UPDATE google_operation_jobs
+            SET job_state = 'SKIPPED', owner_token = NULL,
+                terminal_reason = 'MAPPING_ALREADY_CONFLICTED', terminal_at = CURRENT_TIMESTAMP,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = :jobId AND job_state = 'PROCESSING'
+              AND owner_token = :owner
+              AND EXISTS (
+                  SELECT 1 FROM google_calendar_integrations integration
+                  WHERE integration.id = google_operation_jobs.integration_id
+                    AND integration.google_operation_lease_owner = :owner
+                    AND integration.google_operation_lease_expires_at >= CURRENT_TIMESTAMP
+              )
+            """, nativeQuery = true)
+    int skipOwnedConflictedScope(@Param("jobId") Long jobId, @Param("owner") String owner);
+
     @Query("""
             select distinct job.accountId from GoogleOperationJob job
             where (job.state = com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState.PENDING

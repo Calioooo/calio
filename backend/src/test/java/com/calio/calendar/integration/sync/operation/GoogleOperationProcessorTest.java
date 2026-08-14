@@ -1,6 +1,7 @@
 package com.calio.calendar.integration.sync.operation;
 
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
@@ -12,6 +13,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.calio.calendar.integration.sync.GoogleCalendarSyncService;
+import com.calio.calendar.integration.mapping.service.GoogleCalendarMappingLockService;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJob;
 import com.calio.calendar.integration.sync.operation.dto.GoogleOperationFailureDecision;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,6 +27,7 @@ class GoogleOperationProcessorTest {
     private GoogleOperationLeaseService operationLeaseService;
     private GoogleCalendarSyncService syncService;
     private GoogleOperationFailureClassifier failureClassifier;
+    private GoogleCalendarMappingLockService mappingLockService;
     private GoogleOperationProcessor processor;
 
     @BeforeEach
@@ -33,11 +36,13 @@ class GoogleOperationProcessorTest {
         operationLeaseService = mock(GoogleOperationLeaseService.class);
         syncService = mock(GoogleCalendarSyncService.class);
         failureClassifier = mock(GoogleOperationFailureClassifier.class);
+        mappingLockService = mock(GoogleCalendarMappingLockService.class);
         processor = new GoogleOperationProcessor(
                 jobPersistenceService,
                 operationLeaseService,
                 syncService,
-                failureClassifier
+                failureClassifier,
+                mappingLockService
         );
     }
 
@@ -152,6 +157,21 @@ class GoogleOperationProcessorTest {
     }
 
     @Test
+    @DisplayName("conflicted scope의 outbound Job은 provider 호출 전에 SKIPPED로 종료한다")
+    void givenConflictedOutboundScope_whenProcess_thenSkipsWithoutProviderCall() {
+        GoogleOperationJob job = job(1L, 10L, "EVENT_UPSERT");
+        when(operationLeaseService.acquire(eq(10L), anyString())).thenReturn(true);
+        when(jobPersistenceService.claimNextJob(eq(10L), anyString())).thenReturn(job, null);
+        when(mappingLockService.isScopeConflictedAfterLocking(any(), any())).thenReturn(true);
+
+        processor.processAccount(10L);
+
+        verify(jobPersistenceService).skipConflictedScope(eq(1L), eq(10L), anyString());
+        verify(jobPersistenceService, never()).terminate(eq(1L), eq(10L), anyString(), anyString());
+        verifyNoInteractions(syncService);
+    }
+
+    @Test
     @DisplayName("Account lease를 획득하지 못해도 현재 worker token의 lease 해제를 시도한다")
     void givenLeaseNotAcquired_whenProcess_thenReleasesCurrentWorkerToken() {
         // given
@@ -174,6 +194,9 @@ class GoogleOperationProcessorTest {
         when(job.getId()).thenReturn(jobId);
         when(job.getAccountId()).thenReturn(accountId);
         when(job.getKind()).thenReturn(kind);
+        when(job.getIntegrationId()).thenReturn(20L);
+        when(job.getEffectiveResourceScope()).thenReturn("GENERAL_EVENT");
+        when(job.getEffectiveResourceKey()).thenReturn("1");
         return job;
     }
 }

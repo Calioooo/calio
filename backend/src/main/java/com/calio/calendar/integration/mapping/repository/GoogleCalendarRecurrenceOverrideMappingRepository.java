@@ -3,6 +3,7 @@ package com.calio.calendar.integration.mapping.repository;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarRecurrenceOverrideMapping;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -100,6 +101,19 @@ public interface GoogleCalendarRecurrenceOverrideMappingRepository
     findAllWithRecurrenceEventMappingAndRecurrenceEventOverrideByIdsForUpdate(
             @Param("mappingIds") Collection<Long> mappingIds
     );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @EntityGraph(attributePaths = {"recurrenceEventMapping", "recurrenceEventOverride"})
+    @Query("""
+            select mapping from GoogleCalendarRecurrenceOverrideMapping mapping
+            where mapping.recurrenceEventMapping.integration.id = :integrationId
+              and mapping.recurrenceEventMapping.recurrenceEvent.id = :recurrenceEventId
+              and mapping.recurrenceEventOverride.originStartAt = :originStartAt
+            """)
+    Optional<GoogleCalendarRecurrenceOverrideMapping> findByScopeForUpdate(
+            @Param("integrationId") Long integrationId,
+            @Param("recurrenceEventId") Long recurrenceEventId,
+            @Param("originStartAt") java.time.Instant originStartAt);
 
     @Modifying(flushAutomatically = true)
     @Query("""
