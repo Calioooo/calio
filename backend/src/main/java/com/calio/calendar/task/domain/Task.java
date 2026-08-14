@@ -63,7 +63,7 @@ public class Task extends BaseEntity {
         this.taskTitle = taskTitle;
     }
 
-    public void complete(Instant completedAt) {
+    public void changeCompleted(Instant completedAt) {
         if (completed) {
             return;
         }
@@ -72,7 +72,7 @@ public class Task extends BaseEntity {
         this.completedAt = completedAt;
     }
 
-    public void uncomplete() {
+    public void changeUncompleted() {
         this.completed = false;
         this.completedAt = null;
     }

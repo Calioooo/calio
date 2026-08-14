@@ -36,7 +36,7 @@ public class TaskCleanupScheduler {
     public void deleteOldCompletedTasks() {
         try {
             Instant cutoff = Instant.now(clock).minus(COMPLETED_TASK_RETENTION_DAYS, ChronoUnit.DAYS);
-            int deletedCount = taskService.deleteCompletedTasksOlderThan(cutoff);
+            int deletedCount = taskService.deleteCompletedTasksBefore(cutoff);
             log.info("Completed task cleanup finished. cutoff={} deletedCount={}", cutoff, deletedCount);
         } catch (Exception exception) {
             log.error("Completed task cleanup failed. message={}", exception.getMessage(), exception);
