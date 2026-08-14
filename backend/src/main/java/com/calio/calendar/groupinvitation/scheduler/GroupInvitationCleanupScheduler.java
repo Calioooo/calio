@@ -14,16 +14,16 @@ public class GroupInvitationCleanupScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(GroupInvitationCleanupScheduler.class);
 
-    private final GroupInvitationService invitationService;
+    private final GroupInvitationService groupInvitationService;
     private final GroupInvitationProperties properties;
     private final Clock clock;
 
     public GroupInvitationCleanupScheduler(
-            GroupInvitationService invitationService,
+            GroupInvitationService groupInvitationService,
             GroupInvitationProperties properties,
             Clock clock
     ) {
-        this.invitationService = invitationService;
+        this.groupInvitationService = groupInvitationService;
         this.properties = properties;
         this.clock = clock;
     }
@@ -35,14 +35,14 @@ public class GroupInvitationCleanupScheduler {
             int deletedCount = deleteBatches(cutoff);
             log.info("Group invitation cleanup finished. deletedCount={}", deletedCount);
         } catch (Exception exception) {
-            log.error("Group invitation cleanup failed. errorCode=GROUP_INVITATION_CLEANUP_FAILED");
+            log.error("Group invitation cleanup failed. message={}", exception.getMessage(), exception);
         }
     }
 
     private int deleteBatches(Instant cutoff) {
         int totalDeleted = 0;
         for (int batch = 0; batch < properties.getCleanupMaxBatchesPerRun(); batch++) {
-            int deleted = invitationService.deleteExpiredBatch(cutoff);
+            int deleted = groupInvitationService.deleteExpiredBatch(cutoff);
             totalDeleted += deleted;
             if (deleted < properties.getCleanupBatchSize()) {
                 break;

@@ -1,4 +1,4 @@
-package com.calio.calendar.holiday.config;
+package com.calio.calendar.holiday.client;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
@@ -30,6 +30,6 @@ public class HolidayApiProperties {
     }
 
     public boolean hasServiceKey() {
-        return !serviceKey.isBlank();
+        return serviceKey != null && !serviceKey.isBlank();
     }
 }

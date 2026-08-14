@@ -1,0 +1,196 @@
+package com.calio.calendar.holiday.service;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.groups.Tuple.tuple;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+
+import com.calio.calendar.common.error.CalioException;
+import com.calio.calendar.common.error.ErrorCode;
+import com.calio.calendar.holiday.client.HolidayApiClient;
+import com.calio.calendar.holiday.client.dto.HolidayApiItem;
+import com.calio.calendar.holiday.client.dto.HolidayApiResponse;
+import com.calio.calendar.holiday.controller.dto.NationalHolidayResponse;
+import com.calio.calendar.holiday.domain.NationalHoliday;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.time.LocalDate;
+import java.util.List;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.InOrder;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+@ExtendWith(MockitoExtension.class)
+class NationalHolidayServiceTest {
+
+    @Mock
+    private HolidayApiClient holidayApiClient;
+
+    @Mock
+    private NationalHolidayQueryService nationalHolidayQueryService;
+
+    @Mock
+    private NationalHolidayCommandService nationalHolidayCommandService;
+
+    @InjectMocks
+    private NationalHolidayService nationalHolidayService;
+
+    @Test
+    @DisplayName("단일 연도 동기화는 연도 범위 유스케이스 내부에서만 실행한다")
+    void syncYearIsPrivate() throws NoSuchMethodException {
+        // when
+        Method syncYear = NationalHolidayService.class.getDeclaredMethod("syncYear", int.class);
+
+        // then
+        assertThat(Modifier.isPrivate(syncYear.getModifiers())).isTrue();
+    }
+
+    @Test
+    @DisplayName("유효한 날짜 범위의 공휴일 조회는 QueryService에 위임한다")
+    void givenValidDateRange_whenGetNationalHolidays_thenDelegatesQuery() {
+        // given
+        LocalDate from = LocalDate.of(2026, 5, 5);
+        LocalDate to = LocalDate.of(2026, 6, 6);
+        List<NationalHoliday> holidays = List.of(
+                new NationalHoliday(from, "어린이날"),
+                new NationalHoliday(to, "현충일")
+        );
+        given(nationalHolidayQueryService.getNationalHolidays(from, to)).willReturn(holidays);
+
+        // when
+        List<NationalHolidayResponse> actual = nationalHolidayService.getNationalHolidays(from, to);
+
+        // then
+        assertThat(actual)
+                .extracting(NationalHolidayResponse::holidayDate, NationalHolidayResponse::holidayTitle)
+                .containsExactly(
+                        tuple(from, "어린이날"),
+                        tuple(to, "현충일")
+                );
+        verify(nationalHolidayQueryService).getNationalHolidays(from, to);
+    }
+
+    @Test
+    @DisplayName("시작일이 종료일보다 늦으면 QueryService를 호출하지 않고 INVALID_TIME_RANGE로 실패한다")
+    void givenFromAfterTo_whenGetNationalHolidays_thenRejectsDateRange() {
+        // given
+        LocalDate from = LocalDate.of(2026, 6, 6);
+        LocalDate to = LocalDate.of(2026, 5, 5);
+
+        // when, then
+        assertThatThrownBy(() -> nationalHolidayService.getNationalHolidays(from, to))
+                .isInstanceOfSatisfying(CalioException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.INVALID_TIME_RANGE));
+        verifyNoInteractions(nationalHolidayQueryService);
+    }
+
+    @Test
+    @DisplayName("성공한 연도 동기화는 provider와 DB snapshot을 비교해 신규 공휴일 추가와 stale 삭제를 분리한다")
+    void givenSuccessfulProviderResponse_whenSyncYear_thenReconcilesCanonicalSnapshot() {
+        // given
+        NationalHoliday staleHoliday = new NationalHoliday(LocalDate.of(2026, 5, 5), "어린이날");
+        NationalHoliday retainedHoliday = new NationalHoliday(LocalDate.of(2026, 6, 6), "현충일");
+        given(holidayApiClient.fetchHolidays(2026)).willReturn(new HolidayApiResponse(
+                "00",
+                List.of(
+                        new HolidayApiItem("20260101", "신정", "Y"),
+                        new HolidayApiItem("20260101", "신정", "Y"),
+                        new HolidayApiItem("20260606", "현충일", "Y"),
+                        new HolidayApiItem("20260214", "기념일", "N")
+                )
+        ));
+        given(nationalHolidayQueryService.findExistingHolidays(2026))
+                .willReturn(List.of(staleHoliday, retainedHoliday));
+
+        // when
+        nationalHolidayService.syncYearRange(2026, 2026);
+
+        // then
+        verify(nationalHolidayQueryService).findExistingHolidays(2026);
+        verify(nationalHolidayCommandService).insertIfMissing(List.of(
+                new NationalHolidayProviderRow(LocalDate.of(2026, 1, 1), "신정")
+        ));
+        verify(nationalHolidayCommandService).deleteStaleHolidays(List.of(staleHoliday));
+    }
+
+    @Test
+    @DisplayName("provider 실패 resultCode는 기존 snapshot을 변경하지 않는다")
+    void givenFailedProviderResultCode_whenSyncYear_thenSkipsCommand() {
+        // given
+        given(holidayApiClient.fetchHolidays(2026))
+                .willReturn(new HolidayApiResponse("99", List.of()));
+
+        // when
+        nationalHolidayService.syncYearRange(2026, 2026);
+
+        // then
+        verifyNoInteractions(nationalHolidayCommandService);
+    }
+
+    @Test
+    @DisplayName("성공 응답에 공휴일이 없으면 기존 snapshot을 삭제하지 않는다")
+    void givenResponseWithoutHolidayItems_whenSyncYear_thenSkipsCommand() {
+        // given
+        given(holidayApiClient.fetchHolidays(2026)).willReturn(new HolidayApiResponse(
+                "00",
+                List.of(new HolidayApiItem("20260214", "기념일", "N"))
+        ));
+
+        // when
+        nationalHolidayService.syncYearRange(2026, 2026);
+
+        // then
+        verifyNoInteractions(nationalHolidayCommandService);
+    }
+
+    @Test
+    @DisplayName("한 연도의 외부 API 장애는 다음 연도 동기화를 막지 않는다")
+    void givenOneYearApiFailure_whenSyncYearRange_thenContinuesNextYear() {
+        // given
+        given(holidayApiClient.fetchHolidays(2026))
+                .willThrow(new CalioException(ErrorCode.EXTERNAL_API_UNAVAILABLE));
+        given(holidayApiClient.fetchHolidays(2027)).willReturn(new HolidayApiResponse(
+                "00",
+                List.of(new HolidayApiItem("20270101", "신정", "Y"))
+        ));
+        given(nationalHolidayQueryService.findExistingHolidays(2027)).willReturn(List.of());
+
+        // when
+        nationalHolidayService.syncYearRange(2026, 2027);
+
+        // then
+        InOrder requests = inOrder(holidayApiClient);
+        requests.verify(holidayApiClient).fetchHolidays(2026);
+        requests.verify(holidayApiClient).fetchHolidays(2027);
+        verify(nationalHolidayQueryService, never()).findExistingHolidays(2026);
+        verify(nationalHolidayQueryService).findExistingHolidays(2027);
+        verify(nationalHolidayCommandService).insertIfMissing(List.of(
+                new NationalHolidayProviderRow(LocalDate.of(2027, 1, 1), "신정")
+        ));
+        verify(nationalHolidayCommandService).deleteStaleHolidays(List.of());
+    }
+
+    @Test
+    @DisplayName("잘못된 provider localDate는 snapshot 전체를 적용하지 않고 기존 데이터를 보존한다")
+    void givenInvalidProviderLocalDate_whenSyncYear_thenSkipsCommand() {
+        // given
+        given(holidayApiClient.fetchHolidays(2026)).willReturn(new HolidayApiResponse(
+                "00",
+                List.of(new HolidayApiItem("invalid", "신정", "Y"))
+        ));
+
+        // when
+        nationalHolidayService.syncYearRange(2026, 2026);
+
+        // then
+        verifyNoInteractions(nationalHolidayCommandService);
+    }
+}

@@ -35,6 +35,14 @@ public enum ErrorCode {
             HttpStatus.INTERNAL_SERVER_ERROR,
             "Group invitation generation failed."
     ),
+    GROUP_INVITATION_CREDENTIAL_COLLISION(
+            HttpStatus.INTERNAL_SERVER_ERROR,
+            "Group invitation credential collision."
+    ),
+    GROUP_INVITATION_ISSUE_FAILED(
+            HttpStatus.INTERNAL_SERVER_ERROR,
+            "Group invitation issue failed."
+    ),
     DEFAULT_TAG_NOT_FOUND(HttpStatus.INTERNAL_SERVER_ERROR, "Default tag not found."),
     INVALID_TAG_COLOR_CODE(HttpStatus.BAD_REQUEST, "Invalid tag color code."),
     RECURRENCE_UPDATE_TIME_RANGE_INVALID(HttpStatus.BAD_REQUEST, "Recurrence update time range invalid."),
@@ -90,6 +98,10 @@ public enum ErrorCode {
             "External event mutation is not supported."
     ),
 
+    HOLIDAY_API_CONFIGURATION_MISSING(
+            HttpStatus.INTERNAL_SERVER_ERROR,
+            "Holiday API configuration is missing."
+    ),
     EXTERNAL_API_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "External API is temporarily unavailable."),
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error.");
 

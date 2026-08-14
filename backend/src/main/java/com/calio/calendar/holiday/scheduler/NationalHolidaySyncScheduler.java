@@ -1,7 +1,7 @@
 package com.calio.calendar.holiday.scheduler;
 
-import com.calio.calendar.holiday.config.HolidayApiProperties;
-import com.calio.calendar.holiday.service.NationalHolidaySyncService;
+import com.calio.calendar.holiday.client.HolidayApiProperties;
+import com.calio.calendar.holiday.service.NationalHolidayService;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -19,25 +19,25 @@ public class NationalHolidaySyncScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(NationalHolidaySyncScheduler.class);
 
-    private final NationalHolidaySyncService nationalHolidaySyncService;
+    private final NationalHolidayService nationalHolidayService;
     private final HolidayApiProperties holidayApiProperties;
     private final AtomicBoolean syncRunning = new AtomicBoolean(false);
     private final Clock clock;
 
     @Autowired
     public NationalHolidaySyncScheduler(
-            NationalHolidaySyncService nationalHolidaySyncService,
+            NationalHolidayService nationalHolidayService,
             HolidayApiProperties holidayApiProperties
     ) {
-        this(nationalHolidaySyncService, holidayApiProperties, Clock.system(KOREA_ZONE));
+        this(nationalHolidayService, holidayApiProperties, Clock.system(KOREA_ZONE));
     }
 
     NationalHolidaySyncScheduler(
-            NationalHolidaySyncService nationalHolidaySyncService,
+            NationalHolidayService nationalHolidayService,
             HolidayApiProperties holidayApiProperties,
             Clock clock
     ) {
-        this.nationalHolidaySyncService = nationalHolidaySyncService;
+        this.nationalHolidayService = nationalHolidayService;
         this.holidayApiProperties = holidayApiProperties;
         this.clock = clock;
     }
@@ -46,7 +46,7 @@ public class NationalHolidaySyncScheduler {
     public void syncMonthlyFullRange() {
         runIfAvailable("monthly-full", () -> {
             int currentYear = currentYear();
-            nationalHolidaySyncService.syncYearRange(currentYear - 20, currentYear + 20);
+            nationalHolidayService.syncYearRange(currentYear - 20, currentYear + 20);
         });
     }
 
@@ -60,7 +60,7 @@ public class NationalHolidaySyncScheduler {
 
         runIfAvailable("daily-near", () -> {
             int currentYear = today.getYear();
-            nationalHolidaySyncService.syncYearRange(currentYear, currentYear + 2);
+            nationalHolidayService.syncYearRange(currentYear, currentYear + 2);
         });
     }
 

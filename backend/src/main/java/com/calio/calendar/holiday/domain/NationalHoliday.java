@@ -7,17 +7,10 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDate;
 
 @Entity
-@Table(
-        name = "national_holidays",
-        uniqueConstraints = @UniqueConstraint(
-                name = "uk_national_holiday_date_title",
-                columnNames = {"holiday_date", "holiday_title"}
-        )
-)
+@Table(name = "national_holidays")
 public class NationalHoliday extends BaseEntity {
 
     @Id

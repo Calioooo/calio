@@ -489,7 +489,7 @@ class TaskControllerTest {
 
     private Task saveCompletedTask(String taskTitle, Instant completedAt) {
         Task task = new Task(taskTitle, currentAccountReference());
-        task.complete(completedAt);
+        task.changeCompleted(completedAt);
         return taskRepository.saveAndFlush(task);
     }
 

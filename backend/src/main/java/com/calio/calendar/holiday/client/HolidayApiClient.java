@@ -1,7 +1,6 @@
 package com.calio.calendar.holiday.client;
 
 import com.calio.calendar.holiday.client.dto.HolidayApiResponse;
-import com.calio.calendar.holiday.config.HolidayApiProperties;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import java.time.Duration;
@@ -41,7 +40,7 @@ public class HolidayApiClient {
 
     public HolidayApiResponse fetchHolidays(int year) {
         if (!holidayApiProperties.hasServiceKey()) {
-            throw new IllegalStateException("Holiday API service key is missing");
+            throw new CalioException(ErrorCode.HOLIDAY_API_CONFIGURATION_MISSING);
         }
 
         try {

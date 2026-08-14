@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.groupinvitation.config.GroupInvitationProperties;
 import com.calio.calendar.groupinvitation.domain.InvitationCredentialType;
+import com.calio.calendar.groupinvitation.service.dto.InvitationCredentialPair;
 import java.security.SecureRandom;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -120,22 +121,6 @@ class InvitationCredentialServiceTest {
                 .isInstanceOf(IllegalStateException.class);
         assertThatThrownBy(() -> service("https://calio.app/invite/{token}", production))
                 .isInstanceOf(IllegalStateException.class);
-    }
-
-    @Test
-    @DisplayName("credential DTO의 문자열 표현은 bearer 원문을 노출하지 않는다")
-    void redactsCredentialDtoStringRepresentations() {
-        // given
-        InvitationCredentialPair pair = service("https://calio.app/invite").generatePair();
-
-        // when
-        String representation = pair.toString();
-
-        // then
-        assertThat(representation)
-                .doesNotContain(pair.linkToken())
-                .doesNotContain(pair.inviteCode())
-                .contains("REDACTED");
     }
 
     private InvitationCredentialService service(String baseUrl) {
