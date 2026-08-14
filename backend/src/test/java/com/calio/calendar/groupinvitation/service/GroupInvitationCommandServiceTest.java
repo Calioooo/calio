@@ -9,10 +9,12 @@ import static org.mockito.Mockito.when;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.groupinvitation.domain.GroupInvitation;
+import com.calio.calendar.groupinvitation.domain.InvitationCredentialType;
 import com.calio.calendar.groupinvitation.repository.GroupInvitationRepository;
 import com.calio.calendar.groupinvitation.service.dto.InvitationCredentialPair;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -128,6 +130,62 @@ class GroupInvitationCommandServiceTest {
         // then
         verify(invitationRepository).findAllByCreatedByMemberIdForUpdateOrderById(30L);
         verify(invitationRepository).deleteAllInBatch(invitations);
+    }
+
+    @Test
+    @DisplayName("초대 잠금 조회 command는 credential 인수를 repository에 그대로 위임한다")
+    void lockInvitationDelegatesExactCredentialArguments() {
+        // given
+        byte[] credentialHash = new byte[32];
+        GroupInvitation invitation = org.mockito.Mockito.mock(GroupInvitation.class);
+        when(invitationRepository.findByIdAndCredentialHashForUpdate(
+                40L,
+                "LINK_TOKEN",
+                credentialHash
+        )).thenReturn(Optional.of(invitation));
+
+        // when
+        GroupInvitation result = commandService.lockInvitation(
+                40L,
+                InvitationCredentialType.LINK_TOKEN,
+                credentialHash
+        );
+
+        // then
+        assertThat(result).isSameAs(invitation);
+        verify(invitationRepository).findByIdAndCredentialHashForUpdate(
+                40L,
+                "LINK_TOKEN",
+                credentialHash
+        );
+    }
+
+    @Test
+    @DisplayName("초대 잠금 조회 command는 CODE 자격 증명을 repository의 INVITE_CODE 계약으로 변환한다")
+    void lockInvitationMapsCodeCredentialType() {
+        // given
+        byte[] credentialHash = new byte[32];
+        GroupInvitation invitation = org.mockito.Mockito.mock(GroupInvitation.class);
+        when(invitationRepository.findByIdAndCredentialHashForUpdate(
+                40L,
+                "INVITE_CODE",
+                credentialHash
+        )).thenReturn(Optional.of(invitation));
+
+        // when
+        GroupInvitation result = commandService.lockInvitation(
+                40L,
+                InvitationCredentialType.CODE,
+                credentialHash
+        );
+
+        // then
+        assertThat(result).isSameAs(invitation);
+        verify(invitationRepository).findByIdAndCredentialHashForUpdate(
+                40L,
+                "INVITE_CODE",
+                credentialHash
+        );
     }
 
     private DataIntegrityViolationException credentialCollision(String constraintName) {

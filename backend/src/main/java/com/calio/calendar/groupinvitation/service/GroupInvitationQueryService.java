@@ -13,7 +13,6 @@ import com.calio.calendar.groupspace.repository.GroupSpaceRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
-import java.util.Optional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -55,19 +54,6 @@ public class GroupInvitationQueryService {
         }).orElseThrow(GroupInvitationQueryService::invitationNotFound);
     }
 
-    public GroupInvitation getInvitationForUpdate(
-            Long invitationId,
-            InvitationCredentialType credentialType,
-            byte[] credentialHash
-    ) {
-        return invitationRepository.findByIdAndCredentialHashForUpdate(
-                        invitationId,
-                        credentialQueryType(credentialType),
-                        credentialHash
-                )
-                .orElseThrow(GroupInvitationQueryService::invitationNotFound);
-    }
-
     public GroupSpace getGroupSpace(Long groupSpaceId) {
         return groupSpaceRepository.findById(groupSpaceId)
                 .orElseThrow(GroupInvitationQueryService::invitationNotFound);
@@ -77,37 +63,6 @@ public class GroupInvitationQueryService {
         return groupMemberRepository.countByGroupSpace_IdAndStatus(
                 groupSpaceId,
                 GroupMemberStatus.ACTIVE
-        );
-    }
-
-    public GroupSpace getGroupSpaceForUpdate(Long groupSpaceId) {
-        return groupSpaceRepository.findByIdForUpdate(groupSpaceId)
-                .orElseThrow(GroupInvitationQueryService::groupSpaceNotFound);
-    }
-
-    public GroupMember getActiveMemberForUpdate(Long groupSpaceId, Long accountId) {
-        GroupMember member = groupMemberRepository.findByGroupSpaceIdAndAccountIdForUpdate(
-                        groupSpaceId,
-                        accountId
-                )
-                .orElseThrow(GroupInvitationQueryService::groupSpaceNotFound);
-        if (member.getStatus() != GroupMemberStatus.ACTIVE) {
-            throw groupSpaceNotFound();
-        }
-        return member;
-    }
-
-    public Optional<GroupInvitation> getRevocableInvitationIfExists(
-            Long groupSpaceId,
-            Long invitationId,
-            Long createdByMemberId,
-            Instant now
-    ) {
-        return invitationRepository.findScopedForUpdate(
-                groupSpaceId,
-                invitationId,
-                createdByMemberId,
-                now
         );
     }
 
@@ -132,9 +87,4 @@ public class GroupInvitationQueryService {
         return new CalioException(ErrorCode.GROUP_INVITATION_NOT_FOUND);
     }
 
-    private static String credentialQueryType(InvitationCredentialType credentialType) {
-        return credentialType == InvitationCredentialType.LINK_TOKEN
-                ? "LINK_TOKEN"
-                : "INVITE_CODE";
-    }
 }

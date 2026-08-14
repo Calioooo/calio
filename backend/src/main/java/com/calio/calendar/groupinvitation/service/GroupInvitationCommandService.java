@@ -3,11 +3,13 @@ package com.calio.calendar.groupinvitation.service;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.groupinvitation.domain.GroupInvitation;
+import com.calio.calendar.groupinvitation.domain.InvitationCredentialType;
 import com.calio.calendar.groupinvitation.repository.GroupInvitationRepository;
 import com.calio.calendar.groupinvitation.service.dto.InvitationCredentialPair;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.Set;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -52,6 +54,37 @@ public class GroupInvitationCommandService {
         }
     }
 
+    public GroupInvitation lockInvitation(
+            Long invitationId,
+            InvitationCredentialType credentialType,
+            byte[] credentialHash
+    ) {
+        return invitationRepository.findByIdAndCredentialHashForUpdate(
+                        invitationId,
+                        credentialQueryType(credentialType),
+                        credentialHash
+                )
+                .orElseThrow(GroupInvitationCommandService::invitationNotFound);
+    }
+
+    public List<GroupInvitation> lockInvitationsCreatedBy(Long memberId) {
+        return invitationRepository.findAllByCreatedByMemberIdForUpdateOrderById(memberId);
+    }
+
+    public Optional<GroupInvitation> findRevocableInvitationForUpdate(
+            Long groupSpaceId,
+            Long invitationId,
+            Long createdByMemberId,
+            Instant now
+    ) {
+        return invitationRepository.findScopedForUpdate(
+                groupSpaceId,
+                invitationId,
+                createdByMemberId,
+                now
+        );
+    }
+
     public void delete(GroupInvitation invitation) {
         invitationRepository.delete(invitation);
         invitationRepository.flush();
@@ -72,6 +105,16 @@ public class GroupInvitationCommandService {
         List<GroupInvitation> invitations =
                 invitationRepository.findAllByCreatedByMemberIdForUpdateOrderById(memberId);
         invitationRepository.deleteAllInBatch(invitations);
+    }
+
+    private static CalioException invitationNotFound() {
+        return new CalioException(ErrorCode.GROUP_INVITATION_NOT_FOUND);
+    }
+
+    private static String credentialQueryType(InvitationCredentialType credentialType) {
+        return credentialType == InvitationCredentialType.LINK_TOKEN
+                ? "LINK_TOKEN"
+                : "INVITE_CODE";
     }
 
     private boolean isCredentialCollision(Throwable throwable) {

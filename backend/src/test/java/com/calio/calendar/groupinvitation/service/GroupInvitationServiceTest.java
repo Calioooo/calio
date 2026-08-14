@@ -18,6 +18,8 @@ import com.calio.calendar.groupinvitation.domain.InvitationCredentialType;
 import com.calio.calendar.groupinvitation.service.dto.InvitationCredentialPair;
 import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.domain.GroupMember;
+import com.calio.calendar.groupspace.service.GroupMembershipCommandService;
+import com.calio.calendar.groupspace.service.GroupSpaceCommandService;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -56,6 +58,12 @@ class GroupInvitationServiceTest {
     @Mock
     private GroupInvitationCommandService commandService;
 
+    @Mock
+    private GroupSpaceCommandService groupSpaceCommandService;
+
+    @Mock
+    private GroupMembershipCommandService membershipCommandService;
+
     private GroupInvitationService service;
 
     @BeforeEach
@@ -65,6 +73,8 @@ class GroupInvitationServiceTest {
                 credentialService,
                 queryService,
                 commandService,
+                groupSpaceCommandService,
+                membershipCommandService,
                 new NoOpTransactionManager(),
                 Clock.fixed(NOW, ZoneOffset.UTC),
                 properties
@@ -73,8 +83,9 @@ class GroupInvitationServiceTest {
         ReflectionTestUtils.setField(groupSpace, "id", GROUP_SPACE_ID);
         GroupMember member = new GroupMember(groupSpace, ACCOUNT_ID, "member", NOW);
         ReflectionTestUtils.setField(member, "id", MEMBER_ID);
-        lenient().when(queryService.getGroupSpaceForUpdate(GROUP_SPACE_ID)).thenReturn(groupSpace);
-        lenient().when(queryService.getActiveMemberForUpdate(GROUP_SPACE_ID, ACCOUNT_ID)).thenReturn(member);
+        lenient().when(groupSpaceCommandService.lockGroupSpace(GROUP_SPACE_ID)).thenReturn(groupSpace);
+        lenient().when(membershipCommandService.lockActiveMember(GROUP_SPACE_ID, ACCOUNT_ID))
+                .thenReturn(member);
     }
 
     @Test
@@ -123,7 +134,7 @@ class GroupInvitationServiceTest {
                 new byte[32],
                 NOW.plusSeconds(3600)
         );
-        when(queryService.getRevocableInvitationIfExists(
+        when(commandService.findRevocableInvitationForUpdate(
                 GROUP_SPACE_ID,
                 40L,
                 MEMBER_ID,
@@ -134,9 +145,9 @@ class GroupInvitationServiceTest {
         service.revoke(ACCOUNT_ID, GROUP_SPACE_ID, 40L);
 
         // then
-        verify(queryService).getGroupSpaceForUpdate(GROUP_SPACE_ID);
-        verify(queryService).getActiveMemberForUpdate(GROUP_SPACE_ID, ACCOUNT_ID);
-        verify(queryService).getRevocableInvitationIfExists(GROUP_SPACE_ID, 40L, MEMBER_ID, NOW);
+        verify(groupSpaceCommandService).lockGroupSpace(GROUP_SPACE_ID);
+        verify(membershipCommandService).lockActiveMember(GROUP_SPACE_ID, ACCOUNT_ID);
+        verify(commandService).findRevocableInvitationForUpdate(GROUP_SPACE_ID, 40L, MEMBER_ID, NOW);
         verify(commandService).delete(invitation);
     }
 
