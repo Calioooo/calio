@@ -6,7 +6,6 @@ import com.calio.calendar.event.service.EventCommandService;
 import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrationCommandService;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarContentHasher;
-import com.calio.calendar.integration.mapping.domain.GoogleCalendarMappingSyncStatus;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarRecurrenceEventMapping;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarRecurrenceOverrideMapping;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingCommandService;
@@ -313,7 +312,7 @@ public class GoogleCalendarIntegrationDataService {
             GoogleCalendarEventMapping mapping,
             OperationOwnership ownership
     ) {
-        if (mapping.getSyncStatus() == GoogleCalendarMappingSyncStatus.CONFLICTED) {
+        if (mapping.isConflicted()) {
             return false;
         }
         GoogleCalendarEffectiveScope scope = GoogleCalendarEffectiveScope.event(
@@ -334,7 +333,7 @@ public class GoogleCalendarIntegrationDataService {
             GoogleCalendarRecurrenceEventMapping mapping,
             OperationOwnership ownership
     ) {
-        if (mapping.getSyncStatus() == GoogleCalendarMappingSyncStatus.CONFLICTED) {
+        if (mapping.isConflicted()) {
             return false;
         }
         GoogleCalendarEffectiveScope scope = GoogleCalendarEffectiveScope.recurrenceEvent(
@@ -355,9 +354,7 @@ public class GoogleCalendarIntegrationDataService {
             GoogleCalendarRecurrenceOverrideMapping mapping,
             OperationOwnership ownership
     ) {
-        if (mapping.getSyncStatus() == GoogleCalendarMappingSyncStatus.CONFLICTED
-                || mapping.getRecurrenceEventMapping().getSyncStatus()
-                == GoogleCalendarMappingSyncStatus.CONFLICTED) {
+        if (mapping.isConflicted() || mapping.getRecurrenceEventMapping().isConflicted()) {
             return false;
         }
         GoogleCalendarEffectiveScope scope = GoogleCalendarEffectiveScope.recurrenceOverride(

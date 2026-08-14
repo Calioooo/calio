@@ -6,7 +6,6 @@ import com.calio.calendar.event.service.EventCommandService;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarContentHasher;
-import com.calio.calendar.integration.mapping.domain.GoogleCalendarMappingSyncStatus;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingCommandService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobCommandService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobQueryService;
@@ -79,7 +78,7 @@ public class GoogleCalendarEventChangeService {
             EventUpsert item,
             GoogleCalendarPageOwnership ownership
     ) {
-        if (mapping.getSyncStatus() == GoogleCalendarMappingSyncStatus.CONFLICTED) {
+        if (mapping.isConflicted()) {
             return;
         }
         GoogleCalendarEffectiveScope scope = GoogleCalendarEffectiveScope.event(mapping.getEvent().getId());
@@ -113,7 +112,7 @@ public class GoogleCalendarEventChangeService {
         if (eventMapping == null) {
             return;
         }
-        if (eventMapping.getSyncStatus() == GoogleCalendarMappingSyncStatus.CONFLICTED) {
+        if (eventMapping.isConflicted()) {
             return;
         }
         GoogleCalendarEffectiveScope scope = GoogleCalendarEffectiveScope.event(

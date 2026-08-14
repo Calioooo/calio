@@ -101,8 +101,8 @@ public class GoogleCalendarRecurrenceOverrideMapping extends BaseEntity {
         syncState.markConflicted();
     }
 
-    public GoogleCalendarMappingSyncStatus getSyncStatus() {
-        return syncState.getStatus();
+    public boolean isConflicted() {
+        return syncState.isConflicted();
     }
 
     public String getSyncedContentHash() {

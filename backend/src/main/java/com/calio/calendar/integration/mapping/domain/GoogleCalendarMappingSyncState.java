@@ -38,8 +38,8 @@ public class GoogleCalendarMappingSyncState {
         status = GoogleCalendarMappingSyncStatus.CONFLICTED;
     }
 
-    public GoogleCalendarMappingSyncStatus getStatus() {
-        return status;
+    public boolean isConflicted() {
+        return status == GoogleCalendarMappingSyncStatus.CONFLICTED;
     }
 
     public String getSyncedContentHash() {

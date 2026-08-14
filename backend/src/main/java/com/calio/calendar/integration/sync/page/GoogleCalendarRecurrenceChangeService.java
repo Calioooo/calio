@@ -10,7 +10,6 @@ import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegratio
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarRecurrenceEventMapping;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarRecurrenceOverrideMapping;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarContentHasher;
-import com.calio.calendar.integration.mapping.domain.GoogleCalendarMappingSyncStatus;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarRecurrenceMappingCommandService;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarRecurrenceMappingQueryService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobCommandService;
@@ -102,7 +101,7 @@ public class GoogleCalendarRecurrenceChangeService {
             RecurrenceSchedule schedule,
             GoogleCalendarPageOwnership ownership
     ) {
-        if (mapping.getSyncStatus() == GoogleCalendarMappingSyncStatus.CONFLICTED) {
+        if (mapping.isConflicted()) {
             return;
         }
         GoogleCalendarEffectiveScope scope = GoogleCalendarEffectiveScope.recurrenceEvent(
@@ -136,7 +135,7 @@ public class GoogleCalendarRecurrenceChangeService {
         if (recurrenceEventMapping == null) {
             return;
         }
-        if (recurrenceEventMapping.getSyncStatus() == GoogleCalendarMappingSyncStatus.CONFLICTED) {
+        if (recurrenceEventMapping.isConflicted()) {
             return;
         }
         GoogleCalendarEffectiveScope scope = GoogleCalendarEffectiveScope.recurrenceEvent(
@@ -166,7 +165,7 @@ public class GoogleCalendarRecurrenceChangeService {
     ) {
         GoogleCalendarRecurrenceEventMapping recurrenceEventMapping =
                 requireRecurrenceEventMapping(item, cache);
-        if (recurrenceEventMapping.getSyncStatus() == GoogleCalendarMappingSyncStatus.CONFLICTED) {
+        if (recurrenceEventMapping.isConflicted()) {
             return;
         }
         ExistingRecurrenceOverride existingOverride = resolveExistingOverride(
@@ -298,7 +297,7 @@ public class GoogleCalendarRecurrenceChangeService {
             RecurrenceEventOverrideUpsert item,
             GoogleCalendarPageOwnership ownership
     ) {
-        if (mapping.getSyncStatus() == GoogleCalendarMappingSyncStatus.CONFLICTED) {
+        if (mapping.isConflicted()) {
             return;
         }
         GoogleCalendarEffectiveScope scope = GoogleCalendarEffectiveScope.recurrenceOverride(
