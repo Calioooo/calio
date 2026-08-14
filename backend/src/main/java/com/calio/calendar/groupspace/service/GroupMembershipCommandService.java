@@ -38,16 +38,6 @@ public class GroupMembershipCommandService {
         );
     }
 
-    public GroupSpace lockGroupSpace(Long groupSpaceId) {
-        return groupSpaceRepository.findByIdForUpdate(groupSpaceId)
-                .orElseThrow(GroupMembershipCommandService::groupSpaceNotFound);
-    }
-
-    public GroupSpace lockGroupSpaceForInvitation(Long groupSpaceId) {
-        return groupSpaceRepository.findByIdForUpdate(groupSpaceId)
-                .orElseThrow(GroupMembershipCommandService::invitationNotFound);
-    }
-
     public List<GroupMember> lockMembers(Long groupSpaceId) {
         return groupMemberRepository.findAllByGroupSpaceIdForUpdateOrderById(groupSpaceId);
     }
@@ -87,7 +77,4 @@ public class GroupMembershipCommandService {
         return new CalioException(ErrorCode.GROUP_SPACE_NOT_FOUND);
     }
 
-    private static CalioException invitationNotFound() {
-        return new CalioException(ErrorCode.GROUP_INVITATION_NOT_FOUND);
-    }
 }

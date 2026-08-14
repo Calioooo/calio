@@ -31,6 +31,7 @@ public class GroupMembershipService {
     private final GroupMembershipQueryService queryService;
     private final GroupMembershipCommandService commandService;
     private final GroupSpaceCommandService groupSpaceCommandService;
+    private final GroupSpaceQueryService groupSpaceQueryService;
     private final GroupInvitationQueryService invitationQueryService;
     private final GroupInvitationCommandService invitationCommandService;
     private final InvitationCredentialService credentialService;
@@ -41,6 +42,7 @@ public class GroupMembershipService {
             GroupMembershipQueryService queryService,
             GroupMembershipCommandService commandService,
             GroupSpaceCommandService groupSpaceCommandService,
+            GroupSpaceQueryService groupSpaceQueryService,
             GroupInvitationQueryService invitationQueryService,
             GroupInvitationCommandService invitationCommandService,
             InvitationCredentialService credentialService,
@@ -50,6 +52,7 @@ public class GroupMembershipService {
         this.queryService = queryService;
         this.commandService = commandService;
         this.groupSpaceCommandService = groupSpaceCommandService;
+        this.groupSpaceQueryService = groupSpaceQueryService;
         this.invitationQueryService = invitationQueryService;
         this.invitationCommandService = invitationCommandService;
         this.credentialService = credentialService;
@@ -61,7 +64,7 @@ public class GroupMembershipService {
     public AcceptGroupInvitationResponse accept(Long accountId, AcceptGroupInvitationRequest request) {
         byte[] credentialHash = credentialHash(request);
         GroupInvitation locatedInvitation = locateInvitation(request.credentialType(), credentialHash);
-        GroupSpace groupSpace = commandService.lockGroupSpaceForInvitation(
+        GroupSpace groupSpace = groupSpaceCommandService.lockGroupSpace(
                 locatedInvitation.getGroupSpaceId()
         );
         List<GroupMember> lockedMembers = commandService.lockMembers(groupSpace.getId());
@@ -106,7 +109,7 @@ public class GroupMembershipService {
 
     @Transactional(readOnly = true)
     public GroupMemberListResponse listActiveMembers(Long accountId, Long groupSpaceId) {
-        GroupSpace groupSpace = queryService.getGroupSpace(groupSpaceId);
+        GroupSpace groupSpace = groupSpaceQueryService.getGroupSpace(groupSpaceId);
         requireActiveMembership(groupSpaceId, accountId);
         List<GroupMember> activeMembers = queryService.listActiveMembers(groupSpaceId)
                 .stream()
@@ -121,7 +124,7 @@ public class GroupMembershipService {
             Long groupSpaceId,
             Long targetMemberId
     ) {
-        GroupSpace groupSpace = commandService.lockGroupSpace(groupSpaceId);
+        GroupSpace groupSpace = groupSpaceCommandService.lockGroupSpace(groupSpaceId);
         List<GroupMember> lockedMembers = commandService.lockMembers(groupSpaceId);
         GroupMember actor = requireActiveMembership(lockedMembers, accountId);
         requireOwner(groupSpace, actor);
@@ -137,7 +140,7 @@ public class GroupMembershipService {
 
     @Transactional
     public void leave(Long accountId, Long groupSpaceId) {
-        GroupSpace groupSpace = commandService.lockGroupSpace(groupSpaceId);
+        GroupSpace groupSpace = groupSpaceCommandService.lockGroupSpace(groupSpaceId);
         List<GroupMember> lockedMembers = commandService.lockMembers(groupSpaceId);
         GroupMember actor = requireActiveMembership(lockedMembers, accountId);
         Instant now = clock.instant();
@@ -153,7 +156,7 @@ public class GroupMembershipService {
 
     @Transactional
     public void kick(Long accountId, Long groupSpaceId, Long targetMemberId) {
-        GroupSpace groupSpace = commandService.lockGroupSpace(groupSpaceId);
+        GroupSpace groupSpace = groupSpaceCommandService.lockGroupSpace(groupSpaceId);
         List<GroupMember> lockedMembers = commandService.lockMembers(groupSpaceId);
         GroupMember actor = requireActiveMembership(lockedMembers, accountId);
         Instant now = clock.instant();

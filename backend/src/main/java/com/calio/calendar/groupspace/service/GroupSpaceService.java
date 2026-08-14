@@ -2,6 +2,7 @@ package com.calio.calendar.groupspace.service;
 
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
+import com.calio.calendar.account.service.AccountQueryService;
 import com.calio.calendar.groupinvitation.service.GroupInvitationCommandService;
 import com.calio.calendar.groupspace.controller.dto.CreateGroupSpaceRequest;
 import com.calio.calendar.groupspace.controller.dto.GroupSpaceDetailResponse;
@@ -22,6 +23,9 @@ import org.springframework.transaction.annotation.Transactional;
 public class GroupSpaceService {
 
     private final GroupSpaceQueryService queryService;
+    private final GroupMembershipQueryService membershipQueryService;
+    private final GroupMembershipCommandService membershipCommandService;
+    private final AccountQueryService accountQueryService;
     private final GroupSpaceCommandService commandService;
     private final GroupInvitationCommandService invitationCommandService;
     private final GroupScheduleShareCleanupPort groupScheduleShareCleanupPort;
@@ -30,12 +34,18 @@ public class GroupSpaceService {
     @Autowired
     public GroupSpaceService(
             GroupSpaceQueryService queryService,
+            GroupMembershipQueryService membershipQueryService,
+            GroupMembershipCommandService membershipCommandService,
+            AccountQueryService accountQueryService,
             GroupSpaceCommandService commandService,
             GroupInvitationCommandService invitationCommandService,
             GroupScheduleShareCleanupPort groupScheduleShareCleanupPort,
             Clock clock
     ) {
         this.queryService = queryService;
+        this.membershipQueryService = membershipQueryService;
+        this.membershipCommandService = membershipCommandService;
+        this.accountQueryService = accountQueryService;
         this.commandService = commandService;
         this.invitationCommandService = invitationCommandService;
         this.groupScheduleShareCleanupPort = groupScheduleShareCleanupPort;
@@ -83,7 +93,7 @@ public class GroupSpaceService {
             UpdateGroupSpaceRequest request
     ) {
         GroupSpace groupSpace = commandService.lockGroupSpace(groupSpaceId);
-        GroupMember membership = queryService.getActiveMembership(groupSpaceId, accountId);
+        GroupMember membership = membershipQueryService.getActiveMembership(groupSpaceId, accountId);
         requireOwner(groupSpace, membership);
 
         String name = GroupSpaceFields.normalizeName(request.name());
@@ -95,23 +105,23 @@ public class GroupSpaceService {
     @Transactional
     public void delete(Long accountId, Long groupSpaceId) {
         GroupSpace groupSpace = commandService.lockGroupSpace(groupSpaceId);
-        GroupMember membership = queryService.getActiveMembership(groupSpaceId, accountId);
+        GroupMember membership = membershipQueryService.getActiveMembership(groupSpaceId, accountId);
         requireOwner(groupSpace, membership);
 
-        commandService.lockMembers(groupSpaceId);
+        membershipCommandService.lockMembers(groupSpaceId);
         groupScheduleShareCleanupPort.cleanupGroupShares(groupSpaceId);
         invitationCommandService.deleteAllByGroupSpaceId(groupSpaceId);
         commandService.delete(groupSpace);
     }
 
     private void ensureAccountExists(Long accountId) {
-        if (!queryService.hasAccount(accountId)) {
+        if (!accountQueryService.hasAccount(accountId)) {
             throw new CalioException(ErrorCode.INTERNAL_SERVER_ERROR);
         }
     }
 
     private GroupMember findActiveMembership(Long groupSpaceId, Long accountId) {
-        return queryService.getActiveMembership(groupSpaceId, accountId);
+        return membershipQueryService.getActiveMembership(groupSpaceId, accountId);
     }
 
     private void requireOwner(GroupSpace groupSpace, GroupMember membership) {

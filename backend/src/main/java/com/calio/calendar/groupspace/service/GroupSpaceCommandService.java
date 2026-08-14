@@ -35,10 +35,6 @@ public class GroupSpaceCommandService {
                 .orElseThrow(GroupSpaceCommandService::groupSpaceNotFound);
     }
 
-    public List<GroupMember> lockMembers(Long groupSpaceId) {
-        return groupMemberRepository.findAllByGroupSpaceIdForUpdateOrderById(groupSpaceId);
-    }
-
     public GroupMember createOwnerMembership(
             GroupSpace groupSpace,
             Long accountId,

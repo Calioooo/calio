@@ -30,6 +30,7 @@ class GroupMembershipServiceBoundaryTest {
         GroupMembershipQueryService membershipQueryService = mock(GroupMembershipQueryService.class);
         GroupMembershipCommandService membershipCommandService = mock(GroupMembershipCommandService.class);
         GroupSpaceCommandService groupSpaceCommandService = mock(GroupSpaceCommandService.class);
+        GroupSpaceQueryService groupSpaceQueryService = mock(GroupSpaceQueryService.class);
         GroupInvitationQueryService invitationQueryService = mock(GroupInvitationQueryService.class);
         GroupInvitationCommandService invitationCommandService = mock(GroupInvitationCommandService.class);
         InvitationCredentialService credentialService = mock(InvitationCredentialService.class);
@@ -38,6 +39,7 @@ class GroupMembershipServiceBoundaryTest {
                 membershipQueryService,
                 membershipCommandService,
                 groupSpaceCommandService,
+                groupSpaceQueryService,
                 invitationQueryService,
                 invitationCommandService,
                 credentialService,
@@ -60,7 +62,7 @@ class GroupMembershipServiceBoundaryTest {
                 .thenReturn(credentialHash);
         when(invitationQueryService.getInvitationByCredentialHash(InvitationCredentialType.LINK_TOKEN, credentialHash))
                 .thenReturn(invitation);
-        when(membershipCommandService.lockGroupSpaceForInvitation(20L)).thenReturn(groupSpace);
+        when(groupSpaceCommandService.lockGroupSpace(20L)).thenReturn(groupSpace);
         when(membershipCommandService.lockMembers(20L)).thenReturn(List.of(issuer));
         when(invitationCommandService.lockInvitation(invitation.getId(), InvitationCredentialType.LINK_TOKEN, credentialHash))
                 .thenReturn(invitation);

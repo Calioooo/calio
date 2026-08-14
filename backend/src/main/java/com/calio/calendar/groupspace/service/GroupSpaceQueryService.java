@@ -1,6 +1,5 @@
 package com.calio.calendar.groupspace.service;
 
-import com.calio.calendar.account.service.AccountQueryService;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.groupspace.domain.GroupMember;
@@ -18,20 +17,13 @@ public class GroupSpaceQueryService {
 
     private final GroupSpaceRepository groupSpaceRepository;
     private final GroupMemberRepository groupMemberRepository;
-    private final AccountQueryService accountQueryService;
 
     public GroupSpaceQueryService(
             GroupSpaceRepository groupSpaceRepository,
-            GroupMemberRepository groupMemberRepository,
-            AccountQueryService accountQueryService
+            GroupMemberRepository groupMemberRepository
     ) {
         this.groupSpaceRepository = groupSpaceRepository;
         this.groupMemberRepository = groupMemberRepository;
-        this.accountQueryService = accountQueryService;
-    }
-
-    public boolean hasAccount(Long accountId) {
-        return accountQueryService.hasAccount(accountId);
     }
 
     public GroupSpace getGroupSpace(Long groupSpaceId) {
@@ -45,15 +37,6 @@ public class GroupSpaceQueryService {
                         accountId,
                         GroupMemberStatus.ACTIVE
                 );
-    }
-
-    public GroupMember getActiveMembership(Long groupSpaceId, Long accountId) {
-        return groupMemberRepository.findByGroupSpaceIdAndAccountIdAndStatus(
-                        groupSpaceId,
-                        accountId,
-                        GroupMemberStatus.ACTIVE
-                )
-                .orElseThrow(GroupSpaceQueryService::groupSpaceNotFound);
     }
 
     public int getActiveMemberCount(Long groupSpaceId) {

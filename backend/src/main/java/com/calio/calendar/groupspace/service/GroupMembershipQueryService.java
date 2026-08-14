@@ -6,7 +6,6 @@ import com.calio.calendar.groupspace.domain.GroupMember;
 import com.calio.calendar.groupspace.domain.GroupMemberStatus;
 import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.repository.GroupMemberRepository;
-import com.calio.calendar.groupspace.repository.GroupSpaceRepository;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,20 +14,12 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class GroupMembershipQueryService {
 
-    private final GroupSpaceRepository groupSpaceRepository;
     private final GroupMemberRepository groupMemberRepository;
 
     public GroupMembershipQueryService(
-            GroupSpaceRepository groupSpaceRepository,
             GroupMemberRepository groupMemberRepository
     ) {
-        this.groupSpaceRepository = groupSpaceRepository;
         this.groupMemberRepository = groupMemberRepository;
-    }
-
-    public GroupSpace getGroupSpace(Long groupSpaceId) {
-        return groupSpaceRepository.findById(groupSpaceId)
-                .orElseThrow(GroupMembershipQueryService::groupSpaceNotFound);
     }
 
     public GroupMember getActiveMembership(Long groupSpaceId, Long accountId) {

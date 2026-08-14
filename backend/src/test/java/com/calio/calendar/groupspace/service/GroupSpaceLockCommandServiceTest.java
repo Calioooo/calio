@@ -85,14 +85,14 @@ class GroupSpaceLockCommandServiceTest {
     }
 
     @Test
-    @DisplayName("초대 수락용 그룹 잠금 조회가 실패하면 GROUP_INVITATION_NOT_FOUND를 반환한다")
-    void invitationScopedGroupLockMapsMissingGroupToInvitationNotFound() {
+    @DisplayName("그룹 잠금 조회가 실패하면 GROUP_SPACE_NOT_FOUND를 반환한다")
+    void groupLockMapsMissingGroupToGroupSpaceNotFound() {
         when(groupSpaceRepository.findByIdForUpdate(20L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> membershipCommandService.lockGroupSpaceForInvitation(20L))
+        assertThatThrownBy(() -> groupSpaceCommandService.lockGroupSpace(20L))
                 .isInstanceOfSatisfying(CalioException.class, exception ->
                         assertThat(exception.getErrorCode())
-                                .isEqualTo(ErrorCode.GROUP_INVITATION_NOT_FOUND)
+                                .isEqualTo(ErrorCode.GROUP_SPACE_NOT_FOUND)
                 );
     }
 }
