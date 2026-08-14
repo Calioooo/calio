@@ -14,7 +14,6 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
-import java.time.Instant;
 
 @Entity
 @Table(
@@ -61,25 +60,31 @@ public class GoogleCalendarRecurrenceOverrideMapping extends BaseEntity
             GoogleCalendarRecurrenceEventMapping recurrenceEventMapping,
             RecurrenceEventOverride recurrenceEventOverride,
             String externalEventId,
-            GoogleProviderObservation observation
+            String syncedContentHash
     ) {
         this.recurrenceEventMapping = recurrenceEventMapping;
         this.recurrenceEventOverride = recurrenceEventOverride;
         this.externalEventId = externalEventId;
-        this.syncState = GoogleCalendarMappingSyncState.active(observation);
+        this.syncState = GoogleCalendarMappingSyncState.active(syncedContentHash);
     }
 
     public GoogleCalendarRecurrenceOverrideMapping(
             GoogleCalendarRecurrenceEventMapping recurrenceEventMapping,
             RecurrenceEventOverride recurrenceEventOverride,
-            String externalEventId,
-            String providerEtag,
-            Instant providerUpdatedAt
+            String externalEventId
     ) {
         this(recurrenceEventMapping, recurrenceEventOverride, externalEventId,
-                new GoogleProviderObservation(providerEtag, providerUpdatedAt,
-                        GoogleCalendarContentHasher.hash(
-                                recurrenceEventMapping.getExternalEventId(), recurrenceEventOverride)));
+                GoogleCalendarContentHasher.hash(
+                        recurrenceEventMapping.getExternalEventId(), recurrenceEventOverride));
+    }
+
+    @Deprecated
+    public GoogleCalendarRecurrenceOverrideMapping(
+            GoogleCalendarRecurrenceEventMapping recurrenceEventMapping,
+            RecurrenceEventOverride recurrenceEventOverride, String externalEventId,
+            String ignoredProviderEtag, java.time.Instant ignoredProviderUpdatedAt
+    ) {
+        this(recurrenceEventMapping, recurrenceEventOverride, externalEventId);
     }
 
     public Long getId() {

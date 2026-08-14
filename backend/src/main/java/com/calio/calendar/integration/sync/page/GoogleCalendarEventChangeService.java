@@ -68,7 +68,7 @@ public class GoogleCalendarEventChangeService {
                         integration,
                         event,
                         item.externalEventId(),
-                        GoogleCalendarContentHasher.observation(item)
+                        GoogleCalendarContentHasher.hash(item)
                 )
         );
         eventMappings.put(item.externalEventId(), mapping);
@@ -100,7 +100,7 @@ public class GoogleCalendarEventChangeService {
                     item.title(), item.description(), item.schedule().startAt(), item.schedule().endAt(),
                     item.schedule().allDay(), item.schedule().timeZone());
         }
-        mapping.updateProviderObservation(GoogleCalendarContentHasher.observation(item));
+        mapping.updateSyncedContentHash(GoogleCalendarContentHasher.hash(item));
     }
 
     public void applyCancellation(

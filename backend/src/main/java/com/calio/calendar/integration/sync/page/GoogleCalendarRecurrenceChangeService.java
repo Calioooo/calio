@@ -90,7 +90,7 @@ public class GoogleCalendarRecurrenceChangeService {
                                 integration,
                                 recurrenceEvent,
                                 item.externalEventId(),
-                                GoogleCalendarContentHasher.observation(item)
+                                GoogleCalendarContentHasher.hash(item)
                         )
                 );
         cache.recurrenceEventMappings().put(item.externalEventId(), mapping);
@@ -123,7 +123,7 @@ public class GoogleCalendarRecurrenceChangeService {
             mapping.getRecurrenceEvent().updateProviderContent(
                     item.title(), item.description(), schedule, item.recurrenceRules());
         }
-        mapping.updateProviderObservation(GoogleCalendarContentHasher.observation(item));
+        mapping.updateSyncedContentHash(GoogleCalendarContentHasher.hash(item));
     }
 
     public void applyCancellation(
@@ -283,7 +283,7 @@ public class GoogleCalendarRecurrenceChangeService {
                                 recurrenceEventMapping,
                                 recurrenceEventOverride,
                                 item.externalEventId(),
-                                GoogleCalendarContentHasher.observation(item)
+                                GoogleCalendarContentHasher.hash(item)
                         )
                 );
         cache.googleOverrideMappings().put(
@@ -320,7 +320,7 @@ public class GoogleCalendarRecurrenceChangeService {
         if (change == GoogleCalendarInboundChangeClassifier.Change.GOOGLE_ONLY) {
             updateRecurrenceEventOverride(mapping.getRecurrenceEventOverride(), item);
         }
-        mapping.updateProviderObservation(GoogleCalendarContentHasher.observation(item));
+        mapping.updateSyncedContentHash(GoogleCalendarContentHasher.hash(item));
     }
 
     public void deleteRecurrenceEvent(

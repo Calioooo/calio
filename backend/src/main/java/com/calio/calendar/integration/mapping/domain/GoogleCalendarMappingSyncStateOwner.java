@@ -4,8 +4,8 @@ public interface GoogleCalendarMappingSyncStateOwner {
 
     GoogleCalendarMappingSyncState getSyncState();
 
-    default void updateProviderObservation(GoogleProviderObservation observation) {
-        getSyncState().updateProviderObservation(observation);
+    default void updateSyncedContentHash(String syncedContentHash) {
+        getSyncState().updateSyncedContentHash(syncedContentHash);
     }
 
     default void markConflicted() {
@@ -20,11 +20,4 @@ public interface GoogleCalendarMappingSyncStateOwner {
         return getSyncState().getSyncedContentHash();
     }
 
-    default String getProviderEtag() {
-        return getSyncState().getProviderEtag();
-    }
-
-    default java.time.Instant getProviderUpdatedAt() {
-        return getSyncState().getProviderUpdatedAt();
-    }
 }

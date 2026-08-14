@@ -38,7 +38,6 @@ public class GoogleCalendarRecurrenceMapper {
         List<String> recurrenceRules = validateRecurrenceRules(recurrenceSchedule, item.recurrence());
         return new RecurrenceEventUpsert(
                 item.id(),
-                item.etag(),
                 item.updatedAt(),
                 eventTitle(item.summary()),
                 item.description(),
@@ -55,7 +54,6 @@ public class GoogleCalendarRecurrenceMapper {
                     item.id(),
                     item.recurringEventId(),
                     originStartAt,
-                    item.etag(),
                     item.updatedAt()
             );
         }
@@ -64,7 +62,6 @@ public class GoogleCalendarRecurrenceMapper {
                 item.id(),
                 item.recurringEventId(),
                 originStartAt,
-                item.etag(),
                 item.updatedAt(),
                 eventTitle(item.summary()),
                 item.description(),

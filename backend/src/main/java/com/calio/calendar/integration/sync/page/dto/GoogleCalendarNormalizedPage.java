@@ -27,12 +27,23 @@ public record GoogleCalendarNormalizedPage(
 
     public record EventUpsert(
             String externalEventId,
-            String googleEtag,
             Instant googleUpdatedAt,
             String title,
             String description,
             NormalizedEventSchedule schedule
     ) implements NormalizedItem {
+
+        @Deprecated
+        public EventUpsert(
+                String externalEventId,
+                String ignoredProviderEtag,
+                Instant googleUpdatedAt,
+                String title,
+                String description,
+                NormalizedEventSchedule schedule
+        ) {
+            this(externalEventId, googleUpdatedAt, title, description, schedule);
+        }
     }
 
     public record EventCancellation(String externalEventId) implements NormalizedItem {
@@ -40,7 +51,6 @@ public record GoogleCalendarNormalizedPage(
 
     public record RecurrenceEventUpsert(
             String externalEventId,
-            String googleEtag,
             Instant googleUpdatedAt,
             String title,
             String description,
@@ -50,6 +60,19 @@ public record GoogleCalendarNormalizedPage(
 
         public RecurrenceEventUpsert {
             recurrenceRules = List.copyOf(recurrenceRules);
+        }
+
+        @Deprecated
+        public RecurrenceEventUpsert(
+                String externalEventId,
+                String ignoredProviderEtag,
+                Instant googleUpdatedAt,
+                String title,
+                String description,
+                NormalizedEventSchedule schedule,
+                List<String> recurrenceRules
+        ) {
+            this(externalEventId, googleUpdatedAt, title, description, schedule, recurrenceRules);
         }
     }
 
@@ -65,8 +88,6 @@ public record GoogleCalendarNormalizedPage(
 
         Instant originStartAt();
 
-        String googleEtag();
-
         Instant googleUpdatedAt();
     }
 
@@ -74,20 +95,44 @@ public record GoogleCalendarNormalizedPage(
             String externalEventId,
             String recurrenceEventExternalId,
             Instant originStartAt,
-            String googleEtag,
             Instant googleUpdatedAt,
             String title,
             String description,
             NormalizedEventSchedule schedule
     ) implements RecurrenceEventOverrideUpsert {
+
+        @Deprecated
+        public ActiveRecurrenceEventOverrideUpsert(
+                String externalEventId,
+                String recurrenceEventExternalId,
+                Instant originStartAt,
+                String ignoredProviderEtag,
+                Instant googleUpdatedAt,
+                String title,
+                String description,
+                NormalizedEventSchedule schedule
+        ) {
+            this(externalEventId, recurrenceEventExternalId, originStartAt,
+                    googleUpdatedAt, title, description, schedule);
+        }
     }
 
     public record CancelledRecurrenceEventOverrideUpsert(
             String externalEventId,
             String recurrenceEventExternalId,
             Instant originStartAt,
-            String googleEtag,
             Instant googleUpdatedAt
     ) implements RecurrenceEventOverrideUpsert {
+
+        @Deprecated
+        public CancelledRecurrenceEventOverrideUpsert(
+                String externalEventId,
+                String recurrenceEventExternalId,
+                Instant originStartAt,
+                String ignoredProviderEtag,
+                Instant googleUpdatedAt
+        ) {
+            this(externalEventId, recurrenceEventExternalId, originStartAt, googleUpdatedAt);
+        }
     }
 }

@@ -15,7 +15,6 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
-import java.time.Instant;
 
 @Entity
 @Table(
@@ -64,25 +63,30 @@ public class GoogleCalendarRecurrenceEventMapping extends BaseEntity
             GoogleCalendarIntegration integration,
             RecurrenceEvent recurrenceEvent,
             String externalEventId,
-            GoogleProviderObservation observation
+            String syncedContentHash
     ) {
         this.integration = integration;
         this.recurrenceEvent = recurrenceEvent;
         this.calendarKey = PRIMARY_CALENDAR_KEY;
         this.externalEventId = externalEventId;
-        this.syncState = GoogleCalendarMappingSyncState.active(observation);
+        this.syncState = GoogleCalendarMappingSyncState.active(syncedContentHash);
     }
 
     public GoogleCalendarRecurrenceEventMapping(
             GoogleCalendarIntegration integration,
             RecurrenceEvent recurrenceEvent,
-            String externalEventId,
-            String providerEtag,
-            Instant providerUpdatedAt
+            String externalEventId
     ) {
         this(integration, recurrenceEvent, externalEventId,
-                new GoogleProviderObservation(providerEtag, providerUpdatedAt,
-                        GoogleCalendarContentHasher.hash(recurrenceEvent)));
+                GoogleCalendarContentHasher.hash(recurrenceEvent));
+    }
+
+    @Deprecated
+    public GoogleCalendarRecurrenceEventMapping(
+            GoogleCalendarIntegration integration, RecurrenceEvent recurrenceEvent, String externalEventId,
+            String ignoredProviderEtag, java.time.Instant ignoredProviderUpdatedAt
+    ) {
+        this(integration, recurrenceEvent, externalEventId);
     }
 
     public Long getId() {

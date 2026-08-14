@@ -224,7 +224,7 @@ class GoogleCalendarPageChangeServiceTest {
                 List.of(externalEventId)
         )).singleElement().satisfies(mapping -> {
             assertThat(mapping.getExternalEventId()).isEqualTo(externalEventId);
-            assertThat(mapping.getProviderEtag()).isEqualTo(googleEtag);
+            assertThat(mapping.getSyncedContentHash()).hasSize(64);
         });
     }
 
@@ -441,18 +441,12 @@ class GoogleCalendarPageChangeServiceTest {
         });
         assertThat(recurrenceEventMappingRepository.findAll())
                 .singleElement()
-                .satisfies(mapping -> {
-                    assertThat(mapping.getProviderEtag()).isEqualTo("recurrence-etag-2");
-                    assertThat(mapping.getProviderUpdatedAt())
-                            .isEqualTo(Instant.parse("2026-07-03T08:00:00Z"));
-                });
+                .extracting(GoogleCalendarRecurrenceEventMapping::getSyncedContentHash)
+                .hasSize(64);
         assertThat(recurrenceOverrideMappingRepository.findAll())
                 .singleElement()
-                .satisfies(mapping -> {
-                    assertThat(mapping.getProviderEtag()).isEqualTo("override-etag-2");
-                    assertThat(mapping.getProviderUpdatedAt())
-                            .isEqualTo(Instant.parse("2026-07-02T08:00:00Z"));
-                });
+                .extracting(GoogleCalendarRecurrenceOverrideMapping::getSyncedContentHash)
+                .hasSize(64);
     }
 
     @Test
@@ -631,9 +625,7 @@ class GoogleCalendarPageChangeServiceTest {
             mappings.add(new GoogleCalendarEventMapping(
                     integration,
                     events.get(index),
-                    "event-" + index,
-                    null,
-                    null
+                    "event-" + index
             ));
         }
         mappingRepository.saveAllAndFlush(mappings);

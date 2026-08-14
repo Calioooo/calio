@@ -85,9 +85,7 @@ class GoogleCalendarIntegrationDataServiceTransactionTest {
                 new GoogleCalendarEventMapping(
                         integration,
                         event,
-                        "unseen-event",
-                        null,
-                        null
+                        "unseen-event"
                 )
         );
         doReturn(0).when(integrationRepository).updateNextSyncToken(

@@ -19,18 +19,6 @@ public final class GoogleCalendarContentHasher {
     private GoogleCalendarContentHasher() {
     }
 
-    public static GoogleProviderObservation observation(EventUpsert item) {
-        return new GoogleProviderObservation(item.googleEtag(), item.googleUpdatedAt(), hash(item));
-    }
-
-    public static GoogleProviderObservation observation(RecurrenceEventUpsert item) {
-        return new GoogleProviderObservation(item.googleEtag(), item.googleUpdatedAt(), hash(item));
-    }
-
-    public static GoogleProviderObservation observation(RecurrenceEventOverrideUpsert item) {
-        return new GoogleProviderObservation(item.googleEtag(), item.googleUpdatedAt(), hash(item));
-    }
-
     public static String hash(EventUpsert item) {
         return digest("GENERAL_EVENT", item.title(), item.description(), scheduleFields(item.schedule()));
     }

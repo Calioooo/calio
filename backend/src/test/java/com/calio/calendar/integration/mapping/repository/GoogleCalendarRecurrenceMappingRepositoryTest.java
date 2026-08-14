@@ -86,14 +86,11 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
         );
         String externalRecurrenceEventId = "m".repeat(1024);
         String externalRecurrenceOverrideId = "e".repeat(1024);
-        String etag = "t".repeat(1024);
         GoogleCalendarRecurrenceEventMapping eventMapping = eventMappingRepository.saveAndFlush(
                 new GoogleCalendarRecurrenceEventMapping(
                         integration,
                         recurrenceEvent,
-                        externalRecurrenceEventId,
-                        etag,
-                        null
+                        externalRecurrenceEventId
                 )
         );
         GoogleCalendarRecurrenceOverrideMapping overrideMapping =
@@ -101,9 +98,7 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
                         new GoogleCalendarRecurrenceOverrideMapping(
                                 eventMapping,
                                 recurrenceOverride,
-                                externalRecurrenceOverrideId,
-                                etag,
-                                null
+                                externalRecurrenceOverrideId
                         )
                 );
 
@@ -111,14 +106,6 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
         assertThat(eventMappingRepository.findByRecurrenceEvent_Id(recurrenceEvent.getId()))
                 .map(GoogleCalendarRecurrenceEventMapping::getExternalEventId)
                 .contains(externalRecurrenceEventId);
-        assertThat(eventMappingRepository
-                .findByIntegration_IdAndCalendarKeyAndExternalEventId(
-                        integration.getId(),
-                        GoogleCalendarRecurrenceEventMapping.PRIMARY_CALENDAR_KEY,
-                        externalRecurrenceEventId
-                ))
-                .map(GoogleCalendarRecurrenceEventMapping::getProviderEtag)
-                .contains(etag);
         assertThat(overrideMappingRepository.findAllWithRecurrenceEventMappingByExternalEventIds(
                 integration.getId(),
                 GoogleCalendarRecurrenceEventMapping.PRIMARY_CALENDAR_KEY,
@@ -129,8 +116,6 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
         assertThat(eventMapping.getUpdatedAt()).isNotNull();
         assertThat(overrideMapping.getCreatedAt()).isNotNull();
         assertThat(overrideMapping.getUpdatedAt()).isNotNull();
-        assertThat(overrideMapping.getProviderEtag()).isEqualTo(etag);
-        assertThat(overrideMapping.getProviderUpdatedAt()).isNull();
 
         overrideMappingRepository.delete(overrideMapping);
         overrideMappingRepository.flush();
@@ -144,8 +129,8 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
     }
 
     @Test
-    @DisplayName("recurrence mapping의 nullable provider metadata를 그대로 저장한다")
-    void givenNullProviderMetadata_whenSaveRecurrenceMappings_thenPreservesNulls() {
+    @DisplayName("recurrence mapping의 content hash를 저장한다")
+    void givenRecurrenceMappings_whenSave_thenStoresContentHashes() {
         // given
         RecurrenceFixture fixture = recurrenceFixture();
         GoogleCalendarRecurrenceEventMapping eventMapping =
@@ -166,10 +151,8 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
                 ));
 
         // when, then
-        assertThat(eventMapping.getProviderEtag()).isNull();
-        assertThat(eventMapping.getProviderUpdatedAt()).isNull();
-        assertThat(overrideMapping.getProviderEtag()).isNull();
-        assertThat(overrideMapping.getProviderUpdatedAt()).isNull();
+        assertThat(eventMapping.getSyncedContentHash()).hasSize(64);
+        assertThat(overrideMapping.getSyncedContentHash()).hasSize(64);
     }
 
     @Test
