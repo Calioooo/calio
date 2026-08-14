@@ -103,7 +103,7 @@ class GoogleOperationProducerTransactionTest {
                 GoogleCalendarEffectiveScope.event(1L),
                 null,
                 "{}",
-                "v1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         );
 
         // when, then
@@ -161,7 +161,7 @@ class GoogleOperationProducerTransactionTest {
                 GoogleCalendarEffectiveScope.event(1L),
                 null,
                 "{}",
-                "v1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         );
     }
 

@@ -323,7 +323,7 @@ class GoogleCalendarSyncMigrationTest {
                     INSERT INTO google_calendar_event_mappings (
                         integration_id, event_id, calendar_key, external_event_id,
                         sync_status, synced_content_hash, created_at, updated_at
-                    ) VALUES (900, 900, 'primary', 'invalid-hash', 'ACTIVE', 'v1:invalid',
+                    ) VALUES (900, 900, 'primary', 'invalid-hash', 'ACTIVE', 'invalid',
                               CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                     """))
                     .isInstanceOf(SQLException.class);
@@ -331,7 +331,7 @@ class GoogleCalendarSyncMigrationTest {
     }
 
     private String validHash() {
-        return "v1:" + "a".repeat(64);
+        return "a".repeat(64);
     }
 
     private void migrateTo(String url, MigrationVersion target) {

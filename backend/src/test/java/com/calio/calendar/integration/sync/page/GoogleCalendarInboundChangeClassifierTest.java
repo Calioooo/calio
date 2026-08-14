@@ -46,6 +46,6 @@ class GoogleCalendarInboundChangeClassifierTest {
     }
 
     private static String hash(char value) {
-        return "v1:" + String.valueOf(value).repeat(64);
+        return String.valueOf(value).repeat(64);
     }
 }

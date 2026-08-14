@@ -54,7 +54,7 @@ public class GoogleOperationJob extends BaseEntity {
     @Column(name = "desired_payload", updatable = false, columnDefinition = "JSON")
     private String desiredPayload;
 
-    @Column(name = "desired_content_hash", updatable = false, length = 67)
+    @Column(name = "desired_content_hash", updatable = false, length = 64)
     private String desiredContentHash;
 
     @Column(name = "conflict_detected", nullable = false)
@@ -157,7 +157,7 @@ public class GoogleOperationJob extends BaseEntity {
                 || resourceScope == null || resourceScope.isBlank()
                 || resourceKey == null || resourceKey.isBlank()
                 || desiredPayload == null || desiredPayload.isBlank()
-                || desiredContentHash == null || !desiredContentHash.matches("^v1:[0-9a-f]{64}$")) {
+                || desiredContentHash == null || !desiredContentHash.matches("^[0-9a-f]{64}$")) {
             throw new IllegalArgumentException("Outbound Google operation fields are required");
         }
     }

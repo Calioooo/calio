@@ -91,7 +91,7 @@ public final class GoogleCalendarContentHasher {
                     append(digest, field);
                 }
             }
-            return "v1:" + java.util.HexFormat.of().formatHex(digest.digest());
+            return java.util.HexFormat.of().formatHex(digest.digest());
         } catch (NoSuchAlgorithmException exception) {
             throw new IllegalStateException("SHA-256 is unavailable", exception);
         }

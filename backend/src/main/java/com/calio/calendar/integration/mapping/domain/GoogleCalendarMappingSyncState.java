@@ -10,7 +10,7 @@ import java.time.Instant;
 public class GoogleCalendarMappingSyncState {
 
     public static final int STATUS_LENGTH = 32;
-    public static final int CONTENT_HASH_LENGTH = 67;
+    public static final int CONTENT_HASH_LENGTH = 64;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "sync_status", nullable = false, length = STATUS_LENGTH)
