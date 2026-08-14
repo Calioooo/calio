@@ -10,6 +10,7 @@ import com.calio.calendar.integration.mapping.domain.GoogleCalendarRecurrenceOve
 import com.calio.calendar.integration.mapping.service.GoogleCalendarMappingLockService;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingQueryService;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarRecurrenceMappingQueryService;
+import com.calio.calendar.integration.sync.operation.GoogleOperationLeaseService;
 import com.calio.calendar.integration.sync.page.dto.GoogleCalendarNormalizedPage;
 import com.calio.calendar.integration.sync.page.dto.GoogleCalendarNormalizedPage.EventCancellation;
 import com.calio.calendar.integration.sync.page.dto.GoogleCalendarNormalizedPage.EventUpsert;
@@ -44,6 +45,7 @@ public class GoogleCalendarPageChangeService {
     private final TagQueryService tagQueryService;
     private final RecurrenceEventQueryService recurrenceEventQueryService;
     private final GoogleCalendarRecurrenceChangeService recurrenceChangeService;
+    private final GoogleOperationLeaseService operationLeaseService;
 
     @Autowired
     public GoogleCalendarPageChangeService(
@@ -53,7 +55,8 @@ public class GoogleCalendarPageChangeService {
             AccountQueryService accountQueryService,
             TagQueryService tagQueryService,
             RecurrenceEventQueryService recurrenceEventQueryService,
-            GoogleCalendarRecurrenceChangeService recurrenceChangeService
+            GoogleCalendarRecurrenceChangeService recurrenceChangeService,
+            GoogleOperationLeaseService operationLeaseService
     ) {
         this.integrationQueryService = integrationQueryService;
         this.mappingLockService = mappingLockService;
@@ -62,6 +65,7 @@ public class GoogleCalendarPageChangeService {
         this.tagQueryService = tagQueryService;
         this.recurrenceEventQueryService = recurrenceEventQueryService;
         this.recurrenceChangeService = recurrenceChangeService;
+        this.operationLeaseService = operationLeaseService;
     }
 
     /** Kept for test doubles built against the pre-fenced page boundary. */
@@ -82,6 +86,7 @@ public class GoogleCalendarPageChangeService {
         this.tagQueryService = tagQueryService;
         this.recurrenceEventQueryService = recurrenceEventQueryService;
         this.recurrenceChangeService = recurrenceChangeService;
+        this.operationLeaseService = null;
     }
 
     // Package-private only for page persistence tests that do not exercise job fencing.
@@ -105,6 +110,9 @@ public class GoogleCalendarPageChangeService {
             GoogleCalendarPageOwnership ownership,
             GoogleCalendarNormalizedPage page
     ) {
+        if (operationLeaseService != null) {
+            operationLeaseService.extend(ownership.jobId(), accountId, ownership.workerToken());
+        }
         GoogleCalendarIntegration integration = integrationQueryService.getIntegrationById(integrationId);
         applyPageChanges(integration, accountId, ownership, page.items());
     }
