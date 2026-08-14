@@ -7,11 +7,9 @@ import java.util.Optional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import jakarta.persistence.LockModeType;
 
 public interface GoogleCalendarRecurrenceEventMappingRepository
         extends JpaRepository<GoogleCalendarRecurrenceEventMapping, Long> {
@@ -34,23 +32,6 @@ public interface GoogleCalendarRecurrenceEventMappingRepository
               and mapping.externalEventId in :externalEventIds
             """)
     List<GoogleCalendarRecurrenceEventMapping> findAllWithRecurrenceEventAndTagByExternalIdentity(
-            @Param("integrationId") Long integrationId,
-            @Param("calendarKey") String calendarKey,
-            @Param("externalEventIds") Collection<String> externalEventIds
-    );
-
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @EntityGraph(attributePaths = {"recurrenceEvent", "recurrenceEvent.tag"})
-    @Query("""
-            select mapping
-            from GoogleCalendarRecurrenceEventMapping mapping
-            where mapping.integration.id = :integrationId
-              and mapping.calendarKey = :calendarKey
-              and mapping.externalEventId in :externalEventIds
-            order by mapping.id
-            """)
-    List<GoogleCalendarRecurrenceEventMapping>
-    findAllWithRecurrenceEventAndTagByExternalIdentityForUpdate(
             @Param("integrationId") Long integrationId,
             @Param("calendarKey") String calendarKey,
             @Param("externalEventIds") Collection<String> externalEventIds
@@ -80,28 +61,6 @@ public interface GoogleCalendarRecurrenceEventMappingRepository
             @Param("afterId") Long afterId,
             Pageable pageable
     );
-
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @EntityGraph(attributePaths = "recurrenceEvent")
-    @Query("""
-            select mapping
-            from GoogleCalendarRecurrenceEventMapping mapping
-            where mapping.id in :mappingIds
-            order by mapping.id
-            """)
-    List<GoogleCalendarRecurrenceEventMapping> findAllWithRecurrenceEventByIdsForUpdate(
-            @Param("mappingIds") Collection<Long> mappingIds
-    );
-
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @EntityGraph(attributePaths = "recurrenceEvent")
-    @Query("""
-            select mapping from GoogleCalendarRecurrenceEventMapping mapping
-            where mapping.integration.id = :integrationId and mapping.recurrenceEvent.id = :recurrenceEventId
-            """)
-    Optional<GoogleCalendarRecurrenceEventMapping> findWithRecurrenceEventByScopeForUpdate(
-            @Param("integrationId") Long integrationId,
-            @Param("recurrenceEventId") Long recurrenceEventId);
 
     @Modifying(flushAutomatically = true)
     @Query("""

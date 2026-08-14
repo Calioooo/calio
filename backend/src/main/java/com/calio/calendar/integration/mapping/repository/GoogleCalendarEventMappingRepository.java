@@ -7,11 +7,9 @@ import java.util.Optional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import jakarta.persistence.LockModeType;
 
 public interface GoogleCalendarEventMappingRepository
         extends JpaRepository<GoogleCalendarEventMapping, Long> {
@@ -29,31 +27,6 @@ public interface GoogleCalendarEventMappingRepository
             @Param("calendarKey") String calendarKey,
             @Param("externalEventIds") Collection<String> externalEventIds
     );
-
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @EntityGraph(attributePaths = "event")
-    @Query("""
-            select mapping
-            from GoogleCalendarEventMapping mapping
-            where mapping.integration.id = :integrationId
-              and mapping.calendarKey = :calendarKey
-              and mapping.externalEventId in :externalEventIds
-            order by mapping.id
-            """)
-    List<GoogleCalendarEventMapping> findAllWithEventByExternalIdentityForUpdate(
-            @Param("integrationId") Long integrationId,
-            @Param("calendarKey") String calendarKey,
-            @Param("externalEventIds") Collection<String> externalEventIds
-    );
-
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @EntityGraph(attributePaths = "event")
-    @Query("""
-            select mapping from GoogleCalendarEventMapping mapping
-            where mapping.integration.id = :integrationId and mapping.event.id = :eventId
-            """)
-    Optional<GoogleCalendarEventMapping> findWithEventByScopeForUpdate(
-            @Param("integrationId") Long integrationId, @Param("eventId") Long eventId);
 
     boolean existsByEvent_IdAndIntegration_AccountId(Long eventId, Long accountId);
 

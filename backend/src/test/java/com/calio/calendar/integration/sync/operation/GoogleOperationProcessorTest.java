@@ -13,7 +13,6 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.calio.calendar.integration.sync.GoogleCalendarSyncService;
-import com.calio.calendar.integration.mapping.service.GoogleCalendarMappingLockService;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJob;
 import com.calio.calendar.integration.sync.operation.dto.GoogleOperationFailureDecision;
 import org.junit.jupiter.api.BeforeEach;
@@ -27,7 +26,6 @@ class GoogleOperationProcessorTest {
     private GoogleOperationLeaseService operationLeaseService;
     private GoogleCalendarSyncService syncService;
     private GoogleOperationFailureClassifier failureClassifier;
-    private GoogleCalendarMappingLockService mappingLockService;
     private GoogleOperationProcessor processor;
 
     @BeforeEach
@@ -36,13 +34,11 @@ class GoogleOperationProcessorTest {
         operationLeaseService = mock(GoogleOperationLeaseService.class);
         syncService = mock(GoogleCalendarSyncService.class);
         failureClassifier = mock(GoogleOperationFailureClassifier.class);
-        mappingLockService = mock(GoogleCalendarMappingLockService.class);
         processor = new GoogleOperationProcessor(
                 jobPersistenceService,
                 operationLeaseService,
                 syncService,
-                failureClassifier,
-                mappingLockService
+                failureClassifier
         );
     }
 
@@ -154,21 +150,6 @@ class GoogleOperationProcessorTest {
         );
         verify(syncService, never()).synchronize(eq(1L), eq(10L), anyString());
         verifyNoInteractions(failureClassifier);
-    }
-
-    @Test
-    @DisplayName("conflicted scope의 outbound Job은 provider 호출 전에 SKIPPED로 종료한다")
-    void givenConflictedOutboundScope_whenProcess_thenSkipsWithoutProviderCall() {
-        GoogleOperationJob job = job(1L, 10L, "EVENT_UPSERT");
-        when(operationLeaseService.acquire(eq(10L), anyString())).thenReturn(true);
-        when(jobPersistenceService.claimNextJob(eq(10L), anyString())).thenReturn(job, null);
-        when(mappingLockService.isScopeConflictedAfterLocking(any(), any())).thenReturn(true);
-
-        processor.processAccount(10L);
-
-        verify(jobPersistenceService).skipConflictedScope(eq(1L), eq(10L), anyString());
-        verify(jobPersistenceService, never()).terminate(eq(1L), eq(10L), anyString(), anyString());
-        verifyNoInteractions(syncService);
     }
 
     @Test

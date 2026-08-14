@@ -18,7 +18,6 @@ import com.calio.calendar.integration.connection.service.GoogleCalendarAccessTok
 import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrationQueryService;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingQueryService;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarRecurrenceMappingQueryService;
-import com.calio.calendar.integration.mapping.service.GoogleCalendarMappingLockService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobQueryService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationLeaseService;
@@ -409,8 +408,7 @@ class GoogleCalendarSyncServiceTest {
                     null,
                     mock(GoogleOperationLeaseService.class),
                     mock(GoogleOperationJobService.class),
-                    mock(GoogleOperationJobQueryService.class),
-                    mock(GoogleCalendarMappingLockService.class)
+                    mock(GoogleOperationJobQueryService.class)
             );
         }
 

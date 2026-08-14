@@ -14,6 +14,8 @@ import com.calio.calendar.external.google.dto.GoogleCalendarEventPage;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventTimeResponse;
 import com.calio.calendar.external.google.service.dto.NormalizedEventSchedule;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarEventMapping;
+import com.calio.calendar.integration.mapping.domain.GoogleCalendarRecurrenceEventMapping;
+import com.calio.calendar.integration.mapping.domain.GoogleCalendarRecurrenceOverrideMapping;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.sync.GoogleCalendarIntegrationDataService;
 import com.calio.calendar.integration.sync.GoogleCalendarSyncMode;
@@ -442,11 +444,11 @@ class GoogleCalendarPageChangeServiceTest {
         assertThat(recurrenceEventMappingRepository.findAll())
                 .singleElement()
                 .extracting(GoogleCalendarRecurrenceEventMapping::getSyncedContentHash)
-                .hasSize(64);
+                .matches(hash -> hash.length() == 64);
         assertThat(recurrenceOverrideMappingRepository.findAll())
                 .singleElement()
                 .extracting(GoogleCalendarRecurrenceOverrideMapping::getSyncedContentHash)
-                .hasSize(64);
+                .matches(hash -> hash.length() == 64);
     }
 
     @Test

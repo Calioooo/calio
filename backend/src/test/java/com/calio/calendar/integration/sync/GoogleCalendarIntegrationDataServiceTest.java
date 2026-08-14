@@ -17,7 +17,6 @@ import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMapping
 import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingQueryService;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarRecurrenceMappingCommandService;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarRecurrenceMappingQueryService;
-import com.calio.calendar.integration.mapping.service.GoogleCalendarMappingLockService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobQueryService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationLeaseService;
@@ -48,8 +47,6 @@ class GoogleCalendarIntegrationDataServiceTest {
             mock(GoogleOperationLeaseService.class);
     private final GoogleOperationJobQueryService operationJobQueryService =
             mock(GoogleOperationJobQueryService.class);
-    private final GoogleCalendarMappingLockService mappingLockService =
-            mock(GoogleCalendarMappingLockService.class);
     private final GoogleCalendarEventMapping eventMapping = mock(GoogleCalendarEventMapping.class);
 
     @Test
@@ -87,8 +84,7 @@ class GoogleCalendarIntegrationDataServiceTest {
                 null,
                 operationLeaseService,
                 operationJobPersistenceService,
-                operationJobQueryService,
-                mappingLockService
+                operationJobQueryService
         );
 
         // when
