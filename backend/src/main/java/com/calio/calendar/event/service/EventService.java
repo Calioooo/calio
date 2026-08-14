@@ -10,6 +10,7 @@ import com.calio.calendar.event.controller.dto.EventResponse;
 import com.calio.calendar.event.controller.dto.UpdateEventRequest;
 import com.calio.calendar.event.controller.dto.UpdateImportantEventRequest;
 import com.calio.calendar.event.domain.Event;
+import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingQueryService;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceOccurrence;
@@ -39,6 +40,7 @@ public class EventService {
 
     private final EventQueryService eventQueryService;
     private final EventCommandService eventCommandService;
+    private final GoogleCalendarEventMappingQueryService eventMappingQueryService;
     private final AccountRepository accountRepository;
     private final TagService tagService;
     private final RecurrenceEventQueryService recurrenceEventQueryService;
@@ -47,6 +49,7 @@ public class EventService {
     public EventService(
             EventQueryService eventQueryService,
             EventCommandService eventCommandService,
+            GoogleCalendarEventMappingQueryService eventMappingQueryService,
             AccountRepository accountRepository,
             TagService tagService,
             RecurrenceEventQueryService recurrenceEventQueryService,
@@ -54,6 +57,7 @@ public class EventService {
     ) {
         this.eventQueryService = eventQueryService;
         this.eventCommandService = eventCommandService;
+        this.eventMappingQueryService = eventMappingQueryService;
         this.accountRepository = accountRepository;
         this.tagService = tagService;
         this.recurrenceEventQueryService = recurrenceEventQueryService;
@@ -213,7 +217,7 @@ public class EventService {
     }
 
     private void rejectExternalEventMutation(Long accountId, Long eventId) {
-        if (eventQueryService.hasExternalEventMapping(accountId, eventId)) {
+        if (eventMappingQueryService.hasExternalEventMapping(eventId, accountId)) {
             throw new CalioException(ErrorCode.EXTERNAL_EVENT_MUTATION_NOT_SUPPORTED);
         }
     }

@@ -24,7 +24,7 @@ import com.calio.calendar.event.controller.dto.UpdateEventRequest;
 import com.calio.calendar.event.controller.dto.UpdateImportantEventRequest;
 import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.event.repository.EventRepository;
-import com.calio.calendar.integration.mapping.repository.GoogleCalendarEventMappingRepository;
+import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingQueryService;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceOccurrence;
@@ -68,7 +68,7 @@ class EventServiceTest {
     private EventRepository eventRepository;
 
     @Mock
-    private GoogleCalendarEventMappingRepository googleCalendarEventMappingRepository;
+    private GoogleCalendarEventMappingQueryService eventMappingQueryService;
 
     @Mock
     private RecurrenceEventRepository recurrenceEventRepository;
@@ -138,7 +138,7 @@ class EventServiceTest {
                 30L
         );
         when(eventCommandService.findEventForUpdate(1L, 10L)).thenReturn(event);
-        when(eventQueryService.hasExternalEventMapping(1L, 10L)).thenReturn(false);
+        when(eventMappingQueryService.hasExternalEventMapping(10L, 1L)).thenReturn(false);
         when(tagService.getTagOrDefault(1L, 30L)).thenReturn(updatedTag);
         doAnswer(invocation -> {
             Event target = invocation.getArgument(0);
@@ -161,9 +161,9 @@ class EventServiceTest {
         EventResponse response = eventService.updateEvent(1L, 10L, request);
 
         // then
-        InOrder order = inOrder(eventQueryService, tagService, eventCommandService);
+        InOrder order = inOrder(eventMappingQueryService, tagService, eventCommandService);
         order.verify(eventCommandService).findEventForUpdate(1L, 10L);
-        order.verify(eventQueryService).hasExternalEventMapping(1L, 10L);
+        order.verify(eventMappingQueryService).hasExternalEventMapping(10L, 1L);
         order.verify(tagService).getTagOrDefault(1L, 30L);
         order.verify(eventCommandService).updateEvent(any(), any(), any(), any());
         assertThat(response.title()).isEqualTo("After");
@@ -177,7 +177,7 @@ class EventServiceTest {
         // given
         Event event = event("External", tag("기타"));
         when(eventCommandService.findEventForUpdate(1L, 10L)).thenReturn(event);
-        when(eventQueryService.hasExternalEventMapping(1L, 10L)).thenReturn(true);
+        when(eventMappingQueryService.hasExternalEventMapping(10L, 1L)).thenReturn(true);
         UpdateEventRequest request = new UpdateEventRequest(
                 "Blocked",
                 null,
@@ -205,7 +205,7 @@ class EventServiceTest {
         // given
         Event event = event("External", tag("기타"));
         when(eventCommandService.findEventForUpdate(1L, 10L)).thenReturn(event);
-        when(eventQueryService.hasExternalEventMapping(1L, 10L)).thenReturn(true);
+        when(eventMappingQueryService.hasExternalEventMapping(10L, 1L)).thenReturn(true);
 
         // when, then
         assertThatThrownBy(() -> eventService.deleteEvent(1L, 10L))
@@ -222,7 +222,7 @@ class EventServiceTest {
         // given
         Event event = event("External", tag("기타"));
         when(eventCommandService.findEventForUpdate(1L, 10L)).thenReturn(event);
-        when(eventQueryService.hasExternalEventMapping(1L, 10L)).thenReturn(true);
+        when(eventMappingQueryService.hasExternalEventMapping(10L, 1L)).thenReturn(true);
 
         // when
         assertThatThrownBy(() -> eventService.updateImportantEvent(
@@ -235,7 +235,7 @@ class EventServiceTest {
         );
 
         // then
-        verify(eventQueryService).hasExternalEventMapping(1L, 10L);
+        verify(eventMappingQueryService).hasExternalEventMapping(10L, 1L);
         verify(eventCommandService, never()).updateImportantEvent(any(), anyBoolean());
         assertThat(event.importantEvent()).isFalse();
     }
@@ -384,10 +384,7 @@ class EventServiceTest {
     }
 
     private EventService listEventService() {
-        EventQueryService queryService = new EventQueryService(
-                eventRepository,
-                googleCalendarEventMappingRepository
-        );
+        EventQueryService queryService = new EventQueryService(eventRepository);
         RecurrenceEventQueryService recurrenceQueryService = new RecurrenceEventQueryService(
                 recurrenceEventRepository,
                 recurrenceEventOverrideRepository
@@ -395,6 +392,7 @@ class EventServiceTest {
         return new EventService(
                 queryService,
                 eventCommandService,
+                eventMappingQueryService,
                 accountRepository,
                 tagService,
                 recurrenceQueryService,

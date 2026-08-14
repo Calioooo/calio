@@ -10,7 +10,6 @@ import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.event.repository.EventRepository;
-import com.calio.calendar.integration.mapping.repository.GoogleCalendarEventMappingRepository;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.domain.TagType;
 import java.time.Instant;
@@ -31,9 +30,6 @@ class EventQueryServiceTest {
 
     @Mock
     private EventRepository eventRepository;
-
-    @Mock
-    private GoogleCalendarEventMappingRepository googleCalendarEventMappingRepository;
 
     @InjectMocks
     private EventQueryService eventQueryService;
@@ -63,23 +59,6 @@ class EventQueryServiceTest {
                 .isInstanceOfSatisfying(CalioException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.EVENT_NOT_FOUND)
                 );
-    }
-
-    @Test
-    @DisplayName("외부 일정 매핑 여부 조회는 일정과 계정 ID를 repository에 정확히 전달한다")
-    void givenExternalEventMapping_whenCheckMapping_thenReturnsRepositoryResult() {
-        // given
-        when(googleCalendarEventMappingRepository
-                .existsByEvent_IdAndIntegration_AccountId(10L, 1L))
-                .thenReturn(true);
-
-        // when
-        boolean result = eventQueryService.hasExternalEventMapping(1L, 10L);
-
-        // then
-        assertThat(result).isTrue();
-        verify(googleCalendarEventMappingRepository)
-                .existsByEvent_IdAndIntegration_AccountId(10L, 1L);
     }
 
     @Test
