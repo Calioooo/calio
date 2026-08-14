@@ -10,9 +10,6 @@ import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.groupinvitation.domain.GroupInvitation;
 import com.calio.calendar.groupinvitation.domain.InvitationCredentialType;
 import com.calio.calendar.groupinvitation.repository.GroupInvitationRepository;
-import com.calio.calendar.groupspace.domain.GroupMember;
-import com.calio.calendar.groupspace.domain.GroupSpace;
-import com.calio.calendar.groupspace.service.GroupMembershipQueryService;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -37,9 +34,6 @@ class GroupInvitationQueryServiceTest {
     private GroupInvitationRepository invitationRepository;
 
     @Mock
-    private GroupMembershipQueryService membershipQueryService;
-
-    @Mock
     private Clock clock;
 
     @InjectMocks
@@ -58,18 +52,14 @@ class GroupInvitationQueryServiceTest {
     }
 
     @Test
-    @DisplayName("초대 목록 조회는 활성 멤버 범위와 현재 시각을 repository에 전달한다")
-    void listDelegatesActiveMemberScope() {
-        GroupSpace groupSpace = new GroupSpace(1L, "group", null);
-        GroupMember member = new GroupMember(groupSpace, 1L, "member", NOW);
+    @DisplayName("초대 목록 조회는 그룹·멤버 범위와 현재 시각을 repository에 전달한다")
+    void listDelegatesInvitationScope() {
         List<GroupInvitation> invitations = List.of(invitation());
-        when(membershipQueryService.getActiveMembership(20L, 1L)).thenReturn(member);
         when(clock.instant()).thenReturn(NOW);
-        when(invitationRepository.findActiveInvitations(20L, member.getId(), NOW)).thenReturn(invitations);
+        when(invitationRepository.findActiveInvitations(20L, 30L, NOW)).thenReturn(invitations);
 
-        assertThat(queryService.list(1L, 20L)).isSameAs(invitations);
-        verify(membershipQueryService).getActiveMembership(20L, 1L);
-        verify(invitationRepository).findActiveInvitations(20L, member.getId(), NOW);
+        assertThat(queryService.list(20L, 30L)).isSameAs(invitations);
+        verify(invitationRepository).findActiveInvitations(20L, 30L, NOW);
     }
 
     @Test
