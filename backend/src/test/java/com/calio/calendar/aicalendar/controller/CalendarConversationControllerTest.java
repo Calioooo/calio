@@ -14,6 +14,8 @@ import com.calio.calendar.aicalendar.repository.CalendarConversationMessageRepos
 import com.calio.calendar.aicalendar.repository.CalendarConversationRepository;
 import com.calio.calendar.aicalendar.service.CalendarAssistantAgent;
 import com.calio.calendar.aicalendar.service.CalendarConversationService;
+import com.calio.calendar.aicalendar.service.CalendarRequestCategory;
+import com.calio.calendar.aicalendar.service.CalendarRequestClassifier;
 import com.calio.calendar.aicalendar.service.dto.CalendarAssistantAnswer;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
@@ -67,10 +69,14 @@ class CalendarConversationControllerTest {
     @MockitoBean
     private CalendarAssistantAgent assistantAgent;
 
+    @MockitoBean
+    private CalendarRequestClassifier requestClassifier;
+
     @BeforeEach
     void setUp() {
         messageRepository.deleteAll();
         conversationRepository.deleteAll();
+        when(requestClassifier.classify(any())).thenReturn(CalendarRequestCategory.CALENDAR_READ);
     }
 
     @Test
@@ -170,6 +176,46 @@ class CalendarConversationControllerTest {
         assertThat(messageRepository.count()).isOne();
         assertThat(messageRepository.findAll()).extracting(message -> message.getText())
                 .containsExactly("내일 일정 알려줘");
+    }
+
+    @Test
+    @DisplayName("일정 변경 요청은 agent와 tool을 호출하지 않고 지원 범위를 안내한다")
+    void givenCalendarWriteRequest_whenSendMessage_thenReturnsFixedSupportMessage() throws Exception {
+        // given
+        String conversationId = createConversation();
+        when(requestClassifier.classify(any())).thenReturn(CalendarRequestCategory.CALENDAR_WRITE);
+
+        // when, then
+        mockMvc.perform(post("/api/ai/calendar/conversations/{conversationId}/messages", conversationId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"message":"내일 오후 2시에 회의 만들어줘","timeZone":"Asia/Seoul"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.assistantMessage")
+                        .value("현재는 일정 조회와 빈 시간 찾기만 지원해요."))
+                .andExpect(jsonPath("$.blocks").isEmpty());
+        verifyNoInteractions(assistantAgent);
+    }
+
+    @Test
+    @DisplayName("캘린더와 무관한 요청은 agent와 tool을 호출하지 않고 지원 범위를 안내한다")
+    void givenUnrelatedRequest_whenSendMessage_thenReturnsFixedSupportMessage() throws Exception {
+        // given
+        String conversationId = createConversation();
+        when(requestClassifier.classify(any())).thenReturn(CalendarRequestCategory.UNRELATED);
+
+        // when, then
+        mockMvc.perform(post("/api/ai/calendar/conversations/{conversationId}/messages", conversationId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"message":"오늘 점심 추천해줘","timeZone":"Asia/Seoul"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.assistantMessage")
+                        .value("저는 일정 조회와 빈 시간 찾기를 도와드릴 수 있어요."))
+                .andExpect(jsonPath("$.blocks").isEmpty());
+        verifyNoInteractions(assistantAgent);
     }
 
 

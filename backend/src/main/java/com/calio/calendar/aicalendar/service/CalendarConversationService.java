@@ -25,6 +25,7 @@ public class CalendarConversationService {
 
     private final CalendarConversationQueryService conversationQueryService;
     private final CalendarConversationCommandService conversationCommandService;
+    private final CalendarRequestClassifier requestClassifier;
     private final CalendarAssistantAgent assistantAgent;
     private final Clock clock;
     private final TransactionTemplate transactionTemplate;
@@ -32,12 +33,14 @@ public class CalendarConversationService {
     public CalendarConversationService(
             CalendarConversationQueryService conversationQueryService,
             CalendarConversationCommandService conversationCommandService,
+            CalendarRequestClassifier requestClassifier,
             CalendarAssistantAgent assistantAgent,
             Clock clock,
             PlatformTransactionManager transactionManager
     ) {
         this.conversationQueryService = conversationQueryService;
         this.conversationCommandService = conversationCommandService;
+        this.requestClassifier = requestClassifier;
         this.assistantAgent = assistantAgent;
         this.clock = clock;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
@@ -72,7 +75,7 @@ public class CalendarConversationService {
                 zoneId,
                 history
         );
-        CalendarAssistantAnswer answer = assistantAgent.answer(request);
+        CalendarAssistantAnswer answer = answerRequest(request);
         recordAssistantMessage(conversation.getId(), answer.message());
         return SendCalendarConversationMessageResponse.from(conversationId, answer);
     }
@@ -98,6 +101,18 @@ public class CalendarConversationService {
 
     private List<CalendarConversationHistoryMessage> getRecentHistory(Long conversationId) {
         return conversationQueryService.getRecentHistory(conversationId, MAX_HISTORY_SIZE);
+    }
+
+    private CalendarAssistantAnswer answerRequest(CalendarAssistantRequest request) {
+        return switch (requestClassifier.classify(request)) {
+            case CALENDAR_READ -> assistantAgent.answer(request);
+            case CALENDAR_WRITE -> CalendarAssistantAnswer.withoutBlocks(
+                    "현재는 일정 조회와 빈 시간 찾기만 지원해요."
+            );
+            case UNRELATED -> CalendarAssistantAnswer.withoutBlocks(
+                    "저는 일정 조회와 빈 시간 찾기를 도와드릴 수 있어요."
+            );
+        };
     }
 
     void recordAssistantMessage(Long conversationId, String message) {
