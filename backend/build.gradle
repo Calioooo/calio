@@ -46,4 +46,28 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+    exclude '**/CalendarAssistantEvalTest.class'
+}
+
+tasks.register('aiCalendarEval', Test) {
+    group = 'verification'
+    description = 'Runs AI calendar evaluations against the configured OpenAI model.'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    systemProperty 'spring.profiles.active', 'ai-calendar-eval'
+    useJUnitPlatform()
+    include '**/CalendarAssistantEvalTest.class'
+    outputs.upToDateWhen { false }
+    doFirst {
+        if (System.getenv('OPENAI_API_KEY') == null || System.getenv('OPENAI_API_KEY').isBlank()) {
+            throw new GradleException('OPENAI_API_KEY is required to run aiCalendarEval.')
+        }
+        if (System.getenv('OPENAI_CHAT_MODEL') == null || System.getenv('OPENAI_CHAT_MODEL').isBlank()) {
+            throw new GradleException('OPENAI_CHAT_MODEL is required to run aiCalendarEval.')
+        }
+        if (System.getenv('OPENAI_CHAT_REASONING_EFFORT') == null
+                || System.getenv('OPENAI_CHAT_REASONING_EFFORT').isBlank()) {
+            throw new GradleException('OPENAI_CHAT_REASONING_EFFORT is required to run aiCalendarEval.')
+        }
+    }
 }
