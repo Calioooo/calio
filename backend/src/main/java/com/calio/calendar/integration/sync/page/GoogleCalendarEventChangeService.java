@@ -116,8 +116,13 @@ public class GoogleCalendarEventChangeService {
         if (eventMapping.getSyncStatus() == GoogleCalendarMappingSyncStatus.CONFLICTED) {
             return;
         }
+        GoogleCalendarEffectiveScope scope = GoogleCalendarEffectiveScope.event(
+                eventMapping.getEvent().getId());
         if (!GoogleCalendarContentHasher.hash(eventMapping.getEvent())
-                .equals(eventMapping.getSyncedContentHash())) {
+                .equals(eventMapping.getSyncedContentHash())
+                || !operationJobQueryService.listPendingDesiredContentHashes(
+                        eventMapping.getIntegration().getAccountId(),
+                        eventMapping.getIntegration().getId(), scope).isEmpty()) {
             eventMapping.markConflicted();
             operationJobCommandService.markConflictDetected(ownership.jobId(), ownership.workerToken());
             return;

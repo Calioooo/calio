@@ -146,6 +146,32 @@ public interface GoogleOperationJobRepository extends JpaRepository<GoogleOperat
             @Param("key") String key
     );
 
+    @Query("""
+            select job.desiredContentHash
+            from GoogleOperationJob job
+            where job.accountId = :accountId
+              and job.integrationId = :integrationId
+              and job.kind <> 'SYNC'
+              and job.state in (
+                  com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState.PENDING,
+                  com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState.PROCESSING
+              )
+              and (
+                  (job.effectiveResourceScope = 'RECURRENCE_MASTER'
+                   and job.effectiveResourceKey = :recurrenceEventKey)
+                  or
+                  (job.effectiveResourceScope = 'RECURRENCE_OVERRIDE'
+                   and job.effectiveResourceKey like concat(:overrideKeyPrefix, '%'))
+              )
+            order by job.accountSequence
+            """)
+    List<String> findPendingDesiredContentHashesForRecurrenceAggregate(
+            @Param("accountId") Long accountId,
+            @Param("integrationId") Long integrationId,
+            @Param("recurrenceEventKey") String recurrenceEventKey,
+            @Param("overrideKeyPrefix") String overrideKeyPrefix
+    );
+
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("delete from GoogleOperationJob job where job.integrationId = :integrationId")
     int deleteByIntegrationId(@Param("integrationId") Long integrationId);

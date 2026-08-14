@@ -139,8 +139,13 @@ public class GoogleCalendarRecurrenceChangeService {
         if (recurrenceEventMapping.getSyncStatus() == GoogleCalendarMappingSyncStatus.CONFLICTED) {
             return;
         }
+        GoogleCalendarEffectiveScope scope = GoogleCalendarEffectiveScope.recurrenceEvent(
+                recurrenceEventMapping.getRecurrenceEvent().getId());
         if (!GoogleCalendarContentHasher.hash(recurrenceEventMapping.getRecurrenceEvent())
-                .equals(recurrenceEventMapping.getSyncedContentHash())) {
+                .equals(recurrenceEventMapping.getSyncedContentHash())
+                || !operationJobQueryService.listPendingDesiredContentHashes(
+                        recurrenceEventMapping.getIntegration().getAccountId(),
+                        recurrenceEventMapping.getIntegration().getId(), scope).isEmpty()) {
             recurrenceEventMapping.markConflicted();
             operationJobCommandService.markConflictDetected(ownership.jobId(), ownership.workerToken());
             return;

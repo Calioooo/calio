@@ -32,6 +32,10 @@ public sealed interface GoogleCalendarEffectiveScope permits GoogleCalendarEffec
                 Objects.requireNonNull(originStartAt, "originStartAt"));
     }
 
+    static String overrideKeyPrefix(Long recurrenceEventId) {
+        return requirePositive(recurrenceEventId) + ":";
+    }
+
     static GoogleCalendarEffectiveScope fromStoredValues(String scope, String key) {
         return switch (scope) {
             case EVENT -> event(parseId(key));
@@ -76,6 +80,6 @@ public sealed interface GoogleCalendarEffectiveScope permits GoogleCalendarEffec
     record RecurrenceOverride(Long recurrenceEventId, Instant originStartAt)
             implements GoogleCalendarEffectiveScope {
         @Override public String storedScope() { return RECURRENCE_OVERRIDE; }
-        @Override public String storedKey() { return recurrenceEventId + ":" + originStartAt; }
+        @Override public String storedKey() { return overrideKeyPrefix(recurrenceEventId) + originStartAt; }
     }
 }

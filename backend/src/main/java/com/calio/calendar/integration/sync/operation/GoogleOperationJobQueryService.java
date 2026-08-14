@@ -31,6 +31,15 @@ public class GoogleOperationJobQueryService {
             Long integrationId,
             GoogleCalendarEffectiveScope scope
     ) {
+        if (scope instanceof GoogleCalendarEffectiveScope.RecurrenceEvent recurrenceEvent) {
+            return jobRepository.findPendingDesiredContentHashesForRecurrenceAggregate(
+                    accountId,
+                    integrationId,
+                    recurrenceEvent.storedKey(),
+                    GoogleCalendarEffectiveScope.overrideKeyPrefix(
+                            recurrenceEvent.recurrenceEventId())
+            );
+        }
         return jobRepository.findPendingDesiredContentHashes(
                 accountId,
                 integrationId,
