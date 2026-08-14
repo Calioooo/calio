@@ -53,6 +53,20 @@ public class GoogleOperationJobCommandService {
         }
     }
 
+    public void markConflictDetected(Long jobId, String ownerToken) {
+        if (jobRepository.markConflictDetected(jobId, ownerToken) != 1) {
+            throw new GoogleOperationOwnershipLostException();
+        }
+    }
+
+    /** Completes a sync by retaining conflict diagnostics or deleting an ordinary successful job. */
+    public void completeSyncOperationJob(Long jobId, String ownerToken) {
+        if (jobRepository.terminateOwnedConflictDetected(jobId, ownerToken) == 1) {
+            return;
+        }
+        completeOperationJob(jobId, ownerToken);
+    }
+
     public void deleteJobsForIntegration(Long integrationId) {
         jobRepository.deleteByIntegrationId(integrationId);
     }

@@ -3,10 +3,12 @@ package com.calio.calendar.integration.sync.operation;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrationCommandService;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJob;
+import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEffectiveScope;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
 import java.util.function.Supplier;
+import java.util.function.Function;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -36,9 +38,10 @@ public class GoogleOperationProducerTransaction {
     public <T> T mutate(
             Long accountId,
             Supplier<T> authorizedCanonicalMutation,
-            OutboundJobDraft jobDraft
+            Function<T, OutboundJobDraft> jobDraftFrom
     ) {
         T result = authorizedCanonicalMutation.get();
+        OutboundJobDraft jobDraft = jobDraftFrom.apply(result);
         GoogleCalendarIntegration integration = integrationCommandService.tryLockIntegration(accountId)
                 .orElse(null);
         if (integration == null) {
@@ -47,8 +50,8 @@ public class GoogleOperationProducerTransaction {
         jobCommandService.enqueueOperationJob(GoogleOperationJob.outbound(
                 UUID.randomUUID().toString(), integration.getId(), accountId,
                 integrationCommandService.allocateOperationSequence(integration), jobDraft.kind(),
-                jobDraft.resourceScope(), jobDraft.resourceKey(), jobDraft.providerIdentity(),
-                jobDraft.desiredPayload(), Instant.now(clock)));
+                jobDraft.scope().storedScope(), jobDraft.scope().storedKey(), jobDraft.providerIdentity(),
+                jobDraft.desiredPayload(), jobDraft.desiredContentHash(), Instant.now(clock)));
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
@@ -60,10 +63,10 @@ public class GoogleOperationProducerTransaction {
 
     public record OutboundJobDraft(
             String kind,
-            String resourceScope,
-            String resourceKey,
+            GoogleCalendarEffectiveScope scope,
             String providerIdentity,
-            String desiredPayload
+            String desiredPayload,
+            String desiredContentHash
     ) {
     }
 }

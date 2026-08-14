@@ -268,6 +268,31 @@ class GoogleCalendarSyncMigrationTest {
         }
     }
 
+    @Test
+    @DisplayName("V18은 empty mapping deployment에 conflict baseline과 pending scope index를 추가한다")
+    void givenEmptyV17Schema_whenMigrateToV18_thenAddsConflictFoundation() throws Exception {
+        // given
+        String url = "jdbc:h2:mem:google-mapping-conflict-foundation;MODE=MySQL;DB_CLOSE_DELAY=-1";
+        migrateTo(url, MigrationVersion.fromVersion("17"));
+
+        // when
+        migrateTo(url, MigrationVersion.fromVersion("18"));
+
+        // then
+        try (Connection connection = DriverManager.getConnection(url, "sa", "")) {
+            assertThat(columnNames(connection, "GOOGLE_CALENDAR_EVENT_MAPPINGS"))
+                    .contains("SYNC_STATUS", "SYNCED_CONTENT_HASH");
+            assertThat(columnNames(connection, "GOOGLE_CALENDAR_RECURRENCE_EVENT_MAPPINGS"))
+                    .contains("SYNC_STATUS", "SYNCED_CONTENT_HASH");
+            assertThat(columnNames(connection, "GOOGLE_CALENDAR_RECURRENCE_OVERRIDE_MAPPINGS"))
+                    .contains("SYNC_STATUS", "SYNCED_CONTENT_HASH");
+            assertThat(columnNames(connection, "GOOGLE_OPERATION_JOBS"))
+                    .contains("DESIRED_CONTENT_HASH", "CONFLICT_DETECTED");
+            assertThat(indexNames(connection, "GOOGLE_OPERATION_JOBS"))
+                    .contains("IDX_GOOGLE_OPERATION_JOBS_PENDING_SCOPE");
+        }
+    }
+
     private void migrateTo(String url, MigrationVersion target) {
         Flyway.configure()
                 .dataSource(url, "sa", "")

@@ -9,6 +9,7 @@ import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJob;
+import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEffectiveScope;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobTrigger;
 import com.calio.calendar.integration.connection.repository.GoogleCalendarIntegrationRepository;
@@ -72,7 +73,7 @@ class GoogleOperationProducerTransactionTest {
         Task task = producerTransaction.mutate(
                 account.getId(),
                 () -> taskRepository.save(new Task("Google 반영 작업", account)),
-                outboundDraft()
+                ignored -> outboundDraft()
         );
 
         // then
@@ -99,17 +100,17 @@ class GoogleOperationProducerTransactionTest {
         integrationRepository.saveAndFlush(integration(account.getId()));
         OutboundJobDraft invalidDraft = new OutboundJobDraft(
                 GoogleOperationJob.SYNC_KIND,
-                "EVENT",
-                "event-1",
+                GoogleCalendarEffectiveScope.event(1L),
                 null,
-                "{}"
+                "{}",
+                "v1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         );
 
         // when, then
         assertThatThrownBy(() -> producerTransaction.mutate(
                 account.getId(),
                 () -> taskRepository.save(new Task("rollback 대상", account)),
-                invalidDraft
+                ignored -> invalidDraft
         )).isInstanceOf(IllegalArgumentException.class);
         assertThat(taskRepository.count()).isZero();
         assertThat(jobRepository.count()).isZero();
@@ -129,7 +130,7 @@ class GoogleOperationProducerTransactionTest {
                 () -> {
                     throw new IllegalStateException("mutation failed");
                 },
-                outboundDraft()
+                ignored -> outboundDraft()
         )).isInstanceOf(IllegalStateException.class);
         assertThat(jobRepository.count()).isZero();
         verify(worker, never()).wake(account.getId());
@@ -145,7 +146,7 @@ class GoogleOperationProducerTransactionTest {
         Task task = producerTransaction.mutate(
                 account.getId(),
                 () -> taskRepository.save(new Task("로컬 전용 작업", account)),
-                outboundDraft()
+                ignored -> outboundDraft()
         );
 
         // then
@@ -157,10 +158,10 @@ class GoogleOperationProducerTransactionTest {
     private OutboundJobDraft outboundDraft() {
         return new OutboundJobDraft(
                 "EVENT_UPSERT",
-                "EVENT",
-                "event-1",
+                GoogleCalendarEffectiveScope.event(1L),
                 null,
-                "{}"
+                "{}",
+                "v1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         );
     }
 

@@ -5,6 +5,8 @@ import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegratio
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -58,7 +60,28 @@ public class GoogleCalendarRecurrenceEventMapping extends BaseEntity {
     @Column(name = "provider_updated_at")
     private Instant providerUpdatedAt;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "sync_status", nullable = false, length = 32)
+    private GoogleCalendarMappingSyncStatus syncStatus;
+
+    @Column(name = "synced_content_hash", nullable = false, length = 67)
+    private String syncedContentHash;
+
     protected GoogleCalendarRecurrenceEventMapping() {
+    }
+
+    public GoogleCalendarRecurrenceEventMapping(
+            GoogleCalendarIntegration integration,
+            RecurrenceEvent recurrenceEvent,
+            String externalEventId,
+            GoogleProviderObservation observation
+    ) {
+        this.integration = integration;
+        this.recurrenceEvent = recurrenceEvent;
+        this.calendarKey = PRIMARY_CALENDAR_KEY;
+        this.externalEventId = externalEventId;
+        this.syncStatus = GoogleCalendarMappingSyncStatus.ACTIVE;
+        updateProviderObservation(observation);
     }
 
     public GoogleCalendarRecurrenceEventMapping(
@@ -68,17 +91,19 @@ public class GoogleCalendarRecurrenceEventMapping extends BaseEntity {
             String providerEtag,
             Instant providerUpdatedAt
     ) {
-        this.integration = integration;
-        this.recurrenceEvent = recurrenceEvent;
-        this.calendarKey = PRIMARY_CALENDAR_KEY;
-        this.externalEventId = externalEventId;
-        this.providerEtag = providerEtag;
-        this.providerUpdatedAt = providerUpdatedAt;
+        this(integration, recurrenceEvent, externalEventId,
+                new GoogleProviderObservation(providerEtag, providerUpdatedAt,
+                        GoogleCalendarContentHasher.hash(recurrenceEvent)));
     }
 
-    public void updateProviderVersion(String providerEtag, Instant providerUpdatedAt) {
-        this.providerEtag = providerEtag;
-        this.providerUpdatedAt = providerUpdatedAt;
+    public void updateProviderObservation(GoogleProviderObservation observation) {
+        this.providerEtag = observation.etag();
+        this.providerUpdatedAt = observation.updatedAt();
+        this.syncedContentHash = observation.contentHash();
+    }
+
+    public void markConflicted() {
+        this.syncStatus = GoogleCalendarMappingSyncStatus.CONFLICTED;
     }
 
     public Long getId() {
@@ -104,4 +129,7 @@ public class GoogleCalendarRecurrenceEventMapping extends BaseEntity {
     public Instant getProviderUpdatedAt() {
         return providerUpdatedAt;
     }
+
+    public String getSyncedContentHash() { return syncedContentHash; }
+    public GoogleCalendarMappingSyncStatus getSyncStatus() { return syncStatus; }
 }

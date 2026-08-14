@@ -6,9 +6,11 @@ import java.util.List;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import jakarta.persistence.LockModeType;
 
 public interface GoogleCalendarRecurrenceOverrideMappingRepository
         extends JpaRepository<GoogleCalendarRecurrenceOverrideMapping, Long> {
@@ -24,6 +26,24 @@ public interface GoogleCalendarRecurrenceOverrideMappingRepository
             """)
     List<GoogleCalendarRecurrenceOverrideMapping>
     findAllWithRecurrenceEventMappingByExternalEventIds(
+            @Param("integrationId") Long integrationId,
+            @Param("calendarKey") String calendarKey,
+            @Param("externalEventIds") Collection<String> externalEventIds
+    );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @EntityGraph(attributePaths = {"recurrenceEventMapping", "recurrenceEventOverride"})
+    @Query("""
+            select overrideMapping
+            from GoogleCalendarRecurrenceOverrideMapping overrideMapping
+            join overrideMapping.recurrenceEventMapping recurrenceEventMapping
+            where recurrenceEventMapping.integration.id = :integrationId
+              and recurrenceEventMapping.calendarKey = :calendarKey
+              and overrideMapping.externalEventId in :externalEventIds
+            order by recurrenceEventMapping.id, overrideMapping.id
+            """)
+    List<GoogleCalendarRecurrenceOverrideMapping>
+    findAllWithRecurrenceEventMappingAndRecurrenceEventOverrideByExternalEventIdsForUpdate(
             @Param("integrationId") Long integrationId,
             @Param("calendarKey") String calendarKey,
             @Param("externalEventIds") Collection<String> externalEventIds

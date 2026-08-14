@@ -9,6 +9,7 @@ import com.calio.calendar.integration.connection.service.GoogleCalendarAccessTok
 import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrationQueryService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationLeaseService;
 import com.calio.calendar.integration.sync.page.GoogleCalendarPageChangeService;
+import com.calio.calendar.integration.sync.page.GoogleCalendarPageOwnership;
 import com.calio.calendar.integration.sync.page.GoogleCalendarPageNormalizer;
 import com.calio.calendar.integration.sync.page.dto.GoogleCalendarNormalizedPage;
 import java.util.HashSet;
@@ -104,6 +105,7 @@ public class GoogleCalendarSyncService {
             pageChangeService.applyNormalizedPage(
                     execution.integrationId(),
                     execution.accountId(),
+                    new GoogleCalendarPageOwnership(jobId, execution.workerToken()),
                     normalizedPage
             );
             nextSyncToken = page.nextSyncToken();

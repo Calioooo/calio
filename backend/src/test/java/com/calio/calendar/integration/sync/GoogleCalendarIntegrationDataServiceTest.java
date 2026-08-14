@@ -10,12 +10,15 @@ import static org.mockito.Mockito.when;
 import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.event.service.EventCommandService;
 import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrationCommandService;
+import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarEventMapping;
+import com.calio.calendar.integration.mapping.domain.GoogleCalendarContentHasher;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingCommandService;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingQueryService;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarRecurrenceMappingCommandService;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarRecurrenceMappingQueryService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobService;
+import com.calio.calendar.integration.sync.operation.GoogleOperationJobQueryService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationLeaseService;
 import com.calio.calendar.recurrence.service.RecurrenceEventCommandService;
 import java.util.List;
@@ -42,6 +45,8 @@ class GoogleCalendarIntegrationDataServiceTest {
             mock(GoogleOperationJobService.class);
     private final GoogleOperationLeaseService operationLeaseService =
             mock(GoogleOperationLeaseService.class);
+    private final GoogleOperationJobQueryService operationJobQueryService =
+            mock(GoogleOperationJobQueryService.class);
     private final GoogleCalendarEventMapping eventMapping = mock(GoogleCalendarEventMapping.class);
 
     @Test
@@ -49,10 +54,16 @@ class GoogleCalendarIntegrationDataServiceTest {
     void givenUnseenMappings_whenFinalizeFullSync_thenDeletesByBatchAndRenewsLease() {
         // given
         Event event = mock(Event.class);
+        GoogleCalendarIntegration integration = mock(GoogleCalendarIntegration.class);
         when(eventMapping.getId()).thenReturn(10L);
         when(eventMapping.getExternalEventId()).thenReturn("unseen-event");
         when(eventMapping.getEvent()).thenReturn(event);
+        when(eventMapping.getIntegration()).thenReturn(integration);
+        when(integration.getId()).thenReturn(1L);
+        when(integration.getAccountId()).thenReturn(2L);
         when(event.getId()).thenReturn(20L);
+        String syncedContentHash = GoogleCalendarContentHasher.hash(event);
+        when(eventMapping.getSyncedContentHash()).thenReturn(syncedContentHash);
         when(recurrenceMappingQueryService.listOverrideMappingBatch(1L, 0L, 500))
                 .thenReturn(List.of());
         when(eventMappingQueryService.listEventMappingBatch(1L, 0L, 500))
@@ -72,7 +83,8 @@ class GoogleCalendarIntegrationDataServiceTest {
                 recurrenceEventCommandService,
                 null,
                 operationLeaseService,
-                operationJobPersistenceService
+                operationJobPersistenceService,
+                operationJobQueryService
         );
 
         // when
@@ -95,6 +107,6 @@ class GoogleCalendarIntegrationDataServiceTest {
                 .listEventMappingBatch(eq(1L), any(Long.class), eq(500));
         verify(integrationCommandService).changeNextSyncToken(1L, "next-token");
         verify(operationLeaseService, times(6)).extend(9L, 2L, "run-1");
-        verify(operationJobPersistenceService).succeed(9L, 2L, "run-1");
+        verify(operationJobPersistenceService).completeSyncRun(9L, 2L, "run-1");
     }
 }

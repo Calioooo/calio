@@ -19,10 +19,12 @@ import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrati
 import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingQueryService;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarRecurrenceMappingQueryService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobService;
+import com.calio.calendar.integration.sync.operation.GoogleOperationJobQueryService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationLeaseService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationOwnershipLostException;
 import com.calio.calendar.integration.sync.page.GoogleCalendarEventChangeService;
 import com.calio.calendar.integration.sync.page.GoogleCalendarPageChangeService;
+import com.calio.calendar.integration.sync.page.GoogleCalendarPageOwnership;
 import com.calio.calendar.integration.sync.page.GoogleCalendarPageNormalizer;
 import com.calio.calendar.integration.sync.page.GoogleCalendarRecurrenceChangeService;
 import com.calio.calendar.integration.sync.page.dto.GoogleCalendarNormalizedPage;
@@ -405,7 +407,8 @@ class GoogleCalendarSyncServiceTest {
                     null,
                     null,
                     mock(GoogleOperationLeaseService.class),
-                    mock(GoogleOperationJobService.class)
+                    mock(GoogleOperationJobService.class),
+                    mock(GoogleOperationJobQueryService.class)
             );
         }
 
@@ -526,6 +529,7 @@ class GoogleCalendarSyncServiceTest {
         public void applyNormalizedPage(
                 Long integrationId,
                 Long accountId,
+                GoogleCalendarPageOwnership ownership,
                 GoogleCalendarNormalizedPage page
         ) {
             normalizedPersistCount++;

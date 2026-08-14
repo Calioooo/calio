@@ -9,8 +9,13 @@ import com.calio.calendar.external.google.service.dto.NormalizedEventSchedule;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarRecurrenceEventMapping;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarRecurrenceOverrideMapping;
+import com.calio.calendar.integration.mapping.domain.GoogleCalendarContentHasher;
+import com.calio.calendar.integration.mapping.domain.GoogleCalendarMappingSyncStatus;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarRecurrenceMappingCommandService;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarRecurrenceMappingQueryService;
+import com.calio.calendar.integration.sync.operation.GoogleOperationJobCommandService;
+import com.calio.calendar.integration.sync.operation.GoogleOperationJobQueryService;
+import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEffectiveScope;
 import com.calio.calendar.integration.sync.page.dto.GoogleCalendarNormalizedPage.ActiveRecurrenceEventOverrideUpsert;
 import com.calio.calendar.integration.sync.page.dto.GoogleCalendarNormalizedPage.CancelledRecurrenceEventOverrideUpsert;
 import com.calio.calendar.integration.sync.page.dto.GoogleCalendarNormalizedPage.RecurrenceEventOverrideUpsert;
@@ -35,17 +40,25 @@ public class GoogleCalendarRecurrenceChangeService {
     private final GoogleCalendarRecurrenceMappingCommandService recurrenceMappingCommandService;
     private final EventCommandService eventCommandService;
     private final RecurrenceEventCommandService recurrenceEventCommandService;
+    private final GoogleOperationJobQueryService operationJobQueryService;
+    private final GoogleOperationJobCommandService operationJobCommandService;
+    private final GoogleCalendarInboundChangeClassifier changeClassifier;
 
     public GoogleCalendarRecurrenceChangeService(
             GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService,
             GoogleCalendarRecurrenceMappingCommandService recurrenceMappingCommandService,
             EventCommandService eventCommandService,
-            RecurrenceEventCommandService recurrenceEventCommandService
+            RecurrenceEventCommandService recurrenceEventCommandService,
+            GoogleOperationJobQueryService operationJobQueryService,
+            GoogleOperationJobCommandService operationJobCommandService
     ) {
         this.recurrenceMappingQueryService = recurrenceMappingQueryService;
         this.recurrenceMappingCommandService = recurrenceMappingCommandService;
         this.eventCommandService = eventCommandService;
         this.recurrenceEventCommandService = recurrenceEventCommandService;
+        this.operationJobQueryService = operationJobQueryService;
+        this.operationJobCommandService = operationJobCommandService;
+        this.changeClassifier = new GoogleCalendarInboundChangeClassifier();
     }
 
     public void applyUpsert(
@@ -53,19 +66,14 @@ public class GoogleCalendarRecurrenceChangeService {
             RecurrenceEventUpsert item,
             GoogleCalendarPageRecordCache cache,
             Account account,
-            Tag defaultTag
+            Tag defaultTag,
+            GoogleCalendarPageOwnership ownership
     ) {
         RecurrenceSchedule schedule = toRecurrenceSchedule(item.schedule());
         GoogleCalendarRecurrenceEventMapping existingMapping = cache.recurrenceEventMappings()
                 .get(item.externalEventId());
         if (existingMapping != null) {
-            existingMapping.getRecurrenceEvent().updateProviderContent(
-                    item.title(),
-                    item.description(),
-                    schedule,
-                    item.recurrenceRules()
-            );
-            existingMapping.updateProviderVersion(item.googleEtag(), item.googleUpdatedAt());
+            applyExistingRecurrenceEventMapping(existingMapping, item, schedule, ownership);
             return;
         }
         RecurrenceEvent recurrenceEvent = recurrenceEventCommandService.createRecurrenceEvent(new RecurrenceEvent(
@@ -82,22 +90,62 @@ public class GoogleCalendarRecurrenceChangeService {
                                 integration,
                                 recurrenceEvent,
                                 item.externalEventId(),
-                                item.googleEtag(),
-                                item.googleUpdatedAt()
+                                GoogleCalendarContentHasher.observation(item)
                         )
                 );
         cache.recurrenceEventMappings().put(item.externalEventId(), mapping);
     }
 
+    private void applyExistingRecurrenceEventMapping(
+            GoogleCalendarRecurrenceEventMapping mapping,
+            RecurrenceEventUpsert item,
+            RecurrenceSchedule schedule,
+            GoogleCalendarPageOwnership ownership
+    ) {
+        if (mapping.getSyncStatus() == GoogleCalendarMappingSyncStatus.CONFLICTED) {
+            return;
+        }
+        GoogleCalendarEffectiveScope scope = GoogleCalendarEffectiveScope.recurrenceEvent(
+                mapping.getRecurrenceEvent().getId());
+        GoogleCalendarInboundChangeClassifier.Change change = changeClassifier.classify(
+                mapping.getSyncedContentHash(),
+                GoogleCalendarContentHasher.hash(mapping.getRecurrenceEvent()),
+                operationJobQueryService.listPendingDesiredContentHashes(
+                        mapping.getIntegration().getAccountId(), mapping.getIntegration().getId(), scope),
+                GoogleCalendarContentHasher.hash(item)
+        );
+        if (change == GoogleCalendarInboundChangeClassifier.Change.TRUE_CONFLICT) {
+            mapping.markConflicted();
+            operationJobCommandService.markConflictDetected(ownership.jobId(), ownership.workerToken());
+            return;
+        }
+        if (change == GoogleCalendarInboundChangeClassifier.Change.GOOGLE_ONLY) {
+            mapping.getRecurrenceEvent().updateProviderContent(
+                    item.title(), item.description(), schedule, item.recurrenceRules());
+        }
+        mapping.updateProviderObservation(GoogleCalendarContentHasher.observation(item));
+    }
+
     public void applyCancellation(
             String externalEventId,
-            GoogleCalendarPageRecordCache cache
+            GoogleCalendarPageRecordCache cache,
+            GoogleCalendarPageOwnership ownership
     ) {
         GoogleCalendarRecurrenceEventMapping recurrenceEventMapping = cache.recurrenceEventMappings()
-                .remove(externalEventId);
+                .get(externalEventId);
         if (recurrenceEventMapping == null) {
             return;
         }
+        if (recurrenceEventMapping.getSyncStatus() == GoogleCalendarMappingSyncStatus.CONFLICTED) {
+            return;
+        }
+        if (!GoogleCalendarContentHasher.hash(recurrenceEventMapping.getRecurrenceEvent())
+                .equals(recurrenceEventMapping.getSyncedContentHash())) {
+            recurrenceEventMapping.markConflicted();
+            operationJobCommandService.markConflictDetected(ownership.jobId(), ownership.workerToken());
+            return;
+        }
+        cache.recurrenceEventMappings().remove(externalEventId);
         deleteRecurrenceEvent(recurrenceEventMapping);
         cache.googleOverrideMappings().entrySet().removeIf(entry ->
                 entry.getKey().recurrenceEventMappingId().equals(recurrenceEventMapping.getId()));
@@ -108,15 +156,28 @@ public class GoogleCalendarRecurrenceChangeService {
 
     public void applyRecurrenceEventOverride(
             RecurrenceEventOverrideUpsert item,
-            GoogleCalendarPageRecordCache cache
+            GoogleCalendarPageRecordCache cache,
+            GoogleCalendarPageOwnership ownership
     ) {
         GoogleCalendarRecurrenceEventMapping recurrenceEventMapping =
                 requireRecurrenceEventMapping(item, cache);
+        if (recurrenceEventMapping.getSyncStatus() == GoogleCalendarMappingSyncStatus.CONFLICTED) {
+            return;
+        }
         ExistingRecurrenceOverride existingOverride = resolveExistingOverride(
                 recurrenceEventMapping,
                 item,
                 cache
         );
+        if (existingOverride.googleOverrideMapping() != null) {
+            applyExistingOverrideMapping(
+                    recurrenceEventMapping,
+                    existingOverride.googleOverrideMapping(),
+                    item,
+                    ownership
+            );
+            return;
+        }
         RecurrenceEventOverride recurrenceEventOverride = applyOverride(
                 recurrenceEventMapping,
                 item,
@@ -128,7 +189,8 @@ public class GoogleCalendarRecurrenceChangeService {
                 recurrenceEventOverride,
                 item,
                 existingOverride,
-                cache
+                cache,
+                ownership
         );
     }
 
@@ -207,29 +269,53 @@ public class GoogleCalendarRecurrenceChangeService {
             RecurrenceEventOverride recurrenceEventOverride,
             RecurrenceEventOverrideUpsert item,
             ExistingRecurrenceOverride existingOverride,
-            GoogleCalendarPageRecordCache cache
+            GoogleCalendarPageRecordCache cache,
+            GoogleCalendarPageOwnership ownership
     ) {
-        if (existingOverride.googleOverrideMapping() != null) {
-            existingOverride.googleOverrideMapping().updateProviderVersion(
-                    item.googleEtag(),
-                    item.googleUpdatedAt()
-            );
-            return;
-        }
         GoogleCalendarRecurrenceOverrideMapping googleOverrideMapping =
                 recurrenceMappingCommandService.createOverrideMapping(
                         new GoogleCalendarRecurrenceOverrideMapping(
                                 recurrenceEventMapping,
                                 recurrenceEventOverride,
                                 item.externalEventId(),
-                                item.googleEtag(),
-                                item.googleUpdatedAt()
+                                GoogleCalendarContentHasher.observation(item)
                         )
                 );
         cache.googleOverrideMappings().put(
                 existingOverride.googleOverrideKey(),
                 googleOverrideMapping
         );
+    }
+
+    private void applyExistingOverrideMapping(
+            GoogleCalendarRecurrenceEventMapping recurrenceEventMapping,
+            GoogleCalendarRecurrenceOverrideMapping mapping,
+            RecurrenceEventOverrideUpsert item,
+            GoogleCalendarPageOwnership ownership
+    ) {
+        if (mapping.getSyncStatus() == GoogleCalendarMappingSyncStatus.CONFLICTED) {
+            return;
+        }
+        GoogleCalendarEffectiveScope scope = GoogleCalendarEffectiveScope.recurrenceOverride(
+                recurrenceEventMapping.getRecurrenceEvent().getId(), item.originStartAt());
+        GoogleCalendarInboundChangeClassifier.Change change = changeClassifier.classify(
+                mapping.getSyncedContentHash(),
+                GoogleCalendarContentHasher.hash(
+                        recurrenceEventMapping.getExternalEventId(), mapping.getRecurrenceEventOverride()),
+                operationJobQueryService.listPendingDesiredContentHashes(
+                        recurrenceEventMapping.getIntegration().getAccountId(),
+                        recurrenceEventMapping.getIntegration().getId(), scope),
+                GoogleCalendarContentHasher.hash(item)
+        );
+        if (change == GoogleCalendarInboundChangeClassifier.Change.TRUE_CONFLICT) {
+            mapping.markConflicted();
+            operationJobCommandService.markConflictDetected(ownership.jobId(), ownership.workerToken());
+            return;
+        }
+        if (change == GoogleCalendarInboundChangeClassifier.Change.GOOGLE_ONLY) {
+            updateRecurrenceEventOverride(mapping.getRecurrenceEventOverride(), item);
+        }
+        mapping.updateProviderObservation(GoogleCalendarContentHasher.observation(item));
     }
 
     public void deleteRecurrenceEvent(

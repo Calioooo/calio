@@ -5,6 +5,8 @@ import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -58,7 +60,28 @@ public class GoogleCalendarEventMapping extends BaseEntity {
     @Column(name = "provider_updated_at")
     private Instant providerUpdatedAt;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "sync_status", nullable = false, length = 32)
+    private GoogleCalendarMappingSyncStatus syncStatus;
+
+    @Column(name = "synced_content_hash", nullable = false, length = 67)
+    private String syncedContentHash;
+
     protected GoogleCalendarEventMapping() {
+    }
+
+    public GoogleCalendarEventMapping(
+            GoogleCalendarIntegration integration,
+            Event event,
+            String externalEventId,
+            GoogleProviderObservation observation
+    ) {
+        this.integration = integration;
+        this.event = event;
+        this.calendarKey = PRIMARY_CALENDAR_KEY;
+        this.externalEventId = externalEventId;
+        this.syncStatus = GoogleCalendarMappingSyncStatus.ACTIVE;
+        updateProviderObservation(observation);
     }
 
     public GoogleCalendarEventMapping(
@@ -68,16 +91,19 @@ public class GoogleCalendarEventMapping extends BaseEntity {
             String providerEtag,
             Instant providerUpdatedAt
     ) {
-        this.integration = integration;
-        this.event = event;
-        this.calendarKey = PRIMARY_CALENDAR_KEY;
-        this.externalEventId = externalEventId;
-        updateProviderVersion(providerEtag, providerUpdatedAt);
+        this(integration, event, externalEventId,
+                new GoogleProviderObservation(providerEtag, providerUpdatedAt,
+                        GoogleCalendarContentHasher.hash(event)));
     }
 
-    public void updateProviderVersion(String providerEtag, Instant providerUpdatedAt) {
-        this.providerEtag = providerEtag;
-        this.providerUpdatedAt = providerUpdatedAt;
+    public void updateProviderObservation(GoogleProviderObservation observation) {
+        this.providerEtag = observation.etag();
+        this.providerUpdatedAt = observation.updatedAt();
+        this.syncedContentHash = observation.contentHash();
+    }
+
+    public void markConflicted() {
+        this.syncStatus = GoogleCalendarMappingSyncStatus.CONFLICTED;
     }
 
     public Long getId() {
@@ -99,4 +125,7 @@ public class GoogleCalendarEventMapping extends BaseEntity {
     public String getProviderEtag() {
         return providerEtag;
     }
+
+    public String getSyncedContentHash() { return syncedContentHash; }
+    public GoogleCalendarMappingSyncStatus getSyncStatus() { return syncStatus; }
 }

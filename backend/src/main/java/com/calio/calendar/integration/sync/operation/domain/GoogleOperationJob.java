@@ -54,6 +54,12 @@ public class GoogleOperationJob extends BaseEntity {
     @Column(name = "desired_payload", updatable = false, columnDefinition = "JSON")
     private String desiredPayload;
 
+    @Column(name = "desired_content_hash", updatable = false, length = 67)
+    private String desiredContentHash;
+
+    @Column(name = "conflict_detected", nullable = false)
+    private boolean conflictDetected;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "job_state", nullable = false, length = 32)
     private GoogleOperationJobState state;
@@ -112,9 +118,10 @@ public class GoogleOperationJob extends BaseEntity {
             String resourceKey,
             String providerIdentity,
             String desiredPayload,
+            String desiredContentHash,
             Instant runnableAt
     ) {
-        validateOutboundFields(kind, resourceScope, resourceKey, desiredPayload);
+        validateOutboundFields(kind, resourceScope, resourceKey, desiredPayload, desiredContentHash);
         GoogleOperationJob job = new GoogleOperationJob();
         job.operationId = operationId;
         job.integrationId = integrationId;
@@ -126,6 +133,7 @@ public class GoogleOperationJob extends BaseEntity {
         job.effectiveResourceKey = resourceKey;
         job.providerIdentity = providerIdentity;
         job.desiredPayload = desiredPayload;
+        job.desiredContentHash = desiredContentHash;
         job.state = GoogleOperationJobState.PENDING;
         job.runnableAt = runnableAt;
         return job;
@@ -142,12 +150,14 @@ public class GoogleOperationJob extends BaseEntity {
             String kind,
             String resourceScope,
             String resourceKey,
-            String desiredPayload
+            String desiredPayload,
+            String desiredContentHash
     ) {
         if (kind == null || kind.isBlank() || SYNC_KIND.equals(kind)
                 || resourceScope == null || resourceScope.isBlank()
                 || resourceKey == null || resourceKey.isBlank()
-                || desiredPayload == null || desiredPayload.isBlank()) {
+                || desiredPayload == null || desiredPayload.isBlank()
+                || desiredContentHash == null || !desiredContentHash.matches("^v1:[0-9a-f]{64}$")) {
             throw new IllegalArgumentException("Outbound Google operation fields are required");
         }
     }
@@ -159,6 +169,10 @@ public class GoogleOperationJob extends BaseEntity {
     public void claim(String workerToken) {
         state = GoogleOperationJobState.PROCESSING;
         ownerToken = workerToken;
+    }
+
+    public void markConflictDetected() {
+        conflictDetected = true;
     }
 
     public Long getId() { return id; }
@@ -173,4 +187,8 @@ public class GoogleOperationJob extends BaseEntity {
     public int getRetryCount() { return retryCount; }
     public String getLastErrorReason() { return lastErrorReason; }
     public String getOwnerToken() { return ownerToken; }
+    public String getEffectiveResourceScope() { return effectiveResourceScope; }
+    public String getEffectiveResourceKey() { return effectiveResourceKey; }
+    public String getDesiredContentHash() { return desiredContentHash; }
+    public boolean isConflictDetected() { return conflictDetected; }
 }
