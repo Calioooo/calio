@@ -22,7 +22,7 @@ public class GoogleCalendarEventChangeService {
     private final EventCommandService eventCommandService;
     private final GoogleOperationJobQueryService operationJobQueryService;
     private final GoogleOperationJobCommandService operationJobCommandService;
-    private final GoogleCalendarInboundChangeClassifier changeClassifier;
+    private final GoogleCalendarContentReconciliationPolicy reconciliationPolicy;
 
     public GoogleCalendarEventChangeService(
             GoogleCalendarEventMappingCommandService eventMappingCommandService,
@@ -34,7 +34,7 @@ public class GoogleCalendarEventChangeService {
         this.eventCommandService = eventCommandService;
         this.operationJobQueryService = operationJobQueryService;
         this.operationJobCommandService = operationJobCommandService;
-        this.changeClassifier = new GoogleCalendarInboundChangeClassifier();
+        this.reconciliationPolicy = new GoogleCalendarContentReconciliationPolicy();
     }
 
     public void applyUpsert(
@@ -82,19 +82,19 @@ public class GoogleCalendarEventChangeService {
             return;
         }
         GoogleCalendarEffectiveScope scope = GoogleCalendarEffectiveScope.event(mapping.getEvent().getId());
-        GoogleCalendarInboundChangeClassifier.Change change = changeClassifier.classify(
+        GoogleCalendarContentReconciliationDecision decision = reconciliationPolicy.decide(
                 mapping.getSyncedContentHash(),
                 GoogleCalendarContentHasher.hash(mapping.getEvent()),
                 operationJobQueryService.listPendingDesiredContentHashes(
                         mapping.getIntegration().getAccountId(), mapping.getIntegration().getId(), scope),
                 GoogleCalendarContentHasher.hash(item)
         );
-        if (change == GoogleCalendarInboundChangeClassifier.Change.TRUE_CONFLICT) {
+        if (decision == GoogleCalendarContentReconciliationDecision.TRUE_CONFLICT) {
             mapping.markConflicted();
             operationJobCommandService.markConflictDetected(ownership.jobId(), ownership.workerToken());
             return;
         }
-        if (change == GoogleCalendarInboundChangeClassifier.Change.GOOGLE_ONLY) {
+        if (decision == GoogleCalendarContentReconciliationDecision.GOOGLE_ONLY) {
             mapping.getEvent().replace(
                     item.title(), item.description(), item.schedule().startAt(), item.schedule().endAt(),
                     item.schedule().allDay(), item.schedule().timeZone());

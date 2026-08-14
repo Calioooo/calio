@@ -41,7 +41,7 @@ public class GoogleCalendarRecurrenceChangeService {
     private final RecurrenceEventCommandService recurrenceEventCommandService;
     private final GoogleOperationJobQueryService operationJobQueryService;
     private final GoogleOperationJobCommandService operationJobCommandService;
-    private final GoogleCalendarInboundChangeClassifier changeClassifier;
+    private final GoogleCalendarContentReconciliationPolicy reconciliationPolicy;
 
     public GoogleCalendarRecurrenceChangeService(
             GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService,
@@ -57,7 +57,7 @@ public class GoogleCalendarRecurrenceChangeService {
         this.recurrenceEventCommandService = recurrenceEventCommandService;
         this.operationJobQueryService = operationJobQueryService;
         this.operationJobCommandService = operationJobCommandService;
-        this.changeClassifier = new GoogleCalendarInboundChangeClassifier();
+        this.reconciliationPolicy = new GoogleCalendarContentReconciliationPolicy();
     }
 
     public void applyUpsert(
@@ -106,19 +106,19 @@ public class GoogleCalendarRecurrenceChangeService {
         }
         GoogleCalendarEffectiveScope scope = GoogleCalendarEffectiveScope.recurrenceEvent(
                 mapping.getRecurrenceEvent().getId());
-        GoogleCalendarInboundChangeClassifier.Change change = changeClassifier.classify(
+        GoogleCalendarContentReconciliationDecision decision = reconciliationPolicy.decide(
                 mapping.getSyncedContentHash(),
                 GoogleCalendarContentHasher.hash(mapping.getRecurrenceEvent()),
                 operationJobQueryService.listPendingDesiredContentHashes(
                         mapping.getIntegration().getAccountId(), mapping.getIntegration().getId(), scope),
                 GoogleCalendarContentHasher.hash(item)
         );
-        if (change == GoogleCalendarInboundChangeClassifier.Change.TRUE_CONFLICT) {
+        if (decision == GoogleCalendarContentReconciliationDecision.TRUE_CONFLICT) {
             mapping.markConflicted();
             operationJobCommandService.markConflictDetected(ownership.jobId(), ownership.workerToken());
             return;
         }
-        if (change == GoogleCalendarInboundChangeClassifier.Change.GOOGLE_ONLY) {
+        if (decision == GoogleCalendarContentReconciliationDecision.GOOGLE_ONLY) {
             mapping.getRecurrenceEvent().updateProviderContent(
                     item.title(), item.description(), schedule, item.recurrenceRules());
         }
@@ -302,7 +302,7 @@ public class GoogleCalendarRecurrenceChangeService {
         }
         GoogleCalendarEffectiveScope scope = GoogleCalendarEffectiveScope.recurrenceOverride(
                 recurrenceEventMapping.getRecurrenceEvent().getId(), item.originStartAt());
-        GoogleCalendarInboundChangeClassifier.Change change = changeClassifier.classify(
+        GoogleCalendarContentReconciliationDecision decision = reconciliationPolicy.decide(
                 mapping.getSyncedContentHash(),
                 GoogleCalendarContentHasher.hash(
                         recurrenceEventMapping.getExternalEventId(), mapping.getRecurrenceEventOverride()),
@@ -311,12 +311,12 @@ public class GoogleCalendarRecurrenceChangeService {
                         recurrenceEventMapping.getIntegration().getId(), scope),
                 GoogleCalendarContentHasher.hash(item)
         );
-        if (change == GoogleCalendarInboundChangeClassifier.Change.TRUE_CONFLICT) {
+        if (decision == GoogleCalendarContentReconciliationDecision.TRUE_CONFLICT) {
             mapping.markConflicted();
             operationJobCommandService.markConflictDetected(ownership.jobId(), ownership.workerToken());
             return;
         }
-        if (change == GoogleCalendarInboundChangeClassifier.Change.GOOGLE_ONLY) {
+        if (decision == GoogleCalendarContentReconciliationDecision.GOOGLE_ONLY) {
             updateRecurrenceEventOverride(mapping.getRecurrenceEventOverride(), item);
         }
         mapping.updateSyncedContentHash(GoogleCalendarContentHasher.hash(item));
