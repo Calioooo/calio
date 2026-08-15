@@ -96,8 +96,13 @@ struct CalendarEventFormView: View {
     private var titleSection: some View {
         Section {
             TextField("일정 제목", text: $eventInput.title)
-                .font(.system(size: 20, weight: .semibold))
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(.calioTextPrimary)
                 .submitLabel(.next)
+                .accessibilityIdentifier("event_creation_title_input")
+        } header: {
+            Text("일정")
+                .foregroundStyle(.calioTextSecondary)
         }
     }
 
@@ -128,7 +133,7 @@ struct CalendarEventFormView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("반복 주기")
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.calioTextSecondary)
 
                         HStack(spacing: 8) {
                             ForEach(RecurrenceFrequency.allCases, id: \.self) { frequency in
@@ -217,8 +222,8 @@ struct CalendarEventFormView: View {
                 .frame(minHeight: 96)
                 .overlay(alignment: .topLeading) {
                     if eventInput.description.isEmpty {
-                        Text("메모를 입력하세요")
-                            .foregroundStyle(.secondary)
+                Text("메모를 입력하세요")
+                            .foregroundStyle(.calioTextSecondary)
                             .padding(.top, 8)
                             .padding(.leading, 5)
                             .allowsHitTesting(false)
@@ -274,11 +279,11 @@ struct CalendarEventFormView: View {
         } label: {
             HStack {
                 Text("반복 일정")
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(.calioTextPrimary)
                 Spacer()
                 Text(recurrenceInput.wrappedValue.isEnabled ? "켜짐" : "꺼짐")
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(recurrenceInput.wrappedValue.isEnabled ? Color.accentColor : Color.secondary)
+                    .foregroundStyle(recurrenceInput.wrappedValue.isEnabled ? Color.calioBrand : Color.calioTextSecondary)
             }
             .contentShape(Rectangle())
         }
@@ -288,11 +293,11 @@ struct CalendarEventFormView: View {
     private var fixedRecurrenceEnabledRow: some View {
         HStack {
             Text("반복 일정")
-                .foregroundStyle(.primary)
+                .foregroundStyle(.calioTextPrimary)
             Spacer()
             Text("켜짐")
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(Color.calioBrand)
         }
     }
 
@@ -305,16 +310,16 @@ struct CalendarEventFormView: View {
         } label: {
             Text(frequency.koreanLabel)
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(recurrenceInput.wrappedValue.frequency == frequency ? Color.white : Color.primary)
+                .foregroundStyle(recurrenceInput.wrappedValue.frequency == frequency ? Color.white : Color.calioTextPrimary)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 8)
                 .background(
                     RoundedRectangle(cornerRadius: 8)
-                        .fill(recurrenceInput.wrappedValue.frequency == frequency ? Color.accentColor : Color(uiColor: .secondarySystemGroupedBackground))
+                        .fill(recurrenceInput.wrappedValue.frequency == frequency ? Color.calioBrand : Color.calioSelection)
                 )
                 .overlay {
                     RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
+                        .stroke(Color.calioDivider, lineWidth: 1)
                 }
                 .contentShape(RoundedRectangle(cornerRadius: 8))
         }
@@ -339,16 +344,16 @@ struct CalendarEventFormView: View {
                         .font(.system(size: 11, weight: .bold))
                 }
             }
-            .foregroundStyle(eventInput.tag?.id == tag.id ? Color.white : Color.primary)
+            .foregroundStyle(eventInput.tag?.id == tag.id ? Color.white : Color.calioTextPrimary)
             .padding(.horizontal, 10)
             .padding(.vertical, 7)
             .background(
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(eventInput.tag?.id == tag.id ? Color(hex: tag.colorCode) : Color(uiColor: .secondarySystemGroupedBackground))
+                    .fill(eventInput.tag?.id == tag.id ? Color(hex: tag.colorCode) : Color.calioSelection)
             )
             .overlay {
                 RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
+                    .stroke(Color.calioDivider, lineWidth: 1)
             }
             .contentShape(RoundedRectangle(cornerRadius: 8))
         }

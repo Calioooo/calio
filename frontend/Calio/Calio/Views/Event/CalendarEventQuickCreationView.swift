@@ -26,7 +26,8 @@ struct CalendarEventQuickCreationView: View {
                 previewSections
             }
             .scrollContentBackground(.hidden)
-            .background(Color(uiColor: .systemGroupedBackground))
+            .background(Color.calioBackground)
+            .tint(.calioBrand)
             .navigationTitle("새 일정")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -40,7 +41,9 @@ struct CalendarEventQuickCreationView: View {
                     Button("생성") {
                         onSave()
                     }
+                    .fontWeight(.semibold)
                     .disabled(draft?.canSave != true || isSaving)
+                    .accessibilityIdentifier("event_quick_creation_save_button")
                 }
             }
         }
@@ -55,13 +58,14 @@ struct CalendarEventQuickCreationView: View {
             Section {
                 HStack(alignment: .top, spacing: 10) {
                     Image(systemName: "exclamationmark.circle.fill")
-                        .foregroundStyle(.red)
+                        .foregroundStyle(Color.calendarHoliday)
                     Text(failureMessage)
                         .font(.subheadline)
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(.calioTextPrimary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(.vertical, 2)
+                .listRowBackground(Color.calioSelection)
                 .accessibilityIdentifier("event_quick_creation_failure_message")
             }
         }
@@ -75,6 +79,7 @@ struct CalendarEventQuickCreationView: View {
                 axis: .vertical
             )
             .font(.system(size: 20, weight: .semibold))
+            .foregroundStyle(.calioTextPrimary)
             .lineLimit(1...3)
             .submitLabel(.done)
             .focused($isInputFocused)
@@ -99,7 +104,7 @@ struct CalendarEventQuickCreationView: View {
 
                     Text(draft.eventInput.title)
                         .font(.title3.weight(.semibold))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(.calioTextPrimary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(.vertical, 2)

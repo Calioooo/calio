@@ -81,7 +81,9 @@ struct CalendarEventCreationView: View {
                 )
             }
             .scrollContentBackground(.hidden)
-            .background(Color(uiColor: .systemGroupedBackground))
+            .background(Color.calioBackground)
+            .tint(.calioBrand)
+            .environment(\.locale, Locale(identifier: "ko_KR"))
             .navigationTitle("새 일정")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -105,7 +107,9 @@ struct CalendarEventCreationView: View {
                     Button("저장") {
                         save()
                     }
+                    .fontWeight(.semibold)
                     .disabled(!canSave || isSaving)
+                    .accessibilityIdentifier("event_creation_save_button")
                 }
             }
         }
@@ -117,13 +121,14 @@ struct CalendarEventCreationView: View {
             Section {
                 HStack(alignment: .top, spacing: 10) {
                     Image(systemName: "exclamationmark.circle.fill")
-                        .foregroundStyle(.red)
+                        .foregroundStyle(Color.calendarHoliday)
                     Text(failureMessage)
                         .font(.subheadline)
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(.calioTextPrimary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(.vertical, 2)
+                .listRowBackground(Color.calioSelection)
                 .accessibilityIdentifier("event_creation_failure_message")
             }
         }
