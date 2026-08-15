@@ -59,12 +59,12 @@ public class GoogleCalendarRecurrenceOverrideMapping extends BaseEntity {
             GoogleCalendarRecurrenceEventMapping recurrenceEventMapping,
             RecurrenceEventOverride recurrenceEventOverride,
             String externalEventId,
-            String syncedContentHash
+            String providerEtag
     ) {
         this.recurrenceEventMapping = recurrenceEventMapping;
         this.recurrenceEventOverride = recurrenceEventOverride;
         this.externalEventId = externalEventId;
-        this.syncState = GoogleCalendarMappingSyncState.active(syncedContentHash);
+        this.syncState = GoogleCalendarMappingSyncState.active(providerEtag);
     }
 
     public Long getId() {
@@ -83,8 +83,8 @@ public class GoogleCalendarRecurrenceOverrideMapping extends BaseEntity {
         return externalEventId;
     }
 
-    public void updateSyncedContentHash(String syncedContentHash) {
-        syncState.updateSyncedContentHash(syncedContentHash);
+    public void updateProviderEtag(String providerEtag) {
+        syncState.updateProviderEtag(providerEtag);
     }
 
     public void markConflicted() {
@@ -95,7 +95,7 @@ public class GoogleCalendarRecurrenceOverrideMapping extends BaseEntity {
         return syncState.isConflicted();
     }
 
-    public String getSyncedContentHash() {
-        return syncState.getSyncedContentHash();
+    public String getProviderEtag() {
+        return syncState.getProviderEtag();
     }
 }

@@ -21,20 +21,17 @@ public class GoogleCalendarEventChangeService {
     private final EventCommandService eventCommandService;
     private final GoogleOperationJobQueryService operationJobQueryService;
     private final GoogleOperationJobService operationJobService;
-    private final GoogleCalendarContentReconciliationPolicy reconciliationPolicy;
 
     public GoogleCalendarEventChangeService(
             GoogleCalendarEventMappingCommandService eventMappingCommandService,
             EventCommandService eventCommandService,
             GoogleOperationJobQueryService operationJobQueryService,
-            GoogleOperationJobService operationJobService,
-            GoogleCalendarContentReconciliationPolicy reconciliationPolicy
+            GoogleOperationJobService operationJobService
     ) {
         this.eventMappingCommandService = eventMappingCommandService;
         this.eventCommandService = eventCommandService;
         this.operationJobQueryService = operationJobQueryService;
         this.operationJobService = operationJobService;
-        this.reconciliationPolicy = reconciliationPolicy;
     }
 
     public void applyUpsert(
@@ -67,7 +64,7 @@ public class GoogleCalendarEventChangeService {
                         integration,
                         event,
                         item.externalEventId(),
-                        GoogleCalendarContentHasher.hash(item)
+                        item.providerEtag()
                 )
         );
         eventMappings.put(item.externalEventId(), mapping);
@@ -82,24 +79,19 @@ public class GoogleCalendarEventChangeService {
             return;
         }
         GoogleCalendarEffectiveScope scope = GoogleCalendarEffectiveScope.event(mapping.getEvent().getId());
-        GoogleCalendarContentReconciliationDecision decision = reconciliationPolicy.decide(
-                mapping.getSyncedContentHash(),
-                GoogleCalendarContentHasher.hash(mapping.getEvent()),
-                operationJobQueryService.listPendingTargetContentHashes(
-                        mapping.getIntegration().getAccountId(), mapping.getIntegration().getId(), scope),
-                GoogleCalendarContentHasher.hash(item)
-        );
-        if (decision == GoogleCalendarContentReconciliationDecision.TRUE_CONFLICT) {
+        if (mapping.getProviderEtag().equals(item.providerEtag())) {
+            return;
+        }
+        if (operationJobQueryService.hasPendingOutboundJob(
+                mapping.getIntegration().getAccountId(), mapping.getIntegration().getId(), scope)) {
             mapping.markConflicted();
             recordSyncConflict(mapping, ownership);
             return;
         }
-        if (decision == GoogleCalendarContentReconciliationDecision.GOOGLE_ONLY) {
-            mapping.getEvent().replace(
-                    item.title(), item.description(), item.schedule().startAt(), item.schedule().endAt(),
-                    item.schedule().allDay(), item.schedule().timeZone());
-        }
-        mapping.updateSyncedContentHash(GoogleCalendarContentHasher.hash(item));
+        mapping.getEvent().replace(
+                item.title(), item.description(), item.schedule().startAt(), item.schedule().endAt(),
+                item.schedule().allDay(), item.schedule().timeZone());
+        mapping.updateProviderEtag(item.providerEtag());
     }
 
     public void applyCancellation(
@@ -117,11 +109,8 @@ public class GoogleCalendarEventChangeService {
         }
         GoogleCalendarEffectiveScope scope = GoogleCalendarEffectiveScope.event(
                 eventMapping.getEvent().getId());
-        if (!GoogleCalendarContentHasher.hash(eventMapping.getEvent())
-                .equals(eventMapping.getSyncedContentHash())
-                || !operationJobQueryService.listPendingTargetContentHashes(
-                        eventMapping.getIntegration().getAccountId(),
-                        eventMapping.getIntegration().getId(), scope).isEmpty()) {
+        if (operationJobQueryService.hasPendingOutboundJob(
+                eventMapping.getIntegration().getAccountId(), eventMapping.getIntegration().getId(), scope)) {
             eventMapping.markConflicted();
             recordSyncConflict(eventMapping, ownership);
             return;

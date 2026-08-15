@@ -38,6 +38,7 @@ public class GoogleCalendarRecurrenceMapper {
         List<String> recurrenceRules = validateRecurrenceRules(recurrenceSchedule, item.recurrence());
         return new RecurrenceEventUpsert(
                 item.id(),
+                requireProviderEtag(item),
                 eventTitle(item.summary()),
                 item.description(),
                 schedule,
@@ -53,6 +54,7 @@ public class GoogleCalendarRecurrenceMapper {
                     item.id(),
                     item.recurringEventId(),
                     originStartAt,
+                    requireProviderEtag(item),
                     item.updatedAt() == null ? originStartAt : item.updatedAt()
             );
         }
@@ -61,6 +63,7 @@ public class GoogleCalendarRecurrenceMapper {
                 item.id(),
                 item.recurringEventId(),
                 originStartAt,
+                requireProviderEtag(item),
                 eventTitle(item.summary()),
                 item.description(),
                 schedule
@@ -119,6 +122,7 @@ public class GoogleCalendarRecurrenceMapper {
         boolean isInvalid = item == null
                 || !hasText(item.id())
                 || !hasText(item.recurringEventId())
+                || !hasText(item.etag())
                 || item.originalStartTime() == null
                 || item.isRecurrenceEvent();
         if (isInvalid) {
@@ -128,6 +132,13 @@ public class GoogleCalendarRecurrenceMapper {
 
     private String eventTitle(String summary) {
         return summary == null || summary.isBlank() ? UNTITLED_EVENT_TITLE : summary;
+    }
+
+    private String requireProviderEtag(GoogleCalendarEventResponse item) {
+        if (!hasText(item.etag())) {
+            throw invalidResponse();
+        }
+        return item.etag();
     }
 
     private boolean hasText(String value) {

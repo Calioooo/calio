@@ -9,29 +9,32 @@ import jakarta.persistence.Enumerated;
 public class GoogleCalendarMappingSyncState {
 
     public static final int STATUS_LENGTH = 32;
-    public static final int CONTENT_HASH_LENGTH = 64;
+    public static final int PROVIDER_ETAG_LENGTH = 1024;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "sync_status", nullable = false, length = STATUS_LENGTH)
     private GoogleCalendarMappingSyncStatus status;
 
-    @Column(name = "synced_content_hash", nullable = false, length = CONTENT_HASH_LENGTH)
-    private String syncedContentHash;
+    @Column(name = "provider_etag", nullable = false, length = PROVIDER_ETAG_LENGTH)
+    private String providerEtag;
 
     protected GoogleCalendarMappingSyncState() {
     }
 
-    private GoogleCalendarMappingSyncState(String syncedContentHash) {
+    private GoogleCalendarMappingSyncState(String providerEtag) {
         status = GoogleCalendarMappingSyncStatus.ACTIVE;
-        updateSyncedContentHash(syncedContentHash);
+        updateProviderEtag(providerEtag);
     }
 
-    public static GoogleCalendarMappingSyncState active(String syncedContentHash) {
-        return new GoogleCalendarMappingSyncState(syncedContentHash);
+    public static GoogleCalendarMappingSyncState active(String providerEtag) {
+        return new GoogleCalendarMappingSyncState(providerEtag);
     }
 
-    public void updateSyncedContentHash(String syncedContentHash) {
-        this.syncedContentHash = GoogleCalendarContentHashValidator.requireValid(syncedContentHash);
+    public void updateProviderEtag(String providerEtag) {
+        if (providerEtag == null || providerEtag.isBlank()) {
+            throw new IllegalArgumentException("Google provider etag is required");
+        }
+        this.providerEtag = providerEtag;
     }
 
     public void markConflicted() {
@@ -42,8 +45,8 @@ public class GoogleCalendarMappingSyncState {
         return status == GoogleCalendarMappingSyncStatus.CONFLICTED;
     }
 
-    public String getSyncedContentHash() {
-        return syncedContentHash;
+    public String getProviderEtag() {
+        return providerEtag;
     }
 
 }

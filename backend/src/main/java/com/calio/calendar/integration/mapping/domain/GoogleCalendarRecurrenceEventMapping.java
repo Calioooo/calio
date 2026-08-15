@@ -62,13 +62,13 @@ public class GoogleCalendarRecurrenceEventMapping extends BaseEntity {
             GoogleCalendarIntegration integration,
             RecurrenceEvent recurrenceEvent,
             String externalEventId,
-            String syncedContentHash
+            String providerEtag
     ) {
         this.integration = integration;
         this.recurrenceEvent = recurrenceEvent;
         this.calendarKey = PRIMARY_CALENDAR_KEY;
         this.externalEventId = externalEventId;
-        this.syncState = GoogleCalendarMappingSyncState.active(syncedContentHash);
+        this.syncState = GoogleCalendarMappingSyncState.active(providerEtag);
     }
 
     public Long getId() {
@@ -87,8 +87,8 @@ public class GoogleCalendarRecurrenceEventMapping extends BaseEntity {
         return externalEventId;
     }
 
-    public void updateSyncedContentHash(String syncedContentHash) {
-        syncState.updateSyncedContentHash(syncedContentHash);
+    public void updateProviderEtag(String providerEtag) {
+        syncState.updateProviderEtag(providerEtag);
     }
 
     public void markConflicted() {
@@ -99,7 +99,7 @@ public class GoogleCalendarRecurrenceEventMapping extends BaseEntity {
         return syncState.isConflicted();
     }
 
-    public String getSyncedContentHash() {
-        return syncState.getSyncedContentHash();
+    public String getProviderEtag() {
+        return syncState.getProviderEtag();
     }
 }

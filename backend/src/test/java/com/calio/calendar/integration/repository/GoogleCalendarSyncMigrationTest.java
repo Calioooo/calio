@@ -269,7 +269,7 @@ class GoogleCalendarSyncMigrationTest {
     }
 
     @Test
-    @DisplayName("V18은 empty mapping deployment에 conflict baseline과 pending scope index를 추가한다")
+    @DisplayName("V18은 empty mapping deployment에 conflict 상태와 pending scope index를 추가한다")
     void givenEmptyV17Schema_whenMigrateToV18_thenAddsConflictFoundation() throws Exception {
         // given
         String url = "jdbc:h2:mem:google-mapping-conflict-foundation;MODE=MySQL;DB_CLOSE_DELAY=-1";
@@ -281,13 +281,17 @@ class GoogleCalendarSyncMigrationTest {
         // then
         try (Connection connection = DriverManager.getConnection(url, "sa", "")) {
             assertThat(columnNames(connection, "GOOGLE_CALENDAR_EVENT_MAPPINGS"))
-                    .contains("SYNC_STATUS", "SYNCED_CONTENT_HASH");
+                    .contains("SYNC_STATUS", "PROVIDER_ETAG")
+                    .doesNotContain("PROVIDER_UPDATED_AT", "SYNCED_CONTENT_HASH");
             assertThat(columnNames(connection, "GOOGLE_CALENDAR_RECURRENCE_EVENT_MAPPINGS"))
-                    .contains("SYNC_STATUS", "SYNCED_CONTENT_HASH");
+                    .contains("SYNC_STATUS", "PROVIDER_ETAG")
+                    .doesNotContain("PROVIDER_UPDATED_AT", "SYNCED_CONTENT_HASH");
             assertThat(columnNames(connection, "GOOGLE_CALENDAR_RECURRENCE_OVERRIDE_MAPPINGS"))
-                    .contains("SYNC_STATUS", "SYNCED_CONTENT_HASH");
+                    .contains("SYNC_STATUS", "PROVIDER_ETAG")
+                    .doesNotContain("PROVIDER_UPDATED_AT", "SYNCED_CONTENT_HASH");
             assertThat(columnNames(connection, "GOOGLE_OPERATION_JOBS"))
-                    .contains("TARGET_CONTENT_HASH", "CONFLICT_DETECTED");
+                    .contains("CONFLICT_DETECTED")
+                    .doesNotContain("TARGET_CONTENT_HASH");
             assertThat(indexNames(connection, "GOOGLE_OPERATION_JOBS"))
                     .contains("IDX_GOOGLE_OPERATION_JOBS_PENDING_SCOPE");
         }
@@ -306,17 +310,17 @@ class GoogleCalendarSyncMigrationTest {
         // then
         try (Connection connection = DriverManager.getConnection(url, "sa", "")) {
             assertThat(columnNames(connection, "GOOGLE_OPERATION_JOBS"))
-                    .contains("TARGET_PAYLOAD", "TARGET_CONTENT_HASH")
+                    .contains("TARGET_PAYLOAD")
                     .doesNotContain("DESIRED_PAYLOAD");
         }
     }
 
     @Test
-    @DisplayName("V18은 mapping hash와 status의 null 또는 잘못된 값을 거부한다")
-    void givenV18Schema_whenInsertInvalidMappingBaseline_thenRejectsIt() throws Exception {
+    @DisplayName("V18은 mapping eTag와 status의 null 또는 잘못된 값을 거부한다")
+    void givenV18Schema_whenInsertInvalidMappingState_thenRejectsIt() throws Exception {
         String url = "jdbc:h2:mem:google-mapping-conflict-constraints;MODE=MySQL;DB_CLOSE_DELAY=-1";
-        migrateTo(url, MigrationVersion.fromVersion("8"));
-        insertLegacyEventAndIntegration(url);
+        migrateTo(url, MigrationVersion.fromVersion("17"));
+        insertCurrentEventAndIntegration(url);
         migrateTo(url, MigrationVersion.fromVersion("18"));
 
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
@@ -324,32 +328,28 @@ class GoogleCalendarSyncMigrationTest {
             assertThatThrownBy(() -> statement.executeUpdate("""
                     INSERT INTO google_calendar_event_mappings (
                         integration_id, event_id, calendar_key, external_event_id,
-                        sync_status, synced_content_hash, created_at, updated_at
-                    ) VALUES (900, 900, 'primary', 'missing-hash', 'ACTIVE', NULL,
+                        sync_status, provider_etag, created_at, updated_at
+                    ) VALUES (900, 900, 'primary', 'missing-etag', 'ACTIVE', NULL,
                               CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                     """))
                     .isInstanceOf(SQLException.class);
             assertThatThrownBy(() -> statement.executeUpdate("""
                     INSERT INTO google_calendar_event_mappings (
                         integration_id, event_id, calendar_key, external_event_id,
-                        sync_status, synced_content_hash, created_at, updated_at
-                    ) VALUES (900, 900, 'primary', 'invalid-status', 'UNKNOWN', '%s',
+                        sync_status, provider_etag, created_at, updated_at
+                    ) VALUES (900, 900, 'primary', 'invalid-status', 'UNKNOWN', 'etag',
                               CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                    """.formatted(validHash())))
+                    """))
                     .isInstanceOf(SQLException.class);
             assertThatThrownBy(() -> statement.executeUpdate("""
                     INSERT INTO google_calendar_event_mappings (
                         integration_id, event_id, calendar_key, external_event_id,
-                        sync_status, synced_content_hash, created_at, updated_at
-                    ) VALUES (900, 900, 'primary', 'invalid-hash', 'ACTIVE', 'invalid',
+                        sync_status, provider_etag, created_at, updated_at
+                    ) VALUES (900, 900, 'primary', 'too-long-etag', 'ACTIVE', '%s',
                               CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                    """))
+                    """.formatted("a".repeat(1025))))
                     .isInstanceOf(SQLException.class);
         }
-    }
-
-    private String validHash() {
-        return "a".repeat(64);
     }
 
     private void migrateTo(String url, MigrationVersion target) {
@@ -376,6 +376,39 @@ class GoogleCalendarSyncMigrationTest {
                     VALUES (
                         900, 'Legacy', NULL, '2026-07-01 00:00:00', '2026-07-01 01:00:00',
                         FALSE, NULL, 900, 1, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+                    )
+                    """);
+            statement.executeUpdate("""
+                    INSERT INTO google_calendar_integrations (
+                        id, account_id, google_subject, google_email,
+                        encrypted_refresh_token, encrypted_access_token,
+                        access_token_expires_at, connected_at, created_at, updated_at
+                    )
+                    VALUES (
+                        900, 900, 'subject', 'user@example.com',
+                        'encrypted-refresh', 'encrypted-access',
+                        '2026-07-01 01:00:00', '2026-07-01 00:00:00',
+                        CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+                    )
+                    """);
+        }
+    }
+
+    private void insertCurrentEventAndIntegration(String url) throws Exception {
+        try (Connection connection = DriverManager.getConnection(url, "sa", "");
+             Statement statement = connection.createStatement()) {
+            statement.executeUpdate("""
+                    INSERT INTO accounts (id, created_at, updated_at)
+                    VALUES (900, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))
+                    """);
+            statement.executeUpdate("""
+                    INSERT INTO events (
+                        id, title, description, start_at, end_at, important_event, all_day,
+                        recurrence_id, account_id, tag_id, created_at, updated_at
+                    )
+                    VALUES (
+                        900, 'Current', NULL, '2026-07-01 00:00:00', '2026-07-01 01:00:00',
+                        FALSE, FALSE, NULL, 900, 1, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
                     )
                     """);
             statement.executeUpdate("""

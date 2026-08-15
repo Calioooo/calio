@@ -143,7 +143,7 @@ public interface GoogleOperationJobRepository extends JpaRepository<GoogleOperat
     List<Long> findTerminalIdsBefore(@Param("cutoff") Instant cutoff, Pageable pageable);
 
     @Query("""
-            select job.targetContentHash
+            select (count(job) > 0)
             from GoogleOperationJob job
             where job.accountId = :accountId
               and job.integrationId = :integrationId
@@ -154,9 +154,8 @@ public interface GoogleOperationJobRepository extends JpaRepository<GoogleOperat
                   com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState.PENDING,
                   com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState.PROCESSING
               )
-            order by job.accountSequence
             """)
-    List<String> findPendingTargetContentHashes(
+    boolean existsPendingOutboundJob(
             @Param("accountId") Long accountId,
             @Param("integrationId") Long integrationId,
             @Param("scope") String scope,
@@ -164,7 +163,7 @@ public interface GoogleOperationJobRepository extends JpaRepository<GoogleOperat
     );
 
     @Query("""
-            select job.targetContentHash
+            select (count(job) > 0)
             from GoogleOperationJob job
             where job.accountId = :accountId
               and job.integrationId = :integrationId
@@ -180,9 +179,8 @@ public interface GoogleOperationJobRepository extends JpaRepository<GoogleOperat
                   (job.effectiveResourceScope = :recurrenceOverrideScope
                    and job.effectiveResourceKey like concat(:overrideKeyPrefix, '%'))
               )
-            order by job.accountSequence
             """)
-    List<String> findPendingTargetContentHashesForRecurrenceAggregate(
+    boolean existsPendingOutboundJobForRecurrenceAggregate(
             @Param("accountId") Long accountId,
             @Param("integrationId") Long integrationId,
             @Param("recurrenceEventScope") String recurrenceEventScope,

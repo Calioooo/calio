@@ -27,13 +27,13 @@ public class GoogleOperationJobQueryService {
         return jobRepository.findTerminalIdsBefore(cutoff, PageRequest.of(0, limit));
     }
 
-    public List<String> listPendingTargetContentHashes(
+    public boolean hasPendingOutboundJob(
             Long accountId,
             Long integrationId,
             GoogleCalendarEffectiveScope scope
     ) {
         if (scope instanceof GoogleCalendarEffectiveScope.RecurrenceEvent recurrenceEvent) {
-            return jobRepository.findPendingTargetContentHashesForRecurrenceAggregate(
+            return jobRepository.existsPendingOutboundJobForRecurrenceAggregate(
                     accountId,
                     integrationId,
                     GoogleCalendarEffectiveScopeType.RECURRENCE_EVENT.getStoredValue(),
@@ -43,7 +43,7 @@ public class GoogleOperationJobQueryService {
                             recurrenceEvent.recurrenceEventId())
             );
         }
-        return jobRepository.findPendingTargetContentHashes(
+        return jobRepository.existsPendingOutboundJob(
                 accountId,
                 integrationId,
                 scope.storedScope(),

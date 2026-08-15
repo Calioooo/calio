@@ -72,6 +72,7 @@ class GoogleCalendarPageNormalizerTest {
                 "override-1",
                 "recurrence-event-1",
                 Instant.parse("2026-07-01T09:00:00Z"),
+                "etag-override-1",
                 null
         );
         when(recurrenceMapper.mapRecurrenceOverride(item)).thenReturn(override);
@@ -96,6 +97,7 @@ class GoogleCalendarPageNormalizerTest {
                 deletedRecurrenceOccurrence("override-1", "recurrence-event-1");
         RecurrenceEventUpsert recurrenceEvent = new RecurrenceEventUpsert(
                 "recurrence-event-1",
+                "etag-recurrence-event-1",
                 "Daily",
                 null,
                 schedule(),
@@ -105,6 +107,7 @@ class GoogleCalendarPageNormalizerTest {
                 "override-1",
                 "recurrence-event-1",
                 Instant.parse("2026-07-01T09:00:00Z"),
+                "etag-override-1",
                 null
         );
         when(recurrenceEventLoader.loadRecurrenceEvent(any(), any(), any()))
@@ -141,6 +144,7 @@ class GoogleCalendarPageNormalizerTest {
                 "override-1",
                 "recurrence-event-1",
                 Instant.parse("2026-07-01T09:00:00Z"),
+                "etag-override-1",
                 null
         );
         when(recurrenceMapper.mapRecurrenceOverride(deletedOccurrence)).thenReturn(override);

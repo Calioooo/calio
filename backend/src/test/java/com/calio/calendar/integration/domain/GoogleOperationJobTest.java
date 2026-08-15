@@ -65,7 +65,6 @@ class GoogleOperationJobTest {
                 "event-id",
                 null,
                 "{}",
-                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
                 NOW
         )).isInstanceOf(IllegalArgumentException.class);
     }
@@ -83,7 +82,6 @@ class GoogleOperationJobTest {
                 "event-id",
                 null,
                 "{}",
-                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
                 NOW
         )).isInstanceOf(IllegalArgumentException.class);
     }
@@ -101,7 +99,6 @@ class GoogleOperationJobTest {
                 "event-id",
                 null,
                 "",
-                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
                 NOW
         )).isInstanceOf(IllegalArgumentException.class);
     }

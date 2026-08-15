@@ -153,8 +153,8 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
                 ));
 
         // when, then
-        assertThat(eventMapping.getSyncedContentHash()).hasSize(64);
-        assertThat(overrideMapping.getSyncedContentHash()).hasSize(64);
+        assertThat(eventMapping.getProviderEtag()).isEqualTo("a".repeat(64));
+        assertThat(overrideMapping.getProviderEtag()).isEqualTo("a".repeat(64));
     }
 
     @Test

@@ -170,7 +170,7 @@ class GoogleCalendarPageChangeServiceTest {
         GoogleCalendarEventResponse item = new GoogleCalendarEventResponse(
                 "page-zone-event",
                 "confirmed",
-                null,
+                "\"etag-page-zone\"",
                 null,
                 "Page zone",
                 null,
@@ -229,7 +229,7 @@ class GoogleCalendarPageChangeServiceTest {
                 List.of(externalEventId)
         )).singleElement().satisfies(mapping -> {
             assertThat(mapping.getExternalEventId()).isEqualTo(externalEventId);
-            assertThat(mapping.getSyncedContentHash()).hasSize(64);
+            assertThat(mapping.getProviderEtag()).isEqualTo(googleEtag);
         });
     }
 
@@ -329,7 +329,7 @@ class GoogleCalendarPageChangeServiceTest {
         GoogleCalendarEventResponse recurringItem = new GoogleCalendarEventResponse(
                 "external-1",
                 "confirmed",
-                null,
+                "\"etag-recurring\"",
                 null,
                 "Recurring",
                 null,
@@ -369,6 +369,7 @@ class GoogleCalendarPageChangeServiceTest {
         );
         RecurrenceEventUpsert recurrenceEvent = new RecurrenceEventUpsert(
                 "recurrence-event-1",
+                "etag-recurrence-event-1",
                 "Daily",
                 null,
                 recurrenceSchedule,
@@ -379,6 +380,7 @@ class GoogleCalendarPageChangeServiceTest {
                 "exception-1",
                 "recurrence-event-1",
                 Instant.parse("2026-07-02T09:00:00Z"),
+                "etag-exception-1",
                 "Moved",
                 "Final snapshot",
                 new NormalizedEventSchedule(
@@ -401,6 +403,7 @@ class GoogleCalendarPageChangeServiceTest {
         // when
         RecurrenceEventUpsert updatedRecurrenceEvent = new RecurrenceEventUpsert(
                 "recurrence-event-1",
+                "etag-recurrence-event-2",
                 "Changed",
                 "Google description",
                 recurrenceSchedule,
@@ -411,6 +414,7 @@ class GoogleCalendarPageChangeServiceTest {
                 "exception-1",
                 "recurrence-event-1",
                 Instant.parse("2026-07-02T09:00:00Z"),
+                "etag-exception-2",
                 Instant.parse("2026-07-02T08:00:00Z")
         );
         applyNormalizedPage(
@@ -439,12 +443,12 @@ class GoogleCalendarPageChangeServiceTest {
         });
         assertThat(recurrenceEventMappingRepository.findAll())
                 .singleElement()
-                .extracting(GoogleCalendarRecurrenceEventMapping::getSyncedContentHash)
-                .matches(hash -> hash.length() == 64);
+                .extracting(GoogleCalendarRecurrenceEventMapping::getProviderEtag)
+                .isEqualTo("etag-recurrence-event-2");
         assertThat(recurrenceOverrideMappingRepository.findAll())
                 .singleElement()
-                .extracting(GoogleCalendarRecurrenceOverrideMapping::getSyncedContentHash)
-                .matches(hash -> hash.length() == 64);
+                .extracting(GoogleCalendarRecurrenceOverrideMapping::getProviderEtag)
+                .isEqualTo("etag-exception-2");
     }
 
     @Test
@@ -461,6 +465,7 @@ class GoogleCalendarPageChangeServiceTest {
         );
         RecurrenceEventUpsert firstRecurrenceEvent = new RecurrenceEventUpsert(
                 "recurrence-event-a",
+                "etag-recurrence-event-a",
                 "First recurrence event",
                 null,
                 recurrenceSchedule,
@@ -468,6 +473,7 @@ class GoogleCalendarPageChangeServiceTest {
         );
         RecurrenceEventUpsert secondRecurrenceEvent = new RecurrenceEventUpsert(
                 "recurrence-event-b",
+                "etag-recurrence-event-b",
                 "Second recurrence event",
                 null,
                 recurrenceSchedule,
@@ -517,6 +523,7 @@ class GoogleCalendarPageChangeServiceTest {
         tagRepository.saveAndFlush(new Tag(TagType.DEFAULT, "기타", "#64748B"));
         RecurrenceEventUpsert recurrenceEvent = new RecurrenceEventUpsert(
                 "recurrence-event-1",
+                "etag-recurrence-event-1",
                 "Daily",
                 null,
                 new NormalizedEventSchedule(
@@ -532,6 +539,7 @@ class GoogleCalendarPageChangeServiceTest {
                         "override-1",
                         "recurrence-event-1",
                         Instant.parse("2026-07-02T09:00:00Z"),
+                        "etag-override-1",
                         "Moved",
                         null,
                         new NormalizedEventSchedule(
@@ -616,12 +624,13 @@ class GoogleCalendarPageChangeServiceTest {
                     integration,
                     events.get(index),
                     "event-" + index,
-                    GoogleCalendarContentHasher.hash(events.get(index))
+                    "etag-event-" + index
             ));
         }
         mappingRepository.saveAllAndFlush(mappings);
         RecurrenceEventUpsert recurrenceEvent = new RecurrenceEventUpsert(
                 "recurrence-event-1",
+                "etag-recurrence-event-1",
                 "Daily",
                 null,
                 eventSchedule,
@@ -632,6 +641,7 @@ class GoogleCalendarPageChangeServiceTest {
                         "override-1",
                         "recurrence-event-1",
                         Instant.parse("2026-07-02T09:00:00Z"),
+                        "etag-override-1",
                         "Moved",
                         null,
                         new NormalizedEventSchedule(
@@ -816,7 +826,7 @@ class GoogleCalendarPageChangeServiceTest {
         return new GoogleCalendarEventResponse(
                 id,
                 "cancelled",
-                null,
+                "\"etag-deleted-override\"",
                 null,
                 null,
                 null,
@@ -834,7 +844,7 @@ class GoogleCalendarPageChangeServiceTest {
         return new GoogleCalendarEventResponse(
                 id,
                 "cancelled",
-                null,
+                "\"etag-deleted-override\"",
                 Instant.parse("2026-07-02T08:00:00Z"),
                 null,
                 null,
@@ -854,6 +864,7 @@ class GoogleCalendarPageChangeServiceTest {
                 externalEventId,
                 recurrenceEventExternalId,
                 Instant.parse("2026-07-02T09:00:00Z"),
+                "etag-" + externalEventId,
                 "Moved",
                 null,
                 new NormalizedEventSchedule(

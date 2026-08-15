@@ -259,6 +259,7 @@ public class GoogleCalendarPageNormalizer {
         );
         return new EventUpsert(
                 item.id(),
+                requireProviderEtag(item),
                 eventTitle(item.summary()),
                 item.description(),
                 schedule
@@ -279,7 +280,7 @@ public class GoogleCalendarPageNormalizer {
                 && item.isRecurrenceOverride();
         boolean hasOrphanOrigin = item.originalStartTime() != null
                 && !item.isRecurrenceOverride();
-        if (isMixedRecurrenceShape || hasOrphanOrigin) {
+        if (isMixedRecurrenceShape || hasOrphanOrigin || !hasText(item.etag())) {
             throw invalidResponse();
         }
     }
@@ -374,6 +375,13 @@ public class GoogleCalendarPageNormalizer {
 
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
+    }
+
+    private String requireProviderEtag(GoogleCalendarEventResponse item) {
+        if (!hasText(item.etag())) {
+            throw invalidResponse();
+        }
+        return item.etag();
     }
 
     private CalioException invalidResponse() {

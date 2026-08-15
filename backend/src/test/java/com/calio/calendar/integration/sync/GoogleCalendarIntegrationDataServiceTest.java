@@ -12,7 +12,6 @@ import com.calio.calendar.event.service.EventCommandService;
 import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrationCommandService;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarEventMapping;
-import com.calio.calendar.integration.sync.page.GoogleCalendarContentHasher;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingCommandService;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingQueryService;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarRecurrenceMappingCommandService;
@@ -62,8 +61,7 @@ class GoogleCalendarIntegrationDataServiceTest {
         when(integration.getId()).thenReturn(1L);
         when(integration.getAccountId()).thenReturn(2L);
         when(event.getId()).thenReturn(20L);
-        String syncedContentHash = GoogleCalendarContentHasher.hash(event);
-        when(eventMapping.getSyncedContentHash()).thenReturn(syncedContentHash);
+        when(operationJobQueryService.hasPendingOutboundJob(any(), any(), any())).thenReturn(false);
         when(recurrenceMappingQueryService.listOverrideMappingBatch(1L, 0L, 500))
                 .thenReturn(List.of());
         when(eventMappingQueryService.listEventMappingBatch(1L, 0L, 500))
