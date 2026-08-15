@@ -616,7 +616,7 @@ class GoogleCalendarPageChangeServiceTest {
                     integration,
                     events.get(index),
                     "event-" + index,
-                    "a".repeat(64)
+                    GoogleCalendarContentHasher.hash(events.get(index))
             ));
         }
         mappingRepository.saveAllAndFlush(mappings);
