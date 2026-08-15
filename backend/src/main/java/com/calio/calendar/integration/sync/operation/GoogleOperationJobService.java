@@ -107,11 +107,18 @@ public class GoogleOperationJobService {
             log.warn("Google sync final transition rejected. accountId={} jobId={}", accountId, jobId);
             throw exception;
         }
+        log.info("Google sync run completed. accountId={} jobId={}", accountId, jobId);
     }
 
     @Transactional
-    public void recordSyncConflict(Long jobId, String workerToken) {
-        jobCommandService.markConflictDetected(jobId, workerToken);
+    public void recordSyncConflict(Long jobId, Long accountId, String workerToken) {
+        try {
+            jobCommandService.markConflictDetected(jobId, workerToken);
+        } catch (GoogleOperationOwnershipLostException exception) {
+            log.warn("Google sync conflict detection rejected. accountId={} jobId={}", accountId, jobId);
+            throw exception;
+        }
+        log.info("Google sync conflict detected. accountId={} jobId={}", accountId, jobId);
     }
 
     @Transactional

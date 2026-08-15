@@ -12,7 +12,7 @@ import com.calio.calendar.event.service.EventCommandService;
 import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrationCommandService;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarEventMapping;
-import com.calio.calendar.integration.mapping.domain.GoogleCalendarContentHasher;
+import com.calio.calendar.integration.sync.page.GoogleCalendarContentHasher;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingCommandService;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingQueryService;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarRecurrenceMappingCommandService;

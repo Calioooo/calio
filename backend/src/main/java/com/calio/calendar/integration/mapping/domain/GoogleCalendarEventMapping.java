@@ -71,14 +71,6 @@ public class GoogleCalendarEventMapping extends BaseEntity {
         this.syncState = GoogleCalendarMappingSyncState.active(syncedContentHash);
     }
 
-    public GoogleCalendarEventMapping(
-            GoogleCalendarIntegration integration,
-            Event event,
-            String externalEventId
-    ) {
-        this(integration, event, externalEventId, GoogleCalendarContentHasher.hash(event));
-    }
-
     public Long getId() {
         return id;
     }

@@ -34,7 +34,6 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -50,7 +49,6 @@ public class GoogleCalendarPageChangeService {
     private final GoogleCalendarRecurrenceChangeService recurrenceChangeService;
     private final GoogleOperationLeaseService operationLeaseService;
 
-    @Autowired
     public GoogleCalendarPageChangeService(
             GoogleCalendarIntegrationQueryService integrationQueryService,
             GoogleCalendarEventMappingQueryService eventMappingQueryService,
@@ -73,42 +71,6 @@ public class GoogleCalendarPageChangeService {
         this.operationLeaseService = operationLeaseService;
     }
 
-    /** Kept for test doubles built against the pre-fenced page boundary. */
-    protected GoogleCalendarPageChangeService(
-            GoogleCalendarIntegrationQueryService integrationQueryService,
-            GoogleCalendarEventMappingQueryService eventMappingQueryService,
-            GoogleCalendarEventChangeService eventChangeService,
-            GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService,
-            AccountQueryService accountQueryService,
-            TagQueryService tagQueryService,
-            RecurrenceEventQueryService recurrenceEventQueryService,
-            GoogleCalendarRecurrenceChangeService recurrenceChangeService
-    ) {
-        this.integrationQueryService = integrationQueryService;
-        this.eventMappingQueryService = eventMappingQueryService;
-        this.eventChangeService = eventChangeService;
-        this.recurrenceMappingQueryService = recurrenceMappingQueryService;
-        this.accountQueryService = accountQueryService;
-        this.tagQueryService = tagQueryService;
-        this.recurrenceEventQueryService = recurrenceEventQueryService;
-        this.recurrenceChangeService = recurrenceChangeService;
-        this.operationLeaseService = null;
-    }
-
-    // Package-private only for page persistence tests that do not exercise job fencing.
-    void applyNormalizedPage(
-            Long integrationId,
-            Long accountId,
-            GoogleCalendarNormalizedPage page
-    ) {
-        applyNormalizedPage(
-                integrationId,
-                accountId,
-                new GoogleCalendarPageOwnership(-1L, "legacy-page-call"),
-                page
-        );
-    }
-
     @Transactional
     public void applyNormalizedPage(
             Long integrationId,
@@ -116,9 +78,7 @@ public class GoogleCalendarPageChangeService {
             GoogleCalendarPageOwnership ownership,
             GoogleCalendarNormalizedPage page
     ) {
-        if (operationLeaseService != null) {
-            operationLeaseService.extend(ownership.jobId(), accountId, ownership.workerToken());
-        }
+        operationLeaseService.extend(ownership.jobId(), accountId, ownership.workerToken());
         GoogleCalendarIntegration integration = integrationQueryService.getIntegrationById(integrationId);
         applyPageChanges(integration, accountId, ownership, page.items());
     }

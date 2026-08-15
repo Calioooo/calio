@@ -259,7 +259,6 @@ public class GoogleCalendarPageNormalizer {
         );
         return new EventUpsert(
                 item.id(),
-                item.updatedAt(),
                 eventTitle(item.summary()),
                 item.description(),
                 schedule

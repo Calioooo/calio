@@ -5,7 +5,7 @@ import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.event.service.EventCommandService;
 import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrationCommandService;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarEventMapping;
-import com.calio.calendar.integration.mapping.domain.GoogleCalendarContentHasher;
+import com.calio.calendar.integration.sync.page.GoogleCalendarContentHasher;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarRecurrenceEventMapping;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarRecurrenceOverrideMapping;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingCommandService;
@@ -319,13 +319,14 @@ public class GoogleCalendarIntegrationDataService {
                 mapping.getEvent().getId());
         if (GoogleCalendarContentHasher.hash(mapping.getEvent())
                 .equals(mapping.getSyncedContentHash())
-                && operationJobQueryService.listPendingDesiredContentHashes(
+                && operationJobQueryService.listPendingTargetContentHashes(
                         mapping.getIntegration().getAccountId(), mapping.getIntegration().getId(), scope)
                 .isEmpty()) {
             return true;
         }
         mapping.markConflicted();
-        operationJobService.recordSyncConflict(ownership.jobId(), ownership.workerToken());
+        operationJobService.recordSyncConflict(
+                ownership.jobId(), ownership.accountId(), ownership.workerToken());
         return false;
     }
 
@@ -340,13 +341,14 @@ public class GoogleCalendarIntegrationDataService {
                 mapping.getRecurrenceEvent().getId());
         if (GoogleCalendarContentHasher.hash(mapping.getRecurrenceEvent())
                 .equals(mapping.getSyncedContentHash())
-                && operationJobQueryService.listPendingDesiredContentHashes(
+                && operationJobQueryService.listPendingTargetContentHashes(
                         mapping.getIntegration().getAccountId(), mapping.getIntegration().getId(), scope)
                 .isEmpty()) {
             return true;
         }
         mapping.markConflicted();
-        operationJobService.recordSyncConflict(ownership.jobId(), ownership.workerToken());
+        operationJobService.recordSyncConflict(
+                ownership.jobId(), ownership.accountId(), ownership.workerToken());
         return false;
     }
 
@@ -363,13 +365,14 @@ public class GoogleCalendarIntegrationDataService {
         if (GoogleCalendarContentHasher.hash(
                 mapping.getRecurrenceEventMapping().getExternalEventId(),
                 mapping.getRecurrenceEventOverride()).equals(mapping.getSyncedContentHash())
-                && operationJobQueryService.listPendingDesiredContentHashes(
+                && operationJobQueryService.listPendingTargetContentHashes(
                         mapping.getRecurrenceEventMapping().getIntegration().getAccountId(),
                         mapping.getRecurrenceEventMapping().getIntegration().getId(), scope).isEmpty()) {
             return true;
         }
         mapping.markConflicted();
-        operationJobService.recordSyncConflict(ownership.jobId(), ownership.workerToken());
+        operationJobService.recordSyncConflict(
+                ownership.jobId(), ownership.accountId(), ownership.workerToken());
         return false;
     }
 

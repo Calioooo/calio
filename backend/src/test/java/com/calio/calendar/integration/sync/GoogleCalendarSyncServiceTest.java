@@ -521,7 +521,8 @@ class GoogleCalendarSyncServiceTest {
                     mock(AccountQueryService.class),
                     mock(TagQueryService.class),
                     mock(RecurrenceEventQueryService.class),
-                    mock(GoogleCalendarRecurrenceChangeService.class)
+                    mock(GoogleCalendarRecurrenceChangeService.class),
+                    mock(GoogleOperationLeaseService.class)
             );
         }
 

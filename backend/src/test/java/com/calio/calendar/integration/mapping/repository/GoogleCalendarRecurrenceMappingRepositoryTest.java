@@ -90,7 +90,8 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
                 new GoogleCalendarRecurrenceEventMapping(
                         integration,
                         recurrenceEvent,
-                        externalRecurrenceEventId
+                        externalRecurrenceEventId,
+                        "a".repeat(64)
                 )
         );
         GoogleCalendarRecurrenceOverrideMapping overrideMapping =
@@ -98,7 +99,8 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
                         new GoogleCalendarRecurrenceOverrideMapping(
                                 eventMapping,
                                 recurrenceOverride,
-                                externalRecurrenceOverrideId
+                                externalRecurrenceOverrideId,
+                                "a".repeat(64)
                         )
                 );
 
@@ -349,7 +351,8 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
         return new GoogleCalendarRecurrenceEventMapping(
                 fixture.integration(),
                 recurrenceEvent,
-                externalEventId
+                externalEventId,
+                "a".repeat(64)
         );
     }
 
@@ -381,7 +384,8 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
         return new GoogleCalendarRecurrenceOverrideMapping(
                 parentMapping,
                 recurrenceOverride,
-                externalEventId
+                externalEventId,
+                "a".repeat(64)
         );
     }
 

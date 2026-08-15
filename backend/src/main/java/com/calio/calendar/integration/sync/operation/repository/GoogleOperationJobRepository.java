@@ -143,7 +143,7 @@ public interface GoogleOperationJobRepository extends JpaRepository<GoogleOperat
     List<Long> findTerminalIdsBefore(@Param("cutoff") Instant cutoff, Pageable pageable);
 
     @Query("""
-            select job.desiredContentHash
+            select job.targetContentHash
             from GoogleOperationJob job
             where job.accountId = :accountId
               and job.integrationId = :integrationId
@@ -156,7 +156,7 @@ public interface GoogleOperationJobRepository extends JpaRepository<GoogleOperat
               )
             order by job.accountSequence
             """)
-    List<String> findPendingDesiredContentHashes(
+    List<String> findPendingTargetContentHashes(
             @Param("accountId") Long accountId,
             @Param("integrationId") Long integrationId,
             @Param("scope") String scope,
@@ -164,7 +164,7 @@ public interface GoogleOperationJobRepository extends JpaRepository<GoogleOperat
     );
 
     @Query("""
-            select job.desiredContentHash
+            select job.targetContentHash
             from GoogleOperationJob job
             where job.accountId = :accountId
               and job.integrationId = :integrationId
@@ -182,7 +182,7 @@ public interface GoogleOperationJobRepository extends JpaRepository<GoogleOperat
               )
             order by job.accountSequence
             """)
-    List<String> findPendingDesiredContentHashesForRecurrenceAggregate(
+    List<String> findPendingTargetContentHashesForRecurrenceAggregate(
             @Param("accountId") Long accountId,
             @Param("integrationId") Long integrationId,
             @Param("recurrenceEventScope") String recurrenceEventScope,

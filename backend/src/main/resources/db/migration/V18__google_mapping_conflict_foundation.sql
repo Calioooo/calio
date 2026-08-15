@@ -44,17 +44,17 @@ ALTER TABLE google_calendar_recurrence_override_mappings
         CHECK (REGEXP_LIKE(synced_content_hash, '^[0-9a-f]{64}$'));
 
 ALTER TABLE google_operation_jobs
-    ADD COLUMN desired_content_hash VARCHAR(64) NULL;
+    ADD COLUMN target_content_hash VARCHAR(64) NULL;
 ALTER TABLE google_operation_jobs
     ADD COLUMN conflict_detected BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE google_operation_jobs
-    ADD CONSTRAINT ck_google_operation_jobs_desired_content_hash
+    ADD CONSTRAINT ck_google_operation_jobs_target_content_hash
         CHECK (
-            (job_kind = 'SYNC' AND desired_content_hash IS NULL)
+            (job_kind = 'SYNC' AND target_content_hash IS NULL)
             OR
             (job_kind <> 'SYNC'
-                AND desired_content_hash IS NOT NULL
-                AND REGEXP_LIKE(desired_content_hash, '^[0-9a-f]{64}$'))
+                AND target_content_hash IS NOT NULL
+                AND REGEXP_LIKE(target_content_hash, '^[0-9a-f]{64}$'))
         );
 
 CREATE INDEX idx_google_operation_jobs_pending_scope

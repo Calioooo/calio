@@ -67,16 +67,6 @@ public class GoogleCalendarRecurrenceOverrideMapping extends BaseEntity {
         this.syncState = GoogleCalendarMappingSyncState.active(syncedContentHash);
     }
 
-    public GoogleCalendarRecurrenceOverrideMapping(
-            GoogleCalendarRecurrenceEventMapping recurrenceEventMapping,
-            RecurrenceEventOverride recurrenceEventOverride,
-            String externalEventId
-    ) {
-        this(recurrenceEventMapping, recurrenceEventOverride, externalEventId,
-                GoogleCalendarContentHasher.hash(
-                        recurrenceEventMapping.getExternalEventId(), recurrenceEventOverride));
-    }
-
     public Long getId() {
         return id;
     }

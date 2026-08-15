@@ -71,15 +71,6 @@ public class GoogleCalendarRecurrenceEventMapping extends BaseEntity {
         this.syncState = GoogleCalendarMappingSyncState.active(syncedContentHash);
     }
 
-    public GoogleCalendarRecurrenceEventMapping(
-            GoogleCalendarIntegration integration,
-            RecurrenceEvent recurrenceEvent,
-            String externalEventId
-    ) {
-        this(integration, recurrenceEvent, externalEventId,
-                GoogleCalendarContentHasher.hash(recurrenceEvent));
-    }
-
     public Long getId() {
         return id;
     }

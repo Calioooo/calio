@@ -1,7 +1,7 @@
 package com.calio.calendar.integration.sync.operation.domain;
 
 import com.calio.calendar.common.domain.BaseEntity;
-import com.calio.calendar.integration.mapping.domain.GoogleCalendarContentHash;
+import com.calio.calendar.integration.mapping.domain.GoogleCalendarContentHashValidator;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -52,11 +52,11 @@ public class GoogleOperationJob extends BaseEntity {
     @Column(name = "provider_identity", updatable = false, length = 1024)
     private String providerIdentity;
 
-    @Column(name = "desired_payload", updatable = false, columnDefinition = "JSON")
-    private String desiredPayload;
+    @Column(name = "target_payload", updatable = false, columnDefinition = "JSON")
+    private String targetPayload;
 
-    @Column(name = "desired_content_hash", updatable = false, length = 64)
-    private String desiredContentHash;
+    @Column(name = "target_content_hash", updatable = false, length = 64)
+    private String targetContentHash;
 
     @Column(name = "conflict_detected", nullable = false)
     private boolean conflictDetected;
@@ -118,12 +118,12 @@ public class GoogleOperationJob extends BaseEntity {
             String resourceScope,
             String resourceKey,
             String providerIdentity,
-            String desiredPayload,
-            String desiredContentHash,
+            String targetPayload,
+            String targetContentHash,
             Instant runnableAt
     ) {
-        validateOutboundFields(kind, resourceScope, resourceKey, desiredPayload);
-        desiredContentHash = GoogleCalendarContentHash.requireValid(desiredContentHash);
+        validateOutboundFields(kind, resourceScope, resourceKey, targetPayload);
+        targetContentHash = GoogleCalendarContentHashValidator.requireValid(targetContentHash);
         GoogleOperationJob job = new GoogleOperationJob();
         job.operationId = operationId;
         job.integrationId = integrationId;
@@ -134,8 +134,8 @@ public class GoogleOperationJob extends BaseEntity {
         job.effectiveResourceScope = resourceScope;
         job.effectiveResourceKey = resourceKey;
         job.providerIdentity = providerIdentity;
-        job.desiredPayload = desiredPayload;
-        job.desiredContentHash = desiredContentHash;
+        job.targetPayload = targetPayload;
+        job.targetContentHash = targetContentHash;
         job.state = GoogleOperationJobState.PENDING;
         job.runnableAt = runnableAt;
         return job;
@@ -152,12 +152,12 @@ public class GoogleOperationJob extends BaseEntity {
             String kind,
             String resourceScope,
             String resourceKey,
-            String desiredPayload
+            String targetPayload
     ) {
         if (kind == null || kind.isBlank() || SYNC_KIND.equals(kind)
                 || resourceScope == null || resourceScope.isBlank()
                 || resourceKey == null || resourceKey.isBlank()
-                || desiredPayload == null || desiredPayload.isBlank()) {
+                || targetPayload == null || targetPayload.isBlank()) {
             throw new IllegalArgumentException("Outbound Google operation fields are required");
         }
     }
@@ -189,6 +189,6 @@ public class GoogleOperationJob extends BaseEntity {
     public String getOwnerToken() { return ownerToken; }
     public String getEffectiveResourceScope() { return effectiveResourceScope; }
     public String getEffectiveResourceKey() { return effectiveResourceKey; }
-    public String getDesiredContentHash() { return desiredContentHash; }
+    public String getTargetContentHash() { return targetContentHash; }
     public boolean isConflictDetected() { return conflictDetected; }
 }

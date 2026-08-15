@@ -59,6 +59,9 @@ import org.springframework.transaction.annotation.Transactional;
 })
 class GoogleCalendarPageChangeServiceTest {
 
+    private static final GoogleCalendarPageOwnership PAGE_OWNERSHIP =
+            new GoogleCalendarPageOwnership(1L, "test-worker-token");
+
     @Autowired
     private GoogleCalendarPageChangeService pagePersistenceService;
 
@@ -366,8 +369,6 @@ class GoogleCalendarPageChangeServiceTest {
         );
         RecurrenceEventUpsert recurrenceEvent = new RecurrenceEventUpsert(
                 "recurrence-event-1",
-                "recurrence-etag-1",
-                Instant.parse("2026-07-01T08:00:00Z"),
                 "Daily",
                 null,
                 recurrenceSchedule,
@@ -378,8 +379,6 @@ class GoogleCalendarPageChangeServiceTest {
                 "exception-1",
                 "recurrence-event-1",
                 Instant.parse("2026-07-02T09:00:00Z"),
-                "override-etag-1",
-                Instant.parse("2026-07-02T07:00:00Z"),
                 "Moved",
                 "Final snapshot",
                 new NormalizedEventSchedule(
@@ -389,7 +388,7 @@ class GoogleCalendarPageChangeServiceTest {
                         "UTC"
                 )
         );
-        pagePersistenceService.applyNormalizedPage(
+        applyNormalizedPage(
                 integration.getId(),
                 account.getId(),
                 new GoogleCalendarNormalizedPage(
@@ -402,8 +401,6 @@ class GoogleCalendarPageChangeServiceTest {
         // when
         RecurrenceEventUpsert updatedRecurrenceEvent = new RecurrenceEventUpsert(
                 "recurrence-event-1",
-                "recurrence-etag-2",
-                Instant.parse("2026-07-03T08:00:00Z"),
                 "Changed",
                 "Google description",
                 recurrenceSchedule,
@@ -414,10 +411,9 @@ class GoogleCalendarPageChangeServiceTest {
                 "exception-1",
                 "recurrence-event-1",
                 Instant.parse("2026-07-02T09:00:00Z"),
-                "override-etag-2",
                 Instant.parse("2026-07-02T08:00:00Z")
         );
-        pagePersistenceService.applyNormalizedPage(
+        applyNormalizedPage(
                 integration.getId(),
                 account.getId(),
                 new GoogleCalendarNormalizedPage(
@@ -465,8 +461,6 @@ class GoogleCalendarPageChangeServiceTest {
         );
         RecurrenceEventUpsert firstRecurrenceEvent = new RecurrenceEventUpsert(
                 "recurrence-event-a",
-                null,
-                null,
                 "First recurrence event",
                 null,
                 recurrenceSchedule,
@@ -474,8 +468,6 @@ class GoogleCalendarPageChangeServiceTest {
         );
         RecurrenceEventUpsert secondRecurrenceEvent = new RecurrenceEventUpsert(
                 "recurrence-event-b",
-                null,
-                null,
                 "Second recurrence event",
                 null,
                 recurrenceSchedule,
@@ -483,7 +475,7 @@ class GoogleCalendarPageChangeServiceTest {
         );
         ActiveRecurrenceEventOverrideUpsert firstOverride =
                 recurrenceOverride("shared-override", "recurrence-event-a");
-        pagePersistenceService.applyNormalizedPage(
+        applyNormalizedPage(
                 integration.getId(),
                 account.getId(),
                 new GoogleCalendarNormalizedPage(
@@ -496,7 +488,7 @@ class GoogleCalendarPageChangeServiceTest {
                 recurrenceOverride("shared-override", "recurrence-event-b");
 
         // when, then
-        assertThatThrownBy(() -> pagePersistenceService.applyNormalizedPage(
+        assertThatThrownBy(() -> applyNormalizedPage(
                 integration.getId(),
                 account.getId(),
                 new GoogleCalendarNormalizedPage(
@@ -525,8 +517,6 @@ class GoogleCalendarPageChangeServiceTest {
         tagRepository.saveAndFlush(new Tag(TagType.DEFAULT, "기타", "#64748B"));
         RecurrenceEventUpsert recurrenceEvent = new RecurrenceEventUpsert(
                 "recurrence-event-1",
-                null,
-                null,
                 "Daily",
                 null,
                 new NormalizedEventSchedule(
@@ -542,8 +532,6 @@ class GoogleCalendarPageChangeServiceTest {
                         "override-1",
                         "recurrence-event-1",
                         Instant.parse("2026-07-02T09:00:00Z"),
-                        null,
-                        null,
                         "Moved",
                         null,
                         new NormalizedEventSchedule(
@@ -553,7 +541,7 @@ class GoogleCalendarPageChangeServiceTest {
                                 "UTC"
                         )
                 );
-        pagePersistenceService.applyNormalizedPage(
+        applyNormalizedPage(
                 integration.getId(),
                 account.getId(),
                 new GoogleCalendarNormalizedPage(
@@ -580,7 +568,7 @@ class GoogleCalendarPageChangeServiceTest {
                 ),
                 new GoogleCalendarSyncRunContext("access-token")
         );
-        pagePersistenceService.applyNormalizedPage(
+        applyNormalizedPage(
                 integration.getId(),
                 account.getId(),
                 normalizedPage
@@ -627,14 +615,13 @@ class GoogleCalendarPageChangeServiceTest {
             mappings.add(new GoogleCalendarEventMapping(
                     integration,
                     events.get(index),
-                    "event-" + index
+                    "event-" + index,
+                    "a".repeat(64)
             ));
         }
         mappingRepository.saveAllAndFlush(mappings);
         RecurrenceEventUpsert recurrenceEvent = new RecurrenceEventUpsert(
                 "recurrence-event-1",
-                null,
-                null,
                 "Daily",
                 null,
                 eventSchedule,
@@ -645,8 +632,6 @@ class GoogleCalendarPageChangeServiceTest {
                         "override-1",
                         "recurrence-event-1",
                         Instant.parse("2026-07-02T09:00:00Z"),
-                        null,
-                        null,
                         "Moved",
                         null,
                         new NormalizedEventSchedule(
@@ -656,7 +641,7 @@ class GoogleCalendarPageChangeServiceTest {
                                 "UTC"
                         )
                 );
-        pagePersistenceService.applyNormalizedPage(
+        applyNormalizedPage(
                 integration.getId(),
                 account.getId(),
                 new GoogleCalendarNormalizedPage(
@@ -736,6 +721,19 @@ class GoogleCalendarPageChangeServiceTest {
         assertThat(eventRepository.findById(imported.getId())).isEmpty();
     }
 
+    private void applyNormalizedPage(
+            Long integrationId,
+            Long accountId,
+            GoogleCalendarNormalizedPage page
+    ) {
+        pagePersistenceService.applyNormalizedPage(
+                integrationId,
+                accountId,
+                PAGE_OWNERSHIP,
+                page
+        );
+    }
+
     private void persistProviderPage(
             Long integrationId,
             Long accountId,
@@ -748,7 +746,7 @@ class GoogleCalendarPageChangeServiceTest {
                 page,
                 context
         );
-        pagePersistenceService.applyNormalizedPage(
+        applyNormalizedPage(
                 integrationId,
                 accountId,
                 normalizedPage
@@ -856,8 +854,6 @@ class GoogleCalendarPageChangeServiceTest {
                 externalEventId,
                 recurrenceEventExternalId,
                 Instant.parse("2026-07-02T09:00:00Z"),
-                null,
-                null,
                 "Moved",
                 null,
                 new NormalizedEventSchedule(

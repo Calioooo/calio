@@ -287,9 +287,27 @@ class GoogleCalendarSyncMigrationTest {
             assertThat(columnNames(connection, "GOOGLE_CALENDAR_RECURRENCE_OVERRIDE_MAPPINGS"))
                     .contains("SYNC_STATUS", "SYNCED_CONTENT_HASH");
             assertThat(columnNames(connection, "GOOGLE_OPERATION_JOBS"))
-                    .contains("DESIRED_CONTENT_HASH", "CONFLICT_DETECTED");
+                    .contains("TARGET_CONTENT_HASH", "CONFLICT_DETECTED");
             assertThat(indexNames(connection, "GOOGLE_OPERATION_JOBS"))
                     .contains("IDX_GOOGLE_OPERATION_JOBS_PENDING_SCOPE");
+        }
+    }
+
+    @Test
+    @DisplayName("V19는 Google operation Job의 target payload 이름을 적용한다")
+    void givenV18Schema_whenMigrateToV19_thenRenamesTargetPayload() throws Exception {
+        // given
+        String url = "jdbc:h2:mem:google-operation-job-target-fields;MODE=MySQL;DB_CLOSE_DELAY=-1";
+        migrateTo(url, MigrationVersion.fromVersion("18"));
+
+        // when
+        migrateTo(url, MigrationVersion.fromVersion("19"));
+
+        // then
+        try (Connection connection = DriverManager.getConnection(url, "sa", "")) {
+            assertThat(columnNames(connection, "GOOGLE_OPERATION_JOBS"))
+                    .contains("TARGET_PAYLOAD", "TARGET_CONTENT_HASH")
+                    .doesNotContain("DESIRED_PAYLOAD");
         }
     }
 

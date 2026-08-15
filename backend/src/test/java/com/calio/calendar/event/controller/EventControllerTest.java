@@ -1034,7 +1034,8 @@ class EventControllerTest {
         googleCalendarEventMappingRepository.saveAndFlush(new GoogleCalendarEventMapping(
                 integration,
                 event,
-                "external-" + eventId
+                "external-" + eventId,
+                "a".repeat(64)
         ));
     }
 

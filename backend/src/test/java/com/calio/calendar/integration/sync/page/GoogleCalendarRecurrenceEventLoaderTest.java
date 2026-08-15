@@ -118,8 +118,6 @@ class GoogleCalendarRecurrenceEventLoaderTest {
     private RecurrenceEventUpsert recurrenceEventUpsert(String externalEventId) {
         return new RecurrenceEventUpsert(
                 externalEventId,
-                null,
-                null,
                 "Daily",
                 null,
                 new NormalizedEventSchedule(

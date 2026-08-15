@@ -85,7 +85,8 @@ class GoogleCalendarIntegrationDataServiceTransactionTest {
                 new GoogleCalendarEventMapping(
                         integration,
                         event,
-                        "unseen-event"
+                        "unseen-event",
+                        "a".repeat(64)
                 )
         );
         doReturn(0).when(integrationRepository).updateNextSyncToken(

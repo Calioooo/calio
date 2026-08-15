@@ -1,4 +1,4 @@
-package com.calio.calendar.integration.mapping.domain;
+package com.calio.calendar.integration.sync.page;
 
 import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.external.google.service.dto.NormalizedEventSchedule;

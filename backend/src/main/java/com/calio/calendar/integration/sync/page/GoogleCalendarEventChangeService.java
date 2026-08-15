@@ -5,10 +5,9 @@ import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.event.service.EventCommandService;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
-import com.calio.calendar.integration.mapping.domain.GoogleCalendarContentHasher;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingCommandService;
-import com.calio.calendar.integration.sync.operation.GoogleOperationJobCommandService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobQueryService;
+import com.calio.calendar.integration.sync.operation.GoogleOperationJobService;
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEffectiveScope;
 import com.calio.calendar.integration.sync.page.dto.GoogleCalendarPageRecordCache;
 import com.calio.calendar.integration.sync.page.dto.GoogleCalendarNormalizedPage.EventUpsert;
@@ -21,20 +20,21 @@ public class GoogleCalendarEventChangeService {
     private final GoogleCalendarEventMappingCommandService eventMappingCommandService;
     private final EventCommandService eventCommandService;
     private final GoogleOperationJobQueryService operationJobQueryService;
-    private final GoogleOperationJobCommandService operationJobCommandService;
+    private final GoogleOperationJobService operationJobService;
     private final GoogleCalendarContentReconciliationPolicy reconciliationPolicy;
 
     public GoogleCalendarEventChangeService(
             GoogleCalendarEventMappingCommandService eventMappingCommandService,
             EventCommandService eventCommandService,
             GoogleOperationJobQueryService operationJobQueryService,
-            GoogleOperationJobCommandService operationJobCommandService
+            GoogleOperationJobService operationJobService,
+            GoogleCalendarContentReconciliationPolicy reconciliationPolicy
     ) {
         this.eventMappingCommandService = eventMappingCommandService;
         this.eventCommandService = eventCommandService;
         this.operationJobQueryService = operationJobQueryService;
-        this.operationJobCommandService = operationJobCommandService;
-        this.reconciliationPolicy = new GoogleCalendarContentReconciliationPolicy();
+        this.operationJobService = operationJobService;
+        this.reconciliationPolicy = reconciliationPolicy;
     }
 
     public void applyUpsert(
@@ -85,13 +85,13 @@ public class GoogleCalendarEventChangeService {
         GoogleCalendarContentReconciliationDecision decision = reconciliationPolicy.decide(
                 mapping.getSyncedContentHash(),
                 GoogleCalendarContentHasher.hash(mapping.getEvent()),
-                operationJobQueryService.listPendingDesiredContentHashes(
+                operationJobQueryService.listPendingTargetContentHashes(
                         mapping.getIntegration().getAccountId(), mapping.getIntegration().getId(), scope),
                 GoogleCalendarContentHasher.hash(item)
         );
         if (decision == GoogleCalendarContentReconciliationDecision.TRUE_CONFLICT) {
             mapping.markConflicted();
-            operationJobCommandService.markConflictDetected(ownership.jobId(), ownership.workerToken());
+            recordSyncConflict(mapping, ownership);
             return;
         }
         if (decision == GoogleCalendarContentReconciliationDecision.GOOGLE_ONLY) {
@@ -119,15 +119,26 @@ public class GoogleCalendarEventChangeService {
                 eventMapping.getEvent().getId());
         if (!GoogleCalendarContentHasher.hash(eventMapping.getEvent())
                 .equals(eventMapping.getSyncedContentHash())
-                || !operationJobQueryService.listPendingDesiredContentHashes(
+                || !operationJobQueryService.listPendingTargetContentHashes(
                         eventMapping.getIntegration().getAccountId(),
                         eventMapping.getIntegration().getId(), scope).isEmpty()) {
             eventMapping.markConflicted();
-            operationJobCommandService.markConflictDetected(ownership.jobId(), ownership.workerToken());
+            recordSyncConflict(eventMapping, ownership);
             return;
         }
         eventMappings.remove(externalEventId);
         eventMappingCommandService.deleteEventMapping(eventMapping);
         eventCommandService.deleteEvent(eventMapping.getEvent());
+    }
+
+    private void recordSyncConflict(
+            GoogleCalendarEventMapping mapping,
+            GoogleCalendarPageOwnership ownership
+    ) {
+        operationJobService.recordSyncConflict(
+                ownership.jobId(),
+                mapping.getIntegration().getAccountId(),
+                ownership.workerToken()
+        );
     }
 }
