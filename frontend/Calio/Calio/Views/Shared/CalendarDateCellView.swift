@@ -16,13 +16,15 @@ struct CalendarDateCellView: View {
     let weekday: CalendarWeekday
     let dayText: String
     let isToday: Bool
+    let isSelected: Bool
     let onTap: () -> Void
     let events: [Event]
     
-    init(weekday: CalendarWeekday, dayText: String, isToday: Bool, onTap: @escaping () -> Void, events: [Event]) {
+    init(weekday: CalendarWeekday, dayText: String, isToday: Bool, isSelected: Bool = false, onTap: @escaping () -> Void, events: [Event]) {
         self.weekday = weekday
         self.dayText = dayText
         self.isToday = isToday
+        self.isSelected = isSelected
         self.onTap = onTap
         self.events = events
     }
@@ -52,8 +54,9 @@ struct CalendarDateCellView: View {
             .background{
                 if isToday {
                     Circle()
-                        .fill(Color(red: 0.56, green: 0.76, blue: 0.96))
-                    
+                        .fill(Color.calioBrand)
+                } else if isSelected {
+                    Circle().fill(Color.calioSelection)
                 }
             }
     }
@@ -83,17 +86,17 @@ struct CalendarDateCellView: View {
     private var hiddenEventText: some View {
         return Text("+\(hiddenEventCount)")
             .font(.system(size: 12, weight: .medium))
-            .foregroundStyle(.secondary)
+            .foregroundStyle(.calioTextSecondary)
     }
     
     private var weekdayTextColor: Color {
         switch weekday {
         case .saturday:
-            return .blue
+            return .calioBrand
         case .sunday:
-            return .red
+            return .calioCalendarSunday
         default:
-            return .secondary
+            return .calioTextPrimary
         }
     }
 }

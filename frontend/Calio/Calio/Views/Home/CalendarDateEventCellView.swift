@@ -9,7 +9,6 @@ import SwiftUI
 import UIKit
 
 struct CalendarDateEventCellView: View {
-    private let chipLayoutBuilder = CalendarDateEventChipLayoutBuilder()
     private let popoverEdgeResolver = CalendarDateEventPopoverEdgeResolver()
     
     let day: DayKey
@@ -53,63 +52,42 @@ struct CalendarDateEventCellView: View {
     }
     
     var body: some View {
-        GeometryReader { geometry in
-            let chipLayout = chipLayoutBuilder.make(
-                chips: calendarChips,
-                maxWidth: geometry.size.width
-            )
+        VStack(alignment: .leading, spacing: 10) {
+            Text("\(monthText) / \(dayText)")
+                .font(.headline.weight(isToday ? .bold : .semibold))
+                .foregroundStyle(isToday ? .calioBrand : .calioTextPrimary)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
-            ZStack(alignment: .topLeading) {
-                Color.clear
-                    .contentShape(Rectangle())
-                    .onTapGesture(perform: onTap)
+            ForEach(holidays) { holiday in
+                holidayChip(holiday)
+            }
 
-                VStack(spacing: 8) {
-                    Text("\(monthText) / \(dayText)")
-                        .font(.system(size: 18, weight: .medium))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                    FlowLayout(spacing: chipLayoutBuilder.spacing) {
-                        ForEach(chipLayout.visibleChips) { chip in
-                            switch chip.kind {
-                            case .holiday(let holiday):
-                                holidayChip(holiday)
-                            case .event(let event):
-                                eventChipButton(event)
-                            }
-                        }
-
-                        if chipLayout.hiddenChipCount > 0 {
-                            Text("+\(chipLayout.hiddenChipCount) more")
-                                .font(.system(size: 13, weight: .medium))
-                                .lineLimit(1)
-                                .foregroundStyle(.secondary)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 6)
-                                        .fill(Color.secondary.opacity(0.12))
-                                )
-                        }
-                    }
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            ForEach(events) { event in
+                eventChipButton(event)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .onTapGesture(perform: onTap)
     }
 
     private func holidayChip(_ holiday: NationalHoliday) -> some View {
-        Text(holiday.title)
-            .font(.system(size: 13, weight: .medium))
-            .lineLimit(1)
-            .foregroundStyle(.white)
+        HStack(spacing: 6) {
+            Text(holiday.title)
+                .font(.caption.weight(.semibold))
+                .lineLimit(1)
+
+            Text("종일")
+                .font(.caption2.weight(.medium))
+        }
+        .foregroundStyle(.white)
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
             .background(
-                RoundedRectangle(cornerRadius: 6)
+                Capsule()
                     .fill(Color.calendarHoliday)
             )
-            .accessibilityLabel("\(holiday.title) 공휴일")
+            .accessibilityLabel("\(holiday.title) 공휴일, 종일")
     }
 
     private func eventChipButton(_ event: Event) -> some View {
@@ -117,15 +95,34 @@ struct CalendarDateEventCellView: View {
             selectedEvent = CalendarDateEventSelection(day: day, event: event)
             onEventSelected(event)
         } label: {
-            Text(event.title)
-                .font(.system(size: 13, weight: .medium))
-                .lineLimit(1)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(Color(hex: event.tag.colorCode))
-                )
+            HStack(alignment: .top, spacing: 8) {
+                Circle()
+                    .fill(Color(hex: event.tag.colorCode))
+                    .frame(width: 7, height: 7)
+                    .padding(.top, 7)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(event.title)
+                        .font(.subheadline.weight(.semibold))
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    Text(eventScheduleText(event))
+                        .font(.caption)
+                        .foregroundStyle(.calioTextSecondary)
+                }
+            }
+            .foregroundStyle(.calioTextPrimary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(Color.calioSurface)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(Color.calioDivider, lineWidth: 1)
+            }
         }
         .buttonStyle(.plain)
         .background {
@@ -178,6 +175,18 @@ struct CalendarDateEventCellView: View {
             for: eventChipFrames[event.id],
             screenHeight: UIScreen.main.bounds.height
         )
+    }
+
+    private func eventScheduleText(_ event: Event) -> String {
+        if event.isAllDay {
+            return "종일"
+        }
+
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ko_KR")
+        formatter.dateFormat = "a h:mm"
+        let time = formatter.string(from: event.startAt)
+        return event.isRecurrenceOccurrence ? "반복 · \(time)" : time
     }
 
     var calendarChips: [CalendarDateEventChip] {
