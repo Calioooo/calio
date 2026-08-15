@@ -6,6 +6,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.calio.calendar.aicalendar.domain.CalendarConversationMessageRole;
 import com.calio.calendar.aicalendar.service.CalendarAssistantAgent;
 import com.calio.calendar.aicalendar.service.dto.CalendarAssistantAnswer;
 import com.calio.calendar.aicalendar.service.dto.CalendarAssistantRequest;
@@ -35,7 +36,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
         "spring.datasource.password=",
         "spring.jpa.hibernate.ddl-auto=create-drop",
         "spring.ai.model.chat=openai",
-        "spring.ai.openai.chat.options.temperature=0"
+        "spring.ai.openai.chat.temperature=0"
 })
 @EnabledIfEnvironmentVariable(named = "OPENAI_API_KEY", matches = ".+")
 class CalendarAssistantEvalTest {
@@ -58,7 +59,7 @@ class CalendarAssistantEvalTest {
                 "eval-conversation",
                 ZoneId.of("Asia/Seoul"),
                 List.of(new CalendarConversationHistoryMessage(
-                        com.calio.calendar.aicalendar.domain.CalendarConversationMessageRole.USER,
+                        CalendarConversationMessageRole.USER,
                         "2026년 8월 15일 일정 알려줘"
                 ))
         );
@@ -116,7 +117,7 @@ class CalendarAssistantEvalTest {
                 "eval-conversation",
                 ZoneId.of("Asia/Seoul"),
                 List.of(new CalendarConversationHistoryMessage(
-                        com.calio.calendar.aicalendar.domain.CalendarConversationMessageRole.USER,
+                        CalendarConversationMessageRole.USER,
                         message
                 ))
         );
