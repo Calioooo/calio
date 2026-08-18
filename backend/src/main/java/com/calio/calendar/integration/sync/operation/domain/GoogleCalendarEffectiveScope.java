@@ -3,30 +3,69 @@ package com.calio.calendar.integration.sync.operation.domain;
 import java.time.Instant;
 import java.util.Objects;
 
-public sealed interface GoogleCalendarEffectiveScope permits GoogleCalendarEffectiveScope.Event,
-        GoogleCalendarEffectiveScope.RecurrenceEvent, GoogleCalendarEffectiveScope.RecurrenceOverride {
+public final class GoogleCalendarEffectiveScope {
 
-    GoogleCalendarEffectiveScopeType type();
+    private final GoogleCalendarEffectiveScopeType type;
+    private final Long canonicalId;
+    private final Instant originStartAt;
 
-    default String storedScope() {
-        return type().getStoredValue();
+    private GoogleCalendarEffectiveScope(
+            GoogleCalendarEffectiveScopeType type,
+            Long canonicalId,
+            Instant originStartAt
+    ) {
+        this.type = Objects.requireNonNull(type, "type");
+        this.canonicalId = requirePositive(canonicalId);
+        this.originStartAt = originStartAt;
     }
 
-    String storedKey();
-
-    static Event event(Long eventId) { return new Event(requirePositive(eventId)); }
-
-    static RecurrenceEvent recurrenceEvent(Long recurrenceEventId) {
-        return new RecurrenceEvent(requirePositive(recurrenceEventId));
+    public static GoogleCalendarEffectiveScope event(Long eventId) {
+        return new GoogleCalendarEffectiveScope(GoogleCalendarEffectiveScopeType.EVENT, eventId, null);
     }
 
-    static RecurrenceOverride recurrenceOverride(Long recurrenceEventId, Instant originStartAt) {
-        return new RecurrenceOverride(requirePositive(recurrenceEventId),
-                Objects.requireNonNull(originStartAt, "originStartAt"));
+    public static GoogleCalendarEffectiveScope recurrenceEvent(Long recurrenceEventId) {
+        return new GoogleCalendarEffectiveScope(
+                GoogleCalendarEffectiveScopeType.RECURRENCE_EVENT,
+                recurrenceEventId,
+                null
+        );
     }
 
-    static String overrideKeyPrefix(Long recurrenceEventId) {
-        return requirePositive(recurrenceEventId) + ":";
+    public static GoogleCalendarEffectiveScope recurrenceOverride(
+            Long recurrenceEventId,
+            Instant originStartAt
+    ) {
+        return new GoogleCalendarEffectiveScope(
+                GoogleCalendarEffectiveScopeType.RECURRENCE_OVERRIDE,
+                recurrenceEventId,
+                Objects.requireNonNull(originStartAt, "originStartAt")
+        );
+    }
+
+    public GoogleCalendarEffectiveScopeType type() {
+        return type;
+    }
+
+    public boolean isRecurrenceEventAggregate() {
+        return type == GoogleCalendarEffectiveScopeType.RECURRENCE_EVENT;
+    }
+
+    public String storedScope() {
+        return type.getStoredValue();
+    }
+
+    public String storedKey() {
+        if (type == GoogleCalendarEffectiveScopeType.RECURRENCE_OVERRIDE) {
+            return canonicalId + ":" + originStartAt;
+        }
+        return canonicalId.toString();
+    }
+
+    public String childOverrideKeyPrefix() {
+        if (!isRecurrenceEventAggregate()) {
+            throw new IllegalStateException("Only recurrence-event scope has child overrides");
+        }
+        return canonicalId + ":";
     }
 
     private static Long requirePositive(Long value) {
@@ -34,27 +73,5 @@ public sealed interface GoogleCalendarEffectiveScope permits GoogleCalendarEffec
             throw new IllegalArgumentException("Canonical scope ID must be positive");
         }
         return value;
-    }
-
-    record Event(Long eventId) implements GoogleCalendarEffectiveScope {
-        @Override public GoogleCalendarEffectiveScopeType type() {
-            return GoogleCalendarEffectiveScopeType.EVENT;
-        }
-        @Override public String storedKey() { return eventId.toString(); }
-    }
-
-    record RecurrenceEvent(Long recurrenceEventId) implements GoogleCalendarEffectiveScope {
-        @Override public GoogleCalendarEffectiveScopeType type() {
-            return GoogleCalendarEffectiveScopeType.RECURRENCE_EVENT;
-        }
-        @Override public String storedKey() { return recurrenceEventId.toString(); }
-    }
-
-    record RecurrenceOverride(Long recurrenceEventId, Instant originStartAt)
-            implements GoogleCalendarEffectiveScope {
-        @Override public GoogleCalendarEffectiveScopeType type() {
-            return GoogleCalendarEffectiveScopeType.RECURRENCE_OVERRIDE;
-        }
-        @Override public String storedKey() { return overrideKeyPrefix(recurrenceEventId) + originStartAt; }
     }
 }

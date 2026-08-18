@@ -32,15 +32,14 @@ public class GoogleOperationJobQueryService {
             Long integrationId,
             GoogleCalendarEffectiveScope scope
     ) {
-        if (scope instanceof GoogleCalendarEffectiveScope.RecurrenceEvent recurrenceEvent) {
+        if (scope.isRecurrenceEventAggregate()) {
             return jobRepository.existsPendingOutboundJobForRecurrenceAggregate(
                     accountId,
                     integrationId,
                     GoogleCalendarEffectiveScopeType.RECURRENCE_EVENT.getStoredValue(),
-                    recurrenceEvent.storedKey(),
+                    scope.storedKey(),
                     GoogleCalendarEffectiveScopeType.RECURRENCE_OVERRIDE.getStoredValue(),
-                    GoogleCalendarEffectiveScope.overrideKeyPrefix(
-                            recurrenceEvent.recurrenceEventId())
+                    scope.childOverrideKeyPrefix()
             );
         }
         return jobRepository.existsPendingOutboundJob(
