@@ -46,7 +46,7 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
-    exclude '**/CalendarAssistantEvalTest.class'
+    exclude '**/*EvalTest.class'
 }
 
 tasks.register('aiCalendarEval', Test) {
@@ -56,7 +56,7 @@ tasks.register('aiCalendarEval', Test) {
     classpath = sourceSets.test.runtimeClasspath
     systemProperty 'spring.profiles.active', 'ai-calendar-eval'
     useJUnitPlatform()
-    include '**/CalendarAssistantEvalTest.class'
+    include '**/*EvalTest.class'
     outputs.upToDateWhen { false }
     doFirst {
         if (System.getenv('OPENAI_API_KEY') == null || System.getenv('OPENAI_API_KEY').isBlank()) {

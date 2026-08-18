@@ -1,6 +1,7 @@
 package com.calio.calendar.aicalendar.service;
 
 import com.calio.calendar.aicalendar.controller.dto.SendCalendarConversationMessageResponse;
+import com.calio.calendar.aicalendar.domain.CalendarAssistantRequestClassification;
 import com.calio.calendar.aicalendar.domain.CalendarConversation;
 import com.calio.calendar.aicalendar.domain.CalendarConversationMessageRole;
 import com.calio.calendar.aicalendar.service.dto.CalendarAssistantRequest;
@@ -13,6 +14,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -22,9 +24,15 @@ public class CalendarConversationService {
 
     private static final int MAX_MESSAGE_LENGTH = 2_000;
     private static final int MAX_HISTORY_SIZE = 20;
+    private static final List<String> UNSUPPORTED_MESSAGES = List.of(
+            "일정 조회와 빈 시간 찾기를 도와드릴 수 있어요.",
+            "캘린더의 일정 확인이나 빈 시간 찾기를 요청해 주세요.",
+            "일정 조회와 빈 시간 찾기 기능을 지원해요."
+    );
 
     private final CalendarConversationQueryService conversationQueryService;
     private final CalendarConversationCommandService conversationCommandService;
+    private final CalendarAssistantRequestClassifier requestClassifier;
     private final CalendarAssistantAgent assistantAgent;
     private final Clock clock;
     private final TransactionTemplate transactionTemplate;
@@ -32,12 +40,14 @@ public class CalendarConversationService {
     public CalendarConversationService(
             CalendarConversationQueryService conversationQueryService,
             CalendarConversationCommandService conversationCommandService,
+            CalendarAssistantRequestClassifier requestClassifier,
             CalendarAssistantAgent assistantAgent,
             Clock clock,
             PlatformTransactionManager transactionManager
     ) {
         this.conversationQueryService = conversationQueryService;
         this.conversationCommandService = conversationCommandService;
+        this.requestClassifier = requestClassifier;
         this.assistantAgent = assistantAgent;
         this.clock = clock;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
@@ -66,6 +76,9 @@ public class CalendarConversationService {
                 conversation.getId(),
                 message
         );
+        if (requestClassifier.classify(message) == CalendarAssistantRequestClassification.UNSUPPORTED) {
+            return recordUnsupportedResponse(conversation.getId(), conversationId);
+        }
         CalendarAssistantRequest request = new CalendarAssistantRequest(
                 accountId,
                 conversationId,
@@ -75,6 +88,23 @@ public class CalendarConversationService {
         CalendarAssistantAnswer answer = assistantAgent.answer(request);
         recordAssistantMessage(conversation.getId(), answer.message());
         return SendCalendarConversationMessageResponse.from(conversationId, answer);
+    }
+
+    private SendCalendarConversationMessageResponse recordUnsupportedResponse(
+            Long conversationId,
+            String externalConversationId
+    ) {
+        CalendarAssistantAnswer answer = new CalendarAssistantAnswer(
+                selectUnsupportedMessage(),
+                List.of(),
+                List.of()
+        );
+        recordAssistantMessage(conversationId, answer.message());
+        return SendCalendarConversationMessageResponse.from(externalConversationId, answer);
+    }
+
+    private String selectUnsupportedMessage() {
+        return UNSUPPORTED_MESSAGES.get(ThreadLocalRandom.current().nextInt(UNSUPPORTED_MESSAGES.size()));
     }
 
     List<CalendarConversationHistoryMessage> recordUserMessageAndGetRecentHistory(
