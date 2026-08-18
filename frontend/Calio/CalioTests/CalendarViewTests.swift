@@ -301,4 +301,40 @@ struct CalendarViewTests {
             Issue.record("overflow layout은 겹친 일정 목록을 보여야 합니다.")
         }
     }
+
+    @Test func weekTimelineHeaderAccessibilityKeepsTodayAndSelectionDistinct() async throws {
+        #expect(
+            CalendarWeekTimelineView.dayHeaderAccessibilityLabel(
+                weekday: .monday,
+                day: 17,
+                isToday: true,
+                isSelected: true
+            ) == "월요일 17일, 오늘, 선택됨"
+        )
+        #expect(
+            CalendarWeekTimelineView.dayHeaderAccessibilityLabel(
+                weekday: .sunday,
+                day: 23,
+                isToday: false,
+                isSelected: false
+            ) == "일요일 23일"
+        )
+    }
+
+    @Test func weekTimelineOverflowAccessibilityDescribesTheExistingOverlapAction() async throws {
+        let event = makeEvent(id: 1, title: "디자인 검토", on: Date())
+        let layout = TimelineEventLayout(
+            id: "overflow",
+            event: event,
+            title: "+2",
+            x: 0,
+            y: 0,
+            width: 20,
+            height: 20,
+            style: .overflow,
+            tapAction: .showOverlapGroup([event, event, event])
+        )
+
+        #expect(layout.accessibilityLabel == "겹친 일정 3개 보기")
+    }
 }
