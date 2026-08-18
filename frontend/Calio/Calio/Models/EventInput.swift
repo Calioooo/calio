@@ -64,7 +64,7 @@ struct RecurrenceEventCreateInput: Equatable {
     let title: String
     let description: String
     let recurrenceStartDate: Date
-    let recurrenceEndDate: Date
+    let recurrenceEndDate: Date?
     let recurrenceStartTime: Date
     let recurrenceEndTime: Date
     let recurrenceFrequency: RecurrenceFrequency
@@ -75,7 +75,7 @@ struct RecurrenceEventCreateInput: Equatable {
         title: String,
         description: String,
         recurrenceStartDate: Date,
-        recurrenceEndDate: Date,
+        recurrenceEndDate: Date?,
         recurrenceStartTime: Date,
         recurrenceEndTime: Date,
         recurrenceFrequency: RecurrenceFrequency,
@@ -99,7 +99,7 @@ struct RecurrenceEventDetails: Equatable {
     let title: String
     let description: String
     let recurrenceStartDate: Date
-    let recurrenceEndDate: Date
+    let recurrenceEndDate: Date?
     let recurrenceStartTime: Date
     let recurrenceEndTime: Date
     let recurrenceFrequency: RecurrenceFrequency
@@ -114,7 +114,7 @@ struct RecurrenceEventDetails: Equatable {
         title: String,
         description: String,
         recurrenceStartDate: Date,
-        recurrenceEndDate: Date,
+        recurrenceEndDate: Date?,
         recurrenceStartTime: Date,
         recurrenceEndTime: Date,
         recurrenceFrequency: RecurrenceFrequency,
@@ -144,7 +144,7 @@ struct RecurrenceEventSeriesEditInput: Equatable {
     let title: String
     let description: String
     let recurrenceStartDate: Date
-    let recurrenceEndDate: Date
+    let recurrenceEndDate: Date?
     let recurrenceStartTime: Date
     let recurrenceEndTime: Date
     let recurrenceFrequency: RecurrenceFrequency
@@ -156,7 +156,7 @@ struct RecurrenceEventSeriesEditInput: Equatable {
         title: String,
         description: String,
         recurrenceStartDate: Date,
-        recurrenceEndDate: Date,
+        recurrenceEndDate: Date?,
         recurrenceStartTime: Date,
         recurrenceEndTime: Date,
         recurrenceFrequency: RecurrenceFrequency,
@@ -181,7 +181,7 @@ struct RecurrenceEventUpdateInput: Equatable {
     let title: String
     let description: String
     let recurrenceStartDate: Date
-    let recurrenceEndDate: Date
+    let recurrenceEndDate: Date?
     let recurrenceStartTime: Date
     let recurrenceEndTime: Date
     let recurrenceFrequency: RecurrenceFrequency
@@ -193,7 +193,7 @@ struct RecurrenceEventUpdateInput: Equatable {
         title: String,
         description: String,
         recurrenceStartDate: Date,
-        recurrenceEndDate: Date,
+        recurrenceEndDate: Date?,
         recurrenceStartTime: Date,
         recurrenceEndTime: Date,
         recurrenceFrequency: RecurrenceFrequency,

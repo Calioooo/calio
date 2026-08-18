@@ -10,7 +10,7 @@ struct RecurrenceScheduleRequest: Equatable {
 enum RecurrenceScheduleBuilder {
     static func make(
         startDate: Date,
-        endDate: Date,
+        endDate: Date?,
         startTime: Date,
         endTime: Date,
         frequency: RecurrenceFrequency,
@@ -39,14 +39,14 @@ enum RecurrenceScheduleBuilder {
             time: endTime,
             timeZone: timeZone,
             formTimeZone: formTimeZone
-        ), firstStartAt < firstEndAt,
-        let until = instant(
-            date: endDate,
-            time: startTime,
-            timeZone: timeZone,
-            formTimeZone: formTimeZone
-        ) else {
+        ), firstStartAt < firstEndAt else {
             throw EventServiceError.validationFailed
+        }
+        let until = try endDate.map { date in
+            guard let value = instant(date: date, time: startTime, timeZone: timeZone, formTimeZone: formTimeZone) else {
+                throw EventServiceError.validationFailed
+            }
+            return value
         }
 
         return RecurrenceScheduleRequest(

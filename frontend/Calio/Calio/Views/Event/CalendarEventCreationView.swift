@@ -167,7 +167,7 @@ struct CalendarEventCreationView: View {
 
     private func resetRecurrenceFieldsFromSingleEventTime() {
         recurrenceInput.startDate = eventInput.startAt
-        recurrenceInput.endDate = eventInput.endAt
+        recurrenceInput.endDate = Calendar.current.date(byAdding: .year, value: 1, to: eventInput.startAt) ?? eventInput.startAt
         recurrenceInput.startTime = eventInput.startAt
         recurrenceInput.endTime = eventInput.endAt
         recurrenceInput.frequency = .daily

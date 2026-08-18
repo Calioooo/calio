@@ -20,10 +20,16 @@ struct EventInput: Equatable {
 struct RecurrenceInput: Equatable {
     var isEnabled: Bool
     var startDate: Date
-    var endDate: Date
+    var endDate: Date?
     var startTime: Date
     var endTime: Date
     var frequency: RecurrenceFrequency
+
+    mutating func setNoEndDate(_ isSelected: Bool, calendar: Calendar = .current) {
+        endDate = isSelected
+            ? nil
+            : calendar.date(byAdding: .year, value: 1, to: startDate) ?? startDate
+    }
 }
 
 struct CalendarEventFormView: View {
@@ -191,13 +197,30 @@ struct CalendarEventFormView: View {
             )
             .environment(\.locale, Locale(identifier: "ko_KR"))
 
-            DatePicker(
-                "반복 종료일",
-                selection: recurrenceInput.endDate,
-                displayedComponents: [.date]
-            )
-            .environment(\.locale, Locale(identifier: "ko_KR"))
+            Toggle("종료일 없음", isOn: noEndDateBinding(recurrenceInput))
+
+            if let fallbackEndDate = recurrenceInput.wrappedValue.endDate {
+                DatePicker(
+                    "반복 종료일",
+                    selection: Binding(
+                        get: { recurrenceInput.wrappedValue.endDate ?? fallbackEndDate },
+                        set: { recurrenceInput.wrappedValue.endDate = $0 }
+                    ),
+                    in: recurrenceInput.wrappedValue.startDate...,
+                    displayedComponents: [.date]
+                )
+                .environment(\.locale, Locale(identifier: "ko_KR"))
+            }
         }
+    }
+
+    private func noEndDateBinding(_ recurrenceInput: Binding<RecurrenceInput>) -> Binding<Bool> {
+        Binding(
+            get: { recurrenceInput.wrappedValue.endDate == nil },
+            set: { isNoEndDate in
+                recurrenceInput.wrappedValue.setNoEndDate(isNoEndDate)
+            }
+        )
     }
 
     private func recurrenceTimeSection(_ recurrenceInput: Binding<RecurrenceInput>) -> some View {
