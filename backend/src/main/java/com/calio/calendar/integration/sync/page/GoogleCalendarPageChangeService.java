@@ -98,15 +98,17 @@ public class GoogleCalendarPageChangeService {
         for (NormalizedItem item : items) {
             switch (item) {
                 case EventUpsert event -> {
-                    removeRecurrenceEventWithSameExternalId(event.externalEventId(), cache, ownership);
-                    eventChangeService.applyUpsert(
-                            integration,
-                            event,
-                            cache,
-                            account,
-                            defaultTag,
-                            ownership
-                    );
+                    if (removeRecurrenceEventWithSameExternalId(
+                            event.externalEventId(), cache, ownership)) {
+                        eventChangeService.applyUpsert(
+                                integration,
+                                event,
+                                cache,
+                                account,
+                                defaultTag,
+                                ownership
+                        );
+                    }
                 }
                 case EventCancellation cancellation -> eventChangeService.applyCancellation(
                         cancellation.externalEventId(),
@@ -114,15 +116,17 @@ public class GoogleCalendarPageChangeService {
                         ownership
                 );
                 case RecurrenceEventUpsert recurrenceEvent -> {
-                    removeEventWithSameExternalId(recurrenceEvent.externalEventId(), cache, ownership);
-                    recurrenceChangeService.applyUpsert(
-                            integration,
-                            recurrenceEvent,
-                            cache,
-                            account,
-                            defaultTag,
-                            ownership
-                    );
+                    if (removeEventWithSameExternalId(
+                            recurrenceEvent.externalEventId(), cache, ownership)) {
+                        recurrenceChangeService.applyUpsert(
+                                integration,
+                                recurrenceEvent,
+                                cache,
+                                account,
+                                defaultTag,
+                                ownership
+                        );
+                    }
                 }
                 case RecurrenceEventCancellation cancellation -> recurrenceChangeService.applyCancellation(
                         cancellation.externalEventId(),
@@ -138,26 +142,28 @@ public class GoogleCalendarPageChangeService {
         }
     }
 
-    private void removeRecurrenceEventWithSameExternalId(
+    private boolean removeRecurrenceEventWithSameExternalId(
             String externalEventId,
             GoogleCalendarPageRecordCache cache,
             GoogleCalendarPageOwnership ownership
     ) {
         if (!cache.recurrenceEventMappings().containsKey(externalEventId)) {
-            return;
+            return true;
         }
         recurrenceChangeService.applyCancellation(externalEventId, cache, ownership);
+        return !cache.recurrenceEventMappings().containsKey(externalEventId);
     }
 
-    private void removeEventWithSameExternalId(
+    private boolean removeEventWithSameExternalId(
             String externalEventId,
             GoogleCalendarPageRecordCache cache,
             GoogleCalendarPageOwnership ownership
     ) {
         if (!cache.eventMappings().containsKey(externalEventId)) {
-            return;
+            return true;
         }
         eventChangeService.applyCancellation(externalEventId, cache, ownership);
+        return !cache.eventMappings().containsKey(externalEventId);
     }
 
     private GoogleCalendarPageRecordCache loadPageRecordCache(
