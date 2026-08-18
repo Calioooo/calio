@@ -106,6 +106,9 @@ struct CalendarEventDetailView: View {
             .toolbar {
                 toolbarContent
             }
+            .task(id: event.recurrenceId) {
+                await loadRecurrenceDetails()
+            }
             .confirmationDialog(
                 "반복 일정 수정",
                 isPresented: $isShowingRecurrenceEditScope,
@@ -120,6 +123,8 @@ struct CalendarEventDetailView: View {
                     }
                 }
                 Button("취소", role: .cancel) {}
+            } message: {
+                Text(recurrenceEditScopeGuidance)
             }
             .confirmationDialog(
                 "삭제하시겠습니까?",
@@ -145,6 +150,8 @@ struct CalendarEventDetailView: View {
                     }
                 }
                 Button("취소", role: .cancel) {}
+            } message: {
+                Text(recurrenceDeleteScopeGuidance)
             }
         }
     }
@@ -168,6 +175,10 @@ struct CalendarEventDetailView: View {
             recurrenceDetailSection
             descriptionSection
         }
+        .scrollContentBackground(.hidden)
+        .background(Color.calioBackground)
+        .tint(.calioBrand)
+        .environment(\.locale, Locale(identifier: "ko_KR"))
     }
 
     private var editForm: some View {
@@ -188,7 +199,9 @@ struct CalendarEventDetailView: View {
             )
         }
         .scrollContentBackground(.hidden)
-        .background(Color(uiColor: .systemGroupedBackground))
+        .background(Color.calioBackground)
+        .tint(.calioBrand)
+        .environment(\.locale, Locale(identifier: "ko_KR"))
     }
 
     @ToolbarContentBuilder
@@ -205,7 +218,9 @@ struct CalendarEventDetailView: View {
                 Button("저장") {
                     saveEdit()
                 }
+                .fontWeight(.semibold)
                 .disabled(!canSaveEdit || isEventActionInProgress)
+                .accessibilityIdentifier("event_detail_save_button")
             }
         } else {
             ToolbarItemGroup(placement: .topBarTrailing) {
@@ -246,13 +261,14 @@ struct CalendarEventDetailView: View {
             Section {
                 HStack(alignment: .top, spacing: 10) {
                     Image(systemName: "exclamationmark.circle.fill")
-                        .foregroundStyle(.red)
+                        .foregroundStyle(Color.calendarHoliday)
                     Text(mutationFailureMessage)
                         .font(.subheadline)
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(.calioTextPrimary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(.vertical, 2)
+                .listRowBackground(Color.calioSelection)
                 .accessibilityIdentifier("event_mutation_failure_message")
             }
         }
@@ -266,7 +282,7 @@ struct CalendarEventDetailView: View {
                     ProgressView()
                     Text("반복 일정 정보를 불러오는 중입니다.")
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.calioTextSecondary)
                 }
                 .padding(.vertical, 2)
             }
@@ -280,12 +296,25 @@ struct CalendarEventDetailView: View {
                     .fill(Color(hex: event.tag.colorCode))
                     .frame(width: 6, height: 34)
 
-                Text(event.title)
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(.primary)
-                    .fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(event.title)
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(.calioTextPrimary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    Text(event.tag.title)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.calioTextSecondary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Capsule().fill(Color.calioSelection))
+                }
             }
             .padding(.vertical, 2)
+            .accessibilityIdentifier("event_detail_title")
+        } header: {
+            Text("일정")
+                .foregroundStyle(.calioTextSecondary)
         }
     }
 
@@ -312,6 +341,7 @@ struct CalendarEventDetailView: View {
                 )
             }
         }
+        .foregroundStyle(.calioTextPrimary)
     }
 
     private var inclusiveAllDayEndAt: Date {
@@ -323,15 +353,17 @@ struct CalendarEventDetailView: View {
             Label(importantStatusText, systemImage: importantStatusIconName)
             Label(recurrenceStatusText, systemImage: "repeat")
         }
+        .foregroundStyle(.calioTextPrimary)
     }
 
     @ViewBuilder
     private var recurrenceDetailSection: some View {
         if isRepeatedEvent {
             Section("반복 정보") {
-                LabeledContent("반복 기간", value: "제공된 정보 없음")
-                LabeledContent("반복 주기", value: "제공된 정보 없음")
+                LabeledContent("종료 조건", value: recurrenceEndConditionText)
+                LabeledContent("반복 주기", value: recurrenceFrequencyText)
             }
+            .foregroundStyle(.calioTextPrimary)
         }
     }
 
@@ -340,6 +372,7 @@ struct CalendarEventDetailView: View {
         if hasDescription {
             Section("설명") {
                 Text(event.description)
+                    .foregroundStyle(.calioTextPrimary)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -347,6 +380,22 @@ struct CalendarEventDetailView: View {
 
     private var hasDescription: Bool {
         !event.description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var recurrenceEndConditionText: String {
+        guard let details = recurrenceDetails else { return "제공된 정보 없음" }
+        guard let endDate = details.recurrenceEndDate else { return "종료일 없음" }
+        return CalendarEventDisplayText.dateRange(startAt: endDate, endAt: endDate)
+    }
+
+    private var recurrenceFrequencyText: String {
+        guard let details = recurrenceDetails else { return "제공된 정보 없음" }
+        switch details.recurrenceFrequency {
+        case .daily: return "매일"
+        case .weekly: return "매주"
+        case .monthly: return "매월"
+        case .yearly: return "매년"
+        }
     }
 
     private var importantStatusText: String {
@@ -427,6 +476,14 @@ struct CalendarEventDetailView: View {
         recurrenceDetails?.canUpdateSeries == true && recurrenceDetails?.isRuleEditable == true
     }
 
+    private var recurrenceEditScopeGuidance: String {
+        Self.recurrenceEditScopeGuidance(canUpdateSeries: canUpdateSeries)
+    }
+
+    private var recurrenceDeleteScopeGuidance: String {
+        Self.recurrenceDeleteScopeGuidance(canUpdateSeries: canUpdateSeries)
+    }
+
     private enum RecurrenceAction {
         case edit
         case delete
@@ -457,6 +514,16 @@ struct CalendarEventDetailView: View {
         }
     }
 
+    private func loadRecurrenceDetails() async {
+        guard isRepeatedEvent,
+              let recurrenceId = event.recurrenceId,
+              recurrenceDetails == nil else {
+            return
+        }
+
+        recurrenceDetails = await onFetchRecurrenceEvent(recurrenceId)
+    }
+
     private func startEditingRecurrenceSeries() {
         guard let details = recurrenceDetails,
               details.canUpdateSeries,
@@ -468,7 +535,7 @@ struct CalendarEventDetailView: View {
         editInput.title = details.title
         editInput.description = details.description
         editInput.startAt = details.recurrenceStartDate
-        editInput.endAt = details.recurrenceEndDate
+        editInput.endAt = details.recurrenceEndDate ?? details.recurrenceStartDate
         editInput.isAllDay = details.isAllDay
         seriesTimeZone = details.timeZone
         recurrenceInput = RecurrenceInput(
@@ -631,12 +698,24 @@ struct CalendarEventDetailView: View {
     nonisolated static func canUpdateRecurringEvent(_ event: Event) -> Bool {
         isRepeatedEvent(event) && event.recurrenceId != nil
     }
+
+    nonisolated static func recurrenceEditScopeGuidance(canUpdateSeries: Bool) -> String {
+        canUpdateSeries
+            ? "이 일정만 수정은 선택한 날짜에, 전체 반복 일정 수정은 시리즈 전체에 적용됩니다."
+            : "이 반복 일정은 전체 수정이 불가능해 선택한 날짜만 수정할 수 있습니다."
+    }
+
+    nonisolated static func recurrenceDeleteScopeGuidance(canUpdateSeries: Bool) -> String {
+        canUpdateSeries
+            ? "이 일정만 삭제는 선택한 날짜에, 전체 반복 일정 삭제는 시리즈 전체에 적용됩니다."
+            : "이 반복 일정은 전체 삭제가 불가능해 선택한 날짜만 삭제할 수 있습니다."
+    }
 }
 
 enum CalendarEventDisplayText {
     static func dateRange(startAt: Date, endAt: Date) -> String {
-        let startText = startAt.formatted(date: .abbreviated, time: .omitted)
-        let endText = endAt.formatted(date: .abbreviated, time: .omitted)
+        let startText = dateText(for: startAt, includesYear: true)
+        let endText = dateText(for: endAt, includesYear: true)
 
         guard !Calendar.current.isDate(startAt, inSameDayAs: endAt) else {
             return startText
@@ -669,7 +748,16 @@ enum CalendarEventDisplayText {
         formatter.locale = Locale(identifier: "ko_KR")
         formatter.calendar = Calendar(identifier: .gregorian)
         formatter.dateFormat = includesYear ? "yyyy년 M월 d일 a h:mm" : "M월 d일 a h:mm"
-        
+
+        return formatter.string(from: date)
+    }
+
+    private static func dateText(for date: Date, includesYear: Bool) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ko_KR")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.dateFormat = includesYear ? "yyyy년 M월 d일" : "M월 d일"
+
         return formatter.string(from: date)
     }
 }
