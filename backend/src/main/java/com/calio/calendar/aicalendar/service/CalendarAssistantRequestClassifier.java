@@ -30,17 +30,16 @@ public class CalendarAssistantRequestClassifier {
             throw providerUnavailable(null);
         }
         try {
-            CalendarAssistantRequestClassification classification = ChatClient.create(chatModel)
+            String response = ChatClient.create(chatModel)
                     .prompt()
                     .system(system -> system.text(systemPrompt))
                     .user(message)
                     .call()
-                    .entity(CalendarAssistantRequestClassification.class, spec ->
-                            spec.useProviderStructuredOutput());
-            if (classification == null) {
+                    .content();
+            if (response == null || response.isBlank()) {
                 throw new IllegalStateException("AI calendar request classifier returned an empty response.");
             }
-            return classification;
+            return CalendarAssistantRequestClassification.valueOf(response.trim());
         } catch (RuntimeException exception) {
             throw providerUnavailable(exception);
         }
