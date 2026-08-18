@@ -112,12 +112,7 @@ public class GoogleOperationJobService {
 
     @Transactional
     public void recordSyncConflict(Long jobId, Long accountId, String workerToken) {
-        try {
-            jobCommandService.markConflictDetected(jobId, workerToken);
-        } catch (GoogleOperationOwnershipLostException exception) {
-            log.warn("Google sync conflict detection rejected. accountId={} jobId={}", accountId, jobId);
-            throw exception;
-        }
+        jobCommandService.markConflictDetected(jobId, workerToken);
         log.info("Google sync conflict detected. accountId={} jobId={}", accountId, jobId);
     }
 
