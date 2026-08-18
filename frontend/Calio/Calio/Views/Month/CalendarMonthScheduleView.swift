@@ -25,6 +25,7 @@ struct CalendarMonthScheduleView: View {
     private let monthCellDayHeaderBottomSpacing: CGFloat = 3
     private let monthEventRowHeight: CGFloat = 16
     private let monthEventChipHeight: CGFloat = 14
+    @Environment(\.sizeCategory) private var sizeCategory
 
     let items: [CalendarDayItem]
     let referenceDay: DayKey
@@ -55,7 +56,7 @@ struct CalendarMonthScheduleView: View {
                     weekdayHeader
                     monthGrid
                 }
-                .background(Color(uiColor: .systemBackground))
+                .background(Color.calioBackground)
                 .gesture(monthSwipeGesture)
                 .allowsHitTesting(detailPanelDay == nil)
                 .onDisappear {
@@ -90,6 +91,7 @@ struct CalendarMonthScheduleView: View {
         }
         .padding(.horizontal, 8)
         .frame(height: weekdayHeaderHeight)
+        .background(Color.calioBackground)
     }
 
     private var monthGrid: some View {
@@ -137,12 +139,14 @@ struct CalendarMonthScheduleView: View {
     private func monthGridMetrics(for size: CGSize) -> MonthGridMetrics {
         let cellWidth = size.width / CGFloat(columnCount)
         let cellHeight = size.height / CGFloat(rowCount)
-        let maxEventRowCount = visibleEventRowCount(for: cellHeight)
+        let textScale = sizeCategory.isAccessibilityCategory ? 1.12 : 1
+        let maxEventRowCount = visibleEventRowCount(for: cellHeight, textScale: textScale)
         
         return MonthGridMetrics(
             cellWidth: cellWidth,
             cellHeight: cellHeight,
-            maxEventRowCount: maxEventRowCount
+            maxEventRowCount: maxEventRowCount,
+            textScale: textScale
         )
     }
     
@@ -245,14 +249,14 @@ struct CalendarMonthScheduleView: View {
         detailPanelDay = day
     }
 
-    private func visibleEventRowCount(for cellHeight: CGFloat) -> Int {
+    private func visibleEventRowCount(for cellHeight: CGFloat, textScale: CGFloat) -> Int {
         let verticalPadding = monthCellTopPadding + 4
         let availableHeight = cellHeight
             - verticalPadding
             - monthCellDayHeaderHeight
             - monthCellDayHeaderBottomSpacing
 
-        return max(1, Int(availableHeight / monthEventRowHeight))
+        return max(1, Int(availableHeight / (monthEventRowHeight * textScale)))
     }
 
     private func monthEventSpans(
@@ -265,8 +269,8 @@ struct CalendarMonthScheduleView: View {
                 metrics: metrics,
                 horizontalPadding: monthCellHorizontalPadding,
                 topOffset: eventAreaTopOffset,
-                rowHeight: monthEventRowHeight,
-                chipHeight: monthEventChipHeight
+                rowHeight: monthEventRowHeight * metrics.textScale,
+                chipHeight: monthEventChipHeight * metrics.textScale
             )
         }
     }
@@ -282,8 +286,8 @@ struct CalendarMonthScheduleView: View {
                 columnCount: columnCount,
                 horizontalPadding: monthCellHorizontalPadding,
                 topOffset: eventAreaTopOffset,
-                rowHeight: monthEventRowHeight,
-                chipHeight: monthEventChipHeight
+                rowHeight: monthEventRowHeight * metrics.textScale,
+                chipHeight: monthEventChipHeight * metrics.textScale
             )
         }
     }
@@ -692,11 +696,11 @@ struct CalendarMonthScheduleView: View {
     private func weekdayTextColor(_ weekday: CalendarWeekday) -> Color {
         switch weekday {
         case .sunday:
-            return .red
+            return .calioCalendarSunday
         case .saturday:
-            return .blue
+            return .calioBrand
         default:
-            return .secondary
+            return .calioTextSecondary
         }
     }
 }
@@ -731,6 +735,20 @@ private struct CalendarMonthScheduleDayCellView: View {
         .contentShape(Rectangle())
         .background(cellBackground)
         .overlay(cellBorder)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(
+            MonthCalendarDayAccessibility.label(
+                day: day,
+                weekday: item?.weekday,
+                isToday: item?.isToday == true,
+                isSelected: isReferenceDay,
+                isInSelectedRange: isSelectedInRange,
+                isCurrentMonth: isCurrentMonth,
+                hasHoliday: item?.hasHoliday == true,
+                eventCount: item?.events.count ?? 0
+            )
+        )
+        .accessibilityIdentifier("month_day_\(day.idValue)")
     }
 
     private var dayHeader: some View {
@@ -741,7 +759,7 @@ private struct CalendarMonthScheduleDayCellView: View {
             .background {
                 if item?.isToday == true {
                     Circle()
-                        .fill(Color(red: 0.56, green: 0.60, blue: 0.96))
+                        .fill(Color.calioBrand)
                 }
             }
     }
@@ -749,20 +767,23 @@ private struct CalendarMonthScheduleDayCellView: View {
     private var cellBackground: some View {
         ZStack {
             if isSelectedInRange {
-                Color(red: 0.56, green: 0.60, blue: 0.96).opacity(0.22)
+                Color.calioSelection
             } else if isReferenceDay {
-                Color(red: 0.56, green: 0.60, blue: 0.96).opacity(0.16)
+                Color.calioSelection.opacity(0.72)
             } else if !isCurrentMonth {
-                Color(uiColor: .secondarySystemBackground).opacity(0.45)
+                Color.calioDivider.opacity(0.34)
             } else {
-                Color(uiColor: .systemBackground)
+                Color.calioSurface
             }
         }
     }
 
     private var cellBorder: some View {
         Rectangle()
-            .strokeBorder(Color.secondary.opacity(0.18), lineWidth: 0.6)
+            .strokeBorder(
+                isReferenceDay || isSelectedInRange ? Color.calioBrand.opacity(0.58) : Color.calioDivider,
+                lineWidth: isReferenceDay || isSelectedInRange ? 1 : 0.6
+            )
     }
 
     private var dayTextColor: Color {
@@ -780,11 +801,11 @@ private struct CalendarMonthScheduleDayCellView: View {
         
         switch item?.weekday {
         case .sunday:
-            return .red
+            return .calioCalendarSunday
         case .saturday:
-            return .blue
+            return .calioBrand
         default:
-            return .primary
+            return .calioTextPrimary
         }
     }
 }
@@ -793,6 +814,7 @@ private struct MonthGridMetrics {
     let cellWidth: CGFloat
     let cellHeight: CGFloat
     let maxEventRowCount: Int
+    let textScale: CGFloat
     
     var overflowRowIndex: Int {
         max(maxEventRowCount - 1, 0)
@@ -809,10 +831,10 @@ private struct MonthEventSpanView: View {
     
     var body: some View {
         Text(span.chip.title)
-            .font(.system(size: 10, weight: .medium))
+            .font(.system(size: 10 * metrics.textScale, weight: .medium))
             .lineLimit(1)
             .truncationMode(.tail)
-            .foregroundStyle(.black.opacity(0.85))
+            .foregroundStyle(Color.calioTextPrimary)
             .padding(.horizontal, 4)
             .frame(
                 width: chipWidth,
@@ -822,6 +844,8 @@ private struct MonthEventSpanView: View {
             .background(span.chip.color)
             .clipShape(RoundedRectangle(cornerRadius: 3))
             .offset(x: xOffset, y: yOffset)
+            .accessibilityLabel("\(span.chip.title), \(span.chip.accessibilityKind)")
+            .accessibilityIdentifier("month_event_\(span.id)")
     }
     
     private var chipWidth: CGFloat {
@@ -860,14 +884,16 @@ private struct MonthEventOverflowLabelView: View {
     
     var body: some View {
         Text("+\(label.hiddenCount)")
-            .font(.system(size: 10, weight: .medium))
-            .foregroundStyle(.secondary)
+            .font(.system(size: 10 * metrics.textScale, weight: .semibold))
+            .foregroundStyle(.calioTextSecondary)
             .frame(
                 width: labelWidth,
                 height: chipHeight,
                 alignment: .leading
             )
             .offset(x: xOffset, y: yOffset)
+            .accessibilityLabel("숨겨진 일정 \(label.hiddenCount)개")
+            .accessibilityIdentifier("month_overflow_\(label.day.idValue)")
     }
     
     private var labelWidth: CGFloat {
@@ -906,14 +932,14 @@ private struct CalendarMonthRangeActionPopover: View {
     private var popoverContent: some View {
         VStack(spacing: 8) {
             Text(rangeText)
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(.primary)
+                .font(.headline)
+                .foregroundStyle(.calioTextPrimary)
 
             HStack(spacing: 0) {
                 Button(action: onCreateTapped) {
                     Text("일정 생성")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(.blue)
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(.calioBrand)
                         .frame(maxWidth: .infinity, minHeight: 44)
                         .contentShape(Rectangle())
                 }
@@ -924,8 +950,8 @@ private struct CalendarMonthRangeActionPopover: View {
 
                 Button(action: onCancelTapped) {
                     Text("취소")
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundStyle(.red)
+                        .font(.body.weight(.medium))
+                        .foregroundStyle(.calioCalendarSunday)
                         .frame(maxWidth: .infinity, minHeight: 44)
                         .contentShape(Rectangle())
                 }
@@ -936,8 +962,9 @@ private struct CalendarMonthRangeActionPopover: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 12)
         .frame(width: 220)
-        .background(.regularMaterial)
+        .background(Color.calioSurface)
         .clipShape(RoundedRectangle(cornerRadius: 12))
+        .accessibilityIdentifier("month_range_action")
     }
 
     private var rangeText: String {
@@ -975,7 +1002,7 @@ private struct CalendarDayDetailFloatingPanelView: View {
                 eventList
             }
         }
-        .background(Color(uiColor: .systemBackground))
+        .background(Color.calioSurface)
         .clipShape(RoundedRectangle(cornerRadius: 22))
         .shadow(color: .black.opacity(0.22), radius: 24, x: 0, y: 14)
     }
@@ -984,12 +1011,12 @@ private struct CalendarDayDetailFloatingPanelView: View {
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 5) {
                 Text(dayTitle)
-                    .font(.system(size: 24, weight: .semibold))
-                    .foregroundStyle(.primary)
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(.calioTextPrimary)
 
                 Text(eventCountText)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(.secondary)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.calioTextSecondary)
             }
 
             Spacer()
@@ -997,12 +1024,13 @@ private struct CalendarDayDetailFloatingPanelView: View {
             Button(action: onCreateTapped) {
                 Image(systemName: "plus")
                     .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(Color.calioBrand)
                     .frame(width: 34, height: 34)
                     .contentShape(Circle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("일정 추가")
+            .accessibilityIdentifier("month_detail_add_event")
 
             Button(action: onCloseTapped) {
                 Image(systemName: "xmark")
@@ -1013,6 +1041,7 @@ private struct CalendarDayDetailFloatingPanelView: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("닫기")
+            .accessibilityIdentifier("month_detail_close")
         }
         .padding(.horizontal, 20)
         .padding(.top, 20)
@@ -1027,6 +1056,7 @@ private struct CalendarDayDetailFloatingPanelView: View {
 
                     if event.id != events.last?.id {
                         Divider()
+                            .overlay(Color.calioDivider)
                             .padding(.leading, 44)
                     }
                 }
@@ -1040,12 +1070,13 @@ private struct CalendarDayDetailFloatingPanelView: View {
             Spacer()
 
             Text("일정이 없습니다")
-                .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(.secondary)
+                .font(.body.weight(.medium))
+                .foregroundStyle(.calioTextSecondary)
 
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityIdentifier("month_detail_empty")
     }
 
     private var dayTitle: String {
@@ -1072,18 +1103,18 @@ private struct CalendarDayDetailEventRow: View {
 
             VStack(alignment: .leading, spacing: 5) {
                 Text(eventTimeText)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.secondary)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.calioTextSecondary)
 
                 Text(event.title)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(.primary)
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(.calioTextPrimary)
                     .lineLimit(2)
 
                 if hasDescription {
                     Text(event.description)
-                        .font(.system(size: 13, weight: .regular))
-                        .foregroundStyle(.secondary)
+                        .font(.subheadline)
+                        .foregroundStyle(.calioTextSecondary)
                         .lineLimit(1)
                 }
             }
@@ -1114,6 +1145,12 @@ private struct Triangle: Shape {
         path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
         path.closeSubpath()
         return path
+    }
+}
+
+private extension DayKey {
+    var idValue: String {
+        "\(year)-\(month)-\(day)"
     }
 }
 
