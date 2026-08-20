@@ -44,4 +44,22 @@ class GoogleCalendarEffectiveScopeTest {
         assertThatThrownBy(scope::childOverrideKeyPrefix)
                 .isInstanceOf(IllegalStateException.class);
     }
+
+    @Test
+    @DisplayName("scope는 type, canonical ID, origin start가 모두 같을 때만 동등하다")
+    void givenSameScopeValues_whenCompare_thenUsesValueEquality() {
+        GoogleCalendarEffectiveScope event = GoogleCalendarEffectiveScope.event(10L);
+        GoogleCalendarEffectiveScope sameEvent = GoogleCalendarEffectiveScope.event(10L);
+        GoogleCalendarEffectiveScope differentType = GoogleCalendarEffectiveScope.recurrenceEvent(10L);
+        GoogleCalendarEffectiveScope differentId = GoogleCalendarEffectiveScope.event(11L);
+        GoogleCalendarEffectiveScope override = GoogleCalendarEffectiveScope.recurrenceOverride(
+                10L, Instant.parse("2026-08-18T00:00:00Z"));
+        GoogleCalendarEffectiveScope differentOriginOverride = GoogleCalendarEffectiveScope.recurrenceOverride(
+                10L, Instant.parse("2026-08-19T00:00:00Z"));
+
+        assertThat(event).isEqualTo(sameEvent).hasSameHashCodeAs(sameEvent);
+        assertThat(event).isNotEqualTo(differentType).isNotEqualTo(differentId)
+                .isNotEqualTo(null).isNotEqualTo("event");
+        assertThat(override).isNotEqualTo(differentOriginOverride);
+    }
 }

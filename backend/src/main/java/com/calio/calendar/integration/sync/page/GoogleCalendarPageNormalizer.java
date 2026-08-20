@@ -7,6 +7,7 @@ import com.calio.calendar.external.google.dto.GoogleCalendarEventResponse;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventPage;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarRecurrenceEventMapping;
+import com.calio.calendar.integration.mapping.domain.GoogleCalendarMappingSyncState;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingQueryService;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarRecurrenceMappingQueryService;
 import com.calio.calendar.integration.sync.GoogleCalendarSyncRunContext;
@@ -378,7 +379,8 @@ public class GoogleCalendarPageNormalizer {
     }
 
     private String requireProviderEtag(GoogleCalendarEventResponse item) {
-        if (!hasText(item.etag())) {
+        if (!hasText(item.etag())
+                || item.etag().length() > GoogleCalendarMappingSyncState.PROVIDER_ETAG_LENGTH) {
             throw invalidResponse();
         }
         return item.etag();

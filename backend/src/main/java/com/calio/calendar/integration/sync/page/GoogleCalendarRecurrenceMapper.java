@@ -5,6 +5,7 @@ import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.external.google.GoogleCalendarEventTimeNormalizer;
 import com.calio.calendar.external.google.service.dto.NormalizedEventSchedule;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventResponse;
+import com.calio.calendar.integration.mapping.domain.GoogleCalendarMappingSyncState;
 import com.calio.calendar.integration.sync.page.dto.GoogleCalendarNormalizedPage.ActiveRecurrenceEventOverrideUpsert;
 import com.calio.calendar.integration.sync.page.dto.GoogleCalendarNormalizedPage.CancelledRecurrenceEventOverrideUpsert;
 import com.calio.calendar.integration.sync.page.dto.GoogleCalendarNormalizedPage.RecurrenceEventOverrideUpsert;
@@ -135,7 +136,8 @@ public class GoogleCalendarRecurrenceMapper {
     }
 
     private String requireProviderEtag(GoogleCalendarEventResponse item) {
-        if (!hasText(item.etag())) {
+        if (!hasText(item.etag())
+                || item.etag().length() > GoogleCalendarMappingSyncState.PROVIDER_ETAG_LENGTH) {
             throw invalidResponse();
         }
         return item.etag();

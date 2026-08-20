@@ -1,6 +1,7 @@
 package com.calio.calendar.integration.sync.page;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -8,6 +9,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.calio.calendar.external.google.GoogleCalendarEventTimeNormalizer;
+import com.calio.calendar.common.error.CalioException;
+import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.external.google.service.dto.NormalizedEventSchedule;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventResponse;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventPage;
@@ -161,6 +164,30 @@ class GoogleCalendarPageNormalizerTest {
                 override,
                 new RecurrenceEventCancellation("recurrence-event-1")
         );
+    }
+
+    @Test
+    @DisplayName("최대 길이를 초과한 Event provider ETag는 정규화 전에 거절한다")
+    void givenTooLongEventEtag_whenNormalize_thenRejectsInvalidProviderResponse() {
+        GoogleCalendarEventResponse item = new GoogleCalendarEventResponse(
+                "event-1",
+                "confirmed",
+                "e".repeat(1025),
+                Instant.parse("2026-07-01T00:00:00Z"),
+                "Event",
+                null,
+                List.of(),
+                null,
+                null,
+                new GoogleCalendarEventTimeResponse(null, "2026-07-01T09:00:00Z", "UTC"),
+                new GoogleCalendarEventTimeResponse(null, "2026-07-01T10:00:00Z", "UTC")
+        );
+        when(timeNormalizer.normalizeSchedule(any(), any())).thenReturn(schedule());
+
+        assertThatThrownBy(() -> normalizer.normalize(10L, page(item), new GoogleCalendarSyncRunContext("token")))
+                .isInstanceOfSatisfying(CalioException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID));
     }
 
     private GoogleCalendarEventPage page(GoogleCalendarEventResponse item) {

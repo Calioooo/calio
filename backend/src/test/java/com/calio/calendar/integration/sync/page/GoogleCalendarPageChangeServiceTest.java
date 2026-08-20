@@ -240,6 +240,10 @@ class GoogleCalendarPageChangeServiceTest {
                         null
                 )
         );
+        GoogleCalendarRecurrenceEventMapping existingMapping = recurrenceEventMappingRepository.findAll()
+                .getFirst();
+        Long existingMappingId = existingMapping.getId();
+        Long existingRecurrenceEventId = existingMapping.getRecurrenceEvent().getId();
         when(operationJobQueryService.hasPendingOutboundJob(any(), any(), any())).thenReturn(true);
 
         // when
@@ -270,6 +274,9 @@ class GoogleCalendarPageChangeServiceTest {
                 .singleElement()
                 .satisfies(mapping -> {
                     assertThat(mapping.isConflicted()).isTrue();
+                    assertThat(mapping.getId()).isEqualTo(existingMappingId);
+                    assertThat(mapping.getExternalEventId()).isEqualTo(externalEventId);
+                    assertThat(mapping.getRecurrenceEvent().getId()).isEqualTo(existingRecurrenceEventId);
                     assertThat(mapping.getRecurrenceEvent().getTitle()).isEqualTo("Recurring event");
                     assertThat(mapping.getProviderEtag()).isEqualTo("etag-recurrence");
                 });
@@ -304,6 +311,9 @@ class GoogleCalendarPageChangeServiceTest {
                         null
                 )
         );
+        GoogleCalendarEventMapping existingMapping = mappingRepository.findAll().getFirst();
+        Long existingMappingId = existingMapping.getId();
+        Long existingEventId = existingMapping.getEvent().getId();
         when(operationJobQueryService.hasPendingOutboundJob(any(), any(), any())).thenReturn(true);
 
         // when
@@ -334,6 +344,9 @@ class GoogleCalendarPageChangeServiceTest {
                 .singleElement()
                 .satisfies(mapping -> {
                     assertThat(mapping.isConflicted()).isTrue();
+                    assertThat(mapping.getId()).isEqualTo(existingMappingId);
+                    assertThat(mapping.getExternalEventId()).isEqualTo(externalEventId);
+                    assertThat(mapping.getEvent().getId()).isEqualTo(existingEventId);
                     assertThat(mapping.getEvent().getTitle()).isEqualTo("Standalone event");
                     assertThat(mapping.getProviderEtag()).isEqualTo("etag-event");
                 });
