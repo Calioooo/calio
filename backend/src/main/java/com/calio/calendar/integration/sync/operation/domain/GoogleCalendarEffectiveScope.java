@@ -68,6 +68,24 @@ public final class GoogleCalendarEffectiveScope {
         return canonicalId + ":";
     }
 
+    @Override
+    public boolean equals(Object other) {
+        if (this == other) {
+            return true;
+        }
+        if (!(other instanceof GoogleCalendarEffectiveScope scope)) {
+            return false;
+        }
+        return type == scope.type
+                && canonicalId.equals(scope.canonicalId)
+                && Objects.equals(originStartAt, scope.originStartAt);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(type, canonicalId, originStartAt);
+    }
+
     private static Long requirePositive(Long value) {
         if (value == null || value <= 0) {
             throw new IllegalArgumentException("Canonical scope ID must be positive");
