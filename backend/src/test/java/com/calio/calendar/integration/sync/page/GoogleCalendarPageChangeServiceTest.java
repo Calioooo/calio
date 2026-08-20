@@ -268,7 +268,11 @@ class GoogleCalendarPageChangeServiceTest {
         assertThat(mappingRepository.findAll()).isEmpty();
         assertThat(recurrenceEventMappingRepository.findAll())
                 .singleElement()
-                .satisfies(mapping -> assertThat(mapping.isConflicted()).isTrue());
+                .satisfies(mapping -> {
+                    assertThat(mapping.isConflicted()).isTrue();
+                    assertThat(mapping.getRecurrenceEvent().getTitle()).isEqualTo("Recurring event");
+                    assertThat(mapping.getProviderEtag()).isEqualTo("etag-recurrence");
+                });
         assertThat(eventRepository.count()).isZero();
         assertThat(recurrenceEventRepository.count()).isOne();
     }
@@ -328,7 +332,11 @@ class GoogleCalendarPageChangeServiceTest {
         // then
         assertThat(mappingRepository.findAll())
                 .singleElement()
-                .satisfies(mapping -> assertThat(mapping.isConflicted()).isTrue());
+                .satisfies(mapping -> {
+                    assertThat(mapping.isConflicted()).isTrue();
+                    assertThat(mapping.getEvent().getTitle()).isEqualTo("Standalone event");
+                    assertThat(mapping.getProviderEtag()).isEqualTo("etag-event");
+                });
         assertThat(recurrenceEventMappingRepository.findAll()).isEmpty();
         assertThat(eventRepository.count()).isOne();
         assertThat(recurrenceEventRepository.count()).isZero();

@@ -131,33 +131,6 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
     }
 
     @Test
-    @DisplayName("recurrence mapping의 content hash를 저장한다")
-    void givenRecurrenceMappings_whenSave_thenStoresContentHashes() {
-        // given
-        RecurrenceFixture fixture = recurrenceFixture();
-        GoogleCalendarRecurrenceEventMapping eventMapping =
-                eventMappingRepository.saveAndFlush(eventMapping(
-                        fixture,
-                        fixture.recurrenceEvent(),
-                        "recurrence-event-id"
-                ));
-        RecurrenceEventOverride recurrenceOverride = recurrenceOverride(
-                fixture.recurrenceEvent(),
-                "2026-07-21T00:00:00Z"
-        );
-        GoogleCalendarRecurrenceOverrideMapping overrideMapping =
-                overrideMappingRepository.saveAndFlush(overrideMapping(
-                        eventMapping,
-                        recurrenceOverride,
-                        "recurrence-override-id"
-                ));
-
-        // when, then
-        assertThat(eventMapping.getProviderEtag()).isEqualTo("a".repeat(64));
-        assertThat(overrideMapping.getProviderEtag()).isEqualTo("a".repeat(64));
-    }
-
-    @Test
     @DisplayName("동일 provider recurrence event identity의 mapping 중복을 거부한다")
     void givenDuplicateRecurrenceEventProviderIdentity_whenSave_thenRejectsDuplicate() {
         // given
