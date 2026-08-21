@@ -3,6 +3,7 @@ package com.calio.calendar.tag.service;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.groupcalendar.event.service.GroupCalendarEventCommandService;
+import com.calio.calendar.groupcalendar.recurrence.service.GroupCalendarRecurrenceCommandService;
 import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.service.GroupMembershipQueryService;
 import com.calio.calendar.groupspace.service.GroupSpaceQueryService;
@@ -24,19 +25,22 @@ public class GroupTagService {
     private final TagRepository tagRepository;
     private final TagCommandService tagCommandService;
     private final GroupCalendarEventCommandService groupCalendarEventCommandService;
+    private final GroupCalendarRecurrenceCommandService groupCalendarRecurrenceCommandService;
 
     public GroupTagService(
             GroupSpaceQueryService groupSpaceQueryService,
             GroupMembershipQueryService membershipQueryService,
             TagRepository tagRepository,
             TagCommandService tagCommandService,
-            GroupCalendarEventCommandService groupCalendarEventCommandService
+            GroupCalendarEventCommandService groupCalendarEventCommandService,
+            GroupCalendarRecurrenceCommandService groupCalendarRecurrenceCommandService
     ) {
         this.groupSpaceQueryService = groupSpaceQueryService;
         this.membershipQueryService = membershipQueryService;
         this.tagRepository = tagRepository;
         this.tagCommandService = tagCommandService;
         this.groupCalendarEventCommandService = groupCalendarEventCommandService;
+        this.groupCalendarRecurrenceCommandService = groupCalendarRecurrenceCommandService;
     }
 
     public void createDefaultTag(GroupSpace groupSpace) {
@@ -83,6 +87,7 @@ public class GroupTagService {
         Tag fallbackTag = getDefaultTag(groupSpaceId);
 
         groupCalendarEventCommandService.changeTagForEvents(tag, fallbackTag);
+        groupCalendarRecurrenceCommandService.changeTagForRecurrenceEvents(tag, fallbackTag);
         tagCommandService.deleteTag(tag);
     }
 
