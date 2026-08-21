@@ -37,4 +37,8 @@ public class TagCommandService {
     public void deleteTag(Tag tag) {
         tagRepository.delete(tag);
     }
+
+    public void deleteGroupTags(Long groupSpaceId) {
+        tagRepository.deleteAll(tagRepository.findByGroupSpace_Id(groupSpaceId));
+    }
 }

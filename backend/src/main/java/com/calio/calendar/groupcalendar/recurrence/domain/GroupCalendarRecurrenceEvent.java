@@ -95,15 +95,47 @@ public class GroupCalendarRecurrenceEvent extends BaseEntity {
         this.recurrenceRules = List.copyOf(recurrenceRules);
     }
 
-    public Long getId() { return id; }
-    public GroupSpace getGroupSpace() { return groupSpace; }
-    public Account getCreatedBy() { return createdBy; }
-    public Tag getTag() { return tag; }
-    public String getTitle() { return title; }
-    public String getDescription() { return description; }
-    public boolean isAllDay() { return allDay; }
-    public String getTimeZone() { return timeZone; }
-    public Instant getFirstOccurrenceStartAt() { return firstOccurrenceStartAt; }
-    public Instant getFirstOccurrenceEndAt() { return firstOccurrenceEndAt; }
-    public List<String> getRecurrenceRules() { return recurrenceRules; }
+    public Long getId() {
+        return id;
+    }
+
+    public GroupSpace getGroupSpace() {
+        return groupSpace;
+    }
+
+    public Account getCreatedBy() {
+        return createdBy;
+    }
+
+    public Tag getTag() {
+        return tag;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public boolean isAllDay() {
+        return allDay;
+    }
+
+    public String getTimeZone() {
+        return timeZone;
+    }
+
+    public Instant getFirstOccurrenceStartAt() {
+        return firstOccurrenceStartAt;
+    }
+
+    public Instant getFirstOccurrenceEndAt() {
+        return firstOccurrenceEndAt;
+    }
+
+    public List<String> getRecurrenceRules() {
+        return recurrenceRules;
+    }
 }

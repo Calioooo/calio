@@ -8,14 +8,12 @@ import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.groupcalendar.event.controller.dto.GroupCalendarEventRequest;
 import com.calio.calendar.groupcalendar.event.controller.dto.GroupCalendarEventResponse;
 import com.calio.calendar.groupcalendar.event.domain.GroupCalendarEvent;
-import com.calio.calendar.groupcalendar.event.repository.GroupCalendarEventRepository;
 import com.calio.calendar.groupspace.domain.GroupMember;
 import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.service.GroupMembershipQueryService;
 import com.calio.calendar.groupspace.service.GroupSpaceCommandService;
 import com.calio.calendar.tag.domain.Tag;
-import com.calio.calendar.tag.domain.TagType;
-import com.calio.calendar.tag.repository.TagRepository;
+import com.calio.calendar.tag.service.TagQueryService;
 import java.time.Instant;
 import java.util.List;
 import org.springframework.stereotype.Service;
@@ -28,21 +26,24 @@ public class GroupCalendarEventService {
     private final GroupSpaceCommandService groupSpaceCommandService;
     private final GroupMembershipQueryService membershipQueryService;
     private final AccountQueryService accountQueryService;
-    private final TagRepository tagRepository;
-    private final GroupCalendarEventRepository eventRepository;
+    private final TagQueryService tagQueryService;
+    private final GroupCalendarEventQueryService eventQueryService;
+    private final GroupCalendarEventCommandService eventCommandService;
 
     public GroupCalendarEventService(
             GroupSpaceCommandService groupSpaceCommandService,
             GroupMembershipQueryService membershipQueryService,
             AccountQueryService accountQueryService,
-            TagRepository tagRepository,
-            GroupCalendarEventRepository eventRepository
+            TagQueryService tagQueryService,
+            GroupCalendarEventQueryService eventQueryService,
+            GroupCalendarEventCommandService eventCommandService
     ) {
         this.groupSpaceCommandService = groupSpaceCommandService;
         this.membershipQueryService = membershipQueryService;
         this.accountQueryService = accountQueryService;
-        this.tagRepository = tagRepository;
-        this.eventRepository = eventRepository;
+        this.tagQueryService = tagQueryService;
+        this.eventQueryService = eventQueryService;
+        this.eventCommandService = eventCommandService;
     }
 
     @Transactional
@@ -74,12 +75,12 @@ public class GroupCalendarEventService {
                 schedule.timeZone()
         );
 
-        return GroupCalendarEventResponse.from(eventRepository.save(event));
+        return GroupCalendarEventResponse.from(eventCommandService.createEvent(event));
     }
 
     public GroupCalendarEventResponse get(Long accountId, Long groupSpaceId, Long eventId) {
         membershipQueryService.getActiveMembership(groupSpaceId, accountId);
-        return GroupCalendarEventResponse.from(getEvent(groupSpaceId, eventId));
+        return GroupCalendarEventResponse.from(eventQueryService.getEvent(groupSpaceId, eventId));
     }
 
     public List<GroupCalendarEventResponse> list(
@@ -91,8 +92,7 @@ public class GroupCalendarEventService {
         membershipQueryService.getActiveMembership(groupSpaceId, accountId);
         validateRange(from, to);
 
-        return eventRepository
-                .findByGroupSpace_IdAndStartAtLessThanAndEndAtGreaterThanOrderByStartAtAsc(groupSpaceId, to, from)
+        return eventQueryService.listOverlappingEvents(groupSpaceId, from, to)
                 .stream()
                 .map(GroupCalendarEventResponse::from)
                 .toList();
@@ -131,27 +131,19 @@ public class GroupCalendarEventService {
     public void delete(Long accountId, Long groupSpaceId, Long eventId) {
         GroupCalendarEvent event = getLockedEvent(groupSpaceId, eventId);
         requireAuthorOrOwner(accountId, event);
-        eventRepository.delete(event);
+        eventCommandService.deleteEvent(event);
     }
 
     private GroupCalendarEvent getLockedEvent(Long groupSpaceId, Long eventId) {
-        return eventRepository.findByIdAndGroupSpaceIdForUpdate(groupSpaceId, eventId)
-                .orElseThrow(() -> new CalioException(ErrorCode.GROUP_EVENT_NOT_FOUND));
-    }
-
-    private GroupCalendarEvent getEvent(Long groupSpaceId, Long eventId) {
-        return eventRepository.findByIdAndGroupSpace_Id(eventId, groupSpaceId)
-                .orElseThrow(() -> new CalioException(ErrorCode.GROUP_EVENT_NOT_FOUND));
+        return eventCommandService.lockEvent(groupSpaceId, eventId);
     }
 
     private Tag getTag(Long groupSpaceId, Long tagId) {
         if (tagId == null) {
-            return tagRepository.findByTagTypeAndGroupSpace_Id(TagType.GROUP_DEFAULT, groupSpaceId)
-                    .orElseThrow(() -> new CalioException(ErrorCode.GROUP_DEFAULT_TAG_NOT_FOUND));
+            return tagQueryService.getGroupDefaultTag(groupSpaceId);
         }
 
-        return tagRepository.findByIdAndGroupSpace_Id(tagId, groupSpaceId)
-                .orElseThrow(() -> new CalioException(ErrorCode.GROUP_TAG_NOT_FOUND));
+        return tagQueryService.getGroupTagOrDefault(groupSpaceId, tagId);
     }
 
     private void requireAuthorOrOwner(Long accountId, GroupCalendarEvent event) {

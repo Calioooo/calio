@@ -10,8 +10,6 @@ import com.calio.calendar.groupspace.service.GroupSpaceQueryService;
 import com.calio.calendar.tag.controller.dto.CustomTagRequest;
 import com.calio.calendar.tag.controller.dto.TagResponse;
 import com.calio.calendar.tag.domain.Tag;
-import com.calio.calendar.tag.domain.TagType;
-import com.calio.calendar.tag.repository.TagRepository;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,7 +20,7 @@ public class GroupTagService {
 
     private final GroupSpaceQueryService groupSpaceQueryService;
     private final GroupMembershipQueryService membershipQueryService;
-    private final TagRepository tagRepository;
+    private final TagQueryService tagQueryService;
     private final TagCommandService tagCommandService;
     private final GroupCalendarEventCommandService groupCalendarEventCommandService;
     private final GroupCalendarRecurrenceCommandService groupCalendarRecurrenceCommandService;
@@ -30,14 +28,14 @@ public class GroupTagService {
     public GroupTagService(
             GroupSpaceQueryService groupSpaceQueryService,
             GroupMembershipQueryService membershipQueryService,
-            TagRepository tagRepository,
+            TagQueryService tagQueryService,
             TagCommandService tagCommandService,
             GroupCalendarEventCommandService groupCalendarEventCommandService,
             GroupCalendarRecurrenceCommandService groupCalendarRecurrenceCommandService
     ) {
         this.groupSpaceQueryService = groupSpaceQueryService;
         this.membershipQueryService = membershipQueryService;
-        this.tagRepository = tagRepository;
+        this.tagQueryService = tagQueryService;
         this.tagCommandService = tagCommandService;
         this.groupCalendarEventCommandService = groupCalendarEventCommandService;
         this.groupCalendarRecurrenceCommandService = groupCalendarRecurrenceCommandService;
@@ -49,13 +47,13 @@ public class GroupTagService {
 
     @Transactional
     public void deleteAll(Long groupSpaceId) {
-        tagRepository.deleteAll(tagRepository.findByGroupSpace_Id(groupSpaceId));
+        tagCommandService.deleteGroupTags(groupSpaceId);
     }
 
     public List<TagResponse> list(Long accountId, Long groupSpaceId) {
         membershipQueryService.getActiveMembership(groupSpaceId, accountId);
 
-        return tagRepository.findByGroupSpace_IdOrderByIdAsc(groupSpaceId)
+        return tagQueryService.listGroupTags(groupSpaceId)
                 .stream()
                 .map(TagResponse::from)
                 .toList();
@@ -92,30 +90,20 @@ public class GroupTagService {
     }
 
     private void rejectDuplicateTitle(Long groupSpaceId, String title) {
-        if (tagRepository.existsByTagTypeAndTitleAndGroupSpace_Id(TagType.CUSTOM, title, groupSpaceId)) {
-            throw new CalioException(ErrorCode.VALIDATION_FAILED);
-        }
+        rejectDuplicateTitle(groupSpaceId, null, title);
     }
 
     private void rejectDuplicateTitle(Long groupSpaceId, Long tagId, String title) {
-        if (tagRepository.existsByTagTypeAndTitleAndGroupSpace_IdAndIdNot(
-                TagType.CUSTOM,
-                title,
-                groupSpaceId,
-                tagId
-        )) {
+        if (tagQueryService.hasGroupCustomTagTitle(groupSpaceId, title, tagId)) {
             throw new CalioException(ErrorCode.VALIDATION_FAILED);
         }
     }
 
     private Tag getCustomTag(Long groupSpaceId, Long tagId) {
-        return tagRepository.findByIdAndGroupSpace_Id(tagId, groupSpaceId)
-                .filter(tag -> tag.getTagType() == TagType.CUSTOM)
-                .orElseThrow(() -> new CalioException(ErrorCode.GROUP_TAG_NOT_FOUND));
+        return tagQueryService.getGroupCustomTag(groupSpaceId, tagId);
     }
 
     private Tag getDefaultTag(Long groupSpaceId) {
-        return tagRepository.findByTagTypeAndGroupSpace_Id(TagType.GROUP_DEFAULT, groupSpaceId)
-                .orElseThrow(() -> new CalioException(ErrorCode.GROUP_DEFAULT_TAG_NOT_FOUND));
+        return tagQueryService.getGroupDefaultTag(groupSpaceId);
     }
 }
