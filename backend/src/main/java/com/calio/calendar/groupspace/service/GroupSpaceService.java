@@ -13,6 +13,7 @@ import com.calio.calendar.groupspace.domain.GroupMember;
 import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.domain.GroupSpaceFields;
 import com.calio.calendar.tag.service.GroupTagService;
+import com.calio.calendar.groupcalendar.event.service.GroupCalendarEventCommandService;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -31,6 +32,7 @@ public class GroupSpaceService {
     private final GroupInvitationCommandService invitationCommandService;
     private final GroupScheduleShareCleanupPort groupScheduleShareCleanupPort;
     private final GroupTagService groupTagService;
+    private final GroupCalendarEventCommandService groupCalendarEventCommandService;
     private final Clock clock;
 
     @Autowired
@@ -43,6 +45,7 @@ public class GroupSpaceService {
             GroupInvitationCommandService invitationCommandService,
             GroupScheduleShareCleanupPort groupScheduleShareCleanupPort,
             GroupTagService groupTagService,
+            GroupCalendarEventCommandService groupCalendarEventCommandService,
             Clock clock
     ) {
         this.queryService = queryService;
@@ -53,6 +56,7 @@ public class GroupSpaceService {
         this.invitationCommandService = invitationCommandService;
         this.groupScheduleShareCleanupPort = groupScheduleShareCleanupPort;
         this.groupTagService = groupTagService;
+        this.groupCalendarEventCommandService = groupCalendarEventCommandService;
         this.clock = clock;
     }
 
@@ -115,6 +119,7 @@ public class GroupSpaceService {
 
         membershipCommandService.lockMembers(groupSpaceId);
         groupScheduleShareCleanupPort.cleanupGroupShares(groupSpaceId);
+        groupCalendarEventCommandService.deleteAllByGroupSpaceId(groupSpaceId);
         invitationCommandService.deleteAllByGroupSpaceId(groupSpaceId);
         groupTagService.deleteAll(groupSpaceId);
         commandService.delete(groupSpace);
