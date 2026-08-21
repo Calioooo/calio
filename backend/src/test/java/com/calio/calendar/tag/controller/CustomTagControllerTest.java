@@ -145,7 +145,7 @@ class CustomTagControllerTest {
     void givenCustomAndDefaultTagIds_whenUpdateCustomTag_thenOnlyCustomTagIsUpdated() throws Exception {
         // given
         Tag customTag = tagRepository.save(new Tag(TagType.CUSTOM, "기존", "#111111", currentAccountReference()));
-        Tag defaultTag = tagRepository.save(new Tag(TagType.DEFAULT, "기타", "#64748B"));
+        Tag defaultTag = tagRepository.save(new Tag(TagType.PERSONAL_DEFAULT, "기타", "#64748B"));
 
         // when
         mockMvc.perform(put("/api/custom-tags/{tagId}", customTag.getId())
@@ -169,7 +169,7 @@ class CustomTagControllerTest {
     @DisplayName("custom tag를 삭제하면 event, recurrence event, occurrence event 모두 fallback 기타 태그로 재할당한다")
     void givenCustomTagInUse_whenDeleteCustomTag_thenReassignsAllUsagesToFallbackTag() throws Exception {
         // given
-        Tag fallbackTag = tagRepository.save(new Tag(TagType.DEFAULT, "기타", "#64748B"));
+        Tag fallbackTag = tagRepository.save(new Tag(TagType.PERSONAL_DEFAULT, "기타", "#64748B"));
         Tag customTag = tagRepository.save(new Tag(TagType.CUSTOM, "삭제 대상", "#8B5CF6", currentAccountReference()));
         Event ordinaryEvent = eventRepository.save(event("일반", null, customTag));
         RecurrenceEvent recurrenceEvent = recurrenceEventRepository.save(recurrenceEvent(customTag));

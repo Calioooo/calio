@@ -49,15 +49,15 @@ public class TagQueryService {
     }
 
     public Tag getFallbackTag() {
-        return tagRepository.findFirstByTagTypeAndTitleAndAccountIsNullOrderByIdAsc(
-                        TagType.DEFAULT,
+        return tagRepository.findFirstByTagTypeAndTitleAndAccountIsNullAndGroupSpaceIsNullOrderByIdAsc(
+                        TagType.PERSONAL_DEFAULT,
                         FALLBACK_TAG_TITLE
                 )
                 .orElseThrow(() -> new CalioException(ErrorCode.DEFAULT_TAG_NOT_FOUND));
     }
 
     private List<Tag> listGlobalDefaultTags() {
-        return tagRepository.findByTagTypeAndAccountIsNullOrderByIdAsc(TagType.DEFAULT);
+        return tagRepository.findByTagTypeAndAccountIsNullAndGroupSpaceIsNullOrderByIdAsc(TagType.PERSONAL_DEFAULT);
     }
 
     private List<Tag> listAccountCustomTags(Long accountId) {
@@ -65,7 +65,7 @@ public class TagQueryService {
     }
 
     private Optional<Tag> getGlobalDefaultTagIfExists(Long tagId) {
-        return tagRepository.findByIdAndTagTypeAndAccountIsNull(tagId, TagType.DEFAULT);
+        return tagRepository.findByIdAndTagTypeAndAccountIsNullAndGroupSpaceIsNull(tagId, TagType.PERSONAL_DEFAULT);
     }
 
     private Optional<Tag> getAccountCustomTagIfExists(Long accountId, Long tagId) {

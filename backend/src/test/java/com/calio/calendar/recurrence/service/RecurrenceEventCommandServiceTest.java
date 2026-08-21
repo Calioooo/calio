@@ -160,7 +160,7 @@ class RecurrenceEventCommandServiceTest {
                         "Asia/Seoul"
                 ),
                 List.of("RRULE:FREQ=DAILY;COUNT=3"),
-                new Tag(TagType.DEFAULT, "기타", "#64748B"),
+                new Tag(TagType.PERSONAL_DEFAULT, "기타", "#64748B"),
                 new Account()
         );
         ReflectionTestUtils.setField(recurrenceEvent, "id", 10L);

@@ -4,6 +4,7 @@ import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.common.domain.BaseEntity;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
+import com.calio.calendar.groupspace.domain.GroupSpace;
 import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
@@ -41,18 +42,32 @@ public class Tag extends BaseEntity {
     @JoinColumn(name = "account_id")
     private Account account;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "group_space_id")
+    private GroupSpace groupSpace;
+
     protected Tag() {
     }
 
     public Tag(TagType tagType, String title, String colorCode) {
-        this(tagType, title, colorCode, null);
+        this(tagType, title, colorCode, (Account) null);
     }
 
     public Tag(TagType tagType, String title, String colorCode, Account account) {
+        this(tagType, title, colorCode, account, null);
+    }
+
+    public Tag(TagType tagType, String title, String colorCode, GroupSpace groupSpace) {
+        this(tagType, title, colorCode, null, groupSpace);
+    }
+
+    private Tag(TagType tagType, String title, String colorCode, Account account, GroupSpace groupSpace) {
+        validateOwnership(tagType, account, groupSpace);
         this.tagType = tagType;
         this.title = title;
         this.colorCode = new ColorCode(colorCode);
         this.account = account;
+        this.groupSpace = groupSpace;
     }
 
     public void update(String title, String colorCode) {
@@ -82,5 +97,19 @@ public class Tag extends BaseEntity {
 
     public Account getAccount() {
         return account;
+    }
+
+    public GroupSpace getGroupSpace() {
+        return groupSpace;
+    }
+
+    private void validateOwnership(TagType tagType, Account account, GroupSpace groupSpace) {
+        boolean isPersonalDefault = tagType == TagType.PERSONAL_DEFAULT;
+        boolean isPersonalCustom = tagType == TagType.CUSTOM && account != null && groupSpace == null;
+        boolean isGroupTag = (tagType == TagType.GROUP_DEFAULT || tagType == TagType.CUSTOM)
+                && account == null && groupSpace != null;
+        if (!isPersonalDefault && !isPersonalCustom && !isGroupTag) {
+            throw new CalioException(ErrorCode.VALIDATION_FAILED);
+        }
     }
 }

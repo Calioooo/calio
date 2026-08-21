@@ -75,8 +75,8 @@ class EventControllerTest {
 
     @BeforeEach
     void setUpDefaultTag() {
-        tagRepository.findFirstByTagTypeAndTitleAndAccountIsNullOrderByIdAsc(TagType.DEFAULT, "기타")
-                .orElseGet(() -> tagRepository.save(new Tag(TagType.DEFAULT, "기타", "#64748B")));
+        tagRepository.findFirstByTagTypeAndTitleAndAccountIsNullAndGroupSpaceIsNullOrderByIdAsc(TagType.PERSONAL_DEFAULT, "기타")
+                .orElseGet(() -> tagRepository.save(new Tag(TagType.PERSONAL_DEFAULT, "기타", "#64748B")));
     }
 
     @Test
@@ -252,7 +252,7 @@ class EventControllerTest {
     @DisplayName("사용자는 DEFAULT tagId를 지정해 일정을 생성하면 해당 태그가 저장된 응답을 받는다")
     void givenDefaultTagId_whenCreateEvent_thenStoresSelectedTag() throws Exception {
         // given
-        Tag workTag = tagRepository.save(new Tag(TagType.DEFAULT, "업무", "#2563eb"));
+        Tag workTag = tagRepository.save(new Tag(TagType.PERSONAL_DEFAULT, "업무", "#2563eb"));
 
         // when
         mockMvc.perform(post("/api/events")
@@ -306,7 +306,7 @@ class EventControllerTest {
     @DisplayName("사용자는 tagId 없이 일정을 수정하면 fallback DEFAULT 기타 태그로 변경된다")
     void givenNullTagId_whenUpdateEvent_thenChangesToFallbackTag() throws Exception {
         // given
-        Tag workTag = tagRepository.save(new Tag(TagType.DEFAULT, "업무 수정", "#2563EB"));
+        Tag workTag = tagRepository.save(new Tag(TagType.PERSONAL_DEFAULT, "업무 수정", "#2563EB"));
         MvcResult createResult = mockMvc.perform(post("/api/events")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -770,7 +770,7 @@ class EventControllerTest {
         long eventId = createEvent("Stable", "2026-06-07T00:00:00Z", "2026-06-07T01:00:00Z");
         Event before = eventRepository.findById(eventId).orElseThrow();
         Long originalTagId = before.getTag().getId();
-        Tag replacementTag = tagRepository.save(new Tag(TagType.DEFAULT, "교체 대상", "#123456"));
+        Tag replacementTag = tagRepository.save(new Tag(TagType.PERSONAL_DEFAULT, "교체 대상", "#123456"));
 
         // when
         mockMvc.perform(put("/api/events/{eventId}", eventId)

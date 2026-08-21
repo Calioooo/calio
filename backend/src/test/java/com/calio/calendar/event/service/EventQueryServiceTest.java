@@ -87,7 +87,7 @@ class EventQueryServiceTest {
                 false,
                 "UTC",
                 null,
-                new Tag(TagType.DEFAULT, "기타", "#64748B"),
+                new Tag(TagType.PERSONAL_DEFAULT, "기타", "#64748B"),
                 new Account()
         );
         ReflectionTestUtils.setField(event, "id", 10L);

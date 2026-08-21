@@ -493,6 +493,6 @@ class EventServiceTest {
     }
 
     private Tag tag(String title) {
-        return new Tag(TagType.DEFAULT, title, "#64748B");
+        return new Tag(TagType.PERSONAL_DEFAULT, title, "#64748B");
     }
 }

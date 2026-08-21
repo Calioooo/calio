@@ -43,7 +43,7 @@ class RecurrenceEventRepositoryTest {
     void givenUnboundedRule_whenFindExpansionCandidates_thenIncludesMaster() {
         // given
         Account account = accountRepository.save(new Account());
-        Tag tag = tagRepository.save(new Tag(TagType.DEFAULT, "기타", "#64748B"));
+        Tag tag = tagRepository.save(new Tag(TagType.PERSONAL_DEFAULT, "기타", "#64748B"));
         RecurrenceEvent master = saveRecurrenceEvent(
                 account,
                 tag,
@@ -75,7 +75,7 @@ class RecurrenceEventRepositoryTest {
         // given
         Account account = accountRepository.save(new Account());
         Account otherAccount = accountRepository.save(new Account());
-        Tag tag = tagRepository.save(new Tag(TagType.DEFAULT, "기타", "#64748B"));
+        Tag tag = tagRepository.save(new Tag(TagType.PERSONAL_DEFAULT, "기타", "#64748B"));
         RecurrenceEvent included = saveRecurrenceEvent(
                 account,
                 tag,

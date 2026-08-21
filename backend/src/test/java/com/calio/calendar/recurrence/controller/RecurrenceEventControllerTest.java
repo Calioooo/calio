@@ -83,8 +83,8 @@ class RecurrenceEventControllerTest {
     @BeforeEach
     void setUpDefaultTag() {
         accountId = currentAccountReference().getId();
-        tagRepository.findFirstByTagTypeAndTitleAndAccountIsNullOrderByIdAsc(TagType.DEFAULT, "기타")
-                .orElseGet(() -> tagRepository.save(new Tag(TagType.DEFAULT, "기타", "#64748B")));
+        tagRepository.findFirstByTagTypeAndTitleAndAccountIsNullAndGroupSpaceIsNullOrderByIdAsc(TagType.PERSONAL_DEFAULT, "기타")
+                .orElseGet(() -> tagRepository.save(new Tag(TagType.PERSONAL_DEFAULT, "기타", "#64748B")));
     }
 
     @Test
@@ -682,7 +682,7 @@ class RecurrenceEventControllerTest {
         // given
         Account otherAccount = accountRepository.save(new Account());
         Tag defaultTag = tagRepository
-                .findFirstByTagTypeAndTitleAndAccountIsNullOrderByIdAsc(TagType.DEFAULT, "기타")
+                .findFirstByTagTypeAndTitleAndAccountIsNullAndGroupSpaceIsNullOrderByIdAsc(TagType.PERSONAL_DEFAULT, "기타")
                 .orElseThrow();
         RecurrenceEvent otherMaster = recurrenceEventRepository.save(new RecurrenceEvent(
                 "Other",

@@ -63,7 +63,7 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
     void givenRecurrenceMappings_whenLookup_thenKeepsCanonicalAndProviderIdentitySeparate() {
         // given
         Account account = accountRepository.saveAndFlush(new Account());
-        Tag tag = tagRepository.saveAndFlush(new Tag(TagType.DEFAULT, "기타", "#64748B"));
+        Tag tag = tagRepository.saveAndFlush(new Tag(TagType.PERSONAL_DEFAULT, "기타", "#64748B"));
         GoogleCalendarIntegration integration = integrationRepository.saveAndFlush(
                 integration(account.getId())
         );
@@ -348,7 +348,7 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
 
     private RecurrenceFixture recurrenceFixture() {
         Account account = accountRepository.saveAndFlush(new Account());
-        Tag tag = tagRepository.saveAndFlush(new Tag(TagType.DEFAULT, "기타", "#64748B"));
+        Tag tag = tagRepository.saveAndFlush(new Tag(TagType.PERSONAL_DEFAULT, "기타", "#64748B"));
         GoogleCalendarIntegration integration = integrationRepository.saveAndFlush(
                 integration(account.getId())
         );

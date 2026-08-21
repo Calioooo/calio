@@ -166,7 +166,7 @@ class EventCommandServiceTest {
                 false,
                 "UTC",
                 null,
-                new Tag(TagType.DEFAULT, "기타", "#64748B"),
+                new Tag(TagType.PERSONAL_DEFAULT, "기타", "#64748B"),
                 account()
         );
         ReflectionTestUtils.setField(event, "id", 10L);
