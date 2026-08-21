@@ -1,6 +1,6 @@
 ALTER TABLE tags
     ADD COLUMN group_space_id BIGINT NULL,
-    ADD CONSTRAINT fk_tags_group_space FOREIGN KEY (group_space_id) REFERENCES group_spaces (id);
+    ADD CONSTRAINT fk_tags_group_space FOREIGN KEY (group_space_id) REFERENCES group_spaces (id) ON DELETE CASCADE;
 
 UPDATE tags
 SET tag_type = 'PERSONAL_DEFAULT'

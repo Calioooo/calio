@@ -12,6 +12,7 @@ import com.calio.calendar.groupspace.controller.dto.UpdateGroupSpaceRequest;
 import com.calio.calendar.groupspace.domain.GroupMember;
 import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.domain.GroupSpaceFields;
+import com.calio.calendar.tag.service.GroupTagService;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -29,6 +30,7 @@ public class GroupSpaceService {
     private final GroupSpaceCommandService commandService;
     private final GroupInvitationCommandService invitationCommandService;
     private final GroupScheduleShareCleanupPort groupScheduleShareCleanupPort;
+    private final GroupTagService groupTagService;
     private final Clock clock;
 
     @Autowired
@@ -40,6 +42,7 @@ public class GroupSpaceService {
             GroupSpaceCommandService commandService,
             GroupInvitationCommandService invitationCommandService,
             GroupScheduleShareCleanupPort groupScheduleShareCleanupPort,
+            GroupTagService groupTagService,
             Clock clock
     ) {
         this.queryService = queryService;
@@ -49,6 +52,7 @@ public class GroupSpaceService {
         this.commandService = commandService;
         this.invitationCommandService = invitationCommandService;
         this.groupScheduleShareCleanupPort = groupScheduleShareCleanupPort;
+        this.groupTagService = groupTagService;
         this.clock = clock;
     }
 
@@ -61,6 +65,7 @@ public class GroupSpaceService {
         Instant now = clock.instant();
 
         GroupSpace groupSpace = commandService.create(accountId, name, emoji);
+        groupTagService.createDefaultTag(groupSpace);
         GroupMember membership = commandService.createOwnerMembership(
                 groupSpace,
                 accountId,
@@ -111,6 +116,7 @@ public class GroupSpaceService {
         membershipCommandService.lockMembers(groupSpaceId);
         groupScheduleShareCleanupPort.cleanupGroupShares(groupSpaceId);
         invitationCommandService.deleteAllByGroupSpaceId(groupSpaceId);
+        groupTagService.deleteAll(groupSpaceId);
         commandService.delete(groupSpace);
     }
 
