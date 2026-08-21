@@ -50,6 +50,8 @@ public enum ErrorCode {
     GROUP_TAG_DEFAULT_CONFLICT(HttpStatus.CONFLICT, "Group default tag already exists."),
     GROUP_EVENT_NOT_FOUND(HttpStatus.NOT_FOUND, "Group event not found."),
     GROUP_EVENT_FORBIDDEN(HttpStatus.FORBIDDEN, "Group event operation is forbidden."),
+    GROUP_RECURRENCE_EVENT_NOT_FOUND(HttpStatus.NOT_FOUND, "Group recurrence event not found."),
+    GROUP_RECURRENCE_EVENT_FORBIDDEN(HttpStatus.FORBIDDEN, "Group recurrence event operation is forbidden."),
     INVALID_TAG_COLOR_CODE(HttpStatus.BAD_REQUEST, "Invalid tag color code."),
     RECURRENCE_UPDATE_TIME_RANGE_INVALID(HttpStatus.BAD_REQUEST, "Recurrence update time range invalid."),
     INVALID_TIME_RANGE(HttpStatus.BAD_REQUEST, "Invalid time range."),
