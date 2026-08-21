@@ -89,14 +89,43 @@ public class GroupCalendarEvent extends BaseEntity {
         this.tag = tag;
     }
 
-    public Long getId() { return id; }
-    public GroupSpace getGroupSpace() { return groupSpace; }
-    public Account getCreatedBy() { return createdBy; }
-    public Tag getTag() { return tag; }
-    public String getTitle() { return title; }
-    public String getDescription() { return description; }
-    public Instant getStartAt() { return startAt; }
-    public Instant getEndAt() { return endAt; }
-    public boolean isAllDay() { return allDay; }
-    public String getTimeZone() { return timeZone; }
+    public Long getId() {
+        return id;
+    }
+
+    public GroupSpace getGroupSpace() {
+        return groupSpace;
+    }
+
+    public Account getCreatedBy() {
+        return createdBy;
+    }
+
+    public Tag getTag() {
+        return tag;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public Instant getStartAt() {
+        return startAt;
+    }
+
+    public Instant getEndAt() {
+        return endAt;
+    }
+
+    public boolean isAllDay() {
+        return allDay;
+    }
+
+    public String getTimeZone() {
+        return timeZone;
+    }
 }

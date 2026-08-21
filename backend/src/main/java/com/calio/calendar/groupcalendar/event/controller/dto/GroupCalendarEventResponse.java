@@ -15,6 +15,15 @@ public record GroupCalendarEventResponse(
         TagResponse tag
 ) {
     public static GroupCalendarEventResponse from(GroupCalendarEvent event) {
-        return new GroupCalendarEventResponse(event.getId(), event.getTitle(), event.getDescription(), event.getStartAt(), event.getEndAt(), event.isAllDay(), event.getTimeZone(), TagResponse.from(event.getTag()));
+        return new GroupCalendarEventResponse(
+                event.getId(),
+                event.getTitle(),
+                event.getDescription(),
+                event.getStartAt(),
+                event.getEndAt(),
+                event.isAllDay(),
+                event.getTimeZone(),
+                TagResponse.from(event.getTag())
+        );
     }
 }
