@@ -249,7 +249,7 @@ class EventControllerTest {
     }
 
     @Test
-    @DisplayName("사용자는 DEFAULT tagId를 지정해 일정을 생성하면 해당 태그가 저장된 응답을 받는다")
+    @DisplayName("사용자는 PERSONAL_DEFAULT tagId를 지정해 일정을 생성하면 해당 태그가 저장된 응답을 받는다")
     void givenDefaultTagId_whenCreateEvent_thenStoresSelectedTag() throws Exception {
         // given
         Tag workTag = tagRepository.save(new Tag(TagType.PERSONAL_DEFAULT, "업무", "#2563eb"));
@@ -272,7 +272,7 @@ class EventControllerTest {
                 .andExpect(jsonPath("$.tag.id").value(workTag.getId()))
                 .andExpect(jsonPath("$.tag.title").value("업무"))
                 .andExpect(jsonPath("$.tag.colorCode").value("#2563EB"))
-                .andExpect(jsonPath("$.tag.tagType").value("DEFAULT"));
+                .andExpect(jsonPath("$.tag.tagType").value("PERSONAL_DEFAULT"));
     }
 
     @Test
