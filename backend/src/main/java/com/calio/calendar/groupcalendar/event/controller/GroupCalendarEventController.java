@@ -5,6 +5,8 @@ import com.calio.calendar.groupcalendar.event.controller.dto.GroupCalendarEventR
 import com.calio.calendar.groupcalendar.event.service.GroupCalendarEventService;
 import com.calio.calendar.security.AuthenticatedAccount;
 import jakarta.validation.Valid;
+import java.time.Instant;
+import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -14,6 +16,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -35,6 +38,16 @@ public class GroupCalendarEventController {
             @Valid @RequestBody GroupCalendarEventRequest request
     ) {
         return groupCalendarEventService.create(account.accountId(), groupSpaceId, request);
+    }
+
+    @GetMapping
+    public List<GroupCalendarEventResponse> list(
+            @AuthenticationPrincipal AuthenticatedAccount account,
+            @PathVariable Long groupSpaceId,
+            @RequestParam Instant from,
+            @RequestParam Instant to
+    ) {
+        return groupCalendarEventService.list(account.accountId(), groupSpaceId, from, to);
     }
 
     @GetMapping("/{eventId}")
