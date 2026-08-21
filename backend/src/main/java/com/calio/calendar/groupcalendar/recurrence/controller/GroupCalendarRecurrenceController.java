@@ -2,18 +2,23 @@ package com.calio.calendar.groupcalendar.recurrence.controller;
 
 import com.calio.calendar.groupcalendar.recurrence.controller.dto.GroupCalendarRecurrenceRequest;
 import com.calio.calendar.groupcalendar.recurrence.controller.dto.GroupCalendarRecurrenceResponse;
+import com.calio.calendar.groupcalendar.recurrence.controller.dto.GroupCalendarRecurrenceOccurrenceRequest;
+import com.calio.calendar.groupcalendar.controller.dto.GroupCalendarItemResponse;
 import com.calio.calendar.groupcalendar.recurrence.service.GroupCalendarRecurrenceService;
 import com.calio.calendar.security.AuthenticatedAccount;
 import jakarta.validation.Valid;
+import java.time.Instant;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -64,5 +69,26 @@ public class GroupCalendarRecurrenceController {
             @PathVariable Long recurrenceId
     ) {
         recurrenceService.delete(account.accountId(), groupSpaceId, recurrenceId);
+    }
+
+    @PatchMapping("/{recurrenceId}/occurrences")
+    public GroupCalendarItemResponse updateOccurrence(
+            @AuthenticationPrincipal AuthenticatedAccount account,
+            @PathVariable Long groupSpaceId,
+            @PathVariable Long recurrenceId,
+            @Valid @RequestBody GroupCalendarRecurrenceOccurrenceRequest request
+    ) {
+        return recurrenceService.updateOccurrence(account.accountId(), groupSpaceId, recurrenceId, request);
+    }
+
+    @DeleteMapping("/{recurrenceId}/occurrences")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteOccurrence(
+            @AuthenticationPrincipal AuthenticatedAccount account,
+            @PathVariable Long groupSpaceId,
+            @PathVariable Long recurrenceId,
+            @RequestParam Instant originStartAt
+    ) {
+        recurrenceService.deleteOccurrence(account.accountId(), groupSpaceId, recurrenceId, originStartAt);
     }
 }
