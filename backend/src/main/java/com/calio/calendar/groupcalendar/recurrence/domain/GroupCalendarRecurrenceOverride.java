@@ -112,13 +112,39 @@ public class GroupCalendarRecurrenceOverride extends BaseEntity {
         this.deletedAt = deletedAt;
     }
 
-    public boolean isDeleted() { return deletedAt != null; }
-    public GroupCalendarRecurrenceEvent getRecurrenceEvent() { return recurrenceEvent; }
-    public Instant getOriginStartAt() { return originStartAt; }
-    public String getTitle() { return title; }
-    public String getDescription() { return description; }
-    public Instant getStartAt() { return startAt; }
-    public Instant getEndAt() { return endAt; }
-    public boolean isAllDay() { return Boolean.TRUE.equals(allDay); }
-    public String getTimeZone() { return timeZone; }
+    public boolean isDeleted() {
+        return deletedAt != null;
+    }
+
+    public GroupCalendarRecurrenceEvent getRecurrenceEvent() {
+        return recurrenceEvent;
+    }
+
+    public Instant getOriginStartAt() {
+        return originStartAt;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public Instant getStartAt() {
+        return startAt;
+    }
+
+    public Instant getEndAt() {
+        return endAt;
+    }
+
+    public boolean isAllDay() {
+        return Boolean.TRUE.equals(allDay);
+    }
+
+    public String getTimeZone() {
+        return timeZone;
+    }
 }
