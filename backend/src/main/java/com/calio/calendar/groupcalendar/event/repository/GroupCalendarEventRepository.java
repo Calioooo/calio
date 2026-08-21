@@ -47,4 +47,15 @@ public interface GroupCalendarEventRepository extends JpaRepository<GroupCalenda
             @Param("groupSpaceId") Long groupSpaceId,
             @Param("accountId") Long accountId
     );
+
+    @Modifying(flushAutomatically = true)
+    @Query("""
+            update GroupCalendarEvent event
+            set event.tag = :fallbackTag
+            where event.tag = :sourceTag
+            """)
+    int reassignAllByTag(
+            @Param("sourceTag") com.calio.calendar.tag.domain.Tag sourceTag,
+            @Param("fallbackTag") com.calio.calendar.tag.domain.Tag fallbackTag
+    );
 }

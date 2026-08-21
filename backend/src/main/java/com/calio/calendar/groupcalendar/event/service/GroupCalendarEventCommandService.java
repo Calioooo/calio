@@ -1,6 +1,7 @@
 package com.calio.calendar.groupcalendar.event.service;
 
 import com.calio.calendar.groupcalendar.event.repository.GroupCalendarEventRepository;
+import com.calio.calendar.tag.domain.Tag;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,5 +21,9 @@ public class GroupCalendarEventCommandService {
 
     public void deleteAllByGroupSpaceIdAndCreatedById(Long groupSpaceId, Long accountId) {
         eventRepository.deleteAllByGroupSpaceIdAndCreatedById(groupSpaceId, accountId);
+    }
+
+    public void changeTagForEvents(Tag sourceTag, Tag fallbackTag) {
+        eventRepository.reassignAllByTag(sourceTag, fallbackTag);
     }
 }
