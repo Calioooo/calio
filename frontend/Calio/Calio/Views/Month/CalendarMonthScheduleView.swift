@@ -980,7 +980,7 @@ private struct CalendarMonthRangeActionPopover: View {
     }
 }
 
-private struct CalendarDayDetailFloatingPanelView: View {
+struct CalendarDayDetailFloatingPanelView: View {
     let day: DayKey
     let item: CalendarDayItem?
     let onCreateTapped: () -> Void
@@ -1005,6 +1005,8 @@ private struct CalendarDayDetailFloatingPanelView: View {
         .background(Color.calioSurface)
         .clipShape(RoundedRectangle(cornerRadius: 22))
         .shadow(color: .black.opacity(0.22), radius: 24, x: 0, y: 14)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("month_day_detail_panel")
     }
 
     private var panelHeader: some View {
@@ -1027,6 +1029,7 @@ private struct CalendarDayDetailFloatingPanelView: View {
                     .foregroundStyle(Color.calioBrand)
                     .frame(width: 34, height: 34)
                     .contentShape(Circle())
+                    .background(Circle().fill(Color.calioSelection))
             }
             .buttonStyle(.plain)
             .accessibilityLabel("일정 추가")
@@ -1035,9 +1038,10 @@ private struct CalendarDayDetailFloatingPanelView: View {
             Button(action: onCloseTapped) {
                 Image(systemName: "xmark")
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.calioTextSecondary)
                     .frame(width: 34, height: 34)
                     .contentShape(Circle())
+                    .background(Circle().fill(Color.calioBackground))
             }
             .buttonStyle(.plain)
             .accessibilityLabel("닫기")
@@ -1069,6 +1073,10 @@ private struct CalendarDayDetailFloatingPanelView: View {
         VStack(spacing: 10) {
             Spacer()
 
+            Image(systemName: "calendar")
+                .font(.title3)
+                .foregroundStyle(.calioTextSecondary)
+
             Text("일정이 없습니다")
                 .font(.body.weight(.medium))
                 .foregroundStyle(.calioTextSecondary)
@@ -1076,6 +1084,7 @@ private struct CalendarDayDetailFloatingPanelView: View {
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityLabel("\(dayTitle), 일정 없음. 일정 추가 가능")
         .accessibilityIdentifier("month_detail_empty")
     }
 
@@ -1123,6 +1132,9 @@ private struct CalendarDayDetailEventRow: View {
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(event.title), \(eventTimeText)\(hasDescription ? ", \(event.description)" : "")")
+        .accessibilityIdentifier("month_detail_event_\(event.id)")
     }
 
     private var hasDescription: Bool {

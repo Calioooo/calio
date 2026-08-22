@@ -1043,13 +1043,13 @@ private struct TimelinePopoverArrow: Shape {
     }
 }
 
-private struct CalendarTimelineOverlapPopoverView: View {
+struct CalendarTimelineOverlapPopoverView: View {
     let events: [Event]
     let onShowDetail: (Event) -> Void
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("일정 \(events.count)개")
+            Text("겹치는 일정 \(events.count)개")
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(.calioTextPrimary)
             
@@ -1080,20 +1080,29 @@ private struct CalendarTimelineOverlapPopoverView: View {
                             }
                             
                             Spacer(minLength: 0)
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.calioTextSecondary)
                         }
                         .contentShape(Rectangle())
                         .padding(.vertical, 8)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("\(event.title), \(CalendarEventDisplayText.compactDateTimeRange(startAt: event.startAt, endAt: event.endAt))")
+                    .accessibilityHint("일정 상세 보기")
+                    .accessibilityIdentifier("timeline_overlap_event_\(event.id)")
                     
                     if event.id != events.last?.id {
                         Divider()
+                            .overlay(Color.calioDivider)
                     }
                 }
             }
         }
         .padding(14)
         .frame(width: 260, alignment: .leading)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("timeline_overlap_panel")
     }
 }
 
