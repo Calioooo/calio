@@ -43,6 +43,9 @@ struct CalendarDateCellView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityValue(isSelected ? "선택됨" : "선택 안 됨")
+        .accessibilityIdentifier("calendar_date_strip_\(dayText)_\(weekday.rawValue)")
     }
     
     private var dateNumberText: some View {
@@ -98,6 +101,13 @@ struct CalendarDateCellView: View {
         default:
             return .calioTextPrimary
         }
+    }
+
+    private var accessibilityLabel: String {
+        let state = [isToday ? "오늘" : nil, events.isEmpty ? nil : "일정 \(events.count)개"]
+            .compactMap { $0 }
+            .joined(separator: ", ")
+        return "\(weekday.fullKoreanText) \(dayText)일\(state.isEmpty ? "" : ", \(state)")"
     }
 }
 

@@ -31,6 +31,7 @@ struct CalendarTopBarView: View {
                     .frame(minHeight: 36)
                     .background(Capsule().fill(Color.calioSelection))
                     .accessibilityLabel("오늘로 이동")
+                    .accessibilityIdentifier("calendar_navigation_today")
             }
 
             Button(action: onGoogleCalendarConnectTapped) {
@@ -38,9 +39,12 @@ struct CalendarTopBarView: View {
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(.calioTextSecondary)
                     .frame(width: 44, height: 44)
+                    .background(Circle().fill(Color.calioSurface))
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Google Calendar 연동")
+            .accessibilityHint("Google Calendar 인증을 시작합니다")
+            .accessibilityIdentifier("calendar_navigation_google_connect")
 
             Button(action: onCreateTapped) {
                 Image(systemName: "plus")
@@ -51,10 +55,12 @@ struct CalendarTopBarView: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("일정 추가")
+            .accessibilityIdentifier("calendar_navigation_add_event")
         }
         .padding(.horizontal, 16)
         .frame(minHeight: 60)
         .background(Color.calioBackground)
+        .accessibilityIdentifier("calendar_navigation_top_bar")
     }
 }
 

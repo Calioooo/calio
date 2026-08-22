@@ -85,7 +85,7 @@ struct CalendarYearMonthTitleView: View {
     private var titleText: some View {
         Text(title)
             .font(.system(size: 24, weight: .semibold))
-            .foregroundStyle(.primary)
+            .foregroundStyle(.calioTextPrimary)
     }
 
     private var years: [Int] {
@@ -100,11 +100,12 @@ struct CalendarYearMonthTitleView: View {
         Button(action: action) {
             Text(text)
                 .font(.system(size: 24, weight: .semibold))
-                .foregroundStyle(.primary)
+                .foregroundStyle(.calioTextPrimary)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(text) 선택")
+        .accessibilityIdentifier("calendar_navigation_\(text == "\(referenceDay.year)년" ? "year" : "month")_picker")
     }
 }
 
