@@ -154,18 +154,18 @@ public class GroupCalendarRecurrenceService {
                 recurrenceEvent,
                 request.originStartAt()
         );
-        GroupCalendarRecurrenceOverride override = existingOverride.orElseGet(() ->
-                GroupCalendarRecurrenceOverride.active(
+        GroupCalendarRecurrenceOverride override = existingOverride
+                .map(existing -> {
+                    existing.activate(request.title(), request.description(), schedule);
+                    return existing;
+                })
+                .orElseGet(() -> GroupCalendarRecurrenceOverride.active(
                         recurrenceEvent,
                         request.originStartAt(),
                         request.title(),
                         request.description(),
                         schedule
-                )
-        );
-        if (existingOverride.isPresent()) {
-            override.activate(request.title(), request.description(), schedule);
-        }
+                ));
 
         return GroupCalendarItemResponse.recurrenceOverride(
                 overrideCommandService.createOrUpdateOverride(override),
@@ -190,12 +190,16 @@ public class GroupCalendarRecurrenceService {
                 recurrenceEvent,
                 originStartAt
         );
-        GroupCalendarRecurrenceOverride override = existingOverride.orElseGet(() ->
-                GroupCalendarRecurrenceOverride.deleted(recurrenceEvent, originStartAt, clock.instant())
-        );
-        if (existingOverride.isPresent()) {
-            override.markDeleted(clock.instant());
-        }
+        GroupCalendarRecurrenceOverride override = existingOverride
+                .map(existing -> {
+                    existing.markDeleted(clock.instant());
+                    return existing;
+                })
+                .orElseGet(() -> GroupCalendarRecurrenceOverride.deleted(
+                        recurrenceEvent,
+                        originStartAt,
+                        clock.instant()
+                ));
         overrideCommandService.createOrUpdateOverride(override);
     }
 
@@ -233,12 +237,7 @@ public class GroupCalendarRecurrenceService {
 
     private boolean containsOrigin(GroupCalendarRecurrenceEvent recurrenceEvent, Instant originStartAt) {
         return recurrenceEngine.containsOrigin(
-                new RecurrenceSchedule(
-                        recurrenceEvent.getFirstOccurrenceStartAt(),
-                        recurrenceEvent.getFirstOccurrenceEndAt(),
-                        recurrenceEvent.isAllDay(),
-                        recurrenceEvent.getTimeZone()
-                ),
+                recurrenceEvent.toRecurrenceSchedule(),
                 recurrenceEvent.getRecurrenceRules(),
                 originStartAt
         );

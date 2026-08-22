@@ -18,11 +18,11 @@ public class GroupCalendarRecurrenceCommandService {
         this.recurrenceRepository = recurrenceRepository;
     }
 
-    public void deleteAllByGroupSpaceId(Long groupSpaceId) {
+    public void deleteAllInGroupSpace(Long groupSpaceId) {
         recurrenceRepository.deleteAllByGroupSpace_Id(groupSpaceId);
     }
 
-    public void deleteAllByGroupSpaceIdAndCreatedById(Long groupSpaceId, Long accountId) {
+    public void deleteAllCreatedByMember(Long groupSpaceId, Long accountId) {
         recurrenceRepository.deleteAllByGroupSpace_IdAndCreatedBy_Id(groupSpaceId, accountId);
     }
 

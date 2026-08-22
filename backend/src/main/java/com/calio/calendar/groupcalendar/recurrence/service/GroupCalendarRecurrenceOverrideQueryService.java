@@ -40,11 +40,6 @@ public class GroupCalendarRecurrenceOverrideQueryService {
             Instant from,
             Instant to
     ) {
-        return overrideRepository
-                .findByRecurrenceEvent_GroupSpace_IdAndDeletedAtIsNullAndStartAtLessThanAndEndAtGreaterThan(
-                        groupSpaceId,
-                        to,
-                        from
-                );
+        return overrideRepository.listOverlappingOverrides(groupSpaceId, from, to);
     }
 }

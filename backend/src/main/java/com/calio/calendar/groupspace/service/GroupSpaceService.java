@@ -124,7 +124,7 @@ public class GroupSpaceService {
         membershipCommandService.lockMembers(groupSpaceId);
         groupScheduleShareCleanupPort.cleanupGroupShares(groupSpaceId);
         groupCalendarEventCommandService.deleteAllByGroupSpaceId(groupSpaceId);
-        groupCalendarRecurrenceCommandService.deleteAllByGroupSpaceId(groupSpaceId);
+        groupCalendarRecurrenceCommandService.deleteAllInGroupSpace(groupSpaceId);
         invitationCommandService.deleteAllByGroupSpaceId(groupSpaceId);
         groupTagService.deleteAll(groupSpaceId);
         commandService.delete(groupSpace);

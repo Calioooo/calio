@@ -5,6 +5,7 @@ import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
@@ -27,6 +28,7 @@ public interface GroupCalendarEventRepository extends JpaRepository<GroupCalenda
 
     Optional<GroupCalendarEvent> findByIdAndGroupSpace_Id(Long eventId, Long groupSpaceId);
 
+    @EntityGraph(attributePaths = "tag")
     List<GroupCalendarEvent> findByGroupSpace_IdAndStartAtLessThanAndEndAtGreaterThanOrderByStartAtAsc(
             Long groupSpaceId,
             Instant to,

@@ -138,4 +138,13 @@ public class GroupCalendarRecurrenceEvent extends BaseEntity {
     public List<String> getRecurrenceRules() {
         return recurrenceRules;
     }
+
+    public RecurrenceSchedule toRecurrenceSchedule() {
+        return new RecurrenceSchedule(
+                firstOccurrenceStartAt,
+                firstOccurrenceEndAt,
+                allDay,
+                timeZone
+        );
+    }
 }

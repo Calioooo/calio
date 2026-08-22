@@ -107,7 +107,9 @@ public class Tag extends BaseEntity {
     }
 
     private void validateOwnership(TagType tagType, Account account, GroupSpace groupSpace) {
-        boolean isPersonalDefault = tagType == TagType.PERSONAL_DEFAULT;
+        boolean isPersonalDefault = tagType == TagType.PERSONAL_DEFAULT
+                && account == null
+                && groupSpace == null;
         boolean isPersonalCustom = tagType == TagType.CUSTOM && account != null && groupSpace == null;
         boolean isGroupTag = (tagType == TagType.GROUP_DEFAULT || tagType == TagType.CUSTOM)
                 && account == null && groupSpace != null;

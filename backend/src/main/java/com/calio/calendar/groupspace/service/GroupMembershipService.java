@@ -19,6 +19,7 @@ import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.domain.GroupSpaceFields;
 import com.calio.calendar.groupcalendar.event.service.GroupCalendarEventCommandService;
 import com.calio.calendar.groupcalendar.recurrence.service.GroupCalendarRecurrenceCommandService;
+import com.calio.calendar.tag.service.GroupTagService;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -40,6 +41,7 @@ public class GroupMembershipService {
     private final GroupScheduleShareCleanupPort groupScheduleShareCleanupPort;
     private final GroupCalendarEventCommandService groupCalendarEventCommandService;
     private final GroupCalendarRecurrenceCommandService groupCalendarRecurrenceCommandService;
+    private final GroupTagService groupTagService;
     private final Clock clock;
 
     public GroupMembershipService(
@@ -53,6 +55,7 @@ public class GroupMembershipService {
             GroupScheduleShareCleanupPort groupScheduleShareCleanupPort,
             GroupCalendarEventCommandService groupCalendarEventCommandService,
             GroupCalendarRecurrenceCommandService groupCalendarRecurrenceCommandService,
+            GroupTagService groupTagService,
             Clock clock
     ) {
         this.queryService = queryService;
@@ -65,6 +68,7 @@ public class GroupMembershipService {
         this.groupScheduleShareCleanupPort = groupScheduleShareCleanupPort;
         this.groupCalendarEventCommandService = groupCalendarEventCommandService;
         this.groupCalendarRecurrenceCommandService = groupCalendarRecurrenceCommandService;
+        this.groupTagService = groupTagService;
         this.clock = clock;
     }
 
@@ -252,7 +256,7 @@ public class GroupMembershipService {
                 groupSpaceId,
                 member.getAccountId()
         );
-        groupCalendarRecurrenceCommandService.deleteAllByGroupSpaceIdAndCreatedById(
+        groupCalendarRecurrenceCommandService.deleteAllCreatedByMember(
                 groupSpaceId,
                 member.getAccountId()
         );
@@ -263,8 +267,9 @@ public class GroupMembershipService {
     private void deleteSoleOwnerGroup(GroupSpace groupSpace) {
         groupScheduleShareCleanupPort.cleanupGroupShares(groupSpace.getId());
         groupCalendarEventCommandService.deleteAllByGroupSpaceId(groupSpace.getId());
-        groupCalendarRecurrenceCommandService.deleteAllByGroupSpaceId(groupSpace.getId());
+        groupCalendarRecurrenceCommandService.deleteAllInGroupSpace(groupSpace.getId());
         invitationCommandService.deleteAllByGroupSpaceId(groupSpace.getId());
+        groupTagService.deleteAll(groupSpace.getId());
         groupSpaceCommandService.delete(groupSpace);
     }
 

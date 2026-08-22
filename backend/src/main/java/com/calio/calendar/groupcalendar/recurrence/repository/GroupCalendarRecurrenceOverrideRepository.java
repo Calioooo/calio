@@ -46,10 +46,9 @@ public interface GroupCalendarRecurrenceOverrideRepository
               and recurrenceOverride.startAt < :to
               and recurrenceOverride.endAt > :from
             """)
-    List<GroupCalendarRecurrenceOverride>
-    findByRecurrenceEvent_GroupSpace_IdAndDeletedAtIsNullAndStartAtLessThanAndEndAtGreaterThan(
+    List<GroupCalendarRecurrenceOverride> listOverlappingOverrides(
             @Param("groupSpaceId") Long groupSpaceId,
-            @Param("to") Instant to,
-            @Param("from") Instant from
+            @Param("from") Instant from,
+            @Param("to") Instant to
     );
 }
