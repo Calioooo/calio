@@ -97,6 +97,7 @@ struct CalendarEventFormView: View {
                 tagSection
             }
         }
+        .tint(.calioBrand)
     }
 
     private var titleSection: some View {
@@ -157,22 +158,26 @@ struct CalendarEventFormView: View {
         Section {
             if mode.allowsAllDayToggle {
                 Toggle("하루 종일", isOn: allDayBinding)
+                    .accessibilityIdentifier("event_form_all_day_toggle")
             }
 
             if eventInput.isAllDay {
                 DatePicker("시작일", selection: $eventInput.startAt, displayedComponents: [.date])
+                    .accessibilityIdentifier("event_form_start_date")
                 DatePicker(
                     "종료일",
                     selection: inclusiveAllDayEndBinding,
                     in: eventInput.startAt...,
                     displayedComponents: [.date]
                 )
+                .accessibilityIdentifier("event_form_end_date")
             } else {
                 DatePicker(
                     "시작",
                     selection: $eventInput.startAt,
                     displayedComponents: [.date, .hourAndMinute]
                 )
+                .accessibilityIdentifier("event_form_start_datetime")
 
                 DatePicker(
                     "종료",
@@ -180,6 +185,7 @@ struct CalendarEventFormView: View {
                     in: eventInput.startAt...,
                     displayedComponents: [.date, .hourAndMinute]
                 )
+                .accessibilityIdentifier("event_form_end_datetime")
             }
         }
     }
@@ -198,6 +204,7 @@ struct CalendarEventFormView: View {
             .environment(\.locale, Locale(identifier: "ko_KR"))
 
             Toggle("종료일 없음", isOn: noEndDateBinding(recurrenceInput))
+                .accessibilityIdentifier("event_form_no_end_date_toggle")
 
             if let fallbackEndDate = recurrenceInput.wrappedValue.endDate {
                 DatePicker(
@@ -210,6 +217,7 @@ struct CalendarEventFormView: View {
                     displayedComponents: [.date]
                 )
                 .environment(\.locale, Locale(identifier: "ko_KR"))
+                .accessibilityIdentifier("event_form_recurrence_end_date")
             }
         }
     }
@@ -230,12 +238,14 @@ struct CalendarEventFormView: View {
                 selection: recurrenceInput.startTime,
                 displayedComponents: [.hourAndMinute]
             )
+            .accessibilityIdentifier("event_form_recurrence_start_time")
 
             DatePicker(
                 "종료 시간",
                 selection: recurrenceInput.endTime,
                 displayedComponents: [.hourAndMinute]
             )
+            .accessibilityIdentifier("event_form_recurrence_end_time")
         }
     }
 
@@ -243,6 +253,8 @@ struct CalendarEventFormView: View {
         Section("설명") {
             TextEditor(text: $eventInput.description)
                 .frame(minHeight: 96)
+                .foregroundStyle(.calioTextPrimary)
+                .accessibilityIdentifier("event_form_description_input")
                 .overlay(alignment: .topLeading) {
                     if eventInput.description.isEmpty {
                 Text("메모를 입력하세요")
@@ -263,6 +275,7 @@ struct CalendarEventFormView: View {
             } label: {
                 Label("태그 관리", systemImage: "tag")
             }
+            .accessibilityIdentifier("event_form_tag_management_button")
             .sheet(isPresented: $isShowingTagManagement) {
                 CalendarTagManagementView(
                     tags: tags,
@@ -280,7 +293,7 @@ struct CalendarEventFormView: View {
             if availableTags.isEmpty {
                 Text("사용 가능한 태그가 없습니다.")
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.calioTextSecondary)
             } else {
                 FlowLayout(spacing: 8) {
                     ForEach(availableTags) { tag in
@@ -311,6 +324,7 @@ struct CalendarEventFormView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("event_form_recurrence_toggle")
     }
 
     private var fixedRecurrenceEnabledRow: some View {
@@ -348,6 +362,8 @@ struct CalendarEventFormView: View {
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("recurrence_frequency_\(frequency.rawValue)")
+        .accessibilityLabel("\(frequency.koreanLabel) 반복")
+        .accessibilityValue(recurrenceInput.wrappedValue.frequency == frequency ? "선택됨" : "선택 안 됨")
     }
 
     private func tagButton(_ tag: CalendarTag) -> some View {
@@ -382,6 +398,8 @@ struct CalendarEventFormView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(tag.title) 태그 선택")
+        .accessibilityValue(eventInput.tag?.id == tag.id ? "선택됨" : "선택 안 됨")
+        .accessibilityIdentifier("event_form_tag_\(tag.id)")
     }
 
     private var availableTags: [CalendarTag] {
