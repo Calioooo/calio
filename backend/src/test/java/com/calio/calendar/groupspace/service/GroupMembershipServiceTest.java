@@ -8,12 +8,20 @@ import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.groupinvitation.repository.GroupInvitationRepository;
+import com.calio.calendar.groupcalendar.event.domain.GroupCalendarEvent;
+import com.calio.calendar.groupcalendar.event.repository.GroupCalendarEventRepository;
+import com.calio.calendar.groupcalendar.recurrence.domain.GroupCalendarRecurrenceEvent;
+import com.calio.calendar.groupcalendar.recurrence.repository.GroupCalendarRecurrenceEventRepository;
 import com.calio.calendar.groupspace.domain.GroupMember;
 import com.calio.calendar.groupspace.domain.GroupMemberRole;
 import com.calio.calendar.groupspace.domain.GroupMemberStatus;
 import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.repository.GroupMemberRepository;
 import com.calio.calendar.groupspace.repository.GroupSpaceRepository;
+import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
+import com.calio.calendar.tag.domain.Tag;
+import com.calio.calendar.tag.domain.TagType;
+import com.calio.calendar.tag.repository.TagRepository;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -47,8 +55,20 @@ class GroupMembershipServiceTest {
     @Autowired
     private GroupInvitationRepository groupInvitationRepository;
 
+    @Autowired
+    private GroupCalendarEventRepository groupCalendarEventRepository;
+
+    @Autowired
+    private GroupCalendarRecurrenceEventRepository groupCalendarRecurrenceEventRepository;
+
+    @Autowired
+    private TagRepository tagRepository;
+
     @BeforeEach
     void setUp() {
+        groupCalendarEventRepository.deleteAll();
+        groupCalendarRecurrenceEventRepository.deleteAll();
+        tagRepository.deleteAll();
         groupInvitationRepository.deleteAll();
         groupMemberRepository.deleteAll();
         groupSpaceRepository.deleteAll();
@@ -107,6 +127,49 @@ class GroupMembershipServiceTest {
         )).isInstanceOf(CalioException.class)
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.GROUP_MEMBER_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("마지막 owner 탈퇴는 Group Space 태그와 직접·반복 일정을 함께 hard-delete한다")
+    void givenSoleOwnerGroup_whenLeave_thenDeletesTagsAndCalendarData() {
+        // given
+        Account owner = accountRepository.saveAndFlush(new Account());
+        GroupSpace groupSpace = groupSpaceRepository.saveAndFlush(new GroupSpace(owner.getId(), "Shared", null));
+        groupMemberRepository.saveAndFlush(new GroupMember(groupSpace, owner.getId(), "owner", MEMBER_CREATED_AT));
+        Tag tag = tagRepository.saveAndFlush(new Tag(TagType.GROUP_DEFAULT, "기타", "#64748B", groupSpace));
+        groupCalendarEventRepository.saveAndFlush(new GroupCalendarEvent(
+                groupSpace,
+                owner,
+                tag,
+                "직접 일정",
+                null,
+                MEMBER_CREATED_AT,
+                MEMBER_CREATED_AT.plusSeconds(3600),
+                false,
+                "UTC"
+        ));
+        groupCalendarRecurrenceEventRepository.saveAndFlush(new GroupCalendarRecurrenceEvent(
+                groupSpace,
+                owner,
+                tag,
+                "반복 일정",
+                null,
+                new RecurrenceSchedule(
+                        MEMBER_CREATED_AT,
+                        MEMBER_CREATED_AT.plusSeconds(3600),
+                        false,
+                        "UTC"
+                ),
+                java.util.List.of("RRULE:FREQ=DAILY")
+        ));
+
+        // when
+        groupMembershipService.leave(owner.getId(), groupSpace.getId());
+
+        // then
+        assertThat(groupCalendarEventRepository.findAll()).isEmpty();
+        assertThat(groupCalendarRecurrenceEventRepository.findAll()).isEmpty();
+        assertThat(tagRepository.findAll()).isEmpty();
     }
 
     @Test

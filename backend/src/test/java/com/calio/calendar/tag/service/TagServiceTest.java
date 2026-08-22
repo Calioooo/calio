@@ -30,7 +30,7 @@ class TagServiceTest {
     private TagQueryService tagQueryService;
 
     @Test
-    @DisplayName("예외적인 tagId는 DEFAULT 또는 CUSTOM 태그를 resolve한다")
+    @DisplayName("유효한 tagId는 PERSONAL_DEFAULT 또는 CUSTOM 태그를 resolve한다")
     void givenExistingTagId_whenResolveTag_thenReturnsTag() {
         // given
         Tag defaultTag = new Tag(TagType.PERSONAL_DEFAULT, "업무", "#2563eb");
@@ -70,7 +70,7 @@ class TagServiceTest {
     }
 
     @Test
-    @DisplayName("tagId가 null이면 DEFAULT 기타 fallback 태그를 조회한다")
+    @DisplayName("tagId가 null이면 PERSONAL_DEFAULT 기타 fallback 태그를 조회한다")
     void givenNullTagId_whenResolveDefaultTag_thenReturnsFallbackTag() {
         // given
         Tag fallbackTag = new Tag(TagType.PERSONAL_DEFAULT, "기타", "#64748B");
@@ -85,7 +85,7 @@ class TagServiceTest {
     }
 
     @Test
-    @DisplayName("fallback DEFAULT 기타 태그가 없으면 DEFAULT_TAG_NOT_FOUND로 실패한다")
+    @DisplayName("fallback PERSONAL_DEFAULT 기타 태그가 없으면 DEFAULT_TAG_NOT_FOUND로 실패한다")
     void givenMissingFallbackTag_whenResolveDefaultTag_thenThrowsDefaultTagNotFound() {
         // given
         when(tagRepository.findFirstByTagTypeAndTitleAndAccountIsNullAndGroupSpaceIsNullOrderByIdAsc(TagType.PERSONAL_DEFAULT, "기타"))

@@ -27,8 +27,8 @@ class TagTest {
     }
 
     @Test
-    @DisplayName("DEFAULT 태그는 entity 내부에서도 수정할 수 없다")
-    void givenDefaultTag_whenUpdate_thenThrowsValidationFailed() {
+    @DisplayName("PERSONAL_DEFAULT 태그는 entity 내부에서도 수정할 수 없다")
+    void givenPersonalDefaultTag_whenUpdate_thenThrowsValidationFailed() {
         // given
         Tag tag = new Tag(TagType.PERSONAL_DEFAULT, "기타", "#64748B");
 
@@ -37,5 +37,19 @@ class TagTest {
                 .isInstanceOfSatisfying(CalioException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.VALIDATION_FAILED)
                 );
+    }
+
+    @Test
+    @DisplayName("PERSONAL_DEFAULT 태그는 Account 또는 Group Space에 소유될 수 없다")
+    void givenOwnedPersonalDefaultTag_whenCreated_thenThrowsValidationFailed() {
+        // given, when, then
+        assertThatThrownBy(() -> new Tag(
+                TagType.PERSONAL_DEFAULT,
+                "기타",
+                "#64748B",
+                mock(Account.class)
+        )).isInstanceOfSatisfying(CalioException.class, exception ->
+                assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.VALIDATION_FAILED)
+        );
     }
 }

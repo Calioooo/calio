@@ -44,8 +44,8 @@ class TagControllerTest {
     }
 
     @Test
-    @DisplayName("사용자는 DEFAULT와 CUSTOM 태그 목록을 id, title, colorCode, tagType으로 조회한다")
-    void givenDefaultAndCustomTags_whenListTags_thenReturnsAllTags() throws Exception {
+    @DisplayName("사용자는 PERSONAL_DEFAULT와 CUSTOM 태그 목록을 id, title, colorCode, tagType으로 조회한다")
+    void givenPersonalDefaultAndCustomTags_whenListTags_thenReturnsAllTags() throws Exception {
         // given
         tagRepository.save(new Tag(TagType.PERSONAL_DEFAULT, "업무", "#2563eb"));
         tagRepository.save(new Tag(TagType.PERSONAL_DEFAULT, "기타", "#64748b"));

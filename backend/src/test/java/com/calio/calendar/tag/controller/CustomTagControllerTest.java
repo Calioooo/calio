@@ -141,8 +141,8 @@ class CustomTagControllerTest {
     }
 
     @Test
-    @DisplayName("사용자가 CUSTOM 태그를 수정하면 성공하고, DEFAULT 태그를 수정하면 TAG_NOT_FOUND 예외를 반환한다")
-    void givenCustomAndDefaultTagIds_whenUpdateCustomTag_thenOnlyCustomTagIsUpdated() throws Exception {
+    @DisplayName("사용자가 CUSTOM 태그를 수정하면 성공하고, PERSONAL_DEFAULT 태그를 수정하면 TAG_NOT_FOUND 예외를 반환한다")
+    void givenCustomAndPersonalDefaultTagIds_whenUpdateCustomTag_thenOnlyCustomTagIsUpdated() throws Exception {
         // given
         Tag customTag = tagRepository.save(new Tag(TagType.CUSTOM, "기존", "#111111", currentAccountReference()));
         Tag defaultTag = tagRepository.save(new Tag(TagType.PERSONAL_DEFAULT, "기타", "#64748B"));
