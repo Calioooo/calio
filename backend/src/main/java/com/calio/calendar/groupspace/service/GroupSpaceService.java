@@ -15,6 +15,8 @@ import com.calio.calendar.groupspace.domain.GroupSpaceFields;
 import com.calio.calendar.tag.service.GroupTagService;
 import com.calio.calendar.groupcalendar.event.service.GroupCalendarEventCommandService;
 import com.calio.calendar.groupcalendar.recurrence.service.GroupCalendarRecurrenceCommandService;
+import com.calio.calendar.groupcalendar.sharing.event.service.PersonalEventGroupShareCommandService;
+import com.calio.calendar.groupcalendar.sharing.recurrence.service.PersonalRecurrenceGroupShareCommandService;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -31,7 +33,8 @@ public class GroupSpaceService {
     private final AccountQueryService accountQueryService;
     private final GroupSpaceCommandService commandService;
     private final GroupInvitationCommandService invitationCommandService;
-    private final GroupScheduleShareCleanupPort groupScheduleShareCleanupPort;
+    private final PersonalEventGroupShareCommandService personalEventGroupShareCommandService;
+    private final PersonalRecurrenceGroupShareCommandService personalRecurrenceGroupShareCommandService;
     private final GroupTagService groupTagService;
     private final GroupCalendarEventCommandService groupCalendarEventCommandService;
     private final GroupCalendarRecurrenceCommandService groupCalendarRecurrenceCommandService;
@@ -45,7 +48,8 @@ public class GroupSpaceService {
             AccountQueryService accountQueryService,
             GroupSpaceCommandService commandService,
             GroupInvitationCommandService invitationCommandService,
-            GroupScheduleShareCleanupPort groupScheduleShareCleanupPort,
+            PersonalEventGroupShareCommandService personalEventGroupShareCommandService,
+            PersonalRecurrenceGroupShareCommandService personalRecurrenceGroupShareCommandService,
             GroupTagService groupTagService,
             GroupCalendarEventCommandService groupCalendarEventCommandService,
             GroupCalendarRecurrenceCommandService groupCalendarRecurrenceCommandService,
@@ -57,7 +61,8 @@ public class GroupSpaceService {
         this.accountQueryService = accountQueryService;
         this.commandService = commandService;
         this.invitationCommandService = invitationCommandService;
-        this.groupScheduleShareCleanupPort = groupScheduleShareCleanupPort;
+        this.personalEventGroupShareCommandService = personalEventGroupShareCommandService;
+        this.personalRecurrenceGroupShareCommandService = personalRecurrenceGroupShareCommandService;
         this.groupTagService = groupTagService;
         this.groupCalendarEventCommandService = groupCalendarEventCommandService;
         this.groupCalendarRecurrenceCommandService = groupCalendarRecurrenceCommandService;
@@ -122,7 +127,7 @@ public class GroupSpaceService {
         requireOwner(groupSpace, membership);
 
         membershipCommandService.lockMembers(groupSpaceId);
-        groupScheduleShareCleanupPort.cleanupGroupShares(groupSpaceId);
+        cleanupGroupShares(groupSpaceId);
         groupCalendarEventCommandService.deleteAllByGroupSpaceId(groupSpaceId);
         groupCalendarRecurrenceCommandService.deleteAllInGroupSpace(groupSpaceId);
         invitationCommandService.deleteAllByGroupSpaceId(groupSpaceId);
@@ -166,6 +171,11 @@ public class GroupSpaceService {
 
     private int activeMemberCount(Long groupSpaceId) {
         return queryService.getActiveMemberCount(groupSpaceId);
+    }
+
+    private void cleanupGroupShares(Long groupSpaceId) {
+        personalEventGroupShareCommandService.deleteAllInGroupSpace(groupSpaceId);
+        personalRecurrenceGroupShareCommandService.deleteAllInGroupSpace(groupSpaceId);
     }
 
     private static CalioException groupSpaceNotFound() {
