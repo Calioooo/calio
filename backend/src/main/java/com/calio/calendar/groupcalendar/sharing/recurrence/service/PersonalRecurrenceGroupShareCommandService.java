@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class PersonalRecurrenceGroupShareCommandService {
 
     private final PersonalRecurrenceGroupShareRepository shareRepository;
+
     public PersonalRecurrenceGroupShareCommandService(PersonalRecurrenceGroupShareRepository shareRepository) {
         this.shareRepository = shareRepository;
     }
@@ -23,5 +24,9 @@ public class PersonalRecurrenceGroupShareCommandService {
         } catch (DataIntegrityViolationException exception) {
             throw new CalioException(ErrorCode.PERSONAL_RECURRENCE_GROUP_SHARE_CONFLICT, exception);
         }
+    }
+
+    public void deleteAllForRecurrenceEvent(Long recurrenceEventId) {
+        shareRepository.deleteAllByRecurrenceEventId(recurrenceEventId);
     }
 }

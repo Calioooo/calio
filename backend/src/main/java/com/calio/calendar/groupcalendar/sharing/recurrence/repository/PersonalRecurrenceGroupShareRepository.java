@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -32,4 +33,11 @@ public interface PersonalRecurrenceGroupShareRepository extends JpaRepository<Pe
     List<PersonalRecurrenceGroupShare> findAllByRecurrenceEventId(
             @Param("recurrenceEventId") Long recurrenceEventId
     );
+
+    @Modifying(flushAutomatically = true)
+    @Query("""
+            delete from PersonalRecurrenceGroupShare share
+            where share.recurrenceEvent.id = :recurrenceEventId
+            """)
+    int deleteAllByRecurrenceEventId(@Param("recurrenceEventId") Long recurrenceEventId);
 }
