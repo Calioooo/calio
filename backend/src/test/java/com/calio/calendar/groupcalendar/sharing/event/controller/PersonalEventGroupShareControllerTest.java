@@ -4,6 +4,7 @@ import static com.calio.calendar.security.TestAccountSupport.currentAccountId;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -12,6 +13,7 @@ import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.event.repository.EventRepository;
 import com.calio.calendar.groupcalendar.sharing.event.repository.PersonalEventGroupShareRepository;
+import com.calio.calendar.groupcalendar.sharing.event.domain.PersonalEventGroupShare;
 import com.calio.calendar.groupspace.domain.GroupMember;
 import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.repository.GroupMemberRepository;
@@ -160,6 +162,47 @@ class PersonalEventGroupShareControllerTest {
         assertThat(eventRepository.findById(event.getId()).orElseThrow().getTitle()).isEqualTo("원본 제목");
         assertThat(shareRepository.findAllByEventId(event.getId()).getFirst().getOverrideTitle())
                 .isEqualTo("공개 제목");
+    }
+
+    @Test
+    @DisplayName("Group Space owner는 다른 멤버의 공유 mapping만 해제하고 원본 일정은 보존한다")
+    void givenGroupOwnerAndOtherMemberShare_whenRemove_thenDeletesMappingOnly() throws Exception {
+        // given
+        GroupSpace groupSpace = activeGroupSpace();
+        Event otherMemberEvent = event(accountRepository.saveAndFlush(new Account()).getId(), "다른 멤버 일정");
+        shareRepository.saveAndFlush(new PersonalEventGroupShare(otherMemberEvent, groupSpace));
+
+        // when
+        mockMvc.perform(delete(
+                        "/api/group-spaces/{groupSpaceId}/event-shares/{eventId}",
+                        groupSpace.getId(),
+                        otherMemberEvent.getId()
+                ))
+                // then
+                .andExpect(status().isNoContent());
+
+        assertThat(shareRepository.findAllByEventId(otherMemberEvent.getId())).isEmpty();
+        assertThat(eventRepository.findById(otherMemberEvent.getId())).isPresent();
+    }
+
+    @Test
+    @DisplayName("Group Space owner는 다른 멤버의 공유 표현을 수정할 수 없다")
+    void givenGroupOwnerAndOtherMemberShare_whenUpdate_thenRejectsRequest() throws Exception {
+        // given
+        GroupSpace groupSpace = activeGroupSpace();
+        Event otherMemberEvent = event(accountRepository.saveAndFlush(new Account()).getId(), "다른 멤버 일정");
+        shareRepository.saveAndFlush(new PersonalEventGroupShare(otherMemberEvent, groupSpace));
+
+        // when, then
+        mockMvc.perform(patch(
+                        "/api/group-spaces/{groupSpaceId}/event-shares/{eventId}",
+                        groupSpace.getId(),
+                        otherMemberEvent.getId()
+                )
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{ \"showOriginalDetails\": true }"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value("PERSONAL_EVENT_GROUP_SHARE_FORBIDDEN"));
     }
 
     private GroupSpace activeGroupSpace() {
