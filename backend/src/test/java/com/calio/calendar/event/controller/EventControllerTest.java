@@ -2,6 +2,7 @@ package com.calio.calendar.event.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -1010,7 +1011,7 @@ class EventControllerTest {
                 .andExpect(jsonPath("$[0].groupSpaceId").value(groupSpace.getId()))
                 .andExpect(jsonPath("$[0].description").value("그룹 설명"))
                 .andExpect(jsonPath("$[1].id").value(personalEventId))
-                .andExpect(jsonPath("$[1].groupSpaceId").doesNotExist());
+                .andExpect(jsonPath("$[1].groupSpaceId").value(nullValue()));
     }
 
     @Test
