@@ -11,6 +11,7 @@ import com.calio.calendar.event.controller.dto.UpdateEventRequest;
 import com.calio.calendar.event.controller.dto.UpdateImportantEventRequest;
 import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.groupcalendar.event.service.GroupCalendarEventQueryService;
+import com.calio.calendar.groupcalendar.sharing.event.service.PersonalEventGroupShareCommandService;
 import com.calio.calendar.groupspace.domain.GroupMember;
 import com.calio.calendar.groupspace.service.GroupSpaceQueryService;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingQueryService;
@@ -43,6 +44,7 @@ public class EventService {
 
     private final EventQueryService eventQueryService;
     private final EventCommandService eventCommandService;
+    private final PersonalEventGroupShareCommandService personalEventGroupShareCommandService;
     private final GoogleCalendarEventMappingQueryService eventMappingQueryService;
     private final AccountQueryService accountQueryService;
     private final TagQueryService tagQueryService;
@@ -54,6 +56,7 @@ public class EventService {
     public EventService(
             EventQueryService eventQueryService,
             EventCommandService eventCommandService,
+            PersonalEventGroupShareCommandService personalEventGroupShareCommandService,
             GoogleCalendarEventMappingQueryService eventMappingQueryService,
             AccountQueryService accountQueryService,
             TagQueryService tagQueryService,
@@ -64,6 +67,7 @@ public class EventService {
     ) {
         this.eventQueryService = eventQueryService;
         this.eventCommandService = eventCommandService;
+        this.personalEventGroupShareCommandService = personalEventGroupShareCommandService;
         this.eventMappingQueryService = eventMappingQueryService;
         this.accountQueryService = accountQueryService;
         this.tagQueryService = tagQueryService;
@@ -118,6 +122,7 @@ public class EventService {
     public void deleteEvent(Long accountId, Long eventId) {
         Event event = eventCommandService.lockEvent(accountId, eventId);
         rejectExternalEventMutation(accountId, eventId);
+        personalEventGroupShareCommandService.deleteAllForEvent(eventId);
         eventCommandService.deleteEvent(event);
     }
 

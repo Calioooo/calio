@@ -33,4 +33,8 @@ public class PersonalEventGroupShareCommandService {
         share.changeOriginalDetailsVisibility(showOriginalDetails);
         shareRepository.flush();
     }
+
+    public void deleteAllForEvent(Long eventId) {
+        shareRepository.deleteAllByEventId(eventId);
+    }
 }

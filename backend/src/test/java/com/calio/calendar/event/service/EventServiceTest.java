@@ -26,6 +26,7 @@ import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.event.repository.EventRepository;
 import com.calio.calendar.groupcalendar.event.domain.GroupCalendarEvent;
 import com.calio.calendar.groupcalendar.event.service.GroupCalendarEventQueryService;
+import com.calio.calendar.groupcalendar.sharing.event.service.PersonalEventGroupShareCommandService;
 import com.calio.calendar.groupspace.domain.GroupMember;
 import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.service.GroupSpaceQueryService;
@@ -62,6 +63,9 @@ class EventServiceTest {
 
     @Mock
     private EventCommandService eventCommandService;
+
+    @Mock
+    private PersonalEventGroupShareCommandService personalEventGroupShareCommandService;
 
     @Mock
     private AccountQueryService accountQueryService;
@@ -225,6 +229,29 @@ class EventServiceTest {
                                 .isEqualTo(ErrorCode.EXTERNAL_EVENT_MUTATION_NOT_SUPPORTED)
                 );
         verify(eventCommandService, never()).deleteEvent(any());
+    }
+
+    @Test
+    @DisplayName("개인 원본 일정 삭제는 share mapping을 먼저 hard-delete한다")
+    void givenOwnedEventWithShares_whenDeleteEvent_thenDeletesSharesBeforeSource() {
+        // given
+        Event event = event("개인 일정", tag("기타"));
+        when(eventCommandService.lockEvent(1L, 10L)).thenReturn(event);
+        when(eventMappingQueryService.hasExternalEventMapping(10L, 1L)).thenReturn(false);
+
+        // when
+        eventService.deleteEvent(1L, 10L);
+
+        // then
+        InOrder order = inOrder(
+                eventCommandService,
+                eventMappingQueryService,
+                personalEventGroupShareCommandService
+        );
+        order.verify(eventCommandService).lockEvent(1L, 10L);
+        order.verify(eventMappingQueryService).hasExternalEventMapping(10L, 1L);
+        order.verify(personalEventGroupShareCommandService).deleteAllForEvent(10L);
+        order.verify(eventCommandService).deleteEvent(event);
     }
 
     @Test
@@ -446,6 +473,7 @@ class EventServiceTest {
         return new EventService(
                 queryService,
                 eventCommandService,
+                personalEventGroupShareCommandService,
                 eventMappingQueryService,
                 accountQueryService,
                 tagQueryService,
