@@ -251,7 +251,7 @@ public class GroupMembershipService {
             GroupMemberStatus inactiveStatus,
             Instant now
     ) {
-        groupScheduleShareCleanupPort.cleanupMemberShares(groupSpaceId, member.getId());
+        groupScheduleShareCleanupPort.cleanupMemberShares(groupSpaceId, member.getAccountId());
         groupCalendarEventCommandService.deleteAllByGroupSpaceIdAndCreatedById(
                 groupSpaceId,
                 member.getAccountId()

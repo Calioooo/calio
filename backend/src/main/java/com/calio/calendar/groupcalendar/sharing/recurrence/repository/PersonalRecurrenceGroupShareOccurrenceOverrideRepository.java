@@ -30,4 +30,15 @@ public interface PersonalRecurrenceGroupShareOccurrenceOverrideRepository
             where occurrenceOverride.share.recurrenceEvent.id = :recurrenceEventId
             """)
     int deleteAllByRecurrenceEventId(@Param("recurrenceEventId") Long recurrenceEventId);
+
+    @Modifying(flushAutomatically = true)
+    @Query("""
+            delete from PersonalRecurrenceGroupShareOccurrenceOverride occurrenceOverride
+            where occurrenceOverride.share.groupSpace.id = :groupSpaceId
+              and occurrenceOverride.share.recurrenceEvent.account.id = :accountId
+            """)
+    int deleteAllByGroupSpaceIdAndAccountId(
+            @Param("groupSpaceId") Long groupSpaceId,
+            @Param("accountId") Long accountId
+    );
 }

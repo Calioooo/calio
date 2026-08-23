@@ -1,15 +1,13 @@
 package com.calio.calendar.groupspace.service;
 
-import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-@Component
 public class NoOpGroupScheduleShareCleanupAdapter implements GroupScheduleShareCleanupPort {
 
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
-    public void cleanupMemberShares(Long groupSpaceId, Long memberId) {
+    public void cleanupMemberShares(Long groupSpaceId, Long accountId) {
         // The group schedule aggregate is not available yet.
     }
 

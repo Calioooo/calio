@@ -40,4 +40,15 @@ public interface PersonalRecurrenceGroupShareSelectedOriginRepository
             where selectedOrigin.share.recurrenceEvent.id = :recurrenceEventId
             """)
     int deleteAllByRecurrenceEventId(@Param("recurrenceEventId") Long recurrenceEventId);
+
+    @Modifying(flushAutomatically = true)
+    @Query("""
+            delete from PersonalRecurrenceGroupShareSelectedOrigin selectedOrigin
+            where selectedOrigin.share.groupSpace.id = :groupSpaceId
+              and selectedOrigin.share.recurrenceEvent.account.id = :accountId
+            """)
+    int deleteAllByGroupSpaceIdAndAccountId(
+            @Param("groupSpaceId") Long groupSpaceId,
+            @Param("accountId") Long accountId
+    );
 }

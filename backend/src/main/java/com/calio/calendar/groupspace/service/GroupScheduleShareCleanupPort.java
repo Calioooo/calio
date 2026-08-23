@@ -6,7 +6,7 @@ package com.calio.calendar.groupspace.service;
  */
 public interface GroupScheduleShareCleanupPort {
 
-    void cleanupMemberShares(Long groupSpaceId, Long memberId);
+    void cleanupMemberShares(Long groupSpaceId, Long accountId);
 
     void cleanupGroupShares(Long groupSpaceId);
 }

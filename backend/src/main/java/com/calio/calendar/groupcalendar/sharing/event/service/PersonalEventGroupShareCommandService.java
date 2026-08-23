@@ -48,4 +48,8 @@ public class PersonalEventGroupShareCommandService {
     public void deleteAllForEvent(Long eventId) {
         shareRepository.deleteAllByEventId(eventId);
     }
+
+    public void deleteAllForMemberInGroupSpace(Long groupSpaceId, Long accountId) {
+        shareRepository.deleteAllByGroupSpaceIdAndAccountId(groupSpaceId, accountId);
+    }
 }
