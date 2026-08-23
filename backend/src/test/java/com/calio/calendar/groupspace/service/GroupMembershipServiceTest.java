@@ -7,11 +7,17 @@ import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
+import com.calio.calendar.event.domain.Event;
+import com.calio.calendar.event.repository.EventRepository;
 import com.calio.calendar.groupinvitation.repository.GroupInvitationRepository;
 import com.calio.calendar.groupcalendar.event.domain.GroupCalendarEvent;
 import com.calio.calendar.groupcalendar.event.repository.GroupCalendarEventRepository;
 import com.calio.calendar.groupcalendar.recurrence.domain.GroupCalendarRecurrenceEvent;
 import com.calio.calendar.groupcalendar.recurrence.repository.GroupCalendarRecurrenceEventRepository;
+import com.calio.calendar.groupcalendar.sharing.event.domain.PersonalEventGroupShare;
+import com.calio.calendar.groupcalendar.sharing.event.repository.PersonalEventGroupShareRepository;
+import com.calio.calendar.groupcalendar.sharing.recurrence.domain.PersonalRecurrenceGroupShare;
+import com.calio.calendar.groupcalendar.sharing.recurrence.repository.PersonalRecurrenceGroupShareRepository;
 import com.calio.calendar.groupspace.domain.GroupMember;
 import com.calio.calendar.groupspace.domain.GroupMemberRole;
 import com.calio.calendar.groupspace.domain.GroupMemberStatus;
@@ -19,6 +25,8 @@ import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.repository.GroupMemberRepository;
 import com.calio.calendar.groupspace.repository.GroupSpaceRepository;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
+import com.calio.calendar.recurrence.domain.RecurrenceEvent;
+import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.domain.TagType;
 import com.calio.calendar.tag.repository.TagRepository;
@@ -62,12 +70,28 @@ class GroupMembershipServiceTest {
     private GroupCalendarRecurrenceEventRepository groupCalendarRecurrenceEventRepository;
 
     @Autowired
+    private EventRepository eventRepository;
+
+    @Autowired
+    private PersonalEventGroupShareRepository personalEventGroupShareRepository;
+
+    @Autowired
+    private PersonalRecurrenceGroupShareRepository personalRecurrenceGroupShareRepository;
+
+    @Autowired
+    private RecurrenceEventRepository recurrenceEventRepository;
+
+    @Autowired
     private TagRepository tagRepository;
 
     @BeforeEach
     void setUp() {
+        personalRecurrenceGroupShareRepository.deleteAll();
+        personalEventGroupShareRepository.deleteAll();
         groupCalendarEventRepository.deleteAll();
         groupCalendarRecurrenceEventRepository.deleteAll();
+        eventRepository.deleteAll();
+        recurrenceEventRepository.deleteAll();
         tagRepository.deleteAll();
         groupInvitationRepository.deleteAll();
         groupMemberRepository.deleteAll();
@@ -136,11 +160,12 @@ class GroupMembershipServiceTest {
         Account owner = accountRepository.saveAndFlush(new Account());
         GroupSpace groupSpace = groupSpaceRepository.saveAndFlush(new GroupSpace(owner.getId(), "Shared", null));
         groupMemberRepository.saveAndFlush(new GroupMember(groupSpace, owner.getId(), "owner", MEMBER_CREATED_AT));
-        Tag tag = tagRepository.saveAndFlush(new Tag(TagType.GROUP_DEFAULT, "기타", "#64748B", groupSpace));
+        Tag groupTag = tagRepository.saveAndFlush(new Tag(TagType.GROUP_DEFAULT, "기타", "#64748B", groupSpace));
+        Tag personalTag = tagRepository.saveAndFlush(new Tag(TagType.PERSONAL_DEFAULT, "기타", "#64748B"));
         groupCalendarEventRepository.saveAndFlush(new GroupCalendarEvent(
                 groupSpace,
                 owner,
-                tag,
+                groupTag,
                 "직접 일정",
                 null,
                 MEMBER_CREATED_AT,
@@ -151,7 +176,7 @@ class GroupMembershipServiceTest {
         groupCalendarRecurrenceEventRepository.saveAndFlush(new GroupCalendarRecurrenceEvent(
                 groupSpace,
                 owner,
-                tag,
+                groupTag,
                 "반복 일정",
                 null,
                 new RecurrenceSchedule(
@@ -162,6 +187,16 @@ class GroupMembershipServiceTest {
                 ),
                 java.util.List.of("RRULE:FREQ=DAILY")
         ));
+        Event personalEvent = eventRepository.saveAndFlush(personalEvent(owner, personalTag));
+        RecurrenceEvent personalRecurrence = recurrenceEventRepository.saveAndFlush(
+                personalRecurrence(owner, personalTag)
+        );
+        personalEventGroupShareRepository.saveAndFlush(
+                new PersonalEventGroupShare(personalEvent, groupSpace)
+        );
+        personalRecurrenceGroupShareRepository.saveAndFlush(
+                new PersonalRecurrenceGroupShare(personalRecurrence, groupSpace)
+        );
 
         // when
         groupMembershipService.leave(owner.getId(), groupSpace.getId());
@@ -169,7 +204,66 @@ class GroupMembershipServiceTest {
         // then
         assertThat(groupCalendarEventRepository.findAll()).isEmpty();
         assertThat(groupCalendarRecurrenceEventRepository.findAll()).isEmpty();
-        assertThat(tagRepository.findAll()).isEmpty();
+        assertThat(personalEventGroupShareRepository.findAllByEventId(personalEvent.getId())).isEmpty();
+        assertThat(personalRecurrenceGroupShareRepository.findAllByRecurrenceEventId(personalRecurrence.getId()))
+                .isEmpty();
+        assertThat(eventRepository.existsById(personalEvent.getId())).isTrue();
+        assertThat(recurrenceEventRepository.existsById(personalRecurrence.getId())).isTrue();
+        assertThat(tagRepository.findAll())
+                .extracting(Tag::getId)
+                .containsExactly(personalTag.getId());
+    }
+
+    @Test
+    @DisplayName("멤버 탈퇴·강퇴는 해당 Group Space의 개인 share mapping만 hard-delete하고 원본은 유지한다")
+    void givenMemberSharedPersonalSchedules_whenKicked_thenDeletesOnlyMemberMappings() {
+        // given
+        GroupFixture fixture = createFixture();
+        Tag tag = tagRepository.saveAndFlush(new Tag(TagType.PERSONAL_DEFAULT, "기타", "#64748B"));
+        Event removedEvent = eventRepository.saveAndFlush(personalEvent(fixture.targetAccount(), tag));
+        Event ownerEvent = eventRepository.saveAndFlush(personalEvent(fixture.ownerAccount(), tag));
+        RecurrenceEvent removedRecurrence = recurrenceEventRepository.saveAndFlush(
+                personalRecurrence(fixture.targetAccount(), tag)
+        );
+        RecurrenceEvent ownerRecurrence = recurrenceEventRepository.saveAndFlush(
+                personalRecurrence(fixture.ownerAccount(), tag)
+        );
+        personalEventGroupShareRepository.saveAndFlush(
+                new PersonalEventGroupShare(removedEvent, fixture.groupSpace())
+        );
+        PersonalEventGroupShare ownerEventShare = personalEventGroupShareRepository.saveAndFlush(
+                new PersonalEventGroupShare(ownerEvent, fixture.groupSpace())
+        );
+        personalRecurrenceGroupShareRepository.saveAndFlush(new PersonalRecurrenceGroupShare(
+                removedRecurrence,
+                fixture.groupSpace()
+        ));
+        PersonalRecurrenceGroupShare ownerRecurrenceShare = personalRecurrenceGroupShareRepository.saveAndFlush(
+                new PersonalRecurrenceGroupShare(
+                        ownerRecurrence,
+                        fixture.groupSpace()
+                )
+        );
+
+        // when
+        groupMembershipService.kick(
+                fixture.ownerAccount().getId(),
+                fixture.groupSpace().getId(),
+                fixture.targetMember().getId()
+        );
+
+        // then
+        assertThat(personalEventGroupShareRepository.findAllByEventId(removedEvent.getId())).isEmpty();
+        assertThat(personalRecurrenceGroupShareRepository.findAllByRecurrenceEventId(removedRecurrence.getId()))
+                .isEmpty();
+        assertThat(personalEventGroupShareRepository.findAllByEventId(ownerEvent.getId()))
+                .extracting(PersonalEventGroupShare::getId)
+                .containsExactly(ownerEventShare.getId());
+        assertThat(personalRecurrenceGroupShareRepository.findAllByRecurrenceEventId(ownerRecurrence.getId()))
+                .extracting(PersonalRecurrenceGroupShare::getId)
+                .containsExactly(ownerRecurrenceShare.getId());
+        assertThat(eventRepository.existsById(removedEvent.getId())).isTrue();
+        assertThat(recurrenceEventRepository.existsById(removedRecurrence.getId())).isTrue();
     }
 
     @Test
@@ -201,6 +295,36 @@ class GroupMembershipServiceTest {
                 new GroupMember(groupSpace, targetAccount.getId(), "target", MEMBER_CREATED_AT)
         );
         return new GroupFixture(ownerAccount, targetAccount, groupSpace, ownerMember, targetMember);
+    }
+
+    private Event personalEvent(Account account, Tag tag) {
+        return new Event(
+                "개인 일정",
+                null,
+                MEMBER_CREATED_AT,
+                MEMBER_CREATED_AT.plusSeconds(3600),
+                false,
+                "UTC",
+                null,
+                tag,
+                account
+        );
+    }
+
+    private RecurrenceEvent personalRecurrence(Account account, Tag tag) {
+        return new RecurrenceEvent(
+                "개인 반복 일정",
+                null,
+                new RecurrenceSchedule(
+                        MEMBER_CREATED_AT,
+                        MEMBER_CREATED_AT.plusSeconds(3600),
+                        false,
+                        "UTC"
+                ),
+                java.util.List.of("RRULE:FREQ=DAILY"),
+                tag,
+                account
+        );
     }
 
     private record GroupFixture(

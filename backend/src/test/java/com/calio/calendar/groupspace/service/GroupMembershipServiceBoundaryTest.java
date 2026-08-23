@@ -12,6 +12,8 @@ import com.calio.calendar.groupinvitation.service.GroupInvitationQueryService;
 import com.calio.calendar.groupinvitation.service.InvitationCredentialService;
 import com.calio.calendar.groupcalendar.event.service.GroupCalendarEventCommandService;
 import com.calio.calendar.groupcalendar.recurrence.service.GroupCalendarRecurrenceCommandService;
+import com.calio.calendar.groupcalendar.sharing.event.service.PersonalEventGroupShareCommandService;
+import com.calio.calendar.groupcalendar.sharing.recurrence.service.PersonalRecurrenceGroupShareCommandService;
 import com.calio.calendar.groupspace.controller.dto.AcceptGroupInvitationRequest;
 import com.calio.calendar.groupspace.controller.dto.GroupInvitationAcceptCredentialType;
 import com.calio.calendar.groupspace.domain.GroupMember;
@@ -37,7 +39,6 @@ class GroupMembershipServiceBoundaryTest {
         GroupInvitationQueryService invitationQueryService = mock(GroupInvitationQueryService.class);
         GroupInvitationCommandService invitationCommandService = mock(GroupInvitationCommandService.class);
         InvitationCredentialService credentialService = mock(InvitationCredentialService.class);
-        GroupScheduleShareCleanupPort cleanupPort = mock(GroupScheduleShareCleanupPort.class);
         GroupMembershipService service = new GroupMembershipService(
                 membershipQueryService,
                 membershipCommandService,
@@ -46,7 +47,8 @@ class GroupMembershipServiceBoundaryTest {
                 invitationQueryService,
                 invitationCommandService,
                 credentialService,
-                cleanupPort,
+                mock(PersonalEventGroupShareCommandService.class),
+                mock(PersonalRecurrenceGroupShareCommandService.class),
                 mock(GroupCalendarEventCommandService.class),
                 mock(GroupCalendarRecurrenceCommandService.class),
                 mock(GroupTagService.class),

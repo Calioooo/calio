@@ -29,4 +29,12 @@ public class PersonalRecurrenceGroupShareCommandService {
     public void deleteAllForRecurrenceEvent(Long recurrenceEventId) {
         shareRepository.deleteAllByRecurrenceEventId(recurrenceEventId);
     }
+
+    public void deleteAllForMemberInGroupSpace(Long groupSpaceId, Long accountId) {
+        shareRepository.deleteAllByGroupSpaceIdAndAccountId(groupSpaceId, accountId);
+    }
+
+    public void deleteAllInGroupSpace(Long groupSpaceId) {
+        shareRepository.deleteAllByGroupSpaceId(groupSpaceId);
+    }
 }

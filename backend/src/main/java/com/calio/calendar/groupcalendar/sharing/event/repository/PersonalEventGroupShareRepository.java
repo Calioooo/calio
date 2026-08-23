@@ -39,4 +39,22 @@ public interface PersonalEventGroupShareRepository
             where share.event.id = :eventId
             """)
     int deleteAllByEventId(@Param("eventId") Long eventId);
+
+    @Modifying(flushAutomatically = true)
+    @Query("""
+            delete from PersonalEventGroupShare share
+            where share.groupSpace.id = :groupSpaceId
+              and share.event.account.id = :accountId
+            """)
+    int deleteAllByGroupSpaceIdAndAccountId(
+            @Param("groupSpaceId") Long groupSpaceId,
+            @Param("accountId") Long accountId
+    );
+
+    @Modifying(flushAutomatically = true)
+    @Query("""
+            delete from PersonalEventGroupShare share
+            where share.groupSpace.id = :groupSpaceId
+            """)
+    int deleteAllByGroupSpaceId(@Param("groupSpaceId") Long groupSpaceId);
 }
