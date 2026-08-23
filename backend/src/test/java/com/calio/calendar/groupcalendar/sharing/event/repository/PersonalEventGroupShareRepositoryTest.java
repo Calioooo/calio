@@ -13,7 +13,10 @@ import com.calio.calendar.groupspace.repository.GroupSpaceRepository;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.domain.TagType;
 import com.calio.calendar.tag.repository.TagRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceUnitUtil;
 import java.time.Instant;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,6 +39,9 @@ class PersonalEventGroupShareRepositoryTest {
     private EventRepository eventRepository;
 
     @Autowired
+    private EntityManager entityManager;
+
+    @Autowired
     private GroupSpaceRepository groupSpaceRepository;
 
     @Autowired
@@ -52,6 +58,7 @@ class PersonalEventGroupShareRepositoryTest {
         PersonalEventGroupShare share = shareRepository.saveAndFlush(
                 new PersonalEventGroupShare(fixture.event(), fixture.groupSpace())
         );
+        entityManager.clear();
 
         // when
         PersonalEventGroupShare foundShare = shareRepository.findByEventIdAndGroupSpaceId(
@@ -60,7 +67,12 @@ class PersonalEventGroupShareRepositoryTest {
         ).orElseThrow();
 
         // then
+        PersistenceUnitUtil persistenceUnitUtil = entityManager
+                .getEntityManagerFactory()
+                .getPersistenceUnitUtil();
         assertThat(foundShare.getId()).isEqualTo(share.getId());
+        assertThat(persistenceUnitUtil.isLoaded(foundShare, "event")).isTrue();
+        assertThat(persistenceUnitUtil.isLoaded(foundShare, "groupSpace")).isTrue();
         assertThat(foundShare.getEvent().getId()).isEqualTo(fixture.event().getId());
         assertThat(foundShare.getGroupSpace().getId()).isEqualTo(fixture.groupSpace().getId());
     }
@@ -76,6 +88,38 @@ class PersonalEventGroupShareRepositoryTest {
         assertThatThrownBy(() -> shareRepository.saveAndFlush(
                 new PersonalEventGroupShare(fixture.event(), fixture.groupSpace())
         )).isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    @DisplayName("개인 단건 일정의 공유 목록은 share ID 오름차순이며 association을 함께 조회한다")
+    void givenSharesInMultipleGroupSpaces_whenListByEvent_thenOrdersByShareIdAndLoadsAssociations() {
+        // given
+        Fixture fixture = fixture();
+        GroupSpace secondGroupSpace = groupSpaceRepository.saveAndFlush(
+                new GroupSpace(fixture.event().getAccount().getId(), "두 번째 그룹", null)
+        );
+        PersonalEventGroupShare firstShare = shareRepository.saveAndFlush(
+                new PersonalEventGroupShare(fixture.event(), fixture.groupSpace())
+        );
+        PersonalEventGroupShare secondShare = shareRepository.saveAndFlush(
+                new PersonalEventGroupShare(fixture.event(), secondGroupSpace)
+        );
+        entityManager.clear();
+
+        // when
+        List<PersonalEventGroupShare> shares = shareRepository.findAllByEventId(fixture.event().getId());
+
+        // then
+        PersistenceUnitUtil persistenceUnitUtil = entityManager
+                .getEntityManagerFactory()
+                .getPersistenceUnitUtil();
+        assertThat(shares)
+                .extracting(PersonalEventGroupShare::getId)
+                .containsExactly(firstShare.getId(), secondShare.getId());
+        assertThat(shares).allSatisfy(share -> {
+            assertThat(persistenceUnitUtil.isLoaded(share, "event")).isTrue();
+            assertThat(persistenceUnitUtil.isLoaded(share, "groupSpace")).isTrue();
+        });
     }
 
     private Fixture fixture() {
