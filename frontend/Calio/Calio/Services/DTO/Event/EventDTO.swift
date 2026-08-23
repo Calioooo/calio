@@ -118,9 +118,9 @@ struct EventResponseDTO: Decodable {
         endAt = try container.decode(Date.self, forKey: .endAt)
         allDay = try container.decode(Bool.self, forKey: .allDay)
         timeZone = try container.decodeIfPresent(String.self, forKey: .timeZone)
-        importantEvent = try container.decodeIfPresent(Bool.self, forKey: .importantEvent) ?? false
+        importantEvent = try container.decode(Bool.self, forKey: .importantEvent)
         recurrenceId = try container.decodeIfPresent(Int64.self, forKey: .recurrenceId)
-        isRecurrenceOccurrence = try container.decodeIfPresent(Bool.self, forKey: .isRecurrenceOccurrence) ?? false
+        isRecurrenceOccurrence = try container.decode(Bool.self, forKey: .isRecurrenceOccurrence)
         originStartAt = try container.decodeIfPresent(Date.self, forKey: .originStartAt)
         tag = try container.decode(TagResponseDTO.self, forKey: .tag)
         createdAt = try container.decode(Date.self, forKey: .createdAt)

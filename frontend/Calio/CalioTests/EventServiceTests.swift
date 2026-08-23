@@ -120,6 +120,45 @@ struct EventServiceTests {
         #expect(event.timeZone == "Asia/Seoul")
     }
 
+    @Test func eventResponseDTODecodingRejectsMissingCanonicalBooleanFields() throws {
+        let missingImportantEvent = """
+        {
+          "id": 12,
+          "title": "일정",
+          "startAt": "2026-08-01T00:00:00Z",
+          "endAt": "2026-08-01T01:00:00Z",
+          "allDay": false,
+          "timeZone": "Asia/Seoul",
+          "isRecurrenceOccurrence": false,
+          "tag": { "id": 1, "title": "업무", "colorCode": "#4F46E5", "tagType": "DEFAULT" },
+          "createdAt": "2026-08-01T00:00:00Z",
+          "updatedAt": "2026-08-01T00:00:00Z"
+        }
+        """.data(using: .utf8)!
+        let missingRecurrenceOccurrence = """
+        {
+          "id": 12,
+          "title": "일정",
+          "startAt": "2026-08-01T00:00:00Z",
+          "endAt": "2026-08-01T01:00:00Z",
+          "allDay": false,
+          "timeZone": "Asia/Seoul",
+          "importantEvent": false,
+          "tag": { "id": 1, "title": "업무", "colorCode": "#4F46E5", "tagType": "DEFAULT" },
+          "createdAt": "2026-08-01T00:00:00Z",
+          "updatedAt": "2026-08-01T00:00:00Z"
+        }
+        """.data(using: .utf8)!
+
+        for response in [missingImportantEvent, missingRecurrenceOccurrence] {
+            do {
+                _ = try APIJSONCoding.makeDecoder().decode(EventResponseDTO.self, from: response)
+                Issue.record("Expected missing canonical boolean to fail decoding")
+            } catch is DecodingError {
+            }
+        }
+    }
+
     @Test func eventServiceCreateEventMapsRepositoryResponseToAppEvent() async throws {
         let calendar = fixedCalendar
         let startAt = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 10, hour: 9)))

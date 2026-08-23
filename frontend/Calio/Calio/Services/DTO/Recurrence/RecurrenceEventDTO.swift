@@ -120,7 +120,7 @@ struct RecurrenceEventResponseDTO: Decodable, Equatable {
     let tag: TagResponseDTO
     let createdAt: Date
     let updatedAt: Date
-    let canUpdateSeries: Bool?
+    let canUpdateSeries: Bool
 
     init(
         recurrenceId: Int64,
@@ -134,7 +134,7 @@ struct RecurrenceEventResponseDTO: Decodable, Equatable {
         tag: TagResponseDTO,
         createdAt: Date,
         updatedAt: Date,
-        canUpdateSeries: Bool?
+        canUpdateSeries: Bool
     ) {
         self.recurrenceId = recurrenceId
         self.title = title
