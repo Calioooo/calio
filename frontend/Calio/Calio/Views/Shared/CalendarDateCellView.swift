@@ -55,11 +55,14 @@ struct CalendarDateCellView: View {
             .foregroundStyle(isToday ? .white : weekdayTextColor)
             .frame(width: 30, height: 30)
             .background{
-                if isToday {
+                if isToday || isSelected {
                     Circle()
-                        .fill(Color.calioBrand)
-                } else if isSelected {
-                    Circle().fill(Color.calioSelection)
+                        .fill(isToday ? Color.calioBrand : Color.calioSelection)
+                }
+            }
+            .overlay {
+                if isToday && isSelected {
+                    Circle().stroke(Color.calioSelection, lineWidth: 2)
                 }
             }
     }

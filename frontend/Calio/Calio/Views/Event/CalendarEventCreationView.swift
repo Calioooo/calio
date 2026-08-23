@@ -83,7 +83,6 @@ struct CalendarEventCreationView: View {
             .scrollContentBackground(.hidden)
             .background(Color.calioBackground)
             .tint(.calioBrand)
-            .environment(\.locale, Locale(identifier: "ko_KR"))
             .navigationTitle("새 일정")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

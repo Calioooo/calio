@@ -399,9 +399,23 @@ struct CalendarTagEditView: View {
                 }
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(colorCode) 태그 색상")
+        .accessibilityLabel("\(colorName(for: colorCode)) 태그 색상")
         .accessibilityValue(input.colorCode == colorCode ? "선택됨" : "선택 안 됨")
         .accessibilityIdentifier("tag_edit_color_\(colorCode)")
+    }
+
+    private func colorName(for colorCode: String) -> String {
+        switch colorCode {
+        case "#3B82F6": "파란색"
+        case "#A855F7": "보라색"
+        case "#F97316": "주황색"
+        case "#10B981": "초록색"
+        case "#64748B": "회색"
+        case "#EF4444": "빨간색"
+        case "#0EA5E9": "하늘색"
+        case "#EAB308": "노란색"
+        default: "태그"
+        }
     }
 
     private func save() {

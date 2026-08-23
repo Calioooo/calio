@@ -53,6 +53,9 @@ struct EventPresentationTests {
         #expect(CalendarEventDetailView.recurrenceStatusText(for: repeatedEvent) == "반복 일정")
         #expect(CalendarEventDetailView.recurrenceStatusText(for: occurrenceEvent) == "반복 일정")
         #expect(CalendarEventDetailView.recurrenceStatusText(for: singleEvent) == "반복 없음")
+        #expect(repeatedEvent.isRepeated)
+        #expect(occurrenceEvent.isRepeated)
+        #expect(!singleEvent.isRepeated)
         #expect(!CalendarEventDetailView.recurrenceStatusText(for: repeatedEvent).contains("12345"))
     }
 
@@ -85,12 +88,12 @@ struct EventPresentationTests {
         let allDayStart = try #require(calendar.date(from: DateComponents(year: 2026, month: 8, day: 17)))
         let allDayInclusiveEnd = try #require(calendar.date(from: DateComponents(year: 2026, month: 8, day: 18)))
 
-        #expect(CalendarEventDisplayText.dateRange(startAt: sameDayStart, endAt: sameDayEnd) == "2026년 8월 17일")
-        #expect(CalendarEventDisplayText.dateRange(startAt: sameDayStart, endAt: nextDayEnd) == "2026년 8월 17일 - 2026년 8월 18일")
-        #expect(CalendarEventDisplayText.dateRange(startAt: allDayStart, endAt: allDayInclusiveEnd) == "2026년 8월 17일 - 2026년 8월 18일")
-        #expect(CalendarEventDisplayText.compactDateTimeRange(startAt: sameDayStart, endAt: sameDayEnd) == CalendarEventDisplayText.timeRange(startAt: sameDayStart, endAt: sameDayEnd))
-        #expect(CalendarEventDisplayText.compactDateTimeRange(startAt: sameDayStart, endAt: nextDayEnd).contains("8월 17일"))
-        #expect(CalendarEventDisplayText.compactDateTimeRange(startAt: sameDayStart, endAt: nextDayEnd).contains("8월 18일"))
+        #expect(CalendarEventDisplayText.dateRange(startAt: sameDayStart, endAt: sameDayEnd, calendar: calendar) == "2026년 8월 17일")
+        #expect(CalendarEventDisplayText.dateRange(startAt: sameDayStart, endAt: nextDayEnd, calendar: calendar) == "2026년 8월 17일 - 2026년 8월 18일")
+        #expect(CalendarEventDisplayText.dateRange(startAt: allDayStart, endAt: allDayInclusiveEnd, calendar: calendar) == "2026년 8월 17일 - 2026년 8월 18일")
+        #expect(CalendarEventDisplayText.compactDateTimeRange(startAt: sameDayStart, endAt: sameDayEnd, calendar: calendar) == CalendarEventDisplayText.timeRange(startAt: sameDayStart, endAt: sameDayEnd, calendar: calendar))
+        #expect(CalendarEventDisplayText.compactDateTimeRange(startAt: sameDayStart, endAt: nextDayEnd, calendar: calendar).contains("8월 17일"))
+        #expect(CalendarEventDisplayText.compactDateTimeRange(startAt: sameDayStart, endAt: nextDayEnd, calendar: calendar).contains("8월 18일"))
     }
 
     @Test func eventDetailActionsSeparateSingleAndRecurringEvents() async throws {

@@ -49,6 +49,10 @@ struct Event: Identifiable {
     let recurrenceId: Int64?
     let isRecurrenceOccurrence: Bool
     let originStartAt: Date?
+
+    var isRepeated: Bool {
+        isRecurrenceOccurrence || recurrenceId != nil
+    }
     
     init(
         id: Int64? = nil,

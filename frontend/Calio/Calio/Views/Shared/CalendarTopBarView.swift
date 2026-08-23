@@ -28,7 +28,7 @@ struct CalendarTopBarView: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.calioPrimary)
                     .padding(.horizontal, 10)
-                    .frame(minHeight: 36)
+                    .frame(minWidth: 44, minHeight: 44)
                     .background(Capsule().fill(Color.calioSelection))
                     .accessibilityLabel("오늘로 이동")
                     .accessibilityIdentifier("calendar_navigation_today")

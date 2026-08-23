@@ -186,7 +186,7 @@ struct CalendarDateEventCellView: View {
         formatter.locale = Locale(identifier: "ko_KR")
         formatter.dateFormat = "a h:mm"
         let time = formatter.string(from: event.startAt)
-        return event.isRecurrenceOccurrence ? "반복 · \(time)" : time
+        return event.isRepeated ? "반복 · \(time)" : time
     }
 
     var calendarChips: [CalendarDateEventChip] {

@@ -219,7 +219,7 @@ struct CalendarDateEventView: View {
     }
 
     private var shouldShowEmptyState: Bool {
-        eventLoadState == .idle && items.allSatisfy { $0.calendarItemCount == 0 }
+        !items.isEmpty && eventLoadState == .idle && items.allSatisfy { $0.calendarItemCount == 0 }
     }
 
     private var emptyState: some View {

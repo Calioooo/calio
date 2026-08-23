@@ -922,7 +922,7 @@ private struct CalendarMonthRangeActionPopover: View {
             popoverContent
 
             Triangle()
-                .fill(.regularMaterial)
+                .fill(Color.calioSurface)
                 .frame(width: 18, height: 10)
                 .offset(x: arrowOffsetX)
         }

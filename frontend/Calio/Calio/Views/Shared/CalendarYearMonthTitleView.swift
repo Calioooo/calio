@@ -25,7 +25,10 @@ struct CalendarYearMonthTitleView: View {
     var body: some View {
         if let onSelectedYearMonth {
             HStack(spacing: 4) {
-                titleButton(text: "\(referenceDay.year)년") {
+                titleButton(
+                    text: "\(referenceDay.year)년",
+                    accessibilityIdentifier: "calendar_navigation_year_picker"
+                ) {
                     isShowingYearPicker = true
                 }
                 .popover(
@@ -49,7 +52,10 @@ struct CalendarYearMonthTitleView: View {
                     .presentationCompactAdaptation(.popover)
                 }
 
-                titleButton(text: "\(referenceDay.month)월") {
+                titleButton(
+                    text: "\(referenceDay.month)월",
+                    accessibilityIdentifier: "calendar_navigation_month_picker"
+                ) {
                     isShowingMonthPicker = true
                 }
                 .popover(
@@ -95,6 +101,7 @@ struct CalendarYearMonthTitleView: View {
 
     private func titleButton(
         text: String,
+        accessibilityIdentifier: String,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
@@ -104,8 +111,9 @@ struct CalendarYearMonthTitleView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .frame(minWidth: 44, minHeight: 44)
         .accessibilityLabel("\(text) 선택")
-        .accessibilityIdentifier("calendar_navigation_\(text == "\(referenceDay.year)년" ? "year" : "month")_picker")
+        .accessibilityIdentifier(accessibilityIdentifier)
     }
 }
 

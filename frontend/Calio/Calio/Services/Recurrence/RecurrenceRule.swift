@@ -13,7 +13,9 @@ enum RecurrenceRule {
 
     static func editableRule(from lines: [String], allDay: Bool) -> EditableRecurrenceRule? {
         guard lines.count == 1, lines[0].hasPrefix("RRULE:") else { return nil }
-        let parts = lines[0].dropFirst("RRULE:".count).split(separator: ";").map(String.init)
+        let parts = lines[0].dropFirst("RRULE:".count)
+            .split(separator: ";", omittingEmptySubsequences: false)
+            .map(String.init)
         guard parts.count == 1 || parts.count == 2 else { return nil }
         let values = Dictionary(uniqueKeysWithValues: parts.compactMap { part -> (String, String)? in
             let pair = part.split(separator: "=", maxSplits: 1).map(String.init)

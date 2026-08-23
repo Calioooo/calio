@@ -411,7 +411,7 @@ struct CalendarEventDetailView: View {
     }
 
     private var isRepeatedEvent: Bool {
-        Self.isRepeatedEvent(event)
+        event.isRepeated
     }
 
     private var canUpdateSingleEvent: Bool {
@@ -521,7 +521,9 @@ struct CalendarEventDetailView: View {
             return
         }
 
+        isFetchingRecurrenceEvent = true
         recurrenceDetails = await onFetchRecurrenceEvent(recurrenceId)
+        isFetchingRecurrenceEvent = false
     }
 
     private func startEditingRecurrenceSeries() {
@@ -676,27 +678,23 @@ struct CalendarEventDetailView: View {
     }
 
     nonisolated static func recurrenceStatusText(for event: Event) -> String {
-        isRepeatedEvent(event) ? "반복 일정" : "반복 없음"
-    }
-
-    nonisolated static func isRepeatedEvent(_ event: Event) -> Bool {
-        event.isRecurrenceOccurrence || event.recurrenceId != nil
+        event.isRepeated ? "반복 일정" : "반복 없음"
     }
 
     nonisolated static func canUpdateSingleEvent(_ event: Event) -> Bool {
-        !isRepeatedEvent(event)
+        !event.isRepeated
     }
 
     nonisolated static func canDeleteSingleEvent(_ event: Event) -> Bool {
-        !isRepeatedEvent(event)
+        !event.isRepeated
     }
 
     nonisolated static func canDeleteRecurringEvent(_ event: Event) -> Bool {
-        isRepeatedEvent(event) && event.recurrenceId != nil
+        event.isRepeated && event.recurrenceId != nil
     }
 
     nonisolated static func canUpdateRecurringEvent(_ event: Event) -> Bool {
-        isRepeatedEvent(event) && event.recurrenceId != nil
+        event.isRepeated && event.recurrenceId != nil
     }
 
     nonisolated static func recurrenceEditScopeGuidance(canUpdateSeries: Bool) -> String {
@@ -713,49 +711,56 @@ struct CalendarEventDetailView: View {
 }
 
 enum CalendarEventDisplayText {
-    static func dateRange(startAt: Date, endAt: Date) -> String {
-        let startText = dateText(for: startAt, includesYear: true)
-        let endText = dateText(for: endAt, includesYear: true)
+    static func dateRange(startAt: Date, endAt: Date, calendar: Calendar = .current) -> String {
+        let startText = dateText(for: startAt, includesYear: true, calendar: calendar)
+        let endText = dateText(for: endAt, includesYear: true, calendar: calendar)
 
-        guard !Calendar.current.isDate(startAt, inSameDayAs: endAt) else {
+        guard !calendar.isDate(startAt, inSameDayAs: endAt) else {
             return startText
         }
 
         return "\(startText) - \(endText)"
     }
 
-    static func timeRange(startAt: Date, endAt: Date) -> String {
-        let startText = startAt.formatted(date: .omitted, time: .shortened)
-        let endText = endAt.formatted(date: .omitted, time: .shortened)
+    static func timeRange(startAt: Date, endAt: Date, calendar: Calendar = .current) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = .current
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
+        formatter.timeStyle = .short
+        let startText = formatter.string(from: startAt)
+        let endText = formatter.string(from: endAt)
 
         return "\(startText) - \(endText)"
     }
     
-    static func compactDateTimeRange(startAt: Date, endAt: Date) -> String {
-        guard !Calendar.current.isDate(startAt, inSameDayAs: endAt) else {
-            return timeRange(startAt: startAt, endAt: endAt)
+    static func compactDateTimeRange(startAt: Date, endAt: Date, calendar: Calendar = .current) -> String {
+        guard !calendar.isDate(startAt, inSameDayAs: endAt) else {
+            return timeRange(startAt: startAt, endAt: endAt, calendar: calendar)
         }
         
-        let includesYear = !Calendar.current.isDate(startAt, equalTo: endAt, toGranularity: .year)
-        let startText = dateTimeText(for: startAt, includesYear: includesYear)
-        let endText = dateTimeText(for: endAt, includesYear: includesYear)
+        let includesYear = !calendar.isDate(startAt, equalTo: endAt, toGranularity: .year)
+        let startText = dateTimeText(for: startAt, includesYear: includesYear, calendar: calendar)
+        let endText = dateTimeText(for: endAt, includesYear: includesYear, calendar: calendar)
         
         return "\(startText) - \(endText)"
     }
     
-    private static func dateTimeText(for date: Date, includesYear: Bool) -> String {
+    private static func dateTimeText(for date: Date, includesYear: Bool, calendar: Calendar) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "ko_KR")
-        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
         formatter.dateFormat = includesYear ? "yyyy년 M월 d일 a h:mm" : "M월 d일 a h:mm"
 
         return formatter.string(from: date)
     }
 
-    private static func dateText(for date: Date, includesYear: Bool) -> String {
+    private static func dateText(for date: Date, includesYear: Bool, calendar: Calendar) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "ko_KR")
-        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
         formatter.dateFormat = includesYear ? "yyyy년 M월 d일" : "M월 d일"
 
         return formatter.string(from: date)

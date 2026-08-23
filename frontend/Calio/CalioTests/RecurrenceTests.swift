@@ -83,6 +83,8 @@ struct RecurrenceTests {
 
         #expect(RecurrenceRule.editableRule(from: [line], allDay: false)?.frequency == .weekly)
         #expect(RecurrenceRule.editableRule(from: ["RRULE:FREQ=MONTHLY"], allDay: false) == EditableRecurrenceRule(frequency: .monthly, until: nil))
+        #expect(RecurrenceRule.editableRule(from: ["RRULE:FREQ=MONTHLY;"], allDay: false) == nil)
+        #expect(RecurrenceRule.editableRule(from: ["RRULE:FREQ=MONTHLY;;UNTIL=20260831T000000Z"], allDay: false) == nil)
         #expect(RecurrenceRule.editableRule(from: ["RRULE:FREQ=WEEKLY;COUNT=4"], allDay: false) == nil)
         #expect(RecurrenceRule.editableRule(from: ["RRULE:FREQ=WEEKLY;UNTIL=20260831T000000Z", "EXDATE:20260817T000000Z"], allDay: false) == nil)
     }
