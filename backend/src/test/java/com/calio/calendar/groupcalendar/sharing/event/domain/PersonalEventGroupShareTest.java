@@ -71,6 +71,26 @@ class PersonalEventGroupShareTest {
                 CalioException.class,
                 exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.INVALID_TIME_RANGE)
         );
+        assertThatThrownBy(() -> share.updateRepresentation(
+                false,
+                null,
+                END_AT,
+                null,
+                null
+        )).isInstanceOfSatisfying(
+                CalioException.class,
+                exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.INVALID_TIME_RANGE)
+        );
+        assertThatThrownBy(() -> share.updateRepresentation(
+                false,
+                null,
+                null,
+                START_AT,
+                null
+        )).isInstanceOfSatisfying(
+                CalioException.class,
+                exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.INVALID_TIME_RANGE)
+        );
     }
 
     private Event event() {
