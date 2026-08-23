@@ -143,7 +143,8 @@ struct NetworkRepositoryTests {
             "firstOccurrenceStartAt",
             "firstOccurrenceEndAt",
             "timeZone",
-            "recurrence"
+            "recurrence",
+            "tagId"
         ])
         #expect(object["recurrence"] as? [String] == ["RRULE:FREQ=MONTHLY;UNTIL=20260831T000000Z"])
         #expect(object["colorCode"] == nil)
