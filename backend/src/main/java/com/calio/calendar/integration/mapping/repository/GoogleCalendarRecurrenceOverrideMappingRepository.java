@@ -15,6 +15,11 @@ public interface GoogleCalendarRecurrenceOverrideMappingRepository
         extends JpaRepository<GoogleCalendarRecurrenceOverrideMapping, Long> {
 
     @EntityGraph(attributePaths = "recurrenceEventMapping")
+    Optional<GoogleCalendarRecurrenceOverrideMapping> findByRecurrenceEventOverride_OverrideId(
+            Long recurrenceEventOverrideId
+    );
+
+    @EntityGraph(attributePaths = "recurrenceEventMapping")
     @Query("""
             select overrideMapping
             from GoogleCalendarRecurrenceOverrideMapping overrideMapping

@@ -186,14 +186,17 @@ class GoogleCalendarSyncServiceTest {
     }
 
     @Test
-    @DisplayName("FULL 실패는 partial provider data를 보존하고 sync를 완료하지 않는다")
-    void givenFullSyncFailure_whenSync_thenPreservesPartialProviderData() {
+    @DisplayName("FULL SYNC의 다음 page가 실패하면 앞선 page를 저장해도 final reconciliation과 cursor 변경을 수행하지 않는다")
+    void givenLaterFullSyncPageFailure_whenSync_thenDoesNotFinalizePartialInventory() {
         // given
         FakeProviderDataService providerDataService = new FakeProviderDataService();
         GoogleCalendarSyncService service = service(
                 new FakeIntegrationQueryService(null),
                 providerDataService,
-                new FakeEventsClient(new CalioException(ErrorCode.GOOGLE_CALENDAR_SYNC_FAILED)),
+                new FakeEventsClient(
+                        pageWithNextPageToken("page-2"),
+                        new CalioException(ErrorCode.GOOGLE_CALENDAR_SYNC_FAILED)
+                ),
                 new FakePagePersistenceService()
         );
 
@@ -204,6 +207,7 @@ class GoogleCalendarSyncServiceTest {
                                 assertThat(exception.getErrorCode())
                                         .isEqualTo(ErrorCode.GOOGLE_CALENDAR_SYNC_FAILED)
                 );
+        assertThat(providerDataService.finalizeCount).isZero();
     }
 
     @Test
@@ -398,7 +402,6 @@ class GoogleCalendarSyncServiceTest {
 
         private FakeProviderDataService() {
             super(
-                    null,
                     null,
                     null,
                     null,

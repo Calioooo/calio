@@ -15,6 +15,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import java.time.Instant;
 
 @Entity
 @Table(
@@ -42,9 +43,15 @@ public class GoogleCalendarRecurrenceEventMapping extends BaseEntity {
     @JoinColumn(name = "integration_id", nullable = false)
     private GoogleCalendarIntegration integration;
 
-    @OneToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "recurrence_event_id", nullable = false)
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "recurrence_event_id")
     private RecurrenceEvent recurrenceEvent;
+
+    @Column(name = "local_deleted_at")
+    private Instant localDeletedAt;
+
+    @Column(name = "local_modified_at")
+    private Instant localModifiedAt;
 
     @Column(name = "calendar_key", nullable = false, length = 32)
     private String calendarKey;
@@ -101,5 +108,26 @@ public class GoogleCalendarRecurrenceEventMapping extends BaseEntity {
 
     public String getProviderEtag() {
         return syncState.getProviderEtag();
+    }
+
+    public boolean hasCanonicalRecurrenceEvent() {
+        return recurrenceEvent != null;
+    }
+
+    public void detachCanonicalRecurrenceEvent(Instant deletedAt) {
+        recurrenceEvent = null;
+        localDeletedAt = deletedAt;
+    }
+
+    public void markLocalModification(Instant modifiedAt) {
+        localModifiedAt = modifiedAt;
+    }
+
+    public boolean hasLocalModification() {
+        return localModifiedAt != null;
+    }
+
+    public Instant getLocalDeletedAt() {
+        return localDeletedAt;
     }
 }

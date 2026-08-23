@@ -388,6 +388,30 @@ class GoogleCalendarSyncMigrationTest {
         }
     }
 
+    @Test
+    @DisplayName("V21은 canonical link가 없는 ACTIVE Event mapping에 local deletion marker를 요구한다")
+    void givenV20Schema_whenMigrateToV21_thenRejectsDetachedActiveMappingWithoutMarker()
+            throws Exception {
+        String url = "jdbc:h2:mem:google-retained-mapping-reconciliation;MODE=MySQL;DB_CLOSE_DELAY=-1";
+        migrateTo(url, MigrationVersion.fromVersion("20"));
+        insertCurrentEventAndIntegration(url);
+
+        migrateTo(url, MigrationVersion.fromVersion("21"));
+
+        try (Connection connection = DriverManager.getConnection(url, "sa", "");
+             Statement statement = connection.createStatement()) {
+            assertThatThrownBy(() -> statement.executeUpdate("""
+                    INSERT INTO google_calendar_event_mappings (
+                        integration_id, event_id, calendar_key, external_event_id,
+                        sync_status, provider_etag, created_at, updated_at
+                    ) VALUES (900, NULL, 'primary', 'detached-without-marker',
+                              'ACTIVE', 'etag', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    """))
+                    .isInstanceOf(SQLException.class);
+        }
+
+    }
+
     private void migrateTo(String url, MigrationVersion target) {
         Flyway.configure()
                 .dataSource(url, "sa", "")

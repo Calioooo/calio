@@ -14,6 +14,7 @@ import org.springframework.data.repository.query.Param;
 public interface GoogleCalendarRecurrenceEventMappingRepository
         extends JpaRepository<GoogleCalendarRecurrenceEventMapping, Long> {
 
+    @EntityGraph(attributePaths = "integration")
     Optional<GoogleCalendarRecurrenceEventMapping> findByRecurrenceEvent_Id(Long recurrenceEventId);
 
     Optional<GoogleCalendarRecurrenceEventMapping>

@@ -16,6 +16,8 @@ import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.event.controller.dto.EventResponse;
 import com.calio.calendar.event.service.EventCommandService;
+import com.calio.calendar.integration.mapping.service.GoogleCalendarRecurrenceMappingCommandService;
+import com.calio.calendar.integration.mapping.service.GoogleCalendarRecurrenceMappingQueryService;
 import com.calio.calendar.recurrence.controller.dto.CreateRecurrenceEventRequest;
 import com.calio.calendar.recurrence.controller.dto.RecurrenceEventResponse;
 import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceEventRequest;
@@ -61,6 +63,12 @@ class RecurrenceEventServiceTest {
     private EventCommandService eventCommandService;
 
     @Mock
+    private GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService;
+
+    @Mock
+    private GoogleCalendarRecurrenceMappingCommandService recurrenceMappingCommandService;
+
+    @Mock
     private Rfc5545RecurrenceEngine recurrenceEngine;
 
     @Mock
@@ -84,6 +92,8 @@ class RecurrenceEventServiceTest {
                 accountQueryService,
                 tagQueryService,
                 eventCommandService,
+                recurrenceMappingQueryService,
+                recurrenceMappingCommandService,
                 recurrenceEngine,
                 clock
         );

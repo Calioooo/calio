@@ -507,6 +507,101 @@ class GoogleCalendarPageChangeServiceTest {
 
     @Test
     @Transactional
+    @DisplayName("로컬 변경 Event가 같은 provider ETag로 재수신되면 canonical 내용을 유지한다")
+    void givenLocallyModifiedEventAndSameProviderEtag_whenPersistPage_thenKeepsLocalContent() {
+        tagRepository.saveAndFlush(new Tag(TagType.DEFAULT, "기타", "#64748B"));
+        persistProviderPage(integration.getId(), account.getId(), "first", page(timedItem("event-1", "Google"), "c1"));
+        GoogleCalendarEventMapping mapping = mappingRepository.findAll().getFirst();
+        mapping.getEvent().replace("Local", null,
+                Instant.parse("2026-07-01T09:00:00Z"), Instant.parse("2026-07-01T10:00:00Z"), false, "UTC");
+        mapping.markLocalModification(Instant.now());
+
+        persistProviderPage(integration.getId(), account.getId(), "second", page(timedItem("event-1", "Google"), "c2"));
+
+        assertThat(mapping.getEvent().getTitle()).isEqualTo("Local");
+        assertThat(mapping.isConflicted()).isFalse();
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("로컬 변경 Event가 다른 provider ETag로 재수신되면 내용을 덮어쓰지 않고 충돌 처리한다")
+    void givenLocallyModifiedEventAndChangedProviderEtag_whenPersistPage_thenMarksMappingConflicted() {
+        tagRepository.saveAndFlush(new Tag(TagType.DEFAULT, "기타", "#64748B"));
+        persistProviderPage(integration.getId(), account.getId(), "first", page(timedItem("event-1", "Google"), "c1"));
+        GoogleCalendarEventMapping mapping = mappingRepository.findAll().getFirst();
+        mapping.getEvent().replace("Local", null,
+                Instant.parse("2026-07-01T09:00:00Z"), Instant.parse("2026-07-01T10:00:00Z"), false, "UTC");
+        mapping.markLocalModification(Instant.now());
+
+        persistProviderPage(integration.getId(), account.getId(), "second",
+                page(timedItem("event-1", "Google changed", "\"etag-2\""), "c2"));
+
+        assertThat(mapping.getEvent().getTitle()).isEqualTo("Local");
+        assertThat(mapping.isConflicted()).isTrue();
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("로컬에서 삭제한 Event가 같은 provider ETag로 재수신되면 삭제 상태를 유지하고 충돌 처리하지 않는다")
+    void givenLocallyDeletedEventAndUnchangedProviderUpsert_whenPersistPage_thenKeepsDetachedMapping() {
+        // given
+        tagRepository.saveAndFlush(new Tag(TagType.DEFAULT, "기타", "#64748B"));
+        persistProviderPage(integration.getId(), account.getId(), "first", page(timedItem("event-1", "Google"), "c1"));
+        GoogleCalendarEventMapping mapping = mappingRepository.findAll().getFirst();
+        Long mappingId = mapping.getId();
+        Event importedEvent = mapping.getEvent();
+        mapping.detachCanonicalEvent(Instant.parse("2026-07-01T11:00:00Z"));
+        mappingRepository.flush();
+        eventRepository.delete(importedEvent);
+        eventRepository.flush();
+
+        // when
+        persistProviderPage(integration.getId(), account.getId(), "second",
+                page(timedItem("event-1", "Google"), "c2"));
+
+        // then
+        assertThat(eventRepository.count()).isZero();
+        assertThat(mappingRepository.findAll())
+                .singleElement()
+                .satisfies(savedMapping -> {
+                    assertThat(savedMapping.getId()).isEqualTo(mappingId);
+                    assertThat(savedMapping.hasCanonicalEvent()).isFalse();
+                    assertThat(savedMapping.isConflicted()).isFalse();
+                });
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("로컬에서 삭제한 Event가 Google에 남아 있으면 새 Event를 만들지 않고 기존 mapping을 충돌 처리한다")
+    void givenLocallyDeletedEventAndProviderUpsert_whenPersistPage_thenRetainsDetachedMappingAsConflict() {
+        // given
+        tagRepository.saveAndFlush(new Tag(TagType.DEFAULT, "기타", "#64748B"));
+        persistProviderPage(integration.getId(), account.getId(), "first", page(timedItem("event-1", "Google"), "c1"));
+        GoogleCalendarEventMapping mapping = mappingRepository.findAll().getFirst();
+        Long mappingId = mapping.getId();
+        Event importedEvent = mapping.getEvent();
+        mapping.detachCanonicalEvent(Instant.parse("2026-07-01T11:00:00Z"));
+        mappingRepository.flush();
+        eventRepository.delete(importedEvent);
+        eventRepository.flush();
+
+        // when
+        persistProviderPage(integration.getId(), account.getId(), "second",
+                page(timedItem("event-1", "Google changed", "\"etag-2\""), "c2"));
+
+        // then
+        assertThat(eventRepository.count()).isZero();
+        assertThat(mappingRepository.findAll())
+                .singleElement()
+                .satisfies(savedMapping -> {
+                    assertThat(savedMapping.getId()).isEqualTo(mappingId);
+                    assertThat(savedMapping.hasCanonicalEvent()).isFalse();
+                    assertThat(savedMapping.isConflicted()).isTrue();
+                });
+    }
+
+    @Test
+    @Transactional
     @DisplayName("recurrence-event와 override를 수정에 성공한다.")
     void givenNormalizedRecurrenceReplay_whenPersistPages_thenUpsertsCanonicalAggregate() {
         // given
@@ -599,6 +694,58 @@ class GoogleCalendarPageChangeServiceTest {
                 .singleElement()
                 .extracting(GoogleCalendarRecurrenceOverrideMapping::getProviderEtag)
                 .isEqualTo("etag-exception-2");
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("로컬에서 삭제한 recurrence-event가 같은 ETag로 재수신되면 삭제 상태를 유지하고 변경된 ETag에서만 충돌 처리한다")
+    void givenLocallyDeletedRecurrenceEvent_whenPersistPage_thenKeepsOrConflictsDetachedMappingByProviderEtag() {
+        // given
+        tagRepository.saveAndFlush(new Tag(TagType.DEFAULT, "기타", "#64748B"));
+        NormalizedEventSchedule schedule = new NormalizedEventSchedule(
+                Instant.parse("2026-07-01T09:00:00Z"),
+                Instant.parse("2026-07-01T10:00:00Z"),
+                false,
+                "UTC"
+        );
+        RecurrenceEventUpsert first = new RecurrenceEventUpsert(
+                "recurrence-event-1",
+                "etag-recurrence-event-1",
+                "Google recurrence",
+                null,
+                schedule,
+                List.of("RRULE:FREQ=DAILY")
+        );
+        applyNormalizedPage(integration.getId(), account.getId(),
+                new GoogleCalendarNormalizedPage(List.of(first), null, "cursor-1"));
+        GoogleCalendarRecurrenceEventMapping mapping = recurrenceEventMappingRepository.findAll()
+                .getFirst();
+        mapping.detachCanonicalRecurrenceEvent(Instant.parse("2026-07-01T11:00:00Z"));
+        recurrenceEventMappingRepository.flush();
+
+        // when
+        applyNormalizedPage(integration.getId(), account.getId(),
+                new GoogleCalendarNormalizedPage(List.of(first), null, "cursor-2"));
+
+        // then
+        assertThat(mapping.isConflicted()).isFalse();
+        assertThat(mapping.hasCanonicalRecurrenceEvent()).isFalse();
+
+        // when
+        RecurrenceEventUpsert changed = new RecurrenceEventUpsert(
+                "recurrence-event-1",
+                "etag-recurrence-event-2",
+                "Google recurrence changed",
+                null,
+                schedule,
+                List.of("RRULE:FREQ=DAILY")
+        );
+        applyNormalizedPage(integration.getId(), account.getId(),
+                new GoogleCalendarNormalizedPage(List.of(changed), null, "cursor-3"));
+
+        // then
+        assertThat(mapping.isConflicted()).isTrue();
+        assertThat(recurrenceEventMappingRepository.count()).isOne();
     }
 
     @Test

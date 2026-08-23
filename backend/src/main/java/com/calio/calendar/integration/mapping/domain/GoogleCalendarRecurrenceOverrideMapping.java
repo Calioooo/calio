@@ -14,6 +14,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import java.time.Instant;
 
 @Entity
 @Table(
@@ -51,6 +52,9 @@ public class GoogleCalendarRecurrenceOverrideMapping extends BaseEntity {
 
     @Embedded
     private GoogleCalendarMappingSyncState syncState;
+
+    @Column(name = "local_modified_at")
+    private Instant localModifiedAt;
 
     protected GoogleCalendarRecurrenceOverrideMapping() {
     }
@@ -97,5 +101,13 @@ public class GoogleCalendarRecurrenceOverrideMapping extends BaseEntity {
 
     public String getProviderEtag() {
         return syncState.getProviderEtag();
+    }
+
+    public void markLocalModification(Instant modifiedAt) {
+        localModifiedAt = modifiedAt;
+    }
+
+    public boolean hasLocalModification() {
+        return localModifiedAt != null;
     }
 }

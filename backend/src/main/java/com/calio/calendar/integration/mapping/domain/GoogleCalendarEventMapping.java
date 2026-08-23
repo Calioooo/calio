@@ -15,6 +15,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import java.time.Instant;
 
 @Entity
 @Table(
@@ -42,9 +43,15 @@ public class GoogleCalendarEventMapping extends BaseEntity {
     @JoinColumn(name = "integration_id", nullable = false)
     private GoogleCalendarIntegration integration;
 
-    @OneToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "event_id", nullable = false)
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "event_id")
     private Event event;
+
+    @Column(name = "local_deleted_at")
+    private Instant localDeletedAt;
+
+    @Column(name = "local_modified_at")
+    private Instant localModifiedAt;
 
     @Column(name = "calendar_key", nullable = false, length = 32)
     private String calendarKey;
@@ -99,7 +106,32 @@ public class GoogleCalendarEventMapping extends BaseEntity {
         return syncState.isConflicted();
     }
 
+    public boolean blocksLocalMutation() {
+        return integration.isConnected() && !isConflicted();
+    }
+
     public String getProviderEtag() {
         return syncState.getProviderEtag();
+    }
+
+    public boolean hasCanonicalEvent() {
+        return event != null;
+    }
+
+    public void detachCanonicalEvent(Instant deletedAt) {
+        event = null;
+        localDeletedAt = deletedAt;
+    }
+
+    public void markLocalModification(Instant modifiedAt) {
+        localModifiedAt = modifiedAt;
+    }
+
+    public boolean hasLocalModification() {
+        return localModifiedAt != null;
+    }
+
+    public Instant getLocalDeletedAt() {
+        return localDeletedAt;
     }
 }

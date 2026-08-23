@@ -12,6 +12,8 @@ import com.calio.calendar.event.service.EventCommandService;
 import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrationCommandService;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarEventMapping;
+import com.calio.calendar.integration.mapping.domain.GoogleCalendarRecurrenceEventMapping;
+import com.calio.calendar.integration.mapping.domain.GoogleCalendarRecurrenceOverrideMapping;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingCommandService;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingQueryService;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarRecurrenceMappingCommandService;
@@ -55,6 +57,7 @@ class GoogleCalendarIntegrationDataServiceTest {
         Event event = mock(Event.class);
         GoogleCalendarIntegration integration = mock(GoogleCalendarIntegration.class);
         when(eventMapping.getId()).thenReturn(10L);
+        when(eventMapping.hasCanonicalEvent()).thenReturn(true);
         when(eventMapping.getExternalEventId()).thenReturn("unseen-event");
         when(eventMapping.getEvent()).thenReturn(event);
         when(eventMapping.getIntegration()).thenReturn(integration);
@@ -79,7 +82,6 @@ class GoogleCalendarIntegrationDataServiceTest {
                 recurrenceMappingCommandService,
                 eventCommandService,
                 recurrenceEventCommandService,
-                null,
                 operationLeaseService,
                 operationJobPersistenceService,
                 operationJobQueryService
@@ -106,5 +108,45 @@ class GoogleCalendarIntegrationDataServiceTest {
         verify(integrationCommandService).changeNextSyncToken(1L, "next-token");
         verify(operationLeaseService, times(6)).extend(9L, 2L, "run-1");
         verify(operationJobPersistenceService).completeSyncRun(9L, 2L, "run-1");
+    }
+
+    @Test
+    @DisplayName("FULL SYNC에서 보이지 않은 로컬 변경 override는 삭제하지 않고 해당 override만 충돌 처리한다")
+    void givenLocallyModifiedUnseenOverride_whenFinalizeFullSync_thenRetainsAndMarksOverrideConflicted() {
+        GoogleCalendarRecurrenceOverrideMapping overrideMapping = mock(GoogleCalendarRecurrenceOverrideMapping.class);
+        GoogleCalendarRecurrenceEventMapping parentMapping = mock(GoogleCalendarRecurrenceEventMapping.class);
+        GoogleCalendarIntegration integration = mock(GoogleCalendarIntegration.class);
+        when(overrideMapping.getId()).thenReturn(11L);
+        when(overrideMapping.hasLocalModification()).thenReturn(true);
+        when(overrideMapping.getRecurrenceEventMapping()).thenReturn(parentMapping);
+        when(parentMapping.isConflicted()).thenReturn(false);
+        when(parentMapping.hasCanonicalRecurrenceEvent()).thenReturn(true);
+        when(parentMapping.getIntegration()).thenReturn(integration);
+        when(integration.getId()).thenReturn(1L);
+        when(recurrenceMappingQueryService.listOverrideMappingBatch(1L, 0L, 500))
+                .thenReturn(List.of(overrideMapping));
+        when(recurrenceMappingQueryService.listOverrideMappingBatch(1L, 11L, 500))
+                .thenReturn(List.of());
+        when(eventMappingQueryService.listEventMappingBatch(1L, 0L, 500)).thenReturn(List.of());
+        when(recurrenceMappingQueryService.listRecurrenceEventMappingBatch(1L, 0L, 500))
+                .thenReturn(List.of());
+
+        GoogleCalendarIntegrationDataService service = service();
+
+        service.completeSyncRun(9L, 2L, 1L, "run-1", GoogleCalendarSyncMode.FULL,
+                Set.of(), Set.of(), Set.of(), "next-token");
+
+        verify(overrideMapping).markConflicted();
+        verify(operationJobPersistenceService).recordSyncConflict(9L, 2L, "run-1");
+        verify(recurrenceMappingCommandService, org.mockito.Mockito.never())
+                .deleteOverrideMappingsWithIds(any());
+    }
+
+    private GoogleCalendarIntegrationDataService service() {
+        return new GoogleCalendarIntegrationDataService(
+                integrationCommandService, eventMappingQueryService, eventMappingCommandService,
+                recurrenceMappingQueryService, recurrenceMappingCommandService, eventCommandService,
+                recurrenceEventCommandService, operationLeaseService,
+                operationJobPersistenceService, operationJobQueryService);
     }
 }

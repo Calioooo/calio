@@ -15,6 +15,9 @@ import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.event.service.EventCommandService;
+import com.calio.calendar.integration.mapping.domain.GoogleCalendarRecurrenceEventMapping;
+import com.calio.calendar.integration.mapping.service.GoogleCalendarRecurrenceMappingCommandService;
+import com.calio.calendar.integration.mapping.service.GoogleCalendarRecurrenceMappingQueryService;
 import com.calio.calendar.tag.service.TagQueryService;
 import java.time.Clock;
 import java.time.Instant;
@@ -32,6 +35,8 @@ public class RecurrenceEventService {
     private final AccountQueryService accountQueryService;
     private final TagQueryService tagQueryService;
     private final EventCommandService eventCommandService;
+    private final GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService;
+    private final GoogleCalendarRecurrenceMappingCommandService recurrenceMappingCommandService;
     private final Rfc5545RecurrenceEngine recurrenceEngine;
     private final Clock clock;
 
@@ -41,6 +46,8 @@ public class RecurrenceEventService {
             AccountQueryService accountQueryService,
             TagQueryService tagQueryService,
             EventCommandService eventCommandService,
+            GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService,
+            GoogleCalendarRecurrenceMappingCommandService recurrenceMappingCommandService,
             Rfc5545RecurrenceEngine recurrenceEngine,
             Clock clock
     ) {
@@ -49,6 +56,8 @@ public class RecurrenceEventService {
         this.accountQueryService = accountQueryService;
         this.tagQueryService = tagQueryService;
         this.eventCommandService = eventCommandService;
+        this.recurrenceMappingQueryService = recurrenceMappingQueryService;
+        this.recurrenceMappingCommandService = recurrenceMappingCommandService;
         this.recurrenceEngine = recurrenceEngine;
         this.clock = clock;
     }
@@ -94,6 +103,7 @@ public class RecurrenceEventService {
                 recurrenceRules,
                 tag
         );
+        markLocalProviderContentChange(recurrenceId);
         return RecurrenceEventResponse.from(recurrenceEvent);
     }
 
@@ -123,16 +133,48 @@ public class RecurrenceEventService {
         if (existingOverride.isPresent()) {
             override.activate(request.title(), request.description(), schedule);
         }
-        recurrenceEventCommandService.createOrUpdateRecurrenceOverride(override);
+        RecurrenceEventOverride savedOverride = recurrenceEventCommandService.createOrUpdateRecurrenceOverride(override);
+        markLocalProviderContentChange(savedOverride);
         return EventResponse.recurrenceOverride(override);
     }
 
     @Transactional
     public void deleteRecurrenceEvent(Long accountId, Long recurrenceId) {
         recurrenceEventCommandService.lockRecurrenceEvent(accountId, recurrenceId);
+        detachEligibleRecurrenceEventMapping(recurrenceId);
         recurrenceEventCommandService.deleteRecurrenceOverridesByRecurrenceEventIds(List.of(recurrenceId));
         eventCommandService.deleteEventsByRecurrenceEventIds(List.of(recurrenceId));
         recurrenceEventCommandService.deleteRecurrenceEventsByIds(List.of(recurrenceId));
+    }
+
+    private void detachEligibleRecurrenceEventMapping(Long recurrenceId) {
+        recurrenceMappingQueryService.findRecurrenceEventMapping(recurrenceId)
+                .ifPresent(this::detachOrReject);
+    }
+
+    private void markLocalProviderContentChange(Long recurrenceId) {
+        recurrenceMappingQueryService.findRecurrenceEventMapping(recurrenceId)
+                .filter(mapping -> !mapping.isConflicted() && !mapping.getIntegration().isConnected())
+                .ifPresent(mapping -> recurrenceMappingCommandService.markLocalModification(
+                        mapping, Instant.now(clock)));
+    }
+
+    private void markLocalProviderContentChange(RecurrenceEventOverride override) {
+        recurrenceMappingQueryService.findOverrideMapping(override.getOverrideId())
+                .filter(mapping -> !mapping.isConflicted()
+                        && !mapping.getRecurrenceEventMapping().getIntegration().isConnected())
+                .ifPresent(mapping -> recurrenceMappingCommandService.markLocalModification(
+                        mapping, Instant.now(clock)));
+    }
+
+    private void detachOrReject(GoogleCalendarRecurrenceEventMapping mapping) {
+        if (!mapping.isConflicted() && mapping.getIntegration().isConnected()) {
+            throw new CalioException(ErrorCode.EXTERNAL_EVENT_MUTATION_NOT_SUPPORTED);
+        }
+        recurrenceMappingCommandService.deleteOverrideMappings(
+                recurrenceMappingQueryService.listOverrideMappings(List.of(mapping.getId()))
+        );
+        mapping.detachCanonicalRecurrenceEvent(Instant.now(clock));
     }
 
     @Transactional

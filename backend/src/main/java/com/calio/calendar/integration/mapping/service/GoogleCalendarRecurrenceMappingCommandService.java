@@ -6,6 +6,7 @@ import com.calio.calendar.integration.mapping.repository.GoogleCalendarRecurrenc
 import com.calio.calendar.integration.mapping.repository.GoogleCalendarRecurrenceOverrideMappingRepository;
 import java.util.Collection;
 import java.util.List;
+import java.time.Instant;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,6 +40,14 @@ public class GoogleCalendarRecurrenceMappingCommandService {
     public void deleteRecurrenceEventMapping(GoogleCalendarRecurrenceEventMapping mapping) {
         recurrenceMappingRepository.delete(mapping);
         recurrenceMappingRepository.flush();
+    }
+
+    public void markLocalModification(GoogleCalendarRecurrenceEventMapping mapping, Instant modifiedAt) {
+        mapping.markLocalModification(modifiedAt);
+    }
+
+    public void markLocalModification(GoogleCalendarRecurrenceOverrideMapping mapping, Instant modifiedAt) {
+        mapping.markLocalModification(modifiedAt);
     }
 
     public void deleteRecurrenceEventMappingsWithIds(Collection<Long> mappingIds) {

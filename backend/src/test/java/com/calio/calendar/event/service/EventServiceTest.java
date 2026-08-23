@@ -25,6 +25,9 @@ import com.calio.calendar.event.controller.dto.UpdateImportantEventRequest;
 import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.event.repository.EventRepository;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingQueryService;
+import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingCommandService;
+import com.calio.calendar.integration.mapping.domain.GoogleCalendarEventMapping;
+import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceOccurrence;
@@ -39,6 +42,7 @@ import com.calio.calendar.tag.service.TagQueryService;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -69,6 +73,9 @@ class EventServiceTest {
 
     @Mock
     private GoogleCalendarEventMappingQueryService eventMappingQueryService;
+
+    @Mock
+    private GoogleCalendarEventMappingCommandService eventMappingCommandService;
 
     @Mock
     private RecurrenceEventRepository recurrenceEventRepository;
@@ -138,7 +145,7 @@ class EventServiceTest {
                 30L
         );
         when(eventCommandService.lockEvent(1L, 10L)).thenReturn(event);
-        when(eventMappingQueryService.hasExternalEventMapping(10L, 1L)).thenReturn(false);
+        when(eventMappingQueryService.blocksLocalMutation(10L)).thenReturn(false);
         when(tagQueryService.getTagOrDefault(1L, 30L)).thenReturn(updatedTag);
         doAnswer(invocation -> {
             Event target = invocation.getArgument(0);
@@ -163,7 +170,7 @@ class EventServiceTest {
         // then
         InOrder order = inOrder(eventMappingQueryService, tagQueryService, eventCommandService);
         order.verify(eventCommandService).lockEvent(1L, 10L);
-        order.verify(eventMappingQueryService).hasExternalEventMapping(10L, 1L);
+        order.verify(eventMappingQueryService).blocksLocalMutation(10L);
         order.verify(tagQueryService).getTagOrDefault(1L, 30L);
         order.verify(eventCommandService).updateEvent(any(), any(), any(), any());
         assertThat(response.title()).isEqualTo("After");
@@ -177,7 +184,7 @@ class EventServiceTest {
         // given
         Event event = event("External", tag("기타"));
         when(eventCommandService.lockEvent(1L, 10L)).thenReturn(event);
-        when(eventMappingQueryService.hasExternalEventMapping(10L, 1L)).thenReturn(true);
+        when(eventMappingQueryService.blocksLocalMutation(10L)).thenReturn(true);
         UpdateEventRequest request = new UpdateEventRequest(
                 "Blocked",
                 null,
@@ -200,12 +207,45 @@ class EventServiceTest {
     }
 
     @Test
+    @DisplayName("연결 해제된 Google mapping 일정 수정은 local-only로 처리한다")
+    void givenDisconnectedMappedEvent_whenUpdateEvent_thenUpdatesCanonicalEventLocally() {
+        // given
+        Event event = event("Before", tag("기타"));
+        GoogleCalendarEventMapping mapping = org.mockito.Mockito.mock(GoogleCalendarEventMapping.class);
+        UpdateEventRequest request = new UpdateEventRequest(
+                "After",
+                null,
+                Instant.parse("2027-01-02T00:00:00Z"),
+                Instant.parse("2027-01-02T01:00:00Z"),
+                false,
+                "UTC",
+                null
+        );
+        when(eventCommandService.lockEvent(1L, 10L)).thenReturn(event);
+        when(eventMappingQueryService.blocksLocalMutation(10L)).thenReturn(false);
+        when(eventMappingQueryService.findEventMapping(10L)).thenReturn(Optional.of(mapping));
+        when(mapping.blocksLocalMutation()).thenReturn(false);
+        when(tagQueryService.getTagOrDefault(1L, null)).thenReturn(tag("기타"));
+
+        // when
+        eventService.updateEvent(1L, 10L, request);
+
+        // then
+        verify(eventCommandService).updateEvent(eq(event), eq(request), any(), any());
+        verify(eventMappingCommandService).markLocalModification(eq(mapping), any(Instant.class));
+    }
+
+    @Test
     @DisplayName("외부 캘린더 일정 삭제는 Command를 실행하지 않고 거절한다")
     void givenExternalEvent_whenDeleteEvent_thenRejectsBeforeCommand() {
         // given
         Event event = event("External", tag("기타"));
+        GoogleCalendarEventMapping mapping = org.mockito.Mockito.mock(GoogleCalendarEventMapping.class);
+        GoogleCalendarIntegration integration = org.mockito.Mockito.mock(GoogleCalendarIntegration.class);
         when(eventCommandService.lockEvent(1L, 10L)).thenReturn(event);
-        when(eventMappingQueryService.hasExternalEventMapping(10L, 1L)).thenReturn(true);
+        when(eventMappingQueryService.findEventMapping(10L)).thenReturn(Optional.of(mapping));
+        when(mapping.getIntegration()).thenReturn(integration);
+        when(integration.isConnected()).thenReturn(true);
 
         // when, then
         assertThatThrownBy(() -> eventService.deleteEvent(1L, 10L))
@@ -217,12 +257,32 @@ class EventServiceTest {
     }
 
     @Test
+    @DisplayName("연결 해제된 Google mapping 일정 삭제는 mapping identity를 보존하고 canonical Event만 삭제한다")
+    void givenDisconnectedMappedEvent_whenDeleteEvent_thenDetachesMappingAndDeletesEvent() {
+        // given
+        Event event = event("External", tag("기타"));
+        GoogleCalendarEventMapping mapping = org.mockito.Mockito.mock(GoogleCalendarEventMapping.class);
+        GoogleCalendarIntegration integration = org.mockito.Mockito.mock(GoogleCalendarIntegration.class);
+        when(eventCommandService.lockEvent(1L, 10L)).thenReturn(event);
+        when(eventMappingQueryService.findEventMapping(10L)).thenReturn(Optional.of(mapping));
+        when(mapping.getIntegration()).thenReturn(integration);
+        when(integration.isConnected()).thenReturn(false);
+
+        // when
+        eventService.deleteEvent(1L, 10L);
+
+        // then
+        verify(mapping).detachCanonicalEvent(any(Instant.class));
+        verify(eventCommandService).deleteEvent(event);
+    }
+
+    @Test
     @DisplayName("외부 캘린더 일정의 중요 상태 변경은 Command를 실행하지 않고 거절한다")
     void givenExternalEvent_whenUpdateImportantEvent_thenRejectsBeforeCommand() {
         // given
         Event event = event("External", tag("기타"));
         when(eventCommandService.lockEvent(1L, 10L)).thenReturn(event);
-        when(eventMappingQueryService.hasExternalEventMapping(10L, 1L)).thenReturn(true);
+        when(eventMappingQueryService.blocksLocalMutation(10L)).thenReturn(true);
 
         // when
         assertThatThrownBy(() -> eventService.updateImportantEvent(
@@ -235,7 +295,7 @@ class EventServiceTest {
         );
 
         // then
-        verify(eventMappingQueryService).hasExternalEventMapping(10L, 1L);
+        verify(eventMappingQueryService).blocksLocalMutation(10L);
         verify(eventCommandService, never()).updateImportantEvent(any(), anyBoolean());
         assertThat(event.importantEvent()).isFalse();
     }
@@ -393,6 +453,7 @@ class EventServiceTest {
                 queryService,
                 eventCommandService,
                 eventMappingQueryService,
+                eventMappingCommandService,
                 accountQueryService,
                 tagQueryService,
                 recurrenceQueryService,

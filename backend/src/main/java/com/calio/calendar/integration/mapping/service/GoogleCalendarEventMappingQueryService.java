@@ -4,6 +4,7 @@ import com.calio.calendar.integration.mapping.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.mapping.repository.GoogleCalendarEventMappingRepository;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,8 +21,14 @@ public class GoogleCalendarEventMappingQueryService {
         this.eventMappingRepository = eventMappingRepository;
     }
 
-    public boolean hasExternalEventMapping(Long eventId, Long accountId) {
-        return eventMappingRepository.existsByEvent_IdAndIntegration_AccountId(eventId, accountId);
+    public boolean blocksLocalMutation(Long eventId) {
+        return eventMappingRepository.findByEvent_Id(eventId)
+                .map(GoogleCalendarEventMapping::blocksLocalMutation)
+                .orElse(false);
+    }
+
+    public Optional<GoogleCalendarEventMapping> findEventMapping(Long eventId) {
+        return eventMappingRepository.findByEvent_Id(eventId);
     }
 
     public List<GoogleCalendarEventMapping> listEventMappings(

@@ -75,17 +75,20 @@ public class GoogleCalendarEventChangeService {
             EventUpsert item,
             GoogleCalendarPageOwnership ownership
     ) {
-        if (mapping.isConflicted()) {
+        if (mapping.isConflicted() || keepDetachedMapping(mapping, item, ownership)) {
+            return;
+        }
+        if (mapping.hasLocalModification()) {
+            keepLocalContentOrMarkConflict(mapping, item.providerEtag(), ownership);
             return;
         }
         GoogleCalendarEffectiveScope scope = GoogleCalendarEffectiveScope.event(mapping.getEvent().getId());
-        if (mapping.getProviderEtag().equals(item.providerEtag())) {
+        if (hasSameProviderEtag(mapping, item.providerEtag())) {
             return;
         }
         if (operationJobQueryService.hasPendingOutboundJob(
                 mapping.getIntegration().getAccountId(), mapping.getIntegration().getId(), scope)) {
-            mapping.markConflicted();
-            recordSyncConflict(mapping, ownership);
+            markConflict(mapping, ownership);
             return;
         }
         mapping.getEvent().replace(
@@ -101,18 +104,18 @@ public class GoogleCalendarEventChangeService {
     ) {
         var eventMappings = cache.eventMappings();
         GoogleCalendarEventMapping eventMapping = eventMappings.get(externalEventId);
-        if (eventMapping == null) {
-            return;
-        }
-        if (eventMapping.isConflicted()) {
+        if (eventMapping == null || eventMapping.isConflicted() || !eventMapping.hasCanonicalEvent()) {
             return;
         }
         GoogleCalendarEffectiveScope scope = GoogleCalendarEffectiveScope.event(
                 eventMapping.getEvent().getId());
+        if (eventMapping.hasLocalModification()) {
+            markConflict(eventMapping, ownership);
+            return;
+        }
         if (operationJobQueryService.hasPendingOutboundJob(
                 eventMapping.getIntegration().getAccountId(), eventMapping.getIntegration().getId(), scope)) {
-            eventMapping.markConflicted();
-            recordSyncConflict(eventMapping, ownership);
+            markConflict(eventMapping, ownership);
             return;
         }
         eventMappings.remove(externalEventId);
@@ -129,5 +132,41 @@ public class GoogleCalendarEventChangeService {
                 mapping.getIntegration().getAccountId(),
                 ownership.workerToken()
         );
+    }
+
+    private boolean keepDetachedMapping(
+            GoogleCalendarEventMapping mapping,
+            EventUpsert item,
+            GoogleCalendarPageOwnership ownership
+    ) {
+        if (mapping.hasCanonicalEvent()) {
+            return false;
+        }
+        if (!hasSameProviderEtag(mapping, item.providerEtag())) {
+            markConflict(mapping, ownership);
+        }
+        return true;
+    }
+
+    private void keepLocalContentOrMarkConflict(
+            GoogleCalendarEventMapping mapping,
+            String providerEtag,
+            GoogleCalendarPageOwnership ownership
+    ) {
+        if (!hasSameProviderEtag(mapping, providerEtag)) {
+            markConflict(mapping, ownership);
+        }
+    }
+
+    private boolean hasSameProviderEtag(GoogleCalendarEventMapping mapping, String providerEtag) {
+        return mapping.getProviderEtag().equals(providerEtag);
+    }
+
+    private void markConflict(
+            GoogleCalendarEventMapping mapping,
+            GoogleCalendarPageOwnership ownership
+    ) {
+        mapping.markConflicted();
+        recordSyncConflict(mapping, ownership);
     }
 }

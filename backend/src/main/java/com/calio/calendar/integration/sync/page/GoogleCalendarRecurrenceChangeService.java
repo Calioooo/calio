@@ -97,18 +97,21 @@ public class GoogleCalendarRecurrenceChangeService {
             RecurrenceSchedule schedule,
             GoogleCalendarPageOwnership ownership
     ) {
-        if (mapping.isConflicted()) {
+        if (mapping.isConflicted() || keepDetachedRecurrenceEventMapping(mapping, item, ownership)) {
             return;
         }
         GoogleCalendarEffectiveScope scope = GoogleCalendarEffectiveScope.recurrenceEvent(
                 mapping.getRecurrenceEvent().getId());
-        if (mapping.getProviderEtag().equals(item.providerEtag())) {
+        if (mapping.hasLocalModification()) {
+            keepLocalRecurrenceContentOrMarkConflict(mapping, item.providerEtag(), ownership);
+            return;
+        }
+        if (hasSameProviderEtag(mapping, item.providerEtag())) {
             return;
         }
         if (operationJobQueryService.hasPendingOutboundJob(
                 mapping.getIntegration().getAccountId(), mapping.getIntegration().getId(), scope)) {
-            mapping.markConflicted();
-            recordSyncConflict(mapping, ownership);
+            markConflict(mapping, ownership);
             return;
         }
         mapping.getRecurrenceEvent().updateProviderContent(
@@ -123,19 +126,21 @@ public class GoogleCalendarRecurrenceChangeService {
     ) {
         GoogleCalendarRecurrenceEventMapping recurrenceEventMapping = cache.recurrenceEventMappings()
                 .get(externalEventId);
-        if (recurrenceEventMapping == null) {
-            return;
-        }
-        if (recurrenceEventMapping.isConflicted()) {
+        if (recurrenceEventMapping == null
+                || recurrenceEventMapping.isConflicted()
+                || !recurrenceEventMapping.hasCanonicalRecurrenceEvent()) {
             return;
         }
         GoogleCalendarEffectiveScope scope = GoogleCalendarEffectiveScope.recurrenceEvent(
                 recurrenceEventMapping.getRecurrenceEvent().getId());
+        if (recurrenceEventMapping.hasLocalModification()) {
+            markConflict(recurrenceEventMapping, ownership);
+            return;
+        }
         if (operationJobQueryService.hasPendingOutboundJob(
                 recurrenceEventMapping.getIntegration().getAccountId(),
                 recurrenceEventMapping.getIntegration().getId(), scope)) {
-            recurrenceEventMapping.markConflicted();
-            recordSyncConflict(recurrenceEventMapping, ownership);
+            markConflict(recurrenceEventMapping, ownership);
             return;
         }
         cache.recurrenceEventMappings().remove(externalEventId);
@@ -155,6 +160,10 @@ public class GoogleCalendarRecurrenceChangeService {
         GoogleCalendarRecurrenceEventMapping recurrenceEventMapping =
                 requireRecurrenceEventMapping(item, cache);
         if (recurrenceEventMapping.isConflicted()) {
+            return;
+        }
+        if (!recurrenceEventMapping.hasCanonicalRecurrenceEvent()) {
+            markConflict(recurrenceEventMapping, ownership);
             return;
         }
         ExistingRecurrenceOverride existingOverride = loadExistingOverride(
@@ -289,14 +298,25 @@ public class GoogleCalendarRecurrenceChangeService {
         }
         GoogleCalendarEffectiveScope scope = GoogleCalendarEffectiveScope.recurrenceOverride(
                 recurrenceEventMapping.getRecurrenceEvent().getId(), item.originStartAt());
-        if (mapping.getProviderEtag().equals(item.providerEtag())) {
+        if (mapping.hasLocalModification()) {
+            keepLocalOverrideContentOrMarkConflict(mapping, item.providerEtag(), ownership);
+            return;
+        }
+        if (recurrenceEventMapping.hasLocalModification()) {
+            keepLocalRecurrenceContentOrMarkConflict(
+                    recurrenceEventMapping,
+                    item.providerEtag(),
+                    ownership
+            );
+            return;
+        }
+        if (hasSameProviderEtag(mapping, item.providerEtag())) {
             return;
         }
         if (operationJobQueryService.hasPendingOutboundJob(
                 recurrenceEventMapping.getIntegration().getAccountId(),
                 recurrenceEventMapping.getIntegration().getId(), scope)) {
-            mapping.markConflicted();
-            recordSyncConflict(mapping, ownership);
+            markConflict(mapping, ownership);
             return;
         }
         updateRecurrenceEventOverride(mapping.getRecurrenceEventOverride(), item);
@@ -402,6 +422,70 @@ public class GoogleCalendarRecurrenceChangeService {
                 mapping.getIntegration().getAccountId(),
                 ownership.workerToken()
         );
+    }
+
+    private boolean keepDetachedRecurrenceEventMapping(
+            GoogleCalendarRecurrenceEventMapping mapping,
+            RecurrenceEventUpsert item,
+            GoogleCalendarPageOwnership ownership
+    ) {
+        if (mapping.hasCanonicalRecurrenceEvent()) {
+            return false;
+        }
+        if (!hasSameProviderEtag(mapping, item.providerEtag())) {
+            markConflict(mapping, ownership);
+        }
+        return true;
+    }
+
+    private void keepLocalRecurrenceContentOrMarkConflict(
+            GoogleCalendarRecurrenceEventMapping mapping,
+            String providerEtag,
+            GoogleCalendarPageOwnership ownership
+    ) {
+        if (!hasSameProviderEtag(mapping, providerEtag)) {
+            markConflict(mapping, ownership);
+        }
+    }
+
+    private void keepLocalOverrideContentOrMarkConflict(
+            GoogleCalendarRecurrenceOverrideMapping mapping,
+            String providerEtag,
+            GoogleCalendarPageOwnership ownership
+    ) {
+        if (!hasSameProviderEtag(mapping, providerEtag)) {
+            markConflict(mapping, ownership);
+        }
+    }
+
+    private boolean hasSameProviderEtag(
+            GoogleCalendarRecurrenceEventMapping mapping,
+            String providerEtag
+    ) {
+        return mapping.getProviderEtag().equals(providerEtag);
+    }
+
+    private boolean hasSameProviderEtag(
+            GoogleCalendarRecurrenceOverrideMapping mapping,
+            String providerEtag
+    ) {
+        return mapping.getProviderEtag().equals(providerEtag);
+    }
+
+    private void markConflict(
+            GoogleCalendarRecurrenceEventMapping mapping,
+            GoogleCalendarPageOwnership ownership
+    ) {
+        mapping.markConflicted();
+        recordSyncConflict(mapping, ownership);
+    }
+
+    private void markConflict(
+            GoogleCalendarRecurrenceOverrideMapping mapping,
+            GoogleCalendarPageOwnership ownership
+    ) {
+        mapping.markConflicted();
+        recordSyncConflict(mapping, ownership);
     }
 
     private void recordSyncConflict(

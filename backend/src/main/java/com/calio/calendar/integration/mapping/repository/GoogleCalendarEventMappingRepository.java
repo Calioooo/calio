@@ -28,7 +28,8 @@ public interface GoogleCalendarEventMappingRepository
             @Param("externalEventIds") Collection<String> externalEventIds
     );
 
-    boolean existsByEvent_IdAndIntegration_AccountId(Long eventId, Long accountId);
+    @EntityGraph(attributePaths = "integration")
+    Optional<GoogleCalendarEventMapping> findByEvent_Id(Long eventId);
 
     @Query("""
             select mapping.event.id
