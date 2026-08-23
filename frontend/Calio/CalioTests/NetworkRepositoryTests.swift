@@ -77,19 +77,22 @@ struct NetworkRepositoryTests {
         let responseJSON = """
         {
           "recurrenceId": 123,
-          "recurrenceTitle": "반복 일정",
-          "recurrenceDescription": "설명",
-          "recurrenceStartDate": "2026-08-01",
-          "recurrenceEndDate": "2026-08-31",
-          "recurrenceStartTime": "00:00:00",
-          "recurrenceEndTime": "01:00:00",
-          "recurrenceFrequency": "MONTHLY",
+          "title": "반복 일정",
+          "description": "설명",
+          "allDay": false,
+          "firstOccurrenceStartAt": "2026-08-01T00:00:00Z",
+          "firstOccurrenceEndAt": "2026-08-01T01:00:00Z",
+          "timeZone": "UTC",
+          "recurrence": ["RRULE:FREQ=MONTHLY;UNTIL=20260831T000000Z"],
           "tag": {
             "id": 1,
             "title": "업무",
             "colorCode": "#3B82F6",
             "tagType": "DEFAULT"
-          }
+          },
+          "createdAt": "2026-08-01T00:00:00Z",
+          "updatedAt": "2026-08-01T00:00:00Z",
+          "canUpdateSeries": true
         }
         """.data(using: .utf8)!
         var capturedRequest: URLRequest?
@@ -130,15 +133,15 @@ struct NetworkRepositoryTests {
         #expect(request.url?.absoluteString == "https://example.test/api/recurrence-events")
         #expect(request.httpMethod == "POST")
         #expect(Set(object.keys) == [
-            "recurrenceTitle",
-            "recurrenceDescription",
-            "recurrenceStartDate",
-            "recurrenceEndDate",
-            "recurrenceStartTime",
-            "recurrenceEndTime",
-            "recurrenceFrequency"
+            "title",
+            "description",
+            "allDay",
+            "firstOccurrenceStartAt",
+            "firstOccurrenceEndAt",
+            "timeZone",
+            "recurrence"
         ])
-        #expect(object["recurrenceFrequency"] as? String == "MONTHLY")
+        #expect(object["recurrence"] as? [String] == ["RRULE:FREQ=MONTHLY;UNTIL=20260831T000000Z"])
         #expect(object["colorCode"] == nil)
     }
 
@@ -211,19 +214,22 @@ struct NetworkRepositoryTests {
         let recurrenceResponseJSON = """
         {
           "recurrenceId": 700,
-          "recurrenceTitle": "수정 반복 일정",
-          "recurrenceDescription": "설명",
-          "recurrenceStartDate": "2026-08-01",
-          "recurrenceEndDate": "2026-08-31",
-          "recurrenceStartTime": "09:00:00",
-          "recurrenceEndTime": "10:00:00",
-          "recurrenceFrequency": "WEEKLY",
+          "title": "수정 반복 일정",
+          "description": "설명",
+          "allDay": false,
+          "firstOccurrenceStartAt": "2026-08-01T09:00:00Z",
+          "firstOccurrenceEndAt": "2026-08-01T10:00:00Z",
+          "timeZone": "Asia/Seoul",
+          "recurrence": ["RRULE:FREQ=WEEKLY;UNTIL=20260831T000000Z"],
           "tag": {
             "id": 1,
             "title": "업무",
             "colorCode": "#3B82F6",
             "tagType": "DEFAULT"
-          }
+          },
+          "createdAt": "2026-08-01T09:00:00Z",
+          "updatedAt": "2026-08-01T10:00:00Z",
+          "canUpdateSeries": true
         }
         """.data(using: .utf8)!
         let occurrenceResponseJSON = """

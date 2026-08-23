@@ -248,7 +248,7 @@ struct EventServiceTests {
         )
         let service = EventService(
             repository: repository,
-            deviceTimeZone: TimeZone(identifier: "Asia/Los_Angeles")!
+            deviceTimeZone: TimeZone(identifier: "America/Los_Angeles")!
         )
 
         let event = try await service.updateEvent(

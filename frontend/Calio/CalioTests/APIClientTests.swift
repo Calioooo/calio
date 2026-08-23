@@ -21,7 +21,7 @@ struct APIClientTests {
             #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer guest-token")
             #expect(request.value(forHTTPHeaderField: "Accept") == "application/json")
             #expect(request.value(forHTTPHeaderField: "Content-Type") == "application/json")
-            let body = try #require(request.httpBody)
+            let body = try #require(requestBodyData(from: request))
             let payload = try #require(JSONSerialization.jsonObject(with: body) as? [String: Any])
             #expect(payload["title"] as? String == "회의")
             return response(for: request, statusCode: 201, body: #"{"value":"created"}"#)
