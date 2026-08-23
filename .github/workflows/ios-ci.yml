@@ -34,21 +34,17 @@ jobs:
 
     - name: Boot iOS simulator
       run: |
-        xcrun simctl bootstatus "${{ steps.simulator.outputs.id }}" -b &
-        bootstatus_pid=$!
-
-        for _ in {1..24}; do
-          if ! kill -0 "$bootstatus_pid" 2>/dev/null; then
-            wait "$bootstatus_pid"
-            exit $?
-          fi
-          sleep 5
-        done
-
-        kill "$bootstatus_pid" 2>/dev/null || true
-        wait "$bootstatus_pid" 2>/dev/null || true
-        echo "Timed out waiting for iOS simulator to boot"
-        exit 1
+        ruby -r timeout -e '
+          pid = Process.spawn(*ARGV)
+          begin
+            Timeout.timeout(120) { Process.wait(pid) }
+          rescue Timeout::Error
+            Process.kill("TERM", pid) rescue nil
+            Process.wait(pid) rescue nil
+            abort("Timed out waiting for iOS simulator to boot")
+          end
+          exit $?.exitstatus
+        ' xcrun simctl bootstatus "${{ steps.simulator.outputs.id }}" -b
 
     - name: Run iOS tests
       working-directory: frontend/Calio
