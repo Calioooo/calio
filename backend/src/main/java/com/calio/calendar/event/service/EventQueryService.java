@@ -28,6 +28,11 @@ public class EventQueryService {
         return eventRepository.findNormalEvents(accountId, from, to);
     }
 
+    public Event getPersonalOneOffEvent(Long accountId, Long eventId) {
+        return eventRepository.findPersonalOneOffEventByIdAndAccountId(eventId, accountId)
+                .orElseThrow(() -> new CalioException(ErrorCode.EVENT_NOT_FOUND));
+    }
+
     public List<Event> listPersonalOneOffEvents(Long accountId) {
         return eventRepository.findAllPersonalOneOffEvents(accountId);
     }

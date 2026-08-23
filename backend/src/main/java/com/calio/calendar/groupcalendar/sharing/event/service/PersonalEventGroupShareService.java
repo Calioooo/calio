@@ -78,7 +78,7 @@ public class PersonalEventGroupShareService {
     private List<Event> selectedEvents(Long accountId, List<Long> eventIds) {
         Set<Long> distinctEventIds = new LinkedHashSet<>(eventIds);
         return distinctEventIds.stream()
-                .map(eventId -> eventQueryService.getEvent(accountId, eventId))
+                .map(eventId -> eventQueryService.getPersonalOneOffEvent(accountId, eventId))
                 .toList();
     }
 

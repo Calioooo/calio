@@ -117,6 +117,22 @@ class PersonalEventGroupShareControllerTest {
     }
 
     @Test
+    @DisplayName("선택 공유는 개인 반복 occurrence Event를 단건 공유 대상으로 받지 않는다")
+    void givenRecurrenceOccurrenceEvent_whenShareSelected_thenRejectsRequest() throws Exception {
+        // given
+        GroupSpace groupSpace = activeGroupSpace();
+        Event recurrenceOccurrence = recurrenceOccurrenceEvent(currentAccountId());
+
+        // when, then
+        mockMvc.perform(post("/api/group-spaces/{groupSpaceId}/event-shares", groupSpace.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{ \"selectionEnabled\": true, \"eventIds\": [%d] }"
+                                .formatted(recurrenceOccurrence.getId())))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("EVENT_NOT_FOUND"));
+    }
+
+    @Test
     @DisplayName("선택 공유를 끄면 요청 시점의 모든 개인 단건 일정만 공유한다")
     void givenBulkSelectionDisabled_whenShare_thenSharesCurrentOneOffEventsOnly() throws Exception {
         // given
@@ -229,6 +245,22 @@ class PersonalEventGroupShareControllerTest {
                 false,
                 "UTC",
                 null,
+                tag,
+                account
+        ));
+    }
+
+    private Event recurrenceOccurrenceEvent(Long accountId) {
+        Account account = accountRepository.getReferenceById(accountId);
+        Tag tag = tagRepository.saveAndFlush(new Tag(TagType.PERSONAL_DEFAULT, "기타", "#64748B"));
+        return eventRepository.saveAndFlush(new Event(
+                "반복 회차",
+                null,
+                Instant.parse("2028-01-01T09:00:00Z"),
+                Instant.parse("2028-01-01T10:00:00Z"),
+                false,
+                "UTC",
+                1L,
                 tag,
                 account
         ));
