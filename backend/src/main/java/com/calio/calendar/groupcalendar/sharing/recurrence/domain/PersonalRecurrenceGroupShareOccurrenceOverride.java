@@ -1,6 +1,8 @@
 package com.calio.calendar.groupcalendar.sharing.recurrence.domain;
 
 import com.calio.calendar.common.domain.BaseEntity;
+import com.calio.calendar.common.domain.CanonicalSchedule;
+import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -34,6 +36,18 @@ public class PersonalRecurrenceGroupShareOccurrenceOverride extends BaseEntity {
     @Column(name = "origin_start_at", nullable = false)
     private Instant originStartAt;
 
+    @Column(name = "override_title")
+    private String overrideTitle;
+
+    @Column(name = "override_start_at")
+    private Instant overrideStartAt;
+
+    @Column(name = "override_end_at")
+    private Instant overrideEndAt;
+
+    @Column(name = "override_all_day")
+    private Boolean overrideAllDay;
+
     protected PersonalRecurrenceGroupShareOccurrenceOverride() {
     }
 
@@ -43,6 +57,40 @@ public class PersonalRecurrenceGroupShareOccurrenceOverride extends BaseEntity {
     ) {
         this.share = share;
         this.originStartAt = originStartAt;
+    }
+
+    public void updateRepresentation(
+            String overrideTitle,
+            Instant overrideStartAt,
+            Instant overrideEndAt,
+            Boolean overrideAllDay
+    ) {
+        validateEffectiveSchedule(overrideStartAt, overrideEndAt, overrideAllDay);
+        this.overrideTitle = overrideTitle;
+        this.overrideStartAt = overrideStartAt;
+        this.overrideEndAt = overrideEndAt;
+        this.overrideAllDay = overrideAllDay;
+    }
+
+    private void validateEffectiveSchedule(
+            Instant overrideStartAt,
+            Instant overrideEndAt,
+            Boolean overrideAllDay
+    ) {
+        RecurrenceEvent recurrenceEvent = share.getRecurrenceEvent();
+        boolean allDay = overrideAllDay != null
+                ? overrideAllDay
+                : share.resolveAllDay(recurrenceEvent.isAllDay());
+        CanonicalSchedule.event(
+                overrideStartAt != null
+                        ? overrideStartAt
+                        : share.resolveStartAt(recurrenceEvent.getFirstOccurrenceStartAt()),
+                overrideEndAt != null
+                        ? overrideEndAt
+                        : share.resolveEndAt(recurrenceEvent.getFirstOccurrenceEndAt()),
+                allDay,
+                allDay ? null : recurrenceEvent.getTimeZone()
+        );
     }
 
     public Long getId() {
@@ -55,5 +103,39 @@ public class PersonalRecurrenceGroupShareOccurrenceOverride extends BaseEntity {
 
     public Instant getOriginStartAt() {
         return originStartAt;
+    }
+
+    public String getOverrideTitle() {
+        return overrideTitle;
+    }
+
+    public Instant getOverrideStartAt() {
+        return overrideStartAt;
+    }
+
+    public Instant getOverrideEndAt() {
+        return overrideEndAt;
+    }
+
+    public Boolean getOverrideAllDay() {
+        return overrideAllDay;
+    }
+
+    public String resolvePublicTitle(String sourceTitle, String anonymousTitle) {
+        return overrideTitle != null
+                ? overrideTitle
+                : share.resolvePublicTitle(sourceTitle, anonymousTitle);
+    }
+
+    public Instant resolveStartAt(Instant sourceStartAt) {
+        return overrideStartAt != null ? overrideStartAt : share.resolveStartAt(sourceStartAt);
+    }
+
+    public Instant resolveEndAt(Instant sourceEndAt) {
+        return overrideEndAt != null ? overrideEndAt : share.resolveEndAt(sourceEndAt);
+    }
+
+    public boolean resolveAllDay(boolean sourceAllDay) {
+        return overrideAllDay != null ? overrideAllDay : share.resolveAllDay(sourceAllDay);
     }
 }

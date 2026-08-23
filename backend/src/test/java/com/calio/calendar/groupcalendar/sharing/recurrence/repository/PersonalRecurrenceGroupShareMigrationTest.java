@@ -28,4 +28,23 @@ class PersonalRecurrenceGroupShareMigrationTest {
                 .contains("CREATE TABLE personal_recurrence_group_share_occurrence_overrides")
                 .contains("ON DELETE CASCADE");
     }
+
+    @Test
+    @DisplayName("반복 공유 override migration은 마스터와 occurrence 표현 필드를 추가한다")
+    void migrationAddsPersonalRecurrenceGroupShareRepresentationOverrides() throws IOException {
+        // when
+        String migration = new ClassPathResource(
+                "db/migration/V24__personal_recurrence_group_share_overrides.sql"
+        ).getContentAsString(StandardCharsets.UTF_8);
+
+        // then
+        assertThat(migration)
+                .contains("personal_recurrence_group_shares")
+                .contains("show_original_details BOOLEAN NOT NULL DEFAULT FALSE")
+                .contains("override_title VARCHAR(255) NULL")
+                .contains("override_start_at DATETIME(6) NULL")
+                .contains("override_end_at DATETIME(6) NULL")
+                .contains("override_all_day BOOLEAN NULL")
+                .contains("personal_recurrence_group_share_occurrence_overrides");
+    }
 }
