@@ -16,6 +16,7 @@ import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.event.controller.dto.EventResponse;
 import com.calio.calendar.event.service.EventCommandService;
+import com.calio.calendar.groupcalendar.sharing.recurrence.service.PersonalRecurrenceGroupShareCommandService;
 import com.calio.calendar.recurrence.controller.dto.CreateRecurrenceEventRequest;
 import com.calio.calendar.recurrence.controller.dto.RecurrenceEventResponse;
 import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceEventRequest;
@@ -61,6 +62,9 @@ class RecurrenceEventServiceTest {
     private EventCommandService eventCommandService;
 
     @Mock
+    private PersonalRecurrenceGroupShareCommandService personalRecurrenceGroupShareCommandService;
+
+    @Mock
     private Rfc5545RecurrenceEngine recurrenceEngine;
 
     @Mock
@@ -84,6 +88,7 @@ class RecurrenceEventServiceTest {
                 accountQueryService,
                 tagQueryService,
                 eventCommandService,
+                personalRecurrenceGroupShareCommandService,
                 recurrenceEngine,
                 clock
         );
@@ -185,9 +190,11 @@ class RecurrenceEventServiceTest {
         InOrder deletionOrder = inOrder(
                 recurrenceEventRepository,
                 recurrenceEventOverrideRepository,
-                eventCommandService
+                eventCommandService,
+                personalRecurrenceGroupShareCommandService
         );
         deletionOrder.verify(recurrenceEventRepository).findByIdAndAccountIdForUpdate(10L, 1L);
+        deletionOrder.verify(personalRecurrenceGroupShareCommandService).deleteAllForRecurrenceEvent(10L);
         deletionOrder.verify(recurrenceEventOverrideRepository).deleteAllByRecurrenceEventIds(List.of(10L));
         deletionOrder.verify(eventCommandService).deleteEventsByRecurrenceEventIds(List.of(10L));
         deletionOrder.verify(recurrenceEventRepository).deleteAllByIds(List.of(10L));

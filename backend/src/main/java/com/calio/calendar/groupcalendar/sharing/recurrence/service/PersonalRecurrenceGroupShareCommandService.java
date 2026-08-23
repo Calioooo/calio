@@ -49,4 +49,10 @@ public class PersonalRecurrenceGroupShareCommandService {
     ) {
         return occurrenceOverrideRepository.saveAndFlush(occurrenceOverride);
     }
+
+    public void deleteAllForRecurrenceEvent(Long recurrenceEventId) {
+        occurrenceOverrideRepository.deleteAllByRecurrenceEventId(recurrenceEventId);
+        selectedOriginRepository.deleteAllByRecurrenceEventId(recurrenceEventId);
+        shareRepository.deleteAllByRecurrenceEventId(recurrenceEventId);
+    }
 }

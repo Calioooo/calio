@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -32,4 +33,11 @@ public interface PersonalRecurrenceGroupShareSelectedOriginRepository
             order by selectedOrigin.originStartAt
             """)
     List<PersonalRecurrenceGroupShareSelectedOrigin> findAllByShareId(@Param("shareId") Long shareId);
+
+    @Modifying(flushAutomatically = true)
+    @Query("""
+            delete from PersonalRecurrenceGroupShareSelectedOrigin selectedOrigin
+            where selectedOrigin.share.recurrenceEvent.id = :recurrenceEventId
+            """)
+    int deleteAllByRecurrenceEventId(@Param("recurrenceEventId") Long recurrenceEventId);
 }

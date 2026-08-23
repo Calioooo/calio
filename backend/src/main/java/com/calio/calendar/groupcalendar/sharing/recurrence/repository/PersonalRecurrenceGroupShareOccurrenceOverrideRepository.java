@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -22,4 +23,11 @@ public interface PersonalRecurrenceGroupShareOccurrenceOverrideRepository
             @Param("shareId") Long shareId,
             @Param("originStartAt") Instant originStartAt
     );
+
+    @Modifying(flushAutomatically = true)
+    @Query("""
+            delete from PersonalRecurrenceGroupShareOccurrenceOverride occurrenceOverride
+            where occurrenceOverride.share.recurrenceEvent.id = :recurrenceEventId
+            """)
+    int deleteAllByRecurrenceEventId(@Param("recurrenceEventId") Long recurrenceEventId);
 }
