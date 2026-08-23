@@ -45,6 +45,10 @@ public class PersonalEventGroupShareCommandService {
         shareRepository.flush();
     }
 
+    public void deleteShare(PersonalEventGroupShare share) {
+        shareRepository.delete(share);
+    }
+
     public void deleteAllForEvent(Long eventId) {
         shareRepository.deleteAllByEventId(eventId);
     }

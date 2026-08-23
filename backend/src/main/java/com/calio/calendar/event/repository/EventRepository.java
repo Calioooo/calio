@@ -54,6 +54,15 @@ public interface EventRepository extends JpaRepository<Event, Long> {
             @Param("to") Instant to
     );
 
+    @Query("""
+            select event
+            from Event event
+            where event.account.id = :accountId
+              and event.recurrenceId is null
+            order by event.id asc
+            """)
+    List<Event> findAllPersonalOneOffEvents(@Param("accountId") Long accountId);
+
     List<Event> findByRecurrenceIdAndAccount_IdOrderByStartAtAsc(Long recurrenceId, Long accountId);
 
     @Modifying(flushAutomatically = true)

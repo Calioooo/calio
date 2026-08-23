@@ -27,4 +27,8 @@ public class EventQueryService {
     public List<Event> listEvents(Long accountId, Instant from, Instant to) {
         return eventRepository.findNormalEvents(accountId, from, to);
     }
+
+    public List<Event> listPersonalOneOffEvents(Long accountId) {
+        return eventRepository.findAllPersonalOneOffEvents(accountId);
+    }
 }
