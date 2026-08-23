@@ -2,6 +2,7 @@ package com.calio.calendar.groupcalendar.sharing.event.service;
 
 import com.calio.calendar.groupcalendar.sharing.event.domain.PersonalEventGroupShare;
 import com.calio.calendar.groupcalendar.sharing.event.repository.PersonalEventGroupShareRepository;
+import java.time.Instant;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,5 +18,23 @@ public class PersonalEventGroupShareCommandService {
 
     public PersonalEventGroupShare createShare(PersonalEventGroupShare share) {
         return shareRepository.save(share);
+    }
+
+    public void updateRepresentation(
+            PersonalEventGroupShare share,
+            boolean showOriginalDetails,
+            String overrideTitle,
+            Instant overrideStartAt,
+            Instant overrideEndAt,
+            Boolean overrideAllDay
+    ) {
+        share.updateRepresentation(
+                showOriginalDetails,
+                overrideTitle,
+                overrideStartAt,
+                overrideEndAt,
+                overrideAllDay
+        );
+        shareRepository.flush();
     }
 }
