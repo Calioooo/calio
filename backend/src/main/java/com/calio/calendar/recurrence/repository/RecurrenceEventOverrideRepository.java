@@ -24,6 +24,21 @@ public interface RecurrenceEventOverrideRepository extends JpaRepository<Recurre
     @Query("""
             select recurrenceOverride
             from RecurrenceEventOverride recurrenceOverride
+            where recurrenceOverride.recurrenceEvent.id = :recurrenceId
+              and recurrenceOverride.deletedAt is null
+              and recurrenceOverride.overrideStartAt < :to
+              and recurrenceOverride.overrideEndAt > :from
+            """)
+    List<RecurrenceEventOverride> findActiveOverlappingOverridesForRecurrence(
+            @Param("recurrenceId") Long recurrenceId,
+            @Param("from") Instant from,
+            @Param("to") Instant to
+    );
+
+    @EntityGraph(attributePaths = {"recurrenceEvent", "recurrenceEvent.tag"})
+    @Query("""
+            select recurrenceOverride
+            from RecurrenceEventOverride recurrenceOverride
             where recurrenceOverride.recurrenceEvent.account.id = :accountId
               and recurrenceOverride.deletedAt is null
               and recurrenceOverride.overrideStartAt < :to

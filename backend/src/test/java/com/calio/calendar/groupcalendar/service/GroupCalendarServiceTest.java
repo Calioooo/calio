@@ -17,11 +17,19 @@ import com.calio.calendar.groupcalendar.recurrence.service.GroupCalendarRecurren
 import com.calio.calendar.groupcalendar.recurrence.service.GroupCalendarRecurrenceQueryService;
 import com.calio.calendar.groupcalendar.sharing.event.domain.PersonalEventGroupShare;
 import com.calio.calendar.groupcalendar.sharing.event.service.PersonalEventGroupShareQueryService;
+import com.calio.calendar.groupcalendar.sharing.recurrence.domain.PersonalRecurrenceGroupShare;
+import com.calio.calendar.groupcalendar.sharing.recurrence.domain.PersonalRecurrenceGroupShareOccurrenceOverride;
+import com.calio.calendar.groupcalendar.sharing.recurrence.domain.PersonalRecurrenceGroupShareScope;
+import com.calio.calendar.groupcalendar.sharing.recurrence.domain.PersonalRecurrenceGroupShareSelectedOrigin;
+import com.calio.calendar.groupcalendar.sharing.recurrence.service.PersonalRecurrenceGroupShareQueryService;
 import com.calio.calendar.groupspace.domain.GroupMember;
 import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.service.GroupMembershipQueryService;
 import com.calio.calendar.recurrence.domain.RecurrenceOccurrence;
+import com.calio.calendar.recurrence.domain.RecurrenceEvent;
+import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
+import com.calio.calendar.recurrence.service.RecurrenceEventQueryService;
 import com.calio.calendar.recurrence.service.Rfc5545RecurrenceEngine;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.domain.TagType;
@@ -51,6 +59,8 @@ class GroupCalendarServiceTest {
     @Mock private GroupCalendarRecurrenceQueryService recurrenceQueryService;
     @Mock private GroupCalendarRecurrenceOverrideQueryService overrideQueryService;
     @Mock private PersonalEventGroupShareQueryService personalEventShareQueryService;
+    @Mock private PersonalRecurrenceGroupShareQueryService personalRecurrenceShareQueryService;
+    @Mock private RecurrenceEventQueryService personalRecurrenceQueryService;
     @Mock private Rfc5545RecurrenceEngine recurrenceEngine;
 
     private GroupCalendarService service;
@@ -66,6 +76,8 @@ class GroupCalendarServiceTest {
                 recurrenceQueryService,
                 overrideQueryService,
                 personalEventShareQueryService,
+                personalRecurrenceShareQueryService,
+                personalRecurrenceQueryService,
                 recurrenceEngine
         );
         groupSpace = new GroupSpace(ACCOUNT_ID, "group", null);
@@ -90,6 +102,7 @@ class GroupCalendarServiceTest {
         when(recurrenceQueryService.listExpansionCandidates(GROUP_SPACE_ID, TO)).thenReturn(List.of(recurrenceEvent));
         when(overrideQueryService.listMovedInOverrides(GROUP_SPACE_ID, FROM, TO)).thenReturn(List.of());
         when(personalEventShareQueryService.listSharesInGroupSpace(GROUP_SPACE_ID)).thenReturn(List.of());
+        when(personalRecurrenceShareQueryService.listSharesInGroupSpace(GROUP_SPACE_ID)).thenReturn(List.of());
     }
 
     @Test
@@ -119,6 +132,117 @@ class GroupCalendarServiceTest {
         assertThat(items.getFirst().description()).isNull();
         assertThat(items.getFirst().isSharedPersonalSchedule()).isTrue();
         assertThat(items.getFirst().id()).isNull();
+    }
+
+    @Test
+    @DisplayName("공유 반복 회차는 원본 override 뒤에 회차별 share override를 적용한다")
+    void givenSharedRecurrenceOverrides_whenListItems_thenAppliesDeterministicPrecedence() {
+        // given
+        RecurrenceEvent sourceRecurrence = new RecurrenceEvent(
+                "원본 반복 제목",
+                "원본 반복 설명",
+                new RecurrenceSchedule(FROM, FROM.plusSeconds(3600), false, "UTC"),
+                List.of("RRULE:FREQ=DAILY"),
+                recurrenceEvent.getTag(),
+                account
+        );
+        ReflectionTestUtils.setField(sourceRecurrence, "id", 40L);
+        PersonalRecurrenceGroupShare share = new PersonalRecurrenceGroupShare(
+                sourceRecurrence,
+                groupSpace,
+                PersonalRecurrenceGroupShareScope.WHOLE_SERIES
+        );
+        ReflectionTestUtils.setField(share, "id", 50L);
+        share.updateRepresentation(false, "기본 공개 제목", null, null, null);
+        RecurrenceOccurrence occurrence = occurrence(FROM.plusSeconds(3600));
+        RecurrenceEventOverride sourceOverride = RecurrenceEventOverride.active(
+                sourceRecurrence,
+                occurrence.originStartAt(),
+                "원본 수정 제목",
+                "원본 수정 설명",
+                CanonicalSchedule.recurrenceOverride(
+                        occurrence.startAt(),
+                        occurrence.endAt(),
+                        false,
+                        "UTC"
+                )
+        );
+        PersonalRecurrenceGroupShareOccurrenceOverride shareOverride =
+                new PersonalRecurrenceGroupShareOccurrenceOverride(share, occurrence.originStartAt());
+        shareOverride.updateRepresentation("회차 공개 제목", null, null, null);
+        when(personalRecurrenceShareQueryService.listSharesInGroupSpace(GROUP_SPACE_ID))
+                .thenReturn(List.of(share));
+        when(recurrenceQueryService.listExpansionCandidates(GROUP_SPACE_ID, TO)).thenReturn(List.of());
+        when(recurrenceEngine.expand(
+                RecurrenceSchedule.from(sourceRecurrence),
+                sourceRecurrence.getRecurrenceRules(),
+                FROM,
+                TO
+        )).thenReturn(List.of(occurrence));
+        when(personalRecurrenceQueryService.listOverrides(40L, List.of(occurrence.originStartAt())))
+                .thenReturn(List.of(sourceOverride));
+        when(personalRecurrenceQueryService.listActiveOverlappingOverridesForRecurrence(40L, FROM, TO))
+                .thenReturn(List.of());
+        when(personalRecurrenceShareQueryService.listOccurrenceOverrides(50L)).thenReturn(List.of(shareOverride));
+
+        // when
+        List<GroupCalendarItemResponse> items = service.listItems(ACCOUNT_ID, GROUP_SPACE_ID, FROM, TO);
+
+        // then
+        assertThat(items).extracting(GroupCalendarItemResponse::title).containsExactly("회차 공개 제목");
+        assertThat(items.getFirst().description()).isNull();
+        assertThat(items.getFirst().isSharedPersonalSchedule()).isTrue();
+        assertThat(items.getFirst().recurrenceId()).isNull();
+    }
+
+    @Test
+    @DisplayName("더 이상 반복 규칙이 만들지 않는 선택 origin은 공유 결과에서 제외한다")
+    void givenStaleSelectedOrigin_whenListItems_thenHidesOccurrence() {
+        // given
+        RecurrenceEvent sourceRecurrence = new RecurrenceEvent(
+                "선택 반복 제목",
+                null,
+                new RecurrenceSchedule(FROM, FROM.plusSeconds(3600), false, "UTC"),
+                List.of("RRULE:FREQ=DAILY"),
+                recurrenceEvent.getTag(),
+                account
+        );
+        ReflectionTestUtils.setField(sourceRecurrence, "id", 41L);
+        PersonalRecurrenceGroupShare share = new PersonalRecurrenceGroupShare(
+                sourceRecurrence,
+                groupSpace,
+                PersonalRecurrenceGroupShareScope.SELECTED_OCCURRENCES
+        );
+        ReflectionTestUtils.setField(share, "id", 51L);
+        RecurrenceOccurrence occurrence = occurrence(FROM.plusSeconds(3600));
+        when(personalRecurrenceShareQueryService.listSharesInGroupSpace(GROUP_SPACE_ID))
+                .thenReturn(List.of(share));
+        when(recurrenceQueryService.listExpansionCandidates(GROUP_SPACE_ID, TO)).thenReturn(List.of());
+        when(recurrenceEngine.expand(
+                RecurrenceSchedule.from(sourceRecurrence),
+                sourceRecurrence.getRecurrenceRules(),
+                FROM,
+                TO
+        )).thenReturn(List.of(occurrence));
+        when(personalRecurrenceShareQueryService.listSelectedOrigins(51L)).thenReturn(List.of(
+                new PersonalRecurrenceGroupShareSelectedOrigin(share, occurrence.originStartAt())
+        ));
+        when(recurrenceEngine.containsOrigin(
+                RecurrenceSchedule.from(sourceRecurrence),
+                sourceRecurrence.getRecurrenceRules(),
+                occurrence.originStartAt()
+        )).thenReturn(false);
+        when(personalRecurrenceQueryService.listOverrides(41L, List.of(occurrence.originStartAt())))
+                .thenReturn(List.of());
+        when(personalRecurrenceQueryService.listActiveOverlappingOverridesForRecurrence(41L, FROM, TO))
+                .thenReturn(List.of());
+        when(personalRecurrenceShareQueryService.listOccurrenceOverrides(51L)).thenReturn(List.of());
+
+        // when
+        List<GroupCalendarItemResponse> items = service.listItems(ACCOUNT_ID, GROUP_SPACE_ID, FROM, TO);
+
+        // then
+        assertThat(items).isEmpty();
     }
 
     @Test

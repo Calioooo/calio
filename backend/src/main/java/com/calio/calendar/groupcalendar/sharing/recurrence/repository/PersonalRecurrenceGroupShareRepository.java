@@ -34,6 +34,15 @@ public interface PersonalRecurrenceGroupShareRepository extends JpaRepository<Pe
             @Param("recurrenceEventId") Long recurrenceEventId
     );
 
+    @EntityGraph(attributePaths = {"recurrenceEvent", "recurrenceEvent.tag", "groupSpace"})
+    @Query("""
+            select share
+            from PersonalRecurrenceGroupShare share
+            where share.groupSpace.id = :groupSpaceId
+            order by share.id
+            """)
+    List<PersonalRecurrenceGroupShare> findAllByGroupSpaceId(@Param("groupSpaceId") Long groupSpaceId);
+
     @Modifying(flushAutomatically = true)
     @Query("""
             delete from PersonalRecurrenceGroupShare share

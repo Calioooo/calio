@@ -54,4 +54,16 @@ public class RecurrenceEventQueryService {
     ) {
         return recurrenceEventOverrideRepository.findActiveOverlappingOverrides(accountId, from, to);
     }
+
+    public List<RecurrenceEventOverride> listActiveOverlappingOverridesForRecurrence(
+            Long recurrenceId,
+            Instant from,
+            Instant to
+    ) {
+        return recurrenceEventOverrideRepository.findActiveOverlappingOverridesForRecurrence(
+                recurrenceId,
+                from,
+                to
+        );
+    }
 }

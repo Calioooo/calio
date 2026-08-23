@@ -38,6 +38,10 @@ public class PersonalRecurrenceGroupShareQueryService {
         return shareRepository.findAllByRecurrenceEventId(recurrenceEventId);
     }
 
+    public List<PersonalRecurrenceGroupShare> listSharesInGroupSpace(Long groupSpaceId) {
+        return shareRepository.findAllByGroupSpaceId(groupSpaceId);
+    }
+
     public List<PersonalRecurrenceGroupShareSelectedOrigin> listSelectedOrigins(Long shareId) {
         return selectedOriginRepository.findAllByShareId(shareId);
     }
@@ -47,5 +51,9 @@ public class PersonalRecurrenceGroupShareQueryService {
             Instant originStartAt
     ) {
         return occurrenceOverrideRepository.findByShareIdAndOriginStartAt(shareId, originStartAt);
+    }
+
+    public List<PersonalRecurrenceGroupShareOccurrenceOverride> listOccurrenceOverrides(Long shareId) {
+        return occurrenceOverrideRepository.findAllByShareId(shareId);
     }
 }

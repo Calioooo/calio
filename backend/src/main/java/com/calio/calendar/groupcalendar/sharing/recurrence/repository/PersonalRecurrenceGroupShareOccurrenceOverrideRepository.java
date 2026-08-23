@@ -24,6 +24,16 @@ public interface PersonalRecurrenceGroupShareOccurrenceOverrideRepository
             @Param("originStartAt") Instant originStartAt
     );
 
+    @EntityGraph(attributePaths = "share")
+    @Query("""
+            select occurrenceOverride
+            from PersonalRecurrenceGroupShareOccurrenceOverride occurrenceOverride
+            where occurrenceOverride.share.id = :shareId
+            """)
+    java.util.List<PersonalRecurrenceGroupShareOccurrenceOverride> findAllByShareId(
+            @Param("shareId") Long shareId
+    );
+
     @Modifying(flushAutomatically = true)
     @Query("delete from PersonalRecurrenceGroupShareOccurrenceOverride occurrenceOverride where occurrenceOverride.share.id = :shareId")
     int deleteAllByShareId(@Param("shareId") Long shareId);
