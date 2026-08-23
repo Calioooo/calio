@@ -32,10 +32,25 @@ jobs:
         )
         echo "id=$device_id" >> "$GITHUB_OUTPUT"
 
+    - name: Boot iOS simulator
+      run: |
+        xcrun simctl boot "${{ steps.simulator.outputs.id }}" || true
+        xcrun simctl bootstatus "${{ steps.simulator.outputs.id }}" -b
+
     - name: Run iOS tests
       working-directory: frontend/Calio
       run: |
         xcodebuild test \
           -project Calio.xcodeproj \
           -scheme Calio \
-          -destination 'platform=iOS Simulator,id=${{ steps.simulator.outputs.id }}'
+          -destination 'platform=iOS Simulator,id=${{ steps.simulator.outputs.id }}' \
+          -parallel-testing-enabled NO \
+          -resultBundlePath TestResults.xcresult
+
+    - name: Upload iOS test results
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: ios-test-results
+        path: frontend/Calio/TestResults.xcresult
+        if-no-files-found: warn
