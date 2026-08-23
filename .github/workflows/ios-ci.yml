@@ -34,8 +34,21 @@ jobs:
 
     - name: Boot iOS simulator
       run: |
-        xcrun simctl boot "${{ steps.simulator.outputs.id }}" || true
-        xcrun simctl bootstatus "${{ steps.simulator.outputs.id }}" -b
+        xcrun simctl bootstatus "${{ steps.simulator.outputs.id }}" -b &
+        bootstatus_pid=$!
+
+        for _ in {1..24}; do
+          if ! kill -0 "$bootstatus_pid" 2>/dev/null; then
+            wait "$bootstatus_pid"
+            exit $?
+          fi
+          sleep 5
+        done
+
+        kill "$bootstatus_pid" 2>/dev/null || true
+        wait "$bootstatus_pid" 2>/dev/null || true
+        echo "Timed out waiting for iOS simulator to boot"
+        exit 1
 
     - name: Run iOS tests
       working-directory: frontend/Calio
