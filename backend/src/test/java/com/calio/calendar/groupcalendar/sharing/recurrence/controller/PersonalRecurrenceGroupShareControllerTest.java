@@ -11,6 +11,7 @@ import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.groupcalendar.sharing.recurrence.domain.PersonalRecurrenceGroupShare;
 import com.calio.calendar.groupcalendar.sharing.recurrence.domain.PersonalRecurrenceGroupShareScope;
 import com.calio.calendar.groupcalendar.sharing.recurrence.repository.PersonalRecurrenceGroupShareRepository;
+import com.calio.calendar.groupcalendar.sharing.recurrence.repository.PersonalRecurrenceGroupShareSelectedOriginRepository;
 import com.calio.calendar.groupspace.domain.GroupMember;
 import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.repository.GroupMemberRepository;
@@ -18,6 +19,7 @@ import com.calio.calendar.groupspace.repository.GroupSpaceRepository;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
+import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
 import com.calio.calendar.security.AuthenticatedAccountMockMvcTestConfig;
 import com.calio.calendar.security.WithAuthenticatedAccount;
 import com.calio.calendar.tag.domain.Tag;
@@ -62,7 +64,13 @@ class PersonalRecurrenceGroupShareControllerTest {
     private PersonalRecurrenceGroupShareRepository shareRepository;
 
     @Autowired
+    private PersonalRecurrenceGroupShareSelectedOriginRepository selectedOriginRepository;
+
+    @Autowired
     private RecurrenceEventRepository recurrenceEventRepository;
+
+    @Autowired
+    private RecurrenceEventOverrideRepository recurrenceEventOverrideRepository;
 
     @Autowired
     private TagRepository tagRepository;
@@ -77,7 +85,8 @@ class PersonalRecurrenceGroupShareControllerTest {
         // when
         mockMvc.perform(post("/api/group-spaces/{groupSpaceId}/recurrence-shares", groupSpace.getId())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{ \"recurrenceId\": %d }".formatted(recurrenceEvent.getId())))
+                        .content("{ \"recurrenceId\": %d, \"selectionEnabled\": false }"
+                                .formatted(recurrenceEvent.getId())))
                 // then
                 .andExpect(status().isCreated());
 
@@ -101,19 +110,88 @@ class PersonalRecurrenceGroupShareControllerTest {
         // when, then
         mockMvc.perform(post("/api/group-spaces/{groupSpaceId}/recurrence-shares", groupSpace.getId())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{ \"recurrenceId\": %d }".formatted(otherRecurrence.getId())))
+                        .content("{ \"recurrenceId\": %d, \"selectionEnabled\": false }"
+                                .formatted(otherRecurrence.getId())))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorCode").value("RECURRENCE_EVENT_NOT_FOUND"));
 
         mockMvc.perform(post("/api/group-spaces/{groupSpaceId}/recurrence-shares", groupSpace.getId())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{ \"recurrenceId\": %d }".formatted(ownedRecurrence.getId())))
+                        .content("{ \"recurrenceId\": %d, \"selectionEnabled\": false }"
+                                .formatted(ownedRecurrence.getId())))
                 .andExpect(status().isCreated());
         mockMvc.perform(post("/api/group-spaces/{groupSpaceId}/recurrence-shares", groupSpace.getId())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{ \"recurrenceId\": %d }".formatted(ownedRecurrence.getId())))
+                        .content("{ \"recurrenceId\": %d, \"selectionEnabled\": false }"
+                                .formatted(ownedRecurrence.getId())))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.errorCode").value("PERSONAL_RECURRENCE_GROUP_SHARE_CONFLICT"));
+    }
+
+    @Test
+    @DisplayName("선택한 유효 반복 회차는 originStartAt mapping으로만 공유한다")
+    void givenValidSelectedOrigins_whenShare_thenPersistsOnlyOriginMappings() throws Exception {
+        // given
+        GroupSpace groupSpace = activeGroupSpace();
+        RecurrenceEvent recurrenceEvent = recurrenceEvent(currentAccountId(), "선택 반복 일정");
+        Instant firstOriginStartAt = Instant.parse("2028-01-01T09:00:00Z");
+        Instant secondOriginStartAt = Instant.parse("2028-01-08T09:00:00Z");
+
+        // when
+        mockMvc.perform(post("/api/group-spaces/{groupSpaceId}/recurrence-shares", groupSpace.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "recurrenceId": %d,
+                                  "selectionEnabled": true,
+                                  "originStartAts": ["%s", "%s", "%s"]
+                                }
+                                """.formatted(
+                                recurrenceEvent.getId(),
+                                firstOriginStartAt,
+                                secondOriginStartAt,
+                                secondOriginStartAt
+                        )))
+                // then
+                .andExpect(status().isCreated());
+
+        PersonalRecurrenceGroupShare share = shareRepository
+                .findByRecurrenceEventIdAndGroupSpaceId(recurrenceEvent.getId(), groupSpace.getId())
+                .orElseThrow();
+        assertThat(share.getShareScope()).isEqualTo(PersonalRecurrenceGroupShareScope.SELECTED_OCCURRENCES);
+        assertThat(selectedOriginRepository.findAllByShareId(share.getId()))
+                .extracting(selectedOrigin -> selectedOrigin.getOriginStartAt())
+                .containsExactly(firstOriginStartAt, secondOriginStartAt);
+        assertThat(recurrenceEventOverrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(
+                recurrenceEvent.getId(),
+                firstOriginStartAt
+        )).isEmpty();
+    }
+
+    @Test
+    @DisplayName("반복 규칙이 만들지 않는 originStartAt은 mapping을 저장하지 않고 거절한다")
+    void givenInvalidSelectedOrigin_whenShare_thenRejectsWithoutPersistingShare() throws Exception {
+        // given
+        GroupSpace groupSpace = activeGroupSpace();
+        RecurrenceEvent recurrenceEvent = recurrenceEvent(currentAccountId(), "유효성 확인 반복 일정");
+
+        // when, then
+        mockMvc.perform(post("/api/group-spaces/{groupSpaceId}/recurrence-shares", groupSpace.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "recurrenceId": %d,
+                                  "selectionEnabled": true,
+                                  "originStartAts": ["2028-01-02T09:00:00Z"]
+                                }
+                                """.formatted(recurrenceEvent.getId())))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("RECURRENCE_OCCURRENCE_NOT_FOUND"));
+
+        assertThat(shareRepository.findByRecurrenceEventIdAndGroupSpaceId(
+                recurrenceEvent.getId(),
+                groupSpace.getId()
+        )).isEmpty();
     }
 
     private GroupSpace activeGroupSpace() {

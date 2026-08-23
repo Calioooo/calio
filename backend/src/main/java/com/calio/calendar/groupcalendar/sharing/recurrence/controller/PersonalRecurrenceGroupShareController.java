@@ -26,15 +26,19 @@ public class PersonalRecurrenceGroupShareController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public void shareWholeSeries(
+    public void share(
             @AuthenticationPrincipal AuthenticatedAccount account,
             @PathVariable Long groupSpaceId,
             @Valid @RequestBody PersonalRecurrenceGroupShareRequest request
     ) {
-        shareService.shareWholeSeries(
+        shareService.share(
                 account.accountId(),
                 groupSpaceId,
-                new PersonalRecurrenceGroupShareCommand(request.recurrenceId())
+                new PersonalRecurrenceGroupShareCommand(
+                        request.recurrenceId(),
+                        request.selectionEnabled(),
+                        request.originStartAtsOrEmpty()
+                )
         );
     }
 }
