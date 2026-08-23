@@ -2,6 +2,7 @@ package com.calio.calendar.event.controller.dto;
 
 import com.calio.calendar.tag.controller.dto.TagResponse;
 import com.calio.calendar.event.domain.Event;
+import com.calio.calendar.groupcalendar.event.domain.GroupCalendarEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceOccurrence;
@@ -21,7 +22,8 @@ public record EventResponse(
         TagResponse tag,
         Instant originStartAt,
         Instant createdAt,
-        Instant updatedAt
+        Instant updatedAt,
+        Long groupSpaceId
 ) {
 
     public static EventResponse from(Event event) {
@@ -39,7 +41,8 @@ public record EventResponse(
                 TagResponse.from(event.getTag()),
                 null,
                 event.getCreatedAt(),
-                event.getUpdatedAt()
+                event.getUpdatedAt(),
+                null
         );
     }
 
@@ -61,7 +64,8 @@ public record EventResponse(
                 TagResponse.from(recurrenceEvent.getTag()),
                 occurrence.originStartAt(),
                 recurrenceEvent.getCreatedAt(),
-                recurrenceEvent.getUpdatedAt()
+                recurrenceEvent.getUpdatedAt(),
+                null
         );
     }
 
@@ -81,7 +85,28 @@ public record EventResponse(
                 TagResponse.from(recurrenceEvent.getTag()),
                 override.getOriginStartAt(),
                 recurrenceEvent.getCreatedAt(),
-                recurrenceEvent.getUpdatedAt()
+                recurrenceEvent.getUpdatedAt(),
+                null
+        );
+    }
+
+    public static EventResponse groupCalendarEvent(GroupCalendarEvent event) {
+        return new EventResponse(
+                event.getId(),
+                event.getTitle(),
+                event.getDescription(),
+                event.getStartAt(),
+                event.getEndAt(),
+                event.isAllDay(),
+                event.isAllDay() ? null : event.getTimeZone(),
+                false,
+                null,
+                false,
+                TagResponse.from(event.getTag()),
+                null,
+                event.getCreatedAt(),
+                event.getUpdatedAt(),
+                event.getGroupSpace().getId()
         );
     }
 }

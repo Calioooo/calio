@@ -3,6 +3,7 @@ package com.calio.calendar.groupcalendar.event.repository;
 import com.calio.calendar.groupcalendar.event.domain.GroupCalendarEvent;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -33,6 +34,21 @@ public interface GroupCalendarEventRepository extends JpaRepository<GroupCalenda
             Long groupSpaceId,
             Instant to,
             Instant from
+    );
+
+    @EntityGraph(attributePaths = "tag")
+    @Query("""
+            select event
+            from GroupCalendarEvent event
+            where event.groupSpace.id in :groupSpaceIds
+              and event.startAt < :to
+              and event.endAt > :from
+            order by event.startAt asc
+            """)
+    List<GroupCalendarEvent> findOverlappingEventsInGroupSpaces(
+            @Param("groupSpaceIds") Collection<Long> groupSpaceIds,
+            @Param("from") Instant from,
+            @Param("to") Instant to
     );
 
     @Modifying

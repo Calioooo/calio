@@ -5,6 +5,7 @@ import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.groupcalendar.event.domain.GroupCalendarEvent;
 import com.calio.calendar.groupcalendar.event.repository.GroupCalendarEventRepository;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,5 +28,16 @@ public class GroupCalendarEventQueryService {
     public List<GroupCalendarEvent> listOverlappingEvents(Long groupSpaceId, Instant from, Instant to) {
         return eventRepository
                 .findByGroupSpace_IdAndStartAtLessThanAndEndAtGreaterThanOrderByStartAtAsc(groupSpaceId, to, from);
+    }
+
+    public List<GroupCalendarEvent> listOverlappingEventsInGroupSpaces(
+            Collection<Long> groupSpaceIds,
+            Instant from,
+            Instant to
+    ) {
+        if (groupSpaceIds.isEmpty()) {
+            return List.of();
+        }
+        return eventRepository.findOverlappingEventsInGroupSpaces(groupSpaceIds, from, to);
     }
 }
