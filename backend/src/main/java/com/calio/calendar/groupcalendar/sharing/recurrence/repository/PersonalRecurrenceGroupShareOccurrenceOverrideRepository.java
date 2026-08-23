@@ -25,6 +25,10 @@ public interface PersonalRecurrenceGroupShareOccurrenceOverrideRepository
     );
 
     @Modifying(flushAutomatically = true)
+    @Query("delete from PersonalRecurrenceGroupShareOccurrenceOverride occurrenceOverride where occurrenceOverride.share.id = :shareId")
+    int deleteAllByShareId(@Param("shareId") Long shareId);
+
+    @Modifying(flushAutomatically = true)
     @Query("""
             delete from PersonalRecurrenceGroupShareOccurrenceOverride occurrenceOverride
             where occurrenceOverride.share.recurrenceEvent.id = :recurrenceEventId

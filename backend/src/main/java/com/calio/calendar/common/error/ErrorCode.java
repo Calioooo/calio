@@ -62,6 +62,10 @@ public enum ErrorCode {
             HttpStatus.CONFLICT,
             "Personal recurrence event is already shared with this group space."
     ),
+    PERSONAL_RECURRENCE_GROUP_SHARE_FORBIDDEN(
+            HttpStatus.FORBIDDEN,
+            "Personal recurrence share operation is forbidden."
+    ),
     GROUP_RECURRENCE_EVENT_NOT_FOUND(HttpStatus.NOT_FOUND, "Group recurrence event not found."),
     GROUP_RECURRENCE_EVENT_FORBIDDEN(HttpStatus.FORBIDDEN, "Group recurrence event operation is forbidden."),
     INVALID_TAG_COLOR_CODE(HttpStatus.BAD_REQUEST, "Invalid tag color code."),

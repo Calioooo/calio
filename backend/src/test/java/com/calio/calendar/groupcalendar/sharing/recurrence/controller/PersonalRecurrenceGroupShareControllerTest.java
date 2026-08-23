@@ -2,6 +2,8 @@ package com.calio.calendar.groupcalendar.sharing.recurrence.controller;
 
 import static com.calio.calendar.security.TestAccountSupport.currentAccountId;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -9,17 +11,22 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.groupcalendar.sharing.recurrence.domain.PersonalRecurrenceGroupShare;
+import com.calio.calendar.groupcalendar.sharing.recurrence.domain.PersonalRecurrenceGroupShareOccurrenceOverride;
 import com.calio.calendar.groupcalendar.sharing.recurrence.domain.PersonalRecurrenceGroupShareScope;
+import com.calio.calendar.groupcalendar.sharing.recurrence.domain.PersonalRecurrenceGroupShareSelectedOrigin;
 import com.calio.calendar.groupcalendar.sharing.recurrence.repository.PersonalRecurrenceGroupShareRepository;
+import com.calio.calendar.groupcalendar.sharing.recurrence.repository.PersonalRecurrenceGroupShareOccurrenceOverrideRepository;
 import com.calio.calendar.groupcalendar.sharing.recurrence.repository.PersonalRecurrenceGroupShareSelectedOriginRepository;
 import com.calio.calendar.groupspace.domain.GroupMember;
 import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.repository.GroupMemberRepository;
 import com.calio.calendar.groupspace.repository.GroupSpaceRepository;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
+import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
+import com.calio.calendar.common.domain.CanonicalSchedule;
 import com.calio.calendar.security.AuthenticatedAccountMockMvcTestConfig;
 import com.calio.calendar.security.WithAuthenticatedAccount;
 import com.calio.calendar.tag.domain.Tag;
@@ -62,6 +69,9 @@ class PersonalRecurrenceGroupShareControllerTest {
 
     @Autowired
     private PersonalRecurrenceGroupShareRepository shareRepository;
+
+    @Autowired
+    private PersonalRecurrenceGroupShareOccurrenceOverrideRepository occurrenceOverrideRepository;
 
     @Autowired
     private PersonalRecurrenceGroupShareSelectedOriginRepository selectedOriginRepository;
@@ -192,6 +202,148 @@ class PersonalRecurrenceGroupShareControllerTest {
                 recurrenceEvent.getId(),
                 groupSpace.getId()
         )).isEmpty();
+    }
+
+    @Test
+    @DisplayName("반복 공유의 기본 및 회차별 표현을 수정해도 개인 원본과 원본 override는 변경하지 않는다")
+    void givenOwnedShare_whenUpdateRepresentations_thenPreservesRecurrenceSource() throws Exception {
+        // given
+        GroupSpace groupSpace = activeGroupSpace();
+        RecurrenceEvent recurrenceEvent = recurrenceEvent(currentAccountId(), "원본 반복 제목");
+        Instant originStartAt = Instant.parse("2028-01-08T09:00:00Z");
+        recurrenceEventOverrideRepository.saveAndFlush(RecurrenceEventOverride.active(
+                recurrenceEvent,
+                originStartAt,
+                "원본 회차 제목",
+                "원본 회차 설명",
+                CanonicalSchedule.recurrenceOverride(
+                        originStartAt,
+                        Instant.parse("2028-01-08T10:00:00Z"),
+                        false,
+                        "UTC"
+                )
+        ));
+        mockMvc.perform(post("/api/group-spaces/{groupSpaceId}/recurrence-shares", groupSpace.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{ \"recurrenceId\": %d, \"selectionEnabled\": false }"
+                                .formatted(recurrenceEvent.getId())))
+                .andExpect(status().isCreated());
+
+        // when
+        mockMvc.perform(patch("/api/group-spaces/{groupSpaceId}/recurrence-shares/{recurrenceId}",
+                        groupSpace.getId(),
+                        recurrenceEvent.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "showOriginalDetails": false,
+                                  "overrideTitle": "기본 공개 제목",
+                                  "overrideStartAt": "2028-01-01T11:00:00Z",
+                                  "overrideEndAt": "2028-01-01T12:00:00Z",
+                                  "overrideAllDay": false
+                                }
+                                """))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(patch("/api/group-spaces/{groupSpaceId}/recurrence-shares/{recurrenceId}/occurrence-overrides",
+                        groupSpace.getId(),
+                        recurrenceEvent.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "originStartAt": "2028-01-08T09:00:00Z",
+                                  "overrideTitle": "회차 공개 제목",
+                                  "overrideStartAt": "2028-01-08T13:00:00Z",
+                                  "overrideEndAt": "2028-01-08T14:00:00Z",
+                                  "overrideAllDay": false
+                                }
+                                """))
+                // then
+                .andExpect(status().isNoContent());
+
+        PersonalRecurrenceGroupShare share = shareRepository
+                .findByRecurrenceEventIdAndGroupSpaceId(recurrenceEvent.getId(), groupSpace.getId())
+                .orElseThrow();
+        assertThat(share.getOverrideTitle()).isEqualTo("기본 공개 제목");
+        assertThat(occurrenceOverrideRepository.findByShareIdAndOriginStartAt(share.getId(), originStartAt))
+                .get()
+                .extracting(occurrenceOverride -> occurrenceOverride.getOverrideTitle())
+                .isEqualTo("회차 공개 제목");
+        assertThat(recurrenceEventRepository.findById(recurrenceEvent.getId()).orElseThrow().getTitle())
+                .isEqualTo("원본 반복 제목");
+        assertThat(recurrenceEventOverrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(
+                recurrenceEvent.getId(),
+                originStartAt
+        )).get()
+                .extracting(RecurrenceEventOverride::getOverrideTitle)
+                .isEqualTo("원본 회차 제목");
+    }
+
+    @Test
+    @DisplayName("Group Space owner는 다른 멤버의 반복 공유 mapping만 해제하고 개인 원본은 보존한다")
+    void givenGroupOwnerAndOtherMemberShare_whenRemove_thenDeletesMappingOnly() throws Exception {
+        // given
+        GroupSpace groupSpace = activeGroupSpace();
+        RecurrenceEvent otherRecurrence = recurrenceEvent(
+                accountRepository.saveAndFlush(new Account()).getId(),
+                "다른 멤버 반복 일정"
+        );
+        PersonalRecurrenceGroupShare share = shareRepository.saveAndFlush(new PersonalRecurrenceGroupShare(
+                otherRecurrence,
+                groupSpace,
+                PersonalRecurrenceGroupShareScope.SELECTED_OCCURRENCES
+        ));
+        Instant originStartAt = Instant.parse("2028-01-01T09:00:00Z");
+        selectedOriginRepository.saveAndFlush(new PersonalRecurrenceGroupShareSelectedOrigin(
+                share,
+                originStartAt
+        ));
+        PersonalRecurrenceGroupShareOccurrenceOverride occurrenceOverride =
+                new PersonalRecurrenceGroupShareOccurrenceOverride(share, originStartAt);
+        occurrenceOverride.updateRepresentation("공개 회차 제목", null, null, null);
+        occurrenceOverrideRepository.saveAndFlush(occurrenceOverride);
+
+        // when
+        mockMvc.perform(delete("/api/group-spaces/{groupSpaceId}/recurrence-shares/{recurrenceId}",
+                        groupSpace.getId(),
+                        otherRecurrence.getId()))
+                // then
+                .andExpect(status().isNoContent());
+
+        assertThat(shareRepository.findByRecurrenceEventIdAndGroupSpaceId(
+                otherRecurrence.getId(),
+                groupSpace.getId()
+        )).isEmpty();
+        assertThat(selectedOriginRepository.findAllByShareId(share.getId())).isEmpty();
+        assertThat(occurrenceOverrideRepository.findByShareIdAndOriginStartAt(
+                share.getId(),
+                originStartAt
+        )).isEmpty();
+        assertThat(recurrenceEventRepository.findById(otherRecurrence.getId())).isPresent();
+    }
+
+    @Test
+    @DisplayName("Group Space owner는 다른 멤버의 반복 공유 표현을 수정할 수 없다")
+    void givenGroupOwnerAndOtherMemberShare_whenUpdate_thenRejectsRequest() throws Exception {
+        // given
+        GroupSpace groupSpace = activeGroupSpace();
+        RecurrenceEvent otherRecurrence = recurrenceEvent(
+                accountRepository.saveAndFlush(new Account()).getId(),
+                "다른 멤버 반복 일정"
+        );
+        shareRepository.saveAndFlush(new PersonalRecurrenceGroupShare(
+                otherRecurrence,
+                groupSpace,
+                PersonalRecurrenceGroupShareScope.WHOLE_SERIES
+        ));
+
+        // when, then
+        mockMvc.perform(patch("/api/group-spaces/{groupSpaceId}/recurrence-shares/{recurrenceId}",
+                        groupSpace.getId(),
+                        otherRecurrence.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{ \"showOriginalDetails\": true }"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value("PERSONAL_RECURRENCE_GROUP_SHARE_FORBIDDEN"));
     }
 
     private GroupSpace activeGroupSpace() {

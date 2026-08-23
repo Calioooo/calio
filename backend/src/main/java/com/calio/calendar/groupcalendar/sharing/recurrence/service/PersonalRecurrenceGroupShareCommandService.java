@@ -8,6 +8,7 @@ import com.calio.calendar.groupcalendar.sharing.recurrence.domain.PersonalRecurr
 import com.calio.calendar.groupcalendar.sharing.recurrence.repository.PersonalRecurrenceGroupShareOccurrenceOverrideRepository;
 import com.calio.calendar.groupcalendar.sharing.recurrence.repository.PersonalRecurrenceGroupShareRepository;
 import com.calio.calendar.groupcalendar.sharing.recurrence.repository.PersonalRecurrenceGroupShareSelectedOriginRepository;
+import java.time.Instant;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,10 +45,50 @@ public class PersonalRecurrenceGroupShareCommandService {
         return selectedOriginRepository.saveAndFlush(selectedOrigin);
     }
 
+    public void updateRepresentation(
+            PersonalRecurrenceGroupShare share,
+            boolean showOriginalDetails,
+            String overrideTitle,
+            Instant overrideStartAt,
+            Instant overrideEndAt,
+            Boolean overrideAllDay
+    ) {
+        share.updateRepresentation(
+                showOriginalDetails,
+                overrideTitle,
+                overrideStartAt,
+                overrideEndAt,
+                overrideAllDay
+        );
+        shareRepository.flush();
+    }
+
     public PersonalRecurrenceGroupShareOccurrenceOverride createOccurrenceOverride(
             PersonalRecurrenceGroupShareOccurrenceOverride occurrenceOverride
     ) {
         return occurrenceOverrideRepository.saveAndFlush(occurrenceOverride);
+    }
+
+    public void updateOccurrenceRepresentation(
+            PersonalRecurrenceGroupShareOccurrenceOverride occurrenceOverride,
+            String overrideTitle,
+            Instant overrideStartAt,
+            Instant overrideEndAt,
+            Boolean overrideAllDay
+    ) {
+        occurrenceOverride.updateRepresentation(
+                overrideTitle,
+                overrideStartAt,
+                overrideEndAt,
+                overrideAllDay
+        );
+        occurrenceOverrideRepository.flush();
+    }
+
+    public void deleteShare(PersonalRecurrenceGroupShare share) {
+        occurrenceOverrideRepository.deleteAllByShareId(share.getId());
+        selectedOriginRepository.deleteAllByShareId(share.getId());
+        shareRepository.delete(share);
     }
 
     public void deleteAllForRecurrenceEvent(Long recurrenceEventId) {

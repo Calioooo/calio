@@ -35,6 +35,10 @@ public interface PersonalRecurrenceGroupShareSelectedOriginRepository
     List<PersonalRecurrenceGroupShareSelectedOrigin> findAllByShareId(@Param("shareId") Long shareId);
 
     @Modifying(flushAutomatically = true)
+    @Query("delete from PersonalRecurrenceGroupShareSelectedOrigin selectedOrigin where selectedOrigin.share.id = :shareId")
+    int deleteAllByShareId(@Param("shareId") Long shareId);
+
+    @Modifying(flushAutomatically = true)
     @Query("""
             delete from PersonalRecurrenceGroupShareSelectedOrigin selectedOrigin
             where selectedOrigin.share.recurrenceEvent.id = :recurrenceEventId
