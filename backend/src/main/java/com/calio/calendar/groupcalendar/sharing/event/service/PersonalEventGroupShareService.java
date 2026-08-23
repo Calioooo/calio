@@ -6,6 +6,7 @@ import com.calio.calendar.groupcalendar.sharing.event.domain.PersonalEventGroupS
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.groupcalendar.sharing.event.service.dto.PersonalEventGroupShareCommand;
+import com.calio.calendar.groupcalendar.sharing.event.service.dto.UpdatePersonalEventGroupShareCommand;
 import com.calio.calendar.groupspace.domain.GroupMember;
 import com.calio.calendar.groupspace.service.GroupMembershipQueryService;
 import java.util.LinkedHashSet;
@@ -20,15 +21,18 @@ public class PersonalEventGroupShareService {
 
     private final EventQueryService eventQueryService;
     private final GroupMembershipQueryService membershipQueryService;
+    private final PersonalEventGroupShareQueryService shareQueryService;
     private final PersonalEventGroupShareCommandService shareCommandService;
 
     public PersonalEventGroupShareService(
             EventQueryService eventQueryService,
             GroupMembershipQueryService membershipQueryService,
+            PersonalEventGroupShareQueryService shareQueryService,
             PersonalEventGroupShareCommandService shareCommandService
     ) {
         this.eventQueryService = eventQueryService;
         this.membershipQueryService = membershipQueryService;
+        this.shareQueryService = shareQueryService;
         this.shareCommandService = shareCommandService;
     }
 
@@ -68,5 +72,32 @@ public class PersonalEventGroupShareService {
         return distinctEventIds.stream()
                 .map(eventId -> eventQueryService.getEvent(accountId, eventId))
                 .toList();
+    }
+
+    @Transactional
+    public void update(
+            Long accountId,
+            Long groupSpaceId,
+            Long eventId,
+            UpdatePersonalEventGroupShareCommand command
+    ) {
+        membershipQueryService.getActiveMembership(groupSpaceId, accountId);
+        PersonalEventGroupShare share = shareQueryService.getShareIfExists(eventId, groupSpaceId)
+                .orElseThrow(() -> new CalioException(ErrorCode.EVENT_NOT_FOUND));
+        requireSourceOwner(accountId, share);
+        shareCommandService.updateRepresentation(
+                share,
+                command.showOriginalDetails(),
+                command.overrideTitle(),
+                command.overrideStartAt(),
+                command.overrideEndAt(),
+                command.overrideAllDay()
+        );
+    }
+
+    private void requireSourceOwner(Long accountId, PersonalEventGroupShare share) {
+        if (!share.getEvent().getAccount().getId().equals(accountId)) {
+            throw new CalioException(ErrorCode.PERSONAL_EVENT_GROUP_SHARE_FORBIDDEN);
+        }
     }
 }

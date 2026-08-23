@@ -54,6 +54,10 @@ public enum ErrorCode {
             HttpStatus.CONFLICT,
             "Personal event is already shared with this group space."
     ),
+    PERSONAL_EVENT_GROUP_SHARE_FORBIDDEN(
+            HttpStatus.FORBIDDEN,
+            "Personal event share operation is forbidden."
+    ),
     PERSONAL_RECURRENCE_GROUP_SHARE_CONFLICT(
             HttpStatus.CONFLICT,
             "Personal recurrence event is already shared with this group space."

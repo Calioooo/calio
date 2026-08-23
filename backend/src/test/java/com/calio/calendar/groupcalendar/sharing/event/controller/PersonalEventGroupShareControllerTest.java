@@ -3,6 +3,7 @@ package com.calio.calendar.groupcalendar.sharing.event.controller;
 import static com.calio.calendar.security.TestAccountSupport.currentAccountId;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -128,6 +129,37 @@ class PersonalEventGroupShareControllerTest {
         Event laterEvent = event(accountId, "나중 일정");
         assertThat(shareRepository.findAllByEventId(existingEvent.getId())).hasSize(1);
         assertThat(shareRepository.findAllByEventId(laterEvent.getId())).isEmpty();
+    }
+
+    @Test
+    @DisplayName("공유 표현을 수정해도 개인 원본 일정은 변경하지 않는다")
+    void givenOwnedShare_whenUpdateRepresentation_thenPreservesSourceEvent() throws Exception {
+        // given
+        GroupSpace groupSpace = activeGroupSpace();
+        Event event = event(currentAccountId(), "원본 제목");
+        mockMvc.perform(post("/api/group-spaces/{groupSpaceId}/event-shares", groupSpace.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{ \"selectionEnabled\": true, \"eventIds\": [%d] }".formatted(event.getId())))
+                .andExpect(status().isCreated());
+
+        // when
+        mockMvc.perform(patch("/api/group-spaces/{groupSpaceId}/event-shares/{eventId}", groupSpace.getId(), event.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "showOriginalDetails": false,
+                                  "overrideTitle": "공개 제목",
+                                  "overrideStartAt": "2028-01-01T11:00:00Z",
+                                  "overrideEndAt": "2028-01-01T12:00:00Z",
+                                  "overrideAllDay": false
+                                }
+                                """))
+                // then
+                .andExpect(status().isNoContent());
+
+        assertThat(eventRepository.findById(event.getId()).orElseThrow().getTitle()).isEqualTo("원본 제목");
+        assertThat(shareRepository.findAllByEventId(event.getId()).getFirst().getOverrideTitle())
+                .isEqualTo("공개 제목");
     }
 
     private GroupSpace activeGroupSpace() {

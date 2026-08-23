@@ -1,14 +1,17 @@
 package com.calio.calendar.groupcalendar.sharing.event.controller;
 
 import com.calio.calendar.groupcalendar.sharing.event.controller.dto.PersonalEventGroupShareRequest;
+import com.calio.calendar.groupcalendar.sharing.event.controller.dto.UpdatePersonalEventGroupShareRequest;
 import com.calio.calendar.groupcalendar.sharing.event.service.PersonalEventGroupShareService;
 import com.calio.calendar.groupcalendar.sharing.event.service.dto.PersonalEventGroupShareCommand;
+import com.calio.calendar.groupcalendar.sharing.event.service.dto.UpdatePersonalEventGroupShareCommand;
 import com.calio.calendar.security.AuthenticatedAccount;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -37,6 +40,28 @@ public class PersonalEventGroupShareController {
                 new PersonalEventGroupShareCommand(
                         request.selectionEnabled(),
                         request.eventIdsOrEmpty()
+                )
+        );
+    }
+
+    @PatchMapping("/{eventId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void update(
+            @AuthenticationPrincipal AuthenticatedAccount account,
+            @PathVariable Long groupSpaceId,
+            @PathVariable Long eventId,
+            @Valid @RequestBody UpdatePersonalEventGroupShareRequest request
+    ) {
+        shareService.update(
+                account.accountId(),
+                groupSpaceId,
+                eventId,
+                new UpdatePersonalEventGroupShareCommand(
+                        request.showOriginalDetails(),
+                        request.overrideTitle(),
+                        request.overrideStartAt(),
+                        request.overrideEndAt(),
+                        request.overrideAllDay()
                 )
         );
     }
