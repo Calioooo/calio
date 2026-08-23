@@ -28,8 +28,10 @@ import com.calio.calendar.groupspace.repository.GroupSpaceRepository;
 import com.calio.calendar.security.AuthenticatedAccountMockMvcTestConfig;
 import com.calio.calendar.security.WithAuthenticatedAccount;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
+import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
+import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.domain.TagType;
 import com.calio.calendar.tag.repository.TagRepository;
@@ -70,6 +72,7 @@ class GroupCalendarControllerTest {
     @Autowired private PersonalEventGroupShareRepository personalEventShareRepository;
     @Autowired private PersonalRecurrenceGroupShareRepository personalRecurrenceShareRepository;
     @Autowired private RecurrenceEventRepository recurrenceEventRepository;
+    @Autowired private RecurrenceEventOverrideRepository recurrenceEventOverrideRepository;
     @Autowired private TagRepository tagRepository;
     @Autowired private GroupMemberRepository groupMemberRepository;
     @Autowired private GroupSpaceRepository groupSpaceRepository;
@@ -79,6 +82,7 @@ class GroupCalendarControllerTest {
         personalEventShareRepository.deleteAll();
         personalRecurrenceShareRepository.deleteAll();
         personalEventRepository.deleteAll();
+        recurrenceEventOverrideRepository.deleteAll();
         recurrenceEventRepository.deleteAll();
         eventRepository.deleteAll();
         tagRepository.deleteAll();
@@ -242,6 +246,54 @@ class GroupCalendarControllerTest {
                 .andExpect(jsonPath("$[1].isSharedPersonalSchedule").value(true))
                 .andExpect(jsonPath("$[2].title").value("직접 그룹 일정"))
                 .andExpect(jsonPath("$[2].isSharedPersonalSchedule").value(false));
+    }
+
+    @Test
+    @DisplayName("원본 반복 회차가 취소되면 공유 mapping이 남아 있어도 Group Calendar에 표시하지 않는다")
+    void givenDeletedSourceRecurrenceOccurrence_whenListItems_thenExcludesSharedOccurrence() throws Exception {
+        // given
+        GroupSpace groupSpace = groupSpaceRepository.saveAndFlush(
+                new GroupSpace(currentAccountId(), "cancelled source group", null)
+        );
+        Account sharingAccount = accountRepository.saveAndFlush(new Account());
+        groupMemberRepository.saveAndFlush(new GroupMember(
+                groupSpace,
+                currentAccountId(),
+                "owner",
+                START_AT
+        ));
+        groupMemberRepository.saveAndFlush(new GroupMember(
+                groupSpace,
+                sharingAccount.getId(),
+                "공유자",
+                START_AT
+        ));
+        Tag personalTag = tagRepository.saveAndFlush(new Tag(TagType.PERSONAL_DEFAULT, "개인 기타", "#64748B"));
+        RecurrenceEvent sourceRecurrence = recurrenceEventRepository.saveAndFlush(new RecurrenceEvent(
+                "취소된 원본 반복",
+                null,
+                new RecurrenceSchedule(START_AT, END_AT, false, "UTC"),
+                java.util.List.of("RRULE:FREQ=WEEKLY"),
+                personalTag,
+                sharingAccount
+        ));
+        personalRecurrenceShareRepository.saveAndFlush(new PersonalRecurrenceGroupShare(
+                sourceRecurrence,
+                groupSpace,
+                PersonalRecurrenceGroupShareScope.WHOLE_SERIES
+        ));
+        recurrenceEventOverrideRepository.saveAndFlush(RecurrenceEventOverride.deleted(
+                sourceRecurrence,
+                START_AT,
+                START_AT
+        ));
+
+        // when, then
+        mockMvc.perform(get("/api/group-spaces/{groupSpaceId}/calendar/items", groupSpace.getId())
+                        .param("from", START_AT.minusSeconds(1).toString())
+                        .param("to", END_AT.plusSeconds(1).toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(0)));
     }
 
     private Long responseId(MvcResult result) throws Exception {
