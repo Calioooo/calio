@@ -17,6 +17,8 @@ import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.event.repository.EventRepository;
 import com.calio.calendar.groupcalendar.event.domain.GroupCalendarEvent;
 import com.calio.calendar.groupcalendar.event.repository.GroupCalendarEventRepository;
+import com.calio.calendar.groupcalendar.sharing.event.domain.PersonalEventGroupShare;
+import com.calio.calendar.groupcalendar.sharing.event.repository.PersonalEventGroupShareRepository;
 import com.calio.calendar.groupspace.domain.GroupMember;
 import com.calio.calendar.groupspace.domain.GroupMemberStatus;
 import com.calio.calendar.groupspace.domain.GroupSpace;
@@ -83,6 +85,9 @@ class EventControllerTest {
 
     @Autowired
     private GroupCalendarEventRepository groupCalendarEventRepository;
+
+    @Autowired
+    private PersonalEventGroupShareRepository personalEventShareRepository;
 
     @Autowired
     private GroupMemberRepository groupMemberRepository;
@@ -1012,6 +1017,67 @@ class EventControllerTest {
                 .andExpect(jsonPath("$[0].description").value("그룹 설명"))
                 .andExpect(jsonPath("$[1].id").value(personalEventId))
                 .andExpect(jsonPath("$[1].groupSpaceId").value(nullValue()));
+    }
+
+    @Test
+    @DisplayName("개인 캘린더는 본인 원본을 한 번만 반환하고 Group Space 공유 개인 일정 view는 합성하지 않는다")
+    void givenOwnAndOtherMemberSharedEvents_whenListEvents_thenExcludesSharedViews() throws Exception {
+        // given
+        Instant from = Instant.parse("2030-01-01T00:00:00Z");
+        Instant to = Instant.parse("2030-01-02T00:00:00Z");
+        Tag tag = tagRepository.findFirstByTagTypeAndTitleAndAccountIsNullAndGroupSpaceIsNullOrderByIdAsc(
+                TagType.PERSONAL_DEFAULT,
+                "기타"
+        ).orElseThrow();
+        GroupSpace groupSpace = groupSpaceRepository.saveAndFlush(
+                new GroupSpace(currentAccountReference().getId(), "공유 제외 그룹", null)
+        );
+        groupMemberRepository.saveAndFlush(new GroupMember(
+                groupSpace,
+                currentAccountReference().getId(),
+                "나",
+                from
+        ));
+        Event ownSource = eventRepository.saveAndFlush(new Event(
+                "내 원본 일정",
+                null,
+                from.plusSeconds(3600),
+                from.plusSeconds(7200),
+                false,
+                "UTC",
+                null,
+                tag,
+                currentAccountReference()
+        ));
+        Account otherAccount = accountRepository.saveAndFlush(new Account());
+        groupMemberRepository.saveAndFlush(new GroupMember(
+                groupSpace,
+                otherAccount.getId(),
+                "다른 멤버",
+                from
+        ));
+        Event otherSource = eventRepository.saveAndFlush(new Event(
+                "다른 멤버 원본 일정",
+                null,
+                from.plusSeconds(10800),
+                from.plusSeconds(14400),
+                false,
+                "UTC",
+                null,
+                tag,
+                otherAccount
+        ));
+        personalEventShareRepository.saveAndFlush(new PersonalEventGroupShare(ownSource, groupSpace));
+        personalEventShareRepository.saveAndFlush(new PersonalEventGroupShare(otherSource, groupSpace));
+
+        // when, then
+        mockMvc.perform(get("/api/events")
+                        .param("from", from.toString())
+                        .param("to", to.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].id").value(ownSource.getId()))
+                .andExpect(jsonPath("$[0].title").value("내 원본 일정"));
     }
 
     @Test
