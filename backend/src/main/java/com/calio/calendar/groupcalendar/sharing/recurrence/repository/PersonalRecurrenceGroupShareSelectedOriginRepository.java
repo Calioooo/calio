@@ -51,4 +51,11 @@ public interface PersonalRecurrenceGroupShareSelectedOriginRepository
             @Param("groupSpaceId") Long groupSpaceId,
             @Param("accountId") Long accountId
     );
+
+    @Modifying(flushAutomatically = true)
+    @Query("""
+            delete from PersonalRecurrenceGroupShareSelectedOrigin selectedOrigin
+            where selectedOrigin.share.groupSpace.id = :groupSpaceId
+            """)
+    int deleteAllByGroupSpaceId(@Param("groupSpaceId") Long groupSpaceId);
 }

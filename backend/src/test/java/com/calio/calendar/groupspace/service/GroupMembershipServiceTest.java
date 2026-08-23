@@ -172,6 +172,21 @@ class GroupMembershipServiceTest {
         GroupSpace groupSpace = groupSpaceRepository.saveAndFlush(new GroupSpace(owner.getId(), "Shared", null));
         groupMemberRepository.saveAndFlush(new GroupMember(groupSpace, owner.getId(), "owner", MEMBER_CREATED_AT));
         Tag tag = tagRepository.saveAndFlush(new Tag(TagType.GROUP_DEFAULT, "기타", "#64748B", groupSpace));
+        Tag personalTag = tagRepository.saveAndFlush(
+                new Tag(TagType.PERSONAL_DEFAULT, "개인 기타", "#64748B")
+        );
+        Event sourceEvent = eventRepository.saveAndFlush(personalEvent(owner, personalTag));
+        RecurrenceEvent sourceRecurrence = recurrenceEventRepository.saveAndFlush(
+                personalRecurrence(owner, personalTag)
+        );
+        personalEventGroupShareRepository.saveAndFlush(
+                new PersonalEventGroupShare(sourceEvent, groupSpace)
+        );
+        personalRecurrenceGroupShareRepository.saveAndFlush(new PersonalRecurrenceGroupShare(
+                sourceRecurrence,
+                groupSpace,
+                PersonalRecurrenceGroupShareScope.WHOLE_SERIES
+        ));
         groupCalendarEventRepository.saveAndFlush(new GroupCalendarEvent(
                 groupSpace,
                 owner,
@@ -204,7 +219,11 @@ class GroupMembershipServiceTest {
         // then
         assertThat(groupCalendarEventRepository.findAll()).isEmpty();
         assertThat(groupCalendarRecurrenceEventRepository.findAll()).isEmpty();
-        assertThat(tagRepository.findAll()).isEmpty();
+        assertThat(personalEventGroupShareRepository.findAllByEventId(sourceEvent.getId())).isEmpty();
+        assertThat(personalRecurrenceGroupShareRepository.findAllByRecurrenceEventId(sourceRecurrence.getId()))
+                .isEmpty();
+        assertThat(tagRepository.findByGroupSpace_Id(groupSpace.getId())).isEmpty();
+        assertThat(tagRepository.findById(personalTag.getId())).isPresent();
     }
 
     @Test

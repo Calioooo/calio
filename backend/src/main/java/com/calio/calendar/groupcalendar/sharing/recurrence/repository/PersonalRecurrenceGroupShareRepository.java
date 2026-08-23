@@ -51,4 +51,11 @@ public interface PersonalRecurrenceGroupShareRepository extends JpaRepository<Pe
             @Param("groupSpaceId") Long groupSpaceId,
             @Param("accountId") Long accountId
     );
+
+    @Modifying(flushAutomatically = true)
+    @Query("""
+            delete from PersonalRecurrenceGroupShare share
+            where share.groupSpace.id = :groupSpaceId
+            """)
+    int deleteAllByGroupSpaceId(@Param("groupSpaceId") Long groupSpaceId);
 }

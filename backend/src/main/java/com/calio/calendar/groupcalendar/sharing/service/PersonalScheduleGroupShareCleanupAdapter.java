@@ -31,5 +31,7 @@ public class PersonalScheduleGroupShareCleanupAdapter implements GroupScheduleSh
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
     public void cleanupGroupShares(Long groupSpaceId) {
+        personalEventGroupShareCommandService.deleteAllInGroupSpace(groupSpaceId);
+        personalRecurrenceGroupShareCommandService.deleteAllInGroupSpace(groupSpaceId);
     }
 }

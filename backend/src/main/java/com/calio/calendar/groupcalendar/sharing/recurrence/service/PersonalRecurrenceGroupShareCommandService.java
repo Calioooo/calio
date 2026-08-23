@@ -61,4 +61,10 @@ public class PersonalRecurrenceGroupShareCommandService {
         selectedOriginRepository.deleteAllByGroupSpaceIdAndAccountId(groupSpaceId, accountId);
         shareRepository.deleteAllByGroupSpaceIdAndAccountId(groupSpaceId, accountId);
     }
+
+    public void deleteAllInGroupSpace(Long groupSpaceId) {
+        occurrenceOverrideRepository.deleteAllByGroupSpaceId(groupSpaceId);
+        selectedOriginRepository.deleteAllByGroupSpaceId(groupSpaceId);
+        shareRepository.deleteAllByGroupSpaceId(groupSpaceId);
+    }
 }
