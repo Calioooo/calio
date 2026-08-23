@@ -25,6 +25,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -84,8 +85,7 @@ public class GroupCalendarService {
         items.addAll(listSharedOneOffEvents(groupSpaceId, from, to, nicknamesByAccountId));
         items.addAll(listRecurrenceOccurrences(groupSpaceId, from, to, nicknamesByAccountId));
         items.addAll(listSharedRecurrenceOccurrences(groupSpaceId, from, to, nicknamesByAccountId));
-        items.sort(Comparator.comparing(GroupCalendarItemResponse::startAt));
-        return items;
+        return mergeItems(items);
     }
 
     private List<GroupCalendarItemResponse> listSharedRecurrenceOccurrences(
@@ -297,7 +297,8 @@ public class GroupCalendarService {
                 allDay,
                 allDay ? null : sourceOccurrence.timeZone(),
                 sourceOccurrence.originStartAt(),
-                nickname
+                nickname,
+                share.getId()
         );
     }
 
@@ -316,7 +317,8 @@ public class GroupCalendarService {
                         share.resolveEndAt(),
                         share.resolveAllDay(),
                         share.resolveAllDay() ? null : share.getEvent().getTimeZone(),
-                        nicknameOf(nicknamesByAccountId, share.getEvent().getAccount().getId())
+                        nicknameOf(nicknamesByAccountId, share.getEvent().getAccount().getId()),
+                        share.getId()
                 ))
                 .filter(item -> overlaps(item, from, to))
                 .toList();
@@ -451,6 +453,36 @@ public class GroupCalendarService {
         return nicknameOf(nicknamesByAccountId, accountId) + "의 일정";
     }
 
+    private List<GroupCalendarItemResponse> mergeItems(List<GroupCalendarItemResponse> items) {
+        return items.stream()
+                .collect(Collectors.toMap(
+                        this::itemKey,
+                        Function.identity(),
+                        (first, ignored) -> first,
+                        LinkedHashMap::new
+                ))
+                .values()
+                .stream()
+                .sorted(Comparator.comparing(GroupCalendarItemResponse::startAt))
+                .toList();
+    }
+
+    private CalendarItemKey itemKey(GroupCalendarItemResponse item) {
+        if (item.isSharedPersonalSchedule()) {
+            return new CalendarItemKey(
+                    "SHARED",
+                    item.shareMappingId(),
+                    item.isRecurrenceOccurrence() ? item.originStartAt() : null
+            );
+        }
+        Long directItemId = item.isRecurrenceOccurrence() ? item.recurrenceId() : item.id();
+        return new CalendarItemKey(
+                item.isRecurrenceOccurrence() ? "DIRECT_RECURRENCE" : "DIRECT_EVENT",
+                directItemId,
+                item.originStartAt()
+        );
+    }
+
     private boolean overlaps(GroupCalendarItemResponse item, Instant from, Instant to) {
         return item.startAt().isBefore(to) && item.endAt().isAfter(from);
     }
@@ -471,6 +503,9 @@ public class GroupCalendarService {
     }
 
     private record SharedOccurrenceKey(Long shareId, Instant originStartAt) {
+    }
+
+    private record CalendarItemKey(String originType, Long sourceId, Instant originStartAt) {
     }
 
     private record SharedRecurrenceOccurrence(

@@ -246,6 +246,61 @@ class GroupCalendarServiceTest {
     }
 
     @Test
+    @DisplayName("동일 share의 확장 회차와 범위 안으로 이동한 원본 override는 한 번만 표시한다")
+    void givenExpandedAndMovedInSharedOccurrence_whenListItems_thenDeduplicatesByShareAndOrigin() {
+        // given
+        RecurrenceEvent sourceRecurrence = new RecurrenceEvent(
+                "원본 반복 제목",
+                null,
+                new RecurrenceSchedule(FROM, FROM.plusSeconds(3600), false, "UTC"),
+                List.of("RRULE:FREQ=DAILY"),
+                recurrenceEvent.getTag(),
+                account
+        );
+        ReflectionTestUtils.setField(sourceRecurrence, "id", 42L);
+        PersonalRecurrenceGroupShare share = new PersonalRecurrenceGroupShare(
+                sourceRecurrence,
+                groupSpace,
+                PersonalRecurrenceGroupShareScope.WHOLE_SERIES
+        );
+        ReflectionTestUtils.setField(share, "id", 52L);
+        RecurrenceOccurrence occurrence = occurrence(FROM.plusSeconds(3600));
+        RecurrenceEventOverride sourceOverride = RecurrenceEventOverride.active(
+                sourceRecurrence,
+                occurrence.originStartAt(),
+                "변경된 원본 제목",
+                null,
+                CanonicalSchedule.recurrenceOverride(
+                        occurrence.startAt(),
+                        occurrence.endAt(),
+                        false,
+                        "UTC"
+                )
+        );
+        when(recurrenceQueryService.listExpansionCandidates(GROUP_SPACE_ID, TO)).thenReturn(List.of());
+        when(personalRecurrenceShareQueryService.listSharesInGroupSpace(GROUP_SPACE_ID))
+                .thenReturn(List.of(share));
+        when(recurrenceEngine.expand(
+                RecurrenceSchedule.from(sourceRecurrence),
+                sourceRecurrence.getRecurrenceRules(),
+                FROM,
+                TO
+        )).thenReturn(List.of(occurrence));
+        when(personalRecurrenceQueryService.listOverrides(42L, List.of(occurrence.originStartAt())))
+                .thenReturn(List.of(sourceOverride));
+        when(personalRecurrenceQueryService.listActiveOverlappingOverridesForRecurrence(42L, FROM, TO))
+                .thenReturn(List.of(sourceOverride));
+        when(personalRecurrenceShareQueryService.listOccurrenceOverrides(52L)).thenReturn(List.of());
+
+        // when
+        List<GroupCalendarItemResponse> items = service.listItems(ACCOUNT_ID, GROUP_SPACE_ID, FROM, TO);
+
+        // then
+        assertThat(items).hasSize(1);
+        assertThat(items.getFirst().isSharedPersonalSchedule()).isTrue();
+    }
+
+    @Test
     @DisplayName("삭제된 override가 있는 반복 회차는 통합 캘린더 결과에서 제외된다")
     void givenDeletedOverride_whenListItems_thenExcludesOccurrence() {
         // given

@@ -2,6 +2,7 @@ package com.calio.calendar.groupcalendar.controller;
 
 import static com.calio.calendar.security.TestAccountSupport.currentAccountId;
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -9,13 +10,26 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.calio.calendar.account.domain.Account;
+import com.calio.calendar.account.repository.AccountRepository;
+import com.calio.calendar.event.domain.Event;
+import com.calio.calendar.event.repository.EventRepository;
 import com.calio.calendar.groupcalendar.event.repository.GroupCalendarEventRepository;
+import com.calio.calendar.groupcalendar.event.domain.GroupCalendarEvent;
+import com.calio.calendar.groupcalendar.sharing.event.domain.PersonalEventGroupShare;
+import com.calio.calendar.groupcalendar.sharing.event.repository.PersonalEventGroupShareRepository;
+import com.calio.calendar.groupcalendar.sharing.recurrence.domain.PersonalRecurrenceGroupShare;
+import com.calio.calendar.groupcalendar.sharing.recurrence.domain.PersonalRecurrenceGroupShareScope;
+import com.calio.calendar.groupcalendar.sharing.recurrence.repository.PersonalRecurrenceGroupShareRepository;
 import com.calio.calendar.groupspace.domain.GroupMember;
 import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.repository.GroupMemberRepository;
 import com.calio.calendar.groupspace.repository.GroupSpaceRepository;
 import com.calio.calendar.security.AuthenticatedAccountMockMvcTestConfig;
 import com.calio.calendar.security.WithAuthenticatedAccount;
+import com.calio.calendar.recurrence.domain.RecurrenceEvent;
+import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
+import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.domain.TagType;
 import com.calio.calendar.tag.repository.TagRepository;
@@ -51,12 +65,21 @@ class GroupCalendarControllerTest {
     @Autowired private MockMvc mockMvc;
     @Autowired private ObjectMapper objectMapper;
     @Autowired private GroupCalendarEventRepository eventRepository;
+    @Autowired private AccountRepository accountRepository;
+    @Autowired private EventRepository personalEventRepository;
+    @Autowired private PersonalEventGroupShareRepository personalEventShareRepository;
+    @Autowired private PersonalRecurrenceGroupShareRepository personalRecurrenceShareRepository;
+    @Autowired private RecurrenceEventRepository recurrenceEventRepository;
     @Autowired private TagRepository tagRepository;
     @Autowired private GroupMemberRepository groupMemberRepository;
     @Autowired private GroupSpaceRepository groupSpaceRepository;
 
     @BeforeEach
     void setUp() {
+        personalEventShareRepository.deleteAll();
+        personalRecurrenceShareRepository.deleteAll();
+        personalEventRepository.deleteAll();
+        recurrenceEventRepository.deleteAll();
         eventRepository.deleteAll();
         tagRepository.deleteAll();
         groupMemberRepository.deleteAll();
@@ -139,6 +162,86 @@ class GroupCalendarControllerTest {
                         .content("{}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"));
+    }
+
+    @Test
+    @DisplayName("Group Calendar API는 직접·공유 단건·공유 반복 일정을 origin별로 병합해 시작 시각순으로 반환한다")
+    void givenDirectAndSharedSchedules_whenListItems_thenMergesSortedPublicViews() throws Exception {
+        // given
+        GroupSpace groupSpace = groupSpaceRepository.saveAndFlush(
+                new GroupSpace(currentAccountId(), "shared group", null)
+        );
+        Account sharingAccount = accountRepository.saveAndFlush(new Account());
+        groupMemberRepository.saveAndFlush(new GroupMember(
+                groupSpace,
+                currentAccountId(),
+                "owner",
+                START_AT
+        ));
+        groupMemberRepository.saveAndFlush(new GroupMember(
+                groupSpace,
+                sharingAccount.getId(),
+                "공유자",
+                START_AT
+        ));
+        Tag groupTag = tagRepository.saveAndFlush(new Tag(TagType.GROUP_DEFAULT, "기타", "#64748B", groupSpace));
+        Tag personalTag = tagRepository.saveAndFlush(new Tag(TagType.PERSONAL_DEFAULT, "개인 기타", "#64748B"));
+        Event sourceEvent = personalEventRepository.saveAndFlush(new Event(
+                "개인 원본 일정",
+                "개인 설명",
+                START_AT,
+                END_AT,
+                false,
+                "UTC",
+                null,
+                personalTag,
+                sharingAccount
+        ));
+        RecurrenceEvent sourceRecurrence = recurrenceEventRepository.saveAndFlush(new RecurrenceEvent(
+                "개인 반복 원본",
+                "반복 설명",
+                new RecurrenceSchedule(
+                        START_AT.plusSeconds(7200),
+                        END_AT.plusSeconds(7200),
+                        false,
+                        "UTC"
+                ),
+                java.util.List.of("RRULE:FREQ=WEEKLY"),
+                personalTag,
+                sharingAccount
+        ));
+        personalEventShareRepository.saveAndFlush(new PersonalEventGroupShare(sourceEvent, groupSpace));
+        personalRecurrenceShareRepository.saveAndFlush(new PersonalRecurrenceGroupShare(
+                sourceRecurrence,
+                groupSpace,
+                PersonalRecurrenceGroupShareScope.WHOLE_SERIES
+        ));
+        eventRepository.saveAndFlush(new GroupCalendarEvent(
+                groupSpace,
+                sharingAccount,
+                groupTag,
+                "직접 그룹 일정",
+                null,
+                START_AT.plusSeconds(14400),
+                END_AT.plusSeconds(14400),
+                false,
+                "UTC"
+        ));
+
+        // when, then
+        mockMvc.perform(get("/api/group-spaces/{groupSpaceId}/calendar/items", groupSpace.getId())
+                        .param("from", START_AT.minusSeconds(1).toString())
+                        .param("to", END_AT.plusSeconds(21600).toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(3)))
+                .andExpect(jsonPath("$[0].title").value("공유자의 일정"))
+                .andExpect(jsonPath("$[0].isSharedPersonalSchedule").value(true))
+                .andExpect(jsonPath("$[0].tag").value(nullValue()))
+                .andExpect(jsonPath("$[0].shareMappingId").doesNotExist())
+                .andExpect(jsonPath("$[1].title").value("공유자의 일정"))
+                .andExpect(jsonPath("$[1].isSharedPersonalSchedule").value(true))
+                .andExpect(jsonPath("$[2].title").value("직접 그룹 일정"))
+                .andExpect(jsonPath("$[2].isSharedPersonalSchedule").value(false));
     }
 
     private Long responseId(MvcResult result) throws Exception {
