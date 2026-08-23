@@ -8,6 +8,7 @@ import com.calio.calendar.groupcalendar.recurrence.domain.GroupCalendarRecurrenc
 import com.calio.calendar.groupcalendar.recurrence.domain.GroupCalendarRecurrenceOverride;
 import com.calio.calendar.groupcalendar.recurrence.service.GroupCalendarRecurrenceOverrideQueryService;
 import com.calio.calendar.groupcalendar.recurrence.service.GroupCalendarRecurrenceQueryService;
+import com.calio.calendar.groupcalendar.sharing.event.service.PersonalEventGroupShareQueryService;
 import com.calio.calendar.groupspace.domain.GroupMember;
 import com.calio.calendar.groupspace.service.GroupMembershipQueryService;
 import com.calio.calendar.recurrence.domain.RecurrenceOccurrence;
@@ -35,6 +36,7 @@ public class GroupCalendarService {
     private final GroupCalendarEventQueryService eventQueryService;
     private final GroupCalendarRecurrenceQueryService recurrenceQueryService;
     private final GroupCalendarRecurrenceOverrideQueryService overrideQueryService;
+    private final PersonalEventGroupShareQueryService personalEventShareQueryService;
     private final Rfc5545RecurrenceEngine recurrenceEngine;
 
     public GroupCalendarService(
@@ -42,12 +44,14 @@ public class GroupCalendarService {
             GroupCalendarEventQueryService eventQueryService,
             GroupCalendarRecurrenceQueryService recurrenceQueryService,
             GroupCalendarRecurrenceOverrideQueryService overrideQueryService,
+            PersonalEventGroupShareQueryService personalEventShareQueryService,
             Rfc5545RecurrenceEngine recurrenceEngine
     ) {
         this.membershipQueryService = membershipQueryService;
         this.eventQueryService = eventQueryService;
         this.recurrenceQueryService = recurrenceQueryService;
         this.overrideQueryService = overrideQueryService;
+        this.personalEventShareQueryService = personalEventShareQueryService;
         this.recurrenceEngine = recurrenceEngine;
     }
 
@@ -64,9 +68,31 @@ public class GroupCalendarService {
         List<GroupCalendarItemResponse> items = new ArrayList<>(
                 listDirectEvents(groupSpaceId, from, to, nicknamesByAccountId)
         );
+        items.addAll(listSharedOneOffEvents(groupSpaceId, from, to, nicknamesByAccountId));
         items.addAll(listRecurrenceOccurrences(groupSpaceId, from, to, nicknamesByAccountId));
         items.sort(Comparator.comparing(GroupCalendarItemResponse::startAt));
         return items;
+    }
+
+    private List<GroupCalendarItemResponse> listSharedOneOffEvents(
+            Long groupSpaceId,
+            Instant from,
+            Instant to,
+            Map<Long, String> nicknamesByAccountId
+    ) {
+        return personalEventShareQueryService.listSharesInGroupSpace(groupSpaceId)
+                .stream()
+                .map(share -> GroupCalendarItemResponse.sharedOneOff(
+                        share.resolvePublicTitle(anonymousTitle(nicknamesByAccountId, share.getEvent().getAccount().getId())),
+                        share.resolvePublicDescription(),
+                        share.resolveStartAt(),
+                        share.resolveEndAt(),
+                        share.resolveAllDay(),
+                        share.resolveAllDay() ? null : share.getEvent().getTimeZone(),
+                        nicknameOf(nicknamesByAccountId, share.getEvent().getAccount().getId())
+                ))
+                .filter(item -> overlaps(item, from, to))
+                .toList();
     }
 
     private List<GroupCalendarItemResponse> listDirectEvents(
@@ -192,6 +218,10 @@ public class GroupCalendarService {
 
     private String nicknameOf(Map<Long, String> nicknamesByAccountId, Long accountId) {
         return nicknamesByAccountId.get(accountId);
+    }
+
+    private String anonymousTitle(Map<Long, String> nicknamesByAccountId, Long accountId) {
+        return nicknameOf(nicknamesByAccountId, accountId) + "의 일정";
     }
 
     private boolean overlaps(GroupCalendarItemResponse item, Instant from, Instant to) {

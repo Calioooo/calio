@@ -15,6 +15,8 @@ import com.calio.calendar.groupcalendar.recurrence.domain.GroupCalendarRecurrenc
 import com.calio.calendar.groupcalendar.recurrence.domain.GroupCalendarRecurrenceOverride;
 import com.calio.calendar.groupcalendar.recurrence.service.GroupCalendarRecurrenceOverrideQueryService;
 import com.calio.calendar.groupcalendar.recurrence.service.GroupCalendarRecurrenceQueryService;
+import com.calio.calendar.groupcalendar.sharing.event.domain.PersonalEventGroupShare;
+import com.calio.calendar.groupcalendar.sharing.event.service.PersonalEventGroupShareQueryService;
 import com.calio.calendar.groupspace.domain.GroupMember;
 import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.service.GroupMembershipQueryService;
@@ -48,6 +50,7 @@ class GroupCalendarServiceTest {
     @Mock private GroupCalendarEventQueryService eventQueryService;
     @Mock private GroupCalendarRecurrenceQueryService recurrenceQueryService;
     @Mock private GroupCalendarRecurrenceOverrideQueryService overrideQueryService;
+    @Mock private PersonalEventGroupShareQueryService personalEventShareQueryService;
     @Mock private Rfc5545RecurrenceEngine recurrenceEngine;
 
     private GroupCalendarService service;
@@ -62,6 +65,7 @@ class GroupCalendarServiceTest {
                 eventQueryService,
                 recurrenceQueryService,
                 overrideQueryService,
+                personalEventShareQueryService,
                 recurrenceEngine
         );
         groupSpace = new GroupSpace(ACCOUNT_ID, "group", null);
@@ -85,6 +89,36 @@ class GroupCalendarServiceTest {
         when(eventQueryService.listOverlappingEvents(GROUP_SPACE_ID, FROM, TO)).thenReturn(List.of());
         when(recurrenceQueryService.listExpansionCandidates(GROUP_SPACE_ID, TO)).thenReturn(List.of(recurrenceEvent));
         when(overrideQueryService.listMovedInOverrides(GROUP_SPACE_ID, FROM, TO)).thenReturn(List.of());
+        when(personalEventShareQueryService.listSharesInGroupSpace(GROUP_SPACE_ID)).thenReturn(List.of());
+    }
+
+    @Test
+    @DisplayName("공유 단건 일정은 mapping 공개 표현과 범위 겹침으로 Group Calendar에 표시한다")
+    void givenSharedOneOffEvent_whenListItems_thenAppliesPublicRepresentationAndRange() {
+        // given
+        com.calio.calendar.event.domain.Event sourceEvent = new com.calio.calendar.event.domain.Event(
+                "원본 제목",
+                "원본 설명",
+                FROM.plusSeconds(3600),
+                FROM.plusSeconds(7200),
+                false,
+                "UTC",
+                null,
+                recurrenceEvent.getTag(),
+                account
+        );
+        PersonalEventGroupShare share = new PersonalEventGroupShare(sourceEvent, groupSpace);
+        share.updateRepresentation(false, "공개 제목", null, null, null);
+        when(personalEventShareQueryService.listSharesInGroupSpace(GROUP_SPACE_ID)).thenReturn(List.of(share));
+
+        // when
+        List<GroupCalendarItemResponse> items = service.listItems(ACCOUNT_ID, GROUP_SPACE_ID, FROM, TO);
+
+        // then
+        assertThat(items).extracting(GroupCalendarItemResponse::title).containsExactly("공개 제목");
+        assertThat(items.getFirst().description()).isNull();
+        assertThat(items.getFirst().isSharedPersonalSchedule()).isTrue();
+        assertThat(items.getFirst().id()).isNull();
     }
 
     @Test

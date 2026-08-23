@@ -24,4 +24,8 @@ public class PersonalEventGroupShareQueryService {
     public List<PersonalEventGroupShare> listSharesForEvent(Long eventId) {
         return shareRepository.findAllByEventId(eventId);
     }
+
+    public List<PersonalEventGroupShare> listSharesInGroupSpace(Long groupSpaceId) {
+        return shareRepository.findAllByGroupSpaceId(groupSpaceId);
+    }
 }

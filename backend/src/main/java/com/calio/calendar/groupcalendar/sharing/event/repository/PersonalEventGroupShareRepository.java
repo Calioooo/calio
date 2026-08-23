@@ -33,6 +33,15 @@ public interface PersonalEventGroupShareRepository
             """)
     List<PersonalEventGroupShare> findAllByEventId(@Param("eventId") Long eventId);
 
+    @EntityGraph(attributePaths = {"event", "event.tag", "groupSpace"})
+    @Query("""
+            select share
+            from PersonalEventGroupShare share
+            where share.groupSpace.id = :groupSpaceId
+            order by share.id
+            """)
+    List<PersonalEventGroupShare> findAllByGroupSpaceId(@Param("groupSpaceId") Long groupSpaceId);
+
     @Modifying(flushAutomatically = true)
     @Query("""
             delete from PersonalEventGroupShare share

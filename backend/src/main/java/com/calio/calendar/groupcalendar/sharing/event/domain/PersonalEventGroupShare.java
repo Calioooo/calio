@@ -121,4 +121,27 @@ public class PersonalEventGroupShare extends BaseEntity {
     public Boolean getOverrideAllDay() {
         return overrideAllDay;
     }
+
+    public String resolvePublicTitle(String anonymousTitle) {
+        if (overrideTitle != null) {
+            return overrideTitle;
+        }
+        return showOriginalDetails ? event.getTitle() : anonymousTitle;
+    }
+
+    public String resolvePublicDescription() {
+        return showOriginalDetails ? event.getDescription() : null;
+    }
+
+    public Instant resolveStartAt() {
+        return overrideStartAt != null ? overrideStartAt : event.getStartAt();
+    }
+
+    public Instant resolveEndAt() {
+        return overrideEndAt != null ? overrideEndAt : event.getEndAt();
+    }
+
+    public boolean resolveAllDay() {
+        return overrideAllDay != null ? overrideAllDay : event.isAllDay();
+    }
 }

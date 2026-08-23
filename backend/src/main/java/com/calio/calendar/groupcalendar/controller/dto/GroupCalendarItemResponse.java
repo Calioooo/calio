@@ -19,13 +19,14 @@ public record GroupCalendarItemResponse(
         boolean isRecurrenceOccurrence,
         Instant originStartAt,
         TagResponse tag,
-        String creatorNickname
+        String creatorNickname,
+        boolean isSharedPersonalSchedule
 ) {
     public static GroupCalendarItemResponse from(GroupCalendarEvent event, String creatorNickname) {
         return new GroupCalendarItemResponse(
                 event.getId(), event.getTitle(), event.getDescription(), event.getStartAt(), event.getEndAt(),
                 event.isAllDay(), event.getTimeZone(), null, false, null, TagResponse.from(event.getTag()),
-                creatorNickname
+                creatorNickname, false
         );
     }
 
@@ -38,7 +39,7 @@ public record GroupCalendarItemResponse(
                 null, recurrenceEvent.getTitle(), recurrenceEvent.getDescription(), occurrence.startAt(),
                 occurrence.endAt(), recurrenceEvent.isAllDay(), recurrenceEvent.getTimeZone(),
                 recurrenceEvent.getId(), true, occurrence.originStartAt(), TagResponse.from(recurrenceEvent.getTag()),
-                creatorNickname
+                creatorNickname, false
         );
     }
 
@@ -50,7 +51,38 @@ public record GroupCalendarItemResponse(
         return new GroupCalendarItemResponse(
                 null, override.getTitle(), override.getDescription(), override.getStartAt(), override.getEndAt(),
                 override.isAllDay(), override.getTimeZone(), recurrenceEvent.getId(), true,
-                override.getOriginStartAt(), TagResponse.from(recurrenceEvent.getTag()), creatorNickname
+                override.getOriginStartAt(), TagResponse.from(recurrenceEvent.getTag()), creatorNickname, false
+        );
+    }
+
+    public static GroupCalendarItemResponse sharedOneOff(
+            String title,
+            String description,
+            Instant startAt,
+            Instant endAt,
+            boolean allDay,
+            String timeZone,
+            String creatorNickname
+    ) {
+        return new GroupCalendarItemResponse(
+                null, title, description, startAt, endAt, allDay, timeZone, null, false, null, null,
+                creatorNickname, true
+        );
+    }
+
+    public static GroupCalendarItemResponse sharedRecurrenceOccurrence(
+            String title,
+            String description,
+            Instant startAt,
+            Instant endAt,
+            boolean allDay,
+            String timeZone,
+            Instant originStartAt,
+            String creatorNickname
+    ) {
+        return new GroupCalendarItemResponse(
+                null, title, description, startAt, endAt, allDay, timeZone, null, true, originStartAt, null,
+                creatorNickname, true
         );
     }
 }
