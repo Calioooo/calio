@@ -14,6 +14,13 @@ import static com.calio.calendar.security.TestAccountSupport.currentAccountRefer
 import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.event.repository.EventRepository;
+import com.calio.calendar.groupcalendar.event.domain.GroupCalendarEvent;
+import com.calio.calendar.groupcalendar.event.repository.GroupCalendarEventRepository;
+import com.calio.calendar.groupspace.domain.GroupMember;
+import com.calio.calendar.groupspace.domain.GroupMemberStatus;
+import com.calio.calendar.groupspace.domain.GroupSpace;
+import com.calio.calendar.groupspace.repository.GroupMemberRepository;
+import com.calio.calendar.groupspace.repository.GroupSpaceRepository;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.mapping.repository.GoogleCalendarEventMappingRepository;
@@ -72,6 +79,15 @@ class EventControllerTest {
 
     @Autowired
     private GoogleCalendarEventMappingRepository googleCalendarEventMappingRepository;
+
+    @Autowired
+    private GroupCalendarEventRepository groupCalendarEventRepository;
+
+    @Autowired
+    private GroupMemberRepository groupMemberRepository;
+
+    @Autowired
+    private GroupSpaceRepository groupSpaceRepository;
 
     @BeforeEach
     void setUpDefaultTag() {
@@ -949,6 +965,90 @@ class EventControllerTest {
                 .andExpect(jsonPath("$[0].id").value(overlappingBeforeId))
                 .andExpect(jsonPath("$[1].id").value(lowerBoundaryId))
                 .andExpect(jsonPath("$[2].id").value(middleId));
+    }
+
+    @Test
+    @DisplayName("개인 일정 조회는 ACTIVE Group Space의 직접 일정을 개인 일정과 시작 시각순으로 합친다")
+    void givenActiveGroupMembership_whenListEvents_thenMergesDirectGroupEvent() throws Exception {
+        // given
+        GroupSpace groupSpace = groupSpaceRepository.saveAndFlush(
+                new GroupSpace(currentAccountReference().getId(), "그룹", null)
+        );
+        groupMemberRepository.saveAndFlush(new GroupMember(
+                groupSpace,
+                currentAccountReference().getId(),
+                "멤버",
+                Instant.parse("2028-01-01T00:00:00Z")
+        ));
+        Tag groupTag = tagRepository.saveAndFlush(
+                new Tag(TagType.GROUP_DEFAULT, "기타", "#64748B", groupSpace)
+        );
+        GroupCalendarEvent groupEvent = groupCalendarEventRepository.saveAndFlush(new GroupCalendarEvent(
+                groupSpace,
+                currentAccountReference(),
+                groupTag,
+                "그룹 일정",
+                "그룹 설명",
+                Instant.parse("2028-01-01T00:30:00Z"),
+                Instant.parse("2028-01-01T01:00:00Z"),
+                false,
+                "UTC"
+        ));
+        long personalEventId = createEvent(
+                "개인 일정",
+                "2028-01-01T01:00:00Z",
+                "2028-01-01T02:00:00Z"
+        );
+
+        // when, then
+        mockMvc.perform(get("/api/events")
+                        .param("from", "2028-01-01T00:00:00Z")
+                        .param("to", "2028-01-01T03:00:00Z"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$[0].id").value(groupEvent.getId()))
+                .andExpect(jsonPath("$[0].groupSpaceId").value(groupSpace.getId()))
+                .andExpect(jsonPath("$[0].description").value("그룹 설명"))
+                .andExpect(jsonPath("$[1].id").value(personalEventId))
+                .andExpect(jsonPath("$[1].groupSpaceId").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("개인 일정 조회는 INACTIVE Group Space 멤버십의 직접 일정을 포함하지 않는다")
+    void givenInactiveGroupMembership_whenListEvents_thenExcludesDirectGroupEvent() throws Exception {
+        // given
+        GroupSpace groupSpace = groupSpaceRepository.saveAndFlush(
+                new GroupSpace(currentAccountReference().getId(), "비활성 그룹", null)
+        );
+        GroupMember membership = groupMemberRepository.saveAndFlush(new GroupMember(
+                groupSpace,
+                currentAccountReference().getId(),
+                "멤버",
+                Instant.parse("2028-02-01T00:00:00Z")
+        ));
+        membership.deactivate(GroupMemberStatus.LEFT, Instant.parse("2028-02-02T00:00:00Z"));
+        groupMemberRepository.saveAndFlush(membership);
+        Tag groupTag = tagRepository.saveAndFlush(
+                new Tag(TagType.GROUP_DEFAULT, "기타", "#64748B", groupSpace)
+        );
+        groupCalendarEventRepository.saveAndFlush(new GroupCalendarEvent(
+                groupSpace,
+                currentAccountReference(),
+                groupTag,
+                "숨겨진 그룹 일정",
+                null,
+                Instant.parse("2028-02-03T00:00:00Z"),
+                Instant.parse("2028-02-03T01:00:00Z"),
+                false,
+                "UTC"
+        ));
+
+        // when, then
+        mockMvc.perform(get("/api/events")
+                        .param("from", "2028-02-03T00:00:00Z")
+                        .param("to", "2028-02-03T02:00:00Z"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(0)));
     }
 
     @Test
