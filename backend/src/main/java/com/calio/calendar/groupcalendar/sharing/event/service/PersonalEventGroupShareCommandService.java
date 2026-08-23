@@ -44,4 +44,8 @@ public class PersonalEventGroupShareCommandService {
         );
         shareRepository.flush();
     }
+
+    public void deleteAllForEvent(Long eventId) {
+        shareRepository.deleteAllByEventId(eventId);
+    }
 }

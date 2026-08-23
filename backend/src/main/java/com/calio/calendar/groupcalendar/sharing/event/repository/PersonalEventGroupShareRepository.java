@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -31,4 +32,11 @@ public interface PersonalEventGroupShareRepository
             order by share.id
             """)
     List<PersonalEventGroupShare> findAllByEventId(@Param("eventId") Long eventId);
+
+    @Modifying(flushAutomatically = true)
+    @Query("""
+            delete from PersonalEventGroupShare share
+            where share.event.id = :eventId
+            """)
+    int deleteAllByEventId(@Param("eventId") Long eventId);
 }
