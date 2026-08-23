@@ -10,6 +10,9 @@ import com.calio.calendar.event.controller.dto.EventResponse;
 import com.calio.calendar.event.controller.dto.UpdateEventRequest;
 import com.calio.calendar.event.controller.dto.UpdateImportantEventRequest;
 import com.calio.calendar.event.domain.Event;
+import com.calio.calendar.groupcalendar.event.service.GroupCalendarEventQueryService;
+import com.calio.calendar.groupspace.domain.GroupMember;
+import com.calio.calendar.groupspace.service.GroupSpaceQueryService;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingQueryService;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
@@ -44,6 +47,8 @@ public class EventService {
     private final AccountQueryService accountQueryService;
     private final TagQueryService tagQueryService;
     private final RecurrenceEventQueryService recurrenceEventQueryService;
+    private final GroupSpaceQueryService groupSpaceQueryService;
+    private final GroupCalendarEventQueryService groupCalendarEventQueryService;
     private final Rfc5545RecurrenceEngine recurrenceEngine;
 
     public EventService(
@@ -53,6 +58,8 @@ public class EventService {
             AccountQueryService accountQueryService,
             TagQueryService tagQueryService,
             RecurrenceEventQueryService recurrenceEventQueryService,
+            GroupSpaceQueryService groupSpaceQueryService,
+            GroupCalendarEventQueryService groupCalendarEventQueryService,
             Rfc5545RecurrenceEngine recurrenceEngine
     ) {
         this.eventQueryService = eventQueryService;
@@ -61,6 +68,8 @@ public class EventService {
         this.accountQueryService = accountQueryService;
         this.tagQueryService = tagQueryService;
         this.recurrenceEventQueryService = recurrenceEventQueryService;
+        this.groupSpaceQueryService = groupSpaceQueryService;
+        this.groupCalendarEventQueryService = groupCalendarEventQueryService;
         this.recurrenceEngine = recurrenceEngine;
     }
 
@@ -119,8 +128,21 @@ public class EventService {
                 .map(EventResponse::from)
                 .collect(Collectors.toCollection(ArrayList::new));
         responses.addAll(listRecurrenceOccurrences(accountId, from, to));
+        responses.addAll(listGroupCalendarEvents(accountId, from, to));
         responses.sort(Comparator.comparing(EventResponse::startAt));
         return responses;
+    }
+
+    private List<EventResponse> listGroupCalendarEvents(Long accountId, Instant from, Instant to) {
+        List<Long> groupSpaceIds = groupSpaceQueryService.listActiveMemberships(accountId)
+                .stream()
+                .map(GroupMember::getGroupSpace)
+                .map(groupSpace -> groupSpace.getId())
+                .toList();
+        return groupCalendarEventQueryService.listOverlappingEventsInGroupSpaces(groupSpaceIds, from, to)
+                .stream()
+                .map(EventResponse::groupCalendarEvent)
+                .toList();
     }
 
     private List<EventResponse> listRecurrenceOccurrences(Long accountId, Instant from, Instant to) {

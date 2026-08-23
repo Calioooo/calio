@@ -24,6 +24,11 @@ import com.calio.calendar.event.controller.dto.UpdateEventRequest;
 import com.calio.calendar.event.controller.dto.UpdateImportantEventRequest;
 import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.event.repository.EventRepository;
+import com.calio.calendar.groupcalendar.event.domain.GroupCalendarEvent;
+import com.calio.calendar.groupcalendar.event.service.GroupCalendarEventQueryService;
+import com.calio.calendar.groupspace.domain.GroupMember;
+import com.calio.calendar.groupspace.domain.GroupSpace;
+import com.calio.calendar.groupspace.service.GroupSpaceQueryService;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingQueryService;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
@@ -75,6 +80,12 @@ class EventServiceTest {
 
     @Mock
     private RecurrenceEventOverrideRepository recurrenceEventOverrideRepository;
+
+    @Mock
+    private GroupSpaceQueryService groupSpaceQueryService;
+
+    @Mock
+    private GroupCalendarEventQueryService groupCalendarEventQueryService;
 
     @Mock
     private Rfc5545RecurrenceEngine recurrenceEngine;
@@ -383,6 +394,49 @@ class EventServiceTest {
                 );
     }
 
+    @Test
+    @DisplayName("개인 일정 조회는 ACTIVE Group Space의 직접 일정을 합쳐 시작 시각순으로 반환한다")
+    void givenActiveGroupMembership_whenListEvents_thenMergesDirectGroupEvents() {
+        // given
+        Instant from = Instant.parse("2027-01-01T00:00:00Z");
+        Instant to = Instant.parse("2027-01-01T02:00:00Z");
+        Event personalEvent = event(
+                1L,
+                "개인 일정",
+                Instant.parse("2027-01-01T01:00:00Z"),
+                Instant.parse("2027-01-01T01:30:00Z")
+        );
+        GroupSpace groupSpace = new GroupSpace(1L, "그룹", null);
+        ReflectionTestUtils.setField(groupSpace, "id", 20L);
+        GroupMember membership = new GroupMember(groupSpace, 1L, "멤버", from);
+        GroupCalendarEvent groupEvent = new GroupCalendarEvent(
+                groupSpace,
+                account(),
+                new Tag(TagType.GROUP_DEFAULT, "기타", "#64748B", groupSpace),
+                "그룹 일정",
+                "그룹 설명",
+                Instant.parse("2027-01-01T00:30:00Z"),
+                Instant.parse("2027-01-01T00:45:00Z"),
+                false,
+                "UTC"
+        );
+        ReflectionTestUtils.setField(groupEvent, "id", 30L);
+        when(eventRepository.findNormalEvents(1L, from, to)).thenReturn(List.of(personalEvent));
+        when(recurrenceEventRepository.findExpansionCandidatesStartedBefore(1L, to)).thenReturn(List.of());
+        when(groupSpaceQueryService.listActiveMemberships(1L)).thenReturn(List.of(membership));
+        when(groupCalendarEventQueryService.listOverlappingEventsInGroupSpaces(List.of(20L), from, to))
+                .thenReturn(List.of(groupEvent));
+
+        // when
+        List<EventResponse> responses = listEventService().listEvents(1L, from, to);
+
+        // then
+        assertThat(responses).extracting(EventResponse::title).containsExactly("그룹 일정", "개인 일정");
+        assertThat(responses.getFirst().groupSpaceId()).isEqualTo(20L);
+        assertThat(responses.getFirst().description()).isEqualTo("그룹 설명");
+        assertThat(responses.get(1).groupSpaceId()).isNull();
+    }
+
     private EventService listEventService() {
         EventQueryService queryService = new EventQueryService(eventRepository);
         RecurrenceEventQueryService recurrenceQueryService = new RecurrenceEventQueryService(
@@ -396,6 +450,8 @@ class EventServiceTest {
                 accountQueryService,
                 tagQueryService,
                 recurrenceQueryService,
+                groupSpaceQueryService,
+                groupCalendarEventQueryService,
                 recurrenceEngine
         );
     }
