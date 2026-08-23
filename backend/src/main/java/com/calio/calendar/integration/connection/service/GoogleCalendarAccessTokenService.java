@@ -1,6 +1,9 @@
 package com.calio.calendar.integration.connection.service;
 
 import com.calio.calendar.external.google.GoogleOAuthClient;
+import com.calio.calendar.external.google.GoogleCalendarInvalidGrantException;
+import com.calio.calendar.common.error.CalioException;
+import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.external.google.dto.GoogleAccessTokenRefreshResponse;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
 import com.calio.calendar.security.TokenEncryptor;
@@ -18,6 +21,7 @@ public class GoogleCalendarAccessTokenService {
     private final GoogleCalendarIntegrationCommandService integrationCommandService;
     private final GoogleOAuthClient googleOAuthClient;
     private final TokenEncryptor tokenEncryptor;
+    private final GoogleCalendarIntegrationLifecycleService lifecycleService;
     private final Clock clock;
 
     public GoogleCalendarAccessTokenService(
@@ -25,12 +29,14 @@ public class GoogleCalendarAccessTokenService {
             GoogleCalendarIntegrationCommandService integrationCommandService,
             GoogleOAuthClient googleOAuthClient,
             TokenEncryptor tokenEncryptor,
+            GoogleCalendarIntegrationLifecycleService lifecycleService,
             Clock clock
     ) {
         this.integrationQueryService = integrationQueryService;
         this.integrationCommandService = integrationCommandService;
         this.googleOAuthClient = googleOAuthClient;
         this.tokenEncryptor = tokenEncryptor;
+        this.lifecycleService = lifecycleService;
         this.clock = clock;
     }
 
@@ -48,7 +54,13 @@ public class GoogleCalendarAccessTokenService {
 
     private String refresh(TokenState tokenState) {
         String refreshToken = tokenEncryptor.decrypt(tokenState.encryptedRefreshToken());
-        GoogleAccessTokenRefreshResponse response = googleOAuthClient.refreshAccessToken(refreshToken);
+        GoogleAccessTokenRefreshResponse response;
+        try {
+            response = googleOAuthClient.refreshAccessToken(refreshToken);
+        } catch (GoogleCalendarInvalidGrantException exception) {
+            lifecycleService.disconnectAfterInvalidGrant(tokenState.integrationId(), Instant.now(clock));
+            throw new CalioException(ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED, exception);
+        }
         String encryptedAccessToken = tokenEncryptor.encryptAccessToken(response.accessToken());
         Instant expiresAt = Instant.now(clock).plusSeconds(response.expiresIn());
         persistRefreshedToken(tokenState, encryptedAccessToken, expiresAt);

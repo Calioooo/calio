@@ -24,12 +24,17 @@ public interface GoogleCalendarIntegrationRepository extends JpaRepository<Googl
             """)
     Optional<GoogleCalendarIntegration> findByAccountIdForUpdate(@Param("accountId") Long accountId);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select integration from GoogleCalendarIntegration integration where integration.id = :integrationId")
+    Optional<GoogleCalendarIntegration> findByIdForUpdate(@Param("integrationId") Long integrationId);
+
     boolean existsByAccountId(Long accountId);
 
     @Query("""
             select integration.accountId
             from GoogleCalendarIntegration integration
             where integration.accountId > :lastAccountId
+              and integration.state = com.calio.calendar.integration.connection.domain.GoogleCalendarIntegrationState.CONNECTED
             order by integration.accountId
             """)
     List<Long> findConnectedAccountIdsAfter(
@@ -47,6 +52,7 @@ public interface GoogleCalendarIntegrationRepository extends JpaRepository<Googl
                     CURRENT_TIMESTAMP
                 )
             WHERE account_id = :accountId
+              AND integration_state = 'CONNECTED'
               AND (google_operation_lease_owner IS NULL
                    OR google_operation_lease_expires_at < CURRENT_TIMESTAMP)
             """, nativeQuery = true)
@@ -65,6 +71,7 @@ public interface GoogleCalendarIntegrationRepository extends JpaRepository<Googl
                 CURRENT_TIMESTAMP
             )
             WHERE account_id = :accountId
+              AND integration_state = 'CONNECTED'
               AND google_operation_lease_owner = :owner
               AND google_operation_lease_expires_at >= CURRENT_TIMESTAMP
               AND EXISTS (
@@ -97,6 +104,7 @@ public interface GoogleCalendarIntegrationRepository extends JpaRepository<Googl
             update GoogleCalendarIntegration integration
             set integration.nextSyncToken = :nextSyncToken
             where integration.id = :integrationId
+              and integration.state = com.calio.calendar.integration.connection.domain.GoogleCalendarIntegrationState.CONNECTED
             """)
     int updateNextSyncToken(
             @Param("integrationId") Long integrationId,
@@ -110,6 +118,7 @@ public interface GoogleCalendarIntegrationRepository extends JpaRepository<Googl
             set integration.encryptedAccessToken = :encryptedAccessToken,
                 integration.accessTokenExpiresAt = :accessTokenExpiresAt
             where integration.id = :integrationId
+              and integration.state = com.calio.calendar.integration.connection.domain.GoogleCalendarIntegrationState.CONNECTED
               and integration.encryptedRefreshToken = :expectedEncryptedRefreshToken
             """)
     int updateAccessToken(

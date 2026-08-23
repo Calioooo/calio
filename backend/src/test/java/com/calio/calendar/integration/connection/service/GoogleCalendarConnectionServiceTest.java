@@ -20,8 +20,8 @@ import com.calio.calendar.external.google.dto.GoogleTokenResponse;
 import com.calio.calendar.external.google.dto.GoogleUserInfoResponse;
 import com.calio.calendar.integration.connection.controller.dto.GoogleCalendarIntegrationResponse;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
-import com.calio.calendar.integration.sync.GoogleCalendarIntegrationDataService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobCommandService;
+import com.calio.calendar.integration.sync.operation.GoogleOperationJobEnqueueService;
 import com.calio.calendar.security.TokenEncryptionConfig;
 import com.calio.calendar.security.TokenEncryptionProperties;
 import com.calio.calendar.security.TokenEncryptor;
@@ -54,10 +54,10 @@ class GoogleCalendarConnectionServiceTest {
             mock(GoogleCalendarIntegrationQueryService.class);
     private final GoogleCalendarIntegrationCommandService integrationCommandService =
             mock(GoogleCalendarIntegrationCommandService.class);
-    private final GoogleCalendarIntegrationDataService integrationDataService =
-            mock(GoogleCalendarIntegrationDataService.class);
-    private final GoogleOperationJobCommandService jobCommandService =
-            mock(GoogleOperationJobCommandService.class);
+    private final GoogleOperationJobEnqueueService enqueueService =
+            mock(GoogleOperationJobEnqueueService.class);
+    private final GoogleCalendarIntegrationLifecycleService lifecycleService =
+            mock(GoogleCalendarIntegrationLifecycleService.class);
     private final Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
 
     @Test
@@ -107,6 +107,7 @@ class GoogleCalendarConnectionServiceTest {
         assertThat(response.connected()).isTrue();
         assertThat(refreshTokenCaptor.getValue()).isNotEqualTo("refresh-token");
         assertThat(accessTokenCaptor.getValue()).isNotEqualTo("access-token");
+        verify(enqueueService).enqueueManualSync(ACCOUNT_ID);
     }
 
     @Test
@@ -125,7 +126,7 @@ class GoogleCalendarConnectionServiceTest {
         )).isInstanceOfSatisfying(CalioException.class, exception ->
                 assertThat(exception.getErrorCode())
                         .isEqualTo(ErrorCode.GOOGLE_TOKEN_EXCHANGE_FAILED));
-        verifyNoInteractions(integrationCommandService, integrationDataService, jobCommandService);
+        verifyNoInteractions(integrationCommandService, lifecycleService, enqueueService);
     }
 
     @Test
@@ -166,19 +167,38 @@ class GoogleCalendarConnectionServiceTest {
         // then
         assertThat(response.connected()).isTrue();
         verify(integrationCommandService, times(2)).tryLockIntegration(ACCOUNT_ID);
-        verify(integrationDataService).deleteIntegrationData(existingIntegration.getId());
+        verify(enqueueService).enqueueManualSync(ACCOUNT_ID);
     }
 
     @Test
-    @DisplayName("disconnect는 Google revoke 후 Job, integration data, 연결 순서로 제거한다")
-    void givenConnectedIntegration_whenDisconnect_thenRemovesLocalConnectionInOrder() {
+    @DisplayName("다른 Google subject로 연결하면 retained 연결과 데이터를 교체하지 않는다")
+    void givenDifferentGoogleSubject_whenConnect_thenRejectsReconnect() {
+        // given
+        FakeGoogleOAuthClient googleOAuthClient = connectedGoogleOAuthClient();
+        googleOAuthClient.userInfoResponse = new GoogleUserInfoResponse("different-subject", "other@example.com");
+        GoogleCalendarIntegration retainedIntegration = integrationWithRefreshToken("old-token");
+        when(integrationCommandService.tryLockIntegration(ACCOUNT_ID))
+                .thenReturn(Optional.of(retainedIntegration));
+        GoogleCalendarConnectionService service = service(googleOAuthClient);
+
+        // when, then
+        assertThatThrownBy(() -> service.connect(ACCOUNT_ID, "auth-code"))
+                .isInstanceOfSatisfying(CalioException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED));
+        verify(integrationCommandService, never()).replaceIntegration(
+                any(), anyString(), anyString(), anyString(), anyString(), any(), any());
+        verifyNoInteractions(enqueueService);
+    }
+
+    @Test
+    @DisplayName("disconnect는 Job과 credential/runtime만 먼저 제거하고 revoke 실패와 무관하게 retained 상태로 전환한다")
+    void givenConnectedIntegration_whenDisconnect_thenRetainsIntegrationAfterLocalCleanup() {
         // given
         FakeGoogleOAuthClient googleOAuthClient = new FakeGoogleOAuthClient(googleOAuthProperties);
         GoogleCalendarIntegration integration = integrationWithRefreshToken("refresh-token");
-        when(integrationQueryService.getIntegrationIfExists(ACCOUNT_ID))
-                .thenReturn(Optional.of(integration));
-        when(integrationCommandService.tryLockIntegration(ACCOUNT_ID))
-                .thenReturn(Optional.of(integration));
+        when(lifecycleService.disconnectConnectedIntegration(ACCOUNT_ID, NOW))
+                .thenReturn(Optional.of(tokenEncryptor.encryptRefreshToken("refresh-token")));
         GoogleCalendarConnectionService service = service(googleOAuthClient);
 
         // when
@@ -186,34 +206,58 @@ class GoogleCalendarConnectionServiceTest {
 
         // then
         assertThat(googleOAuthClient.revokedToken).isEqualTo("refresh-token");
-        InOrder removalOrder = inOrder(
-                jobCommandService,
-                integrationDataService,
-                integrationCommandService
-        );
-        removalOrder.verify(jobCommandService).deleteJobsForIntegration(integration.getId());
-        removalOrder.verify(integrationDataService).deleteIntegrationData(integration.getId());
-        removalOrder.verify(integrationCommandService).deleteIntegration(integration);
+        verify(lifecycleService).disconnectConnectedIntegration(ACCOUNT_ID, NOW);
     }
 
     @Test
-    @DisplayName("disconnect는 Google revoke 실패 시 로컬 연결을 유지한다")
-    void givenUnexpectedRevokeFailure_whenDisconnect_thenKeepsConnection() {
+    @DisplayName("disconnect는 Google revoke 실패에도 local retained disconnect를 완료한다")
+    void givenUnexpectedRevokeFailure_whenDisconnect_thenCompletesLocalDisconnect() {
         // given
         FakeGoogleOAuthClient googleOAuthClient = new FakeGoogleOAuthClient(googleOAuthProperties);
         googleOAuthClient.tokenRevokeException =
                 new CalioException(ErrorCode.GOOGLE_TOKEN_REVOKE_FAILED);
-        when(integrationQueryService.getIntegrationIfExists(ACCOUNT_ID))
-                .thenReturn(Optional.of(integrationWithRefreshToken("refresh-token")));
+        GoogleCalendarIntegration integration = integrationWithRefreshToken("refresh-token");
+        when(lifecycleService.disconnectConnectedIntegration(ACCOUNT_ID, NOW))
+                .thenReturn(Optional.of(tokenEncryptor.encryptRefreshToken("refresh-token")));
         GoogleCalendarConnectionService service = service(googleOAuthClient);
 
-        // when, then
-        assertThatThrownBy(() -> service.disconnect(ACCOUNT_ID))
-                .isInstanceOfSatisfying(CalioException.class, exception ->
-                        assertThat(exception.getErrorCode())
-                                .isEqualTo(ErrorCode.GOOGLE_TOKEN_REVOKE_FAILED));
-        verify(integrationCommandService, never()).tryLockIntegration(ACCOUNT_ID);
-        verifyNoInteractions(integrationDataService, jobCommandService);
+        // when
+        service.disconnect(ACCOUNT_ID);
+
+        // then
+        verify(lifecycleService).disconnectConnectedIntegration(ACCOUNT_ID, NOW);
+    }
+
+    @Test
+    @DisplayName("retained DISCONNECTED Integration은 connection-status에서 연결되지 않은 상태로 보인다")
+    void givenDisconnectedIntegration_whenGetConnectionStatus_thenReturnsDisconnected() {
+        // given
+        GoogleCalendarIntegration integration = integrationWithRefreshToken("refresh-token");
+        integration.disconnect(NOW);
+        when(integrationQueryService.getIntegrationIfExists(ACCOUNT_ID))
+                .thenReturn(Optional.of(integration));
+        GoogleCalendarConnectionService service = service(connectedGoogleOAuthClient());
+
+        // when
+        GoogleCalendarIntegrationResponse response = service.getConnectionStatus(ACCOUNT_ID);
+
+        // then
+        assertThat(response.connected()).isFalse();
+        assertThat(response.googleEmail()).isNull();
+        assertThat(response.googleSubject()).isNull();
+    }
+
+    @Test
+    @DisplayName("이미 disconnect된 Integration을 다시 해제해도 revoke 없이 성공한다")
+    void givenAlreadyDisconnectedIntegration_whenDisconnect_thenDoesNothing() {
+        FakeGoogleOAuthClient googleOAuthClient = new FakeGoogleOAuthClient(googleOAuthProperties);
+        when(lifecycleService.disconnectConnectedIntegration(ACCOUNT_ID, NOW)).thenReturn(Optional.empty());
+        GoogleCalendarConnectionService service = service(googleOAuthClient);
+
+        service.disconnect(ACCOUNT_ID);
+
+        verify(lifecycleService).disconnectConnectedIntegration(ACCOUNT_ID, NOW);
+        assertThat(googleOAuthClient.revokedToken).isNull();
     }
 
     private GoogleCalendarConnectionService service(
@@ -225,8 +269,8 @@ class GoogleCalendarConnectionServiceTest {
                 tokenEncryptor,
                 integrationQueryService,
                 integrationCommandService,
-                integrationDataService,
-                jobCommandService,
+                enqueueService,
+                lifecycleService,
                 new NoOpTransactionManager(),
                 clock
         );

@@ -3,6 +3,8 @@ package com.calio.calendar.integration.connection.domain;
 import com.calio.calendar.common.domain.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -33,13 +35,13 @@ public class GoogleCalendarIntegration extends BaseEntity {
     @Column(name = "google_email", nullable = false, length = 320)
     private String googleEmail;
 
-    @Column(name = "encrypted_refresh_token", nullable = false, columnDefinition = "TEXT")
+    @Column(name = "encrypted_refresh_token", columnDefinition = "TEXT")
     private String encryptedRefreshToken;
 
-    @Column(name = "encrypted_access_token", nullable = false, columnDefinition = "TEXT")
+    @Column(name = "encrypted_access_token", columnDefinition = "TEXT")
     private String encryptedAccessToken;
 
-    @Column(name = "access_token_expires_at", nullable = false)
+    @Column(name = "access_token_expires_at")
     private Instant accessTokenExpiresAt;
 
     @Column(name = "connected_at", nullable = false)
@@ -56,6 +58,19 @@ public class GoogleCalendarIntegration extends BaseEntity {
 
     @Column(name = "google_operation_lease_expires_at")
     private Instant googleOperationLeaseExpiresAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "integration_state", nullable = false, length = 32)
+    private GoogleCalendarIntegrationState state = GoogleCalendarIntegrationState.CONNECTED;
+
+    @Column(name = "disconnected_at")
+    private Instant disconnectedAt;
+
+    @Column(name = "sync_error_reason", length = 128)
+    private String syncErrorReason;
+
+    @Column(name = "sync_error_at")
+    private Instant syncErrorAt;
 
     protected GoogleCalendarIntegration() {
     }
@@ -94,7 +109,37 @@ public class GoogleCalendarIntegration extends BaseEntity {
         this.encryptedAccessToken = encryptedAccessToken;
         this.accessTokenExpiresAt = accessTokenExpiresAt;
         this.connectedAt = connectedAt;
+        this.state = GoogleCalendarIntegrationState.CONNECTED;
+        this.disconnectedAt = null;
+        this.syncErrorReason = null;
+        this.syncErrorAt = null;
         clearSyncCursor();
+    }
+
+    public void disconnect(Instant disconnectedAt) {
+        encryptedRefreshToken = null;
+        encryptedAccessToken = null;
+        accessTokenExpiresAt = null;
+        clearSyncCursor();
+        googleOperationLeaseOwner = null;
+        googleOperationLeaseExpiresAt = null;
+        state = GoogleCalendarIntegrationState.DISCONNECTED;
+        this.disconnectedAt = disconnectedAt;
+        syncErrorReason = null;
+        syncErrorAt = null;
+    }
+
+    public void markSyncError(String reason, Instant occurredAt) {
+        googleOperationLeaseOwner = null;
+        googleOperationLeaseExpiresAt = null;
+        state = GoogleCalendarIntegrationState.SYNC_ERROR;
+        disconnectedAt = null;
+        syncErrorReason = reason;
+        syncErrorAt = occurredAt;
+    }
+
+    public boolean isConnected() {
+        return state == GoogleCalendarIntegrationState.CONNECTED;
     }
 
     public void clearSyncCursor() {
@@ -131,6 +176,22 @@ public class GoogleCalendarIntegration extends BaseEntity {
 
     public Instant getConnectedAt() {
         return connectedAt;
+    }
+
+    public GoogleCalendarIntegrationState getState() {
+        return state;
+    }
+
+    public Instant getDisconnectedAt() {
+        return disconnectedAt;
+    }
+
+    public String getSyncErrorReason() {
+        return syncErrorReason;
+    }
+
+    public Instant getSyncErrorAt() {
+        return syncErrorAt;
     }
 
     public String getNextSyncToken() {

@@ -440,7 +440,7 @@ class GoogleCalendarSyncServiceTest {
         private int forceRefreshCount;
 
         private FakeAccessTokenService() {
-            super(null, null, null, null, null);
+            super(null, null, null, null, null, null);
         }
 
         @Override

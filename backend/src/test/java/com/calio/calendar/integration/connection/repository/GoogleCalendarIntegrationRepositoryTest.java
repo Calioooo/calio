@@ -11,6 +11,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -86,6 +87,46 @@ class GoogleCalendarIntegrationRepositoryTest {
         assertThat(refreshed.getEncryptedAccessToken()).isEqualTo("new-encrypted-access-token");
         assertThat(refreshed.getAccessTokenExpiresAt())
                 .isEqualTo(Instant.parse("2026-07-14T14:00:00Z"));
+    }
+
+    @Test
+    @DisplayName("periodic sync 대상은 CONNECTED integration으로 제한한다")
+    void givenDisconnectedAndSyncErrorIntegrations_whenFindConnectedAccounts_thenExcludesPausedStates() {
+        Account connectedAccount = accountRepository.saveAndFlush(new Account());
+        Account disconnectedAccount = accountRepository.saveAndFlush(new Account());
+        Account syncErrorAccount = accountRepository.saveAndFlush(new Account());
+        googleCalendarIntegrationRepository.saveAndFlush(integration(connectedAccount.getId(), "connected"));
+        GoogleCalendarIntegration disconnected = googleCalendarIntegrationRepository.saveAndFlush(
+                integration(disconnectedAccount.getId(), "disconnected"));
+        disconnected.disconnect(Instant.parse("2026-08-23T00:00:00Z"));
+        googleCalendarIntegrationRepository.saveAndFlush(disconnected);
+        GoogleCalendarIntegration syncError = googleCalendarIntegrationRepository.saveAndFlush(
+                integration(syncErrorAccount.getId(), "sync-error"));
+        syncError.markSyncError("ACCOUNT_WIDE_INVARIANT", Instant.parse("2026-08-23T00:00:00Z"));
+        googleCalendarIntegrationRepository.saveAndFlush(syncError);
+
+        assertThat(googleCalendarIntegrationRepository.findConnectedAccountIdsAfter(0L, PageRequest.of(0, 10)))
+                .contains(connectedAccount.getId())
+                .doesNotContain(disconnectedAccount.getId(), syncErrorAccount.getId());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("disconnect 이후 stale worker는 cursor와 access token, operation lease를 갱신하지 못한다")
+    void givenDisconnectedIntegration_whenWorkerPersistsProviderState_thenAllFencedUpdatesAreRejected() {
+        Account account = accountRepository.saveAndFlush(new Account());
+        GoogleCalendarIntegration integration = googleCalendarIntegrationRepository.saveAndFlush(
+                integration(account.getId(), "google-subject"));
+        integration.disconnect(Instant.parse("2026-08-23T00:00:00Z"));
+        googleCalendarIntegrationRepository.saveAndFlush(integration);
+
+        assertThat(googleCalendarIntegrationRepository.updateNextSyncToken(integration.getId(), "stale-cursor"))
+                .isZero();
+        assertThat(googleCalendarIntegrationRepository.updateAccessToken(
+                integration.getId(), "encrypted-refresh-token", "stale-access-token",
+                Instant.parse("2026-08-23T01:00:00Z"))).isZero();
+        assertThat(googleCalendarIntegrationRepository.acquireGoogleOperationLease(
+                account.getId(), "stale-worker", 300)).isZero();
     }
 
     private GoogleCalendarIntegration integration(Long accountId, String googleSubject) {

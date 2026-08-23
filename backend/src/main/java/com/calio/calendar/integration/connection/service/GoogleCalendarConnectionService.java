@@ -8,12 +8,10 @@ import com.calio.calendar.external.google.dto.GoogleTokenResponse;
 import com.calio.calendar.external.google.dto.GoogleUserInfoResponse;
 import com.calio.calendar.integration.connection.controller.dto.GoogleCalendarIntegrationResponse;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
-import com.calio.calendar.integration.sync.GoogleCalendarIntegrationDataService;
-import com.calio.calendar.integration.sync.operation.GoogleOperationJobCommandService;
+import com.calio.calendar.integration.sync.operation.GoogleOperationJobEnqueueService;
 import com.calio.calendar.security.TokenEncryptor;
 import java.time.Clock;
 import java.time.Instant;
-import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -32,10 +30,9 @@ public class GoogleCalendarConnectionService {
     private final TokenEncryptor tokenEncryptor;
     private final GoogleCalendarIntegrationQueryService integrationQueryService;
     private final GoogleCalendarIntegrationCommandService integrationCommandService;
-    private final GoogleCalendarIntegrationDataService integrationDataService;
-    private final GoogleOperationJobCommandService jobCommandService;
+    private final GoogleOperationJobEnqueueService enqueueService;
+    private final GoogleCalendarIntegrationLifecycleService lifecycleService;
     private final TransactionTemplate registrationTransaction;
-    private final TransactionTemplate removalTransaction;
     private final Clock clock;
 
     public GoogleCalendarConnectionService(
@@ -44,8 +41,8 @@ public class GoogleCalendarConnectionService {
             TokenEncryptor tokenEncryptor,
             GoogleCalendarIntegrationQueryService integrationQueryService,
             GoogleCalendarIntegrationCommandService integrationCommandService,
-            GoogleCalendarIntegrationDataService integrationDataService,
-            GoogleOperationJobCommandService jobCommandService,
+            GoogleOperationJobEnqueueService enqueueService,
+            GoogleCalendarIntegrationLifecycleService lifecycleService,
             PlatformTransactionManager transactionManager,
             Clock clock
     ) {
@@ -54,13 +51,12 @@ public class GoogleCalendarConnectionService {
         this.tokenEncryptor = tokenEncryptor;
         this.integrationQueryService = integrationQueryService;
         this.integrationCommandService = integrationCommandService;
-        this.integrationDataService = integrationDataService;
-        this.jobCommandService = jobCommandService;
+        this.enqueueService = enqueueService;
+        this.lifecycleService = lifecycleService;
         this.registrationTransaction = new TransactionTemplate(transactionManager);
         this.registrationTransaction.setPropagationBehavior(
                 TransactionDefinition.PROPAGATION_REQUIRES_NEW
         );
-        this.removalTransaction = new TransactionTemplate(transactionManager);
         this.clock = clock;
     }
 
@@ -80,27 +76,23 @@ public class GoogleCalendarConnectionService {
                 accessTokenExpiresAt,
                 tokenReceivedAt
         );
+        enqueueService.enqueueManualSync(accountId);
         return GoogleCalendarIntegrationResponse.connected(integration);
     }
 
     public GoogleCalendarIntegrationResponse getConnectionStatus(Long accountId) {
         return integrationQueryService.getIntegrationIfExists(accountId)
+                .filter(GoogleCalendarIntegration::isConnected)
                 .map(GoogleCalendarIntegrationResponse::connected)
                 .orElseGet(GoogleCalendarIntegrationResponse::disconnected);
     }
 
     public void disconnect(Long accountId) {
-        Optional<GoogleCalendarIntegration> integration =
-                integrationQueryService.getIntegrationIfExists(accountId);
-        if (integration.isEmpty()) {
+        var refreshToken = lifecycleService.disconnectConnectedIntegration(accountId, Instant.now(clock));
+        if (refreshToken.isEmpty()) {
             return;
         }
-
-        String refreshToken = tokenEncryptor.decrypt(
-                integration.get().getEncryptedRefreshToken()
-        );
-        googleOAuthClient.revokeToken(refreshToken);
-        removeLocalConnection(accountId);
+        revokeTokenSafely(accountId, refreshToken.get());
     }
 
     private void validateConfiguration() {
@@ -205,7 +197,9 @@ public class GoogleCalendarConnectionService {
             GoogleCalendarIntegration integration,
             GoogleCalendarConnectionCredentials credentials
     ) {
-        integrationDataService.deleteIntegrationData(integration.getId());
+        if (!integration.getGoogleSubject().equals(credentials.googleSubject())) {
+            throw new CalioException(ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED);
+        }
         return integrationCommandService.replaceIntegration(
                 integration,
                 credentials.googleSubject(),
@@ -217,16 +211,13 @@ public class GoogleCalendarConnectionService {
         );
     }
 
-    private void removeLocalConnection(Long accountId) {
-        removalTransaction.executeWithoutResult(status ->
-                integrationCommandService.tryLockIntegration(accountId)
-                        .ifPresent(this::removeConnection));
-    }
-
-    private void removeConnection(GoogleCalendarIntegration integration) {
-        jobCommandService.deleteJobsForIntegration(integration.getId());
-        integrationDataService.deleteIntegrationData(integration.getId());
-        integrationCommandService.deleteIntegration(integration);
+    private void revokeTokenSafely(Long accountId, String encryptedRefreshToken) {
+        try {
+            googleOAuthClient.revokeToken(tokenEncryptor.decrypt(encryptedRefreshToken));
+        } catch (RuntimeException exception) {
+            log.warn("Google Calendar token revoke failed after local disconnect. accountId={} causeType={}",
+                    accountId, exception.getClass().getSimpleName());
+        }
     }
 
     private record EncryptedGoogleTokens(

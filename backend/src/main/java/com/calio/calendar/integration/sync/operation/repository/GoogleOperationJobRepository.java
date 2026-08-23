@@ -123,9 +123,14 @@ public interface GoogleOperationJobRepository extends JpaRepository<GoogleOperat
 
     @Query("""
             select distinct job.accountId from GoogleOperationJob job
-            where (job.state = com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState.PENDING
-                   and job.runnableAt <= :now)
-               or job.state = com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState.PROCESSING
+            where ((job.state = com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState.PENDING
+                    and job.runnableAt <= :now)
+                   or job.state = com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState.PROCESSING)
+              and exists (
+                  select 1 from GoogleCalendarIntegration integration
+                  where integration.id = job.integrationId
+                    and integration.state = com.calio.calendar.integration.connection.domain.GoogleCalendarIntegrationState.CONNECTED
+              )
             order by job.accountId
             """)
     List<Long> findRecoverableAccountIds(
