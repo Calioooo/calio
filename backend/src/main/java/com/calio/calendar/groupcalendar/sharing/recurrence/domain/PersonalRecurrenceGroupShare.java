@@ -3,6 +3,7 @@ package com.calio.calendar.groupcalendar.sharing.recurrence.domain;
 import com.calio.calendar.common.domain.BaseEntity;
 import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -35,6 +36,9 @@ public class PersonalRecurrenceGroupShare extends BaseEntity {
     @JoinColumn(name = "group_space_id", nullable = false)
     private GroupSpace groupSpace;
 
+    @Column(name = "show_original_details", nullable = false)
+    private boolean showOriginalDetails;
+
     protected PersonalRecurrenceGroupShare() {
     }
 
@@ -44,6 +48,10 @@ public class PersonalRecurrenceGroupShare extends BaseEntity {
     ) {
         this.recurrenceEvent = recurrenceEvent;
         this.groupSpace = groupSpace;
+    }
+
+    public void changeOriginalDetailsVisibility(boolean showOriginalDetails) {
+        this.showOriginalDetails = showOriginalDetails;
     }
 
     public Long getId() {
@@ -56,5 +64,9 @@ public class PersonalRecurrenceGroupShare extends BaseEntity {
 
     public GroupSpace getGroupSpace() {
         return groupSpace;
+    }
+
+    public boolean isShowOriginalDetails() {
+        return showOriginalDetails;
     }
 }

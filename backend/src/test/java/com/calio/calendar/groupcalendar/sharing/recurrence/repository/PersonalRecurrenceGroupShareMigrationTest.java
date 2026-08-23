@@ -27,4 +27,23 @@ class PersonalRecurrenceGroupShareMigrationTest {
                 .doesNotContain("personal_recurrence_group_share_selected_origins")
                 .doesNotContain("personal_recurrence_group_share_occurrence_overrides");
     }
+
+    @Test
+    @DisplayName("반복 공유 migration은 원본 상세 공개 여부만 추가한다")
+    void migrationAddsPersonalRecurrenceGroupSharePrivacyState() throws IOException {
+        // when
+        String migration = new ClassPathResource(
+                "db/migration/V24__personal_recurrence_group_share_privacy.sql"
+        ).getContentAsString(StandardCharsets.UTF_8);
+
+        // then
+        assertThat(migration)
+                .contains("personal_recurrence_group_shares")
+                .contains("show_original_details BOOLEAN NOT NULL DEFAULT FALSE")
+                .doesNotContain("override_title")
+                .doesNotContain("override_start_at")
+                .doesNotContain("override_end_at")
+                .doesNotContain("override_all_day")
+                .doesNotContain("personal_recurrence_group_share_occurrence_overrides");
+    }
 }
