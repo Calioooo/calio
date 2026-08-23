@@ -1,8 +1,8 @@
 package com.calio.calendar.groupcalendar.sharing.event.controller;
 
-import com.calio.calendar.groupcalendar.sharing.event.controller.dto.SelectedPersonalEventGroupShareRequest;
+import com.calio.calendar.groupcalendar.sharing.event.controller.dto.PersonalEventGroupShareRequest;
 import com.calio.calendar.groupcalendar.sharing.event.service.PersonalEventGroupShareService;
-import com.calio.calendar.groupcalendar.sharing.event.service.dto.SelectedPersonalEventGroupShareCommand;
+import com.calio.calendar.groupcalendar.sharing.event.service.dto.PersonalEventGroupShareCommand;
 import com.calio.calendar.security.AuthenticatedAccount;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -26,15 +26,18 @@ public class PersonalEventGroupShareController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public void shareSelected(
+    public void share(
             @AuthenticationPrincipal AuthenticatedAccount account,
             @PathVariable Long groupSpaceId,
-            @Valid @RequestBody SelectedPersonalEventGroupShareRequest request
+            @Valid @RequestBody PersonalEventGroupShareRequest request
     ) {
-        shareService.shareSelected(
+        shareService.share(
                 account.accountId(),
                 groupSpaceId,
-                new SelectedPersonalEventGroupShareCommand(request.eventIds())
+                new PersonalEventGroupShareCommand(
+                        request.selectionEnabled(),
+                        request.eventIdsOrEmpty()
+                )
         );
     }
 }

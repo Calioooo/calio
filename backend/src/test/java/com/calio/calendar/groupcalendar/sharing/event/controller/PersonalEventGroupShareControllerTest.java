@@ -75,7 +75,7 @@ class PersonalEventGroupShareControllerTest {
         mockMvc.perform(post("/api/group-spaces/{groupSpaceId}/event-shares", groupSpace.getId())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                { "eventIds": [%d, %d] }
+                                { "selectionEnabled": true, "eventIds": [%d, %d] }
                                 """.formatted(firstEvent.getId(), secondEvent.getId())))
                 // then
                 .andExpect(status().isCreated());
@@ -95,19 +95,39 @@ class PersonalEventGroupShareControllerTest {
         // when, then
         mockMvc.perform(post("/api/group-spaces/{groupSpaceId}/event-shares", groupSpace.getId())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{ \"eventIds\": [%d] }".formatted(otherEvent.getId())))
+                        .content("{ \"selectionEnabled\": true, \"eventIds\": [%d] }".formatted(otherEvent.getId())))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorCode").value("EVENT_NOT_FOUND"));
 
         mockMvc.perform(post("/api/group-spaces/{groupSpaceId}/event-shares", groupSpace.getId())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{ \"eventIds\": [%d] }".formatted(ownedEvent.getId())))
+                        .content("{ \"selectionEnabled\": true, \"eventIds\": [%d] }".formatted(ownedEvent.getId())))
                 .andExpect(status().isCreated());
         mockMvc.perform(post("/api/group-spaces/{groupSpaceId}/event-shares", groupSpace.getId())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{ \"eventIds\": [%d] }".formatted(ownedEvent.getId())))
+                        .content("{ \"selectionEnabled\": true, \"eventIds\": [%d] }".formatted(ownedEvent.getId())))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.errorCode").value("PERSONAL_EVENT_GROUP_SHARE_CONFLICT"));
+    }
+
+    @Test
+    @DisplayName("선택 공유를 끄면 요청 시점의 모든 개인 단건 일정만 공유한다")
+    void givenBulkSelectionDisabled_whenShare_thenSharesCurrentOneOffEventsOnly() throws Exception {
+        // given
+        Long accountId = currentAccountId();
+        GroupSpace groupSpace = activeGroupSpace();
+        Event existingEvent = event(accountId, "기존 일정");
+
+        // when
+        mockMvc.perform(post("/api/group-spaces/{groupSpaceId}/event-shares", groupSpace.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{ \"selectionEnabled\": false }"))
+                // then
+                .andExpect(status().isCreated());
+
+        Event laterEvent = event(accountId, "나중 일정");
+        assertThat(shareRepository.findAllByEventId(existingEvent.getId())).hasSize(1);
+        assertThat(shareRepository.findAllByEventId(laterEvent.getId())).isEmpty();
     }
 
     private GroupSpace activeGroupSpace() {

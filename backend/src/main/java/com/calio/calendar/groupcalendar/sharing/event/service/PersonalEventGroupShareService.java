@@ -3,7 +3,9 @@ package com.calio.calendar.groupcalendar.sharing.event.service;
 import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.event.service.EventQueryService;
 import com.calio.calendar.groupcalendar.sharing.event.domain.PersonalEventGroupShare;
-import com.calio.calendar.groupcalendar.sharing.event.service.dto.SelectedPersonalEventGroupShareCommand;
+import com.calio.calendar.common.error.CalioException;
+import com.calio.calendar.common.error.ErrorCode;
+import com.calio.calendar.groupcalendar.sharing.event.service.dto.PersonalEventGroupShareCommand;
 import com.calio.calendar.groupspace.domain.GroupMember;
 import com.calio.calendar.groupspace.service.GroupMembershipQueryService;
 import java.util.LinkedHashSet;
@@ -31,16 +33,34 @@ public class PersonalEventGroupShareService {
     }
 
     @Transactional
-    public void shareSelected(
+    public void share(
             Long accountId,
             Long groupSpaceId,
-            SelectedPersonalEventGroupShareCommand command
+            PersonalEventGroupShareCommand command
     ) {
         GroupMember membership = membershipQueryService.getActiveMembership(groupSpaceId, accountId);
-        selectedEvents(accountId, command.eventIds())
+        shareEvents(accountId, command, membership);
+    }
+
+    private void shareEvents(
+            Long accountId,
+            PersonalEventGroupShareCommand command,
+            GroupMember membership
+    ) {
+        eventsToShare(accountId, command)
                 .forEach(event -> shareCommandService.createShare(
                         new PersonalEventGroupShare(event, membership.getGroupSpace())
                 ));
+    }
+
+    private List<Event> eventsToShare(Long accountId, PersonalEventGroupShareCommand command) {
+        if (!command.selectionEnabled()) {
+            return eventQueryService.listPersonalOneOffEvents(accountId);
+        }
+        if (command.eventIds().isEmpty()) {
+            throw new CalioException(ErrorCode.VALIDATION_FAILED);
+        }
+        return selectedEvents(accountId, command.eventIds());
     }
 
     private List<Event> selectedEvents(Long accountId, List<Long> eventIds) {
