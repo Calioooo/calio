@@ -9,6 +9,7 @@ import com.calio.calendar.external.google.dto.GoogleUserInfoResponse;
 import com.calio.calendar.integration.connection.controller.dto.GoogleCalendarIntegrationResponse;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobEnqueueService;
+import com.calio.calendar.integration.sync.operation.GoogleOperationJobCommandService;
 import com.calio.calendar.security.TokenEncryptor;
 import java.time.Clock;
 import java.time.Instant;
@@ -30,9 +31,10 @@ public class GoogleCalendarConnectionService {
     private final TokenEncryptor tokenEncryptor;
     private final GoogleCalendarIntegrationQueryService integrationQueryService;
     private final GoogleCalendarIntegrationCommandService integrationCommandService;
+    private final GoogleOperationJobCommandService jobCommandService;
     private final GoogleOperationJobEnqueueService enqueueService;
-    private final GoogleCalendarIntegrationLifecycleService lifecycleService;
     private final TransactionTemplate registrationTransaction;
+    private final TransactionTemplate disconnectTransaction;
     private final Clock clock;
 
     public GoogleCalendarConnectionService(
@@ -41,8 +43,8 @@ public class GoogleCalendarConnectionService {
             TokenEncryptor tokenEncryptor,
             GoogleCalendarIntegrationQueryService integrationQueryService,
             GoogleCalendarIntegrationCommandService integrationCommandService,
+            GoogleOperationJobCommandService jobCommandService,
             GoogleOperationJobEnqueueService enqueueService,
-            GoogleCalendarIntegrationLifecycleService lifecycleService,
             PlatformTransactionManager transactionManager,
             Clock clock
     ) {
@@ -51,12 +53,13 @@ public class GoogleCalendarConnectionService {
         this.tokenEncryptor = tokenEncryptor;
         this.integrationQueryService = integrationQueryService;
         this.integrationCommandService = integrationCommandService;
+        this.jobCommandService = jobCommandService;
         this.enqueueService = enqueueService;
-        this.lifecycleService = lifecycleService;
         this.registrationTransaction = new TransactionTemplate(transactionManager);
         this.registrationTransaction.setPropagationBehavior(
                 TransactionDefinition.PROPAGATION_REQUIRES_NEW
         );
+        this.disconnectTransaction = new TransactionTemplate(transactionManager);
         this.clock = clock;
     }
 
@@ -88,11 +91,25 @@ public class GoogleCalendarConnectionService {
     }
 
     public void disconnect(Long accountId) {
-        var refreshToken = lifecycleService.disconnectConnectedIntegration(accountId, Instant.now(clock));
-        if (refreshToken.isEmpty()) {
+        String encryptedRefreshToken = disconnectTransaction.execute(status ->
+                disconnectLocally(accountId, Instant.now(clock))
+        );
+        if (encryptedRefreshToken == null) {
             return;
         }
-        revokeTokenSafely(accountId, refreshToken.get());
+        revokeTokenSafely(accountId, encryptedRefreshToken);
+    }
+
+    private String disconnectLocally(Long accountId, Instant disconnectedAt) {
+        return integrationCommandService.tryLockIntegration(accountId)
+                .filter(GoogleCalendarIntegration::isConnected)
+                .map(integration -> {
+                    String encryptedRefreshToken = integration.getEncryptedRefreshToken();
+                    jobCommandService.deleteJobsForIntegration(integration.getId());
+                    integrationCommandService.disconnectIntegration(integration, disconnectedAt);
+                    return encryptedRefreshToken;
+                })
+                .orElse(null);
     }
 
     private void validateConfiguration() {

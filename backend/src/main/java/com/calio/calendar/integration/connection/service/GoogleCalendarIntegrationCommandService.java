@@ -90,6 +90,16 @@ public class GoogleCalendarIntegrationCommandService {
         integrationRepository.saveAndFlush(integration);
     }
 
+    public void markConnectedIntegrationSyncError(
+            Long accountId,
+            String reason,
+            Instant occurredAt
+    ) {
+        tryLockIntegration(accountId)
+                .filter(GoogleCalendarIntegration::isConnected)
+                .ifPresent(integration -> markIntegrationSyncError(integration, reason, occurredAt));
+    }
+
     public void deleteIntegration(GoogleCalendarIntegration integration) {
         integrationRepository.delete(integration);
     }

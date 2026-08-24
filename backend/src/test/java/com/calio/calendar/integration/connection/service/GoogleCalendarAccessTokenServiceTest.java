@@ -11,12 +11,17 @@ import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.external.google.GoogleCalendarInvalidGrantException;
 import com.calio.calendar.external.google.GoogleOAuthClient;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
+import com.calio.calendar.integration.sync.operation.GoogleOperationJobCommandService;
 import com.calio.calendar.security.TokenEncryptor;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.AbstractPlatformTransactionManager;
+import org.springframework.transaction.support.DefaultTransactionStatus;
 
 class GoogleCalendarAccessTokenServiceTest {
 
@@ -28,14 +33,15 @@ class GoogleCalendarAccessTokenServiceTest {
             mock(GoogleCalendarIntegrationCommandService.class);
     private final GoogleOAuthClient googleOAuthClient = mock(GoogleOAuthClient.class);
     private final TokenEncryptor tokenEncryptor = mock(TokenEncryptor.class);
-    private final GoogleCalendarIntegrationLifecycleService lifecycleService =
-            mock(GoogleCalendarIntegrationLifecycleService.class);
+    private final GoogleOperationJobCommandService jobCommandService =
+            mock(GoogleOperationJobCommandService.class);
     private final GoogleCalendarAccessTokenService service = new GoogleCalendarAccessTokenService(
             integrationQueryService,
             integrationCommandService,
             googleOAuthClient,
             tokenEncryptor,
-            lifecycleService,
+            jobCommandService,
+            new NoOpTransactionManager(),
             Clock.fixed(NOW, ZoneOffset.UTC)
     );
 
@@ -45,10 +51,13 @@ class GoogleCalendarAccessTokenServiceTest {
         // given
         GoogleCalendarIntegration integration = mock(GoogleCalendarIntegration.class);
         when(integration.getId()).thenReturn(10L);
+        when(integration.isConnected()).thenReturn(true);
         when(integration.getEncryptedRefreshToken()).thenReturn("encrypted-refresh-token");
         when(integration.getEncryptedAccessToken()).thenReturn("encrypted-access-token");
         when(integration.getAccessTokenExpiresAt()).thenReturn(NOW.plusSeconds(3600));
         when(integrationQueryService.getIntegrationById(10L)).thenReturn(integration);
+        when(integrationCommandService.tryLockIntegrationById(10L))
+                .thenReturn(Optional.of(integration));
         when(tokenEncryptor.decrypt("encrypted-refresh-token")).thenReturn("refresh-token");
         when(googleOAuthClient.refreshAccessToken("refresh-token"))
                 .thenThrow(new GoogleCalendarInvalidGrantException(new RuntimeException("invalid_grant")));
@@ -58,6 +67,28 @@ class GoogleCalendarAccessTokenServiceTest {
                 .isInstanceOfSatisfying(CalioException.class, exception ->
                         assertThat(exception.getErrorCode())
                                 .isEqualTo(ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED));
-        verify(lifecycleService).disconnectAfterInvalidGrant(10L, NOW);
+        verify(integrationCommandService).tryLockIntegrationById(10L);
+        verify(jobCommandService).deleteJobsForIntegration(10L);
+        verify(integrationCommandService).disconnectIntegration(integration, NOW);
+    }
+
+    private static class NoOpTransactionManager extends AbstractPlatformTransactionManager {
+
+        @Override
+        protected Object doGetTransaction() {
+            return new Object();
+        }
+
+        @Override
+        protected void doBegin(Object transaction, TransactionDefinition definition) {
+        }
+
+        @Override
+        protected void doCommit(DefaultTransactionStatus status) {
+        }
+
+        @Override
+        protected void doRollback(DefaultTransactionStatus status) {
+        }
     }
 }
