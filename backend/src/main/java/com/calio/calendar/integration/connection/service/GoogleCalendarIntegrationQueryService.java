@@ -24,11 +24,13 @@ public class GoogleCalendarIntegrationQueryService {
 
     public GoogleCalendarIntegration getIntegration(Long accountId) {
         return integrationRepository.findByAccountId(accountId)
+                .filter(GoogleCalendarIntegration::isConnected)
                 .orElseThrow(() -> new CalioException(ErrorCode.GOOGLE_CALENDAR_NOT_CONNECTED));
     }
 
     public GoogleCalendarIntegration getIntegrationById(Long integrationId) {
         return integrationRepository.findById(integrationId)
+                .filter(GoogleCalendarIntegration::isConnected)
                 .orElseThrow(() -> new CalioException(ErrorCode.GOOGLE_CALENDAR_NOT_CONNECTED));
     }
 

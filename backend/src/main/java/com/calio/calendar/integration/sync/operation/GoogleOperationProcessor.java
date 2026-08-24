@@ -1,8 +1,14 @@
 package com.calio.calendar.integration.sync.operation;
 
 import com.calio.calendar.integration.sync.GoogleCalendarSyncService;
+import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrationCommandService;
+import com.calio.calendar.external.google.GoogleCalendarInvalidGrantException;
+import com.calio.calendar.common.error.CalioException;
+import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJob;
 import com.calio.calendar.integration.sync.operation.dto.GoogleOperationFailureDecision;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 
@@ -15,17 +21,23 @@ public class GoogleOperationProcessor {
     private final GoogleOperationLeaseService operationLeaseService;
     private final GoogleCalendarSyncService syncService;
     private final GoogleOperationFailureClassifier failureClassifier;
+    private final GoogleCalendarIntegrationCommandService integrationCommandService;
+    private final Clock clock;
 
     public GoogleOperationProcessor(
             GoogleOperationJobService jobService,
             GoogleOperationLeaseService operationLeaseService,
             GoogleCalendarSyncService syncService,
-            GoogleOperationFailureClassifier failureClassifier
+            GoogleOperationFailureClassifier failureClassifier,
+            GoogleCalendarIntegrationCommandService integrationCommandService,
+            Clock clock
     ) {
         this.jobService = jobService;
         this.operationLeaseService = operationLeaseService;
         this.syncService = syncService;
         this.failureClassifier = failureClassifier;
+        this.integrationCommandService = integrationCommandService;
+        this.clock = clock;
     }
 
     public void processAccount(Long accountId) {
@@ -65,17 +77,39 @@ public class GoogleOperationProcessor {
             syncService.synchronize(job.getId(), job.getAccountId(), workerToken);
             return JobExecutionResult.CONTINUE_WITH_NEXT_JOB;
         } catch (RuntimeException failure) {
+            return handleSyncFailure(job, workerToken, failure);
+        }
+    }
 
-            GoogleOperationFailureDecision failureDecision = failureClassifier.classify(failure);
-
-            persistFailureAction(
-                    job,
-                    workerToken,
-                    failureDecision
-            );
-
+    private JobExecutionResult handleSyncFailure(
+            GoogleOperationJob job,
+            String workerToken,
+            RuntimeException failure
+    ) {
+        if (isAlreadyDisconnectedAfterInvalidGrant(failure)) {
+            return JobExecutionResult.STOP_ACCOUNT_PROCESSING;
+        }
+        GoogleOperationFailureDecision failureDecision = failureClassifier.classify(failure);
+        persistFailureAction(job, workerToken, failureDecision);
+        if (!requiresIntegrationPause(failure)) {
             return mapExecutionResult(failureDecision);
         }
+        integrationCommandService.markConnectedIntegrationSyncError(
+                job.getAccountId(),
+                ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED.name(),
+                Instant.now(clock)
+        );
+        return JobExecutionResult.STOP_ACCOUNT_PROCESSING;
+    }
+
+    private boolean requiresIntegrationPause(RuntimeException failure) {
+        return failure instanceof CalioException calioException
+                && calioException.getErrorCode() == ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED;
+    }
+
+    private boolean isAlreadyDisconnectedAfterInvalidGrant(RuntimeException failure) {
+        return failure instanceof CalioException calioException
+                && calioException.getCause() instanceof GoogleCalendarInvalidGrantException;
     }
 
     private void persistFailureAction(

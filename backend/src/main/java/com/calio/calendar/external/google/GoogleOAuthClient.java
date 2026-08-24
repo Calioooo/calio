@@ -30,6 +30,7 @@ public class GoogleOAuthClient {
     private static final String AUTHORIZATION_CODE_GRANT = "authorization_code";
     private static final String REFRESH_TOKEN_GRANT = "refresh_token";
     private static final String INVALID_TOKEN_ERROR = "invalid_token";
+    private static final String INVALID_GRANT_ERROR = "invalid_grant";
 
     private final GoogleOAuthProperties properties;
     private final ObjectMapper objectMapper;
@@ -109,6 +110,9 @@ public class GoogleOAuthClient {
             logGoogleApiFailure("accessTokenRefresh", exception.getErrorCode(), exception);
             throw exception;
         } catch (RestClientResponseException exception) {
+            if (isInvalidGrantRefreshResponse(exception)) {
+                throw new GoogleCalendarInvalidGrantException(exception);
+            }
             ErrorCode errorCode = permanentRefreshFailure(exception)
                     ? ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED
                     : ErrorCode.GOOGLE_CALENDAR_SYNC_FAILED;
@@ -212,6 +216,16 @@ public class GoogleOAuthClient {
             JsonNode root = objectMapper.readTree(exception.getResponseBodyAsString());
             JsonNode error = root.get("error");
             return error != null && INVALID_TOKEN_ERROR.equals(error.asString());
+        } catch (JacksonException ignored) {
+            return false;
+        }
+    }
+
+    private boolean isInvalidGrantRefreshResponse(RestClientResponseException exception) {
+        try {
+            JsonNode root = objectMapper.readTree(exception.getResponseBodyAsString());
+            JsonNode error = root.get("error");
+            return error != null && INVALID_GRANT_ERROR.equals(error.asString());
         } catch (JacksonException ignored) {
             return false;
         }

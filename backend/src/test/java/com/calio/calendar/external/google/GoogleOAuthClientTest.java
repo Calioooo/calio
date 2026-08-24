@@ -223,6 +223,25 @@ class GoogleOAuthClientTest {
     }
 
     @Test
+    @DisplayName("refresh 응답이 invalid_grant이면 retained disconnect를 위한 전용 예외를 발생시킨다")
+    void givenInvalidGrantRefreshFailure_whenRefreshAccessToken_thenSignalsInvalidGrant() {
+        // given
+        RestClient.Builder restClientBuilder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
+        GoogleOAuthClient client = new GoogleOAuthClient(
+                properties(), objectMapper, restClientBuilder.build());
+        server.expect(requestTo("https://oauth.example.test/token"))
+                .andRespond(withStatus(HttpStatus.BAD_REQUEST)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body("{\"error\":\"invalid_grant\"}"));
+
+        // when, then
+        assertThatThrownBy(() -> client.refreshAccessToken("refresh-token"))
+                .isInstanceOf(GoogleCalendarInvalidGrantException.class);
+        server.verify();
+    }
+
+    @Test
     @DisplayName("token 응답 역직렬화 실패는 GOOGLE_TOKEN_RESPONSE_INVALID로 매핑한다")
     void givenMalformedTokenResponse_whenExchangeToken_thenReturnsInvalidTokenResponse() {
         // given

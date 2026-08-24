@@ -24,11 +24,16 @@ public class GoogleCalendarIntegrationCommandService {
 
     public GoogleCalendarIntegration lockIntegration(Long accountId) {
         return integrationRepository.findByAccountIdForUpdate(accountId)
+                .filter(GoogleCalendarIntegration::isConnected)
                 .orElseThrow(() -> new CalioException(ErrorCode.GOOGLE_CALENDAR_NOT_CONNECTED));
     }
 
     public Optional<GoogleCalendarIntegration> tryLockIntegration(Long accountId) {
         return integrationRepository.findByAccountIdForUpdate(accountId);
+    }
+
+    public Optional<GoogleCalendarIntegration> tryLockIntegrationById(Long integrationId) {
+        return integrationRepository.findByIdForUpdate(integrationId);
     }
 
     public GoogleCalendarIntegration createIntegration(
@@ -69,6 +74,30 @@ public class GoogleCalendarIntegrationCommandService {
                 connectedAt
         );
         return integrationRepository.saveAndFlush(integration);
+    }
+
+    public void disconnectIntegration(GoogleCalendarIntegration integration, Instant disconnectedAt) {
+        integration.disconnect(disconnectedAt);
+        integrationRepository.saveAndFlush(integration);
+    }
+
+    public void markIntegrationSyncError(
+            GoogleCalendarIntegration integration,
+            String reason,
+            Instant occurredAt
+    ) {
+        integration.markSyncError(reason, occurredAt);
+        integrationRepository.saveAndFlush(integration);
+    }
+
+    public void markConnectedIntegrationSyncError(
+            Long accountId,
+            String reason,
+            Instant occurredAt
+    ) {
+        tryLockIntegration(accountId)
+                .filter(GoogleCalendarIntegration::isConnected)
+                .ifPresent(integration -> markIntegrationSyncError(integration, reason, occurredAt));
     }
 
     public void deleteIntegration(GoogleCalendarIntegration integration) {

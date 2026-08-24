@@ -352,6 +352,42 @@ class GoogleCalendarSyncMigrationTest {
         }
     }
 
+    @Test
+    @DisplayName("V20은 retained integration lifecycle 상태와 credential 제약을 적용한다")
+    void givenV19Schema_whenMigrateToV20_thenEnforcesRetainedIntegrationLifecycle() throws Exception {
+        String url = "jdbc:h2:mem:google-retained-integration-lifecycle;MODE=MySQL;DB_CLOSE_DELAY=-1";
+        migrateTo(url, MigrationVersion.fromVersion("19"));
+        insertCurrentEventAndIntegration(url);
+
+        migrateTo(url, MigrationVersion.fromVersion("20"));
+
+        try (Connection connection = DriverManager.getConnection(url, "sa", "");
+             Statement statement = connection.createStatement()) {
+            assertThat(columnNames(connection, "GOOGLE_CALENDAR_INTEGRATIONS"))
+                    .contains("INTEGRATION_STATE", "DISCONNECTED_AT", "SYNC_ERROR_REASON", "SYNC_ERROR_AT");
+            assertThat(isNullable(connection, "GOOGLE_CALENDAR_INTEGRATIONS", "ENCRYPTED_REFRESH_TOKEN"))
+                    .isTrue();
+            assertThatThrownBy(() -> statement.executeUpdate("""
+                    UPDATE google_calendar_integrations
+                    SET integration_state = 'DISCONNECTED', disconnected_at = CURRENT_TIMESTAMP
+                    WHERE id = 900
+                    """))
+                    .isInstanceOf(SQLException.class);
+            statement.executeUpdate("""
+                    UPDATE google_calendar_integrations
+                    SET integration_state = 'DISCONNECTED',
+                        encrypted_refresh_token = NULL,
+                        encrypted_access_token = NULL,
+                        access_token_expires_at = NULL,
+                        next_sync_token = NULL,
+                        google_operation_lease_owner = NULL,
+                        google_operation_lease_expires_at = NULL,
+                        disconnected_at = CURRENT_TIMESTAMP
+                    WHERE id = 900
+                    """);
+        }
+    }
+
     private void migrateTo(String url, MigrationVersion target) {
         Flyway.configure()
                 .dataSource(url, "sa", "")

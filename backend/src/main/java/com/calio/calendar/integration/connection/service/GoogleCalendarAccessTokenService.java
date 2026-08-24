@@ -1,23 +1,34 @@
 package com.calio.calendar.integration.connection.service;
 
 import com.calio.calendar.external.google.GoogleOAuthClient;
+import com.calio.calendar.external.google.GoogleCalendarInvalidGrantException;
+import com.calio.calendar.common.error.CalioException;
+import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.external.google.dto.GoogleAccessTokenRefreshResponse;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
+import com.calio.calendar.integration.sync.operation.GoogleOperationJobCommandService;
 import com.calio.calendar.security.TokenEncryptor;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 public class GoogleCalendarAccessTokenService {
 
     private static final Duration REFRESH_WINDOW = Duration.ofSeconds(60);
+    private static final Logger log = LoggerFactory.getLogger(GoogleCalendarAccessTokenService.class);
 
     private final GoogleCalendarIntegrationQueryService integrationQueryService;
     private final GoogleCalendarIntegrationCommandService integrationCommandService;
     private final GoogleOAuthClient googleOAuthClient;
     private final TokenEncryptor tokenEncryptor;
+    private final GoogleOperationJobCommandService jobCommandService;
+    private final TransactionTemplate disconnectTransaction;
     private final Clock clock;
 
     public GoogleCalendarAccessTokenService(
@@ -25,12 +36,16 @@ public class GoogleCalendarAccessTokenService {
             GoogleCalendarIntegrationCommandService integrationCommandService,
             GoogleOAuthClient googleOAuthClient,
             TokenEncryptor tokenEncryptor,
+            GoogleOperationJobCommandService jobCommandService,
+            PlatformTransactionManager transactionManager,
             Clock clock
     ) {
         this.integrationQueryService = integrationQueryService;
         this.integrationCommandService = integrationCommandService;
         this.googleOAuthClient = googleOAuthClient;
         this.tokenEncryptor = tokenEncryptor;
+        this.jobCommandService = jobCommandService;
+        this.disconnectTransaction = new TransactionTemplate(transactionManager);
         this.clock = clock;
     }
 
@@ -48,11 +63,30 @@ public class GoogleCalendarAccessTokenService {
 
     private String refresh(TokenState tokenState) {
         String refreshToken = tokenEncryptor.decrypt(tokenState.encryptedRefreshToken());
-        GoogleAccessTokenRefreshResponse response = googleOAuthClient.refreshAccessToken(refreshToken);
+        GoogleAccessTokenRefreshResponse response;
+        try {
+            response = googleOAuthClient.refreshAccessToken(refreshToken);
+        } catch (GoogleCalendarInvalidGrantException exception) {
+            disconnectAfterInvalidGrant(tokenState.integrationId(), Instant.now(clock));
+            log.warn("Google Calendar integration disconnected after invalid_grant. integrationId={}",
+                    tokenState.integrationId());
+            throw new CalioException(ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED, exception);
+        }
         String encryptedAccessToken = tokenEncryptor.encryptAccessToken(response.accessToken());
         Instant expiresAt = Instant.now(clock).plusSeconds(response.expiresIn());
         persistRefreshedToken(tokenState, encryptedAccessToken, expiresAt);
         return response.accessToken();
+    }
+
+    private void disconnectAfterInvalidGrant(Long integrationId, Instant disconnectedAt) {
+        disconnectTransaction.executeWithoutResult(status -> integrationCommandService
+                .tryLockIntegrationById(integrationId)
+                .filter(GoogleCalendarIntegration::isConnected)
+                .ifPresent(integration -> {
+                    jobCommandService.deleteJobsForIntegration(integration.getId());
+                    integrationCommandService.disconnectIntegration(integration, disconnectedAt);
+                })
+        );
     }
 
     private boolean isUsable(Instant expiresAt) {
