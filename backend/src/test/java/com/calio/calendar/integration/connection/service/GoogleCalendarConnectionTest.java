@@ -1,6 +1,9 @@
 package com.calio.calendar.integration.connection.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.calio.calendar.account.domain.Account;
@@ -145,6 +148,31 @@ class GoogleCalendarConnectionTest {
     }
 
     @Test
+    @DisplayName("다른 Google subject 재연결은 retained Integration과 provider mapping을 변경하지 않는다")
+    void givenDisconnectedIntegrationWithProviderData_whenConnectDifferentSubject_thenPreservesRetainedData() {
+        Account account = accountRepository.saveAndFlush(new Account());
+        GoogleCalendarIntegration integration = integrationRepository.saveAndFlush(integration(account.getId()));
+        Event event = createMappedEvent(account, integration, "retained-event");
+        integration.disconnect(Instant.parse("2026-08-24T00:00:00Z"));
+        integrationRepository.saveAndFlush(integration);
+        stubGoogleConnection();
+        when(googleOAuthClient.fetchUserInfo("new-access-token"))
+                .thenReturn(new GoogleUserInfoResponse("other-subject", "other@example.com"));
+
+        assertThatThrownBy(() -> connectionService.connect(account.getId(), "authorization-code"))
+                .isInstanceOfSatisfying(com.calio.calendar.common.error.CalioException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(com.calio.calendar.common.error.ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED));
+
+        assertThat(integrationRepository.findById(integration.getId()).orElseThrow().getState())
+                .isEqualTo(GoogleCalendarIntegrationState.DISCONNECTED);
+        assertThat(mappingRepository.findEventIdsByIntegrationId(integration.getId()))
+                .containsExactly(event.getId());
+        assertThat(eventRepository.findById(event.getId())).isPresent();
+        assertThat(operationJobRepository.count()).isZero();
+    }
+
+    @Test
     @DisplayName("disconnect시 mapping과 canonical 일정을 보존하고 Integration을 DISCONNECTED로 전환한다")
     void givenConnectedProviderData_whenDisconnect_thenRetainsProviderData() {
         // given
@@ -168,6 +196,20 @@ class GoogleCalendarConnectionTest {
         assertThat(disconnected.getEncryptedRefreshToken()).isNull();
         assertThat(disconnected.getEncryptedAccessToken()).isNull();
         assertThat(disconnected.getNextSyncToken()).isNull();
+    }
+
+    @Test
+    @DisplayName("반복 disconnect는 두 번째 Google revoke와 credential 복호화 없이 성공한다")
+    void givenDisconnectedIntegration_whenDisconnectAgain_thenDoesNotRevokeAgain() {
+        Account account = accountRepository.saveAndFlush(new Account());
+        integrationRepository.saveAndFlush(integration(account.getId()));
+        stubGoogleRevocation();
+
+        connectionService.disconnect(account.getId());
+        connectionService.disconnect(account.getId());
+
+        verify(tokenEncryptor, times(1)).decrypt("encrypted-refresh-token");
+        verify(googleOAuthClient, times(1)).revokeToken("refresh-token");
     }
 
     @Test

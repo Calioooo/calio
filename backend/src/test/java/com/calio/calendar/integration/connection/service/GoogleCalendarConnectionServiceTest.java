@@ -177,6 +177,7 @@ class GoogleCalendarConnectionServiceTest {
         FakeGoogleOAuthClient googleOAuthClient = connectedGoogleOAuthClient();
         googleOAuthClient.userInfoResponse = new GoogleUserInfoResponse("different-subject", "other@example.com");
         GoogleCalendarIntegration retainedIntegration = integrationWithRefreshToken("old-token");
+        retainedIntegration.disconnect(NOW);
         when(integrationCommandService.tryLockIntegration(ACCOUNT_ID))
                 .thenReturn(Optional.of(retainedIntegration));
         GoogleCalendarConnectionService service = service(googleOAuthClient);
