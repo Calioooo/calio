@@ -113,6 +113,8 @@ public class GoogleCalendarIntegration extends BaseEntity {
         this.disconnectedAt = null;
         this.syncErrorReason = null;
         this.syncErrorAt = null;
+        this.googleOperationLeaseOwner = null;
+        this.googleOperationLeaseExpiresAt = null;
         clearSyncCursor();
     }
 

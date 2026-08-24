@@ -11,6 +11,8 @@ import com.calio.calendar.security.TokenEncryptor;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -19,6 +21,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class GoogleCalendarAccessTokenService {
 
     private static final Duration REFRESH_WINDOW = Duration.ofSeconds(60);
+    private static final Logger log = LoggerFactory.getLogger(GoogleCalendarAccessTokenService.class);
 
     private final GoogleCalendarIntegrationQueryService integrationQueryService;
     private final GoogleCalendarIntegrationCommandService integrationCommandService;
@@ -65,6 +68,8 @@ public class GoogleCalendarAccessTokenService {
             response = googleOAuthClient.refreshAccessToken(refreshToken);
         } catch (GoogleCalendarInvalidGrantException exception) {
             disconnectAfterInvalidGrant(tokenState.integrationId(), Instant.now(clock));
+            log.warn("Google Calendar integration disconnected after invalid_grant. integrationId={}",
+                    tokenState.integrationId());
             throw new CalioException(ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED, exception);
         }
         String encryptedAccessToken = tokenEncryptor.encryptAccessToken(response.accessToken());
