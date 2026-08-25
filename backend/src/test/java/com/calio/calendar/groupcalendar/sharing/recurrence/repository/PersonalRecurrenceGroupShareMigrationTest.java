@@ -11,7 +11,7 @@ import org.springframework.core.io.ClassPathResource;
 class PersonalRecurrenceGroupShareMigrationTest {
 
     @Test
-    @DisplayName("개인 반복 일정 공유 migration은 원본·Group Space·선택 회차 FK와 중복 제약을 정의한다")
+    @DisplayName("개인 반복 일정 공유 migration은 반복 마스터와 Group Space의 고유 매핑만 정의한다")
     void migrationDefinesPersonalRecurrenceGroupSharePersistenceContract() throws IOException {
         // when
         String migration = new ClassPathResource("db/migration/V23__personal_recurrence_group_shares.sql")
@@ -23,9 +23,8 @@ class PersonalRecurrenceGroupShareMigrationTest {
                 .contains("UNIQUE (recurrence_event_id, group_space_id)")
                 .contains("FOREIGN KEY (recurrence_event_id) REFERENCES recurrence_events (id)")
                 .contains("FOREIGN KEY (group_space_id) REFERENCES group_spaces (id)")
-                .contains("CREATE TABLE personal_recurrence_group_share_selected_origins")
-                .contains("UNIQUE (share_id, origin_start_at)")
-                .contains("CREATE TABLE personal_recurrence_group_share_occurrence_overrides")
-                .contains("ON DELETE CASCADE");
+                .doesNotContain("share_scope")
+                .doesNotContain("personal_recurrence_group_share_selected_origins")
+                .doesNotContain("personal_recurrence_group_share_occurrence_overrides");
     }
 }

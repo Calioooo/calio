@@ -6,8 +6,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.groupcalendar.sharing.recurrence.domain.PersonalRecurrenceGroupShare;
-import com.calio.calendar.groupcalendar.sharing.recurrence.domain.PersonalRecurrenceGroupShareScope;
-import com.calio.calendar.groupcalendar.sharing.recurrence.domain.PersonalRecurrenceGroupShareSelectedOrigin;
 import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.repository.GroupSpaceRepository;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
@@ -43,36 +41,28 @@ class PersonalRecurrenceGroupShareRepositoryTest {
     private PersonalRecurrenceGroupShareRepository shareRepository;
 
     @Autowired
-    private PersonalRecurrenceGroupShareSelectedOriginRepository selectedOriginRepository;
-
-    @Autowired
     private RecurrenceEventRepository recurrenceEventRepository;
 
     @Autowired
     private TagRepository tagRepository;
 
     @Test
-    @DisplayName("선택 반복 공유는 occurrence 행이 아닌 originStartAt 선택만 저장한다")
-    void givenSelectedOccurrenceShare_whenSaveOrigin_thenPersistsOriginMapping() {
+    @DisplayName("반복 일정 공유는 반복 마스터와 Group Space의 매핑만 저장한다")
+    void givenRecurrenceEventAndGroupSpace_whenSave_thenPersistsMasterMapping() {
         // given
         Fixture fixture = fixture();
-        PersonalRecurrenceGroupShare share = shareRepository.saveAndFlush(new PersonalRecurrenceGroupShare(
+        PersonalRecurrenceGroupShare share = new PersonalRecurrenceGroupShare(
                 fixture.recurrenceEvent(),
-                fixture.groupSpace(),
-                PersonalRecurrenceGroupShareScope.SELECTED_OCCURRENCES
-        ));
-        Instant originStartAt = Instant.parse("2028-01-08T09:00:00Z");
-
-        // when
-        PersonalRecurrenceGroupShareSelectedOrigin selectedOrigin = selectedOriginRepository.saveAndFlush(
-                new PersonalRecurrenceGroupShareSelectedOrigin(share, originStartAt)
+                fixture.groupSpace()
         );
 
+        // when
+        PersonalRecurrenceGroupShare savedShare = shareRepository.saveAndFlush(share);
+
         // then
-        assertThat(selectedOrigin.getShare().getId()).isEqualTo(share.getId());
-        assertThat(selectedOrigin.getOriginStartAt()).isEqualTo(originStartAt);
-        assertThat(selectedOrigin.getShare().getRecurrenceEvent().getId())
+        assertThat(savedShare.getRecurrenceEvent().getId())
                 .isEqualTo(fixture.recurrenceEvent().getId());
+        assertThat(savedShare.getGroupSpace().getId()).isEqualTo(fixture.groupSpace().getId());
     }
 
     @Test
@@ -82,15 +72,13 @@ class PersonalRecurrenceGroupShareRepositoryTest {
         Fixture fixture = fixture();
         shareRepository.saveAndFlush(new PersonalRecurrenceGroupShare(
                 fixture.recurrenceEvent(),
-                fixture.groupSpace(),
-                PersonalRecurrenceGroupShareScope.WHOLE_SERIES
+                fixture.groupSpace()
         ));
 
         // when, then
         assertThatThrownBy(() -> shareRepository.saveAndFlush(new PersonalRecurrenceGroupShare(
                 fixture.recurrenceEvent(),
-                fixture.groupSpace(),
-                PersonalRecurrenceGroupShareScope.SELECTED_OCCURRENCES
+                fixture.groupSpace()
         ))).isInstanceOf(DataIntegrityViolationException.class);
     }
 

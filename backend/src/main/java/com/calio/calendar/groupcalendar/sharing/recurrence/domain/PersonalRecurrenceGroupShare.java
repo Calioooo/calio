@@ -3,10 +3,7 @@ package com.calio.calendar.groupcalendar.sharing.recurrence.domain;
 import com.calio.calendar.common.domain.BaseEntity;
 import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
-import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -38,21 +35,15 @@ public class PersonalRecurrenceGroupShare extends BaseEntity {
     @JoinColumn(name = "group_space_id", nullable = false)
     private GroupSpace groupSpace;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "share_scope", nullable = false)
-    private PersonalRecurrenceGroupShareScope shareScope;
-
     protected PersonalRecurrenceGroupShare() {
     }
 
     public PersonalRecurrenceGroupShare(
             RecurrenceEvent recurrenceEvent,
-            GroupSpace groupSpace,
-            PersonalRecurrenceGroupShareScope shareScope
+            GroupSpace groupSpace
     ) {
         this.recurrenceEvent = recurrenceEvent;
         this.groupSpace = groupSpace;
-        this.shareScope = shareScope;
     }
 
     public Long getId() {
@@ -65,9 +56,5 @@ public class PersonalRecurrenceGroupShare extends BaseEntity {
 
     public GroupSpace getGroupSpace() {
         return groupSpace;
-    }
-
-    public PersonalRecurrenceGroupShareScope getShareScope() {
-        return shareScope;
     }
 }
