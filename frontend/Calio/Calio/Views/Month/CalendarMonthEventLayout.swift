@@ -55,6 +55,15 @@ enum MonthScheduleChip {
             return Color.calendarHoliday
         }
     }
+
+    var accessibilityKind: String {
+        switch self {
+        case .event:
+            return "일정"
+        case .holiday:
+            return "공휴일"
+        }
+    }
     
     var sortStartAt: Date {
         switch self {

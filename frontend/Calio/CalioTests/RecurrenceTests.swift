@@ -77,13 +77,171 @@ struct RecurrenceTests {
         #expect(object["recurrenceFrequency"] == nil)
     }
 
-    @Test func recurrenceRuleKeepsOnlyBoundedSimpleRulesEditable() async throws {
+    @Test func recurrenceRuleKeepsOnlySupportedSimpleRulesEditable() async throws {
         let until = Date(timeIntervalSince1970: 1_788_480_000)
         let line = RecurrenceRule.make(frequency: .weekly, until: until, allDay: false)
 
         #expect(RecurrenceRule.editableRule(from: [line], allDay: false)?.frequency == .weekly)
+        #expect(RecurrenceRule.editableRule(from: ["RRULE:FREQ=MONTHLY"], allDay: false) == EditableRecurrenceRule(frequency: .monthly, until: nil))
+        #expect(RecurrenceRule.editableRule(from: ["RRULE:FREQ=MONTHLY;"], allDay: false) == nil)
+        #expect(RecurrenceRule.editableRule(from: ["RRULE:FREQ=MONTHLY;;UNTIL=20260831T000000Z"], allDay: false) == nil)
         #expect(RecurrenceRule.editableRule(from: ["RRULE:FREQ=WEEKLY;COUNT=4"], allDay: false) == nil)
         #expect(RecurrenceRule.editableRule(from: ["RRULE:FREQ=WEEKLY;UNTIL=20260831T000000Z", "EXDATE:20260817T000000Z"], allDay: false) == nil)
+    }
+
+    @Test func recurrenceScheduleSerializesNoEndWithoutArtificialUntil() throws {
+        let utc = TimeZone(secondsFromGMT: 0)!
+        let startDate = Date(timeIntervalSince1970: 1_788_480_000)
+        let startTime = Date(timeIntervalSince1970: 32_400)
+        let endTime = Date(timeIntervalSince1970: 36_000)
+
+        let schedule = try RecurrenceScheduleBuilder.make(
+            startDate: startDate,
+            endDate: nil,
+            startTime: startTime,
+            endTime: endTime,
+            frequency: .weekly,
+            allDay: false,
+            timeZone: utc,
+            formTimeZone: utc
+        )
+
+        #expect(schedule.recurrence == ["RRULE:FREQ=WEEKLY"])
+    }
+
+    @Test func eventServiceCreatesUnboundedSeriesWithFrequencyOnlyRule() async throws {
+        let startDate = Date(timeIntervalSince1970: 1_788_480_000)
+        let startTime = Date(timeIntervalSince1970: 32_400)
+        let endTime = Date(timeIntervalSince1970: 36_000)
+        let repository = RecordingEventRepository()
+        let service = EventService(repository: repository, deviceTimeZone: TimeZone(secondsFromGMT: 0)!)
+
+        try await service.createRecurrenceEvent(
+            RecurrenceEventCreateInput(
+                title: "종료 없는 주간 점검",
+                description: "",
+                recurrenceStartDate: startDate,
+                recurrenceEndDate: nil,
+                recurrenceStartTime: startTime,
+                recurrenceEndTime: endTime,
+                recurrenceFrequency: .weekly
+            )
+        )
+
+        #expect(repository.recurrenceCreateRequests.first?.recurrence == ["RRULE:FREQ=WEEKLY"])
+    }
+
+    @Test func eventServiceUpdatesUnboundedSeriesWithFrequencyOnlyRule() async throws {
+        let startDate = Date(timeIntervalSince1970: 1_788_480_000)
+        let startTime = Date(timeIntervalSince1970: 32_400)
+        let endTime = Date(timeIntervalSince1970: 36_000)
+        let repository = RecordingEventRepository()
+        let service = EventService(repository: repository, deviceTimeZone: TimeZone(secondsFromGMT: 0)!)
+
+        _ = try await service.updateRecurrenceEvent(
+            recurrenceId: 12,
+            input: RecurrenceEventUpdateInput(
+                title: "종료 없는 월간 점검",
+                description: "",
+                recurrenceStartDate: startDate,
+                recurrenceEndDate: nil,
+                recurrenceStartTime: startTime,
+                recurrenceEndTime: endTime,
+                recurrenceFrequency: .monthly
+            )
+        )
+
+        #expect(repository.updateRecurrenceEventRequests.first?.request.recurrence == ["RRULE:FREQ=MONTHLY"])
+    }
+
+    @Test func recurrenceInputRestoresOneYearBoundedDefaultAfterNoEndIsDisabled() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try #require(TimeZone(identifier: "UTC"))
+        let startDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 8, day: 1)))
+        let expectedEndDate = try #require(calendar.date(from: DateComponents(year: 2027, month: 8, day: 1)))
+        var input = RecurrenceInput(
+            isEnabled: true,
+            startDate: startDate,
+            endDate: startDate,
+            startTime: startDate,
+            endTime: startDate.addingTimeInterval(3600),
+            frequency: .weekly
+        )
+
+        input.setNoEndDate(true, calendar: calendar)
+        #expect(input.endDate == nil)
+
+        input.setNoEndDate(false, calendar: calendar)
+        #expect(input.endDate == expectedEndDate)
+    }
+
+    @Test func eventServiceLoadsOnlySimpleLocallyOwnedUnboundedSeriesAsEditable() async throws {
+        let startAt = Date(timeIntervalSince1970: 1_788_480_000)
+        let response = RecurrenceEventResponseDTO(
+            recurrenceId: 12,
+            title: "종료 없는 월간 점검",
+            description: nil,
+            allDay: false,
+            firstOccurrenceStartAt: startAt,
+            firstOccurrenceEndAt: startAt.addingTimeInterval(3600),
+            timeZone: "UTC",
+            recurrence: ["RRULE:FREQ=MONTHLY"],
+            tag: TagResponseDTO(id: 0, title: "기타", colorCode: "#64748B", tagType: .defaultTag),
+            createdAt: startAt,
+            updatedAt: startAt,
+            canUpdateSeries: true
+        )
+        let repository = RecordingEventRepository(fetchRecurrenceResponse: response)
+        let service = EventService(repository: repository)
+
+        let details = try await service.fetchRecurrenceEvent(recurrenceId: 12)
+
+        #expect(details.isRuleEditable)
+        #expect(details.canUpdateSeries)
+        #expect(details.recurrenceEndDate == nil)
+    }
+
+    @Test func eventServiceKeepsComplexOrExternallyManagedSeriesUnavailableForWholeSeriesEditing() async throws {
+        let startAt = Date(timeIntervalSince1970: 1_788_480_000)
+        let complexResponse = RecurrenceEventResponseDTO(
+            recurrenceId: 12,
+            title: "복잡한 반복",
+            description: nil,
+            allDay: false,
+            firstOccurrenceStartAt: startAt,
+            firstOccurrenceEndAt: startAt.addingTimeInterval(3600),
+            timeZone: "UTC",
+            recurrence: ["RRULE:FREQ=WEEKLY;BYDAY=MO"],
+            tag: TagResponseDTO(id: 0, title: "기타", colorCode: "#64748B", tagType: .defaultTag),
+            createdAt: startAt,
+            updatedAt: startAt,
+            canUpdateSeries: true
+        )
+        let externallyManagedResponse = RecurrenceEventResponseDTO(
+            recurrenceId: 13,
+            title: "외부 반복",
+            description: nil,
+            allDay: false,
+            firstOccurrenceStartAt: startAt,
+            firstOccurrenceEndAt: startAt.addingTimeInterval(3600),
+            timeZone: "UTC",
+            recurrence: ["RRULE:FREQ=WEEKLY"],
+            tag: TagResponseDTO(id: 0, title: "기타", colorCode: "#64748B", tagType: .defaultTag),
+            createdAt: startAt,
+            updatedAt: startAt,
+            canUpdateSeries: false
+        )
+
+        let complexDetails = try await EventService(
+            repository: RecordingEventRepository(fetchRecurrenceResponse: complexResponse)
+        ).fetchRecurrenceEvent(recurrenceId: 12)
+        let externallyManagedDetails = try await EventService(
+            repository: RecordingEventRepository(fetchRecurrenceResponse: externallyManagedResponse)
+        ).fetchRecurrenceEvent(recurrenceId: 13)
+
+        #expect(!complexDetails.isRuleEditable)
+        #expect(externallyManagedDetails.isRuleEditable)
+        #expect(!externallyManagedDetails.canUpdateSeries)
     }
 
     @Test func recurrenceScheduleUsesSeriesZoneForDstAndInclusiveUntil() throws {
@@ -188,7 +346,7 @@ struct RecurrenceTests {
 
         #expect(details.isAllDay)
         #expect(CalendarDateService.localDateString(from: details.recurrenceStartDate) == "2026-08-01")
-        #expect(CalendarDateService.localDateString(from: details.recurrenceEndDate) == "2026-08-31")
+        #expect(CalendarDateService.localDateString(from: try #require(details.recurrenceEndDate)) == "2026-08-31")
     }
     @Test func eventServiceCreateRecurrenceEventMapsSeparateUTCDateAndTimeIntoRepositoryRequest() async throws {
         var kstCalendar = Calendar(identifier: .gregorian)

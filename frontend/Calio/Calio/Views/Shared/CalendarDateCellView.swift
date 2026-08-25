@@ -16,13 +16,15 @@ struct CalendarDateCellView: View {
     let weekday: CalendarWeekday
     let dayText: String
     let isToday: Bool
+    let isSelected: Bool
     let onTap: () -> Void
     let events: [Event]
     
-    init(weekday: CalendarWeekday, dayText: String, isToday: Bool, onTap: @escaping () -> Void, events: [Event]) {
+    init(weekday: CalendarWeekday, dayText: String, isToday: Bool, isSelected: Bool = false, onTap: @escaping () -> Void, events: [Event]) {
         self.weekday = weekday
         self.dayText = dayText
         self.isToday = isToday
+        self.isSelected = isSelected
         self.onTap = onTap
         self.events = events
     }
@@ -41,6 +43,9 @@ struct CalendarDateCellView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityValue(isSelected ? "선택됨" : "선택 안 됨")
+        .accessibilityIdentifier("calendar_date_strip_\(dayText)_\(weekday.rawValue)")
     }
     
     private var dateNumberText: some View {
@@ -50,10 +55,14 @@ struct CalendarDateCellView: View {
             .foregroundStyle(isToday ? .white : weekdayTextColor)
             .frame(width: 30, height: 30)
             .background{
-                if isToday {
+                if isToday || isSelected {
                     Circle()
-                        .fill(Color(red: 0.56, green: 0.76, blue: 0.96))
-                    
+                        .fill(isToday ? Color.calioBrand : Color.calioSelection)
+                }
+            }
+            .overlay {
+                if isToday && isSelected {
+                    Circle().stroke(Color.calioSelection, lineWidth: 2)
                 }
             }
     }
@@ -83,18 +92,25 @@ struct CalendarDateCellView: View {
     private var hiddenEventText: some View {
         return Text("+\(hiddenEventCount)")
             .font(.system(size: 12, weight: .medium))
-            .foregroundStyle(.secondary)
+            .foregroundStyle(.calioTextSecondary)
     }
     
     private var weekdayTextColor: Color {
         switch weekday {
         case .saturday:
-            return .blue
+            return .calioBrand
         case .sunday:
-            return .red
+            return .calioCalendarSunday
         default:
-            return .secondary
+            return .calioTextPrimary
         }
+    }
+
+    private var accessibilityLabel: String {
+        let state = [isToday ? "오늘" : nil, events.isEmpty ? nil : "일정 \(events.count)개"]
+            .compactMap { $0 }
+            .joined(separator: ", ")
+        return "\(weekday.fullKoreanText) \(dayText)일\(state.isEmpty ? "" : ", \(state)")"
     }
 }
 

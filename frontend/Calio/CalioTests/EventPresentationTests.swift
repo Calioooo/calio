@@ -53,6 +53,9 @@ struct EventPresentationTests {
         #expect(CalendarEventDetailView.recurrenceStatusText(for: repeatedEvent) == "반복 일정")
         #expect(CalendarEventDetailView.recurrenceStatusText(for: occurrenceEvent) == "반복 일정")
         #expect(CalendarEventDetailView.recurrenceStatusText(for: singleEvent) == "반복 없음")
+        #expect(repeatedEvent.isRepeated)
+        #expect(occurrenceEvent.isRepeated)
+        #expect(!singleEvent.isRepeated)
         #expect(!CalendarEventDetailView.recurrenceStatusText(for: repeatedEvent).contains("12345"))
     }
 
@@ -74,6 +77,23 @@ struct EventPresentationTests {
         #expect(multiDayText != CalendarEventDisplayText.timeRange(startAt: startAt, endAt: nextDayEndAt))
         #expect(multiDayText.contains("7월 5일"))
         #expect(multiDayText.contains("7월 6일"))
+    }
+
+    @Test func eventDatePresentationUsesKoreanDatesWithoutChangingRangeSemantics() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try #require(TimeZone(identifier: "Asia/Seoul"))
+        let sameDayStart = try #require(calendar.date(from: DateComponents(year: 2026, month: 8, day: 17, hour: 10)))
+        let sameDayEnd = try #require(calendar.date(from: DateComponents(year: 2026, month: 8, day: 17, hour: 11)))
+        let nextDayEnd = try #require(calendar.date(from: DateComponents(year: 2026, month: 8, day: 18, hour: 11)))
+        let allDayStart = try #require(calendar.date(from: DateComponents(year: 2026, month: 8, day: 17)))
+        let allDayInclusiveEnd = try #require(calendar.date(from: DateComponents(year: 2026, month: 8, day: 18)))
+
+        #expect(CalendarEventDisplayText.dateRange(startAt: sameDayStart, endAt: sameDayEnd, calendar: calendar) == "2026년 8월 17일")
+        #expect(CalendarEventDisplayText.dateRange(startAt: sameDayStart, endAt: nextDayEnd, calendar: calendar) == "2026년 8월 17일 - 2026년 8월 18일")
+        #expect(CalendarEventDisplayText.dateRange(startAt: allDayStart, endAt: allDayInclusiveEnd, calendar: calendar) == "2026년 8월 17일 - 2026년 8월 18일")
+        #expect(CalendarEventDisplayText.compactDateTimeRange(startAt: sameDayStart, endAt: sameDayEnd, calendar: calendar) == CalendarEventDisplayText.timeRange(startAt: sameDayStart, endAt: sameDayEnd, calendar: calendar))
+        #expect(CalendarEventDisplayText.compactDateTimeRange(startAt: sameDayStart, endAt: nextDayEnd, calendar: calendar).contains("8월 17일"))
+        #expect(CalendarEventDisplayText.compactDateTimeRange(startAt: sameDayStart, endAt: nextDayEnd, calendar: calendar).contains("8월 18일"))
     }
 
     @Test func eventDetailActionsSeparateSingleAndRecurringEvents() async throws {
@@ -108,6 +128,25 @@ struct EventPresentationTests {
         #expect(CalendarEventDetailView.canDeleteRecurringEvent(recurringEvent))
         #expect(!CalendarEventDetailView.canUpdateRecurringEvent(recurringEventWithoutRecurrenceID))
         #expect(!CalendarEventDetailView.canDeleteRecurringEvent(recurringEventWithoutRecurrenceID))
+    }
+
+    @Test func recurrenceScopeGuidancePreservesEligibleAndUnavailableActionMeaning() {
+        #expect(
+            CalendarEventDetailView.recurrenceEditScopeGuidance(canUpdateSeries: true)
+                == "이 일정만 수정은 선택한 날짜에, 전체 반복 일정 수정은 시리즈 전체에 적용됩니다."
+        )
+        #expect(
+            CalendarEventDetailView.recurrenceDeleteScopeGuidance(canUpdateSeries: true)
+                == "이 일정만 삭제는 선택한 날짜에, 전체 반복 일정 삭제는 시리즈 전체에 적용됩니다."
+        )
+        #expect(
+            CalendarEventDetailView.recurrenceEditScopeGuidance(canUpdateSeries: false)
+                == "이 반복 일정은 전체 수정이 불가능해 선택한 날짜만 수정할 수 있습니다."
+        )
+        #expect(
+            CalendarEventDetailView.recurrenceDeleteScopeGuidance(canUpdateSeries: false)
+                == "이 반복 일정은 전체 삭제가 불가능해 선택한 날짜만 삭제할 수 있습니다."
+        )
     }
 
     @MainActor

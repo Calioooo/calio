@@ -70,6 +70,9 @@ struct CalendarTagManagementView: View {
                 tagSection(title: "기본 태그", tags: rules.defaultTags)
                 tagSection(title: "커스텀 태그", tags: rules.customTags)
             }
+            .scrollContentBackground(.hidden)
+            .background(Color.calioBackground)
+            .tint(.calioBrand)
             .navigationTitle("태그 관리")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -88,6 +91,7 @@ struct CalendarTagManagementView: View {
                     }
                     .disabled(isMutating)
                     .accessibilityLabel("커스텀 태그 추가")
+                    .accessibilityIdentifier("tag_management_add_button")
                 }
             }
             .sheet(isPresented: $isCreatingTag) {
@@ -146,11 +150,15 @@ struct CalendarTagManagementView: View {
             Section {
                 HStack(alignment: .top, spacing: 10) {
                     Image(systemName: "exclamationmark.circle.fill")
-                        .foregroundStyle(.red)
+                        .foregroundStyle(Color.calendarHoliday)
                     Text(failureMessage)
                         .font(.subheadline)
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(.calioTextPrimary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
+                .padding(.vertical, 2)
+                .listRowBackground(Color.calioSelection)
+                .accessibilityIdentifier("tag_management_failure_message")
             }
         }
     }
@@ -159,9 +167,10 @@ struct CalendarTagManagementView: View {
     private func tagSection(title: String, tags: [CalendarTag]) -> some View {
         Section(title) {
             if tags.isEmpty {
-                Text(title == "커스텀 태그" ? "추가한 커스텀 태그가 없습니다." : "태그가 없습니다.")
+                Label(title == "커스텀 태그" ? "추가한 커스텀 태그가 없습니다." : "태그가 없습니다.", systemImage: "tag")
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.calioTextSecondary)
+                    .accessibilityIdentifier("tag_management_empty_\(title == "커스텀 태그" ? "custom" : "default")")
             } else {
                 ForEach(tags) { tag in
                     tagRow(tag)
@@ -174,10 +183,13 @@ struct CalendarTagManagementView: View {
         HStack(spacing: 10) {
             Circle()
                 .fill(Color(hex: tag.colorCode))
-                .frame(width: 12, height: 12)
+                .frame(width: 14, height: 14)
+                .overlay(Circle().stroke(Color.calioDivider, lineWidth: 1))
 
             Text(tag.title)
                 .font(.body)
+                .foregroundStyle(.calioTextPrimary)
+                .lineLimit(1)
 
             Spacer()
 
@@ -191,6 +203,7 @@ struct CalendarTagManagementView: View {
                 .buttonStyle(.borderless)
                 .disabled(isMutating)
                 .accessibilityLabel("\(tag.title) 태그 수정")
+                .accessibilityIdentifier("tag_management_edit_\(tag.id)")
 
                 Button(role: .destructive) {
                     onResetFailure()
@@ -201,13 +214,19 @@ struct CalendarTagManagementView: View {
                 .buttonStyle(.borderless)
                 .disabled(isMutating)
                 .accessibilityLabel("\(tag.title) 태그 삭제")
+                .accessibilityIdentifier("tag_management_delete_\(tag.id)")
             } else {
                 Text("기본")
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.calioTextSecondary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Capsule().fill(Color.calioSelection))
             }
         }
         .contentShape(Rectangle())
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("tag_management_row_\(tag.id)")
     }
 
     private var rules: CalendarTagManagementRules {
@@ -296,9 +315,11 @@ struct CalendarTagEditView: View {
             Form {
                 Section("이름") {
                     TextField("태그 이름", text: titleBinding)
+                        .foregroundStyle(.calioTextPrimary)
+                        .accessibilityIdentifier("tag_edit_title_input")
                     Text("\(input.title.count)/\(maxTitleLength)")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.calioTextSecondary)
                 }
 
                 Section("색상") {
@@ -310,6 +331,9 @@ struct CalendarTagEditView: View {
                     .padding(.vertical, 4)
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(Color.calioBackground)
+            .tint(.calioBrand)
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -318,6 +342,7 @@ struct CalendarTagEditView: View {
                         dismiss()
                     }
                     .disabled(isSaving)
+                    .accessibilityIdentifier("tag_edit_cancel_button")
                 }
 
                 ToolbarItem(placement: .confirmationAction) {
@@ -325,6 +350,7 @@ struct CalendarTagEditView: View {
                         save()
                     }
                     .disabled(!canSave || isSaving)
+                    .accessibilityIdentifier("tag_edit_save_button")
                 }
             }
         }
@@ -369,11 +395,27 @@ struct CalendarTagEditView: View {
                 }
                 .overlay {
                     Circle()
-                        .stroke(Color.secondary.opacity(0.25), lineWidth: 1)
+                        .stroke(input.colorCode == colorCode ? Color.calioBrand : Color.calioDivider, lineWidth: input.colorCode == colorCode ? 2 : 1)
                 }
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("태그 색상 선택")
+        .accessibilityLabel("\(colorName(for: colorCode)) 태그 색상")
+        .accessibilityValue(input.colorCode == colorCode ? "선택됨" : "선택 안 됨")
+        .accessibilityIdentifier("tag_edit_color_\(colorCode)")
+    }
+
+    private func colorName(for colorCode: String) -> String {
+        switch colorCode {
+        case "#3B82F6": "파란색"
+        case "#A855F7": "보라색"
+        case "#F97316": "주황색"
+        case "#10B981": "초록색"
+        case "#64748B": "회색"
+        case "#EF4444": "빨간색"
+        case "#0EA5E9": "하늘색"
+        case "#EAB308": "노란색"
+        default: "태그"
+        }
     }
 
     private func save() {

@@ -63,6 +63,7 @@ struct CalendarHomeView: View {
                     onDeleteCustomTag: viewModel.deleteCustomTag(_:)
                 )
             }
+            .background(Color.calioBackground)
             .animation(.easeInOut(duration: 0.2), value: displayMode)
             .task {
                 viewModel.loadTagsIfNeeded()

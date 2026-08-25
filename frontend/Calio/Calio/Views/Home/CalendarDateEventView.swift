@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct CalendarDateEventView: View {
-    private let dateRowHeight: CGFloat = 96
+    private let dateRowHeight: CGFloat = 112
     private let rowSpacing: CGFloat = 15
     private let contentTopPadding: CGFloat = 12
     private let contentBottomPadding: CGFloat = 24
@@ -98,13 +98,17 @@ struct CalendarDateEventView: View {
                 onRetry: onRetryEventLoading
             )
 
-            GeometryReader { _ in
-                let itemIDs = items.map(\.id)
+            if shouldShowEmptyState {
+                emptyState
+            } else {
+                GeometryReader { _ in
+                    let itemIDs = items.map(\.id)
 
-                if focusCoordinator.canRenderContent(referenceDay: referenceDay, itemIDs: itemIDs) {
-                    scrollContent(itemIDs: itemIDs)
-                } else {
-                    initialAlignmentPlaceholder(itemIDs: itemIDs)
+                    if focusCoordinator.canRenderContent(referenceDay: referenceDay, itemIDs: itemIDs) {
+                        scrollContent(itemIDs: itemIDs)
+                    } else {
+                        initialAlignmentPlaceholder(itemIDs: itemIDs)
+                    }
                 }
             }
         }
@@ -155,8 +159,7 @@ struct CalendarDateEventView: View {
                         events: item.events,
                         holidays: item.holidays
                     )
-                    .frame(height: dateRowHeight)
-                    .clipped()
+                    .frame(minHeight: dateRowHeight)
                     .id(item.id)
                 }
             }
@@ -213,6 +216,20 @@ struct CalendarDateEventView: View {
                     itemIDs: itemIDs
                 )
             }
+    }
+
+    private var shouldShowEmptyState: Bool {
+        !items.isEmpty && eventLoadState == .idle && items.allSatisfy { $0.calendarItemCount == 0 }
+    }
+
+    private var emptyState: some View {
+        ContentUnavailableView(
+            "일정이 없습니다",
+            systemImage: "calendar",
+            description: Text("새 일정을 추가하면 이곳에서 하루를 한눈에 볼 수 있어요.")
+        )
+        .foregroundStyle(.calioTextSecondary)
+        .accessibilityIdentifier("calendar_empty_state")
     }
     
     private func notifyVisibleRangeChanged(

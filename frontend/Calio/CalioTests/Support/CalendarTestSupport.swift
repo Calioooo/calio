@@ -111,7 +111,8 @@ func makeTimelineMetrics() -> TimelineMetrics {
         fullDayEventRowHeight: 52,
         hourHeight: 60,
         visibleDayCount: 5,
-        hourCount: 24
+        hourCount: 24,
+        textScale: 1
     )
 }
 

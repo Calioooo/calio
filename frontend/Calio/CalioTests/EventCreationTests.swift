@@ -48,6 +48,16 @@ struct EventCreationTests {
             endAt: endAt,
             isRecurrenceEnabled: true,
             recurrenceStartDate: startAt,
+            recurrenceEndDate: nil,
+            recurrenceStartTime: startAt,
+            recurrenceEndTime: endAt
+        ))
+        #expect(CalendarEventFormRules.canSave(
+            title: "반복 회의",
+            startAt: startAt,
+            endAt: endAt,
+            isRecurrenceEnabled: true,
+            recurrenceStartDate: startAt,
             recurrenceEndDate: sameUTCDate,
             recurrenceStartTime: startAt,
             recurrenceEndTime: endAt

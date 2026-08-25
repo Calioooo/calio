@@ -81,7 +81,8 @@ struct CalendarEventCreationView: View {
                 )
             }
             .scrollContentBackground(.hidden)
-            .background(Color(uiColor: .systemGroupedBackground))
+            .background(Color.calioBackground)
+            .tint(.calioBrand)
             .navigationTitle("새 일정")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -105,7 +106,9 @@ struct CalendarEventCreationView: View {
                     Button("저장") {
                         save()
                     }
+                    .fontWeight(.semibold)
                     .disabled(!canSave || isSaving)
+                    .accessibilityIdentifier("event_creation_save_button")
                 }
             }
         }
@@ -117,13 +120,14 @@ struct CalendarEventCreationView: View {
             Section {
                 HStack(alignment: .top, spacing: 10) {
                     Image(systemName: "exclamationmark.circle.fill")
-                        .foregroundStyle(.red)
+                        .foregroundStyle(Color.calendarHoliday)
                     Text(failureMessage)
                         .font(.subheadline)
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(.calioTextPrimary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(.vertical, 2)
+                .listRowBackground(Color.calioSelection)
                 .accessibilityIdentifier("event_creation_failure_message")
             }
         }
@@ -162,7 +166,7 @@ struct CalendarEventCreationView: View {
 
     private func resetRecurrenceFieldsFromSingleEventTime() {
         recurrenceInput.startDate = eventInput.startAt
-        recurrenceInput.endDate = eventInput.endAt
+        recurrenceInput.endDate = Calendar.current.date(byAdding: .year, value: 1, to: eventInput.startAt) ?? eventInput.startAt
         recurrenceInput.startTime = eventInput.startAt
         recurrenceInput.endTime = eventInput.endAt
         recurrenceInput.frequency = .daily
