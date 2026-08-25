@@ -16,6 +16,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.groupspace.domain.GroupMember;
+import com.calio.calendar.groupspace.domain.GroupMemberStatus;
 import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.repository.GroupMemberRepository;
 import com.calio.calendar.groupspace.repository.GroupSpaceRepository;
@@ -121,6 +122,38 @@ class GroupSpaceControllerTest {
                 .andExpect(jsonPath("$.groupSpaces[0].groupSpaceId").value(secondId))
                 .andExpect(jsonPath("$.groupSpaces[0].myMembership.role").value("OWNER"))
                 .andExpect(jsonPath("$.groupSpaces[1].name").value("First"));
+    }
+
+    @Test
+    @DisplayName("개인 일정 공유 후보로 사용하는 목록은 ACTIVE Group Space만 반환한다")
+    void givenInactiveMembership_whenListGroupSpaces_thenExcludesInactiveGroupSpace()
+            throws Exception {
+        // given
+        long activeGroupSpaceId = createGroup("Active", "active");
+        Long currentAccountId = groupSpaceRepository.findById(activeGroupSpaceId)
+                .orElseThrow()
+                .getOwnerAccountId();
+        Account anotherAccount = accountRepository.saveAndFlush(new Account());
+        GroupSpace inactiveGroupSpace = groupSpaceRepository.saveAndFlush(
+                new GroupSpace(anotherAccount.getId(), "Inactive", null)
+        );
+        groupMemberRepository.saveAndFlush(
+                new GroupMember(inactiveGroupSpace, anotherAccount.getId(), "owner", Instant.now())
+        );
+        GroupMember inactiveMembership = new GroupMember(
+                inactiveGroupSpace,
+                currentAccountId,
+                "inactive",
+                Instant.now()
+        );
+        inactiveMembership.deactivate(GroupMemberStatus.LEFT, Instant.now());
+        groupMemberRepository.saveAndFlush(inactiveMembership);
+
+        // when, then
+        mockMvc.perform(get("/api/group-spaces"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.groupSpaces", hasSize(1)))
+                .andExpect(jsonPath("$.groupSpaces[0].groupSpaceId").value(activeGroupSpaceId));
     }
 
     @Test
