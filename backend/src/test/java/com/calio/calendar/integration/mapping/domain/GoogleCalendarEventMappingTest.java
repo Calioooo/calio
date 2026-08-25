@@ -1,6 +1,9 @@
 package com.calio.calendar.integration.mapping.domain;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static com.calio.calendar.integration.mapping.domain.GoogleCalendarProviderChangeAction.APPLY;
+import static com.calio.calendar.integration.mapping.domain.GoogleCalendarProviderChangeAction.IGNORE;
+import static com.calio.calendar.integration.mapping.domain.GoogleCalendarProviderChangeAction.MARK_CONFLICT;
 import static org.mockito.Mockito.mock;
 
 import com.calio.calendar.event.domain.Event;
@@ -29,6 +32,24 @@ class GoogleCalendarEventMappingTest {
         assertThat(activeMapping.blocksLocalMutation()).isTrue();
         assertThat(conflictedMapping.blocksLocalMutation()).isFalse();
         assertThat(disconnectedMapping.blocksLocalMutation()).isFalse();
+    }
+
+    @Test
+    @DisplayName("Google 변경은 mapping 상태와 마지막 provider ETag에 따라 적용·무시·충돌로 판정한다")
+    void givenMappingStates_whenEvaluateGoogleUpsert_thenReturnsProviderChangeAction() {
+        GoogleCalendarEventMapping activeMapping = mapping(integration());
+        GoogleCalendarEventMapping locallyModifiedMapping = mapping(integration());
+        locallyModifiedMapping.markLocalModification(NOW);
+        GoogleCalendarEventMapping detachedMapping = mapping(integration());
+        detachedMapping.detachCanonicalEvent(NOW);
+        GoogleCalendarEventMapping conflictedMapping = mapping(integration());
+        conflictedMapping.markConflicted();
+
+        assertThat(activeMapping.evaluateGoogleUpsert("changed-etag")).isEqualTo(APPLY);
+        assertThat(activeMapping.evaluateGoogleUpsert("provider-etag")).isEqualTo(IGNORE);
+        assertThat(locallyModifiedMapping.evaluateGoogleUpsert("changed-etag")).isEqualTo(MARK_CONFLICT);
+        assertThat(detachedMapping.evaluateGoogleUpsert("changed-etag")).isEqualTo(MARK_CONFLICT);
+        assertThat(conflictedMapping.evaluateGoogleUpsert("changed-etag")).isEqualTo(IGNORE);
     }
 
     private GoogleCalendarEventMapping mapping(GoogleCalendarIntegration integration) {

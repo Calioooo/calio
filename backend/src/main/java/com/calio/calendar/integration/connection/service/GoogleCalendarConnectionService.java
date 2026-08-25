@@ -214,7 +214,7 @@ public class GoogleCalendarConnectionService {
             GoogleCalendarIntegration integration,
             GoogleCalendarConnectionCredentials credentials
     ) {
-        if (!integration.getGoogleSubject().equals(credentials.googleSubject())) {
+        if (!integration.hasGoogleSubject(credentials.googleSubject())) {
             throw new CalioException(ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED);
         }
         return integrationCommandService.replaceIntegration(

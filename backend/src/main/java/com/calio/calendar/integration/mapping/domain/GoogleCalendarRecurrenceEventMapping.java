@@ -110,6 +110,10 @@ public class GoogleCalendarRecurrenceEventMapping extends BaseEntity {
         return syncState.getProviderEtag();
     }
 
+    public boolean shouldTrackLocalModification() {
+        return !isConflicted() && !integration.isConnected();
+    }
+
     public boolean hasCanonicalRecurrenceEvent() {
         return recurrenceEvent != null;
     }
@@ -118,9 +122,64 @@ public class GoogleCalendarRecurrenceEventMapping extends BaseEntity {
         return !isConflicted() && hasCanonicalRecurrenceEvent();
     }
 
+    public GoogleCalendarProviderChangeAction evaluateGoogleUpsert(String providerEtag) {
+        if (isConflicted()) {
+            return GoogleCalendarProviderChangeAction.IGNORE;
+        }
+        if (!hasCanonicalRecurrenceEvent() || hasLocalModification()) {
+            return hasSameProviderEtag(providerEtag)
+                    ? GoogleCalendarProviderChangeAction.IGNORE
+                    : GoogleCalendarProviderChangeAction.MARK_CONFLICT;
+        }
+        return hasSameProviderEtag(providerEtag)
+                ? GoogleCalendarProviderChangeAction.IGNORE
+                : GoogleCalendarProviderChangeAction.APPLY;
+    }
+
+    public GoogleCalendarProviderChangeAction evaluateGoogleCancellation() {
+        if (!canApplyGoogleChange()) {
+            return GoogleCalendarProviderChangeAction.IGNORE;
+        }
+        return hasLocalModification()
+                ? GoogleCalendarProviderChangeAction.MARK_CONFLICT
+                : GoogleCalendarProviderChangeAction.APPLY;
+    }
+
+    public GoogleCalendarProviderChangeAction evaluateGoogleOverride() {
+        if (isConflicted()) {
+            return GoogleCalendarProviderChangeAction.IGNORE;
+        }
+        return hasCanonicalRecurrenceEvent()
+                ? GoogleCalendarProviderChangeAction.APPLY
+                : GoogleCalendarProviderChangeAction.MARK_CONFLICT;
+    }
+
+    public GoogleCalendarProviderChangeAction evaluateUnseenProviderRemoval(
+            boolean hasPendingOutboundJob
+    ) {
+        if (!canApplyGoogleChange()) {
+            return GoogleCalendarProviderChangeAction.IGNORE;
+        }
+        return hasLocalModification() || hasPendingOutboundJob
+                ? GoogleCalendarProviderChangeAction.MARK_CONFLICT
+                : GoogleCalendarProviderChangeAction.APPLY;
+    }
+
+    private boolean hasSameProviderEtag(String providerEtag) {
+        return syncState.getProviderEtag().equals(providerEtag);
+    }
+
     public void detachCanonicalRecurrenceEvent(Instant deletedAt) {
         recurrenceEvent = null;
         localDeletedAt = deletedAt;
+    }
+
+    public boolean detachCanonicalRecurrenceEventIfAllowed(Instant deletedAt) {
+        if (isConflicted() || !integration.isConnected()) {
+            detachCanonicalRecurrenceEvent(deletedAt);
+            return true;
+        }
+        return false;
     }
 
     public void markLocalModification(Instant modifiedAt) {

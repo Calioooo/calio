@@ -12,6 +12,7 @@ import com.calio.calendar.event.service.EventCommandService;
 import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrationCommandService;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarEventMapping;
+import com.calio.calendar.integration.mapping.domain.GoogleCalendarProviderChangeAction;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarRecurrenceEventMapping;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarRecurrenceOverrideMapping;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingCommandService;
@@ -58,6 +59,8 @@ class GoogleCalendarIntegrationDataServiceTest {
         GoogleCalendarIntegration integration = mock(GoogleCalendarIntegration.class);
         when(eventMapping.getId()).thenReturn(10L);
         when(eventMapping.canApplyGoogleChange()).thenReturn(true);
+        when(eventMapping.evaluateUnseenProviderRemoval(false))
+                .thenReturn(GoogleCalendarProviderChangeAction.APPLY);
         when(eventMapping.hasCanonicalEvent()).thenReturn(true);
         when(eventMapping.getExternalEventId()).thenReturn("unseen-event");
         when(eventMapping.getEvent()).thenReturn(event);
@@ -118,6 +121,9 @@ class GoogleCalendarIntegrationDataServiceTest {
         GoogleCalendarRecurrenceEventMapping parentMapping = mock(GoogleCalendarRecurrenceEventMapping.class);
         GoogleCalendarIntegration integration = mock(GoogleCalendarIntegration.class);
         when(overrideMapping.getId()).thenReturn(11L);
+        when(overrideMapping.canApplyGoogleChange()).thenReturn(true);
+        when(overrideMapping.evaluateUnseenProviderRemoval(false))
+                .thenReturn(GoogleCalendarProviderChangeAction.MARK_CONFLICT);
         when(overrideMapping.hasLocalModification()).thenReturn(true);
         when(overrideMapping.getRecurrenceEventMapping()).thenReturn(parentMapping);
         when(parentMapping.isConflicted()).thenReturn(false);

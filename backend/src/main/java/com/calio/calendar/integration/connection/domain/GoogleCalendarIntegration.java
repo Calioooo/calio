@@ -144,6 +144,10 @@ public class GoogleCalendarIntegration extends BaseEntity {
         return state == GoogleCalendarIntegrationState.CONNECTED;
     }
 
+    public boolean hasGoogleSubject(String googleSubject) {
+        return this.googleSubject.equals(googleSubject);
+    }
+
     public void clearSyncCursor() {
         this.nextSyncToken = null;
     }

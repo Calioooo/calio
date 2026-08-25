@@ -99,8 +99,45 @@ public class GoogleCalendarRecurrenceOverrideMapping extends BaseEntity {
         return syncState.isConflicted();
     }
 
+    public boolean canApplyGoogleChange() {
+        return !isConflicted() && recurrenceEventMapping.canApplyGoogleChange();
+    }
+
+    public GoogleCalendarProviderChangeAction evaluateGoogleUpsert(String providerEtag) {
+        if (!canApplyGoogleChange() || recurrenceEventMapping.hasLocalModification()) {
+            return GoogleCalendarProviderChangeAction.IGNORE;
+        }
+        if (hasLocalModification()) {
+            return hasSameProviderEtag(providerEtag)
+                    ? GoogleCalendarProviderChangeAction.IGNORE
+                    : GoogleCalendarProviderChangeAction.MARK_CONFLICT;
+        }
+        return hasSameProviderEtag(providerEtag)
+                ? GoogleCalendarProviderChangeAction.IGNORE
+                : GoogleCalendarProviderChangeAction.APPLY;
+    }
+
+    public GoogleCalendarProviderChangeAction evaluateUnseenProviderRemoval(
+            boolean hasPendingOutboundJob
+    ) {
+        if (!canApplyGoogleChange()) {
+            return GoogleCalendarProviderChangeAction.IGNORE;
+        }
+        return hasLocalModification() || hasPendingOutboundJob
+                ? GoogleCalendarProviderChangeAction.MARK_CONFLICT
+                : GoogleCalendarProviderChangeAction.APPLY;
+    }
+
+    private boolean hasSameProviderEtag(String providerEtag) {
+        return syncState.getProviderEtag().equals(providerEtag);
+    }
+
     public String getProviderEtag() {
         return syncState.getProviderEtag();
+    }
+
+    public boolean shouldTrackLocalModification() {
+        return !isConflicted() && !recurrenceEventMapping.getIntegration().isConnected();
     }
 
     public void markLocalModification(Instant modifiedAt) {

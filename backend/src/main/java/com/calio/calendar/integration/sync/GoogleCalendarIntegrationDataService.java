@@ -5,6 +5,7 @@ import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.event.service.EventCommandService;
 import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrationCommandService;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarEventMapping;
+import com.calio.calendar.integration.mapping.domain.GoogleCalendarProviderChangeAction;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarRecurrenceEventMapping;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarRecurrenceOverrideMapping;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingCommandService;
@@ -301,24 +302,32 @@ public class GoogleCalendarIntegrationDataService {
             GoogleCalendarEventMapping mapping,
             OperationOwnership ownership
     ) {
-        if (!mapping.canApplyGoogleChange()) {
-            return false;
-        }
-        if (mapping.hasLocalModification()) {
-            mapping.markConflicted();
-            operationJobService.recordSyncConflict(
-                    ownership.jobId(), ownership.accountId(), ownership.workerToken());
-            return false;
+        GoogleCalendarProviderChangeAction action = mapping.evaluateUnseenProviderRemoval(false);
+        if (action != GoogleCalendarProviderChangeAction.APPLY) {
+            return applyUnseenProviderRemoval(action, mapping, ownership);
         }
         GoogleCalendarEffectiveScope scope = GoogleCalendarEffectiveScope.event(
                 mapping.getEvent().getId());
-        if (!operationJobQueryService.hasPendingOutboundJob(
-                mapping.getIntegration().getAccountId(), mapping.getIntegration().getId(), scope)) {
+        boolean hasPendingOutboundJob = operationJobQueryService.hasPendingOutboundJob(
+                mapping.getIntegration().getAccountId(), mapping.getIntegration().getId(), scope);
+        return applyUnseenProviderRemoval(
+                mapping.evaluateUnseenProviderRemoval(hasPendingOutboundJob),
+                mapping,
+                ownership
+        );
+    }
+
+    private boolean applyUnseenProviderRemoval(
+            GoogleCalendarProviderChangeAction action,
+            GoogleCalendarEventMapping mapping,
+            OperationOwnership ownership
+    ) {
+        if (action == GoogleCalendarProviderChangeAction.APPLY) {
             return true;
         }
-        mapping.markConflicted();
-        operationJobService.recordSyncConflict(
-                ownership.jobId(), ownership.accountId(), ownership.workerToken());
+        if (action == GoogleCalendarProviderChangeAction.MARK_CONFLICT) {
+            markConflict(mapping, ownership);
+        }
         return false;
     }
 
@@ -326,24 +335,32 @@ public class GoogleCalendarIntegrationDataService {
             GoogleCalendarRecurrenceEventMapping mapping,
             OperationOwnership ownership
     ) {
-        if (!mapping.canApplyGoogleChange()) {
-            return false;
-        }
-        if (mapping.hasLocalModification()) {
-            mapping.markConflicted();
-            operationJobService.recordSyncConflict(
-                    ownership.jobId(), ownership.accountId(), ownership.workerToken());
-            return false;
+        GoogleCalendarProviderChangeAction action = mapping.evaluateUnseenProviderRemoval(false);
+        if (action != GoogleCalendarProviderChangeAction.APPLY) {
+            return applyUnseenProviderRemoval(action, mapping, ownership);
         }
         GoogleCalendarEffectiveScope scope = GoogleCalendarEffectiveScope.recurrenceEvent(
                 mapping.getRecurrenceEvent().getId());
-        if (!operationJobQueryService.hasPendingOutboundJob(
-                mapping.getIntegration().getAccountId(), mapping.getIntegration().getId(), scope)) {
+        boolean hasPendingOutboundJob = operationJobQueryService.hasPendingOutboundJob(
+                mapping.getIntegration().getAccountId(), mapping.getIntegration().getId(), scope);
+        return applyUnseenProviderRemoval(
+                mapping.evaluateUnseenProviderRemoval(hasPendingOutboundJob),
+                mapping,
+                ownership
+        );
+    }
+
+    private boolean applyUnseenProviderRemoval(
+            GoogleCalendarProviderChangeAction action,
+            GoogleCalendarRecurrenceEventMapping mapping,
+            OperationOwnership ownership
+    ) {
+        if (action == GoogleCalendarProviderChangeAction.APPLY) {
             return true;
         }
-        mapping.markConflicted();
-        operationJobService.recordSyncConflict(
-                ownership.jobId(), ownership.accountId(), ownership.workerToken());
+        if (action == GoogleCalendarProviderChangeAction.MARK_CONFLICT) {
+            markConflict(mapping, ownership);
+        }
         return false;
     }
 
@@ -351,29 +368,59 @@ public class GoogleCalendarIntegrationDataService {
             GoogleCalendarRecurrenceOverrideMapping mapping,
             OperationOwnership ownership
     ) {
-        if (mapping.isConflicted()
-                || mapping.getRecurrenceEventMapping().isConflicted()
-                || !mapping.getRecurrenceEventMapping().hasCanonicalRecurrenceEvent()) {
-            return false;
-        }
-        if (mapping.hasLocalModification()) {
-            mapping.markConflicted();
-            operationJobService.recordSyncConflict(
-                    ownership.jobId(), ownership.accountId(), ownership.workerToken());
-            return false;
+        GoogleCalendarProviderChangeAction action = mapping.evaluateUnseenProviderRemoval(false);
+        if (action != GoogleCalendarProviderChangeAction.APPLY) {
+            return applyUnseenProviderRemoval(action, mapping, ownership);
         }
         GoogleCalendarEffectiveScope scope = GoogleCalendarEffectiveScope.recurrenceOverride(
                 mapping.getRecurrenceEventMapping().getRecurrenceEvent().getId(),
                 mapping.getRecurrenceEventOverride().getOriginStartAt());
-        if (!operationJobQueryService.hasPendingOutboundJob(
+        boolean hasPendingOutboundJob = operationJobQueryService.hasPendingOutboundJob(
                 mapping.getRecurrenceEventMapping().getIntegration().getAccountId(),
-                mapping.getRecurrenceEventMapping().getIntegration().getId(), scope)) {
+                mapping.getRecurrenceEventMapping().getIntegration().getId(), scope);
+        return applyUnseenProviderRemoval(
+                mapping.evaluateUnseenProviderRemoval(hasPendingOutboundJob),
+                mapping,
+                ownership
+        );
+    }
+
+    private boolean applyUnseenProviderRemoval(
+            GoogleCalendarProviderChangeAction action,
+            GoogleCalendarRecurrenceOverrideMapping mapping,
+            OperationOwnership ownership
+    ) {
+        if (action == GoogleCalendarProviderChangeAction.APPLY) {
             return true;
         }
+        if (action == GoogleCalendarProviderChangeAction.MARK_CONFLICT) {
+            markConflict(mapping, ownership);
+        }
+        return false;
+    }
+
+    private void markConflict(GoogleCalendarEventMapping mapping, OperationOwnership ownership) {
         mapping.markConflicted();
         operationJobService.recordSyncConflict(
                 ownership.jobId(), ownership.accountId(), ownership.workerToken());
-        return false;
+    }
+
+    private void markConflict(
+            GoogleCalendarRecurrenceEventMapping mapping,
+            OperationOwnership ownership
+    ) {
+        mapping.markConflicted();
+        operationJobService.recordSyncConflict(
+                ownership.jobId(), ownership.accountId(), ownership.workerToken());
+    }
+
+    private void markConflict(
+            GoogleCalendarRecurrenceOverrideMapping mapping,
+            OperationOwnership ownership
+    ) {
+        mapping.markConflicted();
+        operationJobService.recordSyncConflict(
+                ownership.jobId(), ownership.accountId(), ownership.workerToken());
     }
 
     private boolean hasText(String value) {

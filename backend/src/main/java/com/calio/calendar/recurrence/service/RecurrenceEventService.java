@@ -154,27 +154,25 @@ public class RecurrenceEventService {
 
     private void markLocalProviderContentChange(Long recurrenceId) {
         recurrenceMappingQueryService.findRecurrenceEventMapping(recurrenceId)
-                .filter(mapping -> !mapping.isConflicted() && !mapping.getIntegration().isConnected())
+                .filter(GoogleCalendarRecurrenceEventMapping::shouldTrackLocalModification)
                 .ifPresent(mapping -> recurrenceMappingCommandService.markLocalModification(
                         mapping, Instant.now(clock)));
     }
 
     private void markLocalProviderContentChange(RecurrenceEventOverride override) {
         recurrenceMappingQueryService.findOverrideMapping(override.getOverrideId())
-                .filter(mapping -> !mapping.isConflicted()
-                        && !mapping.getRecurrenceEventMapping().getIntegration().isConnected())
+                .filter(mapping -> mapping.shouldTrackLocalModification())
                 .ifPresent(mapping -> recurrenceMappingCommandService.markLocalModification(
                         mapping, Instant.now(clock)));
     }
 
     private void detachOrReject(GoogleCalendarRecurrenceEventMapping mapping) {
-        if (!mapping.isConflicted() && mapping.getIntegration().isConnected()) {
+        if (!mapping.detachCanonicalRecurrenceEventIfAllowed(Instant.now(clock))) {
             throw new CalioException(ErrorCode.EXTERNAL_EVENT_MUTATION_NOT_SUPPORTED);
         }
         recurrenceMappingCommandService.deleteOverrideMappings(
                 recurrenceMappingQueryService.listOverrideMappings(List.of(mapping.getId()))
         );
-        mapping.detachCanonicalRecurrenceEvent(Instant.now(clock));
     }
 
     @Transactional

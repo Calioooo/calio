@@ -27,7 +27,6 @@ import com.calio.calendar.event.repository.EventRepository;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingQueryService;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingCommandService;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarEventMapping;
-import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceOccurrence;
@@ -224,7 +223,7 @@ class EventServiceTest {
         when(eventCommandService.lockEvent(1L, 10L)).thenReturn(event);
         when(eventMappingQueryService.blocksLocalMutation(10L)).thenReturn(false);
         when(eventMappingQueryService.findEventMapping(10L)).thenReturn(Optional.of(mapping));
-        when(mapping.blocksLocalMutation()).thenReturn(false);
+        when(mapping.shouldTrackLocalModification()).thenReturn(true);
         when(tagQueryService.getTagOrDefault(1L, null)).thenReturn(tag("기타"));
 
         // when
@@ -241,11 +240,9 @@ class EventServiceTest {
         // given
         Event event = event("External", tag("기타"));
         GoogleCalendarEventMapping mapping = org.mockito.Mockito.mock(GoogleCalendarEventMapping.class);
-        GoogleCalendarIntegration integration = org.mockito.Mockito.mock(GoogleCalendarIntegration.class);
         when(eventCommandService.lockEvent(1L, 10L)).thenReturn(event);
         when(eventMappingQueryService.findEventMapping(10L)).thenReturn(Optional.of(mapping));
-        when(mapping.getIntegration()).thenReturn(integration);
-        when(integration.isConnected()).thenReturn(true);
+        when(mapping.detachCanonicalEventIfAllowed(any(Instant.class))).thenReturn(false);
 
         // when, then
         assertThatThrownBy(() -> eventService.deleteEvent(1L, 10L))
@@ -262,17 +259,15 @@ class EventServiceTest {
         // given
         Event event = event("External", tag("기타"));
         GoogleCalendarEventMapping mapping = org.mockito.Mockito.mock(GoogleCalendarEventMapping.class);
-        GoogleCalendarIntegration integration = org.mockito.Mockito.mock(GoogleCalendarIntegration.class);
         when(eventCommandService.lockEvent(1L, 10L)).thenReturn(event);
         when(eventMappingQueryService.findEventMapping(10L)).thenReturn(Optional.of(mapping));
-        when(mapping.getIntegration()).thenReturn(integration);
-        when(integration.isConnected()).thenReturn(false);
+        when(mapping.detachCanonicalEventIfAllowed(any(Instant.class))).thenReturn(true);
 
         // when
         eventService.deleteEvent(1L, 10L);
 
         // then
-        verify(mapping).detachCanonicalEvent(any(Instant.class));
+        verify(mapping).detachCanonicalEventIfAllowed(any(Instant.class));
         verify(eventCommandService).deleteEvent(event);
     }
 

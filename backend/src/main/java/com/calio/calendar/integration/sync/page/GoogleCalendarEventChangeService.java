@@ -5,6 +5,7 @@ import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.event.service.EventCommandService;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
+import com.calio.calendar.integration.mapping.domain.GoogleCalendarProviderChangeAction;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingCommandService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobQueryService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobService;
@@ -75,17 +76,15 @@ public class GoogleCalendarEventChangeService {
             EventUpsert item,
             GoogleCalendarPageOwnership ownership
     ) {
-        if (mapping.isConflicted() || keepDetachedMapping(mapping, item, ownership)) {
+        GoogleCalendarProviderChangeAction action = mapping.evaluateGoogleUpsert(item.providerEtag());
+        if (action == GoogleCalendarProviderChangeAction.IGNORE) {
             return;
         }
-        if (mapping.hasLocalModification()) {
-            keepLocalContentOrMarkConflict(mapping, item.providerEtag(), ownership);
+        if (action == GoogleCalendarProviderChangeAction.MARK_CONFLICT) {
+            markConflict(mapping, ownership);
             return;
         }
         GoogleCalendarEffectiveScope scope = GoogleCalendarEffectiveScope.event(mapping.getEvent().getId());
-        if (hasSameProviderEtag(mapping, item.providerEtag())) {
-            return;
-        }
         if (operationJobQueryService.hasPendingOutboundJob(
                 mapping.getIntegration().getAccountId(), mapping.getIntegration().getId(), scope)) {
             markConflict(mapping, ownership);
@@ -104,15 +103,19 @@ public class GoogleCalendarEventChangeService {
     ) {
         var eventMappings = cache.eventMappings();
         GoogleCalendarEventMapping eventMapping = eventMappings.get(externalEventId);
-        if (eventMapping == null || !eventMapping.canApplyGoogleChange()) {
+        if (eventMapping == null) {
+            return;
+        }
+        GoogleCalendarProviderChangeAction action = eventMapping.evaluateGoogleCancellation();
+        if (action == GoogleCalendarProviderChangeAction.IGNORE) {
+            return;
+        }
+        if (action == GoogleCalendarProviderChangeAction.MARK_CONFLICT) {
+            markConflict(eventMapping, ownership);
             return;
         }
         GoogleCalendarEffectiveScope scope = GoogleCalendarEffectiveScope.event(
                 eventMapping.getEvent().getId());
-        if (eventMapping.hasLocalModification()) {
-            markConflict(eventMapping, ownership);
-            return;
-        }
         if (operationJobQueryService.hasPendingOutboundJob(
                 eventMapping.getIntegration().getAccountId(), eventMapping.getIntegration().getId(), scope)) {
             markConflict(eventMapping, ownership);
@@ -132,34 +135,6 @@ public class GoogleCalendarEventChangeService {
                 mapping.getIntegration().getAccountId(),
                 ownership.workerToken()
         );
-    }
-
-    private boolean keepDetachedMapping(
-            GoogleCalendarEventMapping mapping,
-            EventUpsert item,
-            GoogleCalendarPageOwnership ownership
-    ) {
-        if (mapping.hasCanonicalEvent()) {
-            return false;
-        }
-        if (!hasSameProviderEtag(mapping, item.providerEtag())) {
-            markConflict(mapping, ownership);
-        }
-        return true;
-    }
-
-    private void keepLocalContentOrMarkConflict(
-            GoogleCalendarEventMapping mapping,
-            String providerEtag,
-            GoogleCalendarPageOwnership ownership
-    ) {
-        if (!hasSameProviderEtag(mapping, providerEtag)) {
-            markConflict(mapping, ownership);
-        }
-    }
-
-    private boolean hasSameProviderEtag(GoogleCalendarEventMapping mapping, String providerEtag) {
-        return mapping.getProviderEtag().equals(providerEtag);
     }
 
     private void markConflict(

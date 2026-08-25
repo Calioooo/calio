@@ -230,7 +230,7 @@ public class EventService {
 
     private void markLocalProviderContentChange(Long eventId) {
         eventMappingQueryService.findEventMapping(eventId)
-                .filter(mapping -> !mapping.blocksLocalMutation())
+                .filter(GoogleCalendarEventMapping::shouldTrackLocalModification)
                 .ifPresent(mapping -> eventMappingCommandService.markLocalModification(
                         mapping, Instant.now()));
     }
@@ -241,8 +241,7 @@ public class EventService {
     }
 
     private void detachOrReject(GoogleCalendarEventMapping mapping) {
-        if (mapping.isConflicted() || !mapping.getIntegration().isConnected()) {
-            mapping.detachCanonicalEvent(Instant.now());
+        if (mapping.detachCanonicalEventIfAllowed(Instant.now())) {
             return;
         }
         throw new CalioException(ErrorCode.EXTERNAL_EVENT_MUTATION_NOT_SUPPORTED);

@@ -110,6 +110,10 @@ public class GoogleCalendarEventMapping extends BaseEntity {
         return integration.isConnected() && !isConflicted();
     }
 
+    public boolean shouldTrackLocalModification() {
+        return !blocksLocalMutation();
+    }
+
     public String getProviderEtag() {
         return syncState.getProviderEtag();
     }
@@ -122,9 +126,55 @@ public class GoogleCalendarEventMapping extends BaseEntity {
         return !isConflicted() && hasCanonicalEvent();
     }
 
+    public GoogleCalendarProviderChangeAction evaluateGoogleUpsert(String providerEtag) {
+        if (isConflicted()) {
+            return GoogleCalendarProviderChangeAction.IGNORE;
+        }
+        if (!hasCanonicalEvent() || hasLocalModification()) {
+            return hasSameProviderEtag(providerEtag)
+                    ? GoogleCalendarProviderChangeAction.IGNORE
+                    : GoogleCalendarProviderChangeAction.MARK_CONFLICT;
+        }
+        return hasSameProviderEtag(providerEtag)
+                ? GoogleCalendarProviderChangeAction.IGNORE
+                : GoogleCalendarProviderChangeAction.APPLY;
+    }
+
+    public GoogleCalendarProviderChangeAction evaluateGoogleCancellation() {
+        if (!canApplyGoogleChange()) {
+            return GoogleCalendarProviderChangeAction.IGNORE;
+        }
+        return hasLocalModification()
+                ? GoogleCalendarProviderChangeAction.MARK_CONFLICT
+                : GoogleCalendarProviderChangeAction.APPLY;
+    }
+
+    public GoogleCalendarProviderChangeAction evaluateUnseenProviderRemoval(
+            boolean hasPendingOutboundJob
+    ) {
+        if (!canApplyGoogleChange()) {
+            return GoogleCalendarProviderChangeAction.IGNORE;
+        }
+        return hasLocalModification() || hasPendingOutboundJob
+                ? GoogleCalendarProviderChangeAction.MARK_CONFLICT
+                : GoogleCalendarProviderChangeAction.APPLY;
+    }
+
+    private boolean hasSameProviderEtag(String providerEtag) {
+        return syncState.getProviderEtag().equals(providerEtag);
+    }
+
     public void detachCanonicalEvent(Instant deletedAt) {
         event = null;
         localDeletedAt = deletedAt;
+    }
+
+    public boolean detachCanonicalEventIfAllowed(Instant deletedAt) {
+        if (blocksLocalMutation()) {
+            return false;
+        }
+        detachCanonicalEvent(deletedAt);
+        return true;
     }
 
     public void markLocalModification(Instant modifiedAt) {
