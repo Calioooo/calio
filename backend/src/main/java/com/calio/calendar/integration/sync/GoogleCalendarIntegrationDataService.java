@@ -301,7 +301,7 @@ public class GoogleCalendarIntegrationDataService {
             GoogleCalendarEventMapping mapping,
             OperationOwnership ownership
     ) {
-        if (mapping.isConflicted() || !mapping.hasCanonicalEvent()) {
+        if (!mapping.canApplyGoogleChange()) {
             return false;
         }
         if (mapping.hasLocalModification()) {
@@ -326,7 +326,7 @@ public class GoogleCalendarIntegrationDataService {
             GoogleCalendarRecurrenceEventMapping mapping,
             OperationOwnership ownership
     ) {
-        if (mapping.isConflicted() || !mapping.hasCanonicalRecurrenceEvent()) {
+        if (!mapping.canApplyGoogleChange()) {
             return false;
         }
         if (mapping.hasLocalModification()) {

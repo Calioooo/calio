@@ -114,6 +114,10 @@ public class GoogleCalendarRecurrenceEventMapping extends BaseEntity {
         return recurrenceEvent != null;
     }
 
+    public boolean canApplyGoogleChange() {
+        return !isConflicted() && hasCanonicalRecurrenceEvent();
+    }
+
     public void detachCanonicalRecurrenceEvent(Instant deletedAt) {
         recurrenceEvent = null;
         localDeletedAt = deletedAt;

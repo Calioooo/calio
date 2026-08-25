@@ -118,6 +118,10 @@ public class GoogleCalendarEventMapping extends BaseEntity {
         return event != null;
     }
 
+    public boolean canApplyGoogleChange() {
+        return !isConflicted() && hasCanonicalEvent();
+    }
+
     public void detachCanonicalEvent(Instant deletedAt) {
         event = null;
         localDeletedAt = deletedAt;

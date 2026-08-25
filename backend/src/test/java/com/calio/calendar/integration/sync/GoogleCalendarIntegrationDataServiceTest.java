@@ -57,6 +57,7 @@ class GoogleCalendarIntegrationDataServiceTest {
         Event event = mock(Event.class);
         GoogleCalendarIntegration integration = mock(GoogleCalendarIntegration.class);
         when(eventMapping.getId()).thenReturn(10L);
+        when(eventMapping.canApplyGoogleChange()).thenReturn(true);
         when(eventMapping.hasCanonicalEvent()).thenReturn(true);
         when(eventMapping.getExternalEventId()).thenReturn("unseen-event");
         when(eventMapping.getEvent()).thenReturn(event);
@@ -120,6 +121,7 @@ class GoogleCalendarIntegrationDataServiceTest {
         when(overrideMapping.hasLocalModification()).thenReturn(true);
         when(overrideMapping.getRecurrenceEventMapping()).thenReturn(parentMapping);
         when(parentMapping.isConflicted()).thenReturn(false);
+        when(parentMapping.canApplyGoogleChange()).thenReturn(true);
         when(parentMapping.hasCanonicalRecurrenceEvent()).thenReturn(true);
         when(parentMapping.getIntegration()).thenReturn(integration);
         when(integration.getId()).thenReturn(1L);

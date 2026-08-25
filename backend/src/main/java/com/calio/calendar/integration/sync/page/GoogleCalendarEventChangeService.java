@@ -104,7 +104,7 @@ public class GoogleCalendarEventChangeService {
     ) {
         var eventMappings = cache.eventMappings();
         GoogleCalendarEventMapping eventMapping = eventMappings.get(externalEventId);
-        if (eventMapping == null || eventMapping.isConflicted() || !eventMapping.hasCanonicalEvent()) {
+        if (eventMapping == null || !eventMapping.canApplyGoogleChange()) {
             return;
         }
         GoogleCalendarEffectiveScope scope = GoogleCalendarEffectiveScope.event(
