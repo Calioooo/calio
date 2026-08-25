@@ -39,22 +39,30 @@ public class PersonalEventGroupShareService {
     @Transactional
     public void share(
             Long accountId,
-            Long groupSpaceId,
             PersonalEventGroupShareCommand command
     ) {
-        GroupMember membership = membershipQueryService.getActiveMembership(groupSpaceId, accountId);
-        shareEvents(accountId, command, membership);
+        List<GroupMember> memberships = activeMemberships(accountId, command.groupSpaceIds());
+        shareEvents(accountId, command, memberships);
     }
 
     private void shareEvents(
             Long accountId,
             PersonalEventGroupShareCommand command,
-            GroupMember membership
+            List<GroupMember> memberships
     ) {
         eventsToShare(accountId, command)
-                .forEach(event -> shareCommandService.createShare(
+                .forEach(event -> memberships.forEach(membership -> shareCommandService.createShare(
                         new PersonalEventGroupShare(event, membership.getGroupSpace())
-                ));
+                )));
+    }
+
+    private List<GroupMember> activeMemberships(Long accountId, List<Long> groupSpaceIds) {
+        if (groupSpaceIds.isEmpty()) {
+            throw new CalioException(ErrorCode.VALIDATION_FAILED);
+        }
+        return new LinkedHashSet<>(groupSpaceIds).stream()
+                .map(groupSpaceId -> membershipQueryService.getActiveMembership(groupSpaceId, accountId))
+                .toList();
     }
 
     private List<Event> eventsToShare(Long accountId, PersonalEventGroupShareCommand command) {
@@ -85,22 +93,15 @@ public class PersonalEventGroupShareService {
         PersonalEventGroupShare share = shareQueryService.getShareIfExists(eventId, groupSpaceId)
                 .orElseThrow(() -> new CalioException(ErrorCode.EVENT_NOT_FOUND));
         requireSourceOwner(accountId, share);
-        shareCommandService.updateRepresentation(
-                share,
-                command.showOriginalDetails(),
-                command.overrideTitle(),
-                command.overrideStartAt(),
-                command.overrideEndAt(),
-                command.overrideAllDay()
-        );
+        shareCommandService.changeOriginalDetailsVisibility(share, command.showOriginalDetails());
     }
 
     @Transactional
     public void remove(Long accountId, Long groupSpaceId, Long eventId) {
-        GroupMember membership = membershipQueryService.getActiveMembership(groupSpaceId, accountId);
+        membershipQueryService.getActiveMembership(groupSpaceId, accountId);
         PersonalEventGroupShare share = shareQueryService.getShareIfExists(eventId, groupSpaceId)
                 .orElseThrow(() -> new CalioException(ErrorCode.EVENT_NOT_FOUND));
-        requireSourceOwnerOrGroupOwner(accountId, membership, share);
+        requireSourceOwner(accountId, share);
         shareCommandService.deleteShare(share);
     }
 
@@ -110,14 +111,4 @@ public class PersonalEventGroupShareService {
         }
     }
 
-    private void requireSourceOwnerOrGroupOwner(
-            Long accountId,
-            GroupMember membership,
-            PersonalEventGroupShare share
-    ) {
-        boolean isSourceOwner = share.getEvent().getAccount().getId().equals(accountId);
-        if (!isSourceOwner && !membership.roleIn(share.getGroupSpace()).isOwner()) {
-            throw new CalioException(ErrorCode.PERSONAL_EVENT_GROUP_SHARE_FORBIDDEN);
-        }
-    }
 }

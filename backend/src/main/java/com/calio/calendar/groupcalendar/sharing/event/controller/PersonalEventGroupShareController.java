@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/group-spaces/{groupSpaceId}/event-shares")
+@RequestMapping("/api/event-shares")
 public class PersonalEventGroupShareController {
 
     private final PersonalEventGroupShareService shareService;
@@ -32,20 +32,19 @@ public class PersonalEventGroupShareController {
     @ResponseStatus(HttpStatus.CREATED)
     public void share(
             @AuthenticationPrincipal AuthenticatedAccount account,
-            @PathVariable Long groupSpaceId,
             @Valid @RequestBody PersonalEventGroupShareRequest request
     ) {
         shareService.share(
                 account.accountId(),
-                groupSpaceId,
                 new PersonalEventGroupShareCommand(
                         request.selectionEnabled(),
-                        request.eventIdsOrEmpty()
+                        request.eventIdsOrEmpty(),
+                        request.groupSpaceIdsOrEmpty()
                 )
         );
     }
 
-    @PatchMapping("/{eventId}")
+    @PatchMapping("/{groupSpaceId}/{eventId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void update(
             @AuthenticationPrincipal AuthenticatedAccount account,
@@ -57,17 +56,11 @@ public class PersonalEventGroupShareController {
                 account.accountId(),
                 groupSpaceId,
                 eventId,
-                new UpdatePersonalEventGroupShareCommand(
-                        request.showOriginalDetails(),
-                        request.overrideTitle(),
-                        request.overrideStartAt(),
-                        request.overrideEndAt(),
-                        request.overrideAllDay()
-                )
+                new UpdatePersonalEventGroupShareCommand(request.showOriginalDetails())
         );
     }
 
-    @DeleteMapping("/{eventId}")
+    @DeleteMapping("/{groupSpaceId}/{eventId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void remove(
             @AuthenticationPrincipal AuthenticatedAccount account,

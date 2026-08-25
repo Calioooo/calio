@@ -145,23 +145,19 @@ class PersonalEventGroupShareControllerTest {
                 .andExpect(status().isCreated());
 
         // when
-        mockMvc.perform(patch("/api/group-spaces/{groupSpaceId}/event-shares/{eventId}", groupSpace.getId(), event.getId())
+        mockMvc.perform(patch("/api/event-shares/{groupSpaceId}/{eventId}", groupSpace.getId(), event.getId())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "showOriginalDetails": false,
-                                  "overrideTitle": "공개 제목",
-                                  "overrideStartAt": "2028-01-01T11:00:00Z",
-                                  "overrideEndAt": "2028-01-01T12:00:00Z",
-                                  "overrideAllDay": false
+                                  "showOriginalDetails": true
                                 }
                                 """))
                 // then
                 .andExpect(status().isNoContent());
 
         assertThat(eventRepository.findById(event.getId()).orElseThrow().getTitle()).isEqualTo("원본 제목");
-        assertThat(shareRepository.findAllByEventId(event.getId()).getFirst().getOverrideTitle())
-                .isEqualTo("공개 제목");
+        assertThat(shareRepository.findAllByEventId(event.getId()).getFirst().isShowOriginalDetails())
+                .isTrue();
     }
 
     @Test
