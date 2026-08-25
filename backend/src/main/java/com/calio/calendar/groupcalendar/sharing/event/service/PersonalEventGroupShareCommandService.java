@@ -4,7 +4,6 @@ import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.groupcalendar.sharing.event.domain.PersonalEventGroupShare;
 import com.calio.calendar.groupcalendar.sharing.event.repository.PersonalEventGroupShareRepository;
-import java.time.Instant;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,21 +26,11 @@ public class PersonalEventGroupShareCommandService {
         }
     }
 
-    public void updateRepresentation(
+    public void changeOriginalDetailsVisibility(
             PersonalEventGroupShare share,
-            boolean showOriginalDetails,
-            String overrideTitle,
-            Instant overrideStartAt,
-            Instant overrideEndAt,
-            Boolean overrideAllDay
+            boolean showOriginalDetails
     ) {
-        share.updateRepresentation(
-                showOriginalDetails,
-                overrideTitle,
-                overrideStartAt,
-                overrideEndAt,
-                overrideAllDay
-        );
+        share.changeOriginalDetailsVisibility(showOriginalDetails);
         shareRepository.flush();
     }
 }

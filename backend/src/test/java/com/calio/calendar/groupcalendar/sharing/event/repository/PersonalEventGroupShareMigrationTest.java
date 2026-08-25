@@ -26,8 +26,8 @@ class PersonalEventGroupShareMigrationTest {
     }
 
     @Test
-    @DisplayName("개인 단건 일정 공유 override migration은 공개 설정과 nullable 표현 override를 추가한다")
-    void migrationAddsPersonalEventGroupShareRepresentationOverrides() throws IOException {
+    @DisplayName("개인 단건 일정 공유 migration은 원본 상세 공개 설정만 추가한다")
+    void migrationAddsPersonalEventGroupSharePrivacySetting() throws IOException {
         // when
         String migration = new ClassPathResource("db/migration/V22__personal_event_group_share_overrides.sql")
                 .getContentAsString(StandardCharsets.UTF_8);
@@ -35,9 +35,9 @@ class PersonalEventGroupShareMigrationTest {
         // then
         assertThat(migration)
                 .contains("show_original_details BOOLEAN NOT NULL DEFAULT FALSE")
-                .contains("override_title VARCHAR(255) NULL")
-                .contains("override_start_at DATETIME(6) NULL")
-                .contains("override_end_at DATETIME(6) NULL")
-                .contains("override_all_day BOOLEAN NULL");
+                .doesNotContain("override_title")
+                .doesNotContain("override_start_at")
+                .doesNotContain("override_end_at")
+                .doesNotContain("override_all_day");
     }
 }
