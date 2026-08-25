@@ -27,6 +27,7 @@ struct CalendarDateEventView: View {
     let onResetEventMutation: () -> Void
     let onResetTagMutation: () -> Void
     let onFetchRecurrenceEvent: (Int64) async -> RecurrenceEventDetails?
+    let onUpdateImportantEvent: (Event, Bool) async -> Event?
     let onUpdateSingleEvent: (Event, EventUpdateInput) async -> Bool
     let onUpdateRecurrenceOccurrence: (Event, EventUpdateInput) async -> Bool
     let onUpdateRecurrenceSeries: (Int64, RecurrenceEventSeriesEditInput) async -> Bool
@@ -36,6 +37,7 @@ struct CalendarDateEventView: View {
     let onCreateCustomTag: (CustomTagInput) async -> Bool
     let onUpdateCustomTag: (CalendarTag, CustomTagInput) async -> Bool
     let onDeleteCustomTag: (CalendarTag) async -> Bool
+    let showsSelectedDayOnly: Bool
 
     init(
         items: [CalendarDayItem],
@@ -52,6 +54,7 @@ struct CalendarDateEventView: View {
         onResetEventMutation: @escaping () -> Void = {},
         onResetTagMutation: @escaping () -> Void = {},
         onFetchRecurrenceEvent: @escaping (Int64) async -> RecurrenceEventDetails? = { _ in nil },
+        onUpdateImportantEvent: @escaping (Event, Bool) async -> Event? = { _, _ in nil },
         onUpdateSingleEvent: @escaping (Event, EventUpdateInput) async -> Bool = { _, _ in true },
         onUpdateRecurrenceOccurrence: @escaping (Event, EventUpdateInput) async -> Bool = { _, _ in true },
         onUpdateRecurrenceSeries: @escaping (Int64, RecurrenceEventSeriesEditInput) async -> Bool = { _, _ in true },
@@ -60,7 +63,8 @@ struct CalendarDateEventView: View {
         onDeleteRecurrenceSeries: @escaping (Event) async -> Bool = { _ in true },
         onCreateCustomTag: @escaping (CustomTagInput) async -> Bool = { _ in false },
         onUpdateCustomTag: @escaping (CalendarTag, CustomTagInput) async -> Bool = { _, _ in false },
-        onDeleteCustomTag: @escaping (CalendarTag) async -> Bool = { _ in false }
+        onDeleteCustomTag: @escaping (CalendarTag) async -> Bool = { _ in false },
+        showsSelectedDayOnly: Bool = false
     ) {
         self.items = items
         self.tags = tags
@@ -76,6 +80,7 @@ struct CalendarDateEventView: View {
         self.onResetEventMutation = onResetEventMutation
         self.onResetTagMutation = onResetTagMutation
         self.onFetchRecurrenceEvent = onFetchRecurrenceEvent
+        self.onUpdateImportantEvent = onUpdateImportantEvent
         self.onUpdateSingleEvent = onUpdateSingleEvent
         self.onUpdateRecurrenceOccurrence = onUpdateRecurrenceOccurrence
         self.onUpdateRecurrenceSeries = onUpdateRecurrenceSeries
@@ -85,6 +90,7 @@ struct CalendarDateEventView: View {
         self.onCreateCustomTag = onCreateCustomTag
         self.onUpdateCustomTag = onUpdateCustomTag
         self.onDeleteCustomTag = onDeleteCustomTag
+        self.showsSelectedDayOnly = showsSelectedDayOnly
     }
     
     @StateObject private var focusCoordinator = CalendarScrollFocusCoordinator()
@@ -102,7 +108,7 @@ struct CalendarDateEventView: View {
                 emptyState
             } else {
                 GeometryReader { _ in
-                    let itemIDs = items.map(\.id)
+                    let itemIDs = displayedItems.map(\.id)
 
                     if focusCoordinator.canRenderContent(referenceDay: referenceDay, itemIDs: itemIDs) {
                         scrollContent(itemIDs: itemIDs)
@@ -121,6 +127,7 @@ struct CalendarDateEventView: View {
                 mutationFailureMessage: eventMutationFailureMessage,
                 tagMutationFailureMessage: tagMutationFailureMessage,
                 onFetchRecurrenceEvent: onFetchRecurrenceEvent,
+                onUpdateImportantEvent: onUpdateImportantEvent,
                 onUpdateSingleEvent: onUpdateSingleEvent,
                 onUpdateRecurrenceOccurrence: onUpdateRecurrenceOccurrence,
                 onUpdateRecurrenceSeries: onUpdateRecurrenceSeries,
@@ -140,7 +147,7 @@ struct CalendarDateEventView: View {
     ) -> some View {
         return ScrollView(.vertical) {
             LazyVStack(spacing: rowSpacing) {
-                ForEach(items) { item in
+                ForEach(displayedItems) { item in
                     CalendarDateEventCellView(
                         day: item.id,
                         weekday: item.weekday,
@@ -159,13 +166,13 @@ struct CalendarDateEventView: View {
                         events: item.events,
                         holidays: item.holidays
                     )
-                    .frame(minHeight: dateRowHeight)
+                    .frame(minHeight: showsSelectedDayOnly ? 0 : dateRowHeight)
                     .id(item.id)
                 }
             }
             .scrollTargetLayout()
-            .padding(.horizontal, 16)
-            .padding(.top, contentTopPadding)
+            .padding(.horizontal, 20)
+            .padding(.top, showsSelectedDayOnly ? 20 : contentTopPadding)
             .padding(.bottom, contentBottomPadding)
         }
         .scrollTargetBehavior(.viewAligned)
@@ -230,6 +237,14 @@ struct CalendarDateEventView: View {
         )
         .foregroundStyle(.calioTextSecondary)
         .accessibilityIdentifier("calendar_empty_state")
+    }
+
+    private var displayedItems: [CalendarDayItem] {
+        guard showsSelectedDayOnly else {
+            return items
+        }
+
+        return items.filter { $0.id == referenceDay }
     }
     
     private func notifyVisibleRangeChanged(

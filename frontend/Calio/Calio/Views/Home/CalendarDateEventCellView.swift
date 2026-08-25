@@ -9,6 +9,7 @@ import SwiftUI
 import UIKit
 
 struct CalendarDateEventCellView: View {
+    @Environment(\.sizeCategory) private var sizeCategory
     private let popoverEdgeResolver = CalendarDateEventPopoverEdgeResolver()
     
     let day: DayKey
@@ -52,11 +53,8 @@ struct CalendarDateEventCellView: View {
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("\(monthText) / \(dayText)")
-                .font(.headline.weight(isToday ? .bold : .semibold))
-                .foregroundStyle(isToday ? .calioBrand : .calioTextPrimary)
-                .frame(maxWidth: .infinity, alignment: .leading)
+        VStack(alignment: .leading, spacing: 14) {
+            agendaHeader
 
             ForEach(holidays) { holiday in
                 holidayChip(holiday)
@@ -90,37 +88,86 @@ struct CalendarDateEventCellView: View {
             .accessibilityLabel("\(holiday.title) 공휴일, 종일")
     }
 
+    @ViewBuilder
+    private var agendaHeader: some View {
+        if sizeCategory.isAccessibilityCategory {
+            VStack(alignment: .leading, spacing: 4) {
+                dateTitle
+                eventCount
+            }
+        } else {
+            HStack(alignment: .firstTextBaseline) {
+                dateTitle
+                Spacer()
+                eventCount
+            }
+        }
+    }
+
+    private var dateTitle: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 7) {
+            Text("\(monthText)월 \(dayText)일")
+                .font(.title3.weight(.bold))
+                .foregroundStyle(.calioTextPrimary)
+
+            Text(weekday.shortEnglishText)
+                .font(.caption2.weight(.semibold))
+                .tracking(0.4)
+                .foregroundStyle(.calioTextSecondary)
+        }
+        .accessibilityLabel("\(monthText)월 \(dayText)일 \(weekday.fullKoreanText)")
+    }
+
+    @ViewBuilder
+    private var eventCount: some View {
+        if !events.isEmpty {
+            Text("일정 \(events.count)개")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.calioTextSecondary)
+        }
+    }
+
     private func eventChipButton(_ event: Event) -> some View {
         Button {
             selectedEvent = CalendarDateEventSelection(day: day, event: event)
             onEventSelected(event)
         } label: {
-            HStack(alignment: .top, spacing: 8) {
+            HStack(alignment: .top, spacing: 12) {
+                Text(eventScheduleText(event))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.calioTextSecondary)
+                    .frame(width: 72, alignment: .leading)
+
                 Circle()
                     .fill(Color(hex: event.tag.colorCode))
-                    .frame(width: 7, height: 7)
-                    .padding(.top, 7)
+                    .frame(width: 8, height: 8)
+                    .padding(.top, 6)
 
-                VStack(alignment: .leading, spacing: 3) {
+                HStack(alignment: .firstTextBaseline, spacing: 5) {
                     Text(event.title)
                         .font(.subheadline.weight(.semibold))
                         .fixedSize(horizontal: false, vertical: true)
 
-                    Text(eventScheduleText(event))
-                        .font(.caption)
-                        .foregroundStyle(.calioTextSecondary)
+                    if event.importantEvent {
+                        Image(systemName: "star.fill")
+                            .font(.caption)
+                            .foregroundStyle(Color.calioImportantStar)
+                            .accessibilityLabel("중요 일정")
+                    }
                 }
+
+                Spacer(minLength: 0)
             }
             .foregroundStyle(.calioTextPrimary)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
             .background(
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(Color.calioSurface)
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.calioSurface)
             )
             .overlay {
-                RoundedRectangle(cornerRadius: 10)
+                RoundedRectangle(cornerRadius: 12)
                     .stroke(Color.calioDivider, lineWidth: 1)
             }
         }
@@ -186,7 +233,7 @@ struct CalendarDateEventCellView: View {
         formatter.locale = Locale(identifier: "ko_KR")
         formatter.dateFormat = "a h:mm"
         let time = formatter.string(from: event.startAt)
-        return event.isRepeated ? "반복 · \(time)" : time
+        return time
     }
 
     var calendarChips: [CalendarDateEventChip] {

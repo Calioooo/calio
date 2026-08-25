@@ -56,6 +56,10 @@ struct UpdateEventRequestDTO: Encodable, Equatable {
     }
 }
 
+struct UpdateImportantEventRequestDTO: Encodable, Equatable {
+    let importantEvent: Bool
+}
+
 struct EventResponseDTO: Decodable {
     let id: Int64?
     let title: String

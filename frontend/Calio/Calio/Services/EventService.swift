@@ -88,6 +88,22 @@ struct EventService {
         }
     }
 
+    func updateImportantEvent(eventId: Int64, importantEvent: Bool) async throws -> Event {
+        do {
+            let response = try await repository.updateImportantEvent(
+                eventId: eventId,
+                request: UpdateImportantEventRequestDTO(importantEvent: importantEvent)
+            )
+            return try mapToEvent(response)
+        } catch let error as APIError {
+            throw mapToServiceError(error)
+        } catch let error as EventServiceError {
+            throw error
+        } catch {
+            throw EventServiceError.unexpected
+        }
+    }
+
     func fetchRecurrenceEvent(recurrenceId: Int64) async throws -> RecurrenceEventDetails {
         do {
             let response = try await repository.fetchRecurrenceEvent(recurrenceId: recurrenceId)

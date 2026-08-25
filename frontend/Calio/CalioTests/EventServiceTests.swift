@@ -271,6 +271,32 @@ struct EventServiceTests {
         #expect(repository.updateRequests.first?.request.timeZone == "America/New_York")
     }
 
+    @Test func eventServiceUpdatesImportantStateUsingCanonicalBackendResponse() async throws {
+        let startAt = Date(timeIntervalSince1970: 1_788_000_000)
+        let response = EventResponseDTO(
+            id: 91,
+            title: "중요 일정",
+            description: "",
+            startAt: startAt,
+            endAt: startAt.addingTimeInterval(3600),
+            allDay: false,
+            timeZone: "Asia/Seoul",
+            importantEvent: true,
+            createdAt: startAt,
+            updatedAt: startAt
+        )
+        let repository = RecordingEventRepository(updateResponse: response)
+        let service = EventService(repository: repository)
+
+        let event = try await service.updateImportantEvent(eventId: 91, importantEvent: true)
+
+        #expect(repository.updateImportantEventRequests.count == 1)
+        #expect(repository.updateImportantEventRequests.first?.eventId == 91)
+        #expect(repository.updateImportantEventRequests.first?.request.importantEvent == true)
+        #expect(event.backendId == 91)
+        #expect(event.importantEvent)
+    }
+
     @Test func eventServiceUsesCanonicalAllDayFlagForUTCMidnightTimedEvent() async throws {
         let startAt = try CalendarDateService.utcDate(from: "2026-08-01")
         let endAt = startAt.addingTimeInterval(3600)

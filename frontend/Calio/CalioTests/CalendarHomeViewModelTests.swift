@@ -626,6 +626,126 @@ struct CalendarHomeViewModelTests {
     }
 
     @MainActor
+    @Test func calendarHomeViewModelUpdatesOnlyIndependentEventImportanceAndRefetchesItsMonth() async throws {
+        let calendar = fixedCalendar
+        let baseDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8, hour: 9)))
+        let event = makeEvent(id: 503, title: "중요 표시 대상", on: baseDate)
+        let response = EventResponseDTO(
+            id: 503,
+            title: event.title,
+            description: event.description,
+            startAt: event.startAt,
+            endAt: event.endAt,
+            allDay: false,
+            timeZone: "Asia/Seoul",
+            importantEvent: true,
+            tag: TagResponseDTO(id: event.tag.id, title: event.tag.title, colorCode: event.tag.colorCode, tagType: event.tag.tagType),
+            createdAt: event.startAt,
+            updatedAt: event.startAt
+        )
+        let repository = RecordingEventRepository(updateResponse: response)
+        let viewModel = CalendarHomeViewModel(
+            calendar: calendar,
+            dateService: CalendarDateService(calendar: calendar),
+            eventService: EventService(repository: repository),
+            nationalHolidayService: makeNationalHolidayService(calendar: calendar),
+            initialState: makeLoadedState(
+                dayOffsets: 0...2,
+                from: baseDate,
+                calendar: calendar,
+                monthEventCache: [YearMonthKey(date: baseDate, calendar: calendar): .loaded([event])]
+            )
+        )
+
+        let updatedEvent = await viewModel.updateImportantEvent(event, importantEvent: true)
+        let didRequestMonth = await repository.waitForRequestCount(1)
+
+        #expect(updatedEvent?.importantEvent == true)
+        #expect(repository.updateImportantEventRequests.first?.eventId == 503)
+        #expect(repository.updateImportantEventRequests.first?.request.importantEvent == true)
+        #expect(didRequestMonth)
+        #expect(viewModel.mutationState == .idle)
+    }
+
+    @MainActor
+    @Test func calendarHomeViewModelDoesNotRequestImportanceMutationForRecurrenceOccurrence() async throws {
+        let calendar = fixedCalendar
+        let baseDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8, hour: 9)))
+        let occurrence = Event(
+            id: nil,
+            title: "반복 회차",
+            description: "",
+            startAt: baseDate,
+            endAt: baseDate.addingTimeInterval(3600),
+            tag: .sample(colorCode: "#4F46E5"),
+            recurrenceId: 700,
+            isRecurrenceOccurrence: true,
+            originStartAt: baseDate
+        )
+        let repository = RecordingEventRepository()
+        let viewModel = CalendarHomeViewModel(
+            calendar: calendar,
+            dateService: CalendarDateService(calendar: calendar),
+            eventService: EventService(repository: repository),
+            nationalHolidayService: makeNationalHolidayService(calendar: calendar)
+        )
+
+        let result = await viewModel.updateImportantEvent(occurrence, importantEvent: true)
+
+        #expect(result == nil)
+        #expect(repository.updateImportantEventRequests.isEmpty)
+        #expect(viewModel.mutationState == .idle)
+    }
+
+    @MainActor
+    @Test func calendarHomeViewModelPreventsDuplicateImportanceMutationWhileRequestIsInFlight() async throws {
+        let calendar = fixedCalendar
+        let baseDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8, hour: 9)))
+        let event = makeEvent(id: 505, title: "중복 요청 방지", on: baseDate)
+        let repository = RecordingEventRepository(shouldSuspendImportantEvent: true)
+        let viewModel = CalendarHomeViewModel(
+            calendar: calendar,
+            dateService: CalendarDateService(calendar: calendar),
+            eventService: EventService(repository: repository),
+            nationalHolidayService: makeNationalHolidayService(calendar: calendar)
+        )
+
+        let firstRequest = Task { await viewModel.updateImportantEvent(event, importantEvent: true) }
+        let didStartRequest = await repository.waitForImportantEventRequestCount(1)
+        #expect(didStartRequest)
+
+        let duplicateRequest = await viewModel.updateImportantEvent(event, importantEvent: true)
+        #expect(duplicateRequest == nil)
+        #expect(repository.updateImportantEventRequests.count == 1)
+
+        repository.finishSuspendedImportantEventRequests()
+        _ = await firstRequest.value
+    }
+
+    @MainActor
+    @Test func calendarHomeViewModelKeepsImportanceStateUnchangedWhenMutationFails() async throws {
+        let calendar = fixedCalendar
+        let baseDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8, hour: 9)))
+        let event = makeEvent(id: 504, title: "실패 대상", on: baseDate)
+        let repository = RecordingEventRepository(
+            updateError: APIError.network(URLError(.notConnectedToInternet))
+        )
+        let viewModel = CalendarHomeViewModel(
+            calendar: calendar,
+            dateService: CalendarDateService(calendar: calendar),
+            eventService: EventService(repository: repository),
+            nationalHolidayService: makeNationalHolidayService(calendar: calendar)
+        )
+
+        let result = await viewModel.updateImportantEvent(event, importantEvent: true)
+
+        #expect(result == nil)
+        #expect(repository.updateImportantEventRequests.count == 1)
+        #expect(viewModel.mutationState == .failed(.network))
+        #expect(viewModel.mutationState.failureMessage == "서버에 연결할 수 없습니다.")
+    }
+
+    @MainActor
     @Test func calendarHomeViewModelEventMutationDoesNotInvalidateLoadedHolidayCache() async throws {
         let calendar = fixedCalendar
         let baseDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8)))

@@ -17,6 +17,7 @@ struct CalendarEventDetailView: View {
     let mutationFailureMessage: String?
     let tagMutationFailureMessage: String?
     let onFetchRecurrenceEvent: (Int64) async -> RecurrenceEventDetails?
+    let onUpdateImportantEvent: (Event, Bool) async -> Event?
     let onUpdateSingleEvent: (Event, EventUpdateInput) async -> Bool
     let onUpdateRecurrenceOccurrence: (Event, EventUpdateInput) async -> Bool
     let onUpdateRecurrenceSeries: (Int64, RecurrenceEventSeriesEditInput) async -> Bool
@@ -38,6 +39,7 @@ struct CalendarEventDetailView: View {
     @State private var seriesTimeZone: String?
     @State private var seriesMutationMessage: String?
     @State private var recurrenceDetails: RecurrenceEventDetails?
+    @State private var displayedImportantEvent: Bool
 
     init(
         event: Event,
@@ -47,6 +49,7 @@ struct CalendarEventDetailView: View {
         mutationFailureMessage: String? = nil,
         tagMutationFailureMessage: String? = nil,
         onFetchRecurrenceEvent: @escaping (Int64) async -> RecurrenceEventDetails? = { _ in nil },
+        onUpdateImportantEvent: @escaping (Event, Bool) async -> Event? = { _, _ in nil },
         onUpdateSingleEvent: @escaping (Event, EventUpdateInput) async -> Bool = { _, _ in true },
         onUpdateRecurrenceOccurrence: @escaping (Event, EventUpdateInput) async -> Bool = { _, _ in true },
         onUpdateRecurrenceSeries: @escaping (Int64, RecurrenceEventSeriesEditInput) async -> Bool = { _, _ in true },
@@ -65,6 +68,7 @@ struct CalendarEventDetailView: View {
         self.mutationFailureMessage = mutationFailureMessage
         self.tagMutationFailureMessage = tagMutationFailureMessage
         self.onFetchRecurrenceEvent = onFetchRecurrenceEvent
+        self.onUpdateImportantEvent = onUpdateImportantEvent
         self.onUpdateSingleEvent = onUpdateSingleEvent
         self.onUpdateRecurrenceOccurrence = onUpdateRecurrenceOccurrence
         self.onUpdateRecurrenceSeries = onUpdateRecurrenceSeries
@@ -96,6 +100,7 @@ struct CalendarEventDetailView: View {
             )
         )
         _seriesTimeZone = State(initialValue: event.timeZone)
+        _displayedImportantEvent = State(initialValue: event.importantEvent)
     }
 
     var body: some View {
@@ -224,6 +229,18 @@ struct CalendarEventDetailView: View {
             }
         } else {
             ToolbarItemGroup(placement: .topBarTrailing) {
+                if canUpdateImportantEvent {
+                    Button {
+                        updateImportantEvent()
+                    } label: {
+                        Image(systemName: displayedImportantEvent ? "star.fill" : "star")
+                    }
+                    .foregroundStyle(Color.calioImportantStar)
+                    .disabled(isEventActionInProgress)
+                    .accessibilityLabel(displayedImportantEvent ? "중요 일정 해제" : "중요 일정으로 표시")
+                    .accessibilityIdentifier("event_detail_important_toggle")
+                }
+
                 if canUpdateRecurringEvent {
                     Button("수정") {
                         fetchRecurrenceEventForAction(.edit)
@@ -297,10 +314,19 @@ struct CalendarEventDetailView: View {
                     .frame(width: 6, height: 34)
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(event.title)
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(.calioTextPrimary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text(event.title)
+                            .font(.title3.weight(.semibold))
+                            .foregroundStyle(.calioTextPrimary)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        if displayedImportantEvent {
+                            Image(systemName: "star.fill")
+                                .font(.subheadline)
+                                .foregroundStyle(Color.calioImportantStar)
+                                .accessibilityLabel("중요 일정")
+                        }
+                    }
 
                     Text(event.tag.title)
                         .font(.caption.weight(.semibold))
@@ -350,7 +376,11 @@ struct CalendarEventDetailView: View {
 
     private var statusSection: some View {
         Section("상태") {
-            Label(importantStatusText, systemImage: importantStatusIconName)
+            HStack(spacing: 8) {
+                Image(systemName: importantStatusIconName)
+                    .foregroundStyle(Color.calioImportantStar)
+                Text(importantStatusText)
+            }
             Label(recurrenceStatusText, systemImage: "repeat")
         }
         .foregroundStyle(.calioTextPrimary)
@@ -399,11 +429,11 @@ struct CalendarEventDetailView: View {
     }
 
     private var importantStatusText: String {
-        Self.importantStatusText(for: event)
+        displayedImportantEvent ? "중요 일정" : "일반 일정"
     }
 
     private var importantStatusIconName: String {
-        event.importantEvent ? "exclamationmark.circle.fill" : "circle"
+        displayedImportantEvent ? "star.fill" : "star"
     }
 
     private var recurrenceStatusText: String {
@@ -416,6 +446,10 @@ struct CalendarEventDetailView: View {
 
     private var canUpdateSingleEvent: Bool {
         Self.canUpdateSingleEvent(event)
+    }
+
+    private var canUpdateImportantEvent: Bool {
+        canUpdateSingleEvent && event.backendId != nil
     }
 
     private var canDeleteSingleEvent: Bool {
@@ -645,6 +679,16 @@ struct CalendarEventDetailView: View {
             if didDelete {
                 dismiss()
             }
+        }
+    }
+
+    private func updateImportantEvent() {
+        Task {
+            guard let updatedEvent = await onUpdateImportantEvent(event, !displayedImportantEvent) else {
+                return
+            }
+
+            displayedImportantEvent = updatedEvent.importantEvent
         }
     }
 

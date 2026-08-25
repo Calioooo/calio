@@ -11,6 +11,10 @@ extension Color {
     static var calendarHoliday: Color {
         Color(hex: "#E76F73")
     }
+
+    static var calioImportantStar: Color {
+        Color(hex: "#C99216")
+    }
     
     init(hex: String) {
         let sanitizedHex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
