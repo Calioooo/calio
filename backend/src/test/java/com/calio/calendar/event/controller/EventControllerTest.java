@@ -969,6 +969,38 @@ class EventControllerTest {
     }
 
     @Test
+    @DisplayName("공유 후보 UI의 기본 30일 범위와 범위 밖 명시 조회는 기존 일정 범위 조회로 지원한다")
+    void givenDefaultThirtyDayRange_whenListEvents_thenAllowsExplicitOutsideRangeLookup()
+            throws Exception {
+        // given
+        long defaultRangeEventId = createEvent(
+                "Default range",
+                "2026-06-30T09:00:00Z",
+                "2026-06-30T10:00:00Z"
+        );
+        long outsideRangeEventId = createEvent(
+                "Outside range",
+                "2026-07-01T09:00:00Z",
+                "2026-07-01T10:00:00Z"
+        );
+
+        // when, then
+        mockMvc.perform(get("/api/events")
+                        .param("from", "2026-06-01T00:00:00Z")
+                        .param("to", "2026-07-01T00:00:00Z"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].id").value(defaultRangeEventId));
+
+        mockMvc.perform(get("/api/events")
+                        .param("from", "2026-07-01T00:00:00Z")
+                        .param("to", "2026-07-02T00:00:00Z"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].id").value(outsideRangeEventId));
+    }
+
+    @Test
     @DisplayName("개인 일정 조회는 ACTIVE Group Space의 직접 일정을 개인 일정과 시작 시각순으로 합친다")
     void givenActiveGroupMembership_whenListEvents_thenMergesDirectGroupEvent() throws Exception {
         // given
