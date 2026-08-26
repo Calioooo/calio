@@ -45,24 +45,6 @@ public class PersonalRecurrenceGroupShareCommandService {
         return selectedOriginRepository.saveAndFlush(selectedOrigin);
     }
 
-    public void updateRepresentation(
-            PersonalRecurrenceGroupShare share,
-            boolean showOriginalDetails,
-            String overrideTitle,
-            Instant overrideStartAt,
-            Instant overrideEndAt,
-            Boolean overrideAllDay
-    ) {
-        share.updateRepresentation(
-                showOriginalDetails,
-                overrideTitle,
-                overrideStartAt,
-                overrideEndAt,
-                overrideAllDay
-        );
-        shareRepository.flush();
-    }
-
     public PersonalRecurrenceGroupShareOccurrenceOverride createOccurrenceOverride(
             PersonalRecurrenceGroupShareOccurrenceOverride occurrenceOverride
     ) {

@@ -119,15 +119,11 @@ public class GroupCalendarService {
                 recurrenceEvent,
                 occurrences
         );
-        Map<Instant, PersonalRecurrenceGroupShareOccurrenceOverride> shareOverrides = shareOverridesByOrigin(share);
-        Set<Instant> selectedOrigins = selectedOrigins(share);
         Set<SharedOccurrenceKey> occurrenceKeys = new HashSet<>();
         occurrences.forEach(occurrence -> addSharedOccurrence(
                 share,
                 occurrence,
                 sourceOverrides.get(occurrence.originStartAt()),
-                shareOverrides.get(occurrence.originStartAt()),
-                selectedOrigins,
                 from,
                 to,
                 nicknamesByAccountId,
@@ -145,8 +141,6 @@ public class GroupCalendarService {
                                 override.getOverrideEndAt()
                         ),
                         override,
-                        shareOverrides.get(override.getOriginStartAt()),
-                        selectedOrigins,
                         from,
                         to,
                         nicknamesByAccountId,
@@ -168,42 +162,16 @@ public class GroupCalendarService {
                 .collect(Collectors.toMap(RecurrenceEventOverride::getOriginStartAt, Function.identity()));
     }
 
-    private Map<Instant, PersonalRecurrenceGroupShareOccurrenceOverride> shareOverridesByOrigin(
-            PersonalRecurrenceGroupShare share
-    ) {
-        return personalRecurrenceShareQueryService.listOccurrenceOverrides(share.getId())
-                .stream()
-                .collect(Collectors.toMap(
-                        PersonalRecurrenceGroupShareOccurrenceOverride::getOriginStartAt,
-                        Function.identity()
-                ));
-    }
-
-    private Set<Instant> selectedOrigins(PersonalRecurrenceGroupShare share) {
-        if (share.getShareScope() == PersonalRecurrenceGroupShareScope.WHOLE_SERIES) {
-            return Set.of();
-        }
-        return personalRecurrenceShareQueryService.listSelectedOrigins(share.getId())
-                .stream()
-                .map(selectedOrigin -> selectedOrigin.getOriginStartAt())
-                .collect(Collectors.toSet());
-    }
-
     private void addSharedOccurrence(
             PersonalRecurrenceGroupShare share,
             RecurrenceOccurrence occurrence,
             RecurrenceEventOverride sourceOverride,
-            PersonalRecurrenceGroupShareOccurrenceOverride shareOverride,
-            Set<Instant> selectedOrigins,
             Instant from,
             Instant to,
             Map<Long, String> nicknamesByAccountId,
             Set<SharedOccurrenceKey> occurrenceKeys,
             List<GroupCalendarItemResponse> items
     ) {
-        if (!isSharedOrigin(share, occurrence.originStartAt(), selectedOrigins)) {
-            return;
-        }
         SharedRecurrenceOccurrence sourceOccurrence = sourceOccurrence(
                 share.getRecurrenceEvent(),
                 occurrence,
@@ -215,28 +183,12 @@ public class GroupCalendarService {
         GroupCalendarItemResponse item = sharedRecurrenceItem(
                 share,
                 sourceOccurrence,
-                shareOverride,
                 nicknamesByAccountId
         );
         SharedOccurrenceKey key = new SharedOccurrenceKey(share.getId(), occurrence.originStartAt());
         if (overlaps(item, from, to) && occurrenceKeys.add(key)) {
             items.add(item);
         }
-    }
-
-    private boolean isSharedOrigin(
-            PersonalRecurrenceGroupShare share,
-            Instant originStartAt,
-            Set<Instant> selectedOrigins
-    ) {
-        if (share.getShareScope() == PersonalRecurrenceGroupShareScope.WHOLE_SERIES) {
-            return true;
-        }
-        return selectedOrigins.contains(originStartAt) && recurrenceEngine.containsOrigin(
-                com.calio.calendar.recurrence.domain.RecurrenceSchedule.from(share.getRecurrenceEvent()),
-                share.getRecurrenceEvent().getRecurrenceRules(),
-                originStartAt
-        );
     }
 
     private SharedRecurrenceOccurrence sourceOccurrence(
@@ -272,26 +224,17 @@ public class GroupCalendarService {
     private GroupCalendarItemResponse sharedRecurrenceItem(
             PersonalRecurrenceGroupShare share,
             SharedRecurrenceOccurrence sourceOccurrence,
-            PersonalRecurrenceGroupShareOccurrenceOverride shareOverride,
             Map<Long, String> nicknamesByAccountId
     ) {
         String nickname = nicknameOf(nicknamesByAccountId, share.getRecurrenceEvent().getAccount().getId());
         String anonymousTitle = nickname + "의 일정";
-        String title = shareOverride == null
-                ? share.resolvePublicTitle(sourceOccurrence.title(), anonymousTitle)
-                : shareOverride.resolvePublicTitle(sourceOccurrence.title(), anonymousTitle);
-        Instant startAt = shareOverride == null
-                ? share.resolveStartAt(sourceOccurrence.startAt())
-                : shareOverride.resolveStartAt(sourceOccurrence.startAt());
-        Instant endAt = shareOverride == null
-                ? share.resolveEndAt(sourceOccurrence.endAt())
-                : shareOverride.resolveEndAt(sourceOccurrence.endAt());
-        boolean allDay = shareOverride == null
-                ? share.resolveAllDay(sourceOccurrence.allDay())
-                : shareOverride.resolveAllDay(sourceOccurrence.allDay());
+        String title = share.resolvePublicTitle(sourceOccurrence.title(), anonymousTitle);
+        Instant startAt = sourceOccurrence.startAt();
+        Instant endAt = sourceOccurrence.endAt();
+        boolean allDay = sourceOccurrence.allDay();
         return GroupCalendarItemResponse.sharedRecurrenceOccurrence(
                 title,
-                share.isShowOriginalDetails() ? sourceOccurrence.description() : null,
+                share.isAnonymous() ? null : sourceOccurrence.description(),
                 startAt,
                 endAt,
                 allDay,
