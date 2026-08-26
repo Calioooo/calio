@@ -33,6 +33,15 @@ public interface PersonalEventGroupShareRepository
             """)
     List<PersonalEventGroupShare> findAllByEventId(@Param("eventId") Long eventId);
 
+    @Query("""
+            select share from PersonalEventGroupShare share
+            where share.event.id in :eventIds and share.groupSpace.id in :groupSpaceIds
+            """)
+    List<PersonalEventGroupShare> findAllByEventIdInAndGroupSpaceIdIn(
+            @Param("eventIds") List<Long> eventIds,
+            @Param("groupSpaceIds") List<Long> groupSpaceIds
+    );
+
     @EntityGraph(attributePaths = {"event", "event.tag", "groupSpace"})
     @Query("""
             select share

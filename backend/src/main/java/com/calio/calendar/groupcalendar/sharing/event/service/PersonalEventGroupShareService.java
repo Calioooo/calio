@@ -51,16 +51,24 @@ public class PersonalEventGroupShareService {
         if (groupSpaceIds.isEmpty()) {
             throw new CalioException(ErrorCode.VALIDATION_FAILED);
         }
+        if ((long) events.size() * groupSpaceIds.size() > 2_000) {
+            throw new CalioException(ErrorCode.VALIDATION_FAILED);
+        }
         Map<Long, GroupMember> memberships = membershipQueryService.listActiveMemberships(accountId, groupSpaceIds)
                 .stream().collect(Collectors.toMap(member -> member.getGroupSpace().getId(), Function.identity()));
+        Set<String> existingPairs = shareQueryService.listSharesForEventsAndGroupSpaces(
+                        events.stream().map(Event::getId).toList(), groupSpaceIds
+                ).stream()
+                .map(share -> pairKey(share.getEvent().getId(), share.getGroupSpace().getId()))
+                .collect(Collectors.toSet());
         List<PersonalEventGroupShareResult.TargetResult> results = groupSpaceIds.stream()
-                .map(groupSpaceId -> shareToGroup(events, groupSpaceId, memberships.get(groupSpaceId)))
+                .map(groupSpaceId -> shareToGroup(events, groupSpaceId, memberships.get(groupSpaceId), existingPairs))
                 .toList();
         return new PersonalEventGroupShareResult(results);
     }
 
     private PersonalEventGroupShareResult.TargetResult shareToGroup(
-            List<Event> events, Long groupSpaceId, GroupMember membership
+            List<Event> events, Long groupSpaceId, GroupMember membership, Set<String> existingPairs
     ) {
         if (membership == null) {
             return new PersonalEventGroupShareResult.TargetResult(
@@ -69,7 +77,7 @@ public class PersonalEventGroupShareService {
         }
         boolean created = false;
         for (Event event : events) {
-            if (shareQueryService.getShareIfExists(event.getId(), groupSpaceId).isEmpty()) {
+            if (!existingPairs.contains(pairKey(event.getId(), groupSpaceId))) {
                 shareCommandService.createShare(new PersonalEventGroupShare(event, membership.getGroupSpace()));
                 created = true;
             }
@@ -79,6 +87,10 @@ public class PersonalEventGroupShareService {
                 created ? PersonalEventGroupShareTargetStatus.SHARED
                         : PersonalEventGroupShareTargetStatus.ALREADY_SHARED
         );
+    }
+
+    private String pairKey(Long eventId, Long groupSpaceId) {
+        return eventId + ":" + groupSpaceId;
     }
 
     private List<Event> eventsToShare(Long accountId, PersonalEventGroupShareCommand command) {
