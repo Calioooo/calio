@@ -61,6 +61,7 @@ class CalendarAssistantRequestClassifierEvalTest {
                 Arguments.of("내일 오후 2시에 회의 만들어줘", CalendarAssistantRequestClassification.SUPPORTED),
                 Arguments.of("내일 회의를 오후 3시로 옮겨줘", CalendarAssistantRequestClassification.SUPPORTED),
                 Arguments.of("내일 회의 삭제해줘", CalendarAssistantRequestClassification.SUPPORTED),
+                Arguments.of("매주 팀 회의 전체를 오후 3시로 옮겨줘", CalendarAssistantRequestClassification.SUPPORTED),
                 Arguments.of("적용해줘", CalendarAssistantRequestClassification.SUPPORTED),
                 Arguments.of("구글 캘린더 앱 사용법 알려줘", CalendarAssistantRequestClassification.UNSUPPORTED),
                 Arguments.of(
