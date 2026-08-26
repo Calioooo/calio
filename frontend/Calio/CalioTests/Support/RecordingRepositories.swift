@@ -461,6 +461,20 @@ final class RecordingEventRepository: EventRepository {
         eventId: Int64,
         request: UpdateImportantEventRequestDTO
     ) async throws -> EventResponseDTO {
+        if shouldSuspendImportantEvent {
+            return try await withCheckedThrowingContinuation { continuation in
+                let continuations = locked {
+                    storedUpdateImportantEventRequests.append((eventId, request))
+                    suspendedImportantEventContinuations.append(continuation)
+                    return readyWaiters(
+                        from: &importantEventRequestCountWaiters,
+                        currentCount: storedUpdateImportantEventRequests.count
+                    )
+                }
+                continuations.forEach { $0.resume(returning: true) }
+            }
+        }
+
         let continuations = locked {
             storedUpdateImportantEventRequests.append((eventId, request))
             return readyWaiters(
@@ -474,30 +488,7 @@ final class RecordingEventRepository: EventRepository {
             throw updateError
         }
 
-        if shouldSuspendImportantEvent {
-            return try await withCheckedThrowingContinuation { continuation in
-                locked {
-                    suspendedImportantEventContinuations.append(continuation)
-                }
-            }
-        }
-
-        return EventResponseDTO(
-            id: eventId,
-            title: updateResponse.title,
-            description: updateResponse.description,
-            startAt: updateResponse.startAt,
-            endAt: updateResponse.endAt,
-            allDay: updateResponse.allDay,
-            timeZone: updateResponse.timeZone,
-            importantEvent: request.importantEvent,
-            recurrenceId: updateResponse.recurrenceId,
-            isRecurrenceOccurrence: updateResponse.isRecurrenceOccurrence,
-            originStartAt: updateResponse.originStartAt,
-            tag: updateResponse.tag,
-            createdAt: updateResponse.createdAt,
-            updatedAt: updateResponse.updatedAt
-        )
+        return updateResponse
     }
 
     func updateRecurrenceEvent(

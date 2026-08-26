@@ -337,4 +337,30 @@ struct CalendarViewTests {
 
         #expect(layout.accessibilityLabel == "겹친 일정 3개 보기")
     }
+
+    @Test func weekTimelineImportantTimedEventShowsIndicatorAndAccessibilityLabel() async throws {
+        let event = Event(
+            id: 1,
+            title: "디자인 검토",
+            description: "",
+            startAt: Date(),
+            endAt: Date().addingTimeInterval(3600),
+            tag: .sample(colorCode: "#4F46E5"),
+            importantEvent: true
+        )
+        let layout = TimelineEventLayout(
+            id: "event",
+            event: event,
+            title: event.title,
+            x: 0,
+            y: 0,
+            width: 100,
+            height: 40,
+            style: .event,
+            tapAction: .showEvent(event)
+        )
+
+        #expect(layout.showsImportantIndicator)
+        #expect(layout.accessibilityLabel == "디자인 검토, 중요 일정, 일정 상세 보기")
+    }
 }

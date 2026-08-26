@@ -99,6 +99,7 @@ struct CalendarEventCreationView: View {
                 .frame(maxWidth: .infinity, minHeight: 52)
                 .background(RoundedRectangle(cornerRadius: 12).fill(Color.calioSelection))
                 .accessibilityIdentifier("event_creation_cancel_button")
+                .disabled(Self.isCancelDisabled(isSaving: isSaving))
 
             Button {
                 save()
@@ -181,6 +182,10 @@ struct CalendarEventCreationView: View {
             referenceDay: referenceDay,
             calendar: calendar
         )
+    }
+
+    nonisolated static func isCancelDisabled(isSaving: Bool) -> Bool {
+        isSaving
     }
 
     private func resetRecurrenceFieldsFromSingleEventTime() {

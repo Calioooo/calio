@@ -281,7 +281,7 @@ struct EventServiceTests {
             endAt: startAt.addingTimeInterval(3600),
             allDay: false,
             timeZone: "Asia/Seoul",
-            importantEvent: true,
+            importantEvent: false,
             createdAt: startAt,
             updatedAt: startAt
         )
@@ -294,7 +294,7 @@ struct EventServiceTests {
         #expect(repository.updateImportantEventRequests.first?.eventId == 91)
         #expect(repository.updateImportantEventRequests.first?.request.importantEvent == true)
         #expect(event.backendId == 91)
-        #expect(event.importantEvent)
+        #expect(!event.importantEvent)
     }
 
     @Test func eventServiceUsesCanonicalAllDayFlagForUTCMidnightTimedEvent() async throws {

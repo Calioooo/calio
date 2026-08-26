@@ -492,9 +492,17 @@ struct CalendarWeekTimelineView: View {
     
     private func eventBlocks(metrics: TimelineMetrics, containerSize: CGSize) -> some View {
         ForEach(eventLayouts(metrics: metrics)) { layout in
-            Text(layout.title)
+            HStack(spacing: 4) {
+                Text(layout.title)
+                    .lineLimit(1)
+
+                if layout.showsImportantIndicator {
+                    Image(systemName: "star.fill")
+                        .font(.caption2)
+                        .foregroundStyle(Color.calioImportantStar)
+                }
+            }
                 .font(.system(size: metrics.eventFontSize, weight: .semibold))
-                .lineLimit(1)
                 .foregroundStyle(layout.foregroundColor)
                 .padding(.horizontal, metrics.eventHorizontalPadding)
                 .padding(.vertical, metrics.eventVerticalPadding)

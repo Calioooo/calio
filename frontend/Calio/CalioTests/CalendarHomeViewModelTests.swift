@@ -664,6 +664,9 @@ struct CalendarHomeViewModelTests {
         #expect(repository.updateImportantEventRequests.first?.eventId == 503)
         #expect(repository.updateImportantEventRequests.first?.request.importantEvent == true)
         #expect(didRequestMonth)
+        #expect(repository.requestMonthKeys(calendar: calendar) == [
+            YearMonthKey(date: baseDate, calendar: calendar)
+        ])
         #expect(viewModel.mutationState == .idle)
     }
 
@@ -672,7 +675,7 @@ struct CalendarHomeViewModelTests {
         let calendar = fixedCalendar
         let baseDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8, hour: 9)))
         let occurrence = Event(
-            id: nil,
+            id: 506,
             title: "반복 회차",
             description: "",
             startAt: baseDate,
@@ -726,7 +729,15 @@ struct CalendarHomeViewModelTests {
     @Test func calendarHomeViewModelKeepsImportanceStateUnchangedWhenMutationFails() async throws {
         let calendar = fixedCalendar
         let baseDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8, hour: 9)))
-        let event = makeEvent(id: 504, title: "실패 대상", on: baseDate)
+        let event = Event(
+            id: 504,
+            title: "실패 대상",
+            description: "",
+            startAt: baseDate,
+            endAt: baseDate.addingTimeInterval(3600),
+            tag: .sample(colorCode: "#4F46E5"),
+            importantEvent: false
+        )
         let repository = RecordingEventRepository(
             updateError: APIError.network(URLError(.notConnectedToInternet))
         )
@@ -734,13 +745,21 @@ struct CalendarHomeViewModelTests {
             calendar: calendar,
             dateService: CalendarDateService(calendar: calendar),
             eventService: EventService(repository: repository),
-            nationalHolidayService: makeNationalHolidayService(calendar: calendar)
+            nationalHolidayService: makeNationalHolidayService(calendar: calendar),
+            initialState: makeLoadedState(
+                dayOffsets: 0...2,
+                from: baseDate,
+                calendar: calendar,
+                monthEventCache: [YearMonthKey(date: baseDate, calendar: calendar): .loaded([event])]
+            )
         )
 
         let result = await viewModel.updateImportantEvent(event, importantEvent: true)
 
         #expect(result == nil)
         #expect(repository.updateImportantEventRequests.count == 1)
+        #expect(viewModel.state.monthEventCache[YearMonthKey(date: baseDate, calendar: calendar)]?.loadedEvents
+            .first?.importantEvent == false)
         #expect(viewModel.mutationState == .failed(.network))
         #expect(viewModel.mutationState.failureMessage == "서버에 연결할 수 없습니다.")
     }
