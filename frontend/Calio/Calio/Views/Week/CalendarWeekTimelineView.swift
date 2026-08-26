@@ -65,7 +65,7 @@ struct CalendarWeekTimelineView: View {
         onResetEventMutation: @escaping () -> Void = {},
         onResetTagMutation: @escaping () -> Void = {},
         onFetchRecurrenceEvent: @escaping (Int64) async -> RecurrenceEventDetails? = { _ in nil },
-        onUpdateImportantEvent: @escaping (Event, Bool) async -> Event? = { _, _ in nil },
+        onUpdateImportantEvent: @escaping (Event, Bool) async -> Event?,
         onUpdateSingleEvent: @escaping (Event, EventUpdateInput) async -> Bool = { _, _ in true },
         onUpdateRecurrenceOccurrence: @escaping (Event, EventUpdateInput) async -> Bool = { _, _ in true },
         onUpdateRecurrenceSeries: @escaping (Int64, RecurrenceEventSeriesEditInput) async -> Bool = { _, _ in true },
@@ -1250,6 +1250,7 @@ private extension UIView {
         onSelectedDay: { _ in },
         onVisibleRangeChanged: { _ in },
         onSelectedYearMonth: { _, _ in },
-        onRetryEventLoading: {}
+        onRetryEventLoading: {},
+        onUpdateImportantEvent: { _, _ in nil }
     )
 }

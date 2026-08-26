@@ -282,7 +282,10 @@ struct EventService {
 
     private func mapToRecurrenceEventDetails(_ dto: RecurrenceEventResponseDTO) throws -> RecurrenceEventDetails {
         let editableRule = RecurrenceRule.editableRule(from: dto.recurrence, allDay: dto.allDay)
-        let seriesTimeZone = dto.timeZone.flatMap(TimeZone.init(identifier:)) ?? deviceTimeZone
+        let seriesTimeZone = try recurrenceSeriesTimeZone(
+            identifier: dto.timeZone,
+            isAllDay: dto.allDay
+        )
         let allDayRange = dto.allDay
             ? try CalendarDateService.localAllDayDisplayRange(
                 utcStartAt: dto.firstOccurrenceStartAt,
@@ -315,6 +318,19 @@ struct EventService {
             isRuleEditable: editableRule != nil,
             tagId: dto.tag.id
         )
+    }
+
+    private func recurrenceSeriesTimeZone(
+        identifier: String?,
+        isAllDay: Bool
+    ) throws -> TimeZone {
+        guard !isAllDay, let identifier else {
+            return deviceTimeZone
+        }
+        guard let timeZone = TimeZone(identifier: identifier) else {
+            throw EventServiceError.validationFailed
+        }
+        return timeZone
     }
 
     private func recurrenceFormDate(
