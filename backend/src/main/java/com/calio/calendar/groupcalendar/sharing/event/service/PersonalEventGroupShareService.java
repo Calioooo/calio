@@ -78,8 +78,7 @@ public class PersonalEventGroupShareService {
         boolean created = false;
         for (Event event : events) {
             if (!existingPairs.contains(pairKey(event.getId(), groupSpaceId))) {
-                shareCommandService.createShare(new PersonalEventGroupShare(event, membership.getGroupSpace()));
-                created = true;
+                created |= shareCommandService.createShare(new PersonalEventGroupShare(event, membership.getGroupSpace()));
             }
         }
         return new PersonalEventGroupShareResult.TargetResult(

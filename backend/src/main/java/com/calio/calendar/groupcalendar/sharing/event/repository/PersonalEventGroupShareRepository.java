@@ -42,6 +42,18 @@ public interface PersonalEventGroupShareRepository
             @Param("groupSpaceIds") List<Long> groupSpaceIds
     );
 
+    @Modifying
+    @Query(value = """
+            insert ignore into personal_event_group_shares
+                (event_id, group_space_id, is_anonymous, public_share_id, created_at, updated_at)
+            values (:eventId, :groupSpaceId, true, :publicShareId, current_timestamp(6), current_timestamp(6))
+            """, nativeQuery = true)
+    int insertIgnore(
+            @Param("eventId") Long eventId,
+            @Param("groupSpaceId") Long groupSpaceId,
+            @Param("publicShareId") String publicShareId
+    );
+
     @EntityGraph(attributePaths = {"event", "event.tag", "groupSpace"})
     @Query("""
             select share
