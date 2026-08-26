@@ -72,6 +72,10 @@ public class PersonalEventGroupShare extends BaseEntity {
         return publicShareId;
     }
 
+    public void changeAnonymous(boolean anonymous) {
+        this.anonymous = anonymous;
+    }
+
     public String resolvePublicTitle(String anonymousTitle) {
         return anonymous ? anonymousTitle : event.getTitle();
     }

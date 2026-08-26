@@ -8,6 +8,7 @@ import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.groupcalendar.sharing.event.service.dto.PersonalEventGroupShareCommand;
 import com.calio.calendar.groupcalendar.sharing.event.service.dto.PersonalEventGroupShareResult;
 import com.calio.calendar.groupcalendar.sharing.event.service.dto.PersonalEventGroupShareTargetStatus;
+import com.calio.calendar.groupcalendar.sharing.event.service.dto.PersonalEventGroupShareStatusResponse;
 import com.calio.calendar.groupspace.domain.GroupMember;
 import com.calio.calendar.groupspace.service.GroupMembershipQueryService;
 import java.util.LinkedHashSet;
@@ -95,6 +96,24 @@ public class PersonalEventGroupShareService {
         return distinctEventIds.stream()
                 .map(eventId -> eventQueryService.getPersonalOneOffEvent(accountId, eventId))
                 .toList();
+    }
+
+    @Transactional
+    public List<PersonalEventGroupShareStatusResponse> listStatuses(Long accountId, Long eventId) {
+        Event event = eventQueryService.getPersonalOneOffEvent(accountId, eventId);
+        return shareQueryService.listSharesForEvent(event.getId()).stream()
+                .map(share -> new PersonalEventGroupShareStatusResponse(
+                        share.getGroupSpace().getId(), share.getGroupSpace().getName(), share.isAnonymous()
+                )).toList();
+    }
+
+    @Transactional
+    public void changeAnonymous(Long accountId, Long groupSpaceId, Long eventId, boolean anonymous) {
+        membershipQueryService.getActiveMembership(groupSpaceId, accountId);
+        PersonalEventGroupShare share = shareQueryService.getShareIfExists(eventId, groupSpaceId)
+                .orElseThrow(() -> new CalioException(ErrorCode.EVENT_NOT_FOUND));
+        requireSourceOwner(accountId, share);
+        shareCommandService.changeAnonymous(share, anonymous);
     }
 
     @Transactional
