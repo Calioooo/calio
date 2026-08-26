@@ -98,15 +98,26 @@ public class PersonalEventGroupShareService {
 
     @Transactional
     public void remove(Long accountId, Long groupSpaceId, Long eventId) {
-        membershipQueryService.getActiveMembership(groupSpaceId, accountId);
+        GroupMember membership = membershipQueryService.getActiveMembership(groupSpaceId, accountId);
         PersonalEventGroupShare share = shareQueryService.getShareIfExists(eventId, groupSpaceId)
                 .orElseThrow(() -> new CalioException(ErrorCode.EVENT_NOT_FOUND));
-        requireSourceOwner(accountId, share);
+        requireSourceOwnerOrGroupOwner(accountId, membership, share);
         shareCommandService.deleteShare(share);
     }
 
     private void requireSourceOwner(Long accountId, PersonalEventGroupShare share) {
         if (!share.getEvent().getAccount().getId().equals(accountId)) {
+            throw new CalioException(ErrorCode.PERSONAL_EVENT_GROUP_SHARE_FORBIDDEN);
+        }
+    }
+
+    private void requireSourceOwnerOrGroupOwner(
+            Long accountId,
+            GroupMember membership,
+            PersonalEventGroupShare share
+    ) {
+        boolean isSourceOwner = share.getEvent().getAccount().getId().equals(accountId);
+        if (!isSourceOwner && !membership.roleIn(share.getGroupSpace()).isOwner()) {
             throw new CalioException(ErrorCode.PERSONAL_EVENT_GROUP_SHARE_FORBIDDEN);
         }
     }

@@ -75,11 +75,11 @@ class PersonalEventGroupShareControllerTest {
         Event secondEvent = event(currentAccountId(), "두 번째 일정");
 
         // when
-        mockMvc.perform(post("/api/group-spaces/{groupSpaceId}/event-shares", groupSpace.getId())
+        mockMvc.perform(post("/api/event-shares")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                { "selectionEnabled": true, "eventIds": [%d, %d] }
-                                """.formatted(firstEvent.getId(), secondEvent.getId())))
+                                { "selectionEnabled": true, "eventIds": [%d, %d], "groupSpaceIds": [%d] }
+                                """.formatted(firstEvent.getId(), secondEvent.getId(), groupSpace.getId())))
                 // then
                 .andExpect(status().isCreated());
 
@@ -96,19 +96,22 @@ class PersonalEventGroupShareControllerTest {
         Event otherEvent = event(accountRepository.saveAndFlush(new Account()).getId(), "다른 사람 일정");
 
         // when, then
-        mockMvc.perform(post("/api/group-spaces/{groupSpaceId}/event-shares", groupSpace.getId())
+        mockMvc.perform(post("/api/event-shares")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{ \"selectionEnabled\": true, \"eventIds\": [%d] }".formatted(otherEvent.getId())))
+                        .content("{ \"selectionEnabled\": true, \"eventIds\": [%d], \"groupSpaceIds\": [%d] }"
+                                .formatted(otherEvent.getId(), groupSpace.getId())))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorCode").value("EVENT_NOT_FOUND"));
 
-        mockMvc.perform(post("/api/group-spaces/{groupSpaceId}/event-shares", groupSpace.getId())
+        mockMvc.perform(post("/api/event-shares")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{ \"selectionEnabled\": true, \"eventIds\": [%d] }".formatted(ownedEvent.getId())))
+                        .content("{ \"selectionEnabled\": true, \"eventIds\": [%d], \"groupSpaceIds\": [%d] }"
+                                .formatted(ownedEvent.getId(), groupSpace.getId())))
                 .andExpect(status().isCreated());
-        mockMvc.perform(post("/api/group-spaces/{groupSpaceId}/event-shares", groupSpace.getId())
+        mockMvc.perform(post("/api/event-shares")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{ \"selectionEnabled\": true, \"eventIds\": [%d] }".formatted(ownedEvent.getId())))
+                        .content("{ \"selectionEnabled\": true, \"eventIds\": [%d], \"groupSpaceIds\": [%d] }"
+                                .formatted(ownedEvent.getId(), groupSpace.getId())))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.errorCode").value("PERSONAL_EVENT_GROUP_SHARE_CONFLICT"));
     }
@@ -122,9 +125,9 @@ class PersonalEventGroupShareControllerTest {
         Event existingEvent = event(accountId, "기존 일정");
 
         // when
-        mockMvc.perform(post("/api/group-spaces/{groupSpaceId}/event-shares", groupSpace.getId())
+        mockMvc.perform(post("/api/event-shares")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{ \"selectionEnabled\": false }"))
+                        .content("{ \"selectionEnabled\": false, \"groupSpaceIds\": [%d] }".formatted(groupSpace.getId())))
                 // then
                 .andExpect(status().isCreated());
 
@@ -139,9 +142,10 @@ class PersonalEventGroupShareControllerTest {
         // given
         GroupSpace groupSpace = activeGroupSpace();
         Event event = event(currentAccountId(), "원본 제목");
-        mockMvc.perform(post("/api/group-spaces/{groupSpaceId}/event-shares", groupSpace.getId())
+        mockMvc.perform(post("/api/event-shares")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{ \"selectionEnabled\": true, \"eventIds\": [%d] }".formatted(event.getId())))
+                        .content("{ \"selectionEnabled\": true, \"eventIds\": [%d], \"groupSpaceIds\": [%d] }"
+                                .formatted(event.getId(), groupSpace.getId())))
                 .andExpect(status().isCreated());
 
         // when
@@ -170,7 +174,7 @@ class PersonalEventGroupShareControllerTest {
 
         // when
         mockMvc.perform(delete(
-                        "/api/group-spaces/{groupSpaceId}/event-shares/{eventId}",
+                        "/api/event-shares/{groupSpaceId}/{eventId}",
                         groupSpace.getId(),
                         otherMemberEvent.getId()
                 ))
@@ -191,7 +195,7 @@ class PersonalEventGroupShareControllerTest {
 
         // when, then
         mockMvc.perform(patch(
-                        "/api/group-spaces/{groupSpaceId}/event-shares/{eventId}",
+                        "/api/event-shares/{groupSpaceId}/{eventId}",
                         groupSpace.getId(),
                         otherMemberEvent.getId()
                 )

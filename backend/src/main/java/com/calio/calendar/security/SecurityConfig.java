@@ -52,6 +52,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/integrations/**").authenticated()
                         .requestMatchers("/api/group-spaces").authenticated()
                         .requestMatchers("/api/group-spaces/**").authenticated()
+                        .requestMatchers("/api/event-shares/**").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/group-invitations/accept").authenticated()
                         .anyRequest().denyAll()
                 )
