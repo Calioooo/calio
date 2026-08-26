@@ -6,11 +6,16 @@ import com.calio.calendar.groupcalendar.sharing.event.domain.PersonalEventGroupS
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.groupcalendar.sharing.event.service.dto.PersonalEventGroupShareCommand;
+import com.calio.calendar.groupcalendar.sharing.event.service.dto.PersonalEventGroupShareResult;
+import com.calio.calendar.groupcalendar.sharing.event.service.dto.PersonalEventGroupShareTargetStatus;
 import com.calio.calendar.groupspace.domain.GroupMember;
 import com.calio.calendar.groupspace.service.GroupMembershipQueryService;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,32 +41,43 @@ public class PersonalEventGroupShareService {
     }
 
     @Transactional
-    public void share(
+    public PersonalEventGroupShareResult share(
             Long accountId,
             PersonalEventGroupShareCommand command
     ) {
-        List<GroupMember> memberships = activeMemberships(accountId, command.groupSpaceIds());
-        shareEvents(accountId, command, memberships);
-    }
-
-    private void shareEvents(
-            Long accountId,
-            PersonalEventGroupShareCommand command,
-            List<GroupMember> memberships
-    ) {
-        eventsToShare(accountId, command)
-                .forEach(event -> memberships.forEach(membership -> shareCommandService.createShare(
-                        new PersonalEventGroupShare(event, membership.getGroupSpace())
-                )));
-    }
-
-    private List<GroupMember> activeMemberships(Long accountId, List<Long> groupSpaceIds) {
+        List<Event> events = eventsToShare(accountId, command);
+        List<Long> groupSpaceIds = new LinkedHashSet<>(command.groupSpaceIds()).stream().toList();
         if (groupSpaceIds.isEmpty()) {
             throw new CalioException(ErrorCode.VALIDATION_FAILED);
         }
-        return new LinkedHashSet<>(groupSpaceIds).stream()
-                .map(groupSpaceId -> membershipQueryService.getActiveMembership(groupSpaceId, accountId))
+        Map<Long, GroupMember> memberships = membershipQueryService.listActiveMemberships(accountId, groupSpaceIds)
+                .stream().collect(Collectors.toMap(member -> member.getGroupSpace().getId(), Function.identity()));
+        List<PersonalEventGroupShareResult.TargetResult> results = groupSpaceIds.stream()
+                .map(groupSpaceId -> shareToGroup(events, groupSpaceId, memberships.get(groupSpaceId)))
                 .toList();
+        return new PersonalEventGroupShareResult(results);
+    }
+
+    private PersonalEventGroupShareResult.TargetResult shareToGroup(
+            List<Event> events, Long groupSpaceId, GroupMember membership
+    ) {
+        if (membership == null) {
+            return new PersonalEventGroupShareResult.TargetResult(
+                    groupSpaceId, PersonalEventGroupShareTargetStatus.NOT_ELIGIBLE
+            );
+        }
+        boolean created = false;
+        for (Event event : events) {
+            if (shareQueryService.getShareIfExists(event.getId(), groupSpaceId).isEmpty()) {
+                shareCommandService.createShare(new PersonalEventGroupShare(event, membership.getGroupSpace()));
+                created = true;
+            }
+        }
+        return new PersonalEventGroupShareResult.TargetResult(
+                groupSpaceId,
+                created ? PersonalEventGroupShareTargetStatus.SHARED
+                        : PersonalEventGroupShareTargetStatus.ALREADY_SHARED
+        );
     }
 
     private List<Event> eventsToShare(Long accountId, PersonalEventGroupShareCommand command) {

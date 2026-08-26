@@ -27,6 +27,13 @@ public interface GroupMemberRepository extends JpaRepository<GroupMember, Long> 
             GroupMemberStatus status
     );
 
+    @EntityGraph(attributePaths = "groupSpace")
+    List<GroupMember> findAllByGroupSpaceIdInAndAccountIdAndStatus(
+            List<Long> groupSpaceIds,
+            Long accountId,
+            GroupMemberStatus status
+    );
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             select member

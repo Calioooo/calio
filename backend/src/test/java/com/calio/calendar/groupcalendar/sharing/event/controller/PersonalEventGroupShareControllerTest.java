@@ -80,15 +80,16 @@ class PersonalEventGroupShareControllerTest {
                                 { "selectionEnabled": true, "eventIds": [%d, %d], "groupSpaceIds": [%d] }
                                 """.formatted(firstEvent.getId(), secondEvent.getId(), groupSpace.getId())))
                 // then
-                .andExpect(status().isCreated());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.groupResults[0].status").value("SHARED"));
 
         assertThat(shareRepository.findAllByEventId(firstEvent.getId())).hasSize(1);
         assertThat(shareRepository.findAllByEventId(secondEvent.getId())).hasSize(1);
     }
 
     @Test
-    @DisplayName("다른 사용자의 일정이나 중복 공유는 안정적인 오류 계약으로 거절한다")
-    void givenUnownedOrDuplicatedEvent_whenShareSelected_thenRejectsRequest() throws Exception {
+    @DisplayName("다른 사용자의 일정은 거절하고 기존 공유는 멱등 성공으로 반환한다")
+    void givenUnownedOrDuplicatedEvent_whenShareSelected_thenRejectsOrReturnsIdempotentResult() throws Exception {
         // given
         GroupSpace groupSpace = activeGroupSpace();
         Event ownedEvent = event(currentAccountId(), "내 일정");
@@ -106,13 +107,14 @@ class PersonalEventGroupShareControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{ \"selectionEnabled\": true, \"eventIds\": [%d], \"groupSpaceIds\": [%d] }"
                                 .formatted(ownedEvent.getId(), groupSpace.getId())))
-                .andExpect(status().isCreated());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.groupResults[0].status").value("SHARED"));
         mockMvc.perform(post("/api/event-shares")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{ \"selectionEnabled\": true, \"eventIds\": [%d], \"groupSpaceIds\": [%d] }"
                                 .formatted(ownedEvent.getId(), groupSpace.getId())))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.errorCode").value("PERSONAL_EVENT_GROUP_SHARE_CONFLICT"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.groupResults[0].status").value("ALREADY_SHARED"));
     }
 
     @Test
@@ -144,7 +146,8 @@ class PersonalEventGroupShareControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{ \"selectionEnabled\": false, \"groupSpaceIds\": [%d] }".formatted(groupSpace.getId())))
                 // then
-                .andExpect(status().isCreated());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.groupResults[0].status").value("SHARED"));
 
         Event laterEvent = event(accountId, "나중 일정");
         assertThat(shareRepository.findAllByEventId(existingEvent.getId())).hasSize(1);
