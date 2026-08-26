@@ -124,10 +124,10 @@ class PersonalEventGroupShareControllerTest {
         Event recurrenceOccurrence = recurrenceOccurrenceEvent(currentAccountId());
 
         // when, then
-        mockMvc.perform(post("/api/group-spaces/{groupSpaceId}/event-shares", groupSpace.getId())
+        mockMvc.perform(post("/api/event-shares")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{ \"selectionEnabled\": true, \"eventIds\": [%d] }"
-                                .formatted(recurrenceOccurrence.getId())))
+                        .content("{ \"selectionEnabled\": true, \"eventIds\": [%d], \"groupSpaceIds\": [%d] }"
+                                .formatted(recurrenceOccurrence.getId(), groupSpace.getId())))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorCode").value("EVENT_NOT_FOUND"));
     }
