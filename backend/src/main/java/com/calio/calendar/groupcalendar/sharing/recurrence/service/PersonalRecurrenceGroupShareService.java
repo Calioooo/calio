@@ -52,9 +52,9 @@ public class PersonalRecurrenceGroupShareService {
 
     @Transactional
     public void remove(Long accountId, Long groupSpaceId, Long recurrenceId) {
-        GroupMember membership = membershipQueryService.getActiveMembership(groupSpaceId, accountId);
+        membershipQueryService.getActiveMembership(groupSpaceId, accountId);
         PersonalRecurrenceGroupShare share = getShare(recurrenceId, groupSpaceId);
-        requireSourceOwnerOrGroupOwner(accountId, membership, share);
+        requireSourceOwner(accountId, share);
         shareCommandService.deleteShare(share);
     }
 
@@ -65,17 +65,6 @@ public class PersonalRecurrenceGroupShareService {
 
     private void requireSourceOwner(Long accountId, PersonalRecurrenceGroupShare share) {
         if (!share.getRecurrenceEvent().getAccount().getId().equals(accountId)) {
-            throw new CalioException(ErrorCode.PERSONAL_RECURRENCE_GROUP_SHARE_FORBIDDEN);
-        }
-    }
-
-    private void requireSourceOwnerOrGroupOwner(
-            Long accountId,
-            GroupMember membership,
-            PersonalRecurrenceGroupShare share
-    ) {
-        boolean isSourceOwner = share.getRecurrenceEvent().getAccount().getId().equals(accountId);
-        if (!isSourceOwner && !membership.roleIn(share.getGroupSpace()).isOwner()) {
             throw new CalioException(ErrorCode.PERSONAL_RECURRENCE_GROUP_SHARE_FORBIDDEN);
         }
     }

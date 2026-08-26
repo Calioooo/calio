@@ -152,8 +152,8 @@ class PersonalEventGroupShareControllerTest {
     }
 
     @Test
-    @DisplayName("Group Space owner는 다른 멤버의 공유 mapping만 해제하고 원본 일정은 보존한다")
-    void givenGroupOwnerAndOtherMemberShare_whenRemove_thenDeletesMappingOnly() throws Exception {
+    @DisplayName("Group Space owner는 다른 멤버의 공유 mapping을 해제할 수 없다")
+    void givenGroupOwnerAndOtherMemberShare_whenRemove_thenRejectsAndPreservesMapping() throws Exception {
         // given
         GroupSpace groupSpace = activeGroupSpace();
         Event otherMemberEvent = event(accountRepository.saveAndFlush(new Account()).getId(), "다른 멤버 일정");
@@ -166,9 +166,10 @@ class PersonalEventGroupShareControllerTest {
                         otherMemberEvent.getId()
                 ))
                 // then
-                .andExpect(status().isNoContent());
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value("PERSONAL_EVENT_GROUP_SHARE_FORBIDDEN"));
 
-        assertThat(shareRepository.findAllByEventId(otherMemberEvent.getId())).isEmpty();
+        assertThat(shareRepository.findAllByEventId(otherMemberEvent.getId())).hasSize(1);
         assertThat(eventRepository.findById(otherMemberEvent.getId())).isPresent();
     }
 
