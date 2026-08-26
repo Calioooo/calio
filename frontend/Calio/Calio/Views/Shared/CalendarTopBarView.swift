@@ -24,35 +24,43 @@ struct CalendarTopBarView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
 
             if showsTodayButton {
-                Button("Today", action: onTodayTapped)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Color.accentColor)
-                    .buttonStyle(.plain)
+                Button("오늘", action: onTodayTapped)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.calioPrimary)
+                    .padding(.horizontal, 10)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .background(Capsule().fill(Color.calioSelection))
                     .accessibilityLabel("오늘로 이동")
+                    .accessibilityIdentifier("calendar_navigation_today")
             }
 
             Button(action: onGoogleCalendarConnectTapped) {
                 Image(systemName: "calendar.badge.plus")
                     .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(.primary)
-                    .frame(width: 36, height: 36)
-                    .contentShape(Circle())
+                    .foregroundStyle(.calioTextSecondary)
+                    .frame(width: 44, height: 44)
+                    .background(Circle().fill(Color.calioSurface))
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Google Calendar 연동")
+            .accessibilityHint("Google Calendar 인증을 시작합니다")
+            .accessibilityIdentifier("calendar_navigation_google_connect")
 
             Button(action: onCreateTapped) {
                 Image(systemName: "plus")
                     .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(.primary)
-                    .frame(width: 36, height: 36)
-                    .contentShape(Circle())
+                    .foregroundStyle(.white)
+                    .frame(width: 44, height: 44)
+                    .background(Circle().fill(Color.calioBrand))
             }
             .buttonStyle(.plain)
             .accessibilityLabel("일정 추가")
+            .accessibilityIdentifier("calendar_navigation_add_event")
         }
-        .padding(.horizontal, 20)
-        .frame(height: 58)
+        .padding(.horizontal, 16)
+        .frame(minHeight: 60)
+        .background(Color.calioBackground)
+        .accessibilityIdentifier("calendar_navigation_top_bar")
     }
 }
 

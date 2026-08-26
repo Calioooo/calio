@@ -277,7 +277,7 @@ struct EventService {
             title: dto.title,
             description: dto.description ?? "",
             recurrenceStartDate: allDayRange?.startAt ?? dto.firstOccurrenceStartAt,
-            recurrenceEndDate: editableRule?.until ?? allDayRange?.startAt ?? dto.firstOccurrenceStartAt,
+            recurrenceEndDate: editableRule?.until,
             recurrenceStartTime: dto.firstOccurrenceStartAt,
             recurrenceEndTime: dto.firstOccurrenceEndAt,
             recurrenceFrequency: editableRule?.frequency ?? .daily,
@@ -315,7 +315,7 @@ struct EventService {
 
     private func recurrenceSchedule(
         startDate: Date,
-        endDate: Date,
+        endDate: Date?,
         startTime: Date,
         endTime: Date,
         frequency: RecurrenceFrequency,

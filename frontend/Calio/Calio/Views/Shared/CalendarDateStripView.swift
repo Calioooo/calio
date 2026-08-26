@@ -45,6 +45,7 @@ struct CalendarDateStripView: View {
                         weekday: item.weekday,
                         dayText: item.dayText,
                         isToday: item.isToday,
+                        isSelected: item.id == referenceDay,
                         onTap: {
                             focusCoordinator.notifyUserSelectedReferenceDay(
                                 item.id,

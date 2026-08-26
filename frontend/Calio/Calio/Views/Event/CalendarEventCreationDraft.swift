@@ -46,7 +46,7 @@ struct CalendarEventCreationDraft: Equatable {
         recurrenceInput = RecurrenceInput(
             isEnabled: false,
             startDate: initialTimeRange.startAt,
-            endDate: initialTimeRange.endAt,
+            endDate: calendar.date(byAdding: .year, value: 1, to: initialTimeRange.startAt) ?? initialTimeRange.startAt,
             startTime: initialTimeRange.startAt,
             endTime: initialTimeRange.endAt,
             frequency: .daily

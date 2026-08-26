@@ -119,9 +119,9 @@ struct CalendarScheduleDrawerView: View {
             )
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(uiColor: .systemBackground))
+        .background(Color.calioSurface)
         .overlay(alignment: .top) {
-            Divider()
+            Rectangle().fill(Color.calioDivider).frame(height: 1)
         }
         .accessibilityIdentifier("calendar_schedule_drawer")
     }
@@ -129,12 +129,12 @@ struct CalendarScheduleDrawerView: View {
     private var dragHandle: some View {
         VStack(spacing: 6) {
             Capsule()
-                .fill(Color.secondary.opacity(0.35))
+                .fill(Color.calioTextSecondary.opacity(0.45))
                 .frame(width: 42, height: 5)
 
             Image(systemName: handleIconName)
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.calioTextSecondary)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
