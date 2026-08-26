@@ -1,0 +1,112 @@
+package com.calio.calendar.aicalendar.service;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import com.calio.calendar.aicalendar.domain.CalendarMutationScope;
+import com.calio.calendar.aicalendar.domain.CalendarMutationType;
+import com.calio.calendar.aicalendar.domain.CalendarMutationOperation;
+import com.calio.calendar.aicalendar.service.tool.dto.CalendarMutationToolRequest;
+import com.calio.calendar.event.controller.dto.EventResponse;
+import com.calio.calendar.event.service.EventService;
+import com.calio.calendar.tag.domain.Tag;
+import com.calio.calendar.tag.domain.TagType;
+import com.calio.calendar.tag.service.TagService;
+import java.time.Instant;
+import java.util.List;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+@ExtendWith(MockitoExtension.class)
+class CalendarMutationServiceTest {
+
+    @Mock
+    private EventService eventService;
+
+    @Mock
+    private TagService tagService;
+
+    @Test
+    @DisplayName("일정 수정 Preview는 기존 일정을 조회하지만 실제 수정은 실행하지 않는다")
+    void givenEventUpdate_whenPreview_thenReturnsBeforeAndAfterWithoutChangingEvent() {
+        // given
+        EventResponse existingEvent = event("기존 회의", Instant.parse("2026-08-21T05:00:00Z"));
+        when(eventService.getEvent(1L, 10L)).thenReturn(existingEvent);
+        when(tagService.getTagOrDefault(1L, 1L)).thenReturn(new Tag(TagType.DEFAULT, "업무", "#64748B"));
+
+        // when
+        var preview = service().preview(1L, updateRequest());
+
+        // then
+        assertThat(preview.type()).isEqualTo(CalendarMutationType.UPDATE);
+        assertThat(preview.scope()).isEqualTo(CalendarMutationScope.EVENT);
+        assertThat(preview.before()).isEqualTo(existingEvent);
+        assertThat(preview.after().title()).isEqualTo("변경 회의");
+        assertThat(preview.after().startAt()).isEqualTo(Instant.parse("2026-08-21T06:00:00Z"));
+        verify(eventService, never()).updateEvent(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    @DisplayName("확정된 일정 수정은 기존 EventService 수정 유스케이스를 호출한다")
+    void givenConfirmedEventUpdate_whenApply_thenDelegatesToExistingEventService() {
+        // given
+        when(eventService.getEvent(1L, 10L)).thenReturn(event("기존 회의", Instant.parse("2026-08-21T05:00:00Z")));
+        EventResponse updatedEvent = event("변경 회의", Instant.parse("2026-08-21T06:00:00Z"));
+        when(eventService.updateEvent(org.mockito.ArgumentMatchers.eq(1L), org.mockito.ArgumentMatchers.eq(10L), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(updatedEvent);
+
+        // when
+        List<EventResponse> result = service().apply(1L, updateRequest());
+
+        // then
+        assertThat(result).containsExactly(updatedEvent);
+        ArgumentCaptor<com.calio.calendar.event.controller.dto.UpdateEventRequest> requestCaptor =
+                ArgumentCaptor.forClass(com.calio.calendar.event.controller.dto.UpdateEventRequest.class);
+        verify(eventService).updateEvent(org.mockito.ArgumentMatchers.eq(1L), org.mockito.ArgumentMatchers.eq(10L), requestCaptor.capture());
+        assertThat(requestCaptor.getValue().title()).isEqualTo("변경 회의");
+        assertThat(requestCaptor.getValue().startAt()).isEqualTo(Instant.parse("2026-08-21T06:00:00Z"));
+    }
+
+    private CalendarMutationService service() {
+        return new CalendarMutationService(eventService, tagService);
+    }
+
+    private CalendarMutationToolRequest updateRequest() {
+        return new CalendarMutationToolRequest(
+                CalendarMutationOperation.UPDATE_EVENT,
+                10L,
+                "변경 회의",
+                "변경된 설명",
+                Instant.parse("2026-08-21T06:00:00Z"),
+                Instant.parse("2026-08-21T07:00:00Z"),
+                false,
+                "Asia/Seoul",
+                1L
+        );
+    }
+
+    private EventResponse event(String title, Instant startAt) {
+        return new EventResponse(
+                10L,
+                title,
+                "기존 설명",
+                startAt,
+                startAt.plusSeconds(3600),
+                false,
+                "Asia/Seoul",
+                false,
+                null,
+                false,
+                null,
+                null,
+                Instant.parse("2026-08-01T00:00:00Z"),
+                Instant.parse("2026-08-01T00:00:00Z")
+        );
+    }
+}

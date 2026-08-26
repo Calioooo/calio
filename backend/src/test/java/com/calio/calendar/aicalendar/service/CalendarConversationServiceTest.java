@@ -182,6 +182,7 @@ class CalendarConversationServiceTest {
         when(assistantAgent.answer(any())).thenReturn(new CalendarAssistantAnswer(
                 "안녕하세요. 일정 조회와 빈 시간 찾기를 도와드릴게요.",
                 List.of(),
+                List.of(),
                 List.of()
         ));
 
@@ -226,7 +227,7 @@ class CalendarConversationServiceTest {
                 .thenReturn(CalendarAssistantRequestClassification.SUPPORTED);
         when(assistantAgent.answer(any()))
                 .thenReturn(
-                        new CalendarAssistantAnswer("팀 회의가 있습니다.", List.of(event), List.of()),
+                        new CalendarAssistantAnswer("팀 회의가 있습니다.", List.of(event), List.of(), List.of()),
                         CalendarAssistantAnswer.withoutBlocks("다른 요청도 도와드릴게요.")
                 );
 

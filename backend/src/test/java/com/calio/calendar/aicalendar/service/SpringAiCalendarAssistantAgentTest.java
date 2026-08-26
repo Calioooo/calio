@@ -92,6 +92,7 @@ class SpringAiCalendarAssistantAgentTest {
         CalendarAIProperties properties = new CalendarAIProperties();
         CalendarAgentTools tools = new CalendarAgentTools(
                 mock(EventService.class),
+                mock(CalendarMutationService.class),
                 properties,
                 mock(CalendarAgentObservationService.class)
         );

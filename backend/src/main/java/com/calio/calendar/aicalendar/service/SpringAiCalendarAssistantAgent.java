@@ -123,7 +123,8 @@ public class SpringAiCalendarAssistantAgent implements CalendarAssistantAgent, A
         return new CalendarAssistantAnswer(
                 answer,
                 resultCollector.events(),
-                resultCollector.freeTimes()
+                resultCollector.freeTimes(),
+                resultCollector.mutationPreviews()
         );
     }
 

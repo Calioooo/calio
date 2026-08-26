@@ -13,7 +13,9 @@ import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.aicalendar.repository.CalendarConversationMessageRepository;
 import com.calio.calendar.aicalendar.repository.CalendarConversationRepository;
 import com.calio.calendar.aicalendar.service.CalendarAssistantAgent;
+import com.calio.calendar.aicalendar.service.CalendarAssistantRequestClassifier;
 import com.calio.calendar.aicalendar.service.CalendarConversationService;
+import com.calio.calendar.aicalendar.domain.CalendarAssistantRequestClassification;
 import com.calio.calendar.aicalendar.service.dto.CalendarAssistantAnswer;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
@@ -67,6 +69,9 @@ class CalendarConversationControllerTest {
     @MockitoBean
     private CalendarAssistantAgent assistantAgent;
 
+    @MockitoBean
+    private CalendarAssistantRequestClassifier requestClassifier;
+
     @BeforeEach
     void setUp() {
         messageRepository.deleteAll();
@@ -91,6 +96,8 @@ class CalendarConversationControllerTest {
             throws Exception {
         // given
         String conversationId = createConversation();
+        when(requestClassifier.classify("내일 일정 알려줘"))
+                .thenReturn(CalendarAssistantRequestClassification.SUPPORTED);
         when(assistantAgent.answer(any())).thenReturn(CalendarAssistantAnswer.withoutBlocks("일정을 확인했어요."));
 
         // when

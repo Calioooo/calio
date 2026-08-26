@@ -102,6 +102,7 @@ public class CalendarConversationService {
         CalendarAssistantAnswer answer = new CalendarAssistantAnswer(
                 selectUnsupportedMessage(),
                 List.of(),
+                List.of(),
                 List.of()
         );
         return recordAssistantResponse(conversationId, externalConversationId, answer);
