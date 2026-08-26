@@ -1,7 +1,6 @@
 package com.calio.calendar.groupcalendar.sharing.event.domain;
 
 import com.calio.calendar.common.domain.BaseEntity;
-import com.calio.calendar.common.domain.CanonicalSchedule;
 import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.groupspace.domain.GroupSpace;
 import jakarta.persistence.Column;
@@ -14,7 +13,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
-import java.time.Instant;
+import java.util.UUID;
 
 @Entity
 @Table(
@@ -38,20 +37,11 @@ public class PersonalEventGroupShare extends BaseEntity {
     @JoinColumn(name = "group_space_id", nullable = false)
     private GroupSpace groupSpace;
 
-    @Column(name = "show_original_details", nullable = false)
-    private boolean showOriginalDetails;
+    @Column(name = "is_anonymous", nullable = false)
+    private boolean anonymous = true;
 
-    @Column(name = "override_title")
-    private String overrideTitle;
-
-    @Column(name = "override_start_at")
-    private Instant overrideStartAt;
-
-    @Column(name = "override_end_at")
-    private Instant overrideEndAt;
-
-    @Column(name = "override_all_day")
-    private Boolean overrideAllDay;
+    @Column(name = "public_share_id", nullable = false, unique = true, updatable = false)
+    private UUID publicShareId;
 
     protected PersonalEventGroupShare() {
     }
@@ -59,35 +49,7 @@ public class PersonalEventGroupShare extends BaseEntity {
     public PersonalEventGroupShare(Event event, GroupSpace groupSpace) {
         this.event = event;
         this.groupSpace = groupSpace;
-    }
-
-    public void updateRepresentation(
-            boolean showOriginalDetails,
-            String overrideTitle,
-            Instant overrideStartAt,
-            Instant overrideEndAt,
-            Boolean overrideAllDay
-    ) {
-        validateEffectiveSchedule(overrideStartAt, overrideEndAt, overrideAllDay);
-        this.showOriginalDetails = showOriginalDetails;
-        this.overrideTitle = overrideTitle;
-        this.overrideStartAt = overrideStartAt;
-        this.overrideEndAt = overrideEndAt;
-        this.overrideAllDay = overrideAllDay;
-    }
-
-    private void validateEffectiveSchedule(
-            Instant overrideStartAt,
-            Instant overrideEndAt,
-            Boolean overrideAllDay
-    ) {
-        boolean allDay = overrideAllDay != null ? overrideAllDay : event.isAllDay();
-        CanonicalSchedule.event(
-                overrideStartAt != null ? overrideStartAt : event.getStartAt(),
-                overrideEndAt != null ? overrideEndAt : event.getEndAt(),
-                allDay,
-                allDay ? null : event.getTimeZone()
-        );
+        this.publicShareId = UUID.randomUUID();
     }
 
     public Long getId() {
@@ -102,46 +64,31 @@ public class PersonalEventGroupShare extends BaseEntity {
         return groupSpace;
     }
 
-    public boolean isShowOriginalDetails() {
-        return showOriginalDetails;
+    public boolean isAnonymous() {
+        return anonymous;
     }
 
-    public String getOverrideTitle() {
-        return overrideTitle;
-    }
-
-    public Instant getOverrideStartAt() {
-        return overrideStartAt;
-    }
-
-    public Instant getOverrideEndAt() {
-        return overrideEndAt;
-    }
-
-    public Boolean getOverrideAllDay() {
-        return overrideAllDay;
+    public UUID getPublicShareId() {
+        return publicShareId;
     }
 
     public String resolvePublicTitle(String anonymousTitle) {
-        if (overrideTitle != null) {
-            return overrideTitle;
-        }
-        return showOriginalDetails ? event.getTitle() : anonymousTitle;
+        return anonymous ? anonymousTitle : event.getTitle();
     }
 
     public String resolvePublicDescription() {
-        return showOriginalDetails ? event.getDescription() : null;
+        return anonymous ? null : event.getDescription();
     }
 
-    public Instant resolveStartAt() {
-        return overrideStartAt != null ? overrideStartAt : event.getStartAt();
+    public java.time.Instant resolveStartAt() {
+        return event.getStartAt();
     }
 
-    public Instant resolveEndAt() {
-        return overrideEndAt != null ? overrideEndAt : event.getEndAt();
+    public java.time.Instant resolveEndAt() {
+        return event.getEndAt();
     }
 
     public boolean resolveAllDay() {
-        return overrideAllDay != null ? overrideAllDay : event.isAllDay();
+        return event.isAllDay();
     }
 }

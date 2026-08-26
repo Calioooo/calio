@@ -3,7 +3,6 @@ package com.calio.calendar.groupcalendar.sharing.event.controller;
 import static com.calio.calendar.security.TestAccountSupport.currentAccountId;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -153,34 +152,6 @@ class PersonalEventGroupShareControllerTest {
     }
 
     @Test
-    @DisplayName("공유 표현을 수정해도 개인 원본 일정은 변경하지 않는다")
-    void givenOwnedShare_whenUpdateRepresentation_thenPreservesSourceEvent() throws Exception {
-        // given
-        GroupSpace groupSpace = activeGroupSpace();
-        Event event = event(currentAccountId(), "원본 제목");
-        mockMvc.perform(post("/api/event-shares")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{ \"selectionEnabled\": true, \"eventIds\": [%d], \"groupSpaceIds\": [%d] }"
-                                .formatted(event.getId(), groupSpace.getId())))
-                .andExpect(status().isCreated());
-
-        // when
-        mockMvc.perform(patch("/api/event-shares/{groupSpaceId}/{eventId}", groupSpace.getId(), event.getId())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "showOriginalDetails": true
-                                }
-                                """))
-                // then
-                .andExpect(status().isNoContent());
-
-        assertThat(eventRepository.findById(event.getId()).orElseThrow().getTitle()).isEqualTo("원본 제목");
-        assertThat(shareRepository.findAllByEventId(event.getId()).getFirst().isShowOriginalDetails())
-                .isTrue();
-    }
-
-    @Test
     @DisplayName("Group Space owner는 다른 멤버의 공유 mapping만 해제하고 원본 일정은 보존한다")
     void givenGroupOwnerAndOtherMemberShare_whenRemove_thenDeletesMappingOnly() throws Exception {
         // given
@@ -199,26 +170,6 @@ class PersonalEventGroupShareControllerTest {
 
         assertThat(shareRepository.findAllByEventId(otherMemberEvent.getId())).isEmpty();
         assertThat(eventRepository.findById(otherMemberEvent.getId())).isPresent();
-    }
-
-    @Test
-    @DisplayName("Group Space owner는 다른 멤버의 공유 표현을 수정할 수 없다")
-    void givenGroupOwnerAndOtherMemberShare_whenUpdate_thenRejectsRequest() throws Exception {
-        // given
-        GroupSpace groupSpace = activeGroupSpace();
-        Event otherMemberEvent = event(accountRepository.saveAndFlush(new Account()).getId(), "다른 멤버 일정");
-        shareRepository.saveAndFlush(new PersonalEventGroupShare(otherMemberEvent, groupSpace));
-
-        // when, then
-        mockMvc.perform(patch(
-                        "/api/event-shares/{groupSpaceId}/{eventId}",
-                        groupSpace.getId(),
-                        otherMemberEvent.getId()
-                )
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{ \"showOriginalDetails\": true }"))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.errorCode").value("PERSONAL_EVENT_GROUP_SHARE_FORBIDDEN"));
     }
 
     private GroupSpace activeGroupSpace() {

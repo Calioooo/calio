@@ -26,18 +26,17 @@ class PersonalEventGroupShareMigrationTest {
     }
 
     @Test
-    @DisplayName("개인 단건 일정 공유 override migration은 공개 설정과 nullable 표현 override를 추가한다")
-    void migrationAddsPersonalEventGroupShareRepresentationOverrides() throws IOException {
+    @DisplayName("개인 단건 일정 공유 정책 migration은 익명 노출과 공개 UUID를 추가한다")
+    void migrationAddsPersonalEventGroupShareAnonymousExposureAndPublicId() throws IOException {
         // when
-        String migration = new ClassPathResource("db/migration/V22__personal_event_group_share_overrides.sql")
+        String migration = new ClassPathResource("db/migration/V25__simplify_personal_event_group_shares.sql")
                 .getContentAsString(StandardCharsets.UTF_8);
 
         // then
         assertThat(migration)
-                .contains("show_original_details BOOLEAN NOT NULL DEFAULT FALSE")
-                .contains("override_title VARCHAR(255) NULL")
-                .contains("override_start_at DATETIME(6) NULL")
-                .contains("override_end_at DATETIME(6) NULL")
-                .contains("override_all_day BOOLEAN NULL");
+                .contains("is_anonymous BOOLEAN NOT NULL DEFAULT TRUE")
+                .contains("public_share_id CHAR(36)")
+                .contains("SET is_anonymous = NOT show_original_details")
+                .contains("uk_personal_event_group_share_public_id UNIQUE (public_share_id)");
     }
 }

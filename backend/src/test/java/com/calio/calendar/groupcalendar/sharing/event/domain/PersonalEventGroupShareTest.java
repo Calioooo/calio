@@ -1,10 +1,7 @@
 package com.calio.calendar.groupcalendar.sharing.event.domain;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.calio.calendar.common.error.CalioException;
-import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.event.domain.Event;
 import java.time.Instant;
 import org.junit.jupiter.api.DisplayName;
@@ -16,81 +13,28 @@ class PersonalEventGroupShareTest {
     private static final Instant END_AT = Instant.parse("2028-01-01T10:00:00Z");
 
     @Test
-    @DisplayName("새 공유 mapping은 원본 상세를 숨기고 모든 표현 값을 원본에서 상속한다")
-    void givenNewShare_whenCreated_thenInheritsSourceRepresentation() {
+    @DisplayName("새 공유 mapping은 익명 노출과 변경되지 않는 공개 UUID를 가진다")
+    void givenNewShare_whenCreated_thenIsAnonymousWithPublicId() {
         // when
         PersonalEventGroupShare share = new PersonalEventGroupShare(event(), null);
 
         // then
-        assertThat(share.isShowOriginalDetails()).isFalse();
-        assertThat(share.getOverrideTitle()).isNull();
-        assertThat(share.getOverrideStartAt()).isNull();
-        assertThat(share.getOverrideEndAt()).isNull();
-        assertThat(share.getOverrideAllDay()).isNull();
+        assertThat(share.isAnonymous()).isTrue();
+        assertThat(share.getPublicShareId()).isNotNull();
     }
 
     @Test
-    @DisplayName("원본 상세를 숨겨도 명시적 제목과 일정 표현 override를 저장할 수 있다")
-    void givenAnonymousShare_whenUpdateRepresentation_thenKeepsExplicitOverrides() {
+    @DisplayName("익명 공유는 원본의 시간은 유지하고 제목과 설명만 숨긴다")
+    void givenAnonymousShare_whenResolved_thenKeepsSourceScheduleAndHidesDetails() {
         // given
         PersonalEventGroupShare share = new PersonalEventGroupShare(event(), null);
-        Instant overrideStartAt = Instant.parse("2028-01-01T11:00:00Z");
-        Instant overrideEndAt = Instant.parse("2028-01-01T12:00:00Z");
-
-        // when
-        share.updateRepresentation(
-                false,
-                "개인 일정",
-                overrideStartAt,
-                overrideEndAt,
-                false
-        );
 
         // then
-        assertThat(share.isShowOriginalDetails()).isFalse();
-        assertThat(share.getOverrideTitle()).isEqualTo("개인 일정");
-        assertThat(share.getOverrideStartAt()).isEqualTo(overrideStartAt);
-        assertThat(share.getOverrideEndAt()).isEqualTo(overrideEndAt);
-        assertThat(share.getOverrideAllDay()).isFalse();
-    }
-
-    @Test
-    @DisplayName("원본과 합성한 공유 일정이 유효하지 않으면 표현 override를 저장할 수 없다")
-    void givenInvalidEffectiveSchedule_whenUpdateRepresentation_thenThrowsInvalidTimeRange() {
-        // given
-        PersonalEventGroupShare share = new PersonalEventGroupShare(event(), null);
-
-        // when, then
-        assertThatThrownBy(() -> share.updateRepresentation(
-                false,
-                null,
-                END_AT,
-                START_AT,
-                null
-        )).isInstanceOfSatisfying(
-                CalioException.class,
-                exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.INVALID_TIME_RANGE)
-        );
-        assertThatThrownBy(() -> share.updateRepresentation(
-                false,
-                null,
-                END_AT,
-                null,
-                null
-        )).isInstanceOfSatisfying(
-                CalioException.class,
-                exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.INVALID_TIME_RANGE)
-        );
-        assertThatThrownBy(() -> share.updateRepresentation(
-                false,
-                null,
-                null,
-                START_AT,
-                null
-        )).isInstanceOfSatisfying(
-                CalioException.class,
-                exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.INVALID_TIME_RANGE)
-        );
+        assertThat(share.resolvePublicTitle("익명 일정")).isEqualTo("익명 일정");
+        assertThat(share.resolvePublicDescription()).isNull();
+        assertThat(share.resolveStartAt()).isEqualTo(START_AT);
+        assertThat(share.resolveEndAt()).isEqualTo(END_AT);
+        assertThat(share.resolveAllDay()).isFalse();
     }
 
     private Event event() {

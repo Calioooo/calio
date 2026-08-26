@@ -106,8 +106,8 @@ class GroupCalendarServiceTest {
     }
 
     @Test
-    @DisplayName("공유 단건 일정은 mapping 공개 표현과 범위 겹침으로 Group Calendar에 표시한다")
-    void givenSharedOneOffEvent_whenListItems_thenAppliesPublicRepresentationAndRange() {
+    @DisplayName("익명 공유 단건 일정은 원본 시간을 유지하고 범위 겹침으로 Group Calendar에 표시한다")
+    void givenAnonymousSharedOneOffEvent_whenListItems_thenUsesAnonymousRepresentationAndRange() {
         // given
         com.calio.calendar.event.domain.Event sourceEvent = new com.calio.calendar.event.domain.Event(
                 "원본 제목",
@@ -121,14 +121,13 @@ class GroupCalendarServiceTest {
                 account
         );
         PersonalEventGroupShare share = new PersonalEventGroupShare(sourceEvent, groupSpace);
-        share.updateRepresentation(false, "공개 제목", null, null, null);
         when(personalEventShareQueryService.listSharesInGroupSpace(GROUP_SPACE_ID)).thenReturn(List.of(share));
 
         // when
         List<GroupCalendarItemResponse> items = service.listItems(ACCOUNT_ID, GROUP_SPACE_ID, FROM, TO);
 
         // then
-        assertThat(items).extracting(GroupCalendarItemResponse::title).containsExactly("공개 제목");
+        assertThat(items).extracting(GroupCalendarItemResponse::title).containsExactly("작성자의 일정");
         assertThat(items.getFirst().description()).isNull();
         assertThat(items.getFirst().isSharedPersonalSchedule()).isTrue();
         assertThat(items.getFirst().id()).isNull();
