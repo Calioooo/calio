@@ -45,6 +45,20 @@ public class PersonalEventGroupShareCommandService {
         shareRepository.flush();
     }
 
+    public void changeOriginalDetailsVisibility(
+            PersonalEventGroupShare share,
+            boolean showOriginalDetails
+    ) {
+        updateRepresentation(
+                share,
+                showOriginalDetails,
+                share.getOverrideTitle(),
+                share.getOverrideStartAt(),
+                share.getOverrideEndAt(),
+                share.getOverrideAllDay()
+        );
+    }
+
     public void deleteShare(PersonalEventGroupShare share) {
         shareRepository.delete(share);
     }
