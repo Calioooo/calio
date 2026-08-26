@@ -19,6 +19,9 @@ struct NetworkRepositoryTests {
           "endAt": "2026-06-10T10:00:00Z",
           "allDay": false,
           "timeZone": "Asia/Seoul",
+          "importantEvent": false,
+          "recurrenceId": null,
+          "isRecurrenceOccurrence": false,
           "tag": {
             "id": 1,
             "title": "업무",
@@ -116,13 +119,14 @@ struct NetworkRepositoryTests {
 
         let response = try await repository.createRecurrenceEvent(
             CreateRecurrenceEventRequestDTO(
-                recurrenceTitle: "반복 일정",
-                recurrenceDescription: "설명",
-                recurrenceStartDate: "2026-08-01",
-                recurrenceEndDate: "2026-08-31",
-                recurrenceStartTime: "00:00:00",
-                recurrenceEndTime: "01:00:00",
-                recurrenceFrequency: .monthly
+                title: "반복 일정",
+                description: "설명",
+                allDay: false,
+                firstOccurrenceStartAt: Date(timeIntervalSince1970: 1_785_628_800),
+                firstOccurrenceEndAt: Date(timeIntervalSince1970: 1_785_632_400),
+                timeZone: "Asia/Seoul",
+                recurrence: ["RRULE:FREQ=MONTHLY;UNTIL=20260831T000000Z"],
+                tagId: 1
             )
         )
         let request = try #require(capturedRequest)
@@ -139,7 +143,8 @@ struct NetworkRepositoryTests {
             "firstOccurrenceStartAt",
             "firstOccurrenceEndAt",
             "timeZone",
-            "recurrence"
+            "recurrence",
+            "tagId"
         ])
         #expect(object["recurrence"] as? [String] == ["RRULE:FREQ=MONTHLY;UNTIL=20260831T000000Z"])
         #expect(object["colorCode"] == nil)
@@ -158,6 +163,9 @@ struct NetworkRepositoryTests {
           "endAt": "2026-06-10T10:00:00Z",
           "allDay": false,
           "timeZone": "America/New_York",
+          "importantEvent": false,
+          "recurrenceId": null,
+          "isRecurrenceOccurrence": false,
           "tag": {
             "id": 1,
             "title": "업무",
@@ -280,19 +288,24 @@ struct NetworkRepositoryTests {
             request: UpdateRecurrenceEventRequestDTO(
                 title: "수정 반복 일정",
                 description: "설명",
-                startDate: "1970-01-01",
-                endDate: "1970-01-01",
-                startTime: "00:00:00",
-                endTime: "01:00:00",
-                recurrenceFrequency: .weekly
+                allDay: false,
+                firstOccurrenceStartAt: Date(timeIntervalSince1970: 0),
+                firstOccurrenceEndAt: Date(timeIntervalSince1970: 3_600),
+                timeZone: "Asia/Seoul",
+                recurrence: ["RRULE:FREQ=WEEKLY;UNTIL=20260831T000000Z"],
+                tagId: 1
             )
         )
         _ = try await repository.updateRecurrenceOccurrence(
             recurrenceId: 700,
             request: UpdateRecurrenceOccurrenceRequestDTO(
                 originStartAt: Date(timeIntervalSince1970: 0),
+                title: "수정 반복 항목",
+                description: "설명",
                 startAt: Date(timeIntervalSince1970: 0),
-                endAt: Date(timeIntervalSince1970: 3600)
+                endAt: Date(timeIntervalSince1970: 3600),
+                allDay: false,
+                timeZone: "Asia/Seoul"
             )
         )
 
@@ -301,6 +314,11 @@ struct NetworkRepositoryTests {
             "https://example.test/api/recurrence-events/700/occurrences"
         ])
         #expect(capturedRequests.map(\.httpMethod) == ["PUT", "PATCH"])
+
+        let occurrenceBody = try #require(requestBodyData(from: capturedRequests[1]))
+        let occurrenceObject = try #require(JSONSerialization.jsonObject(with: occurrenceBody) as? [String: Any])
+        #expect(Set(occurrenceObject.keys) == ["originStartAt", "title", "description", "startAt", "endAt", "allDay", "timeZone"])
+        #expect(occurrenceObject["title"] as? String == "수정 반복 항목")
     }
 
     @Test func urlSessionEventRepositoryDeletesWithoutRequestBodiesAndAcceptsNoContent() async throws {

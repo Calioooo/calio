@@ -283,7 +283,7 @@ struct EventService {
             recurrenceFrequency: editableRule?.frequency ?? .daily,
             isAllDay: dto.allDay,
             timeZone: dto.timeZone,
-            canUpdateSeries: dto.canUpdateSeries == true,
+            canUpdateSeries: dto.canUpdateSeries,
             isRuleEditable: editableRule != nil,
             tagId: dto.tag.id
         )

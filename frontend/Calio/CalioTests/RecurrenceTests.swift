@@ -77,7 +77,31 @@ struct RecurrenceTests {
         #expect(object["recurrenceFrequency"] == nil)
     }
 
-    @Test func recurrenceRuleKeepsOnlySupportedSimpleRulesEditable() async throws {
+    @Test func recurrenceEventResponseDTODecodingRejectsMissingSeriesMutationPermission() throws {
+        let response = """
+        {
+          "recurrenceId": 1,
+          "title": "반복 일정",
+          "description": null,
+          "allDay": false,
+          "firstOccurrenceStartAt": "2026-08-01T00:00:00Z",
+          "firstOccurrenceEndAt": "2026-08-01T01:00:00Z",
+          "timeZone": "Asia/Seoul",
+          "recurrence": ["RRULE:FREQ=DAILY;UNTIL=20260831T000000Z"],
+          "tag": { "id": 1, "title": "업무", "colorCode": "#4F46E5", "tagType": "DEFAULT" },
+          "createdAt": "2026-08-01T00:00:00Z",
+          "updatedAt": "2026-08-01T00:00:00Z"
+        }
+        """.data(using: .utf8)!
+
+        do {
+            _ = try APIJSONCoding.makeDecoder().decode(RecurrenceEventResponseDTO.self, from: response)
+            Issue.record("Expected missing canUpdateSeries to fail decoding")
+        } catch is DecodingError {
+        }
+    }
+
+    @Test func recurrenceRuleKeepsOnlyBoundedSimpleRulesEditable() async throws {
         let until = Date(timeIntervalSince1970: 1_788_480_000)
         let line = RecurrenceRule.make(frequency: .weekly, until: until, allDay: false)
 
