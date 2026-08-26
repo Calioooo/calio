@@ -201,6 +201,48 @@ struct RecurrenceTests {
         #expect(details.recurrenceEndDate == nil)
     }
 
+    @Test func eventServicePreservesSeriesWallClockValuesForRecurrenceEditing() async throws {
+        let seriesTimeZone = try #require(TimeZone(identifier: "America/New_York"))
+        let formTimeZone = try #require(TimeZone(identifier: "Asia/Seoul"))
+        var seriesCalendar = Calendar(identifier: .gregorian)
+        seriesCalendar.timeZone = seriesTimeZone
+        let startAt = try #require(seriesCalendar.date(from: DateComponents(
+            year: 2026, month: 6, day: 8, hour: 9
+        )))
+        let endAt = try #require(seriesCalendar.date(from: DateComponents(
+            year: 2026, month: 6, day: 8, hour: 10
+        )))
+        let response = RecurrenceEventResponseDTO(
+            recurrenceId: 12,
+            title: "뉴욕 회의",
+            description: nil,
+            allDay: false,
+            firstOccurrenceStartAt: startAt,
+            firstOccurrenceEndAt: endAt,
+            timeZone: seriesTimeZone.identifier,
+            recurrence: ["RRULE:FREQ=DAILY;UNTIL=20260630T130000Z"],
+            tag: TagResponseDTO(id: 0, title: "기타", colorCode: "#64748B", tagType: .defaultTag),
+            createdAt: startAt,
+            updatedAt: startAt,
+            canUpdateSeries: true
+        )
+        let service = EventService(
+            repository: RecordingEventRepository(fetchRecurrenceResponse: response),
+            deviceTimeZone: formTimeZone
+        )
+
+        let details = try await service.fetchRecurrenceEvent(recurrenceId: 12)
+
+        var formCalendar = Calendar(identifier: .gregorian)
+        formCalendar.timeZone = formTimeZone
+        #expect(formCalendar.dateComponents([.year, .month, .day], from: details.recurrenceStartDate)
+            == DateComponents(year: 2026, month: 6, day: 8))
+        #expect(formCalendar.component(.hour, from: details.recurrenceStartTime) == 9)
+        #expect(formCalendar.component(.hour, from: details.recurrenceEndTime) == 10)
+        #expect(formCalendar.dateComponents([.year, .month, .day], from: try #require(details.recurrenceEndDate))
+            == DateComponents(year: 2026, month: 6, day: 30))
+    }
+
     @Test func eventServiceKeepsComplexOrExternallyManagedSeriesUnavailableForWholeSeriesEditing() async throws {
         let startAt = Date(timeIntervalSince1970: 1_788_480_000)
         let complexResponse = RecurrenceEventResponseDTO(

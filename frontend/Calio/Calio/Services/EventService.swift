@@ -282,6 +282,7 @@ struct EventService {
 
     private func mapToRecurrenceEventDetails(_ dto: RecurrenceEventResponseDTO) throws -> RecurrenceEventDetails {
         let editableRule = RecurrenceRule.editableRule(from: dto.recurrence, allDay: dto.allDay)
+        let seriesTimeZone = dto.timeZone.flatMap(TimeZone.init(identifier:)) ?? deviceTimeZone
         let allDayRange = dto.allDay
             ? try CalendarDateService.localAllDayDisplayRange(
                 utcStartAt: dto.firstOccurrenceStartAt,
@@ -292,10 +293,21 @@ struct EventService {
             recurrenceId: dto.recurrenceId,
             title: dto.title,
             description: dto.description ?? "",
-            recurrenceStartDate: allDayRange?.startAt ?? dto.firstOccurrenceStartAt,
-            recurrenceEndDate: editableRule?.until,
-            recurrenceStartTime: dto.firstOccurrenceStartAt,
-            recurrenceEndTime: dto.firstOccurrenceEndAt,
+            recurrenceStartDate: allDayRange?.startAt ?? recurrenceFormDate(
+                dto.firstOccurrenceStartAt,
+                seriesTimeZone: seriesTimeZone
+            ),
+            recurrenceEndDate: editableRule?.until.map {
+                recurrenceFormDate($0, seriesTimeZone: seriesTimeZone)
+            },
+            recurrenceStartTime: recurrenceFormDate(
+                dto.firstOccurrenceStartAt,
+                seriesTimeZone: seriesTimeZone
+            ),
+            recurrenceEndTime: recurrenceFormDate(
+                dto.firstOccurrenceEndAt,
+                seriesTimeZone: seriesTimeZone
+            ),
             recurrenceFrequency: editableRule?.frequency ?? .daily,
             isAllDay: dto.allDay,
             timeZone: dto.timeZone,
@@ -303,6 +315,22 @@ struct EventService {
             isRuleEditable: editableRule != nil,
             tagId: dto.tag.id
         )
+    }
+
+    private func recurrenceFormDate(
+        _ instant: Date,
+        seriesTimeZone: TimeZone
+    ) -> Date {
+        var seriesCalendar = Calendar(identifier: .gregorian)
+        seriesCalendar.timeZone = seriesTimeZone
+        let components = seriesCalendar.dateComponents(
+            [.year, .month, .day, .hour, .minute, .second],
+            from: instant
+        )
+
+        var formCalendar = Calendar(identifier: .gregorian)
+        formCalendar.timeZone = deviceTimeZone
+        return formCalendar.date(from: components) ?? instant
     }
 
     private func mapToCalendarTag(_ dto: TagResponseDTO) -> CalendarTag {
