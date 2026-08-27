@@ -23,4 +23,8 @@ public class PersonalEventGroupShareQueryService {
     ) {
         return shareRepository.findAllByEventIdsAndGroupSpaceIds(eventIds, groupSpaceIds);
     }
+
+    public List<PersonalEventGroupShare> listByEventId(Long eventId) {
+        return shareRepository.findAllByEvent_IdOrderByGroupSpace_IdAsc(eventId);
+    }
 }

@@ -15,6 +15,9 @@ public interface PersonalEventGroupShareRepository extends JpaRepository<Persona
     Optional<PersonalEventGroupShare> findByEvent_IdAndGroupSpace_Id(Long eventId, Long groupSpaceId);
 
     @EntityGraph(attributePaths = {"event", "event.account", "groupSpace"})
+    List<PersonalEventGroupShare> findAllByEvent_IdOrderByGroupSpace_IdAsc(Long eventId);
+
+    @EntityGraph(attributePaths = {"event", "event.account", "groupSpace"})
     @Query("""
             select share
             from PersonalEventGroupShare share

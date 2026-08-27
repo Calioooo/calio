@@ -12,6 +12,7 @@ import com.calio.calendar.groupspace.service.GroupMembershipQueryService;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.service.RecurrenceEventQueryService;
 import com.calio.calendar.sharing.controller.dto.GroupShareTargetStatus;
+import com.calio.calendar.sharing.controller.dto.GroupShareStatusResponse;
 import com.calio.calendar.sharing.recurrence.controller.dto.CreateRecurrenceGroupSharesRequest;
 import com.calio.calendar.sharing.recurrence.controller.dto.CreateRecurrenceGroupSharesResponse;
 import java.time.Instant;
@@ -56,6 +57,30 @@ class PersonalRecurrenceGroupShareServiceTest {
         assertThat(response.targets()).extracting(target -> target.status())
                 .containsExactly(GroupShareTargetStatus.SHARED, GroupShareTargetStatus.NOT_ELIGIBLE);
         verify(shareCommandService).createIfAbsent(any());
+    }
+
+    @Test
+    @DisplayName("반복 일정 원본 소유자는 대상별 공유 상태를 조회한다")
+    void listReturnsTargetSpecificShareStatesForSourceOwner() {
+        RecurrenceEvent recurrenceEvent = mock(RecurrenceEvent.class);
+        GroupSpace groupSpace = groupSpace(10L);
+        var share = com.calio.calendar.sharing.recurrence.domain.PersonalRecurrenceGroupShare.create(
+                recurrenceEvent,
+                groupSpace,
+                false
+        );
+        when(recurrenceEventQueryService.getRecurrenceEventForShareManagement(100L, 30L))
+                .thenReturn(recurrenceEvent);
+        when(shareQueryService.listByRecurrenceEventId(30L)).thenReturn(List.of(share));
+
+        List<GroupShareStatusResponse> response = service.list(100L, 30L);
+
+        assertThat(response).singleElement().satisfies(status -> {
+            assertThat(status.groupSpaceId()).isEqualTo(10L);
+            assertThat(status.groupSpaceName()).isEqualTo("group");
+            assertThat(status.isAnonymous()).isFalse();
+            assertThat(status.publicShareId()).isEqualTo(share.getPublicShareId());
+        });
     }
 
     private GroupSpace groupSpace(Long id) {

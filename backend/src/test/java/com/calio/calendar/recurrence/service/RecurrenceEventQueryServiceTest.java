@@ -85,6 +85,21 @@ class RecurrenceEventQueryServiceTest {
     }
 
     @Test
+    @DisplayName("공유 관리에서 다른 계정의 반복 일정은 FORBIDDEN을 반환한다")
+    void givenOtherAccountsRecurrenceEvent_whenManageShare_thenThrowsForbidden() {
+        RecurrenceEvent recurrenceEvent = recurrenceEvent();
+        ReflectionTestUtils.setField(recurrenceEvent.getAccount(), "id", 2L);
+        when(recurrenceEventRepository.findById(10L)).thenReturn(Optional.of(recurrenceEvent));
+
+        assertThatThrownBy(() -> recurrenceEventQueryService
+                .getRecurrenceEventForShareManagement(1L, 10L))
+                .isInstanceOfSatisfying(CalioException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.PERSONAL_SCHEDULE_SHARE_FORBIDDEN)
+                );
+    }
+
+    @Test
     @DisplayName("반복 일정 확장 후보 조회는 계정과 종료 시각을 repository에 그대로 위임한다")
     void givenExpansionRange_whenFindCandidates_thenReturnsRepositoryResult() {
         // given

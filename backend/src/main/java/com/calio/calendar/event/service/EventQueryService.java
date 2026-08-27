@@ -24,6 +24,15 @@ public class EventQueryService {
                 .orElseThrow(() -> new CalioException(ErrorCode.EVENT_NOT_FOUND));
     }
 
+    public Event getEventForShareManagement(Long accountId, Long eventId) {
+        Event event = eventRepository.findById(eventId)
+                .orElseThrow(() -> new CalioException(ErrorCode.EVENT_NOT_FOUND));
+        if (!event.getAccount().getId().equals(accountId)) {
+            throw new CalioException(ErrorCode.PERSONAL_SCHEDULE_SHARE_FORBIDDEN);
+        }
+        return event;
+    }
+
     public List<Event> listShareableEvents(Long accountId, List<Long> eventIds) {
         return eventRepository.findAllShareableByIdsAndAccountId(eventIds, accountId);
     }

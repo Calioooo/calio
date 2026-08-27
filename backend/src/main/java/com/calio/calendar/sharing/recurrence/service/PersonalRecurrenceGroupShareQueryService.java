@@ -26,4 +26,8 @@ public class PersonalRecurrenceGroupShareQueryService {
                 groupSpaceIds
         );
     }
+
+    public List<PersonalRecurrenceGroupShare> listByRecurrenceEventId(Long recurrenceEventId) {
+        return shareRepository.findAllByRecurrenceEvent_IdOrderByGroupSpace_IdAsc(recurrenceEventId);
+    }
 }

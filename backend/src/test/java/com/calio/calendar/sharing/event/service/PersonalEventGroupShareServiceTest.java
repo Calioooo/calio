@@ -16,6 +16,7 @@ import com.calio.calendar.groupspace.domain.GroupMember;
 import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.service.GroupMembershipQueryService;
 import com.calio.calendar.sharing.controller.dto.GroupShareTargetStatus;
+import com.calio.calendar.sharing.controller.dto.GroupShareStatusResponse;
 import com.calio.calendar.sharing.event.controller.dto.CreateEventGroupSharesRequest;
 import com.calio.calendar.sharing.event.controller.dto.CreateEventGroupSharesResponse;
 import java.util.List;
@@ -97,6 +98,30 @@ class PersonalEventGroupShareServiceTest {
         assertThat(response.results().getFirst().targets())
                 .extracting(target -> target.status())
                 .containsExactly(GroupShareTargetStatus.ALREADY_SHARED, GroupShareTargetStatus.ALREADY_SHARED);
+    }
+
+    @Test
+    @DisplayName("원본 소유자는 대상별 공유 상태를 조회한다")
+    void listReturnsTargetSpecificShareStatesForSourceOwner() {
+        Event event = event(1L);
+        GroupSpace groupSpace = groupSpace(10L);
+        var share = com.calio.calendar.sharing.event.domain.PersonalEventGroupShare.create(
+                event,
+                groupSpace,
+                true
+        );
+        when(eventQueryService.getEventForShareManagement(100L, 1L)).thenReturn(event);
+        when(shareQueryService.listByEventId(1L)).thenReturn(List.of(share));
+
+        List<GroupShareStatusResponse> response = service.list(100L, 1L);
+
+        assertThat(response).singleElement().satisfies(status -> {
+            assertThat(status.groupSpaceId()).isEqualTo(10L);
+            assertThat(status.groupSpaceName()).isEqualTo("group");
+            assertThat(status.isAnonymous()).isTrue();
+            assertThat(status.publicShareId()).isEqualTo(share.getPublicShareId());
+        });
+        verifyNoInteractions(shareCommandService);
     }
 
     private Event event(Long id) {

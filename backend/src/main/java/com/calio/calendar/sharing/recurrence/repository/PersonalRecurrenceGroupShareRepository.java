@@ -18,6 +18,11 @@ public interface PersonalRecurrenceGroupShareRepository extends JpaRepository<Pe
     );
 
     @EntityGraph(attributePaths = {"recurrenceEvent", "recurrenceEvent.account", "groupSpace"})
+    List<PersonalRecurrenceGroupShare> findAllByRecurrenceEvent_IdOrderByGroupSpace_IdAsc(
+            Long recurrenceEventId
+    );
+
+    @EntityGraph(attributePaths = {"recurrenceEvent", "recurrenceEvent.account", "groupSpace"})
     @Query("""
             select share
             from PersonalRecurrenceGroupShare share

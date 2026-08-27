@@ -62,6 +62,20 @@ class EventQueryServiceTest {
     }
 
     @Test
+    @DisplayName("공유 관리에서 다른 계정의 일정은 FORBIDDEN을 반환한다")
+    void givenOtherAccountsEvent_whenManageShare_thenThrowsForbidden() {
+        Event event = event();
+        ReflectionTestUtils.setField(event.getAccount(), "id", 2L);
+        when(eventRepository.findById(10L)).thenReturn(Optional.of(event));
+
+        assertThatThrownBy(() -> eventQueryService.getEventForShareManagement(1L, 10L))
+                .isInstanceOfSatisfying(CalioException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.PERSONAL_SCHEDULE_SHARE_FORBIDDEN)
+                );
+    }
+
+    @Test
     @DisplayName("일반 일정 조회는 범위 인수를 그대로 repository에 위임한다")
     void givenTimeRange_whenListEvents_thenReturnsRepositoryResult() {
         // given

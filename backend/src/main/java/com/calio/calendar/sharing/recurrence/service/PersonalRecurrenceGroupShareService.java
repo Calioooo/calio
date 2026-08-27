@@ -7,6 +7,7 @@ import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.service.RecurrenceEventQueryService;
 import com.calio.calendar.sharing.controller.dto.GroupShareTargetResponse;
 import com.calio.calendar.sharing.controller.dto.GroupShareTargetStatus;
+import com.calio.calendar.sharing.controller.dto.GroupShareStatusResponse;
 import com.calio.calendar.sharing.recurrence.controller.dto.CreateRecurrenceGroupSharesRequest;
 import com.calio.calendar.sharing.recurrence.controller.dto.CreateRecurrenceGroupSharesResponse;
 import com.calio.calendar.sharing.recurrence.domain.PersonalRecurrenceGroupShare;
@@ -63,6 +64,18 @@ public class PersonalRecurrenceGroupShareService {
                 ))
                 .toList();
         return new CreateRecurrenceGroupSharesResponse(recurrenceId, targets);
+    }
+
+    public List<GroupShareStatusResponse> list(Long accountId, Long recurrenceId) {
+        recurrenceEventQueryService.getRecurrenceEventForShareManagement(accountId, recurrenceId);
+        return shareQueryService.listByRecurrenceEventId(recurrenceId).stream()
+                .map(share -> new GroupShareStatusResponse(
+                        share.getGroupSpace().getId(),
+                        share.getGroupSpace().getName(),
+                        share.isAnonymous(),
+                        share.getPublicShareId()
+                ))
+                .toList();
     }
 
     private Map<Long, GroupSpace> activeGroupSpaces(Long accountId, List<Long> groupSpaceIds) {

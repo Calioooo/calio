@@ -9,6 +9,7 @@ import com.calio.calendar.event.service.EventService;
 import com.calio.calendar.sharing.event.controller.dto.CreateEventGroupSharesRequest;
 import com.calio.calendar.sharing.event.controller.dto.CreateEventGroupSharesResponse;
 import com.calio.calendar.sharing.event.service.PersonalEventGroupShareService;
+import com.calio.calendar.sharing.controller.dto.GroupShareStatusResponse;
 import jakarta.validation.Valid;
 import java.time.Instant;
 import java.util.List;
@@ -95,6 +96,14 @@ public class EventController {
     ) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(eventGroupShareService.create(account.accountId(), request));
+    }
+
+    @GetMapping("/{eventId}/group-shares")
+    public List<GroupShareStatusResponse> listGroupShares(
+            @AuthenticationPrincipal AuthenticatedAccount account,
+            @PathVariable("eventId") Long eventId
+    ) {
+        return eventGroupShareService.list(account.accountId(), eventId);
     }
 
     @GetMapping

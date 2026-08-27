@@ -9,6 +9,7 @@ import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.service.GroupMembershipQueryService;
 import com.calio.calendar.sharing.controller.dto.GroupShareTargetResponse;
 import com.calio.calendar.sharing.controller.dto.GroupShareTargetStatus;
+import com.calio.calendar.sharing.controller.dto.GroupShareStatusResponse;
 import com.calio.calendar.sharing.event.controller.dto.CreateEventGroupSharesRequest;
 import com.calio.calendar.sharing.event.controller.dto.CreateEventGroupSharesResponse;
 import com.calio.calendar.sharing.event.controller.dto.EventGroupShareResultResponse;
@@ -64,6 +65,18 @@ public class PersonalEventGroupShareService {
                 ))
                 .toList();
         return new CreateEventGroupSharesResponse(results);
+    }
+
+    public List<GroupShareStatusResponse> list(Long accountId, Long eventId) {
+        eventQueryService.getEventForShareManagement(accountId, eventId);
+        return shareQueryService.listByEventId(eventId).stream()
+                .map(share -> new GroupShareStatusResponse(
+                        share.getGroupSpace().getId(),
+                        share.getGroupSpace().getName(),
+                        share.isAnonymous(),
+                        share.getPublicShareId()
+                ))
+                .toList();
     }
 
     private Map<Long, Event> validateSources(Long accountId, List<Long> eventIds) {
