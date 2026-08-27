@@ -196,6 +196,37 @@ class GroupCalendarServiceTest {
     }
 
     @Test
+    @DisplayName("직접 Group Calendar 항목과 반복 회차는 안정적인 namespace 공개 식별자를 가진다")
+    void givenDirectItems_whenListItems_thenReturnsStableNamespacedPublicItemIds() {
+        GroupCalendarEvent directEvent = new GroupCalendarEvent(
+                groupSpace,
+                account,
+                recurrenceEvent.getTag(),
+                "직접 일정",
+                null,
+                FROM.plusSeconds(7200),
+                FROM.plusSeconds(10800),
+                false,
+                "UTC"
+        );
+        ReflectionTestUtils.setField(directEvent, "id", 40L);
+        RecurrenceOccurrence occurrence = occurrence(FROM.plusSeconds(3600));
+        when(eventQueryService.listOverlappingEvents(GROUP_SPACE_ID, FROM, TO)).thenReturn(List.of(directEvent));
+        when(recurrenceEngine.expand(recurrenceEvent.toRecurrenceSchedule(), recurrenceEvent.getRecurrenceRules(), FROM, TO))
+                .thenReturn(List.of(occurrence));
+        when(overrideQueryService.listOverrides(recurrenceEvent.getId(), List.of(occurrence.originStartAt())))
+                .thenReturn(List.of());
+
+        List<GroupCalendarItemResponse> items = service.listItems(ACCOUNT_ID, GROUP_SPACE_ID, FROM, TO);
+
+        assertThat(items).extracting(GroupCalendarItemResponse::publicItemId)
+                .containsExactly(
+                        "group-recurrence:30:" + occurrence.originStartAt(),
+                        "group-event:40"
+                );
+    }
+
+    @Test
     @DisplayName("from이 to와 같거나 이후이면 INVALID_TIME_RANGE를 반환한다")
     void givenInvalidRange_whenListItems_thenThrowsInvalidTimeRange() {
         // given, when, then
