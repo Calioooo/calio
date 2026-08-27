@@ -19,14 +19,21 @@ import com.calio.calendar.sharing.recurrence.repository.PersonalRecurrenceGroupS
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.repository.TagRepository;
 import java.time.Instant;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @SpringBootTest(properties = {
         "spring.datasource.url=jdbc:h2:mem:personal-schedule-group-share-repository-test;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE",
@@ -46,6 +53,7 @@ class PersonalScheduleGroupShareRepositoryTest {
     @Autowired private TagRepository tagRepository;
     @Autowired private GroupSpaceRepository groupSpaceRepository;
     @Autowired private AccountRepository accountRepository;
+    @Autowired private PlatformTransactionManager transactionManager;
 
     @BeforeEach
     void setUp() {
@@ -103,9 +111,8 @@ class PersonalScheduleGroupShareRepositoryTest {
     }
 
     @Test
-    @Transactional
-    @DisplayName("단건 mapping의 idempotent insert는 기존 source-target 조합을 무시한다")
-    void eventShareInsertIgnoreDoesNotRaiseUniqueConstraintFailure() {
+    @DisplayName("동시 단건 mapping insert는 하나만 저장하고 나머지는 idempotent 결과로 수렴한다")
+    void eventShareInsertIgnoreDoesNotRaiseUniqueConstraintFailure() throws Exception {
         Account account = accountRepository.saveAndFlush(new Account());
         Tag tag = tagRepository.saveAndFlush(Tag.personalDefault("기타", "#64748B"));
         Event event = eventRepository.saveAndFlush(new Event(
@@ -113,11 +120,16 @@ class PersonalScheduleGroupShareRepositoryTest {
         ));
         GroupSpace groupSpace = groupSpaceRepository.saveAndFlush(new GroupSpace(account.getId(), "group", null));
 
-        int first = eventShareRepository.insertIgnore(event.getId(), groupSpace.getId(), false, "00000000-0000-0000-0000-000000000001");
-        int duplicate = eventShareRepository.insertIgnore(event.getId(), groupSpace.getId(), true, "00000000-0000-0000-0000-000000000002");
+        List<Integer> results = executeConcurrently(
+                () -> eventShareRepository.insertIgnore(
+                        event.getId(), groupSpace.getId(), false, "00000000-0000-0000-0000-000000000001"
+                ),
+                () -> eventShareRepository.insertIgnore(
+                        event.getId(), groupSpace.getId(), true, "00000000-0000-0000-0000-000000000002"
+                )
+        );
 
-        assertThat(first).isEqualTo(1);
-        assertThat(duplicate).isZero();
+        assertThat(results).containsExactlyInAnyOrder(0, 1);
         assertThat(eventShareRepository.count()).isEqualTo(1);
     }
 
@@ -141,5 +153,39 @@ class PersonalScheduleGroupShareRepositoryTest {
         assertThat(share.getGroupSpace()).isSameAs(groupSpace);
         assertThat(share.isAnonymous()).isTrue();
         assertThat(share.getPublicShareId()).isNotNull();
+    }
+
+    private List<Integer> executeConcurrently(Callable<Integer> first, Callable<Integer> second) throws Exception {
+        CyclicBarrier barrier = new CyclicBarrier(2);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<Integer> firstResult = executor.submit(() -> executeInTransactionAfterBarrier(barrier, first));
+            Future<Integer> secondResult = executor.submit(() -> executeInTransactionAfterBarrier(barrier, second));
+            return List.of(
+                    firstResult.get(5, TimeUnit.SECONDS),
+                    secondResult.get(5, TimeUnit.SECONDS)
+            );
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    private Integer executeInTransactionAfterBarrier(CyclicBarrier barrier, Callable<Integer> command) {
+        return new TransactionTemplate(transactionManager).execute(status -> {
+            await(barrier);
+            try {
+                return command.call();
+            } catch (Exception exception) {
+                throw new IllegalStateException(exception);
+            }
+        });
+    }
+
+    private void await(CyclicBarrier barrier) {
+        try {
+            barrier.await(5, TimeUnit.SECONDS);
+        } catch (Exception exception) {
+            throw new IllegalStateException(exception);
+        }
     }
 }
