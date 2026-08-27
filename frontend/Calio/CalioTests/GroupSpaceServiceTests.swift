@@ -51,6 +51,46 @@ struct GroupSpaceServiceTests {
         #expect(viewModel.members.first { $0.memberId == 11 }?.role == .owner)
     }
 
+    @MainActor @Test func invitationViewModelRetainsAcceptanceContextAfterRecoverableErrorAndClearsItOnDismissal() async {
+        let repository = GroupSpaceRepositoryStub(invitationError: GroupSpaceRepositoryStub.StubError.failed)
+        let viewModel = GroupInvitationViewModel(service: GroupInvitationService(repository: repository))
+
+        let previewed = await viewModel.preview(type: .inviteCode, credential: "CALIO-2026")
+        let accepted = await viewModel.accept(type: .inviteCode, credential: "CALIO-2026", nickname: "준하")
+
+        #expect(!previewed)
+        #expect(!accepted)
+        #expect(viewModel.preview == nil)
+        #expect(viewModel.acceptanceResult == nil)
+        #expect(viewModel.errorMessage == "그룹 공간에 참여하지 못했습니다. 다시 시도해 주세요.")
+
+        viewModel.clearAcceptanceFlow()
+
+        #expect(viewModel.preview == nil)
+        #expect(viewModel.acceptanceResult == nil)
+        #expect(viewModel.errorMessage == nil)
+    }
+
+    @MainActor @Test func invitationViewModelPublishesBackendConfirmedAlreadyMemberResult() async {
+        let repository = GroupSpaceRepositoryStub(
+            previewResponse: .init(name: "프로젝트 팀", emoji: "🗓️", memberCount: 2, expiresAt: GroupSpaceRepositoryStub.date),
+            acceptResponse: .init(
+                joinResult: "ALREADY_MEMBER",
+                groupSpace: .init(id: 7, name: "프로젝트 팀", emoji: "🗓️", myMembership: .init(memberId: 10, nickname: "준하", role: .member), memberCount: 2, createdAt: GroupSpaceRepositoryStub.date),
+                membership: .init(memberId: 10, nickname: "준하", role: .member)
+            )
+        )
+        let viewModel = GroupInvitationViewModel(service: GroupInvitationService(repository: repository))
+
+        let previewed = await viewModel.preview(type: .linkToken, credential: "token")
+        let accepted = await viewModel.accept(type: .linkToken, credential: "token", nickname: "준하")
+
+        #expect(previewed)
+        #expect(accepted)
+        #expect(viewModel.preview?.name == "프로젝트 팀")
+        #expect(viewModel.acceptanceResult?.joinResult == "ALREADY_MEMBER")
+        #expect(viewModel.acceptanceResult?.groupSpace.name == "프로젝트 팀")
+    }
 }
 
 private final class GroupSpaceRepositoryStub: GroupSpaceRepository {
@@ -58,14 +98,27 @@ private final class GroupSpaceRepositoryStub: GroupSpaceRepository {
     var operations: [String] = []
     private var fetchResponses: [[GroupSpaceResponseDTO]]
     private let fetchErrorOnCall: Int?
+    private let previewResponse: PreviewGroupInvitationResponseDTO
+    private let acceptResponse: AcceptGroupInvitationResponseDTO
+    private let invitationError: Error?
     private var fetchCallCount = 0
 
     init(
         fetchResponses: [[GroupSpaceResponseDTO]] = [],
-        fetchErrorOnCall: Int? = nil
+        fetchErrorOnCall: Int? = nil,
+        previewResponse: PreviewGroupInvitationResponseDTO = .init(name: "프로젝트 팀", emoji: nil, memberCount: 2, expiresAt: Date(timeIntervalSince1970: 0)),
+        acceptResponse: AcceptGroupInvitationResponseDTO = .init(
+            joinResult: "JOINED",
+            groupSpace: .init(id: 7, name: "프로젝트 팀", emoji: nil, myMembership: .init(memberId: 10, nickname: "준하", role: .member), memberCount: 2, createdAt: Date(timeIntervalSince1970: 0)),
+            membership: .init(memberId: 10, nickname: "준하", role: .member)
+        ),
+        invitationError: Error? = nil
     ) {
         self.fetchResponses = fetchResponses
         self.fetchErrorOnCall = fetchErrorOnCall
+        self.previewResponse = previewResponse
+        self.acceptResponse = acceptResponse
+        self.invitationError = invitationError
     }
 
     static func sampleSpace(name: String = "프로젝트 팀") -> GroupSpaceResponseDTO {
@@ -86,6 +139,11 @@ private final class GroupSpaceRepositoryStub: GroupSpaceRepository {
     func transferOwnership(groupSpaceId: Int64, request: TransferGroupOwnerRequestDTO) async throws -> TransferGroupOwnerResponseDTO { operations.append("transfer:\(groupSpaceId):\(request.targetMemberId)"); return .init(previousOwner: .init(memberId: 10, nickname: "준하", role: .member), owner: .init(memberId: request.targetMemberId, nickname: "민지", role: .owner)) }
     func leaveGroupSpace(groupSpaceId: Int64) async throws { operations.append("leave:\(groupSpaceId)") }
     func removeMember(groupSpaceId: Int64, memberId: Int64) async throws { operations.append("remove:\(groupSpaceId):\(memberId)") }
+    func issueInvitation(groupSpaceId: Int64) async throws -> GroupInvitationResponseDTO { throw StubError.failed }
+    func fetchInvitations(groupSpaceId: Int64) async throws -> GroupInvitationListResponseDTO { throw StubError.failed }
+    func revokeInvitation(groupSpaceId: Int64, invitationId: Int64) async throws { throw StubError.failed }
+    func previewInvitation(_ request: PreviewGroupInvitationRequestDTO) async throws -> PreviewGroupInvitationResponseDTO { if let invitationError { throw invitationError }; return previewResponse }
+    func acceptInvitation(_ request: AcceptGroupInvitationRequestDTO) async throws -> AcceptGroupInvitationResponseDTO { if let invitationError { throw invitationError }; return acceptResponse }
 
     enum StubError: Error { case failed }
 }

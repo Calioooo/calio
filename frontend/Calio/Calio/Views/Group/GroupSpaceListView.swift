@@ -3,6 +3,7 @@ import SwiftUI
 struct GroupSpaceListView: View {
     @StateObject private var viewModel = GroupSpaceListViewModel()
     @State private var isPresentingCreation = false
+    @State private var isPresentingInvitationJoin = false
     @State private var groupName = ""
     @State private var nickname = ""
 
@@ -56,6 +57,10 @@ struct GroupSpaceListView: View {
             .background(Color.calioBackground)
             .navigationTitle("그룹 공간")
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button { isPresentingInvitationJoin = true } label: { Image(systemName: "person.badge.plus") }
+                        .accessibilityLabel("초대 코드로 그룹 참여")
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { isPresentingCreation = true } label: { Image(systemName: "plus") }
                         .accessibilityLabel("그룹 공간 만들기")
@@ -82,10 +87,19 @@ struct GroupSpaceListView: View {
                     }
                 }
             }
+            .overlay {
+                if isPresentingInvitationJoin {
+                    GroupInvitationJoinView {
+                        isPresentingInvitationJoin = false
+                    }
+                    .transition(.opacity.combined(with: .scale(scale: 0.96)))
+                }
+            }
             .alert("그룹 공간을 처리하지 못했어요", isPresented: errorBinding) {
                 Button("확인", role: .cancel) { viewModel.clearError() }
             } message: { Text(viewModel.errorMessage ?? "잠시 후 다시 시도해 주세요.") }
         }
+        .animation(.easeInOut(duration: 0.2), value: isPresentingInvitationJoin)
     }
 
     private var errorBinding: Binding<Bool> {

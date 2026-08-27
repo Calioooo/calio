@@ -611,6 +611,49 @@ struct NetworkRepositoryTests {
         #expect(requests.dropFirst(4).allSatisfy { requestBodyData(from: $0) == nil })
     }
 
+    @Test func urlSessionGroupSpaceRepositoryUsesCanonicalInvitationPreviewAndAcceptanceContracts() async throws {
+        let previewResponse = """
+        { "name": "프로젝트 팀", "emoji": "🗓️", "memberCount": 2,
+          "memberPreviews": [{ "nickname": "준하" }, { "nickname": "민지" }],
+          "expiresAt": "2026-08-30T00:00:00Z" }
+        """.data(using: .utf8)!
+        let acceptanceResponse = """
+        { "joinResult": "ALREADY_MEMBER",
+          "groupSpace": { "id": 7, "name": "프로젝트 팀", "emoji": "🗓️", "myMembership": { "memberId": 10, "nickname": "준하", "role": "MEMBER" }, "memberCount": 2, "createdAt": "2026-08-01T00:00:00Z" },
+          "membership": { "memberId": 10, "nickname": "준하", "role": "MEMBER" } }
+        """.data(using: .utf8)!
+        var requests: [URLRequest] = []
+        MockURLProtocol.requestHandler = { request in
+            requests.append(request)
+            let data = request.url?.path.hasSuffix("/preview") == true ? previewResponse : acceptanceResponse
+            return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, data)
+        }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        let repository = URLSessionGroupSpaceRepository(
+            baseURL: URL(string: "https://example.test")!,
+            session: URLSession(configuration: configuration),
+            authTokenProvider: StaticAuthTokenProvider(accessToken: "test-token")
+        )
+
+        let preview = try await repository.previewInvitation(.init(credentialType: .code, credential: "CALIO-2026"))
+        let acceptance = try await repository.acceptInvitation(.init(credentialType: .inviteCode, credential: "CALIO-2026", nickname: "준하"))
+
+        #expect(preview.name == "프로젝트 팀")
+        #expect(preview.memberCount == 2)
+        #expect(preview.memberPreviews?.map(\.nickname) == ["준하", "민지"])
+        #expect(acceptance.joinResult == "ALREADY_MEMBER")
+        #expect(acceptance.groupSpace.name == "프로젝트 팀")
+        #expect(requests.map { $0.url?.path } == ["/api/group-invitations/preview", "/api/group-invitations/accept"])
+        #expect(requests.map { $0.httpMethod } == ["POST", "POST"])
+        #expect(requests[0].value(forHTTPHeaderField: "Authorization") == "Bearer test-token")
+        #expect(requests[1].value(forHTTPHeaderField: "Authorization") == "Bearer test-token")
+        let previewBody = try #require(groupRequestBodyJSON(from: requests[0]))
+        let acceptanceBody = try #require(groupRequestBodyJSON(from: requests[1]))
+        #expect(previewBody as NSDictionary == ["credentialType": "CODE", "credential": "CALIO-2026"])
+        #expect(acceptanceBody as NSDictionary == ["credentialType": "INVITE_CODE", "credential": "CALIO-2026", "nickname": "준하"])
+    }
+
     private func groupRequestBodyJSON(from request: URLRequest) -> [String: Any]? {
         guard let body = requestBodyData(from: request) else { return nil }
         return try? JSONSerialization.jsonObject(with: body) as? [String: Any]
