@@ -11,8 +11,7 @@ CREATE TABLE personal_event_group_shares (
     CONSTRAINT uk_personal_event_group_share_public_id UNIQUE (public_share_id),
     CONSTRAINT fk_personal_event_group_share_event FOREIGN KEY (event_id) REFERENCES events (id),
     CONSTRAINT fk_personal_event_group_share_group FOREIGN KEY (group_space_id) REFERENCES group_spaces (id),
-    INDEX ix_personal_event_group_share_group (group_space_id),
-    INDEX ix_personal_event_group_share_event (event_id)
+    INDEX ix_personal_event_group_share_group (group_space_id)
 );
 
 CREATE TABLE personal_recurrence_group_shares (
@@ -28,6 +27,5 @@ CREATE TABLE personal_recurrence_group_shares (
     CONSTRAINT uk_personal_recurrence_group_share_public_id UNIQUE (public_share_id),
     CONSTRAINT fk_personal_recurrence_group_share_event FOREIGN KEY (recurrence_event_id) REFERENCES recurrence_events (id),
     CONSTRAINT fk_personal_recurrence_group_share_group FOREIGN KEY (group_space_id) REFERENCES group_spaces (id),
-    INDEX ix_personal_recurrence_group_share_group (group_space_id),
-    INDEX ix_personal_recurrence_group_share_event (recurrence_event_id)
+    INDEX ix_personal_recurrence_group_share_group (group_space_id)
 );

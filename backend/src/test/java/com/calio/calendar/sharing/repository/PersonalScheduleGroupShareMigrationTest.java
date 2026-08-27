@@ -23,6 +23,8 @@ class PersonalScheduleGroupShareMigrationTest {
                 .contains("public_share_id")
                 .contains("UNIQUE (event_id, group_space_id)")
                 .contains("UNIQUE (recurrence_event_id, group_space_id)")
+                .doesNotContain("ix_personal_event_group_share_event")
+                .doesNotContain("ix_personal_recurrence_group_share_event")
                 .doesNotContain("ON DELETE CASCADE")
                 .doesNotContain("show_original_details")
                 .doesNotContain("override_title")
