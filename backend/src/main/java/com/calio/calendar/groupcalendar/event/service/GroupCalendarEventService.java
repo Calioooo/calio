@@ -139,10 +139,6 @@ public class GroupCalendarEventService {
     }
 
     private Tag getTag(Long groupSpaceId, Long tagId) {
-        if (tagId == null) {
-            return tagQueryService.getGroupDefaultTag(groupSpaceId);
-        }
-
         return tagQueryService.getGroupTagOrDefault(groupSpaceId, tagId);
     }
 

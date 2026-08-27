@@ -49,6 +49,22 @@ public class Tag extends BaseEntity {
     protected Tag() {
     }
 
+    public static Tag personalDefault(String title, String colorCode) {
+        return new Tag(TagType.PERSONAL_DEFAULT, title, colorCode, (Account) null);
+    }
+
+    public static Tag personalCustom(Account account, String title, String colorCode) {
+        return new Tag(TagType.CUSTOM, title, colorCode, account);
+    }
+
+    public static Tag groupDefault(GroupSpace groupSpace) {
+        return new Tag(TagType.GROUP_DEFAULT, "기타", "#64748B", groupSpace);
+    }
+
+    public static Tag groupCustom(GroupSpace groupSpace, String title, String colorCode) {
+        return new Tag(TagType.CUSTOM, title, colorCode, groupSpace);
+    }
+
     public Tag(TagType tagType, String title, String colorCode) {
         this(tagType, title, colorCode, (Account) null);
     }
