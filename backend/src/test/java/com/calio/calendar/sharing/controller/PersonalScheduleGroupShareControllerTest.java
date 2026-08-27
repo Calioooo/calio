@@ -198,6 +198,32 @@ class PersonalScheduleGroupShareControllerTest {
         assertThat(eventShareRepository.count()).isZero();
     }
 
+    @Test
+    @DisplayName("Group Space owner가 멤버를 강퇴하면 해당 멤버의 mapping만 정리하고 개인 원본 일정은 보존한다")
+    void givenSharedEvent_whenGroupOwnerKicksSourceMember_thenCleansMappingAndPreservesSource()
+            throws Exception {
+        long eventId = createEvent("강퇴 대상 일정");
+        Account groupOwner = accountRepository.saveAndFlush(new Account());
+        GroupSpace groupSpace = groupSpaceRepository.saveAndFlush(
+                new GroupSpace(groupOwner.getId(), "cleanup-group", null)
+        );
+        groupMemberRepository.saveAndFlush(new GroupMember(
+                groupSpace, groupOwner.getId(), "owner", MEMBER_CREATED_AT
+        ));
+        GroupMember sourceMember = groupMemberRepository.saveAndFlush(new GroupMember(
+                groupSpace, accountId, "source", MEMBER_CREATED_AT
+        ));
+        createEventShare(eventId, groupSpace.getId());
+
+        mockMvc.perform(delete("/api/group-spaces/{groupSpaceId}/members/{memberId}",
+                        groupSpace.getId(), sourceMember.getId())
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + createAuthenticatedToken(groupOwner)))
+                .andExpect(status().isNoContent());
+
+        assertThat(eventShareRepository.count()).isZero();
+        assertThat(eventRepository.findById(eventId)).isPresent();
+    }
+
     private GroupSpace createGroupWithCurrentMember(String name) {
         GroupSpace groupSpace = groupSpaceRepository.saveAndFlush(
                 new GroupSpace(accountId, name, null)
