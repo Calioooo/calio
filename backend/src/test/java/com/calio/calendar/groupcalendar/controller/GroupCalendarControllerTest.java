@@ -83,7 +83,17 @@ class GroupCalendarControllerTest {
                 "nickname",
                 START_AT
         ));
-        tagRepository.saveAndFlush(new Tag(TagType.GROUP_DEFAULT, "기타", "#64748B", groupSpace));
+        Tag defaultTag = tagRepository.saveAndFlush(new Tag(TagType.GROUP_DEFAULT, "기타", "#64748B", groupSpace));
+        GroupSpace anotherGroupSpace = groupSpaceRepository.saveAndFlush(
+                new GroupSpace(currentAccountId(), "another-group", null)
+        );
+        groupMemberRepository.saveAndFlush(new GroupMember(
+                anotherGroupSpace,
+                currentAccountId(),
+                "other",
+                START_AT
+        ));
+        Tag anotherGroupTag = tagRepository.saveAndFlush(Tag.groupDefault(anotherGroupSpace));
 
         // when
         MvcResult createdTag = mockMvc.perform(post("/api/group-spaces/{groupSpaceId}/tags", groupSpace.getId())
@@ -94,6 +104,16 @@ class GroupCalendarControllerTest {
                 .andExpect(jsonPath("$.tagType").value("CUSTOM"))
                 .andReturn();
         Long tagId = responseId(createdTag);
+
+        mockMvc.perform(post("/api/group-spaces/{groupSpaceId}/tags", groupSpace.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(tagRequest("업무", "#2563EB")))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(post("/api/group-spaces/{groupSpaceId}/events", groupSpace.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(eventRequest("다른 그룹 태그", anotherGroupTag.getId())))
+                .andExpect(status().isNotFound());
 
         mockMvc.perform(patch("/api/group-spaces/{groupSpaceId}/tags/{tagId}", groupSpace.getId(), tagId)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -123,9 +143,14 @@ class GroupCalendarControllerTest {
                 .andExpect(jsonPath("$", hasSize(1)))
                 .andExpect(jsonPath("$[0].creatorNickname").value("nickname"));
 
-        mockMvc.perform(delete("/api/group-spaces/{groupSpaceId}/events/{eventId}", groupSpace.getId(), eventId))
-                .andExpect(status().isNoContent());
         mockMvc.perform(delete("/api/group-spaces/{groupSpaceId}/tags/{tagId}", groupSpace.getId(), tagId))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(get("/api/group-spaces/{groupSpaceId}/events", groupSpace.getId())
+                        .param("from", START_AT.minusSeconds(1).toString())
+                        .param("to", END_AT.plusSeconds(1).toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].tag.id").value(defaultTag.getId()));
+        mockMvc.perform(delete("/api/group-spaces/{groupSpaceId}/events/{eventId}", groupSpace.getId(), eventId))
                 .andExpect(status().isNoContent());
     }
 
