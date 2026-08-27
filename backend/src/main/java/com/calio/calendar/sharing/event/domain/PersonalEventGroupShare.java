@@ -46,7 +46,7 @@ public class PersonalEventGroupShare extends BaseEntity {
     private GroupSpace groupSpace;
 
     @Column(name = "is_anonymous", nullable = false)
-    private boolean anonymous;
+    private boolean isAnonymous;
 
     @JdbcTypeCode(Types.VARCHAR)
     @Column(name = "public_share_id", nullable = false, updatable = false, length = 36)
@@ -55,19 +55,19 @@ public class PersonalEventGroupShare extends BaseEntity {
     protected PersonalEventGroupShare() {
     }
 
-    private PersonalEventGroupShare(Event event, GroupSpace groupSpace, boolean anonymous, UUID publicShareId) {
+    private PersonalEventGroupShare(Event event, GroupSpace groupSpace, boolean isAnonymous, UUID publicShareId) {
         this.event = event;
         this.groupSpace = groupSpace;
-        this.anonymous = anonymous;
+        this.isAnonymous = isAnonymous;
         this.publicShareId = publicShareId;
     }
 
-    public static PersonalEventGroupShare create(Event event, GroupSpace groupSpace, boolean anonymous) {
-        return new PersonalEventGroupShare(event, groupSpace, anonymous, UUID.randomUUID());
+    public static PersonalEventGroupShare create(Event event, GroupSpace groupSpace, boolean isAnonymous) {
+        return new PersonalEventGroupShare(event, groupSpace, isAnonymous, UUID.randomUUID());
     }
 
-    public void changeAnonymous(boolean anonymous) {
-        this.anonymous = anonymous;
+    public void changeAnonymous(boolean isAnonymous) {
+        this.isAnonymous = isAnonymous;
     }
 
     public Long getId() {
@@ -83,7 +83,7 @@ public class PersonalEventGroupShare extends BaseEntity {
     }
 
     public boolean isAnonymous() {
-        return anonymous;
+        return isAnonymous;
     }
 
     public UUID getPublicShareId() {

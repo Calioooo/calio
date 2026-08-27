@@ -46,7 +46,7 @@ public class PersonalRecurrenceGroupShare extends BaseEntity {
     private GroupSpace groupSpace;
 
     @Column(name = "is_anonymous", nullable = false)
-    private boolean anonymous;
+    private boolean isAnonymous;
 
     @JdbcTypeCode(Types.VARCHAR)
     @Column(name = "public_share_id", nullable = false, updatable = false, length = 36)
@@ -58,25 +58,25 @@ public class PersonalRecurrenceGroupShare extends BaseEntity {
     private PersonalRecurrenceGroupShare(
             RecurrenceEvent recurrenceEvent,
             GroupSpace groupSpace,
-            boolean anonymous,
+            boolean isAnonymous,
             UUID publicShareId
     ) {
         this.recurrenceEvent = recurrenceEvent;
         this.groupSpace = groupSpace;
-        this.anonymous = anonymous;
+        this.isAnonymous = isAnonymous;
         this.publicShareId = publicShareId;
     }
 
     public static PersonalRecurrenceGroupShare create(
             RecurrenceEvent recurrenceEvent,
             GroupSpace groupSpace,
-            boolean anonymous
+            boolean isAnonymous
     ) {
-        return new PersonalRecurrenceGroupShare(recurrenceEvent, groupSpace, anonymous, UUID.randomUUID());
+        return new PersonalRecurrenceGroupShare(recurrenceEvent, groupSpace, isAnonymous, UUID.randomUUID());
     }
 
-    public void changeAnonymous(boolean anonymous) {
-        this.anonymous = anonymous;
+    public void changeAnonymous(boolean isAnonymous) {
+        this.isAnonymous = isAnonymous;
     }
 
     public Long getId() {
@@ -92,7 +92,7 @@ public class PersonalRecurrenceGroupShare extends BaseEntity {
     }
 
     public boolean isAnonymous() {
-        return anonymous;
+        return isAnonymous;
     }
 
     public UUID getPublicShareId() {
