@@ -174,7 +174,7 @@ struct CalendarTagManagementView: View {
                         .foregroundStyle(.calioTextPrimary)
 
                     if title == "커스텀 태그" {
-                        Text("오른쪽 위의 태그 추가로 필요한 분류를 만들어 보세요.")
+                        Text("오른쪽 위의 태그 추가로 필요한 태그를 만들어 보세요.")
                             .font(.caption)
                             .foregroundStyle(.calioTextSecondary)
                             .fixedSize(horizontal: false, vertical: true)
