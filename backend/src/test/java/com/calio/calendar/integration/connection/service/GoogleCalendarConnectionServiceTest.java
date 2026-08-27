@@ -1,24 +1,19 @@
 package com.calio.calendar.integration.connection.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import com.calio.calendar.common.error.CalioException;
-import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.external.google.GoogleOAuthClient;
 import com.calio.calendar.external.google.GoogleOAuthProperties;
 import com.calio.calendar.external.google.dto.GoogleTokenResponse;
 import com.calio.calendar.external.google.dto.GoogleUserInfoResponse;
-import com.calio.calendar.integration.connection.controller.dto.GoogleCalendarIntegrationResponse;
+import com.calio.calendar.integration.connection.domain.GoogleCalendarConnection;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobCommandService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobEnqueueService;
@@ -32,344 +27,123 @@ import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InOrder;
-import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.security.crypto.encrypt.BytesEncryptor;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.AbstractPlatformTransactionManager;
 import org.springframework.transaction.support.DefaultTransactionStatus;
-import org.springframework.web.client.RestClient;
-import tools.jackson.databind.ObjectMapper;
 
 class GoogleCalendarConnectionServiceTest {
 
     private static final Long ACCOUNT_ID = 1L;
-    private static final Instant NOW = Instant.parse("2026-07-14T12:00:00Z");
+    private static final Instant NOW = Instant.parse("2026-08-28T00:00:00Z");
 
-    private final GoogleOAuthProperties googleOAuthProperties = googleOAuthProperties();
-    private final BytesEncryptor bytesEncryptor = new TokenEncryptionConfig()
-            .googleTokenBytesEncryptor(tokenEncryptionProperties());
-    private final TokenEncryptor tokenEncryptor = new TokenEncryptor(bytesEncryptor);
-    private final GoogleCalendarIntegrationQueryService integrationQueryService =
-            mock(GoogleCalendarIntegrationQueryService.class);
+    private final GoogleOAuthProperties properties = configuredProperties();
+    private final GoogleOAuthClient oauthClient = mock(GoogleOAuthClient.class);
+    private final TokenEncryptor encryptor = new TokenEncryptor(new TokenEncryptionConfig()
+            .googleTokenBytesEncryptor(encryptionProperties()));
     private final GoogleCalendarIntegrationCommandService integrationCommandService =
             mock(GoogleCalendarIntegrationCommandService.class);
-    private final GoogleOperationJobEnqueueService enqueueService =
-            mock(GoogleOperationJobEnqueueService.class);
-    private final GoogleOperationJobCommandService jobCommandService =
-            mock(GoogleOperationJobCommandService.class);
-    private final Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
+    private final GoogleCalendarConnectionQueryService connectionQueryService =
+            mock(GoogleCalendarConnectionQueryService.class);
+    private final GoogleCalendarConnectionCommandService connectionCommandService =
+            mock(GoogleCalendarConnectionCommandService.class);
+    private final GoogleOperationJobCommandService jobCommandService = mock(GoogleOperationJobCommandService.class);
+    private final GoogleOperationJobEnqueueService enqueueService = mock(GoogleOperationJobEnqueueService.class);
 
     @Test
-    @DisplayName("connect는 Google token을 암호화한 뒤 새 연결을 저장한다")
-    void givenValidAuthorizationCode_whenConnect_thenCreatesEncryptedConnection() {
-        // given
-        FakeGoogleOAuthClient googleOAuthClient = connectedGoogleOAuthClient();
-        when(integrationCommandService.tryLockIntegration(ACCOUNT_ID))
-                .thenReturn(Optional.empty());
-        when(integrationCommandService.createIntegration(
-                eq(ACCOUNT_ID),
-                eq("google-subject"),
-                eq("user@example.com"),
-                anyString(),
-                anyString(),
-                eq(NOW.plusSeconds(3600)),
-                eq(NOW)
-        )).thenReturn(new GoogleCalendarIntegration(
-                ACCOUNT_ID,
-                "google-subject",
-                "user@example.com",
-                "stored-refresh-token",
-                "stored-access-token",
-                NOW.plusSeconds(3600),
-                NOW
-        ));
-        GoogleCalendarConnectionService service = service(googleOAuthClient);
+    @DisplayName("첫 연결은 Account Integration을 만들고 Google Connection에 credential을 저장한다")
+    void givenNoConnection_whenConnect_thenCreatesIntegrationAndConnection() {
+        GoogleCalendarIntegration integration = new GoogleCalendarIntegration(ACCOUNT_ID);
+        GoogleCalendarConnection connection = connection(integration);
+        when(oauthClient.exchangeAuthorizationCode("authorization-code"))
+                .thenReturn(new GoogleTokenResponse("access-token", "refresh-token", 3600));
+        when(oauthClient.fetchUserInfo("access-token"))
+                .thenReturn(new GoogleUserInfoResponse("google-subject", "google@example.com"));
+        when(connectionCommandService.findSingleConnectionForUpdate(ACCOUNT_ID)).thenReturn(Optional.empty());
+        when(integrationCommandService.findIntegrationForUpdate(ACCOUNT_ID)).thenReturn(Optional.empty());
+        when(integrationCommandService.createIntegration(ACCOUNT_ID)).thenReturn(integration);
+        when(connectionCommandService.createConnection(eq(integration), eq("google-subject"), eq("google@example.com"),
+                anyString(), anyString(), eq(NOW.plusSeconds(3600)), eq(NOW))).thenReturn(connection);
 
-        // when
-        GoogleCalendarIntegrationResponse response = service.connect(
-                ACCOUNT_ID,
-                "auth-code"
-        );
+        var response = service().connect(ACCOUNT_ID, "authorization-code");
 
-        // then
-        ArgumentCaptor<String> refreshTokenCaptor = ArgumentCaptor.forClass(String.class);
-        ArgumentCaptor<String> accessTokenCaptor = ArgumentCaptor.forClass(String.class);
-        verify(integrationCommandService).createIntegration(
-                eq(ACCOUNT_ID),
-                eq("google-subject"),
-                eq("user@example.com"),
-                refreshTokenCaptor.capture(),
-                accessTokenCaptor.capture(),
-                eq(NOW.plusSeconds(3600)),
-                eq(NOW)
-        );
+        ArgumentCaptor<String> refreshToken = ArgumentCaptor.forClass(String.class);
+        verify(connectionCommandService).createConnection(eq(integration), eq("google-subject"), eq("google@example.com"),
+                refreshToken.capture(), anyString(), eq(NOW.plusSeconds(3600)), eq(NOW));
+        assertThat(refreshToken.getValue()).isNotEqualTo("refresh-token");
         assertThat(response.connected()).isTrue();
-        assertThat(refreshTokenCaptor.getValue()).isNotEqualTo("refresh-token");
-        assertThat(accessTokenCaptor.getValue()).isNotEqualTo("access-token");
         verify(enqueueService).enqueueManualSync(ACCOUNT_ID);
     }
 
     @Test
-    @DisplayName("connect에서 Google token 교환이 실패하면 로컬 연결을 변경하지 않는다")
-    void givenTokenExchangeFailure_whenConnect_thenDoesNotChangeConnection() {
-        // given
-        FakeGoogleOAuthClient googleOAuthClient = new FakeGoogleOAuthClient(googleOAuthProperties);
-        googleOAuthClient.tokenExchangeException =
-                new CalioException(ErrorCode.GOOGLE_TOKEN_EXCHANGE_FAILED);
-        GoogleCalendarConnectionService service = service(googleOAuthClient);
+    @DisplayName("같은 Google subject 재연결은 기존 Connection의 credential만 교체한다")
+    void givenSameSubjectConnection_whenConnect_thenReplacesCredentials() {
+        GoogleCalendarConnection connection = connection(new GoogleCalendarIntegration(ACCOUNT_ID));
+        when(oauthClient.exchangeAuthorizationCode("authorization-code"))
+                .thenReturn(new GoogleTokenResponse("new-access-token", "new-refresh-token", 3600));
+        when(oauthClient.fetchUserInfo("new-access-token"))
+                .thenReturn(new GoogleUserInfoResponse("google-subject", "new@example.com"));
+        when(connectionCommandService.findSingleConnectionForUpdate(ACCOUNT_ID)).thenReturn(Optional.of(connection));
 
-        // when, then
-        assertThatThrownBy(() -> service.connect(
-                ACCOUNT_ID,
-                "auth-code"
-        )).isInstanceOfSatisfying(CalioException.class, exception ->
-                assertThat(exception.getErrorCode())
-                        .isEqualTo(ErrorCode.GOOGLE_TOKEN_EXCHANGE_FAILED));
-        verifyNoInteractions(integrationCommandService, jobCommandService, enqueueService);
-    }
+        service().connect(ACCOUNT_ID, "authorization-code");
 
-    @Test
-    @DisplayName("connect 등록 경쟁이 발생하면 rollback 후 새 트랜잭션으로 한 번 재시도한다")
-    void givenConnectionRegistrationRace_whenConnect_thenRetriesOnce() {
-        // given
-        FakeGoogleOAuthClient googleOAuthClient = connectedGoogleOAuthClient();
-        GoogleCalendarIntegration existingIntegration = integrationWithRefreshToken("old-token");
-        when(integrationCommandService.tryLockIntegration(ACCOUNT_ID))
-                .thenReturn(Optional.empty())
-                .thenReturn(Optional.of(existingIntegration));
-        when(integrationCommandService.createIntegration(
-                eq(ACCOUNT_ID),
-                eq("google-subject"),
-                eq("user@example.com"),
-                anyString(),
-                anyString(),
-                eq(NOW.plusSeconds(3600)),
-                eq(NOW)
-        )).thenThrow(new DataIntegrityViolationException("registration race"));
-        when(integrationCommandService.replaceIntegration(
-                eq(existingIntegration),
-                eq("google-subject"),
-                eq("user@example.com"),
-                anyString(),
-                anyString(),
-                eq(NOW.plusSeconds(3600)),
-                eq(NOW)
-        )).thenReturn(existingIntegration);
-        GoogleCalendarConnectionService service = service(googleOAuthClient);
-
-        // when
-        GoogleCalendarIntegrationResponse response = service.connect(
-                ACCOUNT_ID,
-                "auth-code"
-        );
-
-        // then
-        assertThat(response.connected()).isTrue();
-        verify(integrationCommandService, times(2)).tryLockIntegration(ACCOUNT_ID);
+        assertThat(connection.getGoogleEmail()).isEqualTo("new@example.com");
+        verify(integrationCommandService, org.mockito.Mockito.never()).createIntegration(any());
         verify(enqueueService).enqueueManualSync(ACCOUNT_ID);
     }
 
     @Test
-    @DisplayName("다른 Google subject로 연결하면 retained 연결과 데이터를 교체하지 않는다")
-    void givenDifferentGoogleSubject_whenConnect_thenRejectsReconnect() {
-        // given
-        FakeGoogleOAuthClient googleOAuthClient = connectedGoogleOAuthClient();
-        googleOAuthClient.userInfoResponse = new GoogleUserInfoResponse("different-subject", "other@example.com");
-        GoogleCalendarIntegration retainedIntegration = integrationWithRefreshToken("old-token");
-        retainedIntegration.disconnect(NOW);
-        when(integrationCommandService.tryLockIntegration(ACCOUNT_ID))
-                .thenReturn(Optional.of(retainedIntegration));
-        GoogleCalendarConnectionService service = service(googleOAuthClient);
+    @DisplayName("연결 해제는 Connection의 Job을 제거하고 credential을 지운 뒤 revoke한다")
+    void givenConnectedConnection_whenDisconnect_thenCleansConnectionBeforeRevokingToken() {
+        GoogleCalendarConnection connection = connection(new GoogleCalendarIntegration(ACCOUNT_ID));
+        when(connectionCommandService.findConnectedConnectionForUpdate(ACCOUNT_ID)).thenReturn(Optional.of(connection));
 
-        // when, then
-        assertThatThrownBy(() -> service.connect(ACCOUNT_ID, "auth-code"))
-                .isInstanceOfSatisfying(CalioException.class, exception ->
-                        assertThat(exception.getErrorCode())
-                                .isEqualTo(ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED));
-        verify(integrationCommandService, never()).replaceIntegration(
-                any(), anyString(), anyString(), anyString(), anyString(), any(), any());
-        verifyNoInteractions(enqueueService);
+        service().disconnect(ACCOUNT_ID);
+
+        verify(jobCommandService).deleteJobsForConnection(connection.getId());
+        verify(connectionCommandService).disconnect(connection, NOW);
+        verify(oauthClient).revokeToken("refresh-token");
     }
 
     @Test
-    @DisplayName("disconnect는 Job과 credential/runtime만 먼저 제거하고 revoke 실패와 무관하게 retained 상태로 전환한다")
-    void givenConnectedIntegration_whenDisconnect_thenRetainsIntegrationAfterLocalCleanup() {
-        // given
-        FakeGoogleOAuthClient googleOAuthClient = new FakeGoogleOAuthClient(googleOAuthProperties);
-        GoogleCalendarIntegration integration = integrationWithRefreshToken("refresh-token");
-        when(integrationCommandService.tryLockIntegration(ACCOUNT_ID))
-                .thenReturn(Optional.of(integration));
-        GoogleCalendarConnectionService service = service(googleOAuthClient);
+    @DisplayName("연결되지 않은 Account를 해제해도 Job 삭제나 revoke를 수행하지 않는다")
+    void givenNoConnectedConnection_whenDisconnect_thenDoesNothing() {
+        when(connectionCommandService.findConnectedConnectionForUpdate(ACCOUNT_ID)).thenReturn(Optional.empty());
 
-        // when
-        service.disconnect(ACCOUNT_ID);
+        service().disconnect(ACCOUNT_ID);
 
-        // then
-        assertThat(googleOAuthClient.revokedToken).isEqualTo("refresh-token");
-        verify(jobCommandService).deleteJobsForIntegration(integration.getId());
-        verify(integrationCommandService).disconnectIntegration(integration, NOW);
+        verifyNoInteractions(jobCommandService, oauthClient);
     }
 
-    @Test
-    @DisplayName("disconnect는 Google revoke 실패에도 local retained disconnect를 완료한다")
-    void givenUnexpectedRevokeFailure_whenDisconnect_thenCompletesLocalDisconnect() {
-        // given
-        FakeGoogleOAuthClient googleOAuthClient = new FakeGoogleOAuthClient(googleOAuthProperties);
-        googleOAuthClient.tokenRevokeException =
-                new CalioException(ErrorCode.GOOGLE_TOKEN_REVOKE_FAILED);
-        GoogleCalendarIntegration integration = integrationWithRefreshToken("refresh-token");
-        when(integrationCommandService.tryLockIntegration(ACCOUNT_ID))
-                .thenReturn(Optional.of(integration));
-        GoogleCalendarConnectionService service = service(googleOAuthClient);
-
-        // when
-        service.disconnect(ACCOUNT_ID);
-
-        // then
-        verify(jobCommandService).deleteJobsForIntegration(integration.getId());
-        verify(integrationCommandService).disconnectIntegration(integration, NOW);
+    private GoogleCalendarConnectionService service() {
+        return new GoogleCalendarConnectionService(properties, oauthClient, encryptor, integrationCommandService,
+                connectionQueryService, connectionCommandService, jobCommandService, enqueueService,
+                new NoOpTransactionManager(), Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
-    @Test
-    @DisplayName("retained DISCONNECTED Integration은 connection-status에서 연결되지 않은 상태로 보인다")
-    void givenDisconnectedIntegration_whenGetConnectionStatus_thenReturnsDisconnected() {
-        // given
-        GoogleCalendarIntegration integration = integrationWithRefreshToken("refresh-token");
-        integration.disconnect(NOW);
-        when(integrationQueryService.getIntegrationIfExists(ACCOUNT_ID))
-                .thenReturn(Optional.of(integration));
-        GoogleCalendarConnectionService service = service(connectedGoogleOAuthClient());
-
-        // when
-        GoogleCalendarIntegrationResponse response = service.getConnectionStatus(ACCOUNT_ID);
-
-        // then
-        assertThat(response.connected()).isFalse();
-        assertThat(response.googleEmail()).isNull();
-        assertThat(response.googleSubject()).isNull();
+    private GoogleCalendarConnection connection(GoogleCalendarIntegration integration) {
+        return new GoogleCalendarConnection(integration, "google-subject", "google@example.com",
+                encryptor.encryptRefreshToken("refresh-token"), encryptor.encryptAccessToken("access-token"),
+                NOW.plusSeconds(3600), NOW);
     }
 
-    @Test
-    @DisplayName("이미 disconnect된 Integration을 다시 해제해도 revoke 없이 성공한다")
-    void givenAlreadyDisconnectedIntegration_whenDisconnect_thenDoesNothing() {
-        FakeGoogleOAuthClient googleOAuthClient = new FakeGoogleOAuthClient(googleOAuthProperties);
-        when(integrationCommandService.tryLockIntegration(ACCOUNT_ID)).thenReturn(Optional.empty());
-        GoogleCalendarConnectionService service = service(googleOAuthClient);
-
-        service.disconnect(ACCOUNT_ID);
-
-        verify(integrationCommandService).tryLockIntegration(ACCOUNT_ID);
-        verifyNoInteractions(jobCommandService);
-        assertThat(googleOAuthClient.revokedToken).isNull();
+    private GoogleOAuthProperties configuredProperties() {
+        GoogleOAuthProperties configured = new GoogleOAuthProperties();
+        configured.setClientId("client-id");
+        configured.setClientSecret("client-secret");
+        configured.setRedirectUri("https://example.com/callback");
+        return configured;
     }
 
-    private GoogleCalendarConnectionService service(
-            FakeGoogleOAuthClient googleOAuthClient
-    ) {
-        return new GoogleCalendarConnectionService(
-                googleOAuthProperties,
-                googleOAuthClient,
-                tokenEncryptor,
-                integrationQueryService,
-                integrationCommandService,
-                jobCommandService,
-                enqueueService,
-                new NoOpTransactionManager(),
-                clock
-        );
+    private TokenEncryptionProperties encryptionProperties() {
+        TokenEncryptionProperties configured = new TokenEncryptionProperties();
+        configured.setGoogleRefreshTokenKey("12345678901234567890123456789012");
+        return configured;
     }
 
-    private FakeGoogleOAuthClient connectedGoogleOAuthClient() {
-        FakeGoogleOAuthClient googleOAuthClient = new FakeGoogleOAuthClient(googleOAuthProperties);
-        googleOAuthClient.tokenResponse =
-                new GoogleTokenResponse("access-token", "refresh-token", 3600);
-        googleOAuthClient.userInfoResponse =
-                new GoogleUserInfoResponse("google-subject", "user@example.com");
-        return googleOAuthClient;
-    }
-
-    private GoogleOAuthProperties googleOAuthProperties() {
-        GoogleOAuthProperties properties = new GoogleOAuthProperties();
-        properties.setTokenUrl("https://oauth2.googleapis.com/token");
-        properties.setUserInfoUrl("https://www.googleapis.com/oauth2/v3/userinfo");
-        properties.setRevokeUrl("https://oauth2.googleapis.com/revoke");
-        properties.setClientId("client-id");
-        properties.setClientSecret("client-secret");
-        properties.setRedirectUri("https://example.com/oauth/callback");
-        return properties;
-    }
-
-    private TokenEncryptionProperties tokenEncryptionProperties() {
-        TokenEncryptionProperties properties = new TokenEncryptionProperties();
-        properties.setGoogleRefreshTokenKey("12345678901234567890123456789012");
-        return properties;
-    }
-
-    private GoogleCalendarIntegration integrationWithRefreshToken(String refreshToken) {
-        return new GoogleCalendarIntegration(
-                ACCOUNT_ID,
-                "google-subject",
-                "user@example.com",
-                tokenEncryptor.encryptRefreshToken(refreshToken),
-                tokenEncryptor.encryptAccessToken("access-token"),
-                NOW.plusSeconds(3600),
-                NOW
-        );
-    }
-
-    private static class FakeGoogleOAuthClient extends GoogleOAuthClient {
-
-        private GoogleTokenResponse tokenResponse;
-        private GoogleUserInfoResponse userInfoResponse;
-        private RuntimeException tokenExchangeException;
-        private RuntimeException tokenRevokeException;
-        private String revokedToken;
-
-        FakeGoogleOAuthClient(GoogleOAuthProperties properties) {
-            super(properties, new ObjectMapper(), RestClient.builder().build());
-        }
-
-        @Override
-        public GoogleTokenResponse exchangeAuthorizationCode(String authorizationCode) {
-            if (tokenExchangeException != null) {
-                throw tokenExchangeException;
-            }
-            return tokenResponse;
-        }
-
-        @Override
-        public GoogleUserInfoResponse fetchUserInfo(String accessToken) {
-            return userInfoResponse;
-        }
-
-        @Override
-        public boolean revokeToken(String token) {
-            if (tokenRevokeException != null) {
-                throw tokenRevokeException;
-            }
-            revokedToken = token;
-            return true;
-        }
-    }
-
-    private static class NoOpTransactionManager extends AbstractPlatformTransactionManager {
-
-        @Override
-        protected Object doGetTransaction() {
-            return new Object();
-        }
-
-        @Override
-        protected void doBegin(Object transaction, TransactionDefinition definition) {
-        }
-
-        @Override
-        protected void doCommit(DefaultTransactionStatus status) {
-        }
-
-        @Override
-        protected void doRollback(DefaultTransactionStatus status) {
-        }
+    private static final class NoOpTransactionManager extends AbstractPlatformTransactionManager {
+        @Override protected Object doGetTransaction() { return new Object(); }
+        @Override protected void doBegin(Object transaction, TransactionDefinition definition) { }
+        @Override protected void doCommit(DefaultTransactionStatus status) { }
+        @Override protected void doRollback(DefaultTransactionStatus status) { }
     }
 }

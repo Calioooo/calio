@@ -19,7 +19,7 @@ public interface GoogleCalendarRecurrenceOverrideMappingRepository
             select overrideMapping
             from GoogleCalendarRecurrenceOverrideMapping overrideMapping
             join overrideMapping.recurrenceEventMapping recurrenceEventMapping
-            where recurrenceEventMapping.integration.id = :integrationId
+            where recurrenceEventMapping.connection.id = :integrationId
               and recurrenceEventMapping.calendarKey = :calendarKey
               and overrideMapping.externalEventId in :externalEventIds
             """)
@@ -47,7 +47,7 @@ public interface GoogleCalendarRecurrenceOverrideMappingRepository
             select overrideMapping
             from GoogleCalendarRecurrenceOverrideMapping overrideMapping
             join overrideMapping.recurrenceEventMapping recurrenceEventMapping
-            where recurrenceEventMapping.integration.id = :integrationId
+            where recurrenceEventMapping.connection.id = :integrationId
             """)
     List<GoogleCalendarRecurrenceOverrideMapping>
     findAllWithRecurrenceEventMappingAndRecurrenceEventOverrideByIntegrationId(
@@ -58,7 +58,7 @@ public interface GoogleCalendarRecurrenceOverrideMappingRepository
     @Query("""
             select mapping
             from GoogleCalendarRecurrenceOverrideMapping mapping
-            where mapping.recurrenceEventMapping.integration.id = :integrationId
+            where mapping.recurrenceEventMapping.connection.id = :integrationId
               and mapping.id > :afterId
             order by mapping.id
             """)

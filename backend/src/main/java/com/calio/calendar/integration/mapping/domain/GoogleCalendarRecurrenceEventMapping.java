@@ -1,7 +1,7 @@
 package com.calio.calendar.integration.mapping.domain;
 
 import com.calio.calendar.common.domain.BaseEntity;
-import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
+import com.calio.calendar.integration.connection.domain.GoogleCalendarConnection;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -22,7 +22,7 @@ import jakarta.persistence.UniqueConstraint;
         uniqueConstraints = {
                 @UniqueConstraint(
                         name = "uk_google_calendar_recurrence_event_external",
-                        columnNames = {"integration_id", "calendar_key", "external_event_id"}
+                        columnNames = {"connection_id", "calendar_key", "external_event_id"}
                 ),
                 @UniqueConstraint(
                         name = "uk_google_calendar_recurrence_event_canonical",
@@ -39,8 +39,8 @@ public class GoogleCalendarRecurrenceEventMapping extends BaseEntity {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "integration_id", nullable = false)
-    private GoogleCalendarIntegration integration;
+    @JoinColumn(name = "connection_id", nullable = false)
+    private GoogleCalendarConnection connection;
 
     @OneToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "recurrence_event_id", nullable = false)
@@ -59,12 +59,12 @@ public class GoogleCalendarRecurrenceEventMapping extends BaseEntity {
     }
 
     public GoogleCalendarRecurrenceEventMapping(
-            GoogleCalendarIntegration integration,
+            GoogleCalendarConnection connection,
             RecurrenceEvent recurrenceEvent,
             String externalEventId,
             String providerEtag
     ) {
-        this.integration = integration;
+        this.connection = connection;
         this.recurrenceEvent = recurrenceEvent;
         this.calendarKey = PRIMARY_CALENDAR_KEY;
         this.externalEventId = externalEventId;
@@ -75,8 +75,8 @@ public class GoogleCalendarRecurrenceEventMapping extends BaseEntity {
         return id;
     }
 
-    public GoogleCalendarIntegration getIntegration() {
-        return integration;
+    public GoogleCalendarConnection getConnection() {
+        return connection;
     }
 
     public RecurrenceEvent getRecurrenceEvent() {

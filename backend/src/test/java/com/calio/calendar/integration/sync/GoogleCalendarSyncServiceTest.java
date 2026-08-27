@@ -13,9 +13,10 @@ import com.calio.calendar.external.google.GoogleCalendarSyncTokenExpiredExceptio
 import com.calio.calendar.external.google.GoogleCalendarUnauthorizedException;
 import com.calio.calendar.external.google.GoogleOAuthProperties;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventPage;
+import com.calio.calendar.integration.connection.domain.GoogleCalendarConnection;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.connection.service.GoogleCalendarAccessTokenService;
-import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrationQueryService;
+import com.calio.calendar.integration.connection.service.GoogleCalendarConnectionQueryService;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingQueryService;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarRecurrenceMappingQueryService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobService;
@@ -367,21 +368,21 @@ class GoogleCalendarSyncServiceTest {
     }
 
     private static final class FakeIntegrationQueryService
-            extends GoogleCalendarIntegrationQueryService {
+            extends GoogleCalendarConnectionQueryService {
 
-        private final GoogleCalendarIntegration integration;
+        private final GoogleCalendarConnection connection;
 
         private FakeIntegrationQueryService(String nextSyncToken) {
             super(null);
-            integration = mock(GoogleCalendarIntegration.class);
-            when(integration.getId()).thenReturn(20L);
-            when(integration.getAccountId()).thenReturn(ACCOUNT_ID);
-            when(integration.getNextSyncToken()).thenReturn(nextSyncToken);
+            connection = mock(GoogleCalendarConnection.class);
+            when(connection.getId()).thenReturn(20L);
+            when(connection.getAccountId()).thenReturn(ACCOUNT_ID);
+            when(connection.getNextSyncToken()).thenReturn(nextSyncToken);
         }
 
         @Override
-        public GoogleCalendarIntegration getIntegration(Long accountId) {
-            return integration;
+        public GoogleCalendarConnection getConnectedConnection(Long accountId) {
+            return connection;
         }
     }
 
@@ -515,7 +516,7 @@ class GoogleCalendarSyncServiceTest {
 
         private FakePagePersistenceService() {
             super(
-                    mock(GoogleCalendarIntegrationQueryService.class),
+                    mock(GoogleCalendarConnectionQueryService.class),
                     mock(GoogleCalendarEventMappingQueryService.class),
                     mock(GoogleCalendarEventChangeService.class),
                     mock(GoogleCalendarRecurrenceMappingQueryService.class),

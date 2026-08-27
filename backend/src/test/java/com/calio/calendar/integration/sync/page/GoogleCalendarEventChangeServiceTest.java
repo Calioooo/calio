@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.event.service.EventCommandService;
 import com.calio.calendar.external.google.service.dto.NormalizedEventSchedule;
+import com.calio.calendar.integration.connection.domain.GoogleCalendarConnection;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingCommandService;
@@ -43,12 +44,14 @@ class GoogleCalendarEventChangeServiceTest {
     void givenChangedProviderEtagAndPendingOutboundJob_whenApplyUpsert_thenMarksMappingConflicted() {
         // given
         GoogleCalendarIntegration integration = mock(GoogleCalendarIntegration.class);
+        GoogleCalendarConnection connection = mock(GoogleCalendarConnection.class);
         Event event = mock(Event.class);
-        when(integration.getId()).thenReturn(20L);
         when(integration.getAccountId()).thenReturn(10L);
+        when(connection.getId()).thenReturn(20L);
+        when(connection.getAccountId()).thenReturn(10L);
         when(event.getId()).thenReturn(30L);
         GoogleCalendarEventMapping mapping = new GoogleCalendarEventMapping(
-                integration,
+                connection,
                 event,
                 "provider-event-id",
                 "etag-before"
@@ -76,7 +79,7 @@ class GoogleCalendarEventChangeServiceTest {
         when(operationJobQueryService.hasPendingOutboundJob(10L, 20L, scope)).thenReturn(true);
 
         // when
-        service.applyUpsert(integration, upsert, cache, null, null, ownership);
+        service.applyUpsert(connection, upsert, cache, null, null, ownership);
 
         // then
         assertThat(mapping.isConflicted()).isTrue();

@@ -388,6 +388,36 @@ class GoogleCalendarSyncMigrationTest {
         }
     }
 
+    @Test
+    @DisplayName("V21은 기존 Google 연결을 Connection으로 보존하고 Account Integration을 분리한다")
+    void givenV20ConnectedIntegration_whenMigrateToV21_thenKeepsConnectionRuntimeAndCreatesAccountIntegration()
+            throws Exception {
+        String url = "jdbc:h2:mem:google-calendar-integration-connection-model;MODE=MySQL;DB_CLOSE_DELAY=-1";
+        migrateTo(url, MigrationVersion.fromVersion("20"));
+        insertCurrentEventAndIntegration(url);
+
+        migrateTo(url, MigrationVersion.fromVersion("21"));
+
+        try (Connection connection = DriverManager.getConnection(url, "sa", "")) {
+            assertThat(columnNames(connection, "GOOGLE_CALENDAR_INTEGRATIONS"))
+                    .containsExactlyInAnyOrder("ID", "ACCOUNT_ID", "CREATED_AT", "UPDATED_AT");
+            assertThat(columnNames(connection, "GOOGLE_CALENDAR_CONNECTIONS"))
+                    .contains("INTEGRATION_ID", "CONNECTION_STATE", "GOOGLE_SUBJECT", "NEXT_SYNC_TOKEN");
+            assertThat(singleString(connection, """
+                    SELECT connection.google_subject
+                    FROM google_calendar_connections connection
+                    JOIN google_calendar_integrations integration ON integration.id = connection.integration_id
+                    WHERE integration.account_id = 900
+                    """)).isEqualTo("subject");
+            assertThat(columnNames(connection, "GOOGLE_OPERATION_JOBS"))
+                    .contains("CONNECTION_ID")
+                    .doesNotContain("INTEGRATION_ID");
+            assertThat(columnNames(connection, "GOOGLE_CALENDAR_EVENT_MAPPINGS"))
+                    .contains("CONNECTION_ID")
+                    .doesNotContain("INTEGRATION_ID");
+        }
+    }
+
     private void migrateTo(String url, MigrationVersion target) {
         Flyway.configure()
                 .dataSource(url, "sa", "")

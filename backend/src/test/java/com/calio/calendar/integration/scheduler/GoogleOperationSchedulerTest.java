@@ -6,7 +6,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrationQueryService;
+import com.calio.calendar.integration.connection.service.GoogleCalendarConnectionQueryService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobEnqueueService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationWorker;
@@ -21,15 +21,15 @@ import org.junit.jupiter.api.Test;
 
 class GoogleOperationSchedulerTest {
 
-    private final GoogleCalendarIntegrationQueryService integrationQueryService =
-            mock(GoogleCalendarIntegrationQueryService.class);
+    private final GoogleCalendarConnectionQueryService connectionQueryService =
+            mock(GoogleCalendarConnectionQueryService.class);
     private final GoogleOperationJobEnqueueService enqueueService =
             mock(GoogleOperationJobEnqueueService.class);
     private final GoogleOperationJobService persistenceService =
             mock(GoogleOperationJobService.class);
     private final GoogleOperationWorker worker = mock(GoogleOperationWorker.class);
     private final GoogleOperationScheduler scheduler = new GoogleOperationScheduler(
-            integrationQueryService,
+            connectionQueryService,
             enqueueService,
             persistenceService,
             worker,
@@ -42,8 +42,8 @@ class GoogleOperationSchedulerTest {
         // given
         List<Long> firstBatch = LongStream.rangeClosed(1L, 500L).boxed().toList();
         when(persistenceService.findRecoverableAccountIds()).thenReturn(List.of());
-        when(integrationQueryService.listConnectedAccountIds(0L, 500)).thenReturn(firstBatch);
-        when(integrationQueryService.listConnectedAccountIds(500L, 500))
+        when(connectionQueryService.listConnectedAccountIds(0L, 500)).thenReturn(firstBatch);
+        when(connectionQueryService.listConnectedAccountIds(500L, 500))
                 .thenReturn(List.of(501L));
 
         // when
@@ -53,8 +53,8 @@ class GoogleOperationSchedulerTest {
         verify(enqueueService, times(501)).enqueuePeriodicSync(anyLong());
         verify(enqueueService).enqueuePeriodicSync(1L);
         verify(enqueueService).enqueuePeriodicSync(501L);
-        verify(integrationQueryService).listConnectedAccountIds(0L, 500);
-        verify(integrationQueryService).listConnectedAccountIds(500L, 500);
+        verify(connectionQueryService).listConnectedAccountIds(0L, 500);
+        verify(connectionQueryService).listConnectedAccountIds(500L, 500);
     }
 
     @Test
@@ -62,7 +62,7 @@ class GoogleOperationSchedulerTest {
     void givenRecoverableAccounts_whenRecoveringAndEnqueuing_thenWakesReturnedBatch() {
         // given
         when(persistenceService.findRecoverableAccountIds()).thenReturn(List.of(10L, 20L));
-        when(integrationQueryService.listConnectedAccountIds(0L, 500)).thenReturn(List.of());
+        when(connectionQueryService.listConnectedAccountIds(0L, 500)).thenReturn(List.of());
 
         // when
         scheduler.recoverAndEnqueuePeriodicSyncs();

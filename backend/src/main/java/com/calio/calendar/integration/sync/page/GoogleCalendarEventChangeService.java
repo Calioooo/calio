@@ -4,7 +4,7 @@ import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.event.service.EventCommandService;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarEventMapping;
-import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
+import com.calio.calendar.integration.connection.domain.GoogleCalendarConnection;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingCommandService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobQueryService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobService;
@@ -35,7 +35,7 @@ public class GoogleCalendarEventChangeService {
     }
 
     public void applyUpsert(
-            GoogleCalendarIntegration integration,
+            GoogleCalendarConnection connection,
             EventUpsert item,
             GoogleCalendarPageRecordCache cache,
             Account account,
@@ -61,7 +61,7 @@ public class GoogleCalendarEventChangeService {
         ));
         GoogleCalendarEventMapping mapping = eventMappingCommandService.createEventMapping(
                 new GoogleCalendarEventMapping(
-                        integration,
+                        connection,
                         event,
                         item.externalEventId(),
                         item.providerEtag()
@@ -83,7 +83,7 @@ public class GoogleCalendarEventChangeService {
             return;
         }
         if (operationJobQueryService.hasPendingOutboundJob(
-                mapping.getIntegration().getAccountId(), mapping.getIntegration().getId(), scope)) {
+                mapping.getConnection().getAccountId(), mapping.getConnection().getId(), scope)) {
             mapping.markConflicted();
             recordSyncConflict(mapping, ownership);
             return;
@@ -110,7 +110,7 @@ public class GoogleCalendarEventChangeService {
         GoogleCalendarEffectiveScope scope = GoogleCalendarEffectiveScope.event(
                 eventMapping.getEvent().getId());
         if (operationJobQueryService.hasPendingOutboundJob(
-                eventMapping.getIntegration().getAccountId(), eventMapping.getIntegration().getId(), scope)) {
+                eventMapping.getConnection().getAccountId(), eventMapping.getConnection().getId(), scope)) {
             eventMapping.markConflicted();
             recordSyncConflict(eventMapping, ownership);
             return;
@@ -126,7 +126,7 @@ public class GoogleCalendarEventChangeService {
     ) {
         operationJobService.recordSyncConflict(
                 ownership.jobId(),
-                mapping.getIntegration().getAccountId(),
+                mapping.getConnection().getAccountId(),
                 ownership.workerToken()
         );
     }

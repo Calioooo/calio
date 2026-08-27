@@ -18,7 +18,7 @@ public interface GoogleCalendarEventMappingRepository
     @Query("""
             select mapping
             from GoogleCalendarEventMapping mapping
-            where mapping.integration.id = :integrationId
+            where mapping.connection.id = :integrationId
               and mapping.calendarKey = :calendarKey
               and mapping.externalEventId in :externalEventIds
             """)
@@ -28,12 +28,12 @@ public interface GoogleCalendarEventMappingRepository
             @Param("externalEventIds") Collection<String> externalEventIds
     );
 
-    boolean existsByEvent_IdAndIntegration_AccountId(Long eventId, Long accountId);
+    boolean existsByEvent_IdAndConnection_Integration_AccountId(Long eventId, Long accountId);
 
     @Query("""
             select mapping.event.id
             from GoogleCalendarEventMapping mapping
-            where mapping.integration.id = :integrationId
+            where mapping.connection.id = :integrationId
             """)
     List<Long> findEventIdsByIntegrationId(@Param("integrationId") Long integrationId);
 
@@ -41,7 +41,7 @@ public interface GoogleCalendarEventMappingRepository
     @Query("""
             select mapping
             from GoogleCalendarEventMapping mapping
-            where mapping.integration.id = :integrationId
+            where mapping.connection.id = :integrationId
             """)
     List<GoogleCalendarEventMapping> findAllWithEventByIntegrationId(
             @Param("integrationId") Long integrationId
@@ -51,7 +51,7 @@ public interface GoogleCalendarEventMappingRepository
     @Query("""
             select mapping
             from GoogleCalendarEventMapping mapping
-            where mapping.integration.id = :integrationId
+            where mapping.connection.id = :integrationId
               and mapping.id > :afterId
             order by mapping.id
             """)

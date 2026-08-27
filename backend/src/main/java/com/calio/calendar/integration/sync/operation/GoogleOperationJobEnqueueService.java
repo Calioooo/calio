@@ -1,7 +1,7 @@
 package com.calio.calendar.integration.sync.operation;
 
-import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
-import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrationCommandService;
+import com.calio.calendar.integration.connection.domain.GoogleCalendarConnection;
+import com.calio.calendar.integration.connection.service.GoogleCalendarConnectionCommandService;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJob;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobTrigger;
 import java.time.Clock;
@@ -15,18 +15,18 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 @Service
 public class GoogleOperationJobEnqueueService {
 
-    private final GoogleCalendarIntegrationCommandService integrationCommandService;
+    private final GoogleCalendarConnectionCommandService connectionCommandService;
     private final GoogleOperationJobCommandService jobCommandService;
     private final GoogleOperationWorker worker;
     private final Clock clock;
 
     public GoogleOperationJobEnqueueService(
-            GoogleCalendarIntegrationCommandService integrationCommandService,
+            GoogleCalendarConnectionCommandService connectionCommandService,
             GoogleOperationJobCommandService jobCommandService,
             GoogleOperationWorker worker,
             Clock clock
     ) {
-        this.integrationCommandService = integrationCommandService;
+        this.connectionCommandService = connectionCommandService;
         this.jobCommandService = jobCommandService;
         this.worker = worker;
         this.clock = clock;
@@ -43,12 +43,12 @@ public class GoogleOperationJobEnqueueService {
     }
 
     private void enqueueSync(Long accountId, GoogleOperationJobTrigger trigger) {
-        GoogleCalendarIntegration integration = integrationCommandService.lockIntegration(accountId);
+        GoogleCalendarConnection connection = connectionCommandService.lockConnectedConnection(accountId);
         GoogleOperationJob job = GoogleOperationJob.sync(
                 UUID.randomUUID().toString(),
-                integration.getId(),
+                connection.getId(),
                 accountId,
-                integrationCommandService.allocateOperationSequence(integration),
+                connectionCommandService.allocateOperationSequence(connection),
                 trigger,
                 Instant.now(clock)
         );

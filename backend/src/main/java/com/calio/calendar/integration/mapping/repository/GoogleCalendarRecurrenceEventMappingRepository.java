@@ -17,8 +17,8 @@ public interface GoogleCalendarRecurrenceEventMappingRepository
     Optional<GoogleCalendarRecurrenceEventMapping> findByRecurrenceEvent_Id(Long recurrenceEventId);
 
     Optional<GoogleCalendarRecurrenceEventMapping>
-    findByIntegration_IdAndCalendarKeyAndExternalEventId(
-            Long integrationId,
+    findByConnection_IdAndCalendarKeyAndExternalEventId(
+            Long connectionId,
             String calendarKey,
             String externalEventId
     );
@@ -27,7 +27,7 @@ public interface GoogleCalendarRecurrenceEventMappingRepository
     @Query("""
             select mapping
             from GoogleCalendarRecurrenceEventMapping mapping
-            where mapping.integration.id = :integrationId
+            where mapping.connection.id = :integrationId
               and mapping.calendarKey = :calendarKey
               and mapping.externalEventId in :externalEventIds
             """)
@@ -41,7 +41,7 @@ public interface GoogleCalendarRecurrenceEventMappingRepository
     @Query("""
             select mapping
             from GoogleCalendarRecurrenceEventMapping mapping
-            where mapping.integration.id = :integrationId
+            where mapping.connection.id = :integrationId
             """)
     List<GoogleCalendarRecurrenceEventMapping> findAllWithRecurrenceEventByIntegrationId(
             @Param("integrationId") Long integrationId
@@ -51,7 +51,7 @@ public interface GoogleCalendarRecurrenceEventMappingRepository
     @Query("""
             select mapping
             from GoogleCalendarRecurrenceEventMapping mapping
-            where mapping.integration.id = :integrationId
+            where mapping.connection.id = :integrationId
               and mapping.id > :afterId
             order by mapping.id
             """)

@@ -18,7 +18,9 @@ import com.calio.calendar.external.google.service.dto.NormalizedEventSchedule;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarRecurrenceEventMapping;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarRecurrenceOverrideMapping;
+import com.calio.calendar.integration.connection.domain.GoogleCalendarConnection;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
+import com.calio.calendar.integration.connection.repository.GoogleCalendarConnectionRepository;
 import com.calio.calendar.integration.sync.GoogleCalendarIntegrationDataService;
 import com.calio.calendar.integration.sync.GoogleCalendarSyncMode;
 import com.calio.calendar.integration.mapping.repository.GoogleCalendarEventMappingRepository;
@@ -79,6 +81,9 @@ class GoogleCalendarPageChangeServiceTest {
     private GoogleCalendarIntegrationRepository integrationRepository;
 
     @Autowired
+    private GoogleCalendarConnectionRepository connectionRepository;
+
+    @Autowired
     private GoogleCalendarEventMappingRepository mappingRepository;
 
     @Autowired
@@ -112,12 +117,13 @@ class GoogleCalendarPageChangeServiceTest {
     private GoogleOperationJobQueryService operationJobQueryService;
 
     private Account account;
-    private GoogleCalendarIntegration integration;
+    private GoogleCalendarConnection integration;
 
     @BeforeEach
     void setUp() {
         account = accountRepository.saveAndFlush(new Account());
-        integration = integrationRepository.saveAndFlush(integration(account.getId()));
+        GoogleCalendarIntegration parent = integrationRepository.saveAndFlush(new GoogleCalendarIntegration(account.getId()));
+        integration = connectionRepository.saveAndFlush(connection(parent));
     }
 
     @Test
@@ -163,7 +169,7 @@ class GoogleCalendarPageChangeServiceTest {
         assertThat(updatedImport.getTag().getId()).isEqualTo(fallbackTag.getId());
         assertThat(mappingRepository.findEventIdsByIntegrationId(integration.getId()))
                 .containsExactly(internalEventId);
-        GoogleCalendarIntegration finalized = integrationRepository.findById(integration.getId())
+        GoogleCalendarConnection finalized = connectionRepository.findById(integration.getId())
                 .orElseThrow();
         assertThat(finalized.getNextSyncToken()).isEqualTo("cursor-2");
     }
@@ -834,7 +840,7 @@ class GoogleCalendarPageChangeServiceTest {
         assertThat(eventRepository.count()).isZero();
         assertThat(recurrenceEventRepository.count()).isZero();
         assertThat(recurrenceEventOverrideRepository.count()).isZero();
-        assertThat(integrationRepository.findById(integration.getId()))
+        assertThat(connectionRepository.findById(integration.getId()))
                 .get()
                 .satisfies(completed -> {
                     assertThat(completed.getNextSyncToken()).isEqualTo("next-sync-token");
@@ -1042,9 +1048,9 @@ class GoogleCalendarPageChangeServiceTest {
         );
     }
 
-    private GoogleCalendarIntegration integration(Long accountId) {
-        return new GoogleCalendarIntegration(
-                accountId,
+    private GoogleCalendarConnection connection(GoogleCalendarIntegration integration) {
+        return new GoogleCalendarConnection(
+                integration,
                 "google-subject",
                 "user@example.com",
                 "encrypted-refresh-token",

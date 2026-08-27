@@ -1,6 +1,6 @@
 package com.calio.calendar.integration.connection.controller.dto;
 
-import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
+import com.calio.calendar.integration.connection.domain.GoogleCalendarConnection;
 import java.time.Instant;
 
 public record GoogleCalendarIntegrationResponse(
@@ -10,12 +10,12 @@ public record GoogleCalendarIntegrationResponse(
         Instant connectedAt
 ) {
 
-    public static GoogleCalendarIntegrationResponse connected(GoogleCalendarIntegration integration) {
+    public static GoogleCalendarIntegrationResponse connected(GoogleCalendarConnection connection) {
         return new GoogleCalendarIntegrationResponse(
                 true,
-                integration.getGoogleEmail(),
-                integration.getGoogleSubject(),
-                integration.getConnectedAt()
+                connection.getGoogleEmail(),
+                connection.getGoogleSubject(),
+                connection.getConnectedAt()
         );
     }
 

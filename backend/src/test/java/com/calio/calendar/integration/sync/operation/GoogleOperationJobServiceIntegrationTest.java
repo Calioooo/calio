@@ -5,11 +5,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
+import com.calio.calendar.integration.connection.domain.GoogleCalendarConnection;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJob;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobTrigger;
 import com.calio.calendar.integration.connection.repository.GoogleCalendarIntegrationRepository;
+import com.calio.calendar.integration.connection.repository.GoogleCalendarConnectionRepository;
 import com.calio.calendar.integration.sync.operation.repository.GoogleOperationJobRepository;
 import java.time.Instant;
 import org.junit.jupiter.api.DisplayName;
@@ -39,6 +41,9 @@ class GoogleOperationJobServiceIntegrationTest {
 
     @Autowired
     private GoogleCalendarIntegrationRepository integrationRepository;
+
+    @Autowired
+    private GoogleCalendarConnectionRepository connectionRepository;
 
     @Autowired
     private AccountRepository accountRepository;
@@ -219,17 +224,15 @@ class GoogleOperationJobServiceIntegrationTest {
 
     private JobFixture jobs(Instant... runnableTimes) {
         Account account = accountRepository.saveAndFlush(new Account());
-        GoogleCalendarIntegration integration = integrationRepository.saveAndFlush(
-                integration(account.getId())
-        );
+        GoogleCalendarConnection connection = connection(account.getId());
         Long firstJobId = null;
         Long secondJobId = null;
         for (int index = 0; index < runnableTimes.length; index++) {
             GoogleOperationJob job = jobRepository.saveAndFlush(GoogleOperationJob.sync(
                     "operation-" + index,
-                    integration.getId(),
+                    connection.getId(),
                     account.getId(),
-                    integration.allocateGoogleOperationSequence(),
+                    connection.allocateGoogleOperationSequence(),
                     GoogleOperationJobTrigger.MANUAL,
                     runnableTimes[index]
             ));
@@ -242,16 +245,17 @@ class GoogleOperationJobServiceIntegrationTest {
         return new JobFixture(account.getId(), firstJobId, secondJobId);
     }
 
-    private GoogleCalendarIntegration integration(Long accountId) {
-        return new GoogleCalendarIntegration(
-                accountId,
+    private GoogleCalendarConnection connection(Long accountId) {
+        GoogleCalendarIntegration integration = integrationRepository.saveAndFlush(new GoogleCalendarIntegration(accountId));
+        return connectionRepository.saveAndFlush(new GoogleCalendarConnection(
+                integration,
                 "google-subject",
                 "user@example.com",
                 "encrypted-refresh-token",
                 "encrypted-access-token",
                 Instant.now().plusSeconds(3_600),
                 Instant.now()
-        );
+        ));
     }
 
     private record JobFixture(

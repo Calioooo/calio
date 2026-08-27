@@ -2,7 +2,7 @@ package com.calio.calendar.integration.mapping.domain;
 
 import com.calio.calendar.common.domain.BaseEntity;
 import com.calio.calendar.event.domain.Event;
-import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
+import com.calio.calendar.integration.connection.domain.GoogleCalendarConnection;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Embedded;
@@ -22,7 +22,7 @@ import jakarta.persistence.UniqueConstraint;
         uniqueConstraints = {
                 @UniqueConstraint(
                         name = "uk_google_calendar_mapping_external_identity",
-                        columnNames = {"integration_id", "calendar_key", "external_event_id"}
+                        columnNames = {"connection_id", "calendar_key", "external_event_id"}
                 ),
                 @UniqueConstraint(
                         name = "uk_google_calendar_mapping_event_id",
@@ -39,8 +39,8 @@ public class GoogleCalendarEventMapping extends BaseEntity {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "integration_id", nullable = false)
-    private GoogleCalendarIntegration integration;
+    @JoinColumn(name = "connection_id", nullable = false)
+    private GoogleCalendarConnection connection;
 
     @OneToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "event_id", nullable = false)
@@ -59,12 +59,12 @@ public class GoogleCalendarEventMapping extends BaseEntity {
     }
 
     public GoogleCalendarEventMapping(
-            GoogleCalendarIntegration integration,
+            GoogleCalendarConnection connection,
             Event event,
             String externalEventId,
             String providerEtag
     ) {
-        this.integration = integration;
+        this.connection = connection;
         this.event = event;
         this.calendarKey = PRIMARY_CALENDAR_KEY;
         this.externalEventId = externalEventId;
@@ -75,8 +75,8 @@ public class GoogleCalendarEventMapping extends BaseEntity {
         return id;
     }
 
-    public GoogleCalendarIntegration getIntegration() {
-        return integration;
+    public GoogleCalendarConnection getConnection() {
+        return connection;
     }
 
     public Event getEvent() {

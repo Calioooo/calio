@@ -1,6 +1,6 @@
 package com.calio.calendar.integration.sync.operation;
 
-import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrationCommandService;
+import com.calio.calendar.integration.connection.service.GoogleCalendarConnectionCommandService;
 import java.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,17 +13,17 @@ public class GoogleOperationLeaseService {
     private static final Logger log = LoggerFactory.getLogger(GoogleOperationLeaseService.class);
     private static final Duration LEASE_DURATION = Duration.ofMinutes(5);
 
-    private final GoogleCalendarIntegrationCommandService integrationCommandService;
+    private final GoogleCalendarConnectionCommandService connectionCommandService;
 
     public GoogleOperationLeaseService(
-            GoogleCalendarIntegrationCommandService integrationCommandService
+            GoogleCalendarConnectionCommandService connectionCommandService
     ) {
-        this.integrationCommandService = integrationCommandService;
+        this.connectionCommandService = connectionCommandService;
     }
 
     @Transactional
     public boolean acquire(Long accountId, String workerToken) {
-        boolean acquired = integrationCommandService.acquireOperationLease(
+        boolean acquired = connectionCommandService.acquireOperationLease(
                 accountId,
                 workerToken,
                 LEASE_DURATION.toSeconds()
@@ -39,7 +39,7 @@ public class GoogleOperationLeaseService {
     @Transactional
     public void extend(Long jobId, Long accountId, String workerToken) {
         try {
-            integrationCommandService.extendOperationLease(
+            connectionCommandService.extendOperationLease(
                     jobId,
                     accountId,
                     workerToken,
@@ -57,7 +57,7 @@ public class GoogleOperationLeaseService {
 
     @Transactional
     public void release(Long accountId, String workerToken) {
-        boolean released = integrationCommandService.releaseOperationLease(accountId, workerToken);
+        boolean released = connectionCommandService.releaseOperationLease(accountId, workerToken);
         if (released) {
             log.info("Google operation lease released. accountId={} state=RELEASED", accountId);
         } else {

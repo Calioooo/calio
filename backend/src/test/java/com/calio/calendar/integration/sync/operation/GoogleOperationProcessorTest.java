@@ -13,7 +13,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.calio.calendar.integration.sync.GoogleCalendarSyncService;
-import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrationCommandService;
+import com.calio.calendar.integration.connection.service.GoogleCalendarConnectionCommandService;
 import com.calio.calendar.external.google.GoogleCalendarInvalidGrantException;
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEffectiveScopeType;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJob;
@@ -30,7 +30,7 @@ class GoogleOperationProcessorTest {
     private GoogleOperationLeaseService operationLeaseService;
     private GoogleCalendarSyncService syncService;
     private GoogleOperationFailureClassifier failureClassifier;
-    private GoogleCalendarIntegrationCommandService integrationCommandService;
+    private GoogleCalendarConnectionCommandService connectionCommandService;
     private GoogleOperationProcessor processor;
 
     @BeforeEach
@@ -39,13 +39,13 @@ class GoogleOperationProcessorTest {
         operationLeaseService = mock(GoogleOperationLeaseService.class);
         syncService = mock(GoogleCalendarSyncService.class);
         failureClassifier = mock(GoogleOperationFailureClassifier.class);
-        integrationCommandService = mock(GoogleCalendarIntegrationCommandService.class);
+        connectionCommandService = mock(GoogleCalendarConnectionCommandService.class);
         processor = new GoogleOperationProcessor(
                 jobPersistenceService,
                 operationLeaseService,
                 syncService,
                 failureClassifier,
-                integrationCommandService,
+                connectionCommandService,
                 Clock.systemUTC()
         );
     }
@@ -134,7 +134,7 @@ class GoogleOperationProcessorTest {
 
         verify(jobPersistenceService).terminate(eq(1L), eq(10L), anyString(),
                 eq("GOOGLE_CALENDAR_RECONNECT_REQUIRED"));
-        verify(integrationCommandService).markConnectedIntegrationSyncError(eq(10L),
+        verify(connectionCommandService).markConnectedConnectionSyncError(eq(10L),
                 eq("GOOGLE_CALENDAR_RECONNECT_REQUIRED"), any());
         verify(jobPersistenceService, times(1)).claimNextJob(eq(10L), anyString());
     }
@@ -156,7 +156,7 @@ class GoogleOperationProcessorTest {
 
         verifyNoInteractions(failureClassifier);
         verify(jobPersistenceService, never()).terminate(eq(1L), eq(10L), anyString(), anyString());
-        verifyNoInteractions(integrationCommandService);
+        verifyNoInteractions(connectionCommandService);
         verify(jobPersistenceService, times(1)).claimNextJob(eq(10L), anyString());
     }
 
@@ -226,7 +226,7 @@ class GoogleOperationProcessorTest {
         when(job.getId()).thenReturn(jobId);
         when(job.getAccountId()).thenReturn(accountId);
         when(job.getKind()).thenReturn(kind);
-        when(job.getIntegrationId()).thenReturn(20L);
+        when(job.getConnectionId()).thenReturn(20L);
         when(job.getEffectiveResourceScope()).thenReturn(
                 GoogleCalendarEffectiveScopeType.EVENT.getStoredValue());
         when(job.getEffectiveResourceKey()).thenReturn("1");
