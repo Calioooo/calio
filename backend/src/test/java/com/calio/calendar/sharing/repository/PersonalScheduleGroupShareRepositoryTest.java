@@ -25,6 +25,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest(properties = {
         "spring.datasource.url=jdbc:h2:mem:personal-schedule-group-share-repository-test;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE",
@@ -98,6 +99,25 @@ class PersonalScheduleGroupShareRepositoryTest {
         assertThatThrownBy(() -> eventShareRepository.saveAndFlush(
                 PersonalEventGroupShare.create(event, groupSpace, true)
         )).isInstanceOf(RuntimeException.class);
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("단건 mapping의 idempotent insert는 기존 source-target 조합을 무시한다")
+    void eventShareInsertIgnoreDoesNotRaiseUniqueConstraintFailure() {
+        Account account = accountRepository.saveAndFlush(new Account());
+        Tag tag = tagRepository.saveAndFlush(Tag.personalDefault("기타", "#64748B"));
+        Event event = eventRepository.saveAndFlush(new Event(
+                "일정", null, START_AT, START_AT.plusSeconds(3600), false, "UTC", null, tag, account
+        ));
+        GroupSpace groupSpace = groupSpaceRepository.saveAndFlush(new GroupSpace(account.getId(), "group", null));
+
+        int first = eventShareRepository.insertIgnore(event.getId(), groupSpace.getId(), false, "00000000-0000-0000-0000-000000000001");
+        int duplicate = eventShareRepository.insertIgnore(event.getId(), groupSpace.getId(), true, "00000000-0000-0000-0000-000000000002");
+
+        assertThat(first).isEqualTo(1);
+        assertThat(duplicate).isZero();
+        assertThat(eventShareRepository.count()).isEqualTo(1);
     }
 
     @Test
