@@ -561,4 +561,58 @@ struct NetworkRepositoryTests {
         #expect(request.httpMethod == "GET")
         #expect(request.value(forHTTPHeaderField: "Accept") == "application/json")
     }
+
+    @Test func urlSessionGroupSpaceRepositoryUsesAuthenticatedLifecycleAndMembershipContracts() async throws {
+        let groupSpaceResponse = """
+        { "groupSpaceId": 7, "name": "프로젝트 팀", "emoji": null, "memberCount": 2,
+          "myMembership": { "nickname": "준하", "role": "OWNER", "createdAt": "2026-08-01T00:00:00Z", "updatedAt": "2026-08-01T00:00:00Z", "statusChangedAt": "2026-08-01T00:00:00Z" },
+          "createdAt": "2026-08-01T00:00:00Z", "updatedAt": "2026-08-01T00:00:00Z" }
+        """.data(using: .utf8)!
+        let membersResponse = """
+        { "members": [ { "memberId": 10, "nickname": "준하", "role": "OWNER" }, { "memberId": 11, "nickname": "민지", "role": "MEMBER" } ] }
+        """.data(using: .utf8)!
+        let transferResponse = """
+        { "previousOwner": { "memberId": 10, "nickname": "준하", "role": "MEMBER" }, "owner": { "memberId": 11, "nickname": "민지", "role": "OWNER" } }
+        """.data(using: .utf8)!
+        var requests: [URLRequest] = []
+        MockURLProtocol.requestHandler = { request in
+            requests.append(request)
+            let responseData: Data
+            switch request.httpMethod {
+            case "GET" where request.url?.path.hasSuffix("/members") == true: responseData = membersResponse
+            case "POST" where request.url?.path.hasSuffix("/owner-transfer") == true: responseData = transferResponse
+            default: responseData = groupSpaceResponse
+            }
+            let status = request.httpMethod == "POST" && request.url?.path == "/api/group-spaces" ? 201 : 200
+            return (HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: nil)!, responseData)
+        }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        let repository = URLSessionGroupSpaceRepository(baseURL: URL(string: "https://example.test")!, session: URLSession(configuration: configuration), authTokenProvider: StaticAuthTokenProvider(accessToken: "test-token"))
+
+        _ = try await repository.createGroupSpace(.init(name: "프로젝트 팀", emoji: nil, nickname: "준하"))
+        _ = try await repository.updateGroupSpace(groupSpaceId: 7, request: .init(name: "수정 팀", emoji: "🗓️"))
+        _ = try await repository.fetchMembers(groupSpaceId: 7)
+        _ = try await repository.transferOwnership(groupSpaceId: 7, request: .init(targetMemberId: 11))
+        try await repository.leaveGroupSpace(groupSpaceId: 7)
+        try await repository.removeMember(groupSpaceId: 7, memberId: 11)
+        try await repository.deleteGroupSpace(groupSpaceId: 7)
+
+        #expect(requests.map { $0.url?.path } == ["/api/group-spaces", "/api/group-spaces/7", "/api/group-spaces/7/members", "/api/group-spaces/7/owner-transfer", "/api/group-spaces/7/members/me", "/api/group-spaces/7/members/11", "/api/group-spaces/7"])
+        #expect(requests.map { $0.httpMethod ?? "" } == ["POST", "PATCH", "GET", "POST", "DELETE", "DELETE", "DELETE"])
+        #expect(requests.allSatisfy { $0.value(forHTTPHeaderField: "Authorization") == "Bearer test-token" })
+        let createBody = try #require(groupRequestBodyJSON(from: requests[0]))
+        let updateBody = try #require(groupRequestBodyJSON(from: requests[1]))
+        let transferBody = try #require(groupRequestBodyJSON(from: requests[3]))
+        #expect(Set(createBody.keys) == ["name", "nickname"])
+        #expect(createBody["emoji"] == nil)
+        #expect(Set(updateBody.keys) == ["name", "emoji"])
+        #expect(transferBody["targetMemberId"] as? Int == 11)
+        #expect(requests.dropFirst(4).allSatisfy { requestBodyData(from: $0) == nil })
+    }
+
+    private func groupRequestBodyJSON(from request: URLRequest) -> [String: Any]? {
+        guard let body = requestBodyData(from: request) else { return nil }
+        return try? JSONSerialization.jsonObject(with: body) as? [String: Any]
+    }
 }

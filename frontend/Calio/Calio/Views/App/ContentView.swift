@@ -108,6 +108,14 @@ struct ContentView: View {
                     Text("월")
                 }
                 .tag(2)
+
+            GroupSpaceListView()
+                .tabItem {
+                    Image(systemName: "person.2")
+                    Text("그룹")
+                }
+                .tag(3)
+
         }
     }
 
