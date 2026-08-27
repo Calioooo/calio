@@ -190,9 +190,11 @@ class RecurrenceEventServiceTest {
         InOrder deletionOrder = inOrder(
                 recurrenceEventRepository,
                 recurrenceEventOverrideRepository,
-                eventCommandService
+                eventCommandService,
+                recurrenceShareCommandService
         );
         deletionOrder.verify(recurrenceEventRepository).findByIdAndAccountIdForUpdate(10L, 1L);
+        deletionOrder.verify(recurrenceShareCommandService).deleteAllForSourceRecurrence(10L);
         deletionOrder.verify(recurrenceEventOverrideRepository).deleteAllByRecurrenceEventIds(List.of(10L));
         deletionOrder.verify(eventCommandService).deleteEventsByRecurrenceEventIds(List.of(10L));
         deletionOrder.verify(recurrenceEventRepository).deleteAllByIds(List.of(10L));

@@ -221,6 +221,20 @@ class EventServiceTest {
     }
 
     @Test
+    @DisplayName("개인 일정 삭제는 원본 삭제 전에 Group Space 공유 mapping을 정리한다")
+    void givenPersonalEvent_whenDeleteEvent_thenCleansShareMappingsBeforeSource() {
+        Event event = event("Personal", tag("기타"));
+        when(eventCommandService.lockEvent(1L, 10L)).thenReturn(event);
+        when(eventMappingQueryService.hasExternalEventMapping(10L, 1L)).thenReturn(false);
+
+        eventService.deleteEvent(1L, 10L);
+
+        InOrder deletionOrder = inOrder(eventShareCommandService, eventCommandService);
+        deletionOrder.verify(eventShareCommandService).deleteAllForSourceEvent(10L);
+        deletionOrder.verify(eventCommandService).deleteEvent(event);
+    }
+
+    @Test
     @DisplayName("외부 캘린더 일정의 중요 상태 변경은 Command를 실행하지 않고 거절한다")
     void givenExternalEvent_whenUpdateImportantEvent_thenRejectsBeforeCommand() {
         // given
