@@ -1,5 +1,6 @@
 package com.calio.calendar.sharing.recurrence.service;
 
+import com.calio.calendar.sharing.recurrence.domain.PersonalRecurrenceGroupShare;
 import com.calio.calendar.sharing.recurrence.repository.PersonalRecurrenceGroupShareRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,5 +25,14 @@ public class PersonalRecurrenceGroupShareCommandService {
 
     public void deleteAllForMemberInGroupSpace(Long groupSpaceId, Long memberId) {
         shareRepository.deleteAllByGroupSpaceIdAndMemberId(groupSpaceId, memberId);
+    }
+
+    public boolean createIfAbsent(PersonalRecurrenceGroupShare share) {
+        return shareRepository.insertIgnore(
+                share.getRecurrenceEvent().getId(),
+                share.getGroupSpace().getId(),
+                share.isAnonymous(),
+                share.getPublicShareId().toString()
+        ) == 1;
     }
 }
