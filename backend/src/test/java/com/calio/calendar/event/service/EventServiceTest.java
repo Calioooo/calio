@@ -36,6 +36,7 @@ import com.calio.calendar.recurrence.service.Rfc5545RecurrenceEngine;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.domain.TagType;
 import com.calio.calendar.tag.service.TagQueryService;
+import com.calio.calendar.sharing.event.service.PersonalEventGroupShareCommandService;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -78,6 +79,9 @@ class EventServiceTest {
 
     @Mock
     private Rfc5545RecurrenceEngine recurrenceEngine;
+
+    @Mock
+    private PersonalEventGroupShareCommandService eventShareCommandService;
 
     @InjectMocks
     private EventService eventService;
@@ -396,7 +400,8 @@ class EventServiceTest {
                 accountQueryService,
                 tagQueryService,
                 recurrenceQueryService,
-                recurrenceEngine
+                recurrenceEngine,
+                eventShareCommandService
         );
     }
 

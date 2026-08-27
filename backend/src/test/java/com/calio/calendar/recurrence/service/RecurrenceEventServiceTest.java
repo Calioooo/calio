@@ -28,6 +28,7 @@ import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.domain.TagType;
 import com.calio.calendar.tag.service.TagQueryService;
+import com.calio.calendar.sharing.recurrence.service.PersonalRecurrenceGroupShareCommandService;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -66,6 +67,9 @@ class RecurrenceEventServiceTest {
     @Mock
     private Clock clock;
 
+    @Mock
+    private PersonalRecurrenceGroupShareCommandService recurrenceShareCommandService;
+
     private RecurrenceEventService recurrenceEventService;
 
     @BeforeEach
@@ -85,7 +89,8 @@ class RecurrenceEventServiceTest {
                 tagQueryService,
                 eventCommandService,
                 recurrenceEngine,
-                clock
+                clock,
+                recurrenceShareCommandService
         );
     }
 
