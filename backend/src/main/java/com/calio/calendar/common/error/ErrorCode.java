@@ -56,6 +56,7 @@ public enum ErrorCode {
             HttpStatus.FORBIDDEN,
             "Personal schedule share operation is forbidden."
     ),
+    PERSONAL_SCHEDULE_SHARE_NOT_FOUND(HttpStatus.NOT_FOUND, "Personal schedule share not found."),
     INVALID_TAG_COLOR_CODE(HttpStatus.BAD_REQUEST, "Invalid tag color code."),
     RECURRENCE_UPDATE_TIME_RANGE_INVALID(HttpStatus.BAD_REQUEST, "Recurrence update time range invalid."),
     INVALID_TIME_RANGE(HttpStatus.BAD_REQUEST, "Invalid time range."),

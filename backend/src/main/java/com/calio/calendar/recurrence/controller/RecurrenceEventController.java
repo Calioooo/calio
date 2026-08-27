@@ -11,6 +11,7 @@ import com.calio.calendar.sharing.recurrence.controller.dto.CreateRecurrenceGrou
 import com.calio.calendar.sharing.recurrence.controller.dto.CreateRecurrenceGroupSharesResponse;
 import com.calio.calendar.sharing.recurrence.service.PersonalRecurrenceGroupShareService;
 import com.calio.calendar.sharing.controller.dto.GroupShareStatusResponse;
+import com.calio.calendar.sharing.controller.dto.UpdateGroupShareAnonymousRequest;
 import java.util.List;
 import jakarta.validation.Valid;
 import java.time.Instant;
@@ -90,6 +91,18 @@ public class RecurrenceEventController {
             @PathVariable("recurrenceId") Long recurrenceId
     ) {
         return recurrenceGroupShareService.list(account.accountId(), recurrenceId);
+    }
+
+    @PatchMapping("/{recurrenceId}/group-shares/{groupSpaceId}")
+    public GroupShareStatusResponse changeGroupShareAnonymous(
+            @AuthenticationPrincipal AuthenticatedAccount account,
+            @PathVariable("recurrenceId") Long recurrenceId,
+            @PathVariable("groupSpaceId") Long groupSpaceId,
+            @Valid @RequestBody UpdateGroupShareAnonymousRequest request
+    ) {
+        return recurrenceGroupShareService.changeAnonymous(
+                account.accountId(), recurrenceId, groupSpaceId, request
+        );
     }
 
     @PutMapping("/{recurrenceId}")

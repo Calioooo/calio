@@ -7,6 +7,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doAnswer;
 
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
@@ -17,6 +18,7 @@ import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.service.GroupMembershipQueryService;
 import com.calio.calendar.sharing.controller.dto.GroupShareTargetStatus;
 import com.calio.calendar.sharing.controller.dto.GroupShareStatusResponse;
+import com.calio.calendar.sharing.controller.dto.UpdateGroupShareAnonymousRequest;
 import com.calio.calendar.sharing.event.controller.dto.CreateEventGroupSharesRequest;
 import com.calio.calendar.sharing.event.controller.dto.CreateEventGroupSharesResponse;
 import java.util.List;
@@ -122,6 +124,36 @@ class PersonalEventGroupShareServiceTest {
             assertThat(status.publicShareId()).isEqualTo(share.getPublicShareId());
         });
         verifyNoInteractions(shareCommandService);
+    }
+
+    @Test
+    @DisplayName("원본 소유자는 한 대상의 익명 여부만 변경한다")
+    void changeAnonymousUpdatesOnlyRequestedTargetMapping() {
+        Event event = event(1L);
+        GroupSpace firstGroup = groupSpace(10L);
+        GroupSpace secondGroup = groupSpace(20L);
+        var firstShare = com.calio.calendar.sharing.event.domain.PersonalEventGroupShare.create(
+                event, firstGroup, false
+        );
+        var secondShare = com.calio.calendar.sharing.event.domain.PersonalEventGroupShare.create(
+                event, secondGroup, false
+        );
+        when(eventQueryService.getEventForShareManagement(100L, 1L)).thenReturn(event);
+        when(shareQueryService.getByEventIdAndGroupSpaceId(1L, 10L)).thenReturn(firstShare);
+        doAnswer(invocation -> {
+            invocation.<com.calio.calendar.sharing.event.domain.PersonalEventGroupShare>getArgument(0)
+                    .changeAnonymous(invocation.getArgument(1));
+            return null;
+        }).when(shareCommandService).changeAnonymous(firstShare, true);
+
+        GroupShareStatusResponse response = service.changeAnonymous(
+                100L, 1L, 10L, new UpdateGroupShareAnonymousRequest(true)
+        );
+
+        assertThat(response.isAnonymous()).isTrue();
+        assertThat(firstShare.isAnonymous()).isTrue();
+        assertThat(secondShare.isAnonymous()).isFalse();
+        verify(shareCommandService).changeAnonymous(firstShare, true);
     }
 
     private Event event(Long id) {

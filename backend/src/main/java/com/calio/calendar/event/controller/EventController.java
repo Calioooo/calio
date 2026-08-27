@@ -10,6 +10,7 @@ import com.calio.calendar.sharing.event.controller.dto.CreateEventGroupSharesReq
 import com.calio.calendar.sharing.event.controller.dto.CreateEventGroupSharesResponse;
 import com.calio.calendar.sharing.event.service.PersonalEventGroupShareService;
 import com.calio.calendar.sharing.controller.dto.GroupShareStatusResponse;
+import com.calio.calendar.sharing.controller.dto.UpdateGroupShareAnonymousRequest;
 import jakarta.validation.Valid;
 import java.time.Instant;
 import java.util.List;
@@ -104,6 +105,18 @@ public class EventController {
             @PathVariable("eventId") Long eventId
     ) {
         return eventGroupShareService.list(account.accountId(), eventId);
+    }
+
+    @PatchMapping("/{eventId}/group-shares/{groupSpaceId}")
+    public GroupShareStatusResponse changeGroupShareAnonymous(
+            @AuthenticationPrincipal AuthenticatedAccount account,
+            @PathVariable("eventId") Long eventId,
+            @PathVariable("groupSpaceId") Long groupSpaceId,
+            @Valid @RequestBody UpdateGroupShareAnonymousRequest request
+    ) {
+        return eventGroupShareService.changeAnonymous(
+                account.accountId(), eventId, groupSpaceId, request
+        );
     }
 
     @GetMapping

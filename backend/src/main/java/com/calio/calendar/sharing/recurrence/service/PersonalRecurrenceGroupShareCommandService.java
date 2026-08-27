@@ -35,4 +35,8 @@ public class PersonalRecurrenceGroupShareCommandService {
                 share.getPublicShareId().toString()
         ) == 1;
     }
+
+    public void changeAnonymous(PersonalRecurrenceGroupShare share, boolean anonymous) {
+        share.changeAnonymous(anonymous);
+    }
 }

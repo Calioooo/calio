@@ -8,6 +8,7 @@ import com.calio.calendar.recurrence.service.RecurrenceEventQueryService;
 import com.calio.calendar.sharing.controller.dto.GroupShareTargetResponse;
 import com.calio.calendar.sharing.controller.dto.GroupShareTargetStatus;
 import com.calio.calendar.sharing.controller.dto.GroupShareStatusResponse;
+import com.calio.calendar.sharing.controller.dto.UpdateGroupShareAnonymousRequest;
 import com.calio.calendar.sharing.recurrence.controller.dto.CreateRecurrenceGroupSharesRequest;
 import com.calio.calendar.sharing.recurrence.controller.dto.CreateRecurrenceGroupSharesResponse;
 import com.calio.calendar.sharing.recurrence.domain.PersonalRecurrenceGroupShare;
@@ -76,6 +77,25 @@ public class PersonalRecurrenceGroupShareService {
                         share.getPublicShareId()
                 ))
                 .toList();
+    }
+
+    @Transactional
+    public GroupShareStatusResponse changeAnonymous(
+            Long accountId,
+            Long recurrenceId,
+            Long groupSpaceId,
+            UpdateGroupShareAnonymousRequest request
+    ) {
+        recurrenceEventQueryService.getRecurrenceEventForShareManagement(accountId, recurrenceId);
+        PersonalRecurrenceGroupShare share = shareQueryService
+                .getByRecurrenceEventIdAndGroupSpaceId(recurrenceId, groupSpaceId);
+        shareCommandService.changeAnonymous(share, request.isAnonymous());
+        return new GroupShareStatusResponse(
+                share.getGroupSpace().getId(),
+                share.getGroupSpace().getName(),
+                share.isAnonymous(),
+                share.getPublicShareId()
+        );
     }
 
     private Map<Long, GroupSpace> activeGroupSpaces(Long accountId, List<Long> groupSpaceIds) {

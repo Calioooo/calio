@@ -10,6 +10,7 @@ import com.calio.calendar.groupspace.service.GroupMembershipQueryService;
 import com.calio.calendar.sharing.controller.dto.GroupShareTargetResponse;
 import com.calio.calendar.sharing.controller.dto.GroupShareTargetStatus;
 import com.calio.calendar.sharing.controller.dto.GroupShareStatusResponse;
+import com.calio.calendar.sharing.controller.dto.UpdateGroupShareAnonymousRequest;
 import com.calio.calendar.sharing.event.controller.dto.CreateEventGroupSharesRequest;
 import com.calio.calendar.sharing.event.controller.dto.CreateEventGroupSharesResponse;
 import com.calio.calendar.sharing.event.controller.dto.EventGroupShareResultResponse;
@@ -77,6 +78,24 @@ public class PersonalEventGroupShareService {
                         share.getPublicShareId()
                 ))
                 .toList();
+    }
+
+    @Transactional
+    public GroupShareStatusResponse changeAnonymous(
+            Long accountId,
+            Long eventId,
+            Long groupSpaceId,
+            UpdateGroupShareAnonymousRequest request
+    ) {
+        eventQueryService.getEventForShareManagement(accountId, eventId);
+        PersonalEventGroupShare share = shareQueryService.getByEventIdAndGroupSpaceId(eventId, groupSpaceId);
+        shareCommandService.changeAnonymous(share, request.isAnonymous());
+        return new GroupShareStatusResponse(
+                share.getGroupSpace().getId(),
+                share.getGroupSpace().getName(),
+                share.isAnonymous(),
+                share.getPublicShareId()
+        );
     }
 
     private Map<Long, Event> validateSources(Long accountId, List<Long> eventIds) {

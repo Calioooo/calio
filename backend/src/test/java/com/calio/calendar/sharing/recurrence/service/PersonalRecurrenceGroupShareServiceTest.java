@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doAnswer;
 
 import com.calio.calendar.groupspace.domain.GroupMember;
 import com.calio.calendar.groupspace.domain.GroupSpace;
@@ -13,6 +14,7 @@ import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.service.RecurrenceEventQueryService;
 import com.calio.calendar.sharing.controller.dto.GroupShareTargetStatus;
 import com.calio.calendar.sharing.controller.dto.GroupShareStatusResponse;
+import com.calio.calendar.sharing.controller.dto.UpdateGroupShareAnonymousRequest;
 import com.calio.calendar.sharing.recurrence.controller.dto.CreateRecurrenceGroupSharesRequest;
 import com.calio.calendar.sharing.recurrence.controller.dto.CreateRecurrenceGroupSharesResponse;
 import java.time.Instant;
@@ -81,6 +83,37 @@ class PersonalRecurrenceGroupShareServiceTest {
             assertThat(status.isAnonymous()).isFalse();
             assertThat(status.publicShareId()).isEqualTo(share.getPublicShareId());
         });
+    }
+
+    @Test
+    @DisplayName("반복 일정 원본 소유자는 한 대상의 익명 여부만 변경한다")
+    void changeAnonymousUpdatesOnlyRequestedTargetMapping() {
+        RecurrenceEvent recurrenceEvent = mock(RecurrenceEvent.class);
+        GroupSpace firstGroup = groupSpace(10L);
+        GroupSpace secondGroup = groupSpace(20L);
+        var firstShare = com.calio.calendar.sharing.recurrence.domain.PersonalRecurrenceGroupShare.create(
+                recurrenceEvent, firstGroup, true
+        );
+        var secondShare = com.calio.calendar.sharing.recurrence.domain.PersonalRecurrenceGroupShare.create(
+                recurrenceEvent, secondGroup, true
+        );
+        when(recurrenceEventQueryService.getRecurrenceEventForShareManagement(100L, 30L))
+                .thenReturn(recurrenceEvent);
+        when(shareQueryService.getByRecurrenceEventIdAndGroupSpaceId(30L, 10L)).thenReturn(firstShare);
+        doAnswer(invocation -> {
+            invocation.<com.calio.calendar.sharing.recurrence.domain.PersonalRecurrenceGroupShare>getArgument(0)
+                    .changeAnonymous(invocation.getArgument(1));
+            return null;
+        }).when(shareCommandService).changeAnonymous(firstShare, false);
+
+        GroupShareStatusResponse response = service.changeAnonymous(
+                100L, 30L, 10L, new UpdateGroupShareAnonymousRequest(false)
+        );
+
+        assertThat(response.isAnonymous()).isFalse();
+        assertThat(firstShare.isAnonymous()).isFalse();
+        assertThat(secondShare.isAnonymous()).isTrue();
+        verify(shareCommandService).changeAnonymous(firstShare, false);
     }
 
     private GroupSpace groupSpace(Long id) {
