@@ -3,6 +3,7 @@ package com.calio.calendar.groupcalendar.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
 
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.common.domain.CanonicalSchedule;
@@ -382,6 +383,27 @@ class GroupCalendarServiceTest {
                         assertThat(exception.getErrorCode())
                                 .isEqualTo(ErrorCode.RECURRENCE_OCCURRENCE_LIMIT_EXCEEDED)
                 );
+    }
+
+    @Test
+    @DisplayName("여러 공유 반복 mapping의 원본 override는 mapping별 조회 없이 한 번에 읽는다")
+    void givenMultipleSharedRecurrences_whenListItems_thenBulkLoadsSourceOverridesOnce() {
+        RecurrenceEvent firstSource = personalRecurrenceEvent("첫 번째", null);
+        RecurrenceEvent secondSource = personalRecurrenceEvent("두 번째", null);
+        ReflectionTestUtils.setField(secondSource, "id", 51L);
+        when(recurrenceShareQueryService.listByGroupSpaceId(GROUP_SPACE_ID)).thenReturn(List.of(
+                PersonalRecurrenceGroupShare.create(firstSource, groupSpace, false),
+                PersonalRecurrenceGroupShare.create(secondSource, groupSpace, false)
+        ));
+        when(personalRecurrenceQueryService.listOverridesForRecurrenceIdsInRange(
+                List.of(50L, 51L), FROM, TO
+        )).thenReturn(List.of());
+
+        service.listItems(ACCOUNT_ID, GROUP_SPACE_ID, FROM, TO);
+
+        verify(personalRecurrenceQueryService).listOverridesForRecurrenceIdsInRange(
+                List.of(50L, 51L), FROM, TO
+        );
     }
 
     @Test
