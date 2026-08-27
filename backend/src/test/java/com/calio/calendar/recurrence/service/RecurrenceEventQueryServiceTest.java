@@ -85,18 +85,12 @@ class RecurrenceEventQueryServiceTest {
     }
 
     @Test
-    @DisplayName("공유 관리에서 다른 계정의 반복 일정은 FORBIDDEN을 반환한다")
-    void givenOtherAccountsRecurrenceEvent_whenManageShare_thenThrowsForbidden() {
+    @DisplayName("반복 일정 ID 조회는 소유권 판단 없이 entity를 반환한다")
+    void givenRecurrenceEventId_whenFindRecurrenceEventById_thenReturnsEntity() {
         RecurrenceEvent recurrenceEvent = recurrenceEvent();
-        ReflectionTestUtils.setField(recurrenceEvent.getAccount(), "id", 2L);
         when(recurrenceEventRepository.findById(10L)).thenReturn(Optional.of(recurrenceEvent));
 
-        assertThatThrownBy(() -> recurrenceEventQueryService
-                .getRecurrenceEventForShareManagement(1L, 10L))
-                .isInstanceOfSatisfying(CalioException.class, exception ->
-                        assertThat(exception.getErrorCode())
-                                .isEqualTo(ErrorCode.PERSONAL_SCHEDULE_SHARE_FORBIDDEN)
-                );
+        assertThat(recurrenceEventQueryService.getRecurrenceEventById(10L)).isSameAs(recurrenceEvent);
     }
 
     @Test

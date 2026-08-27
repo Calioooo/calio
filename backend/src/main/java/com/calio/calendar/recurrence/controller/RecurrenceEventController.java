@@ -90,7 +90,7 @@ public class RecurrenceEventController {
             @AuthenticationPrincipal AuthenticatedAccount account,
             @PathVariable("recurrenceId") Long recurrenceId
     ) {
-        return recurrenceGroupShareService.list(account.accountId(), recurrenceId);
+        return recurrenceEventService.listGroupShares(account.accountId(), recurrenceId);
     }
 
     @PatchMapping("/{recurrenceId}/group-shares/{groupSpaceId}")
@@ -100,7 +100,7 @@ public class RecurrenceEventController {
             @PathVariable("groupSpaceId") Long groupSpaceId,
             @Valid @RequestBody UpdateGroupShareAnonymousRequest request
     ) {
-        return recurrenceGroupShareService.changeAnonymous(
+        return recurrenceEventService.changeGroupShareAnonymous(
                 account.accountId(), recurrenceId, groupSpaceId, request
         );
     }
@@ -111,7 +111,7 @@ public class RecurrenceEventController {
             @PathVariable("recurrenceId") Long recurrenceId,
             @PathVariable("groupSpaceId") Long groupSpaceId
     ) {
-        recurrenceGroupShareService.remove(account.accountId(), recurrenceId, groupSpaceId);
+        recurrenceEventService.removeGroupShare(account.accountId(), recurrenceId, groupSpaceId);
         return ResponseEntity.noContent().build();
     }
 

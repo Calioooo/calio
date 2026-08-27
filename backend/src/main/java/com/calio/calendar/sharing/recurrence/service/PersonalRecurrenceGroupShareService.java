@@ -67,8 +67,7 @@ public class PersonalRecurrenceGroupShareService {
         return new CreateRecurrenceGroupSharesResponse(recurrenceId, targets);
     }
 
-    public List<GroupShareStatusResponse> list(Long accountId, Long recurrenceId) {
-        recurrenceEventQueryService.getRecurrenceEventForShareManagement(accountId, recurrenceId);
+    public List<GroupShareStatusResponse> list(Long recurrenceId) {
         return shareQueryService.listByRecurrenceEventId(recurrenceId).stream()
                 .map(share -> new GroupShareStatusResponse(
                         share.getGroupSpace().getId(),
@@ -81,12 +80,10 @@ public class PersonalRecurrenceGroupShareService {
 
     @Transactional
     public GroupShareStatusResponse changeAnonymous(
-            Long accountId,
             Long recurrenceId,
             Long groupSpaceId,
             UpdateGroupShareAnonymousRequest request
     ) {
-        recurrenceEventQueryService.getRecurrenceEventForShareManagement(accountId, recurrenceId);
         PersonalRecurrenceGroupShare share = shareQueryService
                 .getByRecurrenceEventIdAndGroupSpaceId(recurrenceId, groupSpaceId);
         shareCommandService.changeAnonymous(share, request.isAnonymous());
@@ -99,8 +96,7 @@ public class PersonalRecurrenceGroupShareService {
     }
 
     @Transactional
-    public void remove(Long accountId, Long recurrenceId, Long groupSpaceId) {
-        recurrenceEventQueryService.getRecurrenceEventForShareManagement(accountId, recurrenceId);
+    public void remove(Long recurrenceId, Long groupSpaceId) {
         PersonalRecurrenceGroupShare share = shareQueryService
                 .getByRecurrenceEventIdAndGroupSpaceId(recurrenceId, groupSpaceId);
         shareCommandService.delete(share);

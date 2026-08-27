@@ -72,11 +72,9 @@ class PersonalRecurrenceGroupShareServiceTest {
                 groupSpace,
                 false
         );
-        when(recurrenceEventQueryService.getRecurrenceEventForShareManagement(100L, 30L))
-                .thenReturn(recurrenceEvent);
         when(shareQueryService.listByRecurrenceEventId(30L)).thenReturn(List.of(share));
 
-        List<GroupShareStatusResponse> response = service.list(100L, 30L);
+        List<GroupShareStatusResponse> response = service.list(30L);
 
         assertThat(response).singleElement().satisfies(status -> {
             assertThat(status.groupSpaceId()).isEqualTo(10L);
@@ -98,8 +96,6 @@ class PersonalRecurrenceGroupShareServiceTest {
         var secondShare = com.calio.calendar.sharing.recurrence.domain.PersonalRecurrenceGroupShare.create(
                 recurrenceEvent, secondGroup, true
         );
-        when(recurrenceEventQueryService.getRecurrenceEventForShareManagement(100L, 30L))
-                .thenReturn(recurrenceEvent);
         when(shareQueryService.getByRecurrenceEventIdAndGroupSpaceId(30L, 10L)).thenReturn(firstShare);
         doAnswer(invocation -> {
             invocation.<com.calio.calendar.sharing.recurrence.domain.PersonalRecurrenceGroupShare>getArgument(0)
@@ -108,7 +104,7 @@ class PersonalRecurrenceGroupShareServiceTest {
         }).when(shareCommandService).changeAnonymous(firstShare, false);
 
         GroupShareStatusResponse response = service.changeAnonymous(
-                100L, 30L, 10L, new UpdateGroupShareAnonymousRequest(false)
+                30L, 10L, new UpdateGroupShareAnonymousRequest(false)
         );
 
         assertThat(response.isAnonymous()).isFalse();
@@ -127,12 +123,10 @@ class PersonalRecurrenceGroupShareServiceTest {
         var remainingShare = com.calio.calendar.sharing.recurrence.domain.PersonalRecurrenceGroupShare.create(
                 recurrenceEvent, groupSpace(20L), false
         );
-        when(recurrenceEventQueryService.getRecurrenceEventForShareManagement(100L, 30L))
-                .thenReturn(recurrenceEvent);
         when(shareQueryService.getByRecurrenceEventIdAndGroupSpaceId(30L, 10L))
                 .thenReturn(requestedShare);
 
-        service.remove(100L, 30L, 10L);
+        service.remove(30L, 10L);
 
         verify(shareCommandService).delete(requestedShare);
         verify(shareCommandService, never()).delete(remainingShare);

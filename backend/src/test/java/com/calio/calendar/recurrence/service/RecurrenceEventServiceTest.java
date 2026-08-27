@@ -29,6 +29,7 @@ import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.domain.TagType;
 import com.calio.calendar.tag.service.TagQueryService;
 import com.calio.calendar.sharing.recurrence.service.PersonalRecurrenceGroupShareCommandService;
+import com.calio.calendar.sharing.recurrence.service.PersonalRecurrenceGroupShareService;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -70,6 +71,9 @@ class RecurrenceEventServiceTest {
     @Mock
     private PersonalRecurrenceGroupShareCommandService recurrenceShareCommandService;
 
+    @Mock
+    private PersonalRecurrenceGroupShareService recurrenceGroupShareService;
+
     private RecurrenceEventService recurrenceEventService;
 
     @BeforeEach
@@ -90,7 +94,8 @@ class RecurrenceEventServiceTest {
                 eventCommandService,
                 recurrenceEngine,
                 clock,
-                recurrenceShareCommandService
+                recurrenceShareCommandService,
+                recurrenceGroupShareService
         );
     }
 
@@ -382,6 +387,21 @@ class RecurrenceEventServiceTest {
                 .extracting(exception -> ((CalioException) exception).getErrorCode())
                 .isEqualTo(ErrorCode.RECURRENCE_OCCURRENCE_NOT_FOUND);
         verify(recurrenceEventOverrideRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    @DisplayName("다른 계정은 Group Space owner여도 개인 반복 일정 공유를 관리할 수 없다")
+    void givenOtherAccountsRecurrenceEvent_whenManageGroupShare_thenThrowsForbidden() {
+        RecurrenceEvent recurrenceEvent = recurrenceEvent();
+        ReflectionTestUtils.setField(recurrenceEvent.getAccount(), "id", 2L);
+        when(recurrenceEventRepository.findById(10L)).thenReturn(Optional.of(recurrenceEvent));
+
+        assertThatThrownBy(() -> recurrenceEventService.listGroupShares(1L, 10L))
+                .isInstanceOfSatisfying(CalioException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.PERSONAL_SCHEDULE_SHARE_FORBIDDEN)
+                );
+        verifyNoInteractions(recurrenceGroupShareService);
     }
 
     private CreateRecurrenceEventRequest timedCreateRequest() {

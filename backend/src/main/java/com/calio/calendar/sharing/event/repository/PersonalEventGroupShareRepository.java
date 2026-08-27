@@ -12,10 +12,28 @@ import org.springframework.data.repository.query.Param;
 
 public interface PersonalEventGroupShareRepository extends JpaRepository<PersonalEventGroupShare, Long> {
 
-    Optional<PersonalEventGroupShare> findByEvent_IdAndGroupSpace_Id(Long eventId, Long groupSpaceId);
+    @EntityGraph(attributePaths = {"event", "event.account", "groupSpace"})
+    @Query("""
+            select share
+            from PersonalEventGroupShare share
+            where share.event.id = :eventId
+              and share.groupSpace.id = :groupSpaceId
+            """)
+    Optional<PersonalEventGroupShare> findByEvent_IdAndGroupSpace_Id(
+            @Param("eventId") Long eventId,
+            @Param("groupSpaceId") Long groupSpaceId
+    );
 
     @EntityGraph(attributePaths = {"event", "event.account", "groupSpace"})
-    List<PersonalEventGroupShare> findAllByEvent_IdOrderByGroupSpace_IdAsc(Long eventId);
+    @Query("""
+            select share
+            from PersonalEventGroupShare share
+            where share.event.id = :eventId
+            order by share.groupSpace.id asc
+            """)
+    List<PersonalEventGroupShare> findAllByEvent_IdOrderByGroupSpace_IdAsc(
+            @Param("eventId") Long eventId
+    );
 
     @EntityGraph(attributePaths = {"event", "event.account", "groupSpace"})
     @Query("""

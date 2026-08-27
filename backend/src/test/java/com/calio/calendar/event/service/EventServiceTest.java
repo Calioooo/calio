@@ -37,6 +37,7 @@ import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.domain.TagType;
 import com.calio.calendar.tag.service.TagQueryService;
 import com.calio.calendar.sharing.event.service.PersonalEventGroupShareCommandService;
+import com.calio.calendar.sharing.event.service.PersonalEventGroupShareService;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -82,6 +83,9 @@ class EventServiceTest {
 
     @Mock
     private PersonalEventGroupShareCommandService eventShareCommandService;
+
+    @Mock
+    private PersonalEventGroupShareService eventGroupShareService;
 
     @InjectMocks
     private EventService eventService;
@@ -415,7 +419,8 @@ class EventServiceTest {
                 tagQueryService,
                 recurrenceQueryService,
                 recurrenceEngine,
-                eventShareCommandService
+                eventShareCommandService,
+                org.mockito.Mockito.mock(PersonalEventGroupShareService.class)
         );
     }
 
@@ -424,6 +429,22 @@ class EventServiceTest {
                 .isInstanceOfSatisfying(CalioException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.INVALID_TIME_RANGE)
                 );
+    }
+
+    @Test
+    @DisplayName("다른 계정은 Group Space owner여도 개인 일정 공유를 관리할 수 없다")
+    void givenOtherAccountsEvent_whenManageGroupShare_thenThrowsForbidden() {
+        Event event = event(10L, "Event", Instant.parse("2027-01-01T00:00:00Z"),
+                Instant.parse("2027-01-01T01:00:00Z"));
+        ReflectionTestUtils.setField(event.getAccount(), "id", 2L);
+        when(eventQueryService.getEventById(10L)).thenReturn(event);
+
+        assertThatThrownBy(() -> eventService.listGroupShares(1L, 10L))
+                .isInstanceOfSatisfying(CalioException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.PERSONAL_SCHEDULE_SHARE_FORBIDDEN)
+                );
+        verifyNoInteractions(eventGroupShareService);
     }
 
     private Event event(Long id, String title, Instant startAt, Instant endAt) {

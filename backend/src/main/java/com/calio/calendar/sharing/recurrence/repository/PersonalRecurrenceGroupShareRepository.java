@@ -12,14 +12,27 @@ import org.springframework.data.repository.query.Param;
 
 public interface PersonalRecurrenceGroupShareRepository extends JpaRepository<PersonalRecurrenceGroupShare, Long> {
 
+    @EntityGraph(attributePaths = {"recurrenceEvent", "recurrenceEvent.account", "groupSpace"})
+    @Query("""
+            select share
+            from PersonalRecurrenceGroupShare share
+            where share.recurrenceEvent.id = :recurrenceEventId
+              and share.groupSpace.id = :groupSpaceId
+            """)
     Optional<PersonalRecurrenceGroupShare> findByRecurrenceEvent_IdAndGroupSpace_Id(
-            Long recurrenceEventId,
-            Long groupSpaceId
+            @Param("recurrenceEventId") Long recurrenceEventId,
+            @Param("groupSpaceId") Long groupSpaceId
     );
 
     @EntityGraph(attributePaths = {"recurrenceEvent", "recurrenceEvent.account", "groupSpace"})
+    @Query("""
+            select share
+            from PersonalRecurrenceGroupShare share
+            where share.recurrenceEvent.id = :recurrenceEventId
+            order by share.groupSpace.id asc
+            """)
     List<PersonalRecurrenceGroupShare> findAllByRecurrenceEvent_IdOrderByGroupSpace_IdAsc(
-            Long recurrenceEventId
+            @Param("recurrenceEventId") Long recurrenceEventId
     );
 
     @EntityGraph(attributePaths = {"recurrenceEvent", "recurrenceEvent.account", "groupSpace"})

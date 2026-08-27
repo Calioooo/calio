@@ -18,6 +18,9 @@ import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
 import com.calio.calendar.recurrence.service.RecurrenceEventQueryService;
 import com.calio.calendar.recurrence.service.Rfc5545RecurrenceEngine;
 import com.calio.calendar.sharing.event.service.PersonalEventGroupShareCommandService;
+import com.calio.calendar.sharing.event.service.PersonalEventGroupShareService;
+import com.calio.calendar.sharing.controller.dto.GroupShareStatusResponse;
+import com.calio.calendar.sharing.controller.dto.UpdateGroupShareAnonymousRequest;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.service.TagQueryService;
 import java.time.Duration;
@@ -47,6 +50,7 @@ public class EventService {
     private final RecurrenceEventQueryService recurrenceEventQueryService;
     private final Rfc5545RecurrenceEngine recurrenceEngine;
     private final PersonalEventGroupShareCommandService eventShareCommandService;
+    private final PersonalEventGroupShareService eventGroupShareService;
 
     public EventService(
             EventQueryService eventQueryService,
@@ -56,7 +60,8 @@ public class EventService {
             TagQueryService tagQueryService,
             RecurrenceEventQueryService recurrenceEventQueryService,
             Rfc5545RecurrenceEngine recurrenceEngine,
-            PersonalEventGroupShareCommandService eventShareCommandService
+            PersonalEventGroupShareCommandService eventShareCommandService,
+            PersonalEventGroupShareService eventGroupShareService
     ) {
         this.eventQueryService = eventQueryService;
         this.eventCommandService = eventCommandService;
@@ -66,6 +71,7 @@ public class EventService {
         this.recurrenceEventQueryService = recurrenceEventQueryService;
         this.recurrenceEngine = recurrenceEngine;
         this.eventShareCommandService = eventShareCommandService;
+        this.eventGroupShareService = eventGroupShareService;
     }
 
     @Transactional
@@ -126,6 +132,28 @@ public class EventService {
         responses.addAll(listRecurrenceOccurrences(accountId, from, to));
         responses.sort(Comparator.comparing(EventResponse::startAt));
         return responses;
+    }
+
+    public List<GroupShareStatusResponse> listGroupShares(Long accountId, Long eventId) {
+        Event event = getEventForShareManagement(accountId, eventId);
+        return eventGroupShareService.list(event.getId());
+    }
+
+    @Transactional
+    public GroupShareStatusResponse changeGroupShareAnonymous(
+            Long accountId,
+            Long eventId,
+            Long groupSpaceId,
+            UpdateGroupShareAnonymousRequest request
+    ) {
+        Event event = getEventForShareManagement(accountId, eventId);
+        return eventGroupShareService.changeAnonymous(event.getId(), groupSpaceId, request);
+    }
+
+    @Transactional
+    public void removeGroupShare(Long accountId, Long eventId, Long groupSpaceId) {
+        Event event = getEventForShareManagement(accountId, eventId);
+        eventGroupShareService.remove(event.getId(), groupSpaceId);
     }
 
     private List<EventResponse> listRecurrenceOccurrences(Long accountId, Instant from, Instant to) {
@@ -225,6 +253,14 @@ public class EventService {
         if (eventMappingQueryService.hasExternalEventMapping(eventId, accountId)) {
             throw new CalioException(ErrorCode.EXTERNAL_EVENT_MUTATION_NOT_SUPPORTED);
         }
+    }
+
+    private Event getEventForShareManagement(Long accountId, Long eventId) {
+        Event event = eventQueryService.getEventById(eventId);
+        if (!event.getAccount().getId().equals(accountId)) {
+            throw new CalioException(ErrorCode.PERSONAL_SCHEDULE_SHARE_FORBIDDEN);
+        }
+        return event;
     }
 
     private record OccurrenceKey(Long recurrenceId, Instant originStartAt) {

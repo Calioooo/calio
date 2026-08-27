@@ -68,8 +68,7 @@ public class PersonalEventGroupShareService {
         return new CreateEventGroupSharesResponse(results);
     }
 
-    public List<GroupShareStatusResponse> list(Long accountId, Long eventId) {
-        eventQueryService.getEventForShareManagement(accountId, eventId);
+    public List<GroupShareStatusResponse> list(Long eventId) {
         return shareQueryService.listByEventId(eventId).stream()
                 .map(share -> new GroupShareStatusResponse(
                         share.getGroupSpace().getId(),
@@ -82,12 +81,10 @@ public class PersonalEventGroupShareService {
 
     @Transactional
     public GroupShareStatusResponse changeAnonymous(
-            Long accountId,
             Long eventId,
             Long groupSpaceId,
             UpdateGroupShareAnonymousRequest request
     ) {
-        eventQueryService.getEventForShareManagement(accountId, eventId);
         PersonalEventGroupShare share = shareQueryService.getByEventIdAndGroupSpaceId(eventId, groupSpaceId);
         shareCommandService.changeAnonymous(share, request.isAnonymous());
         return new GroupShareStatusResponse(
@@ -99,8 +96,7 @@ public class PersonalEventGroupShareService {
     }
 
     @Transactional
-    public void remove(Long accountId, Long eventId, Long groupSpaceId) {
-        eventQueryService.getEventForShareManagement(accountId, eventId);
+    public void remove(Long eventId, Long groupSpaceId) {
         PersonalEventGroupShare share = shareQueryService.getByEventIdAndGroupSpaceId(eventId, groupSpaceId);
         shareCommandService.delete(share);
     }

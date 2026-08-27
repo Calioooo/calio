@@ -33,13 +33,9 @@ public class RecurrenceEventQueryService {
                 .orElseThrow(() -> new CalioException(ErrorCode.RECURRENCE_EVENT_NOT_FOUND));
     }
 
-    public RecurrenceEvent getRecurrenceEventForShareManagement(Long accountId, Long recurrenceId) {
-        RecurrenceEvent recurrenceEvent = recurrenceEventRepository.findById(recurrenceId)
+    public RecurrenceEvent getRecurrenceEventById(Long recurrenceId) {
+        return recurrenceEventRepository.findById(recurrenceId)
                 .orElseThrow(() -> new CalioException(ErrorCode.RECURRENCE_EVENT_NOT_FOUND));
-        if (!recurrenceEvent.getAccount().getId().equals(accountId)) {
-            throw new CalioException(ErrorCode.PERSONAL_SCHEDULE_SHARE_FORBIDDEN);
-        }
-        return recurrenceEvent;
     }
 
     public Optional<RecurrenceEventOverride> getOverrideIfExists(Long recurrenceId, Instant originStartAt) {

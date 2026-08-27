@@ -113,10 +113,9 @@ class PersonalEventGroupShareServiceTest {
                 groupSpace,
                 true
         );
-        when(eventQueryService.getEventForShareManagement(100L, 1L)).thenReturn(event);
         when(shareQueryService.listByEventId(1L)).thenReturn(List.of(share));
 
-        List<GroupShareStatusResponse> response = service.list(100L, 1L);
+        List<GroupShareStatusResponse> response = service.list(1L);
 
         assertThat(response).singleElement().satisfies(status -> {
             assertThat(status.groupSpaceId()).isEqualTo(10L);
@@ -139,7 +138,6 @@ class PersonalEventGroupShareServiceTest {
         var secondShare = com.calio.calendar.sharing.event.domain.PersonalEventGroupShare.create(
                 event, secondGroup, false
         );
-        when(eventQueryService.getEventForShareManagement(100L, 1L)).thenReturn(event);
         when(shareQueryService.getByEventIdAndGroupSpaceId(1L, 10L)).thenReturn(firstShare);
         doAnswer(invocation -> {
             invocation.<com.calio.calendar.sharing.event.domain.PersonalEventGroupShare>getArgument(0)
@@ -148,7 +146,7 @@ class PersonalEventGroupShareServiceTest {
         }).when(shareCommandService).changeAnonymous(firstShare, true);
 
         GroupShareStatusResponse response = service.changeAnonymous(
-                100L, 1L, 10L, new UpdateGroupShareAnonymousRequest(true)
+                1L, 10L, new UpdateGroupShareAnonymousRequest(true)
         );
 
         assertThat(response.isAnonymous()).isTrue();
@@ -167,10 +165,9 @@ class PersonalEventGroupShareServiceTest {
         var remainingShare = com.calio.calendar.sharing.event.domain.PersonalEventGroupShare.create(
                 event, groupSpace(20L), false
         );
-        when(eventQueryService.getEventForShareManagement(100L, 1L)).thenReturn(event);
         when(shareQueryService.getByEventIdAndGroupSpaceId(1L, 10L)).thenReturn(requestedShare);
 
-        service.remove(100L, 1L, 10L);
+        service.remove(1L, 10L);
 
         verify(shareCommandService).delete(requestedShare);
         verify(shareCommandService, never()).delete(remainingShare);

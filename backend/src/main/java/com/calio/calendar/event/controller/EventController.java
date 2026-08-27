@@ -104,7 +104,7 @@ public class EventController {
             @AuthenticationPrincipal AuthenticatedAccount account,
             @PathVariable("eventId") Long eventId
     ) {
-        return eventGroupShareService.list(account.accountId(), eventId);
+        return eventService.listGroupShares(account.accountId(), eventId);
     }
 
     @PatchMapping("/{eventId}/group-shares/{groupSpaceId}")
@@ -114,7 +114,7 @@ public class EventController {
             @PathVariable("groupSpaceId") Long groupSpaceId,
             @Valid @RequestBody UpdateGroupShareAnonymousRequest request
     ) {
-        return eventGroupShareService.changeAnonymous(
+        return eventService.changeGroupShareAnonymous(
                 account.accountId(), eventId, groupSpaceId, request
         );
     }
@@ -125,7 +125,7 @@ public class EventController {
             @PathVariable("eventId") Long eventId,
             @PathVariable("groupSpaceId") Long groupSpaceId
     ) {
-        eventGroupShareService.remove(account.accountId(), eventId, groupSpaceId);
+        eventService.removeGroupShare(account.accountId(), eventId, groupSpaceId);
         return ResponseEntity.noContent().build();
     }
 
