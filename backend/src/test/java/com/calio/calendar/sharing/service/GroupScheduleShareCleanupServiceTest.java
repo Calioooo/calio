@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 import org.mockito.Mockito;
 
-class PersonalScheduleGroupShareCleanupAdapterTest {
+class GroupScheduleShareCleanupServiceTest {
 
     @Test
     @DisplayName("멤버 lifecycle cleanup은 해당 Group Space와 멤버의 단건·반복 mapping만 정리한다")
@@ -20,12 +20,12 @@ class PersonalScheduleGroupShareCleanupAdapterTest {
         PersonalRecurrenceGroupShareCommandService recurrenceCommandService = Mockito.mock(
                 PersonalRecurrenceGroupShareCommandService.class
         );
-        PersonalScheduleGroupShareCleanupAdapter adapter = new PersonalScheduleGroupShareCleanupAdapter(
+        GroupScheduleShareCleanupService service = new GroupScheduleShareCleanupService(
                 eventCommandService,
                 recurrenceCommandService
         );
 
-        adapter.cleanupMemberShares(10L, 20L);
+        service.cleanupMemberShares(10L, 20L);
 
         InOrder order = inOrder(eventCommandService, recurrenceCommandService);
         order.verify(eventCommandService).deleteAllForMemberInGroupSpace(10L, 20L);
@@ -41,12 +41,12 @@ class PersonalScheduleGroupShareCleanupAdapterTest {
         PersonalRecurrenceGroupShareCommandService recurrenceCommandService = Mockito.mock(
                 PersonalRecurrenceGroupShareCommandService.class
         );
-        PersonalScheduleGroupShareCleanupAdapter adapter = new PersonalScheduleGroupShareCleanupAdapter(
+        GroupScheduleShareCleanupService service = new GroupScheduleShareCleanupService(
                 eventCommandService,
                 recurrenceCommandService
         );
 
-        adapter.cleanupGroupShares(10L);
+        service.cleanupGroupShares(10L);
 
         InOrder order = inOrder(eventCommandService, recurrenceCommandService);
         order.verify(eventCommandService).deleteAllForGroupSpace(10L);
