@@ -33,5 +33,5 @@ CREATE TABLE group_calendar_recurrence_overrides (
     updated_at DATETIME(6) NOT NULL,
     PRIMARY KEY (id),
     CONSTRAINT uk_group_recurrence_override UNIQUE (recurrence_event_id, origin_start_at),
-    CONSTRAINT fk_group_recurrence_override FOREIGN KEY (recurrence_event_id) REFERENCES group_calendar_recurrence_events (id) ON DELETE CASCADE
+    CONSTRAINT fk_group_recurrence_override FOREIGN KEY (recurrence_event_id) REFERENCES group_calendar_recurrence_events (id)
 );

@@ -7,11 +7,37 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface GroupCalendarRecurrenceOverrideRepository
         extends JpaRepository<GroupCalendarRecurrenceOverride, Long> {
+
+    @Modifying
+    @Query("""
+            delete from GroupCalendarRecurrenceOverride recurrenceOverride
+            where recurrenceOverride.recurrenceEvent.id = :recurrenceId
+            """)
+    void deleteAllByRecurrenceEventId(@Param("recurrenceId") Long recurrenceId);
+
+    @Modifying
+    @Query("""
+            delete from GroupCalendarRecurrenceOverride recurrenceOverride
+            where recurrenceOverride.recurrenceEvent.groupSpace.id = :groupSpaceId
+            """)
+    void deleteAllByGroupSpaceId(@Param("groupSpaceId") Long groupSpaceId);
+
+    @Modifying
+    @Query("""
+            delete from GroupCalendarRecurrenceOverride recurrenceOverride
+            where recurrenceOverride.recurrenceEvent.groupSpace.id = :groupSpaceId
+              and recurrenceOverride.recurrenceEvent.createdBy.id = :accountId
+            """)
+    void deleteAllByGroupSpaceIdAndCreatedById(
+            @Param("groupSpaceId") Long groupSpaceId,
+            @Param("accountId") Long accountId
+    );
 
     @EntityGraph(attributePaths = {"recurrenceEvent", "recurrenceEvent.tag"})
     @Query("""

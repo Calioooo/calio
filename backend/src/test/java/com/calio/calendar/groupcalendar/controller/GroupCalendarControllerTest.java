@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -145,6 +146,11 @@ class GroupCalendarControllerTest {
                         .content("{}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"));
+        mockMvc.perform(post("/api/group-spaces/{groupSpaceId}/recurrence-events", groupSpace.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"));
     }
 
     @Test
@@ -174,6 +180,54 @@ class GroupCalendarControllerTest {
                 .andExpect(jsonPath("$", hasSize(2)))
                 .andExpect(jsonPath("$[0].isRecurrenceOccurrence").value(false))
                 .andExpect(jsonPath("$[1].isRecurrenceOccurrence").value(true));
+    }
+
+    @Test
+    @DisplayName("ACTIVE 멤버는 반복 일정과 회차를 생성·조회·수정·삭제한다")
+    void givenActiveMember_whenManagingRecurrence_thenKeepsRecurrenceApiContract() throws Exception {
+        GroupSpace groupSpace = groupSpaceRepository.saveAndFlush(
+                new GroupSpace(currentAccountId(), "group", null)
+        );
+        groupMemberRepository.saveAndFlush(new GroupMember(
+                groupSpace, currentAccountId(), "nickname", START_AT
+        ));
+        Tag defaultTag = tagRepository.saveAndFlush(Tag.groupDefault(groupSpace));
+
+        MvcResult created = mockMvc.perform(post("/api/group-spaces/{groupSpaceId}/recurrence-events", groupSpace.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(recurrenceRequest("매일 회의", defaultTag.getId())))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.recurrence[0]").value("RRULE:FREQ=DAILY"))
+                .andReturn();
+        Long recurrenceId = responseId(created);
+
+        mockMvc.perform(get("/api/group-spaces/{groupSpaceId}/recurrence-events/{recurrenceId}",
+                        groupSpace.getId(), recurrenceId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("매일 회의"));
+
+        mockMvc.perform(put("/api/group-spaces/{groupSpaceId}/recurrence-events/{recurrenceId}",
+                        groupSpace.getId(), recurrenceId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(recurrenceRequest("수정된 매일 회의", defaultTag.getId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("수정된 매일 회의"));
+
+        mockMvc.perform(patch("/api/group-spaces/{groupSpaceId}/recurrence-events/{recurrenceId}/occurrences",
+                        groupSpace.getId(), recurrenceId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(occurrenceRequest("첫 회차 수정")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("첫 회차 수정"))
+                .andExpect(jsonPath("$.isRecurrenceOccurrence").value(true));
+
+        mockMvc.perform(delete("/api/group-spaces/{groupSpaceId}/recurrence-events/{recurrenceId}/occurrences",
+                        groupSpace.getId(), recurrenceId)
+                        .param("originStartAt", START_AT.toString()))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(delete("/api/group-spaces/{groupSpaceId}/recurrence-events/{recurrenceId}",
+                        groupSpace.getId(), recurrenceId))
+                .andExpect(status().isNoContent());
     }
 
     private Long responseId(MvcResult result) throws Exception {
@@ -210,5 +264,18 @@ class GroupCalendarControllerTest {
                   "tagId": %d
                 }
                 """.formatted(title, START_AT, END_AT, tagId);
+    }
+
+    private String occurrenceRequest(String title) {
+        return """
+                {
+                  "originStartAt": "%s",
+                  "title": "%s",
+                  "startAt": "%s",
+                  "endAt": "%s",
+                  "allDay": false,
+                  "timeZone": "UTC"
+                }
+                """.formatted(START_AT, title, START_AT.plusSeconds(3600), END_AT.plusSeconds(3600));
     }
 }
