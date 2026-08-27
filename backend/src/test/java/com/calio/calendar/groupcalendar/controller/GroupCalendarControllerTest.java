@@ -10,6 +10,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.calio.calendar.groupcalendar.event.repository.GroupCalendarEventRepository;
+import com.calio.calendar.groupcalendar.recurrence.repository.GroupCalendarRecurrenceEventRepository;
+import com.calio.calendar.groupcalendar.recurrence.repository.GroupCalendarRecurrenceOverrideRepository;
 import com.calio.calendar.groupspace.domain.GroupMember;
 import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.repository.GroupMemberRepository;
@@ -51,12 +53,16 @@ class GroupCalendarControllerTest {
     @Autowired private MockMvc mockMvc;
     @Autowired private ObjectMapper objectMapper;
     @Autowired private GroupCalendarEventRepository eventRepository;
+    @Autowired private GroupCalendarRecurrenceOverrideRepository recurrenceOverrideRepository;
+    @Autowired private GroupCalendarRecurrenceEventRepository recurrenceEventRepository;
     @Autowired private TagRepository tagRepository;
     @Autowired private GroupMemberRepository groupMemberRepository;
     @Autowired private GroupSpaceRepository groupSpaceRepository;
 
     @BeforeEach
     void setUp() {
+        recurrenceOverrideRepository.deleteAll();
+        recurrenceEventRepository.deleteAll();
         eventRepository.deleteAll();
         tagRepository.deleteAll();
         groupMemberRepository.deleteAll();
@@ -141,6 +147,35 @@ class GroupCalendarControllerTest {
                 .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"));
     }
 
+    @Test
+    @DisplayName("통합 Group Calendar 응답은 직접 일정과 반복 회차의 JSON 구분 키를 유지한다")
+    void givenDirectAndRecurringEvents_whenListCalendarItems_thenSerializesOccurrenceKey() throws Exception {
+        GroupSpace groupSpace = groupSpaceRepository.saveAndFlush(
+                new GroupSpace(currentAccountId(), "group", null)
+        );
+        groupMemberRepository.saveAndFlush(new GroupMember(
+                groupSpace, currentAccountId(), "nickname", START_AT
+        ));
+        Tag defaultTag = tagRepository.saveAndFlush(Tag.groupDefault(groupSpace));
+
+        mockMvc.perform(post("/api/group-spaces/{groupSpaceId}/events", groupSpace.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(eventRequest("직접 일정", defaultTag.getId())))
+                .andExpect(status().isCreated());
+        mockMvc.perform(post("/api/group-spaces/{groupSpaceId}/recurrence-events", groupSpace.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(recurrenceRequest("반복 일정", defaultTag.getId())))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/api/group-spaces/{groupSpaceId}/calendar/items", groupSpace.getId())
+                        .param("from", START_AT.minusSeconds(1).toString())
+                        .param("to", END_AT.plusSeconds(1).toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$[0].isRecurrenceOccurrence").value(false))
+                .andExpect(jsonPath("$[1].isRecurrenceOccurrence").value(true));
+    }
+
     private Long responseId(MvcResult result) throws Exception {
         JsonNode body = objectMapper.readTree(result.getResponse().getContentAsByteArray());
         return body.get("id").asLong();
@@ -158,6 +193,20 @@ class GroupCalendarControllerTest {
                   "endAt": "%s",
                   "allDay": false,
                   "timeZone": "UTC",
+                  "tagId": %d
+                }
+                """.formatted(title, START_AT, END_AT, tagId);
+    }
+
+    private String recurrenceRequest(String title, Long tagId) {
+        return """
+                {
+                  "title": "%s",
+                  "allDay": false,
+                  "firstOccurrenceStartAt": "%s",
+                  "firstOccurrenceEndAt": "%s",
+                  "timeZone": "UTC",
+                  "recurrence": ["RRULE:FREQ=DAILY"],
                   "tagId": %d
                 }
                 """.formatted(title, START_AT, END_AT, tagId);
