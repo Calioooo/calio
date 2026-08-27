@@ -123,6 +123,38 @@ class PersonalScheduleGroupShareControllerTest {
     }
 
     @Test
+    @DisplayName("유효하지 않은 원본 일정이 포함된 공유 요청은 대상 처리 전에 전체 실패하고 mapping을 만들지 않는다")
+    void givenInvalidSource_whenCreateGroupShares_thenRejectsBeforeWritingMappings() throws Exception {
+        long eventId = createEvent("유효한 일정");
+        GroupSpace groupSpace = createGroupWithCurrentMember("eligible");
+
+        mockMvc.perform(post("/api/events/group-shares")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "eventIds": [%d, 999999],
+                                  "groupSpaceIds": [%d],
+                                  "isAnonymous": false
+                                }
+                                """.formatted(eventId, groupSpace.getId())))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("EVENT_NOT_FOUND"));
+        assertThat(eventShareRepository.count()).isZero();
+
+        mockMvc.perform(post("/api/recurrence-events/{recurrenceId}/group-shares", 999999L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "groupSpaceIds": [%d],
+                                  "isAnonymous": false
+                                }
+                                """.formatted(groupSpace.getId())))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("RECURRENCE_EVENT_NOT_FOUND"));
+        assertThat(recurrenceShareRepository.count()).isZero();
+    }
+
+    @Test
     @DisplayName("반복 일정 다중 공유는 전체 series의 대상별 결과와 초기 익명 여부를 반환한다")
     void givenMixedTargets_whenCreateRecurrenceGroupShares_thenReturnsWholeSeriesTargetResults()
             throws Exception {
