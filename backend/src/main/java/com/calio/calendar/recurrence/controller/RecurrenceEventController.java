@@ -7,6 +7,9 @@ import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceEventRequest
 import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceOccurrenceRequest;
 import com.calio.calendar.recurrence.service.RecurrenceEventService;
 import com.calio.calendar.security.AuthenticatedAccount;
+import com.calio.calendar.sharing.recurrence.controller.dto.CreateRecurrenceGroupSharesRequest;
+import com.calio.calendar.sharing.recurrence.controller.dto.CreateRecurrenceGroupSharesResponse;
+import com.calio.calendar.sharing.recurrence.service.PersonalRecurrenceGroupShareService;
 import jakarta.validation.Valid;
 import java.time.Instant;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -31,9 +34,14 @@ import org.springframework.web.bind.annotation.RestController;
 public class RecurrenceEventController {
 
     private final RecurrenceEventService recurrenceEventService;
+    private final PersonalRecurrenceGroupShareService recurrenceGroupShareService;
 
-    public RecurrenceEventController(RecurrenceEventService recurrenceEventService) {
+    public RecurrenceEventController(
+            RecurrenceEventService recurrenceEventService,
+            PersonalRecurrenceGroupShareService recurrenceGroupShareService
+    ) {
         this.recurrenceEventService = recurrenceEventService;
+        this.recurrenceGroupShareService = recurrenceGroupShareService;
     }
 
     @PostMapping
@@ -62,6 +70,16 @@ public class RecurrenceEventController {
     ) {
         recurrenceEventService.deleteRecurrenceEvent(account.accountId(), recurrenceId);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{recurrenceId}/group-shares")
+    public ResponseEntity<CreateRecurrenceGroupSharesResponse> createGroupShares(
+            @AuthenticationPrincipal AuthenticatedAccount account,
+            @PathVariable("recurrenceId") Long recurrenceId,
+            @Valid @RequestBody CreateRecurrenceGroupSharesRequest request
+    ) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(recurrenceGroupShareService.create(account.accountId(), recurrenceId, request));
     }
 
     @PutMapping("/{recurrenceId}")
