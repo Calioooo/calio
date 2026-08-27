@@ -120,6 +120,25 @@ class RecurrenceEventControllerTest {
     }
 
     @Test
+    @DisplayName("반복 일정 다중 그룹 공유의 DTO 검증 오류는 기존 Problem JSON 계약을 유지한다")
+    void givenInvalidGroupShareRequest_whenCreateGroupShares_thenReturnsValidationProblem() throws Exception {
+        mockMvc.perform(post("/api/recurrence-events/{recurrenceId}/group-shares", 1L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "groupSpaceIds": []
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.detail").value("Validation failed."))
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.instance").value("/api/recurrence-events/1/group-shares"))
+                .andExpect(jsonPath("$.*", hasSize(6)));
+    }
+
+    @Test
     @DisplayName("all-day master는 exclusive 날짜 범위를 UTC midnight occurrence로 반환한다")
     void givenAllDayMaster_whenList_thenReturnsExclusiveUtcMidnightRange() throws Exception {
         // given

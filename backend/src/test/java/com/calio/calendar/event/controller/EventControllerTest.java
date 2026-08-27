@@ -140,6 +140,26 @@ class EventControllerTest {
     }
 
     @Test
+    @DisplayName("개인 일정 다중 그룹 공유의 DTO 검증 오류는 기존 Problem JSON 계약을 유지한다")
+    void givenInvalidGroupShareRequest_whenCreateGroupShares_thenReturnsValidationProblem() throws Exception {
+        mockMvc.perform(post("/api/events/group-shares")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "eventIds": [],
+                                  "groupSpaceIds": [null]
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.detail").value("Validation failed."))
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.instance").value("/api/events/group-shares"))
+                .andExpect(jsonPath("$.*", hasSize(6)));
+    }
+
+    @Test
     @DisplayName("UTC 자정과 exclusive end로 생성한 종일 일정은 저장된 allDay=true를 반환한다")
     void givenUtcMidnightExclusiveRange_whenCreateAllDayEvent_thenReturnsStoredAllDay() throws Exception {
         // when, then
