@@ -7,6 +7,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -28,9 +29,16 @@ public interface GroupCalendarRecurrenceEventRepository extends JpaRepository<Gr
             @Param("groupSpaceId") Long groupSpaceId
     );
 
-    List<GroupCalendarRecurrenceEvent> findByGroupSpace_IdAndFirstOccurrenceStartAtLessThan(
-            Long groupSpaceId,
-            Instant to
+    @EntityGraph(attributePaths = "tag")
+    @Query("""
+            select event
+            from GroupCalendarRecurrenceEvent event
+            where event.groupSpace.id = :groupSpaceId
+              and event.firstOccurrenceStartAt < :to
+            """)
+    List<GroupCalendarRecurrenceEvent> findByGroupSpaceIdAndFirstOccurrenceStartAtBefore(
+            @Param("groupSpaceId") Long groupSpaceId,
+            @Param("to") Instant to
     );
 
     @Modifying

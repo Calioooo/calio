@@ -25,6 +25,6 @@ public class GroupCalendarRecurrenceQueryService {
     }
 
     public List<GroupCalendarRecurrenceEvent> listExpansionCandidates(Long groupSpaceId, Instant to) {
-        return recurrenceRepository.findByGroupSpace_IdAndFirstOccurrenceStartAtLessThan(groupSpaceId, to);
+        return recurrenceRepository.findByGroupSpaceIdAndFirstOccurrenceStartAtBefore(groupSpaceId, to);
     }
 }
