@@ -21,6 +21,8 @@ import com.calio.calendar.groupspace.service.GroupMembershipQueryService;
 import com.calio.calendar.recurrence.domain.RecurrenceOccurrence;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
 import com.calio.calendar.recurrence.service.Rfc5545RecurrenceEngine;
+import com.calio.calendar.sharing.event.domain.PersonalEventGroupShare;
+import com.calio.calendar.sharing.event.service.PersonalEventGroupShareQueryService;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.domain.TagType;
 import java.time.Instant;
@@ -49,6 +51,7 @@ class GroupCalendarServiceTest {
     @Mock private GroupCalendarRecurrenceQueryService recurrenceQueryService;
     @Mock private GroupCalendarRecurrenceOverrideQueryService overrideQueryService;
     @Mock private Rfc5545RecurrenceEngine recurrenceEngine;
+    @Mock private PersonalEventGroupShareQueryService eventShareQueryService;
 
     private GroupCalendarService service;
     private GroupSpace groupSpace;
@@ -62,7 +65,8 @@ class GroupCalendarServiceTest {
                 eventQueryService,
                 recurrenceQueryService,
                 overrideQueryService,
-                recurrenceEngine
+                recurrenceEngine,
+                eventShareQueryService
         );
         groupSpace = new GroupSpace(ACCOUNT_ID, "group", null);
         ReflectionTestUtils.setField(groupSpace, "id", GROUP_SPACE_ID);
@@ -83,6 +87,7 @@ class GroupCalendarServiceTest {
         when(membershipQueryService.getActiveMembership(GROUP_SPACE_ID, ACCOUNT_ID)).thenReturn(member);
         when(membershipQueryService.listActiveMembers(GROUP_SPACE_ID)).thenReturn(List.of(member));
         when(eventQueryService.listOverlappingEvents(GROUP_SPACE_ID, FROM, TO)).thenReturn(List.of());
+        when(eventShareQueryService.listByGroupSpaceId(GROUP_SPACE_ID)).thenReturn(List.of());
         when(recurrenceQueryService.listExpansionCandidates(GROUP_SPACE_ID, TO)).thenReturn(List.of(recurrenceEvent));
         when(overrideQueryService.listMovedInOverrides(GROUP_SPACE_ID, FROM, TO)).thenReturn(List.of());
     }
@@ -196,6 +201,39 @@ class GroupCalendarServiceTest {
     }
 
     @Test
+    @DisplayName("개인 단건 공유는 mapping UUID로 식별하고 익명 설정에 따라 원본 내용을 숨긴다")
+    void givenAnonymousAndVisibleSharedEvents_whenListItems_thenProjectsExposurePerMapping() {
+        var visible = PersonalEventGroupShare.create(
+                personalEvent("공개 일정", "공개 설명", FROM.plusSeconds(3600), FROM.plusSeconds(7200)),
+                groupSpace,
+                false
+        );
+        var anonymous = PersonalEventGroupShare.create(
+                personalEvent("비공개 일정", "비공개 설명", FROM.plusSeconds(10800), FROM.plusSeconds(14400)),
+                groupSpace,
+                true
+        );
+        when(eventShareQueryService.listByGroupSpaceId(GROUP_SPACE_ID)).thenReturn(List.of(visible, anonymous));
+
+        List<GroupCalendarItemResponse> items = service.listItems(ACCOUNT_ID, GROUP_SPACE_ID, FROM, TO);
+
+        assertThat(items).extracting(GroupCalendarItemResponse::title)
+                .containsExactly("공개 일정", "익명 일정");
+        assertThat(items).extracting(GroupCalendarItemResponse::description)
+                .containsExactly("공개 설명", null);
+        assertThat(items).extracting(GroupCalendarItemResponse::publicItemId)
+                .containsExactly(
+                        "shared-event:" + visible.getPublicShareId(),
+                        "shared-event:" + anonymous.getPublicShareId()
+                );
+        assertThat(items).allSatisfy(item -> {
+            assertThat(item.id()).isNull();
+            assertThat(item.recurrenceId()).isNull();
+            assertThat(item.tag()).isNull();
+        });
+    }
+
+    @Test
     @DisplayName("직접 Group Calendar 항목과 반복 회차는 안정적인 namespace 공개 식별자를 가진다")
     void givenDirectItems_whenListItems_thenReturnsStableNamespacedPublicItemIds() {
         GroupCalendarEvent directEvent = new GroupCalendarEvent(
@@ -252,5 +290,24 @@ class GroupCalendarServiceTest {
 
     private RecurrenceOccurrence occurrence(Instant startAt) {
         return new RecurrenceOccurrence(startAt, startAt, startAt.plusSeconds(3600));
+    }
+
+    private com.calio.calendar.event.domain.Event personalEvent(
+            String title,
+            String description,
+            Instant startAt,
+            Instant endAt
+    ) {
+        return new com.calio.calendar.event.domain.Event(
+                title,
+                description,
+                startAt,
+                endAt,
+                false,
+                "UTC",
+                null,
+                new Tag(TagType.PERSONAL_DEFAULT, "개인", "#64748B"),
+                account
+        );
     }
 }
