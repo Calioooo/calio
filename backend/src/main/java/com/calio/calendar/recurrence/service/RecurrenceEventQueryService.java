@@ -52,6 +52,17 @@ public class RecurrenceEventQueryService {
                 .findByRecurrenceEvent_IdAndOriginStartAtIn(recurrenceId, originStartAts);
     }
 
+    public List<RecurrenceEventOverride> listOverridesForRecurrenceIdsInRange(
+            Collection<Long> recurrenceIds,
+            Instant from,
+            Instant to
+    ) {
+        if (recurrenceIds.isEmpty()) {
+            return List.of();
+        }
+        return recurrenceEventOverrideRepository.findAllForRecurrenceIdsInRange(recurrenceIds, from, to);
+    }
+
     public List<RecurrenceEventOverride> listActiveOverlappingOverrides(
             Long accountId,
             Instant from,

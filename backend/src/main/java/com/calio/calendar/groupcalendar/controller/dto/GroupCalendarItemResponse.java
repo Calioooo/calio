@@ -5,6 +5,7 @@ import com.calio.calendar.groupcalendar.recurrence.domain.GroupCalendarRecurrenc
 import com.calio.calendar.groupcalendar.recurrence.domain.GroupCalendarRecurrenceOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceOccurrence;
 import com.calio.calendar.sharing.event.domain.PersonalEventGroupShare;
+import com.calio.calendar.sharing.recurrence.domain.PersonalRecurrenceGroupShare;
 import com.calio.calendar.tag.controller.dto.TagResponse;
 import java.time.Instant;
 
@@ -80,6 +81,32 @@ public record GroupCalendarItemResponse(
                 null,
                 creatorNickname,
                 "shared-event:" + share.getPublicShareId()
+        );
+    }
+
+    public static GroupCalendarItemResponse sharedRecurrenceOccurrence(
+            PersonalRecurrenceGroupShare share,
+            RecurrenceOccurrence occurrence,
+            com.calio.calendar.recurrence.domain.RecurrenceEventOverride override,
+            String creatorNickname
+    ) {
+        var recurrenceEvent = share.getRecurrenceEvent();
+        boolean anonymous = share.isAnonymous();
+        boolean overridden = override != null;
+        return new GroupCalendarItemResponse(
+                null,
+                anonymous ? ANONYMOUS_TITLE : overridden ? override.getOverrideTitle() : recurrenceEvent.getTitle(),
+                anonymous ? null : overridden ? override.getOverrideDescription() : recurrenceEvent.getDescription(),
+                overridden ? override.getOverrideStartAt() : occurrence.startAt(),
+                overridden ? override.getOverrideEndAt() : occurrence.endAt(),
+                overridden ? override.isOverrideAllDay() : recurrenceEvent.isAllDay(),
+                overridden ? override.getOverrideTimeZone() : recurrenceEvent.getTimeZone(),
+                null,
+                true,
+                occurrence.originStartAt(),
+                null,
+                creatorNickname,
+                "shared-recurrence:" + share.getPublicShareId() + ":" + occurrence.originStartAt()
         );
     }
 }

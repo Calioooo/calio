@@ -40,4 +40,8 @@ public class PersonalRecurrenceGroupShareQueryService {
         return shareRepository.findByRecurrenceEvent_IdAndGroupSpace_Id(recurrenceEventId, groupSpaceId)
                 .orElseThrow(() -> new CalioException(ErrorCode.PERSONAL_SCHEDULE_SHARE_NOT_FOUND));
     }
+
+    public List<PersonalRecurrenceGroupShare> listByGroupSpaceId(Long groupSpaceId) {
+        return shareRepository.findAllByGroupSpaceId(groupSpaceId);
+    }
 }
