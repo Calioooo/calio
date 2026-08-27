@@ -104,17 +104,13 @@ struct CalendarDateEventView: View {
                 onRetry: onRetryEventLoading
             )
 
-            if shouldShowEmptyState {
-                emptyState
-            } else {
-                GeometryReader { _ in
-                    let itemIDs = displayedItems.map(\.id)
+            GeometryReader { _ in
+                let itemIDs = displayedItems.map(\.id)
 
-                    if focusCoordinator.canRenderContent(referenceDay: referenceDay, itemIDs: itemIDs) {
-                        scrollContent(itemIDs: itemIDs)
-                    } else {
-                        initialAlignmentPlaceholder(itemIDs: itemIDs)
-                    }
+                if focusCoordinator.canRenderContent(referenceDay: referenceDay, itemIDs: itemIDs) {
+                    scrollContent(itemIDs: itemIDs)
+                } else {
+                    initialAlignmentPlaceholder(itemIDs: itemIDs)
                 }
             }
         }
@@ -223,20 +219,6 @@ struct CalendarDateEventView: View {
                     itemIDs: itemIDs
                 )
             }
-    }
-
-    private var shouldShowEmptyState: Bool {
-        !items.isEmpty && eventLoadState == .idle && items.allSatisfy { $0.calendarItemCount == 0 }
-    }
-
-    private var emptyState: some View {
-        ContentUnavailableView(
-            "일정이 없습니다",
-            systemImage: "calendar",
-            description: Text("새 일정을 추가하면 이곳에서 하루를 한눈에 볼 수 있어요.")
-        )
-        .foregroundStyle(.calioTextSecondary)
-        .accessibilityIdentifier("calendar_empty_state")
     }
 
     private var displayedItems: [CalendarDayItem] {

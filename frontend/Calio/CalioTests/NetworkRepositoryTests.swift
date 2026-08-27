@@ -221,6 +221,7 @@ struct NetworkRepositoryTests {
           "allDay": false,
           "timeZone": "Asia/Seoul",
           "importantEvent": true,
+          "isRecurrenceOccurrence": false,
           "tag": {
             "id": 1,
             "title": "업무",
