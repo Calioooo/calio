@@ -25,6 +25,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataIntegrityViolationException;
 
 @SpringBootTest(properties = {
         "spring.datasource.url=jdbc:h2:mem:personal-schedule-group-share-repository-test;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE",
@@ -97,7 +98,7 @@ class PersonalScheduleGroupShareRepositoryTest {
 
         assertThatThrownBy(() -> eventShareRepository.saveAndFlush(
                 PersonalEventGroupShare.create(event, groupSpace, true)
-        )).isInstanceOf(RuntimeException.class);
+        )).isInstanceOf(DataIntegrityViolationException.class);
     }
 
     @Test
