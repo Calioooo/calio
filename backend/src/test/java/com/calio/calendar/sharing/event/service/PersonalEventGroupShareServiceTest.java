@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.doAnswer;
 
@@ -154,6 +155,25 @@ class PersonalEventGroupShareServiceTest {
         assertThat(firstShare.isAnonymous()).isTrue();
         assertThat(secondShare.isAnonymous()).isFalse();
         verify(shareCommandService).changeAnonymous(firstShare, true);
+    }
+
+    @Test
+    @DisplayName("원본 소유자는 지정한 대상 mapping만 해제한다")
+    void removeDeletesOnlyRequestedTargetMapping() {
+        Event event = event(1L);
+        var requestedShare = com.calio.calendar.sharing.event.domain.PersonalEventGroupShare.create(
+                event, groupSpace(10L), false
+        );
+        var remainingShare = com.calio.calendar.sharing.event.domain.PersonalEventGroupShare.create(
+                event, groupSpace(20L), false
+        );
+        when(eventQueryService.getEventForShareManagement(100L, 1L)).thenReturn(event);
+        when(shareQueryService.getByEventIdAndGroupSpaceId(1L, 10L)).thenReturn(requestedShare);
+
+        service.remove(100L, 1L, 10L);
+
+        verify(shareCommandService).delete(requestedShare);
+        verify(shareCommandService, never()).delete(remainingShare);
     }
 
     private Event event(Long id) {

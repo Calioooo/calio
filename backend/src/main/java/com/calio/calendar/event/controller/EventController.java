@@ -119,6 +119,16 @@ public class EventController {
         );
     }
 
+    @DeleteMapping("/{eventId}/group-shares/{groupSpaceId}")
+    public ResponseEntity<Void> removeGroupShare(
+            @AuthenticationPrincipal AuthenticatedAccount account,
+            @PathVariable("eventId") Long eventId,
+            @PathVariable("groupSpaceId") Long groupSpaceId
+    ) {
+        eventGroupShareService.remove(account.accountId(), eventId, groupSpaceId);
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping
     public List<EventResponse> listEvents(
             @AuthenticationPrincipal AuthenticatedAccount account,

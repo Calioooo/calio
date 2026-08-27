@@ -39,4 +39,8 @@ public class PersonalRecurrenceGroupShareCommandService {
     public void changeAnonymous(PersonalRecurrenceGroupShare share, boolean anonymous) {
         share.changeAnonymous(anonymous);
     }
+
+    public void delete(PersonalRecurrenceGroupShare share) {
+        shareRepository.delete(share);
+    }
 }

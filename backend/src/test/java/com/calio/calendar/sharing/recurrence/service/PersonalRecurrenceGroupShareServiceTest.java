@@ -6,6 +6,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.never;
 
 import com.calio.calendar.groupspace.domain.GroupMember;
 import com.calio.calendar.groupspace.domain.GroupSpace;
@@ -114,6 +115,27 @@ class PersonalRecurrenceGroupShareServiceTest {
         assertThat(firstShare.isAnonymous()).isFalse();
         assertThat(secondShare.isAnonymous()).isTrue();
         verify(shareCommandService).changeAnonymous(firstShare, false);
+    }
+
+    @Test
+    @DisplayName("반복 일정 원본 소유자는 지정한 대상 mapping만 해제한다")
+    void removeDeletesOnlyRequestedTargetMapping() {
+        RecurrenceEvent recurrenceEvent = mock(RecurrenceEvent.class);
+        var requestedShare = com.calio.calendar.sharing.recurrence.domain.PersonalRecurrenceGroupShare.create(
+                recurrenceEvent, groupSpace(10L), false
+        );
+        var remainingShare = com.calio.calendar.sharing.recurrence.domain.PersonalRecurrenceGroupShare.create(
+                recurrenceEvent, groupSpace(20L), false
+        );
+        when(recurrenceEventQueryService.getRecurrenceEventForShareManagement(100L, 30L))
+                .thenReturn(recurrenceEvent);
+        when(shareQueryService.getByRecurrenceEventIdAndGroupSpaceId(30L, 10L))
+                .thenReturn(requestedShare);
+
+        service.remove(100L, 30L, 10L);
+
+        verify(shareCommandService).delete(requestedShare);
+        verify(shareCommandService, never()).delete(remainingShare);
     }
 
     private GroupSpace groupSpace(Long id) {

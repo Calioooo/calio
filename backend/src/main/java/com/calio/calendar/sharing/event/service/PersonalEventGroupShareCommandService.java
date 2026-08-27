@@ -39,4 +39,8 @@ public class PersonalEventGroupShareCommandService {
     public void changeAnonymous(PersonalEventGroupShare share, boolean anonymous) {
         share.changeAnonymous(anonymous);
     }
+
+    public void delete(PersonalEventGroupShare share) {
+        shareRepository.delete(share);
+    }
 }

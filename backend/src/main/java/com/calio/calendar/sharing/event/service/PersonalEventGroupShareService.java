@@ -98,6 +98,13 @@ public class PersonalEventGroupShareService {
         );
     }
 
+    @Transactional
+    public void remove(Long accountId, Long eventId, Long groupSpaceId) {
+        eventQueryService.getEventForShareManagement(accountId, eventId);
+        PersonalEventGroupShare share = shareQueryService.getByEventIdAndGroupSpaceId(eventId, groupSpaceId);
+        shareCommandService.delete(share);
+    }
+
     private Map<Long, Event> validateSources(Long accountId, List<Long> eventIds) {
         Map<Long, Event> eventsById = eventQueryService.listShareableEvents(accountId, eventIds)
                 .stream()

@@ -98,6 +98,14 @@ public class PersonalRecurrenceGroupShareService {
         );
     }
 
+    @Transactional
+    public void remove(Long accountId, Long recurrenceId, Long groupSpaceId) {
+        recurrenceEventQueryService.getRecurrenceEventForShareManagement(accountId, recurrenceId);
+        PersonalRecurrenceGroupShare share = shareQueryService
+                .getByRecurrenceEventIdAndGroupSpaceId(recurrenceId, groupSpaceId);
+        shareCommandService.delete(share);
+    }
+
     private Map<Long, GroupSpace> activeGroupSpaces(Long accountId, List<Long> groupSpaceIds) {
         return membershipQueryService.listActiveMemberships(accountId, groupSpaceIds)
                 .stream()

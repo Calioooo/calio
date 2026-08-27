@@ -105,6 +105,16 @@ public class RecurrenceEventController {
         );
     }
 
+    @DeleteMapping("/{recurrenceId}/group-shares/{groupSpaceId}")
+    public ResponseEntity<Void> removeGroupShare(
+            @AuthenticationPrincipal AuthenticatedAccount account,
+            @PathVariable("recurrenceId") Long recurrenceId,
+            @PathVariable("groupSpaceId") Long groupSpaceId
+    ) {
+        recurrenceGroupShareService.remove(account.accountId(), recurrenceId, groupSpaceId);
+        return ResponseEntity.noContent().build();
+    }
+
     @PutMapping("/{recurrenceId}")
     public RecurrenceEventResponse updateRecurrenceEvent(
             @AuthenticationPrincipal AuthenticatedAccount account,
