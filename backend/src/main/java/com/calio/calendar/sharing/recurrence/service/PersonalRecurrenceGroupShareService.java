@@ -64,17 +64,12 @@ public class PersonalRecurrenceGroupShareService {
                         request.isAnonymous()
                 ))
                 .toList();
-        return new CreateRecurrenceGroupSharesResponse(recurrenceId, targets);
+        return CreateRecurrenceGroupSharesResponse.from(recurrenceId, targets);
     }
 
     public List<GroupShareStatusResponse> list(Long recurrenceId) {
         return shareQueryService.listByRecurrenceEventId(recurrenceId).stream()
-                .map(share -> new GroupShareStatusResponse(
-                        share.getGroupSpace().getId(),
-                        share.getGroupSpace().getName(),
-                        share.isAnonymous(),
-                        share.getPublicShareId()
-                ))
+                .map(GroupShareStatusResponse::from)
                 .toList();
     }
 
@@ -87,12 +82,7 @@ public class PersonalRecurrenceGroupShareService {
         PersonalRecurrenceGroupShare share = shareQueryService
                 .getByRecurrenceEventIdAndGroupSpaceId(recurrenceId, groupSpaceId);
         shareCommandService.changeAnonymous(share, request.isAnonymous());
-        return new GroupShareStatusResponse(
-                share.getGroupSpace().getId(),
-                share.getGroupSpace().getName(),
-                share.isAnonymous(),
-                share.getPublicShareId()
-        );
+        return GroupShareStatusResponse.from(share);
     }
 
     @Transactional
@@ -119,15 +109,15 @@ public class PersonalRecurrenceGroupShareService {
             boolean anonymous
     ) {
         if (groupSpace == null) {
-            return new GroupShareTargetResponse(groupSpaceId, GroupShareTargetStatus.NOT_ELIGIBLE);
+            return GroupShareTargetResponse.from(groupSpaceId, GroupShareTargetStatus.NOT_ELIGIBLE);
         }
         if (existingGroupSpaceIds.contains(groupSpaceId)) {
-            return new GroupShareTargetResponse(groupSpaceId, GroupShareTargetStatus.ALREADY_SHARED);
+            return GroupShareTargetResponse.from(groupSpaceId, GroupShareTargetStatus.ALREADY_SHARED);
         }
         boolean inserted = shareCommandService.createIfAbsent(
                 PersonalRecurrenceGroupShare.create(recurrenceEvent, groupSpace, anonymous)
         );
-        return new GroupShareTargetResponse(
+        return GroupShareTargetResponse.from(
                 groupSpaceId,
                 inserted ? GroupShareTargetStatus.SHARED : GroupShareTargetStatus.ALREADY_SHARED
         );
