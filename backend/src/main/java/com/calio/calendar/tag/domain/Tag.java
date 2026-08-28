@@ -50,31 +50,19 @@ public class Tag extends BaseEntity {
     }
 
     public static Tag personalDefault(String title, String colorCode) {
-        return new Tag(TagType.PERSONAL_DEFAULT, title, colorCode, (Account) null);
+        return new Tag(TagType.PERSONAL_DEFAULT, title, colorCode, null, null);
     }
 
     public static Tag personalCustom(Account account, String title, String colorCode) {
-        return new Tag(TagType.CUSTOM, title, colorCode, account);
+        return new Tag(TagType.CUSTOM, title, colorCode, account, null);
     }
 
     public static Tag groupDefault(GroupSpace groupSpace) {
-        return new Tag(TagType.GROUP_DEFAULT, "기타", "#64748B", groupSpace);
+        return new Tag(TagType.GROUP_DEFAULT, "기타", "#64748B", null, groupSpace);
     }
 
     public static Tag groupCustom(GroupSpace groupSpace, String title, String colorCode) {
-        return new Tag(TagType.CUSTOM, title, colorCode, groupSpace);
-    }
-
-    public Tag(TagType tagType, String title, String colorCode) {
-        this(tagType, title, colorCode, (Account) null);
-    }
-
-    public Tag(TagType tagType, String title, String colorCode, Account account) {
-        this(tagType, title, colorCode, account, null);
-    }
-
-    public Tag(TagType tagType, String title, String colorCode, GroupSpace groupSpace) {
-        this(tagType, title, colorCode, null, groupSpace);
+        return new Tag(TagType.CUSTOM, title, colorCode, null, groupSpace);
     }
 
     private Tag(TagType tagType, String title, String colorCode, Account account, GroupSpace groupSpace) {

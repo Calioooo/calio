@@ -68,7 +68,7 @@ class GroupCalendarServiceTest {
         ReflectionTestUtils.setField(groupSpace, "id", GROUP_SPACE_ID);
         account = new Account();
         ReflectionTestUtils.setField(account, "id", ACCOUNT_ID);
-        Tag tag = new Tag(TagType.GROUP_DEFAULT, "기타", "#64748B", groupSpace);
+        Tag tag = Tag.groupDefault(groupSpace);
         recurrenceEvent = new GroupCalendarRecurrenceEvent(
                 groupSpace,
                 account,

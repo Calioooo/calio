@@ -84,7 +84,7 @@ class RecurrenceEventControllerTest {
     void setUpDefaultTag() {
         accountId = currentAccountReference().getId();
         tagRepository.findFirstByTagTypeAndTitleAndAccountIsNullAndGroupSpaceIsNullOrderByIdAsc(TagType.PERSONAL_DEFAULT, "기타")
-                .orElseGet(() -> tagRepository.save(new Tag(TagType.PERSONAL_DEFAULT, "기타", "#64748B")));
+                .orElseGet(() -> tagRepository.save(Tag.personalDefault("기타", "#64748B")));
     }
 
     @Test
@@ -419,11 +419,10 @@ class RecurrenceEventControllerTest {
                 originalTag,
                 accountRepository.getReferenceById(accountId)
         ));
-        Tag replacementTag = tagRepository.save(new Tag(
-                TagType.CUSTOM,
+        Tag replacementTag = tagRepository.save(Tag.personalCustom(
+                accountRepository.getReferenceById(accountId),
                 "Changed tag",
-                "#123456",
-                accountRepository.getReferenceById(accountId)
+                "#123456"
         ));
 
         // when
@@ -801,7 +800,7 @@ class RecurrenceEventControllerTest {
     void givenOtherAccountTag_whenCreate_thenReturnsTagNotFound() throws Exception {
         // given
         Account otherAccount = accountRepository.save(new Account());
-        Tag otherTag = tagRepository.save(new Tag(TagType.CUSTOM, "Other", "#123456", otherAccount));
+        Tag otherTag = tagRepository.save(Tag.personalCustom(otherAccount, "Other", "#123456"));
 
         // when, then
         mockMvc.perform(post("/api/recurrence-events")

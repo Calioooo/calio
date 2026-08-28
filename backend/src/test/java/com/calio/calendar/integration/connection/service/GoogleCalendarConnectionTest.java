@@ -140,7 +140,7 @@ class GoogleCalendarConnectionTest {
         // given
         Account account = accountRepository.saveAndFlush(new Account());
         Tag defaultTag = tagRepository.saveAndFlush(
-                new Tag(TagType.PERSONAL_DEFAULT, "기타", "#64748B")
+                Tag.personalDefault("기타", "#64748B")
         );
         GoogleCalendarIntegration integration = integrationRepository.saveAndFlush(
                 integration(account.getId())
@@ -216,7 +216,7 @@ class GoogleCalendarConnectionTest {
             String externalEventId
     ) {
         Tag fallbackTag = tagRepository.saveAndFlush(
-                new Tag(TagType.PERSONAL_DEFAULT, "기타", "#64748B")
+                Tag.personalDefault("기타", "#64748B")
         );
         Event event = eventRepository.saveAndFlush(new Event(
                 "Imported",

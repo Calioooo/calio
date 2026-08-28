@@ -83,7 +83,7 @@ class GroupCalendarControllerTest {
                 "nickname",
                 START_AT
         ));
-        Tag defaultTag = tagRepository.saveAndFlush(new Tag(TagType.GROUP_DEFAULT, "기타", "#64748B", groupSpace));
+        Tag defaultTag = tagRepository.saveAndFlush(Tag.groupDefault(groupSpace));
         GroupSpace anotherGroupSpace = groupSpaceRepository.saveAndFlush(
                 new GroupSpace(currentAccountId(), "another-group", null)
         );

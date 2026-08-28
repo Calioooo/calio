@@ -136,7 +136,7 @@ class GroupMembershipServiceTest {
         Account owner = accountRepository.saveAndFlush(new Account());
         GroupSpace groupSpace = groupSpaceRepository.saveAndFlush(new GroupSpace(owner.getId(), "Shared", null));
         groupMemberRepository.saveAndFlush(new GroupMember(groupSpace, owner.getId(), "owner", MEMBER_CREATED_AT));
-        Tag tag = tagRepository.saveAndFlush(new Tag(TagType.GROUP_DEFAULT, "기타", "#64748B", groupSpace));
+        Tag tag = tagRepository.saveAndFlush(Tag.groupDefault(groupSpace));
         groupCalendarEventRepository.saveAndFlush(new GroupCalendarEvent(
                 groupSpace,
                 owner,

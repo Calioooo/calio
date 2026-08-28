@@ -33,8 +33,8 @@ class TagServiceTest {
     @DisplayName("유효한 tagId는 PERSONAL_DEFAULT 또는 CUSTOM 태그를 resolve한다")
     void givenExistingTagId_whenResolveTag_thenReturnsTag() {
         // given
-        Tag defaultTag = new Tag(TagType.PERSONAL_DEFAULT, "업무", "#2563eb");
-        Tag customTag = new Tag(TagType.CUSTOM, "사용자", "#8b5cf6", mock(Account.class));
+        Tag defaultTag = Tag.personalDefault("업무", "#2563eb");
+        Tag customTag = Tag.personalCustom(mock(Account.class), "사용자", "#8b5cf6");
         when(tagRepository.findByIdAndTagTypeAndAccountIsNullAndGroupSpaceIsNull(1L, TagType.PERSONAL_DEFAULT))
                 .thenReturn(Optional.of(defaultTag));
         when(tagRepository.findByIdAndTagTypeAndAccountIsNullAndGroupSpaceIsNull(2L, TagType.PERSONAL_DEFAULT))
@@ -73,7 +73,7 @@ class TagServiceTest {
     @DisplayName("tagId가 null이면 PERSONAL_DEFAULT 기타 fallback 태그를 조회한다")
     void givenNullTagId_whenResolveDefaultTag_thenReturnsFallbackTag() {
         // given
-        Tag fallbackTag = new Tag(TagType.PERSONAL_DEFAULT, "기타", "#64748B");
+        Tag fallbackTag = Tag.personalDefault("기타", "#64748B");
         when(tagRepository.findFirstByTagTypeAndTitleAndAccountIsNullAndGroupSpaceIsNullOrderByIdAsc(TagType.PERSONAL_DEFAULT, "기타"))
                 .thenReturn(Optional.of(fallbackTag));
 
@@ -102,7 +102,7 @@ class TagServiceTest {
     @DisplayName("colorCode는 #RRGGBB 형식만 허용한다")
     void givenInvalidColorCode_whenCreateTag_thenThrowsInvalidTagColorCode() {
         // when, then
-        assertThatThrownBy(() -> new Tag(TagType.PERSONAL_DEFAULT, "잘못된 색상", "2563EB"))
+        assertThatThrownBy(() -> Tag.personalDefault("잘못된 색상", "2563EB"))
                 .isInstanceOfSatisfying(CalioException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.INVALID_TAG_COLOR_CODE)
                 );

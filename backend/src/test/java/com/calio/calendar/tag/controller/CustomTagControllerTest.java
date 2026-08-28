@@ -144,8 +144,8 @@ class CustomTagControllerTest {
     @DisplayName("사용자가 CUSTOM 태그를 수정하면 성공하고, PERSONAL_DEFAULT 태그를 수정하면 TAG_NOT_FOUND 예외를 반환한다")
     void givenCustomAndPersonalDefaultTagIds_whenUpdateCustomTag_thenOnlyCustomTagIsUpdated() throws Exception {
         // given
-        Tag customTag = tagRepository.save(new Tag(TagType.CUSTOM, "기존", "#111111", currentAccountReference()));
-        Tag defaultTag = tagRepository.save(new Tag(TagType.PERSONAL_DEFAULT, "기타", "#64748B"));
+        Tag customTag = tagRepository.save(Tag.personalCustom(currentAccountReference(), "기존", "#111111"));
+        Tag defaultTag = tagRepository.save(Tag.personalDefault("기타", "#64748B"));
 
         // when
         mockMvc.perform(put("/api/custom-tags/{tagId}", customTag.getId())
@@ -169,8 +169,8 @@ class CustomTagControllerTest {
     @DisplayName("custom tag를 삭제하면 event, recurrence event, occurrence event 모두 fallback 기타 태그로 재할당한다")
     void givenCustomTagInUse_whenDeleteCustomTag_thenReassignsAllUsagesToFallbackTag() throws Exception {
         // given
-        Tag fallbackTag = tagRepository.save(new Tag(TagType.PERSONAL_DEFAULT, "기타", "#64748B"));
-        Tag customTag = tagRepository.save(new Tag(TagType.CUSTOM, "삭제 대상", "#8B5CF6", currentAccountReference()));
+        Tag fallbackTag = tagRepository.save(Tag.personalDefault("기타", "#64748B"));
+        Tag customTag = tagRepository.save(Tag.personalCustom(currentAccountReference(), "삭제 대상", "#8B5CF6"));
         Event ordinaryEvent = eventRepository.save(event("일반", null, customTag));
         RecurrenceEvent recurrenceEvent = recurrenceEventRepository.save(recurrenceEvent(customTag));
         Event occurrenceEvent = eventRepository.save(event("반복 occurrence", recurrenceEvent.getId(), customTag));
@@ -196,7 +196,7 @@ class CustomTagControllerTest {
     void givenMissingFallbackTag_whenDeleteCustomTag_thenHidesInternalErrorAndKeepsReferences()
             throws Exception {
         // given
-        Tag customTag = tagRepository.save(new Tag(TagType.CUSTOM, "삭제 보류", "#8B5CF6", currentAccountReference()));
+        Tag customTag = tagRepository.save(Tag.personalCustom(currentAccountReference(), "삭제 보류", "#8B5CF6"));
         Event ordinaryEvent = eventRepository.save(event("일반", null, customTag));
         RecurrenceEvent recurrenceEvent = recurrenceEventRepository.save(recurrenceEvent(customTag));
 

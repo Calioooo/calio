@@ -47,9 +47,9 @@ class TagControllerTest {
     @DisplayName("사용자는 PERSONAL_DEFAULT와 CUSTOM 태그 목록을 id, title, colorCode, tagType으로 조회한다")
     void givenPersonalDefaultAndCustomTags_whenListTags_thenReturnsAllTags() throws Exception {
         // given
-        tagRepository.save(new Tag(TagType.PERSONAL_DEFAULT, "업무", "#2563eb"));
-        tagRepository.save(new Tag(TagType.PERSONAL_DEFAULT, "기타", "#64748b"));
-        tagRepository.save(new Tag(TagType.CUSTOM, "사용자", "#111111", currentAccountReference()));
+        tagRepository.save(Tag.personalDefault("업무", "#2563eb"));
+        tagRepository.save(Tag.personalDefault("기타", "#64748b"));
+        tagRepository.save(Tag.personalCustom(currentAccountReference(), "사용자", "#111111"));
 
         // when
         mockMvc.perform(get("/api/tags"))
