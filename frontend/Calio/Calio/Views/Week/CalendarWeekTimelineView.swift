@@ -34,6 +34,7 @@ struct CalendarWeekTimelineView: View {
     let onResetEventMutation: () -> Void
     let onResetTagMutation: () -> Void
     let onFetchRecurrenceEvent: (Int64) async -> RecurrenceEventDetails?
+    let onUpdateImportantEvent: (Event, Bool) async -> Event?
     let onUpdateSingleEvent: (Event, EventUpdateInput) async -> Bool
     let onUpdateRecurrenceOccurrence: (Event, EventUpdateInput) async -> Bool
     let onUpdateRecurrenceSeries: (Int64, RecurrenceEventSeriesEditInput) async -> Bool
@@ -64,6 +65,7 @@ struct CalendarWeekTimelineView: View {
         onResetEventMutation: @escaping () -> Void = {},
         onResetTagMutation: @escaping () -> Void = {},
         onFetchRecurrenceEvent: @escaping (Int64) async -> RecurrenceEventDetails? = { _ in nil },
+        onUpdateImportantEvent: @escaping (Event, Bool) async -> Event?,
         onUpdateSingleEvent: @escaping (Event, EventUpdateInput) async -> Bool = { _, _ in true },
         onUpdateRecurrenceOccurrence: @escaping (Event, EventUpdateInput) async -> Bool = { _, _ in true },
         onUpdateRecurrenceSeries: @escaping (Int64, RecurrenceEventSeriesEditInput) async -> Bool = { _, _ in true },
@@ -93,6 +95,7 @@ struct CalendarWeekTimelineView: View {
         self.onResetEventMutation = onResetEventMutation
         self.onResetTagMutation = onResetTagMutation
         self.onFetchRecurrenceEvent = onFetchRecurrenceEvent
+        self.onUpdateImportantEvent = onUpdateImportantEvent
         self.onUpdateSingleEvent = onUpdateSingleEvent
         self.onUpdateRecurrenceOccurrence = onUpdateRecurrenceOccurrence
         self.onUpdateRecurrenceSeries = onUpdateRecurrenceSeries
@@ -180,6 +183,7 @@ struct CalendarWeekTimelineView: View {
                 mutationFailureMessage: eventMutationFailureMessage,
                 tagMutationFailureMessage: tagMutationFailureMessage,
                 onFetchRecurrenceEvent: onFetchRecurrenceEvent,
+                onUpdateImportantEvent: onUpdateImportantEvent,
                 onUpdateSingleEvent: onUpdateSingleEvent,
                 onUpdateRecurrenceOccurrence: onUpdateRecurrenceOccurrence,
                 onUpdateRecurrenceSeries: onUpdateRecurrenceSeries,
@@ -393,9 +397,18 @@ struct CalendarWeekTimelineView: View {
         _ event: Event,
         metrics: TimelineMetrics
     ) -> some View {
-        Text(event.title)
-            .font(.system(size: metrics.fullDayEventFontSize, weight: .semibold))
-            .lineLimit(1)
+        HStack(spacing: 4) {
+            Text(event.title)
+                .font(.system(size: metrics.fullDayEventFontSize, weight: .semibold))
+                .lineLimit(1)
+
+            if event.importantEvent {
+                Image(systemName: "star.fill")
+                    .font(.caption2)
+                    .foregroundStyle(Color.calioImportantStar)
+                    .accessibilityLabel("중요 일정")
+            }
+        }
             .foregroundStyle(.white)
             .padding(.horizontal, metrics.eventHorizontalPadding)
             .frame(maxWidth: .infinity, minHeight: metrics.fullDayEventHeight)
@@ -404,7 +417,7 @@ struct CalendarWeekTimelineView: View {
                     .fill(Color(hex: event.tag.colorCode))
             )
             .contentShape(Rectangle())
-            .accessibilityLabel("\(event.title), 종일 일정")
+            .accessibilityLabel("\(event.title), \(event.importantEvent ? "중요 일정, " : "")종일 일정")
             .accessibilityAddTraits(.isButton)
             .accessibilityIdentifier("week_full_day_event_\(event.id)")
             .onTapGesture {
@@ -479,9 +492,17 @@ struct CalendarWeekTimelineView: View {
     
     private func eventBlocks(metrics: TimelineMetrics, containerSize: CGSize) -> some View {
         ForEach(eventLayouts(metrics: metrics)) { layout in
-            Text(layout.title)
+            HStack(spacing: 4) {
+                Text(layout.title)
+                    .lineLimit(1)
+
+                if layout.showsImportantIndicator {
+                    Image(systemName: "star.fill")
+                        .font(.caption2)
+                        .foregroundStyle(Color.calioImportantStar)
+                }
+            }
                 .font(.system(size: metrics.eventFontSize, weight: .semibold))
-                .lineLimit(1)
                 .foregroundStyle(layout.foregroundColor)
                 .padding(.horizontal, metrics.eventHorizontalPadding)
                 .padding(.vertical, metrics.eventVerticalPadding)
@@ -1064,10 +1085,18 @@ struct CalendarTimelineOverlapPopoverView: View {
                                 .frame(width: 5, height: 34)
                             
                             VStack(alignment: .leading, spacing: 3) {
-                                Text(event.title)
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .foregroundStyle(.calioTextPrimary)
-                                    .lineLimit(1)
+                                HStack(spacing: 4) {
+                                    Text(event.title)
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .foregroundStyle(.calioTextPrimary)
+                                        .lineLimit(1)
+
+                                    if event.importantEvent {
+                                        Image(systemName: "star.fill")
+                                            .font(.caption)
+                                            .foregroundStyle(Color.calioImportantStar)
+                                    }
+                                }
                                 
                                 Text(
                                     CalendarEventDisplayText.compactDateTimeRange(
@@ -1088,7 +1117,7 @@ struct CalendarTimelineOverlapPopoverView: View {
                         .padding(.vertical, 8)
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("\(event.title), \(CalendarEventDisplayText.compactDateTimeRange(startAt: event.startAt, endAt: event.endAt))")
+                    .accessibilityLabel("\(event.title), \(event.importantEvent ? "중요 일정, " : "")\(CalendarEventDisplayText.compactDateTimeRange(startAt: event.startAt, endAt: event.endAt))")
                     .accessibilityHint("일정 상세 보기")
                     .accessibilityIdentifier("timeline_overlap_event_\(event.id)")
                     
@@ -1221,6 +1250,7 @@ private extension UIView {
         onSelectedDay: { _ in },
         onVisibleRangeChanged: { _ in },
         onSelectedYearMonth: { _, _ in },
-        onRetryEventLoading: {}
+        onRetryEventLoading: {},
+        onUpdateImportantEvent: { _, _ in nil }
     )
 }

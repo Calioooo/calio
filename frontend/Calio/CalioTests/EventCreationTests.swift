@@ -6,6 +6,11 @@ import SwiftUI
 @Suite(.serialized)
 struct EventCreationTests {
 
+    @Test func eventCreationDisablesCancelOnlyWhileSaving() async throws {
+        #expect(CalendarEventCreationView.isCancelDisabled(isSaving: true))
+        #expect(!CalendarEventCreationView.isCancelDisabled(isSaving: false))
+    }
+
     @Test func eventCreationDefaultTimesUseReferenceDayMorningRange() async throws {
         let calendar = fixedCalendar
         let referenceDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 10, hour: 15)))

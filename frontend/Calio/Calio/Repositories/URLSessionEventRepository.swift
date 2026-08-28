@@ -71,6 +71,19 @@ struct URLSessionEventRepository: EventRepository {
         )
     }
 
+    func updateImportantEvent(
+        eventId: Int64,
+        request: UpdateImportantEventRequestDTO
+    ) async throws -> EventResponseDTO {
+        try await apiClient.send(
+            EventResponseDTO.self,
+            method: .patch,
+            pathComponents: ["api", "events", String(eventId), "important-event"],
+            authorization: .bearer,
+            body: request
+        )
+    }
+
     func updateRecurrenceEvent(
         recurrenceId: Int64,
         request: UpdateRecurrenceEventRequestDTO

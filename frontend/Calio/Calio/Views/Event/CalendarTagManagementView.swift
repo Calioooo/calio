@@ -87,7 +87,8 @@ struct CalendarTagManagementView: View {
                         onResetFailure()
                         isCreatingTag = true
                     } label: {
-                        Image(systemName: "plus")
+                        Label("태그 추가", systemImage: "plus")
+                            .font(.subheadline.weight(.semibold))
                     }
                     .disabled(isMutating)
                     .accessibilityLabel("커스텀 태그 추가")
@@ -167,9 +168,20 @@ struct CalendarTagManagementView: View {
     private func tagSection(title: String, tags: [CalendarTag]) -> some View {
         Section(title) {
             if tags.isEmpty {
-                Label(title == "커스텀 태그" ? "추가한 커스텀 태그가 없습니다." : "태그가 없습니다.", systemImage: "tag")
-                    .font(.subheadline)
-                    .foregroundStyle(.calioTextSecondary)
+                VStack(alignment: .leading, spacing: 6) {
+                    Label(title == "커스텀 태그" ? "추가한 커스텀 태그가 없습니다." : "태그가 없습니다.", systemImage: "tag")
+                        .font(.subheadline)
+                        .foregroundStyle(.calioTextPrimary)
+
+                    if title == "커스텀 태그" {
+                        Text("오른쪽 위의 태그 추가로 필요한 태그를 만들어 보세요.")
+                            .font(.caption)
+                            .foregroundStyle(.calioTextSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .padding(.vertical, 4)
+                .listRowBackground(Color.calioSurface)
                     .accessibilityIdentifier("tag_management_empty_\(title == "커스텀 태그" ? "custom" : "default")")
             } else {
                 ForEach(tags) { tag in
@@ -180,18 +192,26 @@ struct CalendarTagManagementView: View {
     }
 
     private func tagRow(_ tag: CalendarTag) -> some View {
-        HStack(spacing: 10) {
+        let isSelected = selectedTag?.id == tag.id
+
+        return HStack(spacing: 10) {
             Circle()
                 .fill(Color(hex: tag.colorCode))
                 .frame(width: 14, height: 14)
                 .overlay(Circle().stroke(Color.calioDivider, lineWidth: 1))
 
             Text(tag.title)
-                .font(.body)
+                .font(.body.weight(isSelected ? .semibold : .regular))
                 .foregroundStyle(.calioTextPrimary)
                 .lineLimit(1)
 
             Spacer()
+
+            if isSelected {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(.calioBrand)
+                    .accessibilityLabel("선택됨")
+            }
 
             if tag.tagType == .custom {
                 Button {
@@ -224,6 +244,8 @@ struct CalendarTagManagementView: View {
                     .background(Capsule().fill(Color.calioSelection))
             }
         }
+        .padding(.vertical, 5)
+        .listRowBackground(isSelected ? Color.calioSelection : Color.calioSurface)
         .contentShape(Rectangle())
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("tag_management_row_\(tag.id)")

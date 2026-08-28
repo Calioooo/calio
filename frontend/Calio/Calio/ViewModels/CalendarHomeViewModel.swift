@@ -398,6 +398,37 @@ final class CalendarHomeViewModel: ObservableObject {
         }
     }
 
+    func updateImportantEvent(_ event: Event, importantEvent: Bool) async -> Event? {
+        guard let eventId = event.backendId,
+              !event.isRecurrenceOccurrence,
+              event.recurrenceId == nil,
+              !mutationState.isMutating
+        else {
+            return nil
+        }
+
+        mutationState = .saving
+
+        do {
+            let updatedEvent = try await eventService.updateImportantEvent(
+                eventId: eventId,
+                importantEvent: importantEvent
+            )
+            invalidateAndRefetchMonths([
+                YearMonthKey(date: event.startAt, calendar: calendar),
+                YearMonthKey(date: updatedEvent.startAt, calendar: calendar)
+            ])
+            mutationState = .idle
+            return updatedEvent
+        } catch let error as EventServiceError {
+            mutationState = .failed(CalendarEventMutationFailure(error: error))
+            return nil
+        } catch {
+            mutationState = .failed(.unexpected)
+            return nil
+        }
+    }
+
     func fetchRecurrenceEvent(recurrenceId: Int64) async -> RecurrenceEventDetails? {
         guard !mutationState.isMutating else {
             return nil

@@ -88,6 +88,22 @@ struct EventService {
         }
     }
 
+    func updateImportantEvent(eventId: Int64, importantEvent: Bool) async throws -> Event {
+        do {
+            let response = try await repository.updateImportantEvent(
+                eventId: eventId,
+                request: UpdateImportantEventRequestDTO(importantEvent: importantEvent)
+            )
+            return try mapToEvent(response)
+        } catch let error as APIError {
+            throw mapToServiceError(error)
+        } catch let error as EventServiceError {
+            throw error
+        } catch {
+            throw EventServiceError.unexpected
+        }
+    }
+
     func fetchRecurrenceEvent(recurrenceId: Int64) async throws -> RecurrenceEventDetails {
         do {
             let response = try await repository.fetchRecurrenceEvent(recurrenceId: recurrenceId)
@@ -266,6 +282,10 @@ struct EventService {
 
     private func mapToRecurrenceEventDetails(_ dto: RecurrenceEventResponseDTO) throws -> RecurrenceEventDetails {
         let editableRule = RecurrenceRule.editableRule(from: dto.recurrence, allDay: dto.allDay)
+        let seriesTimeZone = try recurrenceSeriesTimeZone(
+            identifier: dto.timeZone,
+            isAllDay: dto.allDay
+        )
         let allDayRange = dto.allDay
             ? try CalendarDateService.localAllDayDisplayRange(
                 utcStartAt: dto.firstOccurrenceStartAt,
@@ -276,10 +296,21 @@ struct EventService {
             recurrenceId: dto.recurrenceId,
             title: dto.title,
             description: dto.description ?? "",
-            recurrenceStartDate: allDayRange?.startAt ?? dto.firstOccurrenceStartAt,
-            recurrenceEndDate: editableRule?.until,
-            recurrenceStartTime: dto.firstOccurrenceStartAt,
-            recurrenceEndTime: dto.firstOccurrenceEndAt,
+            recurrenceStartDate: allDayRange?.startAt ?? recurrenceFormDate(
+                dto.firstOccurrenceStartAt,
+                seriesTimeZone: seriesTimeZone
+            ),
+            recurrenceEndDate: editableRule?.until.map {
+                recurrenceFormDate($0, seriesTimeZone: seriesTimeZone)
+            },
+            recurrenceStartTime: recurrenceFormDate(
+                dto.firstOccurrenceStartAt,
+                seriesTimeZone: seriesTimeZone
+            ),
+            recurrenceEndTime: recurrenceFormDate(
+                dto.firstOccurrenceEndAt,
+                seriesTimeZone: seriesTimeZone
+            ),
             recurrenceFrequency: editableRule?.frequency ?? .daily,
             isAllDay: dto.allDay,
             timeZone: dto.timeZone,
@@ -287,6 +318,35 @@ struct EventService {
             isRuleEditable: editableRule != nil,
             tagId: dto.tag.id
         )
+    }
+
+    private func recurrenceSeriesTimeZone(
+        identifier: String?,
+        isAllDay: Bool
+    ) throws -> TimeZone {
+        guard !isAllDay, let identifier else {
+            return deviceTimeZone
+        }
+        guard let timeZone = TimeZone(identifier: identifier) else {
+            throw EventServiceError.validationFailed
+        }
+        return timeZone
+    }
+
+    private func recurrenceFormDate(
+        _ instant: Date,
+        seriesTimeZone: TimeZone
+    ) -> Date {
+        var seriesCalendar = Calendar(identifier: .gregorian)
+        seriesCalendar.timeZone = seriesTimeZone
+        let components = seriesCalendar.dateComponents(
+            [.year, .month, .day, .hour, .minute, .second],
+            from: instant
+        )
+
+        var formCalendar = Calendar(identifier: .gregorian)
+        formCalendar.timeZone = deviceTimeZone
+        return formCalendar.date(from: components) ?? instant
     }
 
     private func mapToCalendarTag(_ dto: TagResponseDTO) -> CalendarTag {

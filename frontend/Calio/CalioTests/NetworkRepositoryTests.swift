@@ -218,6 +218,58 @@ struct NetworkRepositoryTests {
         #expect(object["timeZone"] as? String == "America/New_York")
     }
 
+    @Test func urlSessionEventRepositoryUpdatesImportantEventWithBackendContractBody() async throws {
+        let responseJSON = """
+        {
+          "id": 88,
+          "title": "중요 일정",
+          "description": "",
+          "startAt": "2026-06-10T09:00:00Z",
+          "endAt": "2026-06-10T10:00:00Z",
+          "allDay": false,
+          "timeZone": "Asia/Seoul",
+          "importantEvent": true,
+          "isRecurrenceOccurrence": false,
+          "tag": {
+            "id": 1,
+            "title": "업무",
+            "colorCode": "#3B82F6",
+            "tagType": "DEFAULT"
+          },
+          "createdAt": "2026-06-10T09:00:00Z",
+          "updatedAt": "2026-06-10T09:00:00Z"
+        }
+        """.data(using: .utf8)!
+        var capturedRequest: URLRequest?
+        MockURLProtocol.requestHandler = { request in
+            capturedRequest = request
+            let response = HTTPURLResponse(
+                url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil
+            )!
+            return (response, responseJSON)
+        }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        let repository = URLSessionEventRepository(
+            baseURL: URL(string: "https://example.test")!,
+            session: URLSession(configuration: configuration)
+        )
+
+        let event = try await repository.updateImportantEvent(
+            eventId: 88,
+            request: UpdateImportantEventRequestDTO(importantEvent: true)
+        )
+        let request = try #require(capturedRequest)
+        let body = try #require(requestBodyData(from: request))
+        let object = try #require(JSONSerialization.jsonObject(with: body) as? [String: Any])
+
+        #expect(event.importantEvent)
+        #expect(request.url?.absoluteString == "https://example.test/api/events/88/important-event")
+        #expect(request.httpMethod == "PATCH")
+        #expect(Set(object.keys) == ["importantEvent"])
+        #expect(object["importantEvent"] as? Bool == true)
+    }
+
     @Test func urlSessionEventRepositoryUpdatesRecurrenceEndpointsWithBackendContractBodies() async throws {
         let recurrenceResponseJSON = """
         {

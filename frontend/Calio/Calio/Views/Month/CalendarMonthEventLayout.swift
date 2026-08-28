@@ -56,6 +56,14 @@ enum MonthScheduleChip {
         }
     }
 
+    var isImportant: Bool {
+        guard case .event(let event) = self else {
+            return false
+        }
+
+        return event.importantEvent
+    }
+
     var accessibilityKind: String {
         switch self {
         case .event:

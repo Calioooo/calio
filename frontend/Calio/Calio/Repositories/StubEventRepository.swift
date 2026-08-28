@@ -109,6 +109,23 @@ struct StubEventRepository: EventRepository, TagRepository {
         )
     }
 
+    func updateImportantEvent(
+        eventId: Int64,
+        request: UpdateImportantEventRequestDTO
+    ) async throws -> EventResponseDTO {
+        EventResponseDTO(
+            id: eventId,
+            title: "일정",
+            description: nil,
+            startAt: Date(),
+            endAt: Date().addingTimeInterval(3600),
+            importantEvent: request.importantEvent,
+            tag: Self.defaultTags[0],
+            createdAt: Date(),
+            updatedAt: Date()
+        )
+    }
+
     func updateRecurrenceEvent(
         recurrenceId: Int64,
         request: UpdateRecurrenceEventRequestDTO

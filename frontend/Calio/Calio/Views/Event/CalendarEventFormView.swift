@@ -90,11 +90,11 @@ struct CalendarEventFormView: View {
             if mode.showsRecurrenceFields {
                 recurrenceSection
             }
-            if mode.showsDescriptionField {
-                descriptionSection
-            }
             if mode.showsTagField {
                 tagSection
+            }
+            if mode.showsDescriptionField {
+                descriptionSection
             }
         }
         .tint(.calioBrand)
@@ -187,6 +187,8 @@ struct CalendarEventFormView: View {
                 )
                 .accessibilityIdentifier("event_form_end_datetime")
             }
+        } header: {
+            Text("날짜와 시간")
         }
     }
 

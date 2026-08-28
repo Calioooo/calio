@@ -191,6 +191,7 @@ final class RecordingEventRepository: EventRepository {
     private var storedRecurrenceCreateRequests: [CreateRecurrenceEventRequestDTO] = []
     private var storedFetchRecurrenceEventIDs: [Int64] = []
     private var storedUpdateRequests: [(eventId: Int64, request: UpdateEventRequestDTO)] = []
+    private var storedUpdateImportantEventRequests: [(eventId: Int64, request: UpdateImportantEventRequestDTO)] = []
     private var storedUpdateRecurrenceEventRequests: [(recurrenceId: Int64, request: UpdateRecurrenceEventRequestDTO)] = []
     private var storedUpdateRecurrenceOccurrenceRequests: [(recurrenceId: Int64, request: UpdateRecurrenceOccurrenceRequestDTO)] = []
     private var storedDeleteEventIDs: [Int64] = []
@@ -198,10 +199,13 @@ final class RecordingEventRepository: EventRepository {
     private var storedDeleteRecurrenceOccurrenceRequests: [(recurrenceId: Int64, originStartAt: Date)] = []
     private var suspendedContinuations: [CheckedContinuation<[EventResponseDTO], Error>] = []
     private var suspendedCreateContinuations: [CheckedContinuation<EventResponseDTO, Error>] = []
+    private var suspendedImportantEventContinuations: [CheckedContinuation<EventResponseDTO, Error>] = []
     private var requestCountWaiters: [CountWaiter] = []
     private var createRequestCountWaiters: [CountWaiter] = []
+    private var importantEventRequestCountWaiters: [CountWaiter] = []
     private let shouldSuspend: Bool
     private let shouldSuspendCreate: Bool
+    private let shouldSuspendImportantEvent: Bool
     private let error: Error?
     private var createError: Error?
     private let createResponse: EventResponseDTO
@@ -246,6 +250,7 @@ final class RecordingEventRepository: EventRepository {
         updateError: Error? = nil,
         deleteError: Error? = nil,
         shouldSuspendCreate: Bool = false,
+        shouldSuspendImportantEvent: Bool = false,
         recurrenceCreateResponse: RecurrenceEventResponseDTO = RecurrenceEventResponseDTO(
             recurrenceId: 1,
             title: "반복 일정", description: "", allDay: false,
@@ -288,6 +293,7 @@ final class RecordingEventRepository: EventRepository {
     ) {
         self.shouldSuspend = shouldSuspend
         self.shouldSuspendCreate = shouldSuspendCreate
+        self.shouldSuspendImportantEvent = shouldSuspendImportantEvent
         self.error = error
         self.fetchResponse = fetchResponse
         self.createError = createError
@@ -334,6 +340,12 @@ final class RecordingEventRepository: EventRepository {
     var updateRequests: [(eventId: Int64, request: UpdateEventRequestDTO)] {
         locked {
             storedUpdateRequests
+        }
+    }
+
+    var updateImportantEventRequests: [(eventId: Int64, request: UpdateImportantEventRequestDTO)] {
+        locked {
+            storedUpdateImportantEventRequests
         }
     }
 
@@ -437,6 +449,40 @@ final class RecordingEventRepository: EventRepository {
         locked {
             storedUpdateRequests.append((eventId, request))
         }
+
+        if let updateError {
+            throw updateError
+        }
+
+        return updateResponse
+    }
+
+    func updateImportantEvent(
+        eventId: Int64,
+        request: UpdateImportantEventRequestDTO
+    ) async throws -> EventResponseDTO {
+        if shouldSuspendImportantEvent {
+            return try await withCheckedThrowingContinuation { continuation in
+                let continuations = locked {
+                    storedUpdateImportantEventRequests.append((eventId, request))
+                    suspendedImportantEventContinuations.append(continuation)
+                    return readyWaiters(
+                        from: &importantEventRequestCountWaiters,
+                        currentCount: storedUpdateImportantEventRequests.count
+                    )
+                }
+                continuations.forEach { $0.resume(returning: true) }
+            }
+        }
+
+        let continuations = locked {
+            storedUpdateImportantEventRequests.append((eventId, request))
+            return readyWaiters(
+                from: &importantEventRequestCountWaiters,
+                currentCount: storedUpdateImportantEventRequests.count
+            )
+        }
+        continuations.forEach { $0.resume(returning: true) }
 
         if let updateError {
             throw updateError
@@ -555,6 +601,26 @@ final class RecordingEventRepository: EventRepository {
         }
     }
 
+    func waitForImportantEventRequestCount(
+        _ count: Int,
+        timeoutNanoseconds: UInt64 = 5_000_000_000
+    ) async -> Bool {
+        await waitForCount(
+            count,
+            timeoutNanoseconds: timeoutNanoseconds,
+            kind: .importantEvent
+        )
+    }
+
+    func finishSuspendedImportantEventRequests() {
+        let continuations = locked {
+            let continuations = suspendedImportantEventContinuations
+            suspendedImportantEventContinuations.removeAll()
+            return continuations
+        }
+        continuations.forEach { $0.resume(returning: updateResponse) }
+    }
+
     func requestMonthKeys(calendar: Calendar) -> [YearMonthKey] {
         requests.map { request in
             YearMonthKey(date: request.startDate, calendar: calendar)
@@ -638,6 +704,8 @@ final class RecordingEventRepository: EventRepository {
             return storedRequests.count
         case .create:
             return storedCreateRequests.count
+        case .importantEvent:
+            return storedUpdateImportantEventRequests.count
         }
     }
 
@@ -647,6 +715,8 @@ final class RecordingEventRepository: EventRepository {
             return requestCountWaiters
         case .create:
             return createRequestCountWaiters
+        case .importantEvent:
+            return importantEventRequestCountWaiters
         }
     }
 
@@ -656,6 +726,8 @@ final class RecordingEventRepository: EventRepository {
             requestCountWaiters.append(waiter)
         case .create:
             createRequestCountWaiters.append(waiter)
+        case .importantEvent:
+            importantEventRequestCountWaiters.append(waiter)
         }
     }
 
@@ -665,6 +737,8 @@ final class RecordingEventRepository: EventRepository {
             return requestCountWaiters.remove(at: index)
         case .create:
             return createRequestCountWaiters.remove(at: index)
+        case .importantEvent:
+            return importantEventRequestCountWaiters.remove(at: index)
         }
     }
 
@@ -692,5 +766,6 @@ final class RecordingEventRepository: EventRepository {
     private enum CountWaiterKind {
         case fetch
         case create
+        case importantEvent
     }
 }

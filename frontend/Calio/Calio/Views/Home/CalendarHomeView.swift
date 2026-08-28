@@ -52,6 +52,7 @@ struct CalendarHomeView: View {
                     onResetEventMutation: viewModel.resetMutationState,
                     onResetTagMutation: viewModel.resetTagMutationState,
                     onFetchRecurrenceEvent: viewModel.fetchRecurrenceEvent(recurrenceId:),
+                    onUpdateImportantEvent: viewModel.updateImportantEvent(_:importantEvent:),
                     onUpdateSingleEvent: viewModel.updateSingleEvent(_:input:),
                     onUpdateRecurrenceOccurrence: viewModel.updateRecurrenceOccurrence(_:input:),
                     onUpdateRecurrenceSeries: viewModel.updateRecurrenceSeries(recurrenceId:input:),

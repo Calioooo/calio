@@ -830,11 +830,20 @@ private struct MonthEventSpanView: View {
     let chipHeight: CGFloat
     
     var body: some View {
-        Text(span.chip.title)
-            .font(.system(size: 10 * metrics.textScale, weight: .medium))
-            .lineLimit(1)
-            .truncationMode(.tail)
-            .foregroundStyle(Color.calioTextPrimary)
+        HStack(spacing: 3) {
+            if span.chip.isImportant {
+                Image(systemName: "star.fill")
+                    .font(.system(size: 9 * metrics.textScale, weight: .semibold))
+                    .foregroundStyle(Color.calioImportantStar)
+                    .accessibilityHidden(true)
+            }
+
+            Text(span.chip.title)
+                .lineLimit(1)
+                .truncationMode(.tail)
+        }
+        .font(.system(size: 10 * metrics.textScale, weight: .medium))
+        .foregroundStyle(Color.calioTextPrimary)
             .padding(.horizontal, 4)
             .frame(
                 width: chipWidth,
@@ -844,7 +853,7 @@ private struct MonthEventSpanView: View {
             .background(span.chip.color)
             .clipShape(RoundedRectangle(cornerRadius: 3))
             .offset(x: xOffset, y: yOffset)
-            .accessibilityLabel("\(span.chip.title), \(span.chip.accessibilityKind)")
+            .accessibilityLabel("\(span.chip.title), \(span.chip.accessibilityKind)\(span.chip.isImportant ? ", 중요 일정" : "")")
             .accessibilityIdentifier("month_event_\(span.id)")
     }
     
@@ -1115,10 +1124,19 @@ private struct CalendarDayDetailEventRow: View {
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(.calioTextSecondary)
 
-                Text(event.title)
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(.calioTextPrimary)
-                    .lineLimit(2)
+                HStack(alignment: .firstTextBaseline, spacing: 5) {
+                    Text(event.title)
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(.calioTextPrimary)
+                        .lineLimit(2)
+
+                    if event.importantEvent {
+                        Image(systemName: "star.fill")
+                            .font(.caption)
+                            .foregroundStyle(Color.calioImportantStar)
+                            .accessibilityLabel("중요 일정")
+                    }
+                }
 
                 if hasDescription {
                     Text(event.description)
@@ -1133,7 +1151,7 @@ private struct CalendarDayDetailEventRow: View {
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(event.title), \(eventTimeText)\(hasDescription ? ", \(event.description)" : "")")
+        .accessibilityLabel("\(event.title), \(event.importantEvent ? "중요 일정, " : "")\(eventTimeText)\(hasDescription ? ", \(event.description)" : "")")
         .accessibilityIdentifier("month_detail_event_\(event.id)")
     }
 

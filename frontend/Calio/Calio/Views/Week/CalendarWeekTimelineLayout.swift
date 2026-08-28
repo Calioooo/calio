@@ -630,10 +630,14 @@ struct TimelineEventLayout: Identifiable {
         }
     }
 
+    var showsImportantIndicator: Bool {
+        style == .event && event.importantEvent
+    }
+
     var accessibilityLabel: String {
         switch tapAction {
         case .showEvent(let event):
-            return "\(event.title), 일정 상세 보기"
+            return "\(event.title), \(event.importantEvent ? "중요 일정, " : "")일정 상세 보기"
         case .showOverlapGroup(let events):
             return "겹친 일정 \(events.count)개 보기"
         }

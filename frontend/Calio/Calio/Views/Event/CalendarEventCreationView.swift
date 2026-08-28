@@ -85,33 +85,45 @@ struct CalendarEventCreationView: View {
             .tint(.calioBrand)
             .navigationTitle("새 일정")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button {
-                        if let onBack {
-                            onBack()
-                        } else {
-                            dismiss()
-                        }
-                    } label: {
-                        if onBack != nil {
-                            Label("빠른 입력", systemImage: "chevron.left")
-                        } else {
-                            Text("취소")
-                        }
-                    }
-                }
-                
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("저장") {
-                        save()
-                    }
-                    .fontWeight(.semibold)
-                    .disabled(!canSave || isSaving)
-                    .accessibilityIdentifier("event_creation_save_button")
-                }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                saveAction
             }
         }
+    }
+
+    private var saveAction: some View {
+        HStack(spacing: 12) {
+            Button("취소", action: cancel)
+                .font(.headline.weight(.semibold))
+                .foregroundStyle(.calioPrimary)
+                .frame(maxWidth: .infinity, minHeight: 52)
+                .background(RoundedRectangle(cornerRadius: 12).fill(Color.calioSelection))
+                .accessibilityIdentifier("event_creation_cancel_button")
+                .disabled(Self.isCancelDisabled(isSaving: isSaving))
+
+            Button {
+                save()
+            } label: {
+                HStack(spacing: 8) {
+                    if isSaving {
+                        ProgressView()
+                            .tint(.white)
+                    }
+                    Text(isSaving ? "저장 중" : "일정 생성")
+                }
+                .font(.headline.weight(.semibold))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity, minHeight: 52)
+                .background(RoundedRectangle(cornerRadius: 12).fill(Color.calioBrand))
+            }
+            .disabled(!canSave || isSaving)
+            .opacity(canSave && !isSaving ? 1 : 0.45)
+            .accessibilityIdentifier("event_creation_save_button")
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 12)
+        .padding(.bottom, 8)
+        .background(.ultraThinMaterial)
     }
 
     @ViewBuilder
@@ -147,6 +159,14 @@ struct CalendarEventCreationView: View {
         }
     }
 
+    private func cancel() {
+        if let onBack {
+            onBack()
+        } else {
+            dismiss()
+        }
+    }
+
     private var currentDraft: CalendarEventCreationDraft {
         CalendarEventCreationDraft(
             eventInput: eventInput,
@@ -162,6 +182,10 @@ struct CalendarEventCreationView: View {
             referenceDay: referenceDay,
             calendar: calendar
         )
+    }
+
+    nonisolated static func isCancelDisabled(isSaving: Bool) -> Bool {
+        isSaving
     }
 
     private func resetRecurrenceFieldsFromSingleEventTime() {
