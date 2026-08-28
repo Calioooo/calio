@@ -156,6 +156,9 @@ class SharedPersonalScheduleGroupCalendarControllerTest {
                 .andExpect(jsonPath("$[0].publicItemId").value(
                         "shared-recurrence:" + share.getPublicShareId() + ":2026-08-03T09:00:00Z"
                 ))
+                .andExpect(jsonPath("$[0].id").isEmpty())
+                .andExpect(jsonPath("$[0].recurrenceId").isEmpty())
+                .andExpect(jsonPath("$[0].tag").isEmpty())
                 .andExpect(jsonPath("$[1].title").value("이동한 원본 override"))
                 .andExpect(jsonPath("$[1].description").value("override 설명"))
                 .andExpect(jsonPath("$[1].startAt").value("2026-08-05T12:00:00Z"))
