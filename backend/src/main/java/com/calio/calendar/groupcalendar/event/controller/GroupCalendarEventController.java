@@ -3,7 +3,6 @@ package com.calio.calendar.groupcalendar.event.controller;
 import com.calio.calendar.groupcalendar.event.controller.dto.GroupCalendarEventRequest;
 import com.calio.calendar.groupcalendar.event.controller.dto.GroupCalendarEventResponse;
 import com.calio.calendar.groupcalendar.event.service.GroupCalendarEventService;
-import com.calio.calendar.groupcalendar.event.service.dto.GroupCalendarEventCommand;
 import com.calio.calendar.security.AuthenticatedAccount;
 import jakarta.validation.Valid;
 import java.time.Instant;
@@ -38,7 +37,7 @@ public class GroupCalendarEventController {
             @PathVariable Long groupSpaceId,
             @Valid @RequestBody GroupCalendarEventRequest request
     ) {
-        return groupCalendarEventService.create(account.accountId(), groupSpaceId, toCommand(request));
+        return groupCalendarEventService.create(account.accountId(), groupSpaceId, request);
     }
 
     @GetMapping
@@ -67,7 +66,7 @@ public class GroupCalendarEventController {
             @PathVariable Long eventId,
             @Valid @RequestBody GroupCalendarEventRequest request
     ) {
-        return groupCalendarEventService.update(account.accountId(), groupSpaceId, eventId, toCommand(request));
+        return groupCalendarEventService.update(account.accountId(), groupSpaceId, eventId, request);
     }
 
     @DeleteMapping("/{eventId}")
@@ -78,17 +77,5 @@ public class GroupCalendarEventController {
             @PathVariable Long eventId
     ) {
         groupCalendarEventService.delete(account.accountId(), groupSpaceId, eventId);
-    }
-
-    private GroupCalendarEventCommand toCommand(GroupCalendarEventRequest request) {
-        return new GroupCalendarEventCommand(
-                request.title(),
-                request.description(),
-                request.startAt(),
-                request.endAt(),
-                request.allDay(),
-                request.timeZone(),
-                request.tagId()
-        );
     }
 }

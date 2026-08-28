@@ -5,9 +5,9 @@ import com.calio.calendar.account.service.AccountQueryService;
 import com.calio.calendar.common.domain.CanonicalSchedule;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
+import com.calio.calendar.groupcalendar.event.controller.dto.GroupCalendarEventRequest;
 import com.calio.calendar.groupcalendar.event.controller.dto.GroupCalendarEventResponse;
 import com.calio.calendar.groupcalendar.event.domain.GroupCalendarEvent;
-import com.calio.calendar.groupcalendar.event.service.dto.GroupCalendarEventCommand;
 import com.calio.calendar.groupspace.domain.GroupMember;
 import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.service.GroupMembershipQueryService;
@@ -50,25 +50,25 @@ public class GroupCalendarEventService {
     public GroupCalendarEventResponse create(
             Long accountId,
             Long groupSpaceId,
-            GroupCalendarEventCommand command
+            GroupCalendarEventRequest request
     ) {
         GroupSpace groupSpace = groupSpaceCommandService.lockGroupSpace(groupSpaceId);
         membershipQueryService.getActiveMembership(groupSpaceId, accountId);
 
         CanonicalSchedule schedule = CanonicalSchedule.event(
-                command.startAt(),
-                command.endAt(),
-                command.allDay(),
-                command.timeZone()
+                request.startAt(),
+                request.endAt(),
+                request.allDay(),
+                request.timeZone()
         );
         Account account = accountQueryService.getAccount(accountId);
-        Tag tag = getTag(groupSpaceId, command.tagId());
+        Tag tag = getTag(groupSpaceId, request.tagId());
         GroupCalendarEvent event = new GroupCalendarEvent(
                 groupSpace,
                 account,
                 tag,
-                command.title(),
-                command.description(),
+                request.title(),
+                request.description(),
                 schedule.startAt(),
                 schedule.endAt(),
                 schedule.allDay(),
@@ -103,25 +103,25 @@ public class GroupCalendarEventService {
             Long accountId,
             Long groupSpaceId,
             Long eventId,
-            GroupCalendarEventCommand command
+            GroupCalendarEventRequest request
     ) {
         GroupCalendarEvent event = getLockedEvent(groupSpaceId, eventId);
         requireAuthorOrOwner(accountId, event);
 
         CanonicalSchedule schedule = CanonicalSchedule.event(
-                command.startAt(),
-                command.endAt(),
-                command.allDay(),
-                command.timeZone()
+                request.startAt(),
+                request.endAt(),
+                request.allDay(),
+                request.timeZone()
         );
         event.replace(
-                command.title(),
-                command.description(),
+                request.title(),
+                request.description(),
                 schedule.startAt(),
                 schedule.endAt(),
                 schedule.allDay(),
                 schedule.timeZone(),
-                getTag(groupSpaceId, command.tagId())
+                getTag(groupSpaceId, request.tagId())
         );
 
         return GroupCalendarEventResponse.from(event);
