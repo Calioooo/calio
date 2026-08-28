@@ -23,7 +23,7 @@ import com.calio.calendar.recurrence.domain.RecurrenceOccurrence;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
-import com.calio.calendar.recurrence.service.RecurrenceEventQueryService;
+import com.calio.calendar.recurrence.service.RecurrenceEventService;
 import com.calio.calendar.recurrence.service.Rfc5545RecurrenceEngine;
 import com.calio.calendar.sharing.event.domain.PersonalEventGroupShare;
 import com.calio.calendar.sharing.event.service.PersonalEventGroupShareQueryService;
@@ -61,7 +61,7 @@ class GroupCalendarServiceTest {
     @Mock private Rfc5545RecurrenceEngine recurrenceEngine;
     @Mock private PersonalEventGroupShareQueryService eventShareQueryService;
     @Mock private PersonalRecurrenceGroupShareQueryService recurrenceShareQueryService;
-    @Mock private RecurrenceEventQueryService personalRecurrenceQueryService;
+    @Mock private RecurrenceEventService personalRecurrenceEventService;
 
     private GroupCalendarService service;
     private GroupSpace groupSpace;
@@ -78,7 +78,7 @@ class GroupCalendarServiceTest {
                 recurrenceEngine,
                 eventShareQueryService,
                 recurrenceShareQueryService,
-                personalRecurrenceQueryService,
+                personalRecurrenceEventService,
                 new SimpleMeterRegistry()
         );
         groupSpace = new GroupSpace(ACCOUNT_ID, "group", null);
@@ -102,7 +102,7 @@ class GroupCalendarServiceTest {
         when(eventQueryService.listOverlappingEvents(GROUP_SPACE_ID, FROM, TO)).thenReturn(List.of());
         when(eventShareQueryService.listByGroupSpaceId(GROUP_SPACE_ID)).thenReturn(List.of());
         when(recurrenceShareQueryService.listByGroupSpaceId(GROUP_SPACE_ID)).thenReturn(List.of());
-        when(personalRecurrenceQueryService.listOverridesForRecurrenceIdsInRange(
+        when(personalRecurrenceEventService.listOverridesForRecurrenceIdsInRange(
                 org.mockito.ArgumentMatchers.anyCollection(),
                 org.mockito.ArgumentMatchers.eq(FROM),
                 org.mockito.ArgumentMatchers.eq(TO)
@@ -310,7 +310,7 @@ class GroupCalendarServiceTest {
         when(recurrenceShareQueryService.listByGroupSpaceId(GROUP_SPACE_ID)).thenReturn(List.of(share));
         when(recurrenceEngine.expand(RecurrenceSchedule.from(source), source.getRecurrenceRules(), FROM, TO))
                 .thenReturn(List.of(changedOccurrence, deletedOccurrence));
-        when(personalRecurrenceQueryService.listOverridesForRecurrenceIdsInRange(
+        when(personalRecurrenceEventService.listOverridesForRecurrenceIdsInRange(
                 List.of(source.getId()), FROM, TO
         )).thenReturn(List.of(changed, deleted));
 
@@ -349,7 +349,7 @@ class GroupCalendarServiceTest {
         when(recurrenceShareQueryService.listByGroupSpaceId(GROUP_SPACE_ID)).thenReturn(List.of(share));
         when(recurrenceEngine.expand(RecurrenceSchedule.from(source), source.getRecurrenceRules(), FROM, TO))
                 .thenReturn(List.of());
-        when(personalRecurrenceQueryService.listOverridesForRecurrenceIdsInRange(
+        when(personalRecurrenceEventService.listOverridesForRecurrenceIdsInRange(
                 List.of(source.getId()), FROM, TO
         )).thenReturn(List.of(movedIn));
 
@@ -374,7 +374,7 @@ class GroupCalendarServiceTest {
         when(recurrenceShareQueryService.listByGroupSpaceId(GROUP_SPACE_ID)).thenReturn(List.of(share));
         when(recurrenceEngine.expand(RecurrenceSchedule.from(source), source.getRecurrenceRules(), FROM, TO))
                 .thenReturn(occurrences);
-        when(personalRecurrenceQueryService.listOverridesForRecurrenceIdsInRange(
+        when(personalRecurrenceEventService.listOverridesForRecurrenceIdsInRange(
                 List.of(source.getId()), FROM, TO
         )).thenReturn(List.of());
 
@@ -395,13 +395,13 @@ class GroupCalendarServiceTest {
                 PersonalRecurrenceGroupShare.create(firstSource, groupSpace, false),
                 PersonalRecurrenceGroupShare.create(secondSource, groupSpace, false)
         ));
-        when(personalRecurrenceQueryService.listOverridesForRecurrenceIdsInRange(
+        when(personalRecurrenceEventService.listOverridesForRecurrenceIdsInRange(
                 List.of(50L, 51L), FROM, TO
         )).thenReturn(List.of());
 
         service.listItems(ACCOUNT_ID, GROUP_SPACE_ID, FROM, TO);
 
-        verify(personalRecurrenceQueryService).listOverridesForRecurrenceIdsInRange(
+        verify(personalRecurrenceEventService).listOverridesForRecurrenceIdsInRange(
                 List.of(50L, 51L), FROM, TO
         );
     }

@@ -57,9 +57,6 @@ public class RecurrenceEventQueryService {
             Instant from,
             Instant to
     ) {
-        if (recurrenceIds.isEmpty()) {
-            return List.of();
-        }
         return recurrenceEventOverrideRepository.findAllForRecurrenceIdsInRange(recurrenceIds, from, to);
     }
 

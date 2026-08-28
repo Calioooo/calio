@@ -13,7 +13,7 @@ import com.calio.calendar.groupspace.service.GroupMembershipQueryService;
 import com.calio.calendar.recurrence.domain.RecurrenceOccurrence;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
-import com.calio.calendar.recurrence.service.RecurrenceEventQueryService;
+import com.calio.calendar.recurrence.service.RecurrenceEventService;
 import com.calio.calendar.recurrence.service.Rfc5545RecurrenceEngine;
 import com.calio.calendar.sharing.event.service.PersonalEventGroupShareQueryService;
 import com.calio.calendar.sharing.recurrence.domain.PersonalRecurrenceGroupShare;
@@ -49,7 +49,7 @@ public class GroupCalendarService {
     private final Rfc5545RecurrenceEngine recurrenceEngine;
     private final PersonalEventGroupShareQueryService eventShareQueryService;
     private final PersonalRecurrenceGroupShareQueryService recurrenceShareQueryService;
-    private final RecurrenceEventQueryService personalRecurrenceQueryService;
+    private final RecurrenceEventService personalRecurrenceEventService;
     private final MeterRegistry meterRegistry;
 
     public GroupCalendarService(
@@ -60,7 +60,7 @@ public class GroupCalendarService {
             Rfc5545RecurrenceEngine recurrenceEngine,
             PersonalEventGroupShareQueryService eventShareQueryService,
             PersonalRecurrenceGroupShareQueryService recurrenceShareQueryService,
-            RecurrenceEventQueryService personalRecurrenceQueryService,
+            RecurrenceEventService personalRecurrenceEventService,
             MeterRegistry meterRegistry
     ) {
         this.membershipQueryService = membershipQueryService;
@@ -70,7 +70,7 @@ public class GroupCalendarService {
         this.recurrenceEngine = recurrenceEngine;
         this.eventShareQueryService = eventShareQueryService;
         this.recurrenceShareQueryService = recurrenceShareQueryService;
-        this.personalRecurrenceQueryService = personalRecurrenceQueryService;
+        this.personalRecurrenceEventService = personalRecurrenceEventService;
         this.meterRegistry = meterRegistry;
     }
 
@@ -117,7 +117,7 @@ public class GroupCalendarService {
     ) {
         List<PersonalRecurrenceGroupShare> shares = recurrenceShareQueryService.listByGroupSpaceId(groupSpaceId);
         long overrideQueryStartedAt = System.nanoTime();
-        List<RecurrenceEventOverride> overrides = personalRecurrenceQueryService
+        List<RecurrenceEventOverride> overrides = personalRecurrenceEventService
                 .listOverridesForRecurrenceIdsInRange(
                         shares.stream().map(share -> share.getRecurrenceEvent().getId()).toList(), from, to
                 );

@@ -22,6 +22,7 @@ import com.calio.calendar.sharing.controller.dto.GroupShareStatusResponse;
 import com.calio.calendar.sharing.controller.dto.UpdateGroupShareAnonymousRequest;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
@@ -164,6 +165,17 @@ public class RecurrenceEventService {
     public List<GroupShareStatusResponse> listGroupShares(Long accountId, Long recurrenceId) {
         RecurrenceEvent recurrenceEvent = getRecurrenceEventForShareManagement(accountId, recurrenceId);
         return recurrenceGroupShareService.list(recurrenceEvent.getId());
+    }
+
+    public List<RecurrenceEventOverride> listOverridesForRecurrenceIdsInRange(
+            Collection<Long> recurrenceIds,
+            Instant from,
+            Instant to
+    ) {
+        if (recurrenceIds.isEmpty()) {
+            return List.of();
+        }
+        return recurrenceEventQueryService.listOverridesForRecurrenceIdsInRange(recurrenceIds, from, to);
     }
 
     @Transactional
