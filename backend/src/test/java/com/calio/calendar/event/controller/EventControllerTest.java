@@ -14,6 +14,8 @@ import static com.calio.calendar.security.TestAccountSupport.currentAccountRefer
 import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.event.repository.EventRepository;
+import com.calio.calendar.groupspace.domain.GroupSpace;
+import com.calio.calendar.groupspace.repository.GroupSpaceRepository;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.mapping.repository.GoogleCalendarEventMappingRepository;
@@ -24,6 +26,8 @@ import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.domain.TagType;
 import com.calio.calendar.security.AuthenticatedAccountMockMvcTestConfig;
 import com.calio.calendar.security.WithAuthenticatedAccount;
+import com.calio.calendar.sharing.event.domain.PersonalEventGroupShare;
+import com.calio.calendar.sharing.event.repository.PersonalEventGroupShareRepository;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
@@ -66,6 +70,12 @@ class EventControllerTest {
 
     @Autowired
     private EventRepository eventRepository;
+
+    @Autowired
+    private GroupSpaceRepository groupSpaceRepository;
+
+    @Autowired
+    private PersonalEventGroupShareRepository eventGroupShareRepository;
 
     @Autowired
     private GoogleCalendarIntegrationRepository googleCalendarIntegrationRepository;
@@ -965,6 +975,114 @@ class EventControllerTest {
     }
 
     @Test
+    @DisplayName("일정 소유자는 그룹 공유 상태를 조회하고 익명 여부를 변경한 뒤 공유를 해제한다")
+    void givenOwnedEventGroupShare_whenManagingShare_thenKeepsHttpContract() throws Exception {
+        // given
+        long eventId = createEvent("Share status", "2026-08-01T00:00:00Z", "2026-08-01T01:00:00Z");
+        Event event = eventRepository.findById(eventId).orElseThrow();
+        GroupSpace groupSpace = createGroupSpace(event.getAccount().getId(), "Share target");
+        eventGroupShareRepository.saveAndFlush(PersonalEventGroupShare.create(event, groupSpace, true));
+
+        // when, then
+        mockMvc.perform(get("/api/events/{eventId}/group-shares", eventId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].groupSpaceId").value(groupSpace.getId()))
+                .andExpect(jsonPath("$[0].groupSpaceName").value("Share target"))
+                .andExpect(jsonPath("$[0].isAnonymous").value(true))
+                .andExpect(jsonPath("$[0].publicShareId").isString());
+
+        mockMvc.perform(patch("/api/events/{eventId}/group-shares/{groupSpaceId}", eventId, groupSpace.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"isAnonymous\": false}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.groupSpaceId").value(groupSpace.getId()))
+                .andExpect(jsonPath("$.groupSpaceName").value("Share target"))
+                .andExpect(jsonPath("$.isAnonymous").value(false))
+                .andExpect(jsonPath("$.publicShareId").isString());
+
+        mockMvc.perform(delete("/api/events/{eventId}/group-shares/{groupSpaceId}", eventId, groupSpace.getId()))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    @DisplayName("그룹 공유 익명 여부 요청의 필수값이 없으면 검증 오류를 반환한다")
+    void givenMissingAnonymousFlag_whenChangingEventGroupShare_thenReturnsValidationFailed() throws Exception {
+        // given
+        long eventId = createEvent("Validation", "2026-08-02T00:00:00Z", "2026-08-02T01:00:00Z");
+        GroupSpace groupSpace = createGroupSpace(
+                eventRepository.findById(eventId).orElseThrow().getAccount().getId(),
+                "Validation target"
+        );
+
+        // when, then
+        mockMvc.perform(patch("/api/events/{eventId}/group-shares/{groupSpaceId}", eventId, groupSpace.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"));
+    }
+
+    @Test
+    @DisplayName("다른 사용자의 일정 그룹 공유는 조회 변경 해제할 수 없다")
+    void givenAnotherOwnersEventGroupShare_whenManagingShare_thenReturnsForbidden() throws Exception {
+        // given
+        Account otherAccount = accountRepository.saveAndFlush(new Account());
+        Tag defaultTag = tagRepository
+                .findFirstByTagTypeAndTitleAndAccountIsNullAndGroupSpaceIsNullOrderByIdAsc(
+                        TagType.PERSONAL_DEFAULT, "기타"
+                )
+                .orElseThrow();
+        Event otherEvent = eventRepository.saveAndFlush(new Event(
+                "Other owner's event",
+                null,
+                Instant.parse("2026-08-03T00:00:00Z"),
+                Instant.parse("2026-08-03T01:00:00Z"),
+                false,
+                "UTC",
+                null,
+                defaultTag,
+                otherAccount
+        ));
+        GroupSpace groupSpace = createGroupSpace(otherAccount.getId(), "Other target");
+        eventGroupShareRepository.saveAndFlush(PersonalEventGroupShare.create(otherEvent, groupSpace, true));
+
+        // when, then
+        mockMvc.perform(get("/api/events/{eventId}/group-shares", otherEvent.getId()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.title").value("PERSONAL_SCHEDULE_SHARE_FORBIDDEN"));
+        mockMvc.perform(patch("/api/events/{eventId}/group-shares/{groupSpaceId}", otherEvent.getId(), groupSpace.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"isAnonymous\": false}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.title").value("PERSONAL_SCHEDULE_SHARE_FORBIDDEN"));
+        mockMvc.perform(delete("/api/events/{eventId}/group-shares/{groupSpaceId}", otherEvent.getId(), groupSpace.getId()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.title").value("PERSONAL_SCHEDULE_SHARE_FORBIDDEN"));
+    }
+
+    @Test
+    @DisplayName("소유 일정에 없는 대상 그룹 공유를 변경 또는 해제하면 찾을 수 없음 오류를 반환한다")
+    void givenMissingEventGroupShare_whenChangingOrRemovingShare_thenReturnsNotFound() throws Exception {
+        // given
+        long eventId = createEvent("Missing share", "2026-08-04T00:00:00Z", "2026-08-04T01:00:00Z");
+        GroupSpace groupSpace = createGroupSpace(
+                eventRepository.findById(eventId).orElseThrow().getAccount().getId(),
+                "Missing target"
+        );
+
+        // when, then
+        mockMvc.perform(patch("/api/events/{eventId}/group-shares/{groupSpaceId}", eventId, groupSpace.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"isAnonymous\": false}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("PERSONAL_SCHEDULE_SHARE_NOT_FOUND"));
+        mockMvc.perform(delete("/api/events/{eventId}/group-shares/{groupSpaceId}", eventId, groupSpace.getId()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("PERSONAL_SCHEDULE_SHARE_NOT_FOUND"));
+    }
+
+    @Test
     @DisplayName("중요 일정 상태 변경 후에도 조회 결과는 startAt 기준으로 정렬된다")
     void givenChangedImportantEvent_whenListEvents_thenReturnsStoredImportantEventStateSortedByStartAt()
             throws Exception {
@@ -990,6 +1108,10 @@ class EventControllerTest {
 
     private long createEvent(String title, String startAt, String endAt) throws Exception {
         return readResponse(createEventResult(title, startAt, endAt)).get("id").asLong();
+    }
+
+    private GroupSpace createGroupSpace(Long ownerAccountId, String name) {
+        return groupSpaceRepository.saveAndFlush(new GroupSpace(ownerAccountId, name, null));
     }
 
     private MvcResult createEventResult(String title, String startAt, String endAt) throws Exception {

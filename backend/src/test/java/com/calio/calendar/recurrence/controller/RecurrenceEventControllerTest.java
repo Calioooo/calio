@@ -15,6 +15,8 @@ import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.event.repository.EventRepository;
+import com.calio.calendar.groupspace.domain.GroupSpace;
+import com.calio.calendar.groupspace.repository.GroupSpaceRepository;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
@@ -22,6 +24,8 @@ import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepositor
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.security.AuthenticatedAccountMockMvcTestConfig;
 import com.calio.calendar.security.WithAuthenticatedAccount;
+import com.calio.calendar.sharing.recurrence.domain.PersonalRecurrenceGroupShare;
+import com.calio.calendar.sharing.recurrence.repository.PersonalRecurrenceGroupShareRepository;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.domain.TagType;
 import com.calio.calendar.tag.repository.TagRepository;
@@ -77,6 +81,12 @@ class RecurrenceEventControllerTest {
 
     @Autowired
     private TagRepository tagRepository;
+
+    @Autowired
+    private GroupSpaceRepository groupSpaceRepository;
+
+    @Autowired
+    private PersonalRecurrenceGroupShareRepository recurrenceGroupShareRepository;
 
     private Long accountId;
 
@@ -859,6 +869,142 @@ class RecurrenceEventControllerTest {
     }
 
     @Test
+    @DisplayName("반복 일정 소유자는 그룹 공유 상태를 조회하고 익명 여부를 변경한 뒤 공유를 해제한다")
+    void givenOwnedRecurrenceGroupShare_whenManagingShare_thenKeepsHttpContract() throws Exception {
+        // given
+        long recurrenceId = createTimedRecurrence("Share status", "2026-10-01", "UTC");
+        RecurrenceEvent recurrenceEvent = recurrenceEventRepository.findById(recurrenceId).orElseThrow();
+        GroupSpace groupSpace = createGroupSpace("Recurrence target");
+        recurrenceGroupShareRepository.saveAndFlush(
+                PersonalRecurrenceGroupShare.create(recurrenceEvent, groupSpace, true)
+        );
+
+        // when, then
+        mockMvc.perform(get("/api/recurrence-events/{recurrenceId}/group-shares", recurrenceId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].groupSpaceId").value(groupSpace.getId()))
+                .andExpect(jsonPath("$[0].groupSpaceName").value("Recurrence target"))
+                .andExpect(jsonPath("$[0].isAnonymous").value(true))
+                .andExpect(jsonPath("$[0].publicShareId").isString());
+
+        mockMvc.perform(patch(
+                        "/api/recurrence-events/{recurrenceId}/group-shares/{groupSpaceId}",
+                        recurrenceId,
+                        groupSpace.getId()
+                )
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"isAnonymous\": false}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.groupSpaceId").value(groupSpace.getId()))
+                .andExpect(jsonPath("$.groupSpaceName").value("Recurrence target"))
+                .andExpect(jsonPath("$.isAnonymous").value(false))
+                .andExpect(jsonPath("$.publicShareId").isString());
+
+        mockMvc.perform(delete(
+                        "/api/recurrence-events/{recurrenceId}/group-shares/{groupSpaceId}",
+                        recurrenceId,
+                        groupSpace.getId()
+                ))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    @DisplayName("반복 일정 그룹 공유 익명 여부 요청의 필수값이 없으면 검증 오류를 반환한다")
+    void givenMissingAnonymousFlag_whenChangingRecurrenceGroupShare_thenReturnsValidationFailed() throws Exception {
+        // given
+        long recurrenceId = createTimedRecurrence("Validation", "2026-10-02", "UTC");
+        GroupSpace groupSpace = createGroupSpace("Validation target");
+
+        // when, then
+        mockMvc.perform(patch(
+                        "/api/recurrence-events/{recurrenceId}/group-shares/{groupSpaceId}",
+                        recurrenceId,
+                        groupSpace.getId()
+                )
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"));
+    }
+
+    @Test
+    @DisplayName("다른 사용자의 반복 일정 그룹 공유는 조회 변경 해제할 수 없다")
+    void givenAnotherOwnersRecurrenceGroupShare_whenManagingShare_thenReturnsForbidden() throws Exception {
+        // given
+        Account otherAccount = accountRepository.saveAndFlush(new Account());
+        Tag defaultTag = tagRepository
+                .findFirstByTagTypeAndTitleAndAccountIsNullAndGroupSpaceIsNullOrderByIdAsc(
+                        TagType.PERSONAL_DEFAULT, "기타"
+                )
+                .orElseThrow();
+        RecurrenceEvent otherRecurrenceEvent = recurrenceEventRepository.saveAndFlush(new RecurrenceEvent(
+                "Other owner's recurrence",
+                null,
+                RecurrenceSchedule.create(
+                        false,
+                        Instant.parse("2026-10-03T00:00:00Z"),
+                        Instant.parse("2026-10-03T01:00:00Z"),
+                        "UTC"
+                ),
+                List.of("RRULE:FREQ=DAILY;COUNT=2"),
+                defaultTag,
+                otherAccount
+        ));
+        GroupSpace groupSpace = createGroupSpace("Other target");
+        recurrenceGroupShareRepository.saveAndFlush(
+                PersonalRecurrenceGroupShare.create(otherRecurrenceEvent, groupSpace, true)
+        );
+
+        // when, then
+        mockMvc.perform(get("/api/recurrence-events/{recurrenceId}/group-shares", otherRecurrenceEvent.getId()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.title").value("PERSONAL_SCHEDULE_SHARE_FORBIDDEN"));
+        mockMvc.perform(patch(
+                        "/api/recurrence-events/{recurrenceId}/group-shares/{groupSpaceId}",
+                        otherRecurrenceEvent.getId(),
+                        groupSpace.getId()
+                )
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"isAnonymous\": false}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.title").value("PERSONAL_SCHEDULE_SHARE_FORBIDDEN"));
+        mockMvc.perform(delete(
+                        "/api/recurrence-events/{recurrenceId}/group-shares/{groupSpaceId}",
+                        otherRecurrenceEvent.getId(),
+                        groupSpace.getId()
+                ))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.title").value("PERSONAL_SCHEDULE_SHARE_FORBIDDEN"));
+    }
+
+    @Test
+    @DisplayName("소유 반복 일정에 없는 대상 그룹 공유를 변경 또는 해제하면 찾을 수 없음 오류를 반환한다")
+    void givenMissingRecurrenceGroupShare_whenChangingOrRemovingShare_thenReturnsNotFound() throws Exception {
+        // given
+        long recurrenceId = createTimedRecurrence("Missing share", "2026-10-04", "UTC");
+        GroupSpace groupSpace = createGroupSpace("Missing target");
+
+        // when, then
+        mockMvc.perform(patch(
+                        "/api/recurrence-events/{recurrenceId}/group-shares/{groupSpaceId}",
+                        recurrenceId,
+                        groupSpace.getId()
+                )
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"isAnonymous\": false}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("PERSONAL_SCHEDULE_SHARE_NOT_FOUND"));
+        mockMvc.perform(delete(
+                        "/api/recurrence-events/{recurrenceId}/group-shares/{groupSpaceId}",
+                        recurrenceId,
+                        groupSpace.getId()
+                ))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("PERSONAL_SCHEDULE_SHARE_NOT_FOUND"));
+    }
+
+    @Test
     @DisplayName("RDATE, EXDATE, EXRULE, 복수 RRULE 입력을 하나의 recurrence set으로 저장한다")
     void givenMultipleRecurrenceRules_whenCreate_thenAcceptsContract() throws Exception {
         // given
@@ -888,6 +1034,10 @@ class RecurrenceEventControllerTest {
                 .andExpect(status().isCreated())
                 .andReturn();
         return readResponse(result).get("recurrenceId").asLong();
+    }
+
+    private GroupSpace createGroupSpace(String name) {
+        return groupSpaceRepository.saveAndFlush(new GroupSpace(accountId, name, null));
     }
 
     private void assertCurrentAllDaySnapshot(Long recurrenceId, Instant originStartAt, String title) {
