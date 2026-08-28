@@ -15,6 +15,7 @@ import com.calio.calendar.account.domain.AccountAuthToken;
 import com.calio.calendar.account.repository.AccountAuthTokenRepository;
 import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.auth.service.AccessTokenEncoder;
+import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.event.repository.EventRepository;
 import com.calio.calendar.groupspace.domain.GroupMember;
 import com.calio.calendar.groupspace.domain.GroupSpace;
@@ -23,6 +24,7 @@ import com.calio.calendar.groupspace.repository.GroupSpaceRepository;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.security.AuthenticatedAccountMockMvcTestConfig;
 import com.calio.calendar.security.WithAuthenticatedAccount;
+import com.calio.calendar.sharing.event.domain.PersonalEventGroupShare;
 import com.calio.calendar.sharing.event.repository.PersonalEventGroupShareRepository;
 import com.calio.calendar.sharing.recurrence.repository.PersonalRecurrenceGroupShareRepository;
 import com.calio.calendar.tag.domain.Tag;
@@ -170,6 +172,7 @@ class PersonalScheduleGroupShareControllerTest {
         ));
         createEventShare(eventId, groupSpace.getId());
         String sourceOwnerToken = createAuthenticatedToken(accountRepository.getReferenceById(accountId));
+        String groupOwnerToken = createAuthenticatedToken(groupOwner);
 
         MvcResult listed = mockMvc.perform(get("/api/events/{eventId}/group-shares", eventId))
                 .andExpect(status().isOk())
@@ -180,6 +183,16 @@ class PersonalScheduleGroupShareControllerTest {
         String publicShareId = response(listed).get(0).get("publicShareId").asString();
 
         mockMvc.perform(patch("/api/events/{eventId}/group-shares/{groupSpaceId}", eventId, groupSpace.getId())
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + groupOwnerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"isAnonymous\":false}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value("PERSONAL_SCHEDULE_SHARE_FORBIDDEN"));
+        assertThat(eventShareRepository.findByEvent_IdAndGroupSpace_Id(eventId, groupSpace.getId()))
+                .hasValueSatisfying(share -> assertThat(share.isAnonymous()).isTrue());
+
+        mockMvc.perform(patch("/api/events/{eventId}/group-shares/{groupSpaceId}", eventId, groupSpace.getId())
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + sourceOwnerToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"isAnonymous\":false}"))
                 .andExpect(status().isOk())
@@ -187,7 +200,7 @@ class PersonalScheduleGroupShareControllerTest {
                 .andExpect(jsonPath("$.publicShareId").value(publicShareId));
 
         mockMvc.perform(delete("/api/events/{eventId}/group-shares/{groupSpaceId}", eventId, groupSpace.getId())
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + createAuthenticatedToken(groupOwner)))
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + groupOwnerToken))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.errorCode").value("PERSONAL_SCHEDULE_SHARE_FORBIDDEN"));
         assertThat(eventShareRepository.count()).isEqualTo(1);
@@ -214,13 +227,43 @@ class PersonalScheduleGroupShareControllerTest {
                 groupSpace, accountId, "source", MEMBER_CREATED_AT
         ));
         createEventShare(eventId, groupSpace.getId());
+        Account anotherMember = accountRepository.saveAndFlush(new Account());
+        groupMemberRepository.saveAndFlush(new GroupMember(
+                groupSpace, anotherMember.getId(), "another", MEMBER_CREATED_AT
+        ));
+        Tag defaultTag = tagRepository
+                .findFirstByTagTypeAndTitleAndAccountIsNullAndGroupSpaceIsNullOrderByIdAsc(
+                        TagType.PERSONAL_DEFAULT, "기타"
+                )
+                .orElseThrow();
+        Event anotherMembersEvent = eventRepository.saveAndFlush(new Event(
+                "다른 멤버 일정",
+                null,
+                Instant.parse("2026-08-02T09:00:00Z"),
+                Instant.parse("2026-08-02T10:00:00Z"),
+                false,
+                "UTC",
+                null,
+                defaultTag,
+                anotherMember
+        ));
+        eventShareRepository.saveAndFlush(PersonalEventGroupShare.create(
+                anotherMembersEvent,
+                groupSpace,
+                true
+        ));
 
         mockMvc.perform(delete("/api/group-spaces/{groupSpaceId}/members/{memberId}",
                         groupSpace.getId(), sourceMember.getId())
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + createAuthenticatedToken(groupOwner)))
                 .andExpect(status().isNoContent());
 
-        assertThat(eventShareRepository.count()).isZero();
+        assertThat(eventShareRepository.findByEvent_IdAndGroupSpace_Id(eventId, groupSpace.getId())).isEmpty();
+        assertThat(eventShareRepository.findByEvent_IdAndGroupSpace_Id(
+                anotherMembersEvent.getId(),
+                groupSpace.getId()
+        )).isPresent();
+        assertThat(eventShareRepository.count()).isEqualTo(1);
         assertThat(eventRepository.findById(eventId)).isPresent();
     }
 
