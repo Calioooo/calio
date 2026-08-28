@@ -29,7 +29,6 @@ public class GoogleCalendarAccessTokenService {
     private final TokenEncryptor tokenEncryptor;
     private final GoogleOperationJobCommandService jobCommandService;
     private final TransactionTemplate disconnectTransaction;
-    private final TransactionTemplate tokenUpdateTransaction;
     private final Clock clock;
 
     public GoogleCalendarAccessTokenService(
@@ -47,7 +46,6 @@ public class GoogleCalendarAccessTokenService {
         this.tokenEncryptor = tokenEncryptor;
         this.jobCommandService = jobCommandService;
         this.disconnectTransaction = new TransactionTemplate(transactionManager);
-        this.tokenUpdateTransaction = new TransactionTemplate(transactionManager);
         this.clock = clock;
     }
 
@@ -82,11 +80,9 @@ public class GoogleCalendarAccessTokenService {
 
     private void disconnectAfterInvalidGrant(Long connectionId, Instant disconnectedAt) {
         disconnectTransaction.executeWithoutResult(status -> {
-            connectionCommandService.tryLockConnectedConnectionById(connectionId)
-                    .ifPresent(connection -> {
-                        jobCommandService.deleteJobsForConnection(connection.getId());
-                        connectionCommandService.disconnect(connection, disconnectedAt);
-                    });
+            GoogleCalendarConnection connection = connectionCommandService.lockConnectedConnectionById(connectionId);
+            jobCommandService.deleteJobsForIntegration(connection.getIntegration().getId());
+            connectionCommandService.disconnect(connection, disconnectedAt);
         });
     }
 
@@ -109,11 +105,9 @@ public class GoogleCalendarAccessTokenService {
             String encryptedAccessToken,
             Instant accessTokenExpiresAt
     ) {
-        tokenUpdateTransaction.executeWithoutResult(status -> {
-            GoogleCalendarConnection connection =
-                    connectionCommandService.lockConnectedConnectionById(tokenState.connectionId());
-            connectionCommandService.replaceAccessToken(connection, encryptedAccessToken, accessTokenExpiresAt);
-        });
+        GoogleCalendarConnection connection =
+                connectionCommandService.lockConnectedConnectionById(tokenState.connectionId());
+        connectionCommandService.replaceAccessToken(connection, encryptedAccessToken, accessTokenExpiresAt);
     }
 
     protected record TokenState(

@@ -1,7 +1,8 @@
 package com.calio.calendar.integration.sync.operation;
 
 import com.calio.calendar.integration.sync.GoogleCalendarSyncService;
-import com.calio.calendar.integration.connection.service.GoogleCalendarConnectionService;
+import com.calio.calendar.integration.connection.service.GoogleCalendarConnectionCommandService;
+import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrationQueryService;
 import com.calio.calendar.external.google.GoogleCalendarInvalidGrantException;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
@@ -21,7 +22,8 @@ public class GoogleOperationProcessor {
     private final GoogleOperationLeaseService operationLeaseService;
     private final GoogleCalendarSyncService syncService;
     private final GoogleOperationFailureClassifier failureClassifier;
-    private final GoogleCalendarConnectionService connectionService;
+    private final GoogleCalendarConnectionCommandService connectionCommandService;
+    private final GoogleCalendarIntegrationQueryService integrationQueryService;
     private final Clock clock;
 
     public GoogleOperationProcessor(
@@ -29,14 +31,16 @@ public class GoogleOperationProcessor {
             GoogleOperationLeaseService operationLeaseService,
             GoogleCalendarSyncService syncService,
             GoogleOperationFailureClassifier failureClassifier,
-            GoogleCalendarConnectionService connectionService,
+            GoogleCalendarConnectionCommandService connectionCommandService,
+            GoogleCalendarIntegrationQueryService integrationQueryService,
             Clock clock
     ) {
         this.jobService = jobService;
         this.operationLeaseService = operationLeaseService;
         this.syncService = syncService;
         this.failureClassifier = failureClassifier;
-        this.connectionService = connectionService;
+        this.connectionCommandService = connectionCommandService;
+        this.integrationQueryService = integrationQueryService;
         this.clock = clock;
     }
 
@@ -56,7 +60,10 @@ public class GoogleOperationProcessor {
     }
 
     private JobExecutionResult processHead(Long accountId, String workerToken) {
-        GoogleOperationJob job = jobService.claimNextJob(accountId, workerToken);
+        Long integrationId = integrationQueryService.findIntegration(accountId)
+                .orElseThrow()
+                .getId();
+        GoogleOperationJob job = jobService.claimNextJob(accountId, integrationId, workerToken);
         if (job == null) {
             return JobExecutionResult.STOP_ACCOUNT_PROCESSING;
         }
@@ -94,7 +101,7 @@ public class GoogleOperationProcessor {
         if (!requiresIntegrationPause(failure)) {
             return mapExecutionResult(failureDecision);
         }
-        connectionService.pauseConnectedConnectionForReconnect(
+        connectionCommandService.markConnectedConnectionSyncError(
                 job.getAccountId(),
                 ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED.name(),
                 Instant.now(clock)

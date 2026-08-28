@@ -5,7 +5,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.calio.calendar.integration.connection.service.GoogleCalendarConnectionCommandService;
+import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrationCommandService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -13,16 +13,16 @@ class GoogleOperationLeaseServiceTest {
 
     private static final long LEASE_DURATION_SECONDS = 300L;
 
-    private final GoogleCalendarConnectionCommandService connectionCommandService =
-            mock(GoogleCalendarConnectionCommandService.class);
+    private final GoogleCalendarIntegrationCommandService integrationCommandService =
+            mock(GoogleCalendarIntegrationCommandService.class);
     private final GoogleOperationLeaseService leaseService =
-            new GoogleOperationLeaseService(connectionCommandService);
+            new GoogleOperationLeaseService(integrationCommandService);
 
     @Test
     @DisplayName("operation lease 획득은 Lease Service가 소유한 유효 기간을 사용한다")
     void givenAvailableLease_whenAcquire_thenUsesOwnedDuration() {
         // given
-        when(connectionCommandService.acquireOperationLease(
+        when(integrationCommandService.acquireOperationLease(
                 1L,
                 "worker-token",
                 LEASE_DURATION_SECONDS
@@ -33,7 +33,7 @@ class GoogleOperationLeaseServiceTest {
 
         // then
         assertThat(acquired).isTrue();
-        verify(connectionCommandService).acquireOperationLease(
+        verify(integrationCommandService).acquireOperationLease(
                 1L,
                 "worker-token",
                 LEASE_DURATION_SECONDS
@@ -47,7 +47,7 @@ class GoogleOperationLeaseServiceTest {
         leaseService.extend(10L, 1L, "worker-token");
 
         // then
-        verify(connectionCommandService).extendOperationLease(
+        verify(integrationCommandService).extendOperationLease(
                 10L,
                 1L,
                 "worker-token",

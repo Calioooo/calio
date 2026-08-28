@@ -92,21 +92,4 @@ public class GoogleCalendarConnectionCommandService {
         });
     }
 
-    public long allocateOperationSequence(GoogleCalendarConnection connection) {
-        return connection.allocateGoogleOperationSequence();
-    }
-
-    public boolean acquireOperationLease(Long accountId, String ownerToken, long seconds) {
-        return connectionRepository.acquireGoogleOperationLease(accountId, ownerToken, seconds) == 1;
-    }
-
-    public void extendOperationLease(Long jobId, Long accountId, String ownerToken, long seconds) {
-        if (connectionRepository.renewOwnedGoogleOperationLease(jobId, accountId, ownerToken, seconds) != 1) {
-            throw new GoogleOperationOwnershipLostException();
-        }
-    }
-
-    public boolean releaseOperationLease(Long accountId, String ownerToken) {
-        return connectionRepository.releaseGoogleOperationLease(accountId, ownerToken) == 1;
-    }
 }

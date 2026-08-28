@@ -106,7 +106,7 @@ class GoogleCalendarConnectionServiceTest {
 
         service().disconnect(ACCOUNT_ID);
 
-        verify(jobCommandService).deleteJobsForConnection(connection.getId());
+        verify(jobCommandService).deleteJobsForIntegration(connection.getIntegration().getId());
         verify(connectionCommandService).disconnect(connection, NOW);
         verify(oauthClient).revokeToken("refresh-token");
     }

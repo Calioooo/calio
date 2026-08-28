@@ -439,6 +439,29 @@ class GoogleCalendarSyncMigrationTest {
         }
     }
 
+    @Test
+    @DisplayName("V22는 Job sequence와 operation lease를 Integration으로 옮긴다")
+    void givenV21Schema_whenMigrateToV22_thenMovesGoogleOperationRuntimeToIntegration() throws Exception {
+        String url = "jdbc:h2:mem:google-integration-job-runtime;MODE=MySQL;DB_CLOSE_DELAY=-1";
+        migrateTo(url, MigrationVersion.fromVersion("22"));
+
+        try (Connection connection = DriverManager.getConnection(url, "sa", "")) {
+            assertThat(columnNames(connection, "GOOGLE_CALENDAR_INTEGRATIONS")).contains(
+                    "NEXT_GOOGLE_OPERATION_SEQUENCE",
+                    "GOOGLE_OPERATION_LEASE_OWNER",
+                    "GOOGLE_OPERATION_LEASE_EXPIRES_AT"
+            );
+            assertThat(columnNames(connection, "GOOGLE_CALENDAR_CONNECTIONS")).doesNotContain(
+                    "NEXT_GOOGLE_OPERATION_SEQUENCE",
+                    "GOOGLE_OPERATION_LEASE_OWNER",
+                    "GOOGLE_OPERATION_LEASE_EXPIRES_AT"
+            );
+            assertThat(columnNames(connection, "GOOGLE_OPERATION_JOBS"))
+                    .contains("INTEGRATION_ID", "INTEGRATION_SEQUENCE")
+                    .doesNotContain("CONNECTION_ID", "ACCOUNT_SEQUENCE");
+        }
+    }
+
     private void migrateTo(String url, MigrationVersion target) {
         Flyway.configure()
                 .dataSource(url, "sa", "")

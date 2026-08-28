@@ -26,14 +26,14 @@ public class GoogleOperationJob extends BaseEntity {
     @Column(name = "operation_id", nullable = false, updatable = false, length = 36)
     private String operationId;
 
-    @Column(name = "connection_id", nullable = false, updatable = false)
-    private Long connectionId;
+    @Column(name = "integration_id", nullable = false, updatable = false)
+    private Long integrationId;
 
     @Column(name = "account_id", nullable = false, updatable = false)
     private Long accountId;
 
-    @Column(name = "account_sequence", nullable = false, updatable = false)
-    private long accountSequence;
+    @Column(name = "integration_sequence", nullable = false, updatable = false)
+    private long integrationSequence;
 
     @Column(name = "job_kind", nullable = false, updatable = false, length = 64)
     private String kind;
@@ -84,18 +84,18 @@ public class GoogleOperationJob extends BaseEntity {
 
     public static GoogleOperationJob sync(
             String operationId,
-            Long connectionId,
+            Long integrationId,
             Long accountId,
-            long accountSequence,
+            long integrationSequence,
             GoogleOperationJobTrigger trigger,
             Instant runnableAt
     ) {
         validateSyncTrigger(trigger);
         GoogleOperationJob job = new GoogleOperationJob();
         job.operationId = operationId;
-        job.connectionId = connectionId;
+        job.integrationId = integrationId;
         job.accountId = accountId;
-        job.accountSequence = accountSequence;
+        job.integrationSequence = integrationSequence;
         job.kind = SYNC_KIND;
         job.trigger = trigger;
         job.effectiveResourceScope = PRIMARY_CALENDAR_SCOPE;
@@ -107,9 +107,9 @@ public class GoogleOperationJob extends BaseEntity {
 
     public static GoogleOperationJob outbound(
             String operationId,
-            Long connectionId,
+            Long integrationId,
             Long accountId,
-            long accountSequence,
+            long integrationSequence,
             String kind,
             String resourceScope,
             String resourceKey,
@@ -120,9 +120,9 @@ public class GoogleOperationJob extends BaseEntity {
         validateOutboundFields(kind, resourceScope, resourceKey, targetPayload);
         GoogleOperationJob job = new GoogleOperationJob();
         job.operationId = operationId;
-        job.connectionId = connectionId;
+        job.integrationId = integrationId;
         job.accountId = accountId;
-        job.accountSequence = accountSequence;
+        job.integrationSequence = integrationSequence;
         job.kind = kind;
         job.trigger = GoogleOperationJobTrigger.CANONICAL_MUTATION;
         job.effectiveResourceScope = resourceScope;
@@ -170,9 +170,9 @@ public class GoogleOperationJob extends BaseEntity {
 
     public Long getId() { return id; }
     public String getOperationId() { return operationId; }
-    public Long getConnectionId() { return connectionId; }
+    public Long getIntegrationId() { return integrationId; }
     public Long getAccountId() { return accountId; }
-    public long getAccountSequence() { return accountSequence; }
+    public long getIntegrationSequence() { return integrationSequence; }
     public String getKind() { return kind; }
     public GoogleOperationJobTrigger getTrigger() { return trigger; }
     public GoogleOperationJobState getState() { return state; }
