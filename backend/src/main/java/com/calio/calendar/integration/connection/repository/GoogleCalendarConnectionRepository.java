@@ -42,20 +42,36 @@ public interface GoogleCalendarConnectionRepository extends JpaRepository<Google
             from GoogleCalendarConnection connection
             join connection.integration integration
             where integration.accountId = :accountId
+              and connection.state = :state
             """)
-    Optional<GoogleCalendarConnection> findWithIntegrationByAccountIdForUpdate(@Param("accountId") Long accountId);
+    Optional<GoogleCalendarConnection> findWithIntegrationByAccountIdAndStateForUpdate(
+            @Param("accountId") Long accountId,
+            @Param("state") GoogleCalendarConnectionState state
+    );
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @EntityGraph(attributePaths = "integration")
     @Query("""
             select connection
             from GoogleCalendarConnection connection
-            join connection.integration integration
-            where integration.accountId = :accountId
+            where connection.integration.id = :integrationId
+              and connection.googleSubject = :googleSubject
+            """)
+    Optional<GoogleCalendarConnection> findWithIntegrationByIntegrationIdAndGoogleSubjectForUpdate(
+            @Param("integrationId") Long integrationId,
+            @Param("googleSubject") String googleSubject
+    );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @EntityGraph(attributePaths = "integration")
+    @Query("""
+            select connection
+            from GoogleCalendarConnection connection
+            where connection.integration.id = :integrationId
               and connection.state = :state
             """)
-    Optional<GoogleCalendarConnection> findWithIntegrationByAccountIdAndStateForUpdate(
-            @Param("accountId") Long accountId,
+    Optional<GoogleCalendarConnection> findWithIntegrationByIntegrationIdAndStateForUpdate(
+            @Param("integrationId") Long integrationId,
             @Param("state") GoogleCalendarConnectionState state
     );
 

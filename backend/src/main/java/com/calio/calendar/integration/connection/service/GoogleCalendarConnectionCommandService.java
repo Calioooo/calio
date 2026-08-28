@@ -32,8 +32,21 @@ public class GoogleCalendarConnectionCommandService {
         );
     }
 
-    public Optional<GoogleCalendarConnection> tryLockConnection(Long accountId) {
-        return connectionRepository.findWithIntegrationByAccountIdForUpdate(accountId);
+    public Optional<GoogleCalendarConnection> tryLockConnection(
+            Long integrationId,
+            String googleSubject
+    ) {
+        return connectionRepository.findWithIntegrationByIntegrationIdAndGoogleSubjectForUpdate(
+                integrationId,
+                googleSubject
+        );
+    }
+
+    public Optional<GoogleCalendarConnection> tryLockConnectionByIntegrationAndState(
+            Long integrationId,
+            GoogleCalendarConnectionState state
+    ) {
+        return connectionRepository.findWithIntegrationByIntegrationIdAndStateForUpdate(integrationId, state);
     }
 
     public GoogleCalendarConnection lockConnectedConnectionById(Long connectionId) {
