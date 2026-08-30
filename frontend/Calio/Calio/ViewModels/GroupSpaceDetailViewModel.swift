@@ -16,6 +16,8 @@ import Foundation
         self.service = service
     }
 
+    deinit {}
+
     func loadMembers() async {
         isLoading = true
         defer { isLoading = false }

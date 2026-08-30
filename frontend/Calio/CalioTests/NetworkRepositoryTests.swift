@@ -611,9 +611,9 @@ struct NetworkRepositoryTests {
         #expect(requests.map { $0.url?.path } == ["/api/group-spaces", "/api/group-spaces", "/api/group-spaces/7", "/api/group-spaces/7/members", "/api/group-spaces/7/owner-transfer", "/api/group-spaces/7/members/me", "/api/group-spaces/7/members/11", "/api/group-spaces/7"])
         #expect(requests.map { $0.httpMethod ?? "" } == ["GET", "POST", "PATCH", "GET", "POST", "DELETE", "DELETE", "DELETE"])
         #expect(requests.allSatisfy { $0.value(forHTTPHeaderField: "Authorization") == "Bearer test-token" })
-        let createBody = try #require(groupRequestBodyJSON(from: requests[1]))
-        let updateBody = try #require(groupRequestBodyJSON(from: requests[2]))
-        let transferBody = try #require(groupRequestBodyJSON(from: requests[4]))
+        let createBody = try groupRequestBodyJSON(from: requests[1])
+        let updateBody = try groupRequestBodyJSON(from: requests[2])
+        let transferBody = try groupRequestBodyJSON(from: requests[4])
         #expect(Set(createBody.keys) == ["name", "nickname"])
         #expect(createBody["emoji"] == nil)
         #expect(Set(updateBody.keys) == ["name", "emoji"])
@@ -621,8 +621,11 @@ struct NetworkRepositoryTests {
         #expect(requests.dropFirst(5).allSatisfy { requestBodyData(from: $0) == nil })
     }
 
-    private func groupRequestBodyJSON(from request: URLRequest) -> [String: Any]? {
-        guard let body = requestBodyData(from: request) else { return nil }
-        return try? JSONSerialization.jsonObject(with: body) as? [String: Any]
+    private func groupRequestBodyJSON(from request: URLRequest) throws -> [String: Any] {
+        guard let body = requestBodyData(from: request) else { throw GroupRequestBodyError.missing }
+        guard let json = try JSONSerialization.jsonObject(with: body) as? [String: Any] else { throw GroupRequestBodyError.invalid }
+        return json
     }
+
+    private enum GroupRequestBodyError: Error { case missing, invalid }
 }

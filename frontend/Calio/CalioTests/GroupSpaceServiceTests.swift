@@ -278,6 +278,8 @@ private final class GroupSpaceRepositoryStub: GroupSpaceRepository {
     func removeMember(groupSpaceId: Int64, memberId: Int64) async throws { operations.append("remove:\(groupSpaceId):\(memberId)") }
 
     enum StubError: Error { case failed }
+
+    deinit {}
 }
 
 private struct FailingGroupSpaceRepository: GroupSpaceRepository {

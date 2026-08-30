@@ -11,6 +11,8 @@ import Combine
     private let service: GroupSpaceService
     private var latestLoadRequestID = 0
     init(service: GroupSpaceService = GroupSpaceService()) { self.service = service }
+    deinit {}
+
     func load() async {
         latestLoadRequestID += 1
         let requestID = latestLoadRequestID
