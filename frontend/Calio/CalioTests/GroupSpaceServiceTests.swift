@@ -87,6 +87,42 @@ struct GroupSpaceServiceTests {
         #expect(viewModel.failure == nil)
     }
 
+    @MainActor @Test func listViewModelShowsInitialFailureThenRecoversOnRetry() async {
+        let confirmedSpace = GroupSpaceRepositoryStub.sampleSpace()
+        let repository = GroupSpaceRepositoryStub(fetchResponses: [[confirmedSpace]], fetchErrorOnCall: 1)
+        let viewModel = GroupSpaceListViewModel(service: GroupSpaceService(repository: repository))
+
+        await viewModel.load()
+
+        #expect(viewModel.didFailLoading)
+        #expect(viewModel.failure == .unexpected)
+        #expect(viewModel.failedOperation == .load)
+
+        await viewModel.load()
+
+        #expect(viewModel.spaces.map(\.name) == ["프로젝트 팀"])
+        #expect(!viewModel.didFailLoading)
+        #expect(viewModel.errorMessage == nil)
+    }
+
+    @MainActor @Test func listViewModelExposesCreationFailureEvenAfterInitialLoadFailure() async {
+        let viewModel = GroupSpaceListViewModel(
+            service: GroupSpaceService(repository: FailingGroupSpaceRepository(error: .backend(
+                statusCode: 409,
+                problem: .init(type: nil, title: "CONFLICT", status: 409, detail: nil, errorCode: "GROUP_SPACE_CONFLICT")
+            )))
+        )
+
+        await viewModel.load()
+        let succeeded = await viewModel.create(name: "프로젝트 팀", nickname: "준하")
+
+        #expect(!succeeded)
+        #expect(viewModel.didFailLoading)
+        #expect(viewModel.failure == .backend(errorCode: "GROUP_SPACE_CONFLICT"))
+        #expect(viewModel.failedOperation == .create)
+        #expect(viewModel.errorMessage?.contains("GROUP_SPACE_CONFLICT") == true)
+    }
+
     @MainActor @Test func ownershipTransferAppliesBackendConfirmedRolesToDetailState() async throws {
         let repository = GroupSpaceRepositoryStub()
         let viewModel = GroupSpaceDetailViewModel(
@@ -119,6 +155,42 @@ struct GroupSpaceServiceTests {
         #expect(viewModel.groupSpace.memberCount == 1)
         #expect(viewModel.members.map(\.memberId) == [10])
         #expect(repository.operations == ["members:7", "remove:7:11", "fetch:7"])
+    }
+
+    @MainActor @Test func detailViewModelRecordsOperationFailuresWithoutDiscardingBackendErrorCode() async {
+        let viewModel = GroupSpaceDetailViewModel(
+            groupSpace: GroupSpaceRepositoryStub.sampleGroupSpace(),
+            service: GroupSpaceService(repository: FailingGroupSpaceRepository(error: .backend(
+                statusCode: 403,
+                problem: .init(type: nil, title: "FORBIDDEN", status: 403, detail: nil, errorCode: "GROUP_SPACE_FORBIDDEN")
+            )))
+        )
+        let member = GroupMember(memberId: 11, nickname: "민지", role: .member)
+
+        await viewModel.loadMembers()
+        #expect(viewModel.failedOperation == .loadMembers)
+        #expect(viewModel.failure == .backend(errorCode: "GROUP_SPACE_FORBIDDEN"))
+
+        let updateSucceeded = await viewModel.update(name: "수정 팀")
+        #expect(!updateSucceeded)
+        #expect(viewModel.failedOperation == .update)
+        let deletionSucceeded = await viewModel.delete()
+        #expect(!deletionSucceeded)
+        #expect(viewModel.failedOperation == .delete)
+        let leaveSucceeded = await viewModel.leave()
+        #expect(!leaveSucceeded)
+        #expect(viewModel.failedOperation == .leave)
+        let removalSucceeded = await viewModel.remove(member: member)
+        #expect(!removalSucceeded)
+        #expect(viewModel.failedOperation == .removeMember)
+        let transferSucceeded = await viewModel.transferOwnership(to: member)
+        #expect(!transferSucceeded)
+        #expect(viewModel.failedOperation == .transferOwnership)
+    }
+
+    @Test func groupSpaceManagementPermissionFollowsCanonicalMembershipRole() {
+        #expect(GroupSpaceRepositoryStub.sampleGroupSpace().canManageGroupSpace)
+        #expect(!GroupSpaceRepositoryStub.sampleGroupSpace(role: .member).canManageGroupSpace)
     }
 
     private func expectFetchFailure(_ apiError: APIError, equals expected: GroupSpaceFailure) async {
@@ -160,7 +232,7 @@ private final class GroupSpaceRepositoryStub: GroupSpaceRepository {
               createdAt: date, updatedAt: date)
     }
 
-    static func sampleGroupSpace(name: String = "프로젝트 팀") -> GroupSpace {
+    static func sampleGroupSpace(name: String = "프로젝트 팀", role: GroupMemberRole = .owner) -> GroupSpace {
         GroupSpace(
             groupSpaceId: 7,
             name: name,
@@ -168,7 +240,7 @@ private final class GroupSpaceRepositoryStub: GroupSpaceRepository {
             memberCount: 2,
             myMembership: GroupMembership(
                 nickname: "준하",
-                role: .owner,
+                role: role,
                 createdAt: date,
                 updatedAt: date,
                 statusChangedAt: date

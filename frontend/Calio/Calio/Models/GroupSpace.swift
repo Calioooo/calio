@@ -23,6 +23,8 @@ struct GroupSpace: Identifiable, Equatable {
     let updatedAt: Date
 
     var id: Int64 { groupSpaceId }
+
+    var canManageGroupSpace: Bool { myMembership.role == .owner }
 }
 
 struct GroupMember: Identifiable, Equatable {

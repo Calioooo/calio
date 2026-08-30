@@ -32,7 +32,7 @@ struct GroupSpaceDetailView: View {
                 else { ForEach(viewModel.members, id: \.memberId) { member in memberRow(member) } }
             }
             Section("그룹 설정") {
-                if viewModel.groupSpace.myMembership.role == .owner {
+                if viewModel.groupSpace.canManageGroupSpace {
                     Button("그룹 이름 수정") { editedName = viewModel.groupSpace.name; isEditing = true }
                     Button("그룹 삭제", role: .destructive) { confirmation = .delete }
                 } else { Button("그룹 나가기", role: .destructive) { confirmation = .leave } }
@@ -63,7 +63,7 @@ struct GroupSpaceDetailView: View {
                 Text(member.nickname).font(.body.weight(.medium))
                 Text(member.role == .owner ? "소유자" : "멤버").font(.footnote).foregroundStyle(.calioTextSecondary)
             }; Spacer()
-            if viewModel.groupSpace.myMembership.role == .owner && member.role != .owner {
+            if viewModel.groupSpace.canManageGroupSpace && member.role != .owner {
                 Menu {
                     Button("소유권 이전") { confirmation = .transfer(member) }
                     Button("멤버 내보내기", role: .destructive) { confirmation = .remove(member) }
