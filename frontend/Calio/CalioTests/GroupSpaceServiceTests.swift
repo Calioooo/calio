@@ -4,6 +4,24 @@ import Testing
 
 @Suite(.serialized)
 struct GroupSpaceServiceTests {
+    @Test func servicePreservesNetworkDecodingAndBackendFailures() async {
+        await expectFetchFailure(
+            .network(URLError(.notConnectedToInternet)),
+            equals: .network
+        )
+        await expectFetchFailure(
+            .decoding(DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "invalid response"))),
+            equals: .decoding
+        )
+        await expectFetchFailure(
+            .backend(
+                statusCode: 409,
+                problem: .init(type: nil, title: "CONFLICT", status: 409, detail: nil, errorCode: "GROUP_SPACE_CONFLICT")
+            ),
+            equals: .backend(errorCode: "GROUP_SPACE_CONFLICT")
+        )
+    }
+
     @Test func serviceMapsGroupSpaceDTOsToAppModels() async throws {
         let repository = GroupSpaceRepositoryStub(fetchResponses: [[GroupSpaceRepositoryStub.sampleSpace()]])
         let service = GroupSpaceService(repository: repository)
@@ -86,6 +104,19 @@ struct GroupSpaceServiceTests {
         #expect(repository.operations == ["members:7", "remove:7:11", "fetch:7"])
     }
 
+    private func expectFetchFailure(_ apiError: APIError, equals expected: GroupSpaceFailure) async {
+        let service = GroupSpaceService(repository: FailingGroupSpaceRepository(error: apiError))
+
+        do {
+            _ = try await service.fetchGroupSpaces()
+            Issue.record("Expected group space service failure")
+        } catch let failure as GroupSpaceFailure {
+            #expect(failure == expected)
+        } catch {
+            Issue.record("Unexpected failure: \(error)")
+        }
+    }
+
 }
 
 private final class GroupSpaceRepositoryStub: GroupSpaceRepository {
@@ -158,4 +189,18 @@ private final class GroupSpaceRepositoryStub: GroupSpaceRepository {
     func removeMember(groupSpaceId: Int64, memberId: Int64) async throws { operations.append("remove:\(groupSpaceId):\(memberId)") }
 
     enum StubError: Error { case failed }
+}
+
+private struct FailingGroupSpaceRepository: GroupSpaceRepository {
+    let error: APIError
+
+    func fetchGroupSpaces() async throws -> GroupSpaceListResponseDTO { throw error }
+    func fetchGroupSpace(groupSpaceId: Int64) async throws -> GroupSpaceResponseDTO { throw error }
+    func createGroupSpace(_ request: CreateGroupSpaceRequestDTO) async throws -> GroupSpaceResponseDTO { throw error }
+    func updateGroupSpace(groupSpaceId: Int64, request: UpdateGroupSpaceRequestDTO) async throws -> GroupSpaceResponseDTO { throw error }
+    func deleteGroupSpace(groupSpaceId: Int64) async throws { throw error }
+    func fetchMembers(groupSpaceId: Int64) async throws -> GroupMemberListResponseDTO { throw error }
+    func transferOwnership(groupSpaceId: Int64, request: TransferGroupOwnerRequestDTO) async throws -> TransferGroupOwnerResponseDTO { throw error }
+    func leaveGroupSpace(groupSpaceId: Int64) async throws { throw error }
+    func removeMember(groupSpaceId: Int64, memberId: Int64) async throws { throw error }
 }

@@ -5,6 +5,8 @@ import Combine
     @Published private(set) var spaces: [GroupSpace] = []
     @Published private(set) var isLoading = false
     @Published private(set) var didFailLoading = false
+    @Published private(set) var failure: GroupSpaceFailure?
+    @Published private(set) var failedOperation: GroupSpaceOperation?
     @Published var errorMessage: String?
     private let service: GroupSpaceService
     init(service: GroupSpaceService = GroupSpaceService()) { self.service = service }
@@ -14,20 +16,20 @@ import Combine
         do {
             spaces = try await service.fetchGroupSpaces()
             didFailLoading = false
-            errorMessage = nil
+            clearFailure()
         } catch {
             didFailLoading = true
-            errorMessage = "그룹 공간을 불러오지 못했습니다. 다시 시도해 주세요."
+            recordFailure(error, for: .load)
         }
     }
     func create(name: String, nickname: String) async -> Bool {
         do {
             let space = try await service.create(name: name, emoji: nil, nickname: nickname)
             spaces.append(space)
-            errorMessage = nil
+            clearFailure()
             return true
         } catch {
-            errorMessage = "그룹 공간을 만들지 못했습니다. 다시 시도해 주세요."
+            recordFailure(error, for: .create)
             return false
         }
     }
@@ -38,5 +40,18 @@ import Combine
     func remove(groupSpaceId: Int64) {
         spaces.removeAll { $0.groupSpaceId == groupSpaceId }
     }
-    func clearError() { errorMessage = nil }
+    func clearError() { clearFailure() }
+
+    private func recordFailure(_ error: Error, for operation: GroupSpaceOperation) {
+        let failure = error as? GroupSpaceFailure ?? .unexpected
+        self.failure = failure
+        failedOperation = operation
+        errorMessage = failure.message(for: operation)
+    }
+
+    private func clearFailure() {
+        failure = nil
+        failedOperation = nil
+        errorMessage = nil
+    }
 }

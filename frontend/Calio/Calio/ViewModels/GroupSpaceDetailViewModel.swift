@@ -5,6 +5,8 @@ import Foundation
     @Published private(set) var groupSpace: GroupSpace
     @Published private(set) var members: [GroupMember] = []
     @Published private(set) var isLoading = false
+    @Published private(set) var failure: GroupSpaceFailure?
+    @Published private(set) var failedOperation: GroupSpaceOperation?
     @Published var errorMessage: String?
 
     private let service: GroupSpaceService
@@ -19,19 +21,19 @@ import Foundation
         defer { isLoading = false }
         do {
             members = try await service.members(groupSpaceId: groupSpace.groupSpaceId)
-            errorMessage = nil
+            clearFailure()
         } catch {
-            errorMessage = "멤버 정보를 불러오지 못했습니다. 다시 시도해 주세요."
+            recordFailure(error, for: .loadMembers)
         }
     }
 
     func update(name: String) async -> Bool {
         do {
             groupSpace = try await service.update(groupSpaceId: groupSpace.groupSpaceId, name: name, emoji: groupSpace.emoji)
-            errorMessage = nil
+            clearFailure()
             return true
         } catch {
-            errorMessage = "그룹 공간을 수정하지 못했습니다. 다시 시도해 주세요."
+            recordFailure(error, for: .update)
             return false
         }
     }
@@ -39,9 +41,10 @@ import Foundation
     func delete() async -> Bool {
         do {
             try await service.delete(groupSpaceId: groupSpace.groupSpaceId)
+            clearFailure()
             return true
         } catch {
-            errorMessage = "그룹 공간을 삭제하지 못했습니다. 다시 시도해 주세요."
+            recordFailure(error, for: .delete)
             return false
         }
     }
@@ -49,9 +52,10 @@ import Foundation
     func leave() async -> Bool {
         do {
             try await service.leave(groupSpaceId: groupSpace.groupSpaceId)
+            clearFailure()
             return true
         } catch {
-            errorMessage = "그룹 공간에서 나가지 못했습니다. 다시 시도해 주세요."
+            recordFailure(error, for: .leave)
             return false
         }
     }
@@ -61,10 +65,10 @@ import Foundation
             try await service.removeMember(groupSpaceId: groupSpace.groupSpaceId, memberId: member.memberId)
             groupSpace = try await service.fetchGroupSpace(groupSpaceId: groupSpace.groupSpaceId)
             members.removeAll { $0.memberId == member.memberId }
-            errorMessage = nil
+            clearFailure()
             return true
         } catch {
-            errorMessage = "멤버를 내보내지 못했습니다. 다시 시도해 주세요."
+            recordFailure(error, for: .removeMember)
             return false
         }
     }
@@ -76,15 +80,28 @@ import Foundation
                 targetMemberId: member.memberId
             )
             applyOwnershipTransfer(result)
-            errorMessage = nil
+            clearFailure()
             return true
         } catch {
-            errorMessage = "소유권을 이전하지 못했습니다. 다시 시도해 주세요."
+            recordFailure(error, for: .transferOwnership)
             return false
         }
     }
 
-    func clearError() { errorMessage = nil }
+    func clearError() { clearFailure() }
+
+    private func recordFailure(_ error: Error, for operation: GroupSpaceOperation) {
+        let failure = error as? GroupSpaceFailure ?? .unexpected
+        self.failure = failure
+        failedOperation = operation
+        errorMessage = failure.message(for: operation)
+    }
+
+    private func clearFailure() {
+        failure = nil
+        failedOperation = nil
+        errorMessage = nil
+    }
 
     private func applyOwnershipTransfer(_ result: GroupOwnershipTransfer) {
         members = members.map { member in
