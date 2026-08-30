@@ -35,7 +35,7 @@ struct GroupSpaceListView: View {
                 } else {
                     List {
                         Section("내 그룹 공간") {
-                            ForEach(viewModel.spaces, id: \.groupSpaceId) { space in
+                            ForEach(viewModel.spaces) { space in
                                 NavigationLink {
                                     GroupSpaceDetailView(groupSpace: space) { result in
                                         switch result {
@@ -98,7 +98,7 @@ struct GroupSpaceListView: View {
 }
 
 private struct GroupSpaceRow: View {
-    let space: GroupSpaceResponseDTO
+    let space: GroupSpace
     var body: some View {
         HStack(spacing: 12) {
             Text(space.emoji ?? String(space.name.prefix(1)))

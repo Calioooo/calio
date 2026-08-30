@@ -4,6 +4,23 @@ import Testing
 
 @Suite(.serialized)
 struct GroupSpaceServiceTests {
+    @Test func serviceMapsGroupSpaceDTOsToAppModels() async throws {
+        let repository = GroupSpaceRepositoryStub(fetchResponses: [[GroupSpaceRepositoryStub.sampleSpace()]])
+        let service = GroupSpaceService(repository: repository)
+
+        let spaces = try await service.fetchGroupSpaces()
+        let members = try await service.members(groupSpaceId: 7)
+        let transfer = try await service.transferOwnership(groupSpaceId: 7, targetMemberId: 11)
+
+        #expect(spaces == [GroupSpaceRepositoryStub.sampleGroupSpace()])
+        #expect(members == [
+            GroupMember(memberId: 10, nickname: "준하", role: .owner),
+            GroupMember(memberId: 11, nickname: "민지", role: .member)
+        ])
+        #expect(transfer.previousOwner.role == .member)
+        #expect(transfer.owner.role == .owner)
+    }
+
     @Test func serviceForwardsLifecycleAndMembershipOperationsToRepository() async throws {
         let repository = GroupSpaceRepositoryStub()
         let service = GroupSpaceService(repository: repository)
@@ -17,6 +34,7 @@ struct GroupSpaceServiceTests {
         try await service.delete(groupSpaceId: 7)
 
         #expect(created.name == "프로젝트 팀")
+        #expect(created.myMembership.role == .owner)
         #expect(updated.name == "새 프로젝트 팀")
         #expect(members.map(\.memberId) == [10, 11])
         #expect(repository.operations == ["create", "update:7", "members:7", "transfer:7:11", "remove:7:11", "leave:7", "delete:7"])
@@ -37,7 +55,7 @@ struct GroupSpaceServiceTests {
     @MainActor @Test func ownershipTransferAppliesBackendConfirmedRolesToDetailState() async throws {
         let repository = GroupSpaceRepositoryStub()
         let viewModel = GroupSpaceDetailViewModel(
-            groupSpace: GroupSpaceRepositoryStub.sampleSpace(),
+            groupSpace: GroupSpaceRepositoryStub.sampleGroupSpace(),
             service: GroupSpaceService(repository: repository)
         )
 
@@ -72,6 +90,24 @@ private final class GroupSpaceRepositoryStub: GroupSpaceRepository {
         .init(groupSpaceId: 7, name: name, emoji: nil, memberCount: 2,
               myMembership: .init(nickname: "준하", role: .owner, createdAt: date, updatedAt: date, statusChangedAt: date),
               createdAt: date, updatedAt: date)
+    }
+
+    static func sampleGroupSpace(name: String = "프로젝트 팀") -> GroupSpace {
+        GroupSpace(
+            groupSpaceId: 7,
+            name: name,
+            emoji: nil,
+            memberCount: 2,
+            myMembership: GroupMembership(
+                nickname: "준하",
+                role: .owner,
+                createdAt: date,
+                updatedAt: date,
+                statusChangedAt: date
+            ),
+            createdAt: date,
+            updatedAt: date
+        )
     }
 
     func fetchGroupSpaces() async throws -> GroupSpaceListResponseDTO {

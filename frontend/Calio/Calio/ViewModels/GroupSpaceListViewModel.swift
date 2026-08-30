@@ -2,7 +2,7 @@ import Foundation
 import Combine
 
 @MainActor final class GroupSpaceListViewModel: ObservableObject {
-    @Published private(set) var spaces: [GroupSpaceResponseDTO] = []
+    @Published private(set) var spaces: [GroupSpace] = []
     @Published private(set) var isLoading = false
     @Published private(set) var didFailLoading = false
     @Published var errorMessage: String?
@@ -31,7 +31,7 @@ import Combine
             return false
         }
     }
-    func replace(_ updatedSpace: GroupSpaceResponseDTO) {
+    func replace(_ updatedSpace: GroupSpace) {
         guard let index = spaces.firstIndex(where: { $0.groupSpaceId == updatedSpace.groupSpaceId }) else { return }
         spaces[index] = updatedSpace
     }

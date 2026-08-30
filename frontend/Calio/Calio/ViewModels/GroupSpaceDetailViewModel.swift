@@ -2,14 +2,14 @@ import Combine
 import Foundation
 
 @MainActor final class GroupSpaceDetailViewModel: ObservableObject {
-    @Published private(set) var groupSpace: GroupSpaceResponseDTO
-    @Published private(set) var members: [GroupMemberResponseDTO] = []
+    @Published private(set) var groupSpace: GroupSpace
+    @Published private(set) var members: [GroupMember] = []
     @Published private(set) var isLoading = false
     @Published var errorMessage: String?
 
     private let service: GroupSpaceService
 
-    init(groupSpace: GroupSpaceResponseDTO, service: GroupSpaceService = GroupSpaceService()) {
+    init(groupSpace: GroupSpace, service: GroupSpaceService = GroupSpaceService()) {
         self.groupSpace = groupSpace
         self.service = service
     }
@@ -56,7 +56,7 @@ import Foundation
         }
     }
 
-    func remove(member: GroupMemberResponseDTO) async {
+    func remove(member: GroupMember) async {
         do {
             try await service.removeMember(groupSpaceId: groupSpace.groupSpaceId, memberId: member.memberId)
             members.removeAll { $0.memberId == member.memberId }
@@ -65,7 +65,7 @@ import Foundation
         }
     }
 
-    func transferOwnership(to member: GroupMemberResponseDTO) async -> Bool {
+    func transferOwnership(to member: GroupMember) async -> Bool {
         do {
             let result = try await service.transferOwnership(
                 groupSpaceId: groupSpace.groupSpaceId,
@@ -82,7 +82,7 @@ import Foundation
 
     func clearError() { errorMessage = nil }
 
-    private func applyOwnershipTransfer(_ result: TransferGroupOwnerResponseDTO) {
+    private func applyOwnershipTransfer(_ result: GroupOwnershipTransfer) {
         members = members.map { member in
             if member.memberId == result.previousOwner.memberId {
                 return result.previousOwner
@@ -94,12 +94,12 @@ import Foundation
         }
 
         let membership = groupSpace.myMembership
-        groupSpace = GroupSpaceResponseDTO(
+        groupSpace = GroupSpace(
             groupSpaceId: groupSpace.groupSpaceId,
             name: groupSpace.name,
             emoji: groupSpace.emoji,
             memberCount: groupSpace.memberCount,
-            myMembership: GroupMembershipResponseDTO(
+            myMembership: GroupMembership(
                 nickname: membership.nickname,
                 role: result.previousOwner.role,
                 createdAt: membership.createdAt,
