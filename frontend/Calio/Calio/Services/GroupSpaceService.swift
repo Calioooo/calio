@@ -100,7 +100,7 @@ enum GroupSpaceFailure: Error, Equatable {
     }
 }
 
-enum GroupSpaceOperation {
+enum GroupSpaceOperation: Equatable {
     case load, create, update, delete, leave, removeMember, transferOwnership, loadMembers
 
     var failureAction: String {

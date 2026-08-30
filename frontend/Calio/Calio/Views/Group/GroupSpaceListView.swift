@@ -90,7 +90,7 @@ struct GroupSpaceListView: View {
 
     private var errorBinding: Binding<Bool> {
         Binding(
-            get: { viewModel.errorMessage != nil && !viewModel.didFailLoading },
+            get: { viewModel.errorMessage != nil && !(viewModel.didFailLoading && viewModel.failedOperation == .load) },
             set: { if !$0 { viewModel.clearError() } }
         )
     }

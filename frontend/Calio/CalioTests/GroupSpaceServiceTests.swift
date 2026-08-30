@@ -70,6 +70,23 @@ struct GroupSpaceServiceTests {
         #expect(viewModel.errorMessage == "그룹 공간을 불러오지 못했습니다. 다시 시도해 주세요.")
     }
 
+    @MainActor @Test func listViewModelIgnoresAnOlderLoadThatFinishesAfterTheLatestLoad() async {
+        let repository = OutOfOrderGroupSpaceRepository()
+        let viewModel = GroupSpaceListViewModel(service: GroupSpaceService(repository: repository))
+
+        let firstLoad = Task { await viewModel.load() }
+        while await repository.startedFetchCount() == 0 { await Task.yield() }
+        let secondLoad = Task { await viewModel.load() }
+
+        await firstLoad.value
+        await secondLoad.value
+
+        #expect(viewModel.spaces.map(\.name) == ["최신 공간"])
+        #expect(!viewModel.isLoading)
+        #expect(!viewModel.didFailLoading)
+        #expect(viewModel.failure == nil)
+    }
+
     @MainActor @Test func ownershipTransferAppliesBackendConfirmedRolesToDetailState() async throws {
         let repository = GroupSpaceRepositoryStub()
         let viewModel = GroupSpaceDetailViewModel(
@@ -203,4 +220,26 @@ private struct FailingGroupSpaceRepository: GroupSpaceRepository {
     func transferOwnership(groupSpaceId: Int64, request: TransferGroupOwnerRequestDTO) async throws -> TransferGroupOwnerResponseDTO { throw error }
     func leaveGroupSpace(groupSpaceId: Int64) async throws { throw error }
     func removeMember(groupSpaceId: Int64, memberId: Int64) async throws { throw error }
+}
+
+private actor OutOfOrderGroupSpaceRepository: GroupSpaceRepository {
+    private var fetchCount = 0
+
+    func startedFetchCount() -> Int { fetchCount }
+
+    func fetchGroupSpaces() async throws -> GroupSpaceListResponseDTO {
+        fetchCount += 1
+        let requestNumber = fetchCount
+        try await Task.sleep(for: requestNumber == 1 ? .milliseconds(50) : .milliseconds(1))
+        return .init(groupSpaces: [GroupSpaceRepositoryStub.sampleSpace(name: requestNumber == 1 ? "이전 공간" : "최신 공간")])
+    }
+
+    func fetchGroupSpace(groupSpaceId: Int64) async throws -> GroupSpaceResponseDTO { fatalError("Unexpected call") }
+    func createGroupSpace(_ request: CreateGroupSpaceRequestDTO) async throws -> GroupSpaceResponseDTO { fatalError("Unexpected call") }
+    func updateGroupSpace(groupSpaceId: Int64, request: UpdateGroupSpaceRequestDTO) async throws -> GroupSpaceResponseDTO { fatalError("Unexpected call") }
+    func deleteGroupSpace(groupSpaceId: Int64) async throws { fatalError("Unexpected call") }
+    func fetchMembers(groupSpaceId: Int64) async throws -> GroupMemberListResponseDTO { fatalError("Unexpected call") }
+    func transferOwnership(groupSpaceId: Int64, request: TransferGroupOwnerRequestDTO) async throws -> TransferGroupOwnerResponseDTO { fatalError("Unexpected call") }
+    func leaveGroupSpace(groupSpaceId: Int64) async throws { fatalError("Unexpected call") }
+    func removeMember(groupSpaceId: Int64, memberId: Int64) async throws { fatalError("Unexpected call") }
 }

@@ -9,17 +9,24 @@ import Combine
     @Published private(set) var failedOperation: GroupSpaceOperation?
     @Published var errorMessage: String?
     private let service: GroupSpaceService
+    private var latestLoadRequestID = 0
     init(service: GroupSpaceService = GroupSpaceService()) { self.service = service }
     func load() async {
+        latestLoadRequestID += 1
+        let requestID = latestLoadRequestID
         isLoading = true
-        defer { isLoading = false }
         do {
-            spaces = try await service.fetchGroupSpaces()
+            let spaces = try await service.fetchGroupSpaces()
+            guard requestID == latestLoadRequestID else { return }
+            self.spaces = spaces
             didFailLoading = false
             clearFailure()
+            isLoading = false
         } catch {
-            didFailLoading = true
+            guard requestID == latestLoadRequestID else { return }
+            didFailLoading = spaces.isEmpty
             recordFailure(error, for: .load)
+            isLoading = false
         }
     }
     func create(name: String, nickname: String) async -> Bool {
