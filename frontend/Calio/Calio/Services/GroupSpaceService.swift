@@ -6,6 +6,9 @@ struct GroupSpaceService {
     func fetchGroupSpaces() async throws -> [GroupSpace] {
         try await repository.fetchGroupSpaces().groupSpaces.map(mapToGroupSpace(_:))
     }
+    func fetchGroupSpace(groupSpaceId: Int64) async throws -> GroupSpace {
+        mapToGroupSpace(try await repository.fetchGroupSpace(groupSpaceId: groupSpaceId))
+    }
     func create(name: String, emoji: String?, nickname: String) async throws -> GroupSpace {
         mapToGroupSpace(try await repository.createGroupSpace(.init(name: name, emoji: emoji, nickname: nickname)))
     }

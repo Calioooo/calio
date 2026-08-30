@@ -69,6 +69,23 @@ struct GroupSpaceServiceTests {
         #expect(viewModel.members.first { $0.memberId == 11 }?.role == .owner)
     }
 
+    @MainActor @Test func removingMemberRefreshesGroupSpaceFromBackend() async throws {
+        let repository = GroupSpaceRepositoryStub(memberCountAfterRemoval: 1)
+        let viewModel = GroupSpaceDetailViewModel(
+            groupSpace: GroupSpaceRepositoryStub.sampleGroupSpace(),
+            service: GroupSpaceService(repository: repository)
+        )
+
+        await viewModel.loadMembers()
+        let member = try #require(viewModel.members.first { $0.memberId == 11 })
+        let succeeded = await viewModel.remove(member: member)
+
+        #expect(succeeded)
+        #expect(viewModel.groupSpace.memberCount == 1)
+        #expect(viewModel.members.map(\.memberId) == [10])
+        #expect(repository.operations == ["members:7", "remove:7:11", "fetch:7"])
+    }
+
 }
 
 private final class GroupSpaceRepositoryStub: GroupSpaceRepository {
@@ -76,14 +93,17 @@ private final class GroupSpaceRepositoryStub: GroupSpaceRepository {
     var operations: [String] = []
     private var fetchResponses: [[GroupSpaceResponseDTO]]
     private let fetchErrorOnCall: Int?
+    private let memberCountAfterRemoval: Int
     private var fetchCallCount = 0
 
     init(
         fetchResponses: [[GroupSpaceResponseDTO]] = [],
-        fetchErrorOnCall: Int? = nil
+        fetchErrorOnCall: Int? = nil,
+        memberCountAfterRemoval: Int = 2
     ) {
         self.fetchResponses = fetchResponses
         self.fetchErrorOnCall = fetchErrorOnCall
+        self.memberCountAfterRemoval = memberCountAfterRemoval
     }
 
     static func sampleSpace(name: String = "프로젝트 팀") -> GroupSpaceResponseDTO {
@@ -114,6 +134,20 @@ private final class GroupSpaceRepositoryStub: GroupSpaceRepository {
         fetchCallCount += 1
         if fetchErrorOnCall == fetchCallCount { throw StubError.failed }
         return .init(groupSpaces: fetchResponses.isEmpty ? [] : fetchResponses.removeFirst())
+    }
+    func fetchGroupSpace(groupSpaceId: Int64) async throws -> GroupSpaceResponseDTO {
+        operations.append("fetch:\(groupSpaceId)")
+        var response = Self.sampleSpace()
+        response = .init(
+            groupSpaceId: response.groupSpaceId,
+            name: response.name,
+            emoji: response.emoji,
+            memberCount: memberCountAfterRemoval,
+            myMembership: response.myMembership,
+            createdAt: response.createdAt,
+            updatedAt: response.updatedAt
+        )
+        return response
     }
     func createGroupSpace(_ request: CreateGroupSpaceRequestDTO) async throws -> GroupSpaceResponseDTO { operations.append("create"); return Self.sampleSpace(name: request.name) }
     func updateGroupSpace(groupSpaceId: Int64, request: UpdateGroupSpaceRequestDTO) async throws -> GroupSpaceResponseDTO { operations.append("update:\(groupSpaceId)"); return Self.sampleSpace(name: request.name) }

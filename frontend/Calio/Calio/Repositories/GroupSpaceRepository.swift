@@ -2,6 +2,7 @@ import Foundation
 
 protocol GroupSpaceRepository {
     func fetchGroupSpaces() async throws -> GroupSpaceListResponseDTO
+    func fetchGroupSpace(groupSpaceId: Int64) async throws -> GroupSpaceResponseDTO
     func createGroupSpace(_ request: CreateGroupSpaceRequestDTO) async throws -> GroupSpaceResponseDTO
     func updateGroupSpace(groupSpaceId: Int64, request: UpdateGroupSpaceRequestDTO) async throws -> GroupSpaceResponseDTO
     func deleteGroupSpace(groupSpaceId: Int64) async throws

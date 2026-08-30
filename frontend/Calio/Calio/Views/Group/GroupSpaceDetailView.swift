@@ -76,7 +76,13 @@ struct GroupSpaceDetailView: View {
         switch confirmation {
         case .delete: Button("그룹 삭제", role: .destructive) { Task { if await viewModel.delete() { onFinished(.removed(viewModel.groupSpace.groupSpaceId)); dismiss() } } }
         case .leave: Button("그룹 나가기", role: .destructive) { Task { if await viewModel.leave() { onFinished(.removed(viewModel.groupSpace.groupSpaceId)); dismiss() } } }
-        case .remove(let member): Button("멤버 내보내기", role: .destructive) { Task { await viewModel.remove(member: member) } }
+        case .remove(let member): Button("멤버 내보내기", role: .destructive) {
+            Task {
+                if await viewModel.remove(member: member) {
+                    onFinished(.updated(viewModel.groupSpace))
+                }
+            }
+        }
         case .transfer(let member): Button("소유권 이전", role: .destructive) {
             Task {
                 if await viewModel.transferOwnership(to: member) {

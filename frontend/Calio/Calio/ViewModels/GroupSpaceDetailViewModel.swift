@@ -56,12 +56,16 @@ import Foundation
         }
     }
 
-    func remove(member: GroupMember) async {
+    func remove(member: GroupMember) async -> Bool {
         do {
             try await service.removeMember(groupSpaceId: groupSpace.groupSpaceId, memberId: member.memberId)
+            groupSpace = try await service.fetchGroupSpace(groupSpaceId: groupSpace.groupSpaceId)
             members.removeAll { $0.memberId == member.memberId }
+            errorMessage = nil
+            return true
         } catch {
             errorMessage = "멤버를 내보내지 못했습니다. 다시 시도해 주세요."
+            return false
         }
     }
 
