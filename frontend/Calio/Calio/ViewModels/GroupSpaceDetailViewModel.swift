@@ -24,6 +24,8 @@ import Foundation
         do {
             members = try await service.members(groupSpaceId: groupSpace.groupSpaceId)
             clearFailure()
+        } catch is CancellationError {
+            return
         } catch {
             recordFailure(error, for: .loadMembers)
         }
@@ -34,6 +36,8 @@ import Foundation
             groupSpace = try await service.update(groupSpaceId: groupSpace.groupSpaceId, name: name, emoji: groupSpace.emoji)
             clearFailure()
             return true
+        } catch is CancellationError {
+            return false
         } catch {
             recordFailure(error, for: .update)
             return false
@@ -45,6 +49,8 @@ import Foundation
             try await service.delete(groupSpaceId: groupSpace.groupSpaceId)
             clearFailure()
             return true
+        } catch is CancellationError {
+            return false
         } catch {
             recordFailure(error, for: .delete)
             return false
@@ -56,6 +62,8 @@ import Foundation
             try await service.leave(groupSpaceId: groupSpace.groupSpaceId)
             clearFailure()
             return true
+        } catch is CancellationError {
+            return false
         } catch {
             recordFailure(error, for: .leave)
             return false
@@ -69,6 +77,8 @@ import Foundation
             members.removeAll { $0.memberId == member.memberId }
             clearFailure()
             return true
+        } catch is CancellationError {
+            return false
         } catch {
             recordFailure(error, for: .removeMember)
             return false
@@ -84,6 +94,8 @@ import Foundation
             applyOwnershipTransfer(result)
             clearFailure()
             return true
+        } catch is CancellationError {
+            return false
         } catch {
             recordFailure(error, for: .transferOwnership)
             return false

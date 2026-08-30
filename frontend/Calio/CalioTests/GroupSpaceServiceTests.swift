@@ -22,6 +22,18 @@ struct GroupSpaceServiceTests {
         )
     }
 
+    @Test func servicePreservesTaskCancellation() async {
+        let service = GroupSpaceService(repository: CancelledGroupSpaceRepository())
+
+        do {
+            _ = try await service.fetchGroupSpaces()
+            Issue.record("Expected task cancellation")
+        } catch is CancellationError {
+        } catch {
+            Issue.record("Unexpected failure: \(error)")
+        }
+    }
+
     @Test func serviceMapsGroupSpaceDTOsToAppModels() async throws {
         let repository = GroupSpaceRepositoryStub(fetchResponses: [[GroupSpaceRepositoryStub.sampleSpace()]])
         let service = GroupSpaceService(repository: repository)
@@ -85,6 +97,21 @@ struct GroupSpaceServiceTests {
         #expect(!viewModel.isLoading)
         #expect(!viewModel.didFailLoading)
         #expect(viewModel.failure == nil)
+    }
+
+    @MainActor @Test func listViewModelDoesNotPublishFailureWhenLoadingIsCancelled() async {
+        let repository = CancellableGroupSpaceRepository()
+        let viewModel = GroupSpaceListViewModel(service: GroupSpaceService(repository: repository))
+
+        let load = Task { await viewModel.load() }
+        while await repository.startedFetchCount() == 0 { await Task.yield() }
+        load.cancel()
+        await load.value
+
+        #expect(!viewModel.isLoading)
+        #expect(viewModel.failure == nil)
+        #expect(viewModel.failedOperation == nil)
+        #expect(viewModel.errorMessage == nil)
     }
 
     @MainActor @Test func listViewModelShowsInitialFailureThenRecoversOnRetry() async {
@@ -306,6 +333,39 @@ private actor OutOfOrderGroupSpaceRepository: GroupSpaceRepository {
         let requestNumber = fetchCount
         try await Task.sleep(for: requestNumber == 1 ? .milliseconds(50) : .milliseconds(1))
         return .init(groupSpaces: [GroupSpaceRepositoryStub.sampleSpace(name: requestNumber == 1 ? "이전 공간" : "최신 공간")])
+    }
+
+    func fetchGroupSpace(groupSpaceId: Int64) async throws -> GroupSpaceResponseDTO { fatalError("Unexpected call") }
+    func createGroupSpace(_ request: CreateGroupSpaceRequestDTO) async throws -> GroupSpaceResponseDTO { fatalError("Unexpected call") }
+    func updateGroupSpace(groupSpaceId: Int64, request: UpdateGroupSpaceRequestDTO) async throws -> GroupSpaceResponseDTO { fatalError("Unexpected call") }
+    func deleteGroupSpace(groupSpaceId: Int64) async throws { fatalError("Unexpected call") }
+    func fetchMembers(groupSpaceId: Int64) async throws -> GroupMemberListResponseDTO { fatalError("Unexpected call") }
+    func transferOwnership(groupSpaceId: Int64, request: TransferGroupOwnerRequestDTO) async throws -> TransferGroupOwnerResponseDTO { fatalError("Unexpected call") }
+    func leaveGroupSpace(groupSpaceId: Int64) async throws { fatalError("Unexpected call") }
+    func removeMember(groupSpaceId: Int64, memberId: Int64) async throws { fatalError("Unexpected call") }
+}
+
+private struct CancelledGroupSpaceRepository: GroupSpaceRepository {
+    func fetchGroupSpaces() async throws -> GroupSpaceListResponseDTO { throw CancellationError() }
+    func fetchGroupSpace(groupSpaceId: Int64) async throws -> GroupSpaceResponseDTO { throw CancellationError() }
+    func createGroupSpace(_ request: CreateGroupSpaceRequestDTO) async throws -> GroupSpaceResponseDTO { throw CancellationError() }
+    func updateGroupSpace(groupSpaceId: Int64, request: UpdateGroupSpaceRequestDTO) async throws -> GroupSpaceResponseDTO { throw CancellationError() }
+    func deleteGroupSpace(groupSpaceId: Int64) async throws { throw CancellationError() }
+    func fetchMembers(groupSpaceId: Int64) async throws -> GroupMemberListResponseDTO { throw CancellationError() }
+    func transferOwnership(groupSpaceId: Int64, request: TransferGroupOwnerRequestDTO) async throws -> TransferGroupOwnerResponseDTO { throw CancellationError() }
+    func leaveGroupSpace(groupSpaceId: Int64) async throws { throw CancellationError() }
+    func removeMember(groupSpaceId: Int64, memberId: Int64) async throws { throw CancellationError() }
+}
+
+private actor CancellableGroupSpaceRepository: GroupSpaceRepository {
+    private var fetchCount = 0
+
+    func startedFetchCount() -> Int { fetchCount }
+
+    func fetchGroupSpaces() async throws -> GroupSpaceListResponseDTO {
+        fetchCount += 1
+        try await Task.sleep(for: .seconds(1))
+        return .init(groupSpaces: [])
     }
 
     func fetchGroupSpace(groupSpaceId: Int64) async throws -> GroupSpaceResponseDTO { fatalError("Unexpected call") }

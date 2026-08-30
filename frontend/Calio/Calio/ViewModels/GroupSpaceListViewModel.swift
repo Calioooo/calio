@@ -24,6 +24,9 @@ import Combine
             didFailLoading = false
             clearFailure()
             isLoading = false
+        } catch is CancellationError {
+            guard requestID == latestLoadRequestID else { return }
+            isLoading = false
         } catch {
             guard requestID == latestLoadRequestID else { return }
             didFailLoading = spaces.isEmpty
@@ -37,6 +40,8 @@ import Combine
             spaces.append(space)
             clearFailure()
             return true
+        } catch is CancellationError {
+            return false
         } catch {
             recordFailure(error, for: .create)
             return false

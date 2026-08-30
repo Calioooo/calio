@@ -72,6 +72,8 @@ struct GroupSpaceService {
     private func perform<T>(_ operation: () async throws -> T) async throws -> T {
         do {
             return try await operation()
+        } catch is CancellationError {
+            throw CancellationError()
         } catch let error as APIError {
             throw GroupSpaceFailure(apiError: error)
         } catch {
