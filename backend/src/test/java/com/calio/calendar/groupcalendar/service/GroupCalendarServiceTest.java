@@ -218,6 +218,7 @@ class GroupCalendarServiceTest {
 
         // then
         assertThat(items).extracting(GroupCalendarItemResponse::title).containsExactly("반복", "직접 일정");
+        assertThat(items).extracting(GroupCalendarItemResponse::creatorNickname).containsOnly("작성자");
     }
 
     @Test

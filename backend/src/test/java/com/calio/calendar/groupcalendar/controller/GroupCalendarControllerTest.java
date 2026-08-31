@@ -164,7 +164,7 @@ class GroupCalendarControllerTest {
                         .param("to", END_AT.plusSeconds(1).toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(1)))
-                .andExpect(jsonPath("$[0].creatorNickname").doesNotExist());
+                .andExpect(jsonPath("$[0].creatorNickname").value("nickname"));
 
         mockMvc.perform(delete("/api/group-spaces/{groupSpaceId}/tags/{tagId}", groupSpace.getId(), tagId))
                 .andExpect(status().isNoContent());
@@ -226,7 +226,8 @@ class GroupCalendarControllerTest {
                         .param("to", END_AT.plusSeconds(1).toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(2)))
-                .andExpect(jsonPath("$[0].creatorNickname").doesNotExist())
+                .andExpect(jsonPath("$[0].creatorNickname").value("nickname"))
+                .andExpect(jsonPath("$[1].creatorNickname").value("nickname"))
                 .andExpect(jsonPath("$[0].publicItemId").value(startsWith("group-event:")))
                 .andExpect(jsonPath("$[1].publicItemId").value(startsWith("group-recurrence:")));
     }
