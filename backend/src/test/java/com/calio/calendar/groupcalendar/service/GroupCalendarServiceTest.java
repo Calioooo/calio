@@ -10,6 +10,7 @@ import com.calio.calendar.common.domain.CanonicalSchedule;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.groupcalendar.controller.dto.GroupCalendarItemResponse;
+import com.calio.calendar.groupcalendar.controller.dto.SharedCalendarItemResponse;
 import com.calio.calendar.groupcalendar.event.domain.GroupCalendarEvent;
 import com.calio.calendar.groupcalendar.event.service.GroupCalendarEventQueryService;
 import com.calio.calendar.groupcalendar.recurrence.domain.GroupCalendarRecurrenceEvent;
@@ -127,7 +128,7 @@ class GroupCalendarServiceTest {
                 .thenReturn(List.of(deleted));
 
         // when
-        List<GroupCalendarItemResponse> items = service.listItems(ACCOUNT_ID, GROUP_SPACE_ID, FROM, TO);
+        List<GroupCalendarItemResponse> items = service.listGroupItems(ACCOUNT_ID, GROUP_SPACE_ID, FROM, TO);
 
         // then
         assertThat(items).isEmpty();
@@ -159,7 +160,7 @@ class GroupCalendarServiceTest {
         when(overrideQueryService.listMovedInOverrides(GROUP_SPACE_ID, FROM, TO)).thenReturn(List.of(movedIn));
 
         // when
-        List<GroupCalendarItemResponse> items = service.listItems(ACCOUNT_ID, GROUP_SPACE_ID, FROM, TO);
+        List<GroupCalendarItemResponse> items = service.listGroupItems(ACCOUNT_ID, GROUP_SPACE_ID, FROM, TO);
 
         // then
         assertThat(items).extracting(GroupCalendarItemResponse::title).containsExactly("안으로 이동");
@@ -184,7 +185,7 @@ class GroupCalendarServiceTest {
         when(overrideQueryService.listMovedInOverrides(GROUP_SPACE_ID, FROM, TO)).thenReturn(List.of(override));
 
         // when
-        List<GroupCalendarItemResponse> items = service.listItems(ACCOUNT_ID, GROUP_SPACE_ID, FROM, TO);
+        List<GroupCalendarItemResponse> items = service.listGroupItems(ACCOUNT_ID, GROUP_SPACE_ID, FROM, TO);
 
         // then
         assertThat(items).hasSize(1);
@@ -213,7 +214,7 @@ class GroupCalendarServiceTest {
                 .thenReturn(List.of());
 
         // when
-        List<GroupCalendarItemResponse> items = service.listItems(ACCOUNT_ID, GROUP_SPACE_ID, FROM, TO);
+        List<GroupCalendarItemResponse> items = service.listGroupItems(ACCOUNT_ID, GROUP_SPACE_ID, FROM, TO);
 
         // then
         assertThat(items).extracting(GroupCalendarItemResponse::title).containsExactly("반복", "직접 일정");
@@ -234,22 +235,18 @@ class GroupCalendarServiceTest {
         );
         when(eventShareQueryService.listByGroupSpaceId(GROUP_SPACE_ID)).thenReturn(List.of(visible, anonymous));
 
-        List<GroupCalendarItemResponse> items = service.listItems(ACCOUNT_ID, GROUP_SPACE_ID, FROM, TO);
+        List<SharedCalendarItemResponse> items = service.listSharedItems(ACCOUNT_ID, GROUP_SPACE_ID, FROM, TO);
 
-        assertThat(items).extracting(GroupCalendarItemResponse::title)
+        assertThat(items).extracting(SharedCalendarItemResponse::title)
                 .containsExactly("공개 일정", "익명 일정");
-        assertThat(items).extracting(GroupCalendarItemResponse::description)
+        assertThat(items).extracting(SharedCalendarItemResponse::description)
                 .containsExactly("공개 설명", null);
-        assertThat(items).extracting(GroupCalendarItemResponse::publicItemId)
+        assertThat(items).extracting(SharedCalendarItemResponse::publicItemId)
                 .containsExactly(
                         "shared-event:" + visible.getPublicShareId(),
                         "shared-event:" + anonymous.getPublicShareId()
                 );
-        assertThat(items).allSatisfy(item -> {
-            assertThat(item.id()).isNull();
-            assertThat(item.recurrenceId()).isNull();
-            assertThat(item.tag()).isNull();
-        });
+        assertThat(items).allSatisfy(item -> assertThat(item.originStartAt()).isNull());
     }
 
     @Test
@@ -274,7 +271,7 @@ class GroupCalendarServiceTest {
         when(overrideQueryService.listOverrides(recurrenceEvent.getId(), List.of(occurrence.originStartAt())))
                 .thenReturn(List.of());
 
-        List<GroupCalendarItemResponse> items = service.listItems(ACCOUNT_ID, GROUP_SPACE_ID, FROM, TO);
+        List<GroupCalendarItemResponse> items = service.listGroupItems(ACCOUNT_ID, GROUP_SPACE_ID, FROM, TO);
 
         assertThat(items).extracting(GroupCalendarItemResponse::publicItemId)
                 .containsExactly(
@@ -314,7 +311,7 @@ class GroupCalendarServiceTest {
                 List.of(source.getId()), FROM, TO
         )).thenReturn(List.of(changed, deleted));
 
-        List<GroupCalendarItemResponse> items = service.listItems(ACCOUNT_ID, GROUP_SPACE_ID, FROM, TO);
+        List<SharedCalendarItemResponse> items = service.listSharedItems(ACCOUNT_ID, GROUP_SPACE_ID, FROM, TO);
 
         assertThat(items).singleElement().satisfies(item -> {
             assertThat(item.title()).isEqualTo("원본 수정");
@@ -322,9 +319,6 @@ class GroupCalendarServiceTest {
             assertThat(item.startAt()).isEqualTo(FROM.plusSeconds(10800));
             assertThat(item.publicItemId())
                     .isEqualTo("shared-recurrence:" + share.getPublicShareId() + ":" + changedOccurrence.originStartAt());
-            assertThat(item.id()).isNull();
-            assertThat(item.recurrenceId()).isNull();
-            assertThat(item.tag()).isNull();
         });
     }
 
@@ -353,7 +347,7 @@ class GroupCalendarServiceTest {
                 List.of(source.getId()), FROM, TO
         )).thenReturn(List.of(movedIn));
 
-        List<GroupCalendarItemResponse> items = service.listItems(ACCOUNT_ID, GROUP_SPACE_ID, FROM, TO);
+        List<SharedCalendarItemResponse> items = service.listSharedItems(ACCOUNT_ID, GROUP_SPACE_ID, FROM, TO);
 
         assertThat(items).singleElement().satisfies(item -> {
             assertThat(item.title()).isEqualTo("익명 일정");
@@ -378,7 +372,7 @@ class GroupCalendarServiceTest {
                 List.of(source.getId()), FROM, TO
         )).thenReturn(List.of());
 
-        assertThatThrownBy(() -> service.listItems(ACCOUNT_ID, GROUP_SPACE_ID, FROM, TO))
+        assertThatThrownBy(() -> service.listSharedItems(ACCOUNT_ID, GROUP_SPACE_ID, FROM, TO))
                 .isInstanceOfSatisfying(CalioException.class, exception ->
                         assertThat(exception.getErrorCode())
                                 .isEqualTo(ErrorCode.RECURRENCE_OCCURRENCE_LIMIT_EXCEEDED)
@@ -399,7 +393,7 @@ class GroupCalendarServiceTest {
                 List.of(50L, 51L), FROM, TO
         )).thenReturn(List.of());
 
-        service.listItems(ACCOUNT_ID, GROUP_SPACE_ID, FROM, TO);
+        service.listSharedItems(ACCOUNT_ID, GROUP_SPACE_ID, FROM, TO);
 
         verify(personalRecurrenceEventService).listOverridesForRecurrenceIdsInRange(
                 List.of(50L, 51L), FROM, TO
@@ -410,7 +404,7 @@ class GroupCalendarServiceTest {
     @DisplayName("from이 to와 같거나 이후이면 INVALID_TIME_RANGE를 반환한다")
     void givenInvalidRange_whenListItems_thenThrowsInvalidTimeRange() {
         // given, when, then
-        assertThatThrownBy(() -> service.listItems(ACCOUNT_ID, GROUP_SPACE_ID, TO, TO))
+        assertThatThrownBy(() -> service.listGroupItems(ACCOUNT_ID, GROUP_SPACE_ID, TO, TO))
                 .isInstanceOfSatisfying(CalioException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.INVALID_TIME_RANGE)
                 );
@@ -420,7 +414,7 @@ class GroupCalendarServiceTest {
     @DisplayName("366일을 넘는 조회 범위는 EVENT_QUERY_RANGE_TOO_LARGE를 반환한다")
     void givenRangeOver366Days_whenListItems_thenThrowsRangeTooLarge() {
         // given, when, then
-        assertThatThrownBy(() -> service.listItems(
+        assertThatThrownBy(() -> service.listGroupItems(
                 ACCOUNT_ID,
                 GROUP_SPACE_ID,
                 FROM,

@@ -105,18 +105,20 @@ class SharedPersonalScheduleGroupCalendarControllerTest {
                 .andExpect(jsonPath("$[0].publicItemId").value(
                         "shared-event:" + visibleShare.getPublicShareId()
                 ))
-                .andExpect(jsonPath("$[0].id").isEmpty())
-                .andExpect(jsonPath("$[0].recurrenceId").isEmpty())
-                .andExpect(jsonPath("$[0].tag").isEmpty())
+                .andExpect(jsonPath("$[0].id").doesNotExist())
+                .andExpect(jsonPath("$[0].recurrenceId").doesNotExist())
+                .andExpect(jsonPath("$[0].tag").doesNotExist())
+                .andExpect(jsonPath("$[0].creatorNickname").doesNotExist())
                 .andExpect(jsonPath("$[1].title").value("익명 일정"))
                 .andExpect(jsonPath("$[1].description").isEmpty())
                 .andExpect(jsonPath("$[1].publicItemId").value(
                         "shared-event:" + anonymousShare.getPublicShareId()
                 ))
                 .andExpect(jsonPath("$[1].publicItemId").value(startsWith("shared-event:")))
-                .andExpect(jsonPath("$[1].id").isEmpty())
-                .andExpect(jsonPath("$[1].recurrenceId").isEmpty())
-                .andExpect(jsonPath("$[1].tag").isEmpty());
+                .andExpect(jsonPath("$[1].id").doesNotExist())
+                .andExpect(jsonPath("$[1].recurrenceId").doesNotExist())
+                .andExpect(jsonPath("$[1].tag").doesNotExist())
+                .andExpect(jsonPath("$[1].creatorNickname").doesNotExist());
     }
 
     @Test
@@ -156,18 +158,19 @@ class SharedPersonalScheduleGroupCalendarControllerTest {
                 .andExpect(jsonPath("$[0].publicItemId").value(
                         "shared-recurrence:" + share.getPublicShareId() + ":2026-08-03T09:00:00Z"
                 ))
-                .andExpect(jsonPath("$[0].id").isEmpty())
-                .andExpect(jsonPath("$[0].recurrenceId").isEmpty())
-                .andExpect(jsonPath("$[0].tag").isEmpty())
+                .andExpect(jsonPath("$[0].id").doesNotExist())
+                .andExpect(jsonPath("$[0].recurrenceId").doesNotExist())
+                .andExpect(jsonPath("$[0].tag").doesNotExist())
                 .andExpect(jsonPath("$[1].title").value("이동한 원본 override"))
                 .andExpect(jsonPath("$[1].description").value("override 설명"))
                 .andExpect(jsonPath("$[1].startAt").value("2026-08-05T12:00:00Z"))
                 .andExpect(jsonPath("$[1].publicItemId").value(
                         "shared-recurrence:" + share.getPublicShareId() + ":2026-08-01T09:00:00Z"
                 ))
-                .andExpect(jsonPath("$[1].id").isEmpty())
-                .andExpect(jsonPath("$[1].recurrenceId").isEmpty())
-                .andExpect(jsonPath("$[1].tag").isEmpty());
+                .andExpect(jsonPath("$[1].id").doesNotExist())
+                .andExpect(jsonPath("$[1].recurrenceId").doesNotExist())
+                .andExpect(jsonPath("$[1].tag").doesNotExist())
+                .andExpect(jsonPath("$[1].creatorNickname").doesNotExist());
     }
 
     private GroupSpace createGroupSpace() {
@@ -222,7 +225,7 @@ class SharedPersonalScheduleGroupCalendarControllerTest {
             String from,
             String to
     ) {
-        return get("/api/group-spaces/{groupSpaceId}/calendar/items", groupSpace.getId())
+        return get("/api/group-spaces/{groupSpaceId}/calendar/shared-items", groupSpace.getId())
                 .param("from", from)
                 .param("to", to);
     }

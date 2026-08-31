@@ -1,6 +1,7 @@
 package com.calio.calendar.groupcalendar.controller;
 
 import com.calio.calendar.groupcalendar.controller.dto.GroupCalendarItemResponse;
+import com.calio.calendar.groupcalendar.controller.dto.SharedCalendarItemResponse;
 import com.calio.calendar.groupcalendar.service.GroupCalendarService;
 import com.calio.calendar.security.AuthenticatedAccount;
 import java.time.Instant;
@@ -22,16 +23,6 @@ public class GroupCalendarController {
         this.groupCalendarService = groupCalendarService;
     }
 
-    @GetMapping("/items")
-    public List<GroupCalendarItemResponse> listItems(
-            @AuthenticationPrincipal AuthenticatedAccount account,
-            @PathVariable Long groupSpaceId,
-            @RequestParam Instant from,
-            @RequestParam Instant to
-    ) {
-        return groupCalendarService.listItems(account.accountId(), groupSpaceId, from, to);
-    }
-
     @GetMapping("/group-items")
     public List<GroupCalendarItemResponse> listGroupItems(
             @AuthenticationPrincipal AuthenticatedAccount account,
@@ -43,7 +34,7 @@ public class GroupCalendarController {
     }
 
     @GetMapping("/shared-items")
-    public List<GroupCalendarItemResponse> listSharedItems(
+    public List<SharedCalendarItemResponse> listSharedItems(
             @AuthenticationPrincipal AuthenticatedAccount account,
             @PathVariable Long groupSpaceId,
             @RequestParam Instant from,

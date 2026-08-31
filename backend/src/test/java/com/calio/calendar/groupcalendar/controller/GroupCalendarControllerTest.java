@@ -159,12 +159,12 @@ class GroupCalendarControllerTest {
                 .andExpect(jsonPath("$", hasSize(1)))
                 .andExpect(jsonPath("$[0].title").value("회의"));
 
-        mockMvc.perform(get("/api/group-spaces/{groupSpaceId}/calendar/items", groupSpace.getId())
+        mockMvc.perform(get("/api/group-spaces/{groupSpaceId}/calendar/group-items", groupSpace.getId())
                         .param("from", START_AT.minusSeconds(1).toString())
                         .param("to", END_AT.plusSeconds(1).toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(1)))
-                .andExpect(jsonPath("$[0].creatorNickname").value("nickname"));
+                .andExpect(jsonPath("$[0].creatorNickname").doesNotExist());
 
         mockMvc.perform(delete("/api/group-spaces/{groupSpaceId}/tags/{tagId}", groupSpace.getId(), tagId))
                 .andExpect(status().isNoContent());
@@ -184,7 +184,7 @@ class GroupCalendarControllerTest {
         GroupSpace groupSpace = groupSpaceRepository.saveAndFlush(new GroupSpace(999L, "other", null));
 
         // when, then
-        mockMvc.perform(get("/api/group-spaces/{groupSpaceId}/calendar/items", groupSpace.getId())
+        mockMvc.perform(get("/api/group-spaces/{groupSpaceId}/calendar/group-items", groupSpace.getId())
                         .param("from", START_AT.toString())
                         .param("to", END_AT.toString()))
                 .andExpect(status().isNotFound())
@@ -221,19 +221,12 @@ class GroupCalendarControllerTest {
                         .content(recurrenceRequest("반복 일정", defaultTag.getId())))
                 .andExpect(status().isCreated());
 
-        mockMvc.perform(get("/api/group-spaces/{groupSpaceId}/calendar/items", groupSpace.getId())
-                        .param("from", START_AT.minusSeconds(1).toString())
-                        .param("to", END_AT.plusSeconds(1).toString()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(2)))
-                .andExpect(jsonPath("$[0].isRecurrenceOccurrence").value(false))
-                .andExpect(jsonPath("$[1].isRecurrenceOccurrence").value(true));
-
         mockMvc.perform(get("/api/group-spaces/{groupSpaceId}/calendar/group-items", groupSpace.getId())
                         .param("from", START_AT.minusSeconds(1).toString())
                         .param("to", END_AT.plusSeconds(1).toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$[0].creatorNickname").doesNotExist())
                 .andExpect(jsonPath("$[0].publicItemId").value(startsWith("group-event:")))
                 .andExpect(jsonPath("$[1].publicItemId").value(startsWith("group-recurrence:")));
     }
@@ -279,7 +272,7 @@ class GroupCalendarControllerTest {
         );
 
         // when
-        MvcResult result = mockMvc.perform(get("/api/group-spaces/{groupSpaceId}/calendar/items", groupSpace.getId())
+        MvcResult result = mockMvc.perform(get("/api/group-spaces/{groupSpaceId}/calendar/shared-items", groupSpace.getId())
                         .param("from", START_AT.minusSeconds(1).toString())
                         .param("to", END_AT.plusSeconds(10801).toString()))
                 // then
@@ -299,20 +292,14 @@ class GroupCalendarControllerTest {
         assertThat(recurrenceItem.get("title").asString()).isEqualTo("익명 일정");
         assertThat(eventItem.has("accountId")).isFalse();
         assertThat(recurrenceItem.has("accountId")).isFalse();
-        assertThat(eventItem.get("id").isNull()).isTrue();
-        assertThat(eventItem.get("recurrenceId").isNull()).isTrue();
-        assertThat(eventItem.get("tag").isNull()).isTrue();
-        assertThat(recurrenceItem.get("id").isNull()).isTrue();
-        assertThat(recurrenceItem.get("recurrenceId").isNull()).isTrue();
-        assertThat(recurrenceItem.get("tag").isNull()).isTrue();
-
-        mockMvc.perform(get("/api/group-spaces/{groupSpaceId}/calendar/shared-items", groupSpace.getId())
-                        .param("from", START_AT.minusSeconds(1).toString())
-                        .param("to", END_AT.plusSeconds(10801).toString()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(2)))
-                .andExpect(jsonPath("$[0].publicItemId").value(startsWith("shared-recurrence:")))
-                .andExpect(jsonPath("$[1].publicItemId").value(startsWith("shared-event:")));
+        assertThat(eventItem.has("id")).isFalse();
+        assertThat(eventItem.has("recurrenceId")).isFalse();
+        assertThat(eventItem.has("tag")).isFalse();
+        assertThat(recurrenceItem.has("id")).isFalse();
+        assertThat(recurrenceItem.has("recurrenceId")).isFalse();
+        assertThat(recurrenceItem.has("tag")).isFalse();
+        assertThat(eventItem.has("creatorNickname")).isFalse();
+        assertThat(recurrenceItem.has("creatorNickname")).isFalse();
     }
 
     @Test

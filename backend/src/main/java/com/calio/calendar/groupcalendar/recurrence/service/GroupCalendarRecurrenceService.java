@@ -167,10 +167,7 @@ public class GroupCalendarRecurrenceService {
                         schedule
                 ));
 
-        return GroupCalendarItemResponse.recurrenceOverride(
-                overrideCommandService.createOrUpdateOverride(override),
-                getCreatorNickname(recurrenceEvent)
-        );
+        return GroupCalendarItemResponse.recurrenceOverride(overrideCommandService.createOrUpdateOverride(override));
     }
 
     @Transactional
@@ -243,12 +240,4 @@ public class GroupCalendarRecurrenceService {
         );
     }
 
-    private String getCreatorNickname(GroupCalendarRecurrenceEvent recurrenceEvent) {
-        return membershipQueryService
-                .getActiveMembership(
-                        recurrenceEvent.getGroupSpace().getId(),
-                        recurrenceEvent.getCreatedBy().getId()
-                )
-                .getNickname();
-    }
 }
