@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -420,7 +421,7 @@ class EventServiceTest {
                 recurrenceQueryService,
                 recurrenceEngine,
                 eventShareCommandService,
-                org.mockito.Mockito.mock(PersonalEventGroupShareService.class)
+                mock(PersonalEventGroupShareService.class)
         );
     }
 
