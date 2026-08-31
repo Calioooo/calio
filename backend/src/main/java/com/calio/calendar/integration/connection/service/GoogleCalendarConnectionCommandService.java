@@ -32,9 +32,13 @@ public class GoogleCalendarConnectionCommandService {
     }
 
     public GoogleCalendarConnection lockConnectedConnectionById(Long connectionId) {
-        return connectionRepository.findByIdForUpdate(connectionId)
-                .filter(GoogleCalendarConnection::isConnected)
+        return tryLockConnectedConnectionById(connectionId)
                 .orElseThrow(() -> new CalioException(ErrorCode.GOOGLE_CALENDAR_NOT_CONNECTED));
+    }
+
+    public Optional<GoogleCalendarConnection> tryLockConnectedConnectionById(Long connectionId) {
+        return connectionRepository.findByIdForUpdate(connectionId)
+                .filter(GoogleCalendarConnection::isConnected);
     }
 
     public GoogleCalendarConnection createConnection(

@@ -17,36 +17,81 @@ import java.time.Instant;
 @Entity
 @Table(name = "google_calendar_connections")
 public class GoogleCalendarConnection extends BaseEntity {
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY) private Long id;
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "integration_id", nullable = false)
     private GoogleCalendarIntegration integration;
-    @Column(name = "google_subject", nullable = false, updatable = false) private String googleSubject;
-    @Column(name = "google_email", nullable = false, length = 320) private String googleEmail;
-    @Column(name = "encrypted_refresh_token", columnDefinition = "TEXT") private String encryptedRefreshToken;
-    @Column(name = "encrypted_access_token", columnDefinition = "TEXT") private String encryptedAccessToken;
-    @Column(name = "access_token_expires_at") private Instant accessTokenExpiresAt;
-    @Column(name = "connected_at", nullable = false) private Instant connectedAt;
-    @Column(name = "next_sync_token", columnDefinition = "TEXT") private String nextSyncToken;
-    @Column(name = "next_google_operation_sequence", nullable = false) private long nextGoogleOperationSequence = 1L;
-    @Column(name = "google_operation_lease_owner", length = 36) private String googleOperationLeaseOwner;
-    @Column(name = "google_operation_lease_expires_at") private Instant googleOperationLeaseExpiresAt;
+
+    @Column(name = "google_subject", nullable = false, updatable = false)
+    private String googleSubject;
+
+    @Column(name = "google_email", nullable = false, length = 320)
+    private String googleEmail;
+
+    @Column(name = "encrypted_refresh_token", columnDefinition = "TEXT")
+    private String encryptedRefreshToken;
+
+    @Column(name = "encrypted_access_token", columnDefinition = "TEXT")
+    private String encryptedAccessToken;
+
+    @Column(name = "access_token_expires_at")
+    private Instant accessTokenExpiresAt;
+
+    @Column(name = "connected_at", nullable = false)
+    private Instant connectedAt;
+
+    @Column(name = "next_sync_token", columnDefinition = "TEXT")
+    private String nextSyncToken;
+
+    @Column(name = "next_google_operation_sequence", nullable = false)
+    private long nextGoogleOperationSequence = 1L;
+
+    @Column(name = "google_operation_lease_owner", length = 36)
+    private String googleOperationLeaseOwner;
+
+    @Column(name = "google_operation_lease_expires_at")
+    private Instant googleOperationLeaseExpiresAt;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "connection_state", nullable = false, length = 32)
     private GoogleCalendarConnectionState state = GoogleCalendarConnectionState.CONNECTED;
-    @Column(name = "disconnected_at") private Instant disconnectedAt;
-    @Column(name = "sync_error_reason", length = 128) private String syncErrorReason;
-    @Column(name = "sync_error_at") private Instant syncErrorAt;
 
-    protected GoogleCalendarConnection() { }
-    public GoogleCalendarConnection(GoogleCalendarIntegration integration, String googleSubject, String googleEmail,
-            String encryptedRefreshToken, String encryptedAccessToken, Instant accessTokenExpiresAt, Instant connectedAt) {
+    @Column(name = "disconnected_at")
+    private Instant disconnectedAt;
+
+    @Column(name = "sync_error_reason", length = 128)
+    private String syncErrorReason;
+
+    @Column(name = "sync_error_at")
+    private Instant syncErrorAt;
+
+    protected GoogleCalendarConnection() {
+    }
+
+    public GoogleCalendarConnection(
+            GoogleCalendarIntegration integration,
+            String googleSubject,
+            String googleEmail,
+            String encryptedRefreshToken,
+            String encryptedAccessToken,
+            Instant accessTokenExpiresAt,
+            Instant connectedAt
+    ) {
         this.integration = integration;
         this.googleSubject = googleSubject;
         replaceCredentials(googleEmail, encryptedRefreshToken, encryptedAccessToken, accessTokenExpiresAt, connectedAt);
     }
-    public void replaceCredentials(String googleEmail, String encryptedRefreshToken, String encryptedAccessToken,
-            Instant accessTokenExpiresAt, Instant connectedAt) {
+    public void replaceCredentials(
+            String googleEmail,
+            String encryptedRefreshToken,
+            String encryptedAccessToken,
+            Instant accessTokenExpiresAt,
+            Instant connectedAt
+    ) {
         this.googleEmail = googleEmail;
         this.encryptedRefreshToken = encryptedRefreshToken;
         this.encryptedAccessToken = encryptedAccessToken;
@@ -60,34 +105,99 @@ public class GoogleCalendarConnection extends BaseEntity {
         googleOperationLeaseExpiresAt = null;
         nextSyncToken = null;
     }
+
     public void disconnect(Instant at) {
-        encryptedRefreshToken = null; encryptedAccessToken = null; accessTokenExpiresAt = null; nextSyncToken = null;
-        googleOperationLeaseOwner = null; googleOperationLeaseExpiresAt = null;
-        state = GoogleCalendarConnectionState.DISCONNECTED; disconnectedAt = at; syncErrorReason = null; syncErrorAt = null;
+        encryptedRefreshToken = null;
+        encryptedAccessToken = null;
+        accessTokenExpiresAt = null;
+        nextSyncToken = null;
+        googleOperationLeaseOwner = null;
+        googleOperationLeaseExpiresAt = null;
+        state = GoogleCalendarConnectionState.DISCONNECTED;
+        disconnectedAt = at;
+        syncErrorReason = null;
+        syncErrorAt = null;
     }
+
     public void markSyncError(String reason, Instant at) {
-        googleOperationLeaseOwner = null; googleOperationLeaseExpiresAt = null;
-        state = GoogleCalendarConnectionState.SYNC_ERROR; disconnectedAt = null; syncErrorReason = reason; syncErrorAt = at;
+        googleOperationLeaseOwner = null;
+        googleOperationLeaseExpiresAt = null;
+        state = GoogleCalendarConnectionState.SYNC_ERROR;
+        disconnectedAt = null;
+        syncErrorReason = reason;
+        syncErrorAt = at;
     }
+
     public void replaceAccessToken(String encryptedAccessToken, Instant accessTokenExpiresAt) {
         this.encryptedAccessToken = encryptedAccessToken;
         this.accessTokenExpiresAt = accessTokenExpiresAt;
     }
-    public void replaceNextSyncToken(String nextSyncToken) { this.nextSyncToken = nextSyncToken; }
-    public boolean isConnected() { return state == GoogleCalendarConnectionState.CONNECTED; }
-    public long allocateGoogleOperationSequence() { return nextGoogleOperationSequence++; }
-    public Long getId() { return id; }
-    public GoogleCalendarIntegration getIntegration() { return integration; }
-    public Long getAccountId() { return integration.getAccountId(); }
-    public String getGoogleSubject() { return googleSubject; }
-    public String getGoogleEmail() { return googleEmail; }
-    public String getEncryptedRefreshToken() { return encryptedRefreshToken; }
-    public String getEncryptedAccessToken() { return encryptedAccessToken; }
-    public Instant getAccessTokenExpiresAt() { return accessTokenExpiresAt; }
-    public Instant getConnectedAt() { return connectedAt; }
-    public GoogleCalendarConnectionState getState() { return state; }
-    public Instant getDisconnectedAt() { return disconnectedAt; }
-    public String getSyncErrorReason() { return syncErrorReason; }
-    public Instant getSyncErrorAt() { return syncErrorAt; }
-    public String getNextSyncToken() { return nextSyncToken; }
+
+    public void replaceNextSyncToken(String nextSyncToken) {
+        this.nextSyncToken = nextSyncToken;
+    }
+
+    public boolean isConnected() {
+        return state == GoogleCalendarConnectionState.CONNECTED;
+    }
+
+    public long allocateGoogleOperationSequence() {
+        return nextGoogleOperationSequence++;
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public GoogleCalendarIntegration getIntegration() {
+        return integration;
+    }
+
+    public Long getAccountId() {
+        return integration.getAccountId();
+    }
+
+    public String getGoogleSubject() {
+        return googleSubject;
+    }
+
+    public String getGoogleEmail() {
+        return googleEmail;
+    }
+
+    public String getEncryptedRefreshToken() {
+        return encryptedRefreshToken;
+    }
+
+    public String getEncryptedAccessToken() {
+        return encryptedAccessToken;
+    }
+
+    public Instant getAccessTokenExpiresAt() {
+        return accessTokenExpiresAt;
+    }
+
+    public Instant getConnectedAt() {
+        return connectedAt;
+    }
+
+    public GoogleCalendarConnectionState getState() {
+        return state;
+    }
+
+    public Instant getDisconnectedAt() {
+        return disconnectedAt;
+    }
+
+    public String getSyncErrorReason() {
+        return syncErrorReason;
+    }
+
+    public Instant getSyncErrorAt() {
+        return syncErrorAt;
+    }
+
+    public String getNextSyncToken() {
+        return nextSyncToken;
+    }
 }

@@ -82,9 +82,11 @@ public class GoogleCalendarAccessTokenService {
 
     private void disconnectAfterInvalidGrant(Long connectionId, Instant disconnectedAt) {
         disconnectTransaction.executeWithoutResult(status -> {
-            GoogleCalendarConnection connection = connectionCommandService.lockConnectedConnectionById(connectionId);
-            jobCommandService.deleteJobsForConnection(connection.getId());
-            connectionCommandService.disconnect(connection, disconnectedAt);
+            connectionCommandService.tryLockConnectedConnectionById(connectionId)
+                    .ifPresent(connection -> {
+                        jobCommandService.deleteJobsForConnection(connection.getId());
+                        connectionCommandService.disconnect(connection, disconnectedAt);
+                    });
         });
     }
 

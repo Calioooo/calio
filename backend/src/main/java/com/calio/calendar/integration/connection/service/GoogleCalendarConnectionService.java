@@ -39,27 +39,46 @@ public class GoogleCalendarConnectionService {
     private final TransactionTemplate disconnectTransaction;
     private final Clock clock;
 
-    public GoogleCalendarConnectionService(GoogleOAuthProperties properties, GoogleOAuthClient oauthClient,
-            TokenEncryptor encryptor, GoogleCalendarIntegrationCommandService integrationCommandService,
+    public GoogleCalendarConnectionService(
+            GoogleOAuthProperties properties,
+            GoogleOAuthClient oauthClient,
+            TokenEncryptor encryptor,
+            GoogleCalendarIntegrationCommandService integrationCommandService,
             GoogleCalendarConnectionQueryService connectionQueryService,
             GoogleCalendarConnectionCommandService connectionCommandService,
-            GoogleOperationJobCommandService jobCommandService, GoogleOperationJobEnqueueService enqueueService,
-            PlatformTransactionManager transactionManager, Clock clock) {
-        this.properties = properties; this.oauthClient = oauthClient; this.encryptor = encryptor;
+            GoogleOperationJobCommandService jobCommandService,
+            GoogleOperationJobEnqueueService enqueueService,
+            PlatformTransactionManager transactionManager,
+            Clock clock
+    ) {
+        this.properties = properties;
+        this.oauthClient = oauthClient;
+        this.encryptor = encryptor;
         this.integrationCommandService = integrationCommandService;
-        this.connectionQueryService = connectionQueryService; this.connectionCommandService = connectionCommandService;
-        this.jobCommandService = jobCommandService; this.enqueueService = enqueueService; this.clock = clock;
+        this.connectionQueryService = connectionQueryService;
+        this.connectionCommandService = connectionCommandService;
+        this.jobCommandService = jobCommandService;
+        this.enqueueService = enqueueService;
+        this.clock = clock;
         registrationTransaction = new TransactionTemplate(transactionManager);
         registrationTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         disconnectTransaction = new TransactionTemplate(transactionManager);
     }
 
     public GoogleCalendarIntegrationResponse connect(Long accountId, String authorizationCode) {
-        if (!properties.isConfigured()) throw new CalioException(ErrorCode.GOOGLE_CALENDAR_CONFIGURATION_MISSING);
+        if (!properties.isConfigured()) {
+            throw new CalioException(ErrorCode.GOOGLE_CALENDAR_CONFIGURATION_MISSING);
+        }
         Instant now = Instant.now(clock);
         GoogleTokenResponse token = oauthClient.exchangeAuthorizationCode(authorizationCode);
         GoogleUserInfoResponse user = oauthClient.fetchUserInfo(token.accessToken());
-        GoogleCalendarConnection connection = register(accountId, user, token, now.plusSeconds(token.expiresIn()), now);
+        GoogleCalendarConnection connection = register(
+                accountId,
+                user,
+                token,
+                now.plusSeconds(token.expiresIn()),
+                now
+        );
         enqueueService.enqueueManualSync(accountId);
         return GoogleCalendarIntegrationResponse.connected(connection);
     }
@@ -71,27 +90,50 @@ public class GoogleCalendarConnectionService {
     }
 
     public void disconnect(Long accountId) {
-        String encrypted = disconnectTransaction.execute(status -> connectionCommandService.tryLockConnectedConnection(accountId)
-                .map(connection -> {
-                    String refreshToken = connection.getEncryptedRefreshToken();
-                    jobCommandService.deleteJobsForConnection(connection.getId());
-                    connectionCommandService.disconnect(connection, Instant.now(clock));
-                    return refreshToken;
-                }).orElse(null));
-        if (encrypted != null) revokeTokenSafely(encrypted);
+        String encryptedRefreshToken = disconnectTransaction.execute(status ->
+                connectionCommandService.tryLockConnectedConnection(accountId)
+                        .map(connection -> {
+                            String refreshToken = connection.getEncryptedRefreshToken();
+                            jobCommandService.deleteJobsForConnection(connection.getId());
+                            connectionCommandService.disconnect(connection, Instant.now(clock));
+                            return refreshToken;
+                        })
+                        .orElse(null)
+        );
+        if (encryptedRefreshToken != null) {
+            revokeTokenSafely(encryptedRefreshToken);
+        }
     }
 
-    private GoogleCalendarConnection register(Long accountId, GoogleUserInfoResponse user, GoogleTokenResponse token,
-            Instant expiresAt, Instant connectedAt) {
-        try { return registrationTransaction.execute(s -> registerInTransaction(accountId, user, token, expiresAt, connectedAt)); }
-        catch (DataIntegrityViolationException ignored) { return registrationTransaction.execute(s -> registerInTransaction(accountId, user, token, expiresAt, connectedAt)); }
+    private GoogleCalendarConnection register(
+            Long accountId,
+            GoogleUserInfoResponse user,
+            GoogleTokenResponse token,
+            Instant expiresAt,
+            Instant connectedAt
+    ) {
+        try {
+            return registrationTransaction.execute(status ->
+                    registerInTransaction(accountId, user, token, expiresAt, connectedAt));
+        } catch (DataIntegrityViolationException ignored) {
+            return registrationTransaction.execute(status ->
+                    registerInTransaction(accountId, user, token, expiresAt, connectedAt));
+        }
     }
 
-    private GoogleCalendarConnection registerInTransaction(Long accountId, GoogleUserInfoResponse user, GoogleTokenResponse token,
-            Instant expiresAt, Instant connectedAt) {
-        GoogleCalendarConnection current = connectionCommandService.tryLockConnection(accountId).orElse(null);
+    private GoogleCalendarConnection registerInTransaction(
+            Long accountId,
+            GoogleUserInfoResponse user,
+            GoogleTokenResponse token,
+            Instant expiresAt,
+            Instant connectedAt
+    ) {
+        GoogleCalendarConnection current = connectionCommandService.tryLockConnection(accountId)
+                .orElse(null);
         if (current != null) {
-            if (!current.getGoogleSubject().equals(user.subject())) throw new CalioException(ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED);
+            if (!current.getGoogleSubject().equals(user.subject())) {
+                throw new CalioException(ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED);
+            }
             connectionCommandService.replaceCredentials(
                     current,
                     user.email(),
@@ -104,8 +146,15 @@ public class GoogleCalendarConnectionService {
         }
         GoogleCalendarIntegration integration = integrationCommandService.tryLockIntegration(accountId)
                 .orElseGet(() -> integrationCommandService.createIntegration(accountId));
-        return connectionCommandService.createConnection(integration, user.subject(), user.email(),
-                encryptor.encryptRefreshToken(token.refreshToken()), encryptor.encryptAccessToken(token.accessToken()), expiresAt, connectedAt);
+        return connectionCommandService.createConnection(
+                integration,
+                user.subject(),
+                user.email(),
+                encryptor.encryptRefreshToken(token.refreshToken()),
+                encryptor.encryptAccessToken(token.accessToken()),
+                expiresAt,
+                connectedAt
+        );
     }
 
     @Transactional

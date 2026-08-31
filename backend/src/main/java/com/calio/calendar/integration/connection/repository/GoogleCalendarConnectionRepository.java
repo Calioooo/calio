@@ -43,10 +43,11 @@ public interface GoogleCalendarConnectionRepository extends JpaRepository<Google
     Optional<GoogleCalendarConnection> findSingleConnectionByAccountIdForUpdate(@Param("accountId") Long accountId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @EntityGraph(attributePaths = "integration")
     @Query("""
             select connection
             from GoogleCalendarConnection connection
-            join fetch connection.integration integration
+            join connection.integration integration
             where integration.accountId = :accountId
               and connection.state = com.calio.calendar.integration.connection.domain.GoogleCalendarConnectionState.CONNECTED
             """)
