@@ -119,10 +119,10 @@ class PersonalScheduleGroupShareRepositoryTest {
 
         List<Integer> results = executeConcurrently(
                 () -> eventShareRepository.insertIgnore(
-                        event.getId(), groupSpace.getId(), false, "00000000-0000-0000-0000-000000000001"
+                        event.getId(), groupSpace.getId(), "00000000-0000-0000-0000-000000000001"
                 ),
                 () -> eventShareRepository.insertIgnore(
-                        event.getId(), groupSpace.getId(), true, "00000000-0000-0000-0000-000000000002"
+                        event.getId(), groupSpace.getId(), "00000000-0000-0000-0000-000000000002"
                 )
         );
 

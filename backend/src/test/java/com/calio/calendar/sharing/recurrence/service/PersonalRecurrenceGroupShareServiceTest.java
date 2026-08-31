@@ -17,7 +17,6 @@ import com.calio.calendar.sharing.recurrence.controller.dto.CreateRecurrenceGrou
 import com.calio.calendar.sharing.recurrence.domain.PersonalRecurrenceGroupShare;
 import java.time.Instant;
 import java.util.List;
-import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -40,7 +39,7 @@ class PersonalRecurrenceGroupShareServiceTest {
     );
 
     @Test
-    @DisplayName("반복 master 전체 공유는 중복 target을 한 번 처리하고 초기 익명 여부를 전달한다")
+    @DisplayName("반복 master 전체 공유는 중복 target을 한 번 처리한다")
     void createSharesWholeMasterOncePerDistinctActiveTarget() {
         RecurrenceEvent recurrenceEvent = mock(RecurrenceEvent.class);
         when(recurrenceEvent.getId()).thenReturn(30L);
@@ -52,16 +51,12 @@ class PersonalRecurrenceGroupShareServiceTest {
         when(shareCommandService.createIfAbsent(any())).thenReturn(true);
 
         CreateRecurrenceGroupSharesResponse response = service.create(100L, 30L,
-                new CreateRecurrenceGroupSharesRequest(List.of(10L, 20L, 10L), true));
+                new CreateRecurrenceGroupSharesRequest(List.of(10L, 20L, 10L)));
 
         assertThat(response.recurrenceId()).isEqualTo(30L);
         assertThat(response.targets()).extracting(target -> target.status())
                 .containsExactly(GroupShareTargetStatus.SHARED, GroupShareTargetStatus.NOT_ELIGIBLE);
-        ArgumentCaptor<PersonalRecurrenceGroupShare> shareCaptor = ArgumentCaptor.forClass(
-                PersonalRecurrenceGroupShare.class
-        );
-        verify(shareCommandService).createIfAbsent(shareCaptor.capture());
-        assertThat(shareCaptor.getValue().isAnonymous()).isTrue();
+        verify(shareCommandService).createIfAbsent(any(PersonalRecurrenceGroupShare.class));
     }
 
     private GroupSpace groupSpace(Long id) {

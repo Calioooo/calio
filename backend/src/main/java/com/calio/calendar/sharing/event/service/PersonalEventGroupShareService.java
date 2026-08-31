@@ -59,8 +59,7 @@ public class PersonalEventGroupShareService {
                                 eventsById.get(eventId),
                                 groupSpaceIds,
                                 activeGroupSpacesById,
-                                existingKeys,
-                                request.isAnonymous()
+                                existingKeys
                         )
                 ))
                 .toList();
@@ -97,16 +96,14 @@ public class PersonalEventGroupShareService {
             Event event,
             List<Long> groupSpaceIds,
             Map<Long, GroupSpace> activeGroupSpacesById,
-            Set<ShareKey> existingKeys,
-            boolean anonymous
+            Set<ShareKey> existingKeys
     ) {
         return groupSpaceIds.stream()
                 .map(groupSpaceId -> shareTarget(
                         event,
                         groupSpaceId,
                         activeGroupSpacesById.get(groupSpaceId),
-                        existingKeys,
-                        anonymous
+                        existingKeys
                 ))
                 .toList();
     }
@@ -115,8 +112,7 @@ public class PersonalEventGroupShareService {
             Event event,
             Long groupSpaceId,
             GroupSpace groupSpace,
-            Set<ShareKey> existingKeys,
-            boolean anonymous
+            Set<ShareKey> existingKeys
     ) {
         if (groupSpace == null) {
             return new GroupShareTargetResponse(groupSpaceId, GroupShareTargetStatus.NOT_ELIGIBLE);
@@ -126,7 +122,7 @@ public class PersonalEventGroupShareService {
             return new GroupShareTargetResponse(groupSpaceId, GroupShareTargetStatus.ALREADY_SHARED);
         }
         boolean inserted = shareCommandService.createIfAbsent(
-                PersonalEventGroupShare.create(event, groupSpace, anonymous)
+                PersonalEventGroupShare.create(event, groupSpace)
         );
         return new GroupShareTargetResponse(
                 groupSpaceId,

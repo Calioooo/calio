@@ -31,7 +31,6 @@ public class PersonalEventGroupShareCommandService {
         return shareRepository.insertIgnore(
                 share.getEvent().getId(),
                 share.getGroupSpace().getId(),
-                share.isAnonymous(),
                 share.getPublicShareId().toString()
         ) == 1;
     }

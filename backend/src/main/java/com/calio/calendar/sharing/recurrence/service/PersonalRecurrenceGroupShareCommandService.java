@@ -31,7 +31,6 @@ public class PersonalRecurrenceGroupShareCommandService {
         return shareRepository.insertIgnore(
                 share.getRecurrenceEvent().getId(),
                 share.getGroupSpace().getId(),
-                share.isAnonymous(),
                 share.getPublicShareId().toString()
         ) == 1;
     }

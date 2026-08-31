@@ -58,8 +58,7 @@ public class PersonalRecurrenceGroupShareService {
                         recurrenceEvent,
                         groupSpaceId,
                         activeGroupSpacesById.get(groupSpaceId),
-                        existingGroupSpaceIds,
-                        request.isAnonymous()
+                        existingGroupSpaceIds
                 ))
                 .toList();
         return new CreateRecurrenceGroupSharesResponse(recurrenceId, targets);
@@ -78,8 +77,7 @@ public class PersonalRecurrenceGroupShareService {
             RecurrenceEvent recurrenceEvent,
             Long groupSpaceId,
             GroupSpace groupSpace,
-            Set<Long> existingGroupSpaceIds,
-            boolean anonymous
+            Set<Long> existingGroupSpaceIds
     ) {
         if (groupSpace == null) {
             return new GroupShareTargetResponse(groupSpaceId, GroupShareTargetStatus.NOT_ELIGIBLE);
@@ -88,7 +86,7 @@ public class PersonalRecurrenceGroupShareService {
             return new GroupShareTargetResponse(groupSpaceId, GroupShareTargetStatus.ALREADY_SHARED);
         }
         boolean inserted = shareCommandService.createIfAbsent(
-                PersonalRecurrenceGroupShare.create(recurrenceEvent, groupSpace, anonymous)
+                PersonalRecurrenceGroupShare.create(recurrenceEvent, groupSpace)
         );
         return new GroupShareTargetResponse(
                 groupSpaceId,

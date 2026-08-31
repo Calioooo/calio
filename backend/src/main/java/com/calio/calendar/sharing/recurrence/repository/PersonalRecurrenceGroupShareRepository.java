@@ -69,13 +69,12 @@ public interface PersonalRecurrenceGroupShareRepository extends JpaRepository<Pe
     @Modifying
     @Query(value = """
             insert ignore into personal_recurrence_group_shares
-                (recurrence_event_id, group_space_id, is_anonymous, public_share_id, created_at, updated_at)
-            values (:recurrenceEventId, :groupSpaceId, :anonymous, :publicShareId, current_timestamp(6), current_timestamp(6))
+                (recurrence_event_id, group_space_id, public_share_id, created_at, updated_at)
+            values (:recurrenceEventId, :groupSpaceId, :publicShareId, current_timestamp(6), current_timestamp(6))
             """, nativeQuery = true)
     int insertIgnore(
             @Param("recurrenceEventId") Long recurrenceEventId,
             @Param("groupSpaceId") Long groupSpaceId,
-            @Param("anonymous") boolean anonymous,
             @Param("publicShareId") String publicShareId
     );
 }

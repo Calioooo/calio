@@ -52,7 +52,7 @@ class PersonalEventGroupShareServiceTest {
         when(shareCommandService.createIfAbsent(any())).thenReturn(true);
 
         CreateEventGroupSharesResponse response = service.create(100L, new CreateEventGroupSharesRequest(
-                List.of(1L, 1L), List.of(10L, 20L, 20L), true
+                List.of(1L, 1L), List.of(10L, 20L, 20L)
         ));
 
         assertThat(response.results()).hasSize(1);
@@ -69,7 +69,7 @@ class PersonalEventGroupShareServiceTest {
         when(eventQueryService.listShareableEvents(100L, List.of(1L, 2L))).thenReturn(List.of(ownedEvent));
 
         assertThatThrownBy(() -> service.create(100L, new CreateEventGroupSharesRequest(
-                List.of(1L, 2L), List.of(10L), false
+                List.of(1L, 2L), List.of(10L)
         ))).isInstanceOfSatisfying(CalioException.class, exception ->
                 assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.EVENT_NOT_FOUND)
         );
@@ -86,12 +86,12 @@ class PersonalEventGroupShareServiceTest {
         when(membershipQueryService.listActiveMemberships(100L, List.of(10L, 20L)))
                 .thenReturn(List.of(member(firstGroup), member(secondGroup)));
         when(shareQueryService.listExistingShares(List.of(1L), List.of(10L, 20L))).thenReturn(List.of(
-                com.calio.calendar.sharing.event.domain.PersonalEventGroupShare.create(event, firstGroup, false)
+                com.calio.calendar.sharing.event.domain.PersonalEventGroupShare.create(event, firstGroup)
         ));
         when(shareCommandService.createIfAbsent(any())).thenReturn(false);
 
         CreateEventGroupSharesResponse response = service.create(100L, new CreateEventGroupSharesRequest(
-                List.of(1L), List.of(10L, 20L), false
+                List.of(1L), List.of(10L, 20L)
         ));
 
         assertThat(response.results().getFirst().targets())
