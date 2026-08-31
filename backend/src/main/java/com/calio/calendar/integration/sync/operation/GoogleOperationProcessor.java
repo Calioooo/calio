@@ -60,7 +60,7 @@ public class GoogleOperationProcessor {
     }
 
     private JobExecutionResult processHead(Long accountId, String workerToken) {
-        Long integrationId = integrationQueryService.findIntegration(accountId)
+        Long integrationId = integrationQueryService.getIntegrationIfExists(accountId)
                 .orElseThrow()
                 .getId();
         GoogleOperationJob job = jobService.claimNextJob(accountId, integrationId, workerToken);

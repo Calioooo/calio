@@ -48,7 +48,7 @@ public class GoogleOperationJobEnqueueService {
 
     private void enqueueSync(Long accountId, GoogleOperationJobTrigger trigger) {
         connectionCommandService.lockConnectedConnection(accountId);
-        GoogleCalendarIntegration integration = integrationCommandService.findIntegrationForUpdate(accountId)
+        GoogleCalendarIntegration integration = integrationCommandService.tryLockIntegration(accountId)
                 .orElseThrow();
         GoogleOperationJob job = GoogleOperationJob.sync(
                 UUID.randomUUID().toString(),
