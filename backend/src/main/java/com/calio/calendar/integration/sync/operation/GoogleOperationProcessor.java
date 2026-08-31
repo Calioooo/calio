@@ -1,7 +1,7 @@
 package com.calio.calendar.integration.sync.operation;
 
 import com.calio.calendar.integration.sync.GoogleCalendarSyncService;
-import com.calio.calendar.integration.connection.service.GoogleCalendarConnectionCommandService;
+import com.calio.calendar.integration.connection.service.GoogleCalendarConnectionService;
 import com.calio.calendar.external.google.GoogleCalendarInvalidGrantException;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
@@ -21,7 +21,7 @@ public class GoogleOperationProcessor {
     private final GoogleOperationLeaseService operationLeaseService;
     private final GoogleCalendarSyncService syncService;
     private final GoogleOperationFailureClassifier failureClassifier;
-    private final GoogleCalendarConnectionCommandService connectionCommandService;
+    private final GoogleCalendarConnectionService connectionService;
     private final Clock clock;
 
     public GoogleOperationProcessor(
@@ -29,14 +29,14 @@ public class GoogleOperationProcessor {
             GoogleOperationLeaseService operationLeaseService,
             GoogleCalendarSyncService syncService,
             GoogleOperationFailureClassifier failureClassifier,
-            GoogleCalendarConnectionCommandService connectionCommandService,
+            GoogleCalendarConnectionService connectionService,
             Clock clock
     ) {
         this.jobService = jobService;
         this.operationLeaseService = operationLeaseService;
         this.syncService = syncService;
         this.failureClassifier = failureClassifier;
-        this.connectionCommandService = connectionCommandService;
+        this.connectionService = connectionService;
         this.clock = clock;
     }
 
@@ -94,7 +94,7 @@ public class GoogleOperationProcessor {
         if (!requiresIntegrationPause(failure)) {
             return mapExecutionResult(failureDecision);
         }
-        connectionCommandService.markConnectedConnectionSyncError(
+        connectionService.pauseConnectedConnectionForReconnect(
                 job.getAccountId(),
                 ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED.name(),
                 Instant.now(clock)

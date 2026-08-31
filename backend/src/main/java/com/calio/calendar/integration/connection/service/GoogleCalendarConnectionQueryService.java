@@ -24,7 +24,7 @@ public class GoogleCalendarConnectionQueryService {
                 .orElseThrow(() -> new CalioException(ErrorCode.GOOGLE_CALENDAR_NOT_CONNECTED));
     }
 
-    public Optional<GoogleCalendarConnection> findConnectedConnection(Long accountId) {
+    public Optional<GoogleCalendarConnection> getConnectedConnectionIfExists(Long accountId) {
         return connectionRepository.findConnectedByAccountId(accountId);
     }
 

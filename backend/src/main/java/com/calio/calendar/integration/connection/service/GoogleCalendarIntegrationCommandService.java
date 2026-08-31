@@ -4,10 +4,8 @@ import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegratio
 import com.calio.calendar.integration.connection.repository.GoogleCalendarIntegrationRepository;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@Transactional
 public class GoogleCalendarIntegrationCommandService {
     private final GoogleCalendarIntegrationRepository integrationRepository;
 
@@ -15,7 +13,7 @@ public class GoogleCalendarIntegrationCommandService {
         this.integrationRepository = integrationRepository;
     }
 
-    public Optional<GoogleCalendarIntegration> findIntegrationForUpdate(Long accountId) {
+    public Optional<GoogleCalendarIntegration> tryLockIntegration(Long accountId) {
         return integrationRepository.findByAccountIdForUpdate(accountId);
     }
 

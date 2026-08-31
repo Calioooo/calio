@@ -26,30 +26,30 @@ public class GoogleCalendarRecurrenceMappingQueryService {
     }
 
     public List<GoogleCalendarRecurrenceEventMapping> listRecurrenceEventMappings(
-            Long integrationId,
+            Long connectionId,
             String calendarKey,
             Collection<String> externalEventIds
     ) {
         return recurrenceMappingRepository.findAllWithRecurrenceEventAndTagByExternalIdentity(
-                integrationId,
+                connectionId,
                 calendarKey,
                 externalEventIds
         );
     }
 
     public List<GoogleCalendarRecurrenceEventMapping> listRecurrenceEventMappings(
-            Long integrationId
+            Long connectionId
     ) {
-        return recurrenceMappingRepository.findAllWithRecurrenceEventByIntegrationId(integrationId);
+        return recurrenceMappingRepository.findAllWithRecurrenceEventByConnectionId(connectionId);
     }
 
     public List<GoogleCalendarRecurrenceEventMapping> listRecurrenceEventMappingBatch(
-            Long integrationId,
+            Long connectionId,
             Long afterId,
             int limit
     ) {
-        return recurrenceMappingRepository.findNextBatchWithRecurrenceEventByIntegrationId(
-                integrationId,
+        return recurrenceMappingRepository.findNextBatchWithRecurrenceEventByConnectionId(
+                connectionId,
                 afterId,
                 PageRequest.of(0, limit)
         );
@@ -65,32 +65,32 @@ public class GoogleCalendarRecurrenceMappingQueryService {
     }
 
     public List<GoogleCalendarRecurrenceOverrideMapping> listOverrideMappings(
-            Long integrationId,
+            Long connectionId,
             String calendarKey,
             Collection<String> externalEventIds
     ) {
         return overrideMappingRepository.findAllWithRecurrenceEventMappingByExternalEventIds(
-                integrationId,
+                connectionId,
                 calendarKey,
                 externalEventIds
         );
     }
 
-    public List<GoogleCalendarRecurrenceOverrideMapping> listOverrideMappings(Long integrationId) {
+    public List<GoogleCalendarRecurrenceOverrideMapping> listOverrideMappings(Long connectionId) {
         return overrideMappingRepository
-                .findAllWithRecurrenceEventMappingAndRecurrenceEventOverrideByIntegrationId(
-                        integrationId
+                .findAllWithRecurrenceEventMappingAndRecurrenceEventOverrideByConnectionId(
+                        connectionId
                 );
     }
 
     public List<GoogleCalendarRecurrenceOverrideMapping> listOverrideMappingBatch(
-            Long integrationId,
+            Long connectionId,
             Long afterId,
             int limit
     ) {
         return overrideMappingRepository
-                .findNextBatchWithRecurrenceEventMappingAndRecurrenceEventOverrideByIntegrationId(
-                        integrationId,
+                .findNextBatchWithRecurrenceEventMappingAndRecurrenceEventOverrideByConnectionId(
+                        connectionId,
                         afterId,
                         PageRequest.of(0, limit)
                 );

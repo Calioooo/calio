@@ -18,12 +18,12 @@ public interface GoogleCalendarEventMappingRepository
     @Query("""
             select mapping
             from GoogleCalendarEventMapping mapping
-            where mapping.connection.id = :integrationId
+            where mapping.connection.id = :connectionId
               and mapping.calendarKey = :calendarKey
               and mapping.externalEventId in :externalEventIds
             """)
     List<GoogleCalendarEventMapping> findAllWithEventByExternalIdentity(
-            @Param("integrationId") Long integrationId,
+            @Param("connectionId") Long connectionId,
             @Param("calendarKey") String calendarKey,
             @Param("externalEventIds") Collection<String> externalEventIds
     );
@@ -33,30 +33,30 @@ public interface GoogleCalendarEventMappingRepository
     @Query("""
             select mapping.event.id
             from GoogleCalendarEventMapping mapping
-            where mapping.connection.id = :integrationId
+            where mapping.connection.id = :connectionId
             """)
-    List<Long> findEventIdsByIntegrationId(@Param("integrationId") Long integrationId);
+    List<Long> findEventIdsByConnectionId(@Param("connectionId") Long connectionId);
 
     @EntityGraph(attributePaths = "event")
     @Query("""
             select mapping
             from GoogleCalendarEventMapping mapping
-            where mapping.connection.id = :integrationId
+            where mapping.connection.id = :connectionId
             """)
-    List<GoogleCalendarEventMapping> findAllWithEventByIntegrationId(
-            @Param("integrationId") Long integrationId
+    List<GoogleCalendarEventMapping> findAllWithEventByConnectionId(
+            @Param("connectionId") Long connectionId
     );
 
     @EntityGraph(attributePaths = "event")
     @Query("""
             select mapping
             from GoogleCalendarEventMapping mapping
-            where mapping.connection.id = :integrationId
+            where mapping.connection.id = :connectionId
               and mapping.id > :afterId
             order by mapping.id
             """)
-    List<GoogleCalendarEventMapping> findNextBatchWithEventByIntegrationId(
-            @Param("integrationId") Long integrationId,
+    List<GoogleCalendarEventMapping> findNextBatchWithEventByConnectionId(
+            @Param("connectionId") Long connectionId,
             @Param("afterId") Long afterId,
             Pageable pageable
     );

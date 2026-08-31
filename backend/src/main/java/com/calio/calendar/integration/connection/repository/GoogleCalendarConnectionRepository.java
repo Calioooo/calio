@@ -5,6 +5,7 @@ import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
@@ -13,28 +14,30 @@ import org.springframework.data.repository.query.Param;
 
 public interface GoogleCalendarConnectionRepository extends JpaRepository<GoogleCalendarConnection, Long> {
 
+    @EntityGraph(attributePaths = "integration")
     @Query("""
             select connection
             from GoogleCalendarConnection connection
-            join fetch connection.integration integration
+            join connection.integration integration
             where integration.accountId = :accountId
               and connection.state = com.calio.calendar.integration.connection.domain.GoogleCalendarConnectionState.CONNECTED
             """)
     Optional<GoogleCalendarConnection> findConnectedByAccountId(@Param("accountId") Long accountId);
 
+    @EntityGraph(attributePaths = "integration")
     @Query("""
             select connection
             from GoogleCalendarConnection connection
-            join fetch connection.integration
             where connection.id = :connectionId
             """)
     Optional<GoogleCalendarConnection> findByIdWithIntegration(@Param("connectionId") Long connectionId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @EntityGraph(attributePaths = "integration")
     @Query("""
             select connection
             from GoogleCalendarConnection connection
-            join fetch connection.integration integration
+            join connection.integration integration
             where integration.accountId = :accountId
             """)
     Optional<GoogleCalendarConnection> findSingleConnectionByAccountIdForUpdate(@Param("accountId") Long accountId);
@@ -50,10 +53,10 @@ public interface GoogleCalendarConnectionRepository extends JpaRepository<Google
     Optional<GoogleCalendarConnection> findConnectedByAccountIdForUpdate(@Param("accountId") Long accountId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @EntityGraph(attributePaths = "integration")
     @Query("""
             select connection
             from GoogleCalendarConnection connection
-            join fetch connection.integration
             where connection.id = :connectionId
             """)
     Optional<GoogleCalendarConnection> findByIdForUpdate(@Param("connectionId") Long connectionId);

@@ -14,14 +14,19 @@ import com.calio.calendar.integration.sync.operation.GoogleOperationJobEnqueueSe
 import com.calio.calendar.security.TokenEncryptor;
 import java.time.Clock;
 import java.time.Instant;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 public class GoogleCalendarConnectionService {
+
+    private static final Logger log = LoggerFactory.getLogger(GoogleCalendarConnectionService.class);
     private final GoogleOAuthProperties properties;
     private final GoogleOAuthClient oauthClient;
     private final TokenEncryptor encryptor;
@@ -60,13 +65,13 @@ public class GoogleCalendarConnectionService {
     }
 
     public GoogleCalendarIntegrationResponse getConnectionStatus(Long accountId) {
-        return connectionQueryService.findConnectedConnection(accountId)
+        return connectionQueryService.getConnectedConnectionIfExists(accountId)
                 .map(GoogleCalendarIntegrationResponse::connected)
                 .orElseGet(GoogleCalendarIntegrationResponse::disconnected);
     }
 
     public void disconnect(Long accountId) {
-        String encrypted = disconnectTransaction.execute(status -> connectionCommandService.findConnectedConnectionForUpdate(accountId)
+        String encrypted = disconnectTransaction.execute(status -> connectionCommandService.tryLockConnectedConnection(accountId)
                 .map(connection -> {
                     String refreshToken = connection.getEncryptedRefreshToken();
                     jobCommandService.deleteJobsForConnection(connection.getId());
@@ -84,20 +89,35 @@ public class GoogleCalendarConnectionService {
 
     private GoogleCalendarConnection registerInTransaction(Long accountId, GoogleUserInfoResponse user, GoogleTokenResponse token,
             Instant expiresAt, Instant connectedAt) {
-        GoogleCalendarConnection current = connectionCommandService.findSingleConnectionForUpdate(accountId).orElse(null);
+        GoogleCalendarConnection current = connectionCommandService.tryLockConnection(accountId).orElse(null);
         if (current != null) {
             if (!current.getGoogleSubject().equals(user.subject())) throw new CalioException(ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED);
-            current.replaceCredentials(user.email(), encryptor.encryptRefreshToken(token.refreshToken()),
-                    encryptor.encryptAccessToken(token.accessToken()), expiresAt, connectedAt);
+            connectionCommandService.replaceCredentials(
+                    current,
+                    user.email(),
+                    encryptor.encryptRefreshToken(token.refreshToken()),
+                    encryptor.encryptAccessToken(token.accessToken()),
+                    expiresAt,
+                    connectedAt
+            );
             return current;
         }
-        GoogleCalendarIntegration integration = integrationCommandService.findIntegrationForUpdate(accountId)
+        GoogleCalendarIntegration integration = integrationCommandService.tryLockIntegration(accountId)
                 .orElseGet(() -> integrationCommandService.createIntegration(accountId));
         return connectionCommandService.createConnection(integration, user.subject(), user.email(),
                 encryptor.encryptRefreshToken(token.refreshToken()), encryptor.encryptAccessToken(token.accessToken()), expiresAt, connectedAt);
     }
 
+    @Transactional
+    public void pauseConnectedConnectionForReconnect(Long accountId, String reason, Instant occurredAt) {
+        connectionCommandService.markConnectedConnectionSyncError(accountId, reason, occurredAt);
+    }
+
     private void revokeTokenSafely(String encryptedRefreshToken) {
-        try { oauthClient.revokeToken(encryptor.decrypt(encryptedRefreshToken)); } catch (RuntimeException ignored) { }
+        try {
+            oauthClient.revokeToken(encryptor.decrypt(encryptedRefreshToken));
+        } catch (RuntimeException exception) {
+            log.warn("Google Calendar token revocation failed after local disconnect.", exception);
+        }
     }
 }

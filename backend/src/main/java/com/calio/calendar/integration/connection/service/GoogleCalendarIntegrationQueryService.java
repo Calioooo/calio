@@ -15,7 +15,7 @@ public class GoogleCalendarIntegrationQueryService {
         this.integrationRepository = integrationRepository;
     }
 
-    public Optional<GoogleCalendarIntegration> findIntegration(Long accountId) {
+    public Optional<GoogleCalendarIntegration> getIntegrationIfExists(Long accountId) {
         return integrationRepository.findByAccountId(accountId);
     }
 

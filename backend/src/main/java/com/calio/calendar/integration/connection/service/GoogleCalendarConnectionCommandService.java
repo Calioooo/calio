@@ -9,10 +9,8 @@ import com.calio.calendar.integration.sync.operation.GoogleOperationOwnershipLos
 import java.time.Instant;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@Transactional
 public class GoogleCalendarConnectionCommandService {
     private final GoogleCalendarConnectionRepository connectionRepository;
 
@@ -25,11 +23,11 @@ public class GoogleCalendarConnectionCommandService {
                 .orElseThrow(() -> new CalioException(ErrorCode.GOOGLE_CALENDAR_NOT_CONNECTED));
     }
 
-    public Optional<GoogleCalendarConnection> findConnectedConnectionForUpdate(Long accountId) {
+    public Optional<GoogleCalendarConnection> tryLockConnectedConnection(Long accountId) {
         return connectionRepository.findConnectedByAccountIdForUpdate(accountId);
     }
 
-    public Optional<GoogleCalendarConnection> findSingleConnectionForUpdate(Long accountId) {
+    public Optional<GoogleCalendarConnection> tryLockConnection(Long accountId) {
         return connectionRepository.findSingleConnectionByAccountIdForUpdate(accountId);
     }
 
@@ -60,13 +58,31 @@ public class GoogleCalendarConnectionCommandService {
         connectionRepository.saveAndFlush(connection);
     }
 
+    public void replaceCredentials(
+            GoogleCalendarConnection connection,
+            String googleEmail,
+            String encryptedRefreshToken,
+            String encryptedAccessToken,
+            Instant accessTokenExpiresAt,
+            Instant connectedAt
+    ) {
+        connection.replaceCredentials(
+                googleEmail,
+                encryptedRefreshToken,
+                encryptedAccessToken,
+                accessTokenExpiresAt,
+                connectedAt
+        );
+        connectionRepository.saveAndFlush(connection);
+    }
+
     public void changeNextSyncToken(GoogleCalendarConnection connection, String nextSyncToken) {
         connection.replaceNextSyncToken(nextSyncToken);
         connectionRepository.saveAndFlush(connection);
     }
 
     public void markConnectedConnectionSyncError(Long accountId, String reason, Instant occurredAt) {
-        findConnectedConnectionForUpdate(accountId).ifPresent(connection -> {
+        tryLockConnectedConnection(accountId).ifPresent(connection -> {
             connection.markSyncError(reason, occurredAt);
             connectionRepository.saveAndFlush(connection);
         });
