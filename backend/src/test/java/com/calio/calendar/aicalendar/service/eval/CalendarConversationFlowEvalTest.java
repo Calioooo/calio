@@ -241,8 +241,11 @@ class CalendarConversationFlowEvalTest {
         assertThat(second.assistantMessage()).isNotBlank();
         assertThat(second.blocks()).extracting(block -> block.type())
                 .contains(CalendarAssistantBlockType.MUTATION_PREVIEW);
-        assertThat(capturedPreviewRequest().operation())
+        CalendarMutationToolRequest mutationRequest = capturedPreviewRequest();
+        assertThat(mutationRequest.operation())
                 .isEqualTo(CalendarMutationOperation.UPDATE_RECURRENCE_OCCURRENCE);
+        assertThat(mutationRequest.recurrenceId()).isEqualTo(10L);
+        assertThat(mutationRequest.originStartAt()).isEqualTo(Instant.parse("2026-08-16T05:00:00Z"));
         verify(mutationService, never()).apply(any(), any());
     }
 

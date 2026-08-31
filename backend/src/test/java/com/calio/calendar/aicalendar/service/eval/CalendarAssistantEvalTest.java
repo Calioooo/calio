@@ -393,7 +393,11 @@ class CalendarAssistantEvalTest {
 
         // then
         assertThat(answer.mutationPreviews()).containsExactly(preview);
-        assertMutationOperation(CalendarMutationOperation.UPDATE_RECURRENCE_OCCURRENCE);
+        CalendarMutationToolRequest mutationRequest = assertMutationOperation(
+                CalendarMutationOperation.UPDATE_RECURRENCE_OCCURRENCE
+        );
+        assertThat(mutationRequest.recurrenceId()).isEqualTo(10L);
+        assertThat(mutationRequest.originStartAt()).isEqualTo(Instant.parse("2026-08-16T05:00:00Z"));
         verify(mutationService, never()).apply(any(), any());
     }
 
@@ -458,7 +462,11 @@ class CalendarAssistantEvalTest {
                 assertThat(seriesPreview.recurrence().after())
                         .containsExactly("RRULE:FREQ=WEEKLY;BYDAY=SUN;BYHOUR=6")
         );
-        assertMutationOperation(CalendarMutationOperation.UPDATE_RECURRENCE_SERIES);
+        CalendarMutationToolRequest mutationRequest = assertMutationOperation(
+                CalendarMutationOperation.UPDATE_RECURRENCE_SERIES
+        );
+        assertThat(mutationRequest.recurrenceId()).isEqualTo(10L);
+        assertThat(mutationRequest.originStartAt()).isNull();
         verify(mutationService, never()).apply(any(), any());
     }
 
@@ -651,12 +659,14 @@ class CalendarAssistantEvalTest {
         );
     }
 
-    private void assertMutationOperation(CalendarMutationOperation expectedOperation) {
+    private CalendarMutationToolRequest assertMutationOperation(CalendarMutationOperation expectedOperation) {
         ArgumentCaptor<CalendarMutationToolRequest> requestCaptor = ArgumentCaptor.forClass(
                 CalendarMutationToolRequest.class
         );
         verify(mutationService).preview(eq(1L), requestCaptor.capture());
-        assertThat(requestCaptor.getValue().operation()).isEqualTo(expectedOperation);
+        CalendarMutationToolRequest request = requestCaptor.getValue();
+        assertThat(request.operation()).isEqualTo(expectedOperation);
+        return request;
     }
 
     private FactCheckingEvaluator factCheckingEvaluator() {
