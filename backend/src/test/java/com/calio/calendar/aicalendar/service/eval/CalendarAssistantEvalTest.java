@@ -19,6 +19,7 @@ import com.calio.calendar.aicalendar.service.dto.CalendarAssistantAnswer;
 import com.calio.calendar.aicalendar.service.dto.CalendarAssistantRequest;
 import com.calio.calendar.aicalendar.service.dto.CalendarConversationHistoryMessage;
 import com.calio.calendar.aicalendar.service.dto.CalendarMutationPreview;
+import com.calio.calendar.aicalendar.service.dto.CalendarMutationRecurrencePreview;
 import com.calio.calendar.aicalendar.service.tool.dto.CalendarMutationToolRequest;
 import com.calio.calendar.event.controller.dto.EventResponse;
 import com.calio.calendar.event.service.EventService;
@@ -414,7 +415,11 @@ class CalendarAssistantEvalTest {
                 CalendarMutationType.UPDATE,
                 CalendarMutationScope.ENTIRE_SERIES,
                 before,
-                after
+                after,
+                new CalendarMutationRecurrencePreview(
+                        List.of("RRULE:FREQ=WEEKLY;BYDAY=SUN"),
+                        List.of("RRULE:FREQ=WEEKLY;BYDAY=SUN;BYHOUR=6")
+                )
         );
         when(eventService.listEvents(any(), any(), any())).thenReturn(List.of(before));
         when(mutationService.preview(any(), any())).thenReturn(preview);
@@ -426,6 +431,10 @@ class CalendarAssistantEvalTest {
 
         // then
         assertThat(answer.mutationPreviews()).containsExactly(preview);
+        assertThat(answer.mutationPreviews()).singleElement().satisfies(seriesPreview ->
+                assertThat(seriesPreview.recurrence().after())
+                        .containsExactly("RRULE:FREQ=WEEKLY;BYDAY=SUN;BYHOUR=6")
+        );
         assertMutationOperation(CalendarMutationOperation.UPDATE_RECURRENCE_SERIES);
         verify(mutationService, never()).apply(any(), any());
     }
