@@ -125,6 +125,38 @@ class PersonalScheduleGroupShareControllerTest {
     }
 
     @Test
+    @DisplayName("유효하지 않은 원본 일정이 포함된 공유 요청은 대상 처리 전에 전체 실패하고 mapping을 만들지 않는다")
+    void givenInvalidSource_whenCreateGroupShares_thenRejectsBeforeWritingMappings() throws Exception {
+        long eventId = createEvent("유효한 일정");
+        GroupSpace groupSpace = createGroupWithCurrentMember("eligible");
+
+        mockMvc.perform(post("/api/events/group-shares")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "eventIds": [%d, 999999],
+                                  "groupSpaceIds": [%d],
+                                  "isAnonymous": false
+                                }
+                                """.formatted(eventId, groupSpace.getId())))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("EVENT_NOT_FOUND"));
+        assertThat(eventShareRepository.count()).isZero();
+
+        mockMvc.perform(post("/api/recurrence-events/{recurrenceId}/group-shares", 999999L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "groupSpaceIds": [%d],
+                                  "isAnonymous": false
+                                }
+                                """.formatted(groupSpace.getId())))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("RECURRENCE_EVENT_NOT_FOUND"));
+        assertThat(recurrenceShareRepository.count()).isZero();
+    }
+
+    @Test
     @DisplayName("반복 일정 다중 공유는 전체 series의 대상별 결과와 초기 익명 여부를 반환한다")
     void givenMixedTargets_whenCreateRecurrenceGroupShares_thenReturnsWholeSeriesTargetResults()
             throws Exception {
@@ -154,6 +186,51 @@ class PersonalScheduleGroupShareControllerTest {
                 .andExpect(jsonPath("$[0].groupSpaceId").value(eligible.getId()))
                 .andExpect(jsonPath("$[0].isAnonymous").value(true))
                 .andExpect(jsonPath("$[0].publicShareId").isString());
+    }
+
+    @Test
+    @DisplayName("다중 공유의 초기 익명 상태는 대상별로 독립되어 이후 한 대상 변경이 다른 대상에 영향을 주지 않는다")
+    void givenMultiTargetShares_whenChangingOneTargetAnonymousState_thenKeepsOtherTargetsUnchanged()
+            throws Exception {
+        long eventId = createEvent("단건 일정");
+        long recurrenceId = createRecurrence("반복 일정");
+        GroupSpace firstGroup = createGroupWithCurrentMember("first");
+        GroupSpace secondGroup = createGroupWithCurrentMember("second");
+        createEventShare(eventId, firstGroup.getId(), secondGroup.getId());
+        mockMvc.perform(post("/api/recurrence-events/{recurrenceId}/group-shares", recurrenceId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "groupSpaceIds": [%d, %d],
+                                  "isAnonymous": true
+                                }
+                                """.formatted(firstGroup.getId(), secondGroup.getId())))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(patch("/api/events/{eventId}/group-shares/{groupSpaceId}", eventId, firstGroup.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"isAnonymous\":false}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isAnonymous").value(false));
+        mockMvc.perform(patch("/api/recurrence-events/{recurrenceId}/group-shares/{groupSpaceId}",
+                        recurrenceId, firstGroup.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"isAnonymous\":false}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isAnonymous").value(false));
+
+        mockMvc.perform(get("/api/events/{eventId}/group-shares", eventId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].groupSpaceId").value(firstGroup.getId()))
+                .andExpect(jsonPath("$[0].isAnonymous").value(false))
+                .andExpect(jsonPath("$[1].groupSpaceId").value(secondGroup.getId()))
+                .andExpect(jsonPath("$[1].isAnonymous").value(true));
+        mockMvc.perform(get("/api/recurrence-events/{recurrenceId}/group-shares", recurrenceId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].groupSpaceId").value(firstGroup.getId()))
+                .andExpect(jsonPath("$[0].isAnonymous").value(false))
+                .andExpect(jsonPath("$[1].groupSpaceId").value(secondGroup.getId()))
+                .andExpect(jsonPath("$[1].isAnonymous").value(true));
     }
 
     @Test
@@ -312,10 +389,10 @@ class PersonalScheduleGroupShareControllerTest {
         return response(result).get("recurrenceId").asLong();
     }
 
-    private void createEventShare(long eventId, long groupSpaceId) throws Exception {
+    private void createEventShare(long eventId, long... groupSpaceIds) throws Exception {
         mockMvc.perform(post("/api/events/group-shares")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(eventShareRequest(eventId, groupSpaceId)))
+                        .content(eventShareRequest(eventId, groupSpaceIds)))
                 .andExpect(status().isCreated());
     }
 
