@@ -10,6 +10,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
+import com.calio.calendar.aicalendar.domain.CalendarMutationScope;
+import com.calio.calendar.aicalendar.domain.CalendarMutationType;
 import com.calio.calendar.aicalendar.repository.CalendarConversationMessageRepository;
 import com.calio.calendar.aicalendar.repository.CalendarConversationRepository;
 import com.calio.calendar.aicalendar.service.CalendarAssistantAgent;
@@ -17,11 +19,15 @@ import com.calio.calendar.aicalendar.service.CalendarAssistantRequestClassifier;
 import com.calio.calendar.aicalendar.service.CalendarConversationService;
 import com.calio.calendar.aicalendar.domain.CalendarAssistantRequestClassification;
 import com.calio.calendar.aicalendar.service.dto.CalendarAssistantAnswer;
+import com.calio.calendar.aicalendar.service.dto.CalendarMutationPreview;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
+import com.calio.calendar.event.controller.dto.EventResponse;
 import com.calio.calendar.security.AuthenticatedAccountMockMvcTestConfig;
 import com.calio.calendar.security.WithAuthenticatedAccount;
+import java.time.Instant;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -121,6 +127,42 @@ class CalendarConversationControllerTest {
     }
 
     @Test
+    @DisplayName("mutation Preview가 있는 응답은 변경 전후 값을 포함한 block으로 반환한다")
+    void givenAgentAnswerWithMutationPreview_whenSendMessage_thenReturnsMutationPreviewBlock()
+            throws Exception {
+        // given
+        String conversationId = createConversation();
+        when(requestClassifier.classify("회의 시간을 변경해줘"))
+                .thenReturn(CalendarAssistantRequestClassification.SUPPORTED);
+        when(assistantAgent.answer(any())).thenReturn(new CalendarAssistantAnswer(
+                "변경 내용을 확인해 주세요.",
+                List.of(),
+                List.of(),
+                List.of(new CalendarMutationPreview(
+                        CalendarMutationType.UPDATE,
+                        CalendarMutationScope.EVENT,
+                        event("기존 회의", "2026-08-21T05:00:00Z"),
+                        event("변경 회의", "2026-08-21T06:00:00Z")
+                ))
+        ));
+
+        // when, then
+        mockMvc.perform(post("/api/ai/calendar/conversations/{conversationId}/messages", conversationId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"message":"회의 시간을 변경해줘","timeZone":"Asia/Seoul"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.blocks[0].type").value("MUTATION_PREVIEW"))
+                .andExpect(jsonPath("$.blocks[0].items[0].type").value("UPDATE"))
+                .andExpect(jsonPath("$.blocks[0].items[0].scope").value("EVENT"))
+                .andExpect(jsonPath("$.blocks[0].items[0].before.title").value("기존 회의"))
+                .andExpect(jsonPath("$.blocks[0].items[0].after.title").value("변경 회의"))
+                .andExpect(jsonPath("$.blocks[0].items[0].after.startAt")
+                        .value("2026-08-21T06:00:00Z"));
+    }
+
+    @Test
     @DisplayName("유효하지 않은 timezone은 message 저장과 agent 호출 전에 거부한다")
     void givenInvalidTimeZone_whenSendMessage_thenRejectsBeforePersistenceOrAgentCall() throws Exception {
         // given
@@ -182,6 +224,26 @@ class CalendarConversationControllerTest {
 
     private JsonNode readJson(MvcResult result) throws Exception {
         return objectMapper.readTree(result.getResponse().getContentAsString(StandardCharsets.UTF_8));
+    }
+
+    private EventResponse event(String title, String startAt) {
+        Instant start = Instant.parse(startAt);
+        return new EventResponse(
+                1L,
+                title,
+                null,
+                start,
+                start.plusSeconds(3_600),
+                false,
+                "Asia/Seoul",
+                false,
+                null,
+                false,
+                null,
+                null,
+                Instant.parse("2026-08-01T00:00:00Z"),
+                Instant.parse("2026-08-01T00:00:00Z")
+        );
     }
 
     private String createConversation() throws Exception {
