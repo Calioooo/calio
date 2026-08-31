@@ -55,6 +55,7 @@ class SendCalendarConversationMessageResponseTest {
         assertThat(response.blocks().get(2).items()).singleElement().satisfies(preview -> {
             CalendarMutationPreviewResponse mutationPreview = (CalendarMutationPreviewResponse) preview;
             assertThat(mutationPreview.type()).isEqualTo(CalendarMutationType.UPDATE);
+            assertThat(mutationPreview.scope()).isEqualTo(CalendarMutationScope.EVENT);
             assertThat(mutationPreview.before().title()).isEqualTo("Planning");
             assertThat(mutationPreview.after().startAt()).isEqualTo(Instant.parse("2026-07-01T11:00:00Z"));
         });
