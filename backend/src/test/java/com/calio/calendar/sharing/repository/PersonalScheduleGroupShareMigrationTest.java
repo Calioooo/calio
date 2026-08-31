@@ -11,7 +11,7 @@ import org.springframework.core.io.ClassPathResource;
 class PersonalScheduleGroupShareMigrationTest {
 
     @Test
-    @DisplayName("공유 mapping migration은 UUID와 source-target unique 제약만 추가한다")
+    @DisplayName("공유 mapping migration은 UUID와 source-target unique 제약을 두고 익명 정책은 membership에 둔다")
     void createsMinimalMappingSchemaWithoutCascadeOrPresentationOverrides() throws IOException {
         String migration = new ClassPathResource("db/migration/V21__personal_schedule_group_shares.sql")
                 .getContentAsString(StandardCharsets.UTF_8);
@@ -19,7 +19,8 @@ class PersonalScheduleGroupShareMigrationTest {
         assertThat(migration)
                 .contains("personal_event_group_shares")
                 .contains("personal_recurrence_group_shares")
-                .contains("is_anonymous")
+                .contains("ALTER TABLE group_members")
+                .contains("ADD COLUMN is_anonymous BOOLEAN NOT NULL DEFAULT FALSE")
                 .contains("public_share_id")
                 .contains("UNIQUE (event_id, group_space_id)")
                 .contains("UNIQUE (recurrence_event_id, group_space_id)")
