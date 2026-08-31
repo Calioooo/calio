@@ -26,7 +26,7 @@ public record CalendarMutationToolRequest(
         Boolean allDay,
         @ToolParam(description = "IANA timezone identifier. Required when creating a timed event; optional replacement timezone for updates.", required = false)
         String timeZone,
-        @ToolParam(description = "Optional Calio tag ID for creation or update. Omit it to preserve the existing tag on updates.", required = false)
+        @ToolParam(description = "Optional Calio tag ID for creation, normal event updates, or entire recurrence series updates. A single recurrence occurrence cannot change its tag. Omit it to preserve the existing tag on updates.", required = false)
         Long tagId,
         @ToolParam(description = "RFC 5545 recurrence rules. Required only when replacing recurrence rules for UPDATE_RECURRENCE_SERIES; omit to preserve existing rules.", required = false)
         List<String> recurrenceRules

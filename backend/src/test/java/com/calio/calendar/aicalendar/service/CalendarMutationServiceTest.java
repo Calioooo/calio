@@ -1,6 +1,7 @@
 package com.calio.calendar.aicalendar.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -9,6 +10,8 @@ import com.calio.calendar.aicalendar.domain.CalendarMutationScope;
 import com.calio.calendar.aicalendar.domain.CalendarMutationType;
 import com.calio.calendar.aicalendar.domain.CalendarMutationOperation;
 import com.calio.calendar.aicalendar.service.tool.dto.CalendarMutationToolRequest;
+import com.calio.calendar.common.error.CalioException;
+import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.event.controller.dto.EventResponse;
 import com.calio.calendar.event.service.EventService;
 import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceOccurrenceRequest;
@@ -115,6 +118,38 @@ class CalendarMutationServiceTest {
                 .isEqualTo(Instant.parse("2026-08-21T05:00:00Z"));
         assertThat(requestCaptor.getValue().startAt())
                 .isEqualTo(Instant.parse("2026-08-21T06:00:00Z"));
+    }
+
+    @Test
+    @DisplayName("반복 회차 태그 변경 Preview는 지원하지 않는 변경 오류를 반환한다")
+    void givenOccurrenceTagChange_whenPreview_thenRejectsUnsupportedChange() {
+        // given
+        EventResponse existingOccurrence = recurrenceOccurrence(
+                "기존 회의",
+                Instant.parse("2026-08-21T05:00:00Z")
+        );
+        when(eventService.listEvents(org.mockito.ArgumentMatchers.eq(1L), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(List.of(existingOccurrence));
+        CalendarMutationToolRequest request = new CalendarMutationToolRequest(
+                CalendarMutationOperation.UPDATE_RECURRENCE_OCCURRENCE,
+                null,
+                20L,
+                Instant.parse("2026-08-21T05:00:00Z"),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                99L,
+                null
+        );
+
+        // when, then
+        assertThatThrownBy(() -> service().preview(1L, request))
+                .isInstanceOf(CalioException.class)
+                .extracting(exception -> ((CalioException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.RECURRENCE_OCCURRENCE_TAG_CHANGE_NOT_SUPPORTED);
     }
 
     private CalendarMutationService service() {

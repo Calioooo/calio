@@ -402,7 +402,7 @@ public class CalendarMutationService {
     ) {
         Long existingTagId = before.tag() == null ? null : before.tag().id();
         if (request.tagId() != null && !request.tagId().equals(existingTagId)) {
-            throw new CalioException(ErrorCode.VALIDATION_FAILED);
+            throw new CalioException(ErrorCode.RECURRENCE_OCCURRENCE_TAG_CHANGE_NOT_SUPPORTED);
         }
     }
 
