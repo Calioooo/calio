@@ -80,8 +80,7 @@ public class GroupCalendarService {
             Instant from,
             Instant to
     ) {
-        membershipQueryService.getActiveMembership(groupSpaceId, accountId);
-        validateRange(from, to);
+        validateCalendarAccess(accountId, groupSpaceId, from, to);
         Map<Long, String> nicknamesByAccountId = listNicknames(groupSpaceId);
 
         List<GroupCalendarItemResponse> items = new ArrayList<>(
@@ -92,6 +91,43 @@ public class GroupCalendarService {
         items.addAll(listSharedRecurrenceOccurrences(groupSpaceId, from, to, nicknamesByAccountId));
         items.sort(Comparator.comparing(GroupCalendarItemResponse::startAt));
         return items;
+    }
+
+    public List<GroupCalendarItemResponse> listGroupItems(
+            Long accountId,
+            Long groupSpaceId,
+            Instant from,
+            Instant to
+    ) {
+        validateCalendarAccess(accountId, groupSpaceId, from, to);
+        Map<Long, String> nicknamesByAccountId = listNicknames(groupSpaceId);
+        List<GroupCalendarItemResponse> items = new ArrayList<>(
+                listDirectEvents(groupSpaceId, from, to, nicknamesByAccountId)
+        );
+        items.addAll(listRecurrenceOccurrences(groupSpaceId, from, to, nicknamesByAccountId));
+        items.sort(Comparator.comparing(GroupCalendarItemResponse::startAt));
+        return items;
+    }
+
+    public List<GroupCalendarItemResponse> listSharedItems(
+            Long accountId,
+            Long groupSpaceId,
+            Instant from,
+            Instant to
+    ) {
+        validateCalendarAccess(accountId, groupSpaceId, from, to);
+        Map<Long, String> nicknamesByAccountId = listNicknames(groupSpaceId);
+        List<GroupCalendarItemResponse> items = new ArrayList<>(
+                listSharedEvents(groupSpaceId, from, to, nicknamesByAccountId)
+        );
+        items.addAll(listSharedRecurrenceOccurrences(groupSpaceId, from, to, nicknamesByAccountId));
+        items.sort(Comparator.comparing(GroupCalendarItemResponse::startAt));
+        return items;
+    }
+
+    private void validateCalendarAccess(Long accountId, Long groupSpaceId, Instant from, Instant to) {
+        membershipQueryService.getActiveMembership(groupSpaceId, accountId);
+        validateRange(from, to);
     }
 
     private List<GroupCalendarItemResponse> listSharedEvents(

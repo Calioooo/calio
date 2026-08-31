@@ -31,4 +31,24 @@ public class GroupCalendarController {
     ) {
         return groupCalendarService.listItems(account.accountId(), groupSpaceId, from, to);
     }
+
+    @GetMapping("/group-items")
+    public List<GroupCalendarItemResponse> listGroupItems(
+            @AuthenticationPrincipal AuthenticatedAccount account,
+            @PathVariable Long groupSpaceId,
+            @RequestParam Instant from,
+            @RequestParam Instant to
+    ) {
+        return groupCalendarService.listGroupItems(account.accountId(), groupSpaceId, from, to);
+    }
+
+    @GetMapping("/shared-items")
+    public List<GroupCalendarItemResponse> listSharedItems(
+            @AuthenticationPrincipal AuthenticatedAccount account,
+            @PathVariable Long groupSpaceId,
+            @RequestParam Instant from,
+            @RequestParam Instant to
+    ) {
+        return groupCalendarService.listSharedItems(account.accountId(), groupSpaceId, from, to);
+    }
 }

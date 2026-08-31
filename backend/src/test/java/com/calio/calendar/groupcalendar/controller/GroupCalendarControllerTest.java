@@ -3,6 +3,7 @@ package com.calio.calendar.groupcalendar.controller;
 import static com.calio.calendar.security.TestAccountSupport.currentAccountId;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -227,6 +228,14 @@ class GroupCalendarControllerTest {
                 .andExpect(jsonPath("$", hasSize(2)))
                 .andExpect(jsonPath("$[0].isRecurrenceOccurrence").value(false))
                 .andExpect(jsonPath("$[1].isRecurrenceOccurrence").value(true));
+
+        mockMvc.perform(get("/api/group-spaces/{groupSpaceId}/calendar/group-items", groupSpace.getId())
+                        .param("from", START_AT.minusSeconds(1).toString())
+                        .param("to", END_AT.plusSeconds(1).toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$[0].publicItemId").value(startsWith("group-event:")))
+                .andExpect(jsonPath("$[1].publicItemId").value(startsWith("group-recurrence:")));
     }
 
     @Test
@@ -296,6 +305,14 @@ class GroupCalendarControllerTest {
         assertThat(recurrenceItem.get("id").isNull()).isTrue();
         assertThat(recurrenceItem.get("recurrenceId").isNull()).isTrue();
         assertThat(recurrenceItem.get("tag").isNull()).isTrue();
+
+        mockMvc.perform(get("/api/group-spaces/{groupSpaceId}/calendar/shared-items", groupSpace.getId())
+                        .param("from", START_AT.minusSeconds(1).toString())
+                        .param("to", END_AT.plusSeconds(10801).toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$[0].publicItemId").value(startsWith("shared-recurrence:")))
+                .andExpect(jsonPath("$[1].publicItemId").value(startsWith("shared-event:")));
     }
 
     @Test
