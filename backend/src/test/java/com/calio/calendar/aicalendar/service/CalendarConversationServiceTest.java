@@ -153,9 +153,9 @@ class CalendarConversationServiceTest {
         verify(assistantAgent, never()).answer(any());
         assertThat(response.blocks()).isEmpty();
         assertThat(response.assistantMessage()).isIn(
-                "일정 조회와 빈 시간 찾기를 도와드릴 수 있어요.",
-                "캘린더의 일정 확인이나 빈 시간 찾기를 요청해 주세요.",
-                "일정 조회와 빈 시간 찾기 기능을 지원해요."
+                "일정 조회, 빈 시간 찾기, 일정 생성·수정·삭제를 도와드릴 수 있어요.",
+                "캘린더의 일정 확인, 빈 시간 찾기, 일정 생성·수정·삭제를 요청해 주세요.",
+                "일정 조회, 빈 시간 찾기, 일정 생성·수정·삭제 기능을 지원해요."
         );
         assertThat(messageRepository.findAll()).satisfiesExactly(
                 savedMessage -> {
