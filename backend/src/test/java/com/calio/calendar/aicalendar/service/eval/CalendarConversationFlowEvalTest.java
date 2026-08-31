@@ -212,8 +212,18 @@ class CalendarConversationFlowEvalTest {
         // given
         Account account = accountRepository.saveAndFlush(new Account());
         String conversationId = conversationService.createConversation(account.getId());
-        EventResponse before = recurrenceOccurrence("팀 회의", "2026-08-16T05:00:00Z", "2026-08-16T06:00:00Z");
-        EventResponse after = recurrenceOccurrence("팀 회의", "2026-08-16T06:00:00Z", "2026-08-16T07:00:00Z");
+        EventResponse before = recurrenceOccurrence(
+                "팀 회의",
+                "2026-08-16T05:00:00Z",
+                "2026-08-16T05:00:00Z",
+                "2026-08-16T06:00:00Z"
+        );
+        EventResponse after = recurrenceOccurrence(
+                "팀 회의",
+                "2026-08-16T05:00:00Z",
+                "2026-08-16T06:00:00Z",
+                "2026-08-16T07:00:00Z"
+        );
         when(eventService.listEvents(any(), any(), any())).thenReturn(List.of(before));
         when(mutationService.preview(eq(account.getId()), any())).thenReturn(new CalendarMutationPreview(
                 CalendarMutationType.UPDATE,
@@ -398,12 +408,17 @@ class CalendarConversationFlowEvalTest {
         );
     }
 
-    private EventResponse recurrenceOccurrence(String title, String startAt, String endAt) {
+    private EventResponse recurrenceOccurrence(
+            String title,
+            String originStartAt,
+            String startAt,
+            String endAt
+    ) {
         return new EventResponse(
                 null,
                 title,
                 null,
-                Instant.parse(startAt),
+                Instant.parse(originStartAt),
                 Instant.parse(endAt),
                 false,
                 "Asia/Seoul",
