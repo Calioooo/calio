@@ -364,11 +364,11 @@ class GroupCalendarServiceTest {
     }
 
     @Test
-    @DisplayName("공유 반복 회차가 5,000건을 초과하면 무제한 응답 대신 제한 오류를 반환한다")
+    @DisplayName("공유 반복 회차가 10,000건을 초과하면 무제한 응답 대신 제한 오류를 반환한다")
     void givenTooManySharedRecurrenceOccurrences_whenListItems_thenRejectsResult() {
         RecurrenceEvent source = personalRecurrenceEvent("원본 반복", "원본 설명");
         PersonalRecurrenceGroupShare share = PersonalRecurrenceGroupShare.create(source, groupSpace, false);
-        List<RecurrenceOccurrence> occurrences = IntStream.range(0, 5_001)
+        List<RecurrenceOccurrence> occurrences = IntStream.range(0, 10_001)
                 .mapToObj(index -> occurrence(FROM.plusMillis(index)))
                 .toList();
         when(recurrenceShareQueryService.listByGroupSpaceId(GROUP_SPACE_ID)).thenReturn(List.of(share));

@@ -40,7 +40,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class GroupCalendarService {
 
     private static final Duration MAX_QUERY_RANGE = Duration.ofDays(366);
-    private static final int MAX_SHARED_RECURRENCE_OCCURRENCES = 5_000;
+    private static final int MAX_SHARED_RECURRENCE_OCCURRENCES = 10_000;
 
     private final GroupMembershipQueryService membershipQueryService;
     private final GroupCalendarEventQueryService eventQueryService;
