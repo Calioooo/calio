@@ -1,6 +1,7 @@
 package com.calio.calendar.integration.connection.repository;
 
 import com.calio.calendar.integration.connection.domain.GoogleCalendarConnection;
+import com.calio.calendar.integration.connection.domain.GoogleCalendarConnectionState;
 import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
@@ -19,9 +20,12 @@ public interface GoogleCalendarConnectionRepository extends JpaRepository<Google
             from GoogleCalendarConnection connection
             join connection.integration integration
             where integration.accountId = :accountId
-              and connection.state = com.calio.calendar.integration.connection.domain.GoogleCalendarConnectionState.CONNECTED
+              and connection.state = :state
             """)
-    Optional<GoogleCalendarConnection> findConnectedByAccountId(@Param("accountId") Long accountId);
+    Optional<GoogleCalendarConnection> findWithIntegrationByAccountIdAndState(
+            @Param("accountId") Long accountId,
+            @Param("state") GoogleCalendarConnectionState state
+    );
 
     @EntityGraph(attributePaths = "integration")
     @Query("""
@@ -29,7 +33,7 @@ public interface GoogleCalendarConnectionRepository extends JpaRepository<Google
             from GoogleCalendarConnection connection
             where connection.id = :connectionId
             """)
-    Optional<GoogleCalendarConnection> findByIdWithIntegration(@Param("connectionId") Long connectionId);
+    Optional<GoogleCalendarConnection> findWithIntegrationById(@Param("connectionId") Long connectionId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @EntityGraph(attributePaths = "integration")
@@ -39,7 +43,7 @@ public interface GoogleCalendarConnectionRepository extends JpaRepository<Google
             join connection.integration integration
             where integration.accountId = :accountId
             """)
-    Optional<GoogleCalendarConnection> findSingleConnectionByAccountIdForUpdate(@Param("accountId") Long accountId);
+    Optional<GoogleCalendarConnection> findWithIntegrationByAccountIdForUpdate(@Param("accountId") Long accountId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @EntityGraph(attributePaths = "integration")
@@ -48,9 +52,12 @@ public interface GoogleCalendarConnectionRepository extends JpaRepository<Google
             from GoogleCalendarConnection connection
             join connection.integration integration
             where integration.accountId = :accountId
-              and connection.state = com.calio.calendar.integration.connection.domain.GoogleCalendarConnectionState.CONNECTED
+              and connection.state = :state
             """)
-    Optional<GoogleCalendarConnection> findConnectedByAccountIdForUpdate(@Param("accountId") Long accountId);
+    Optional<GoogleCalendarConnection> findWithIntegrationByAccountIdAndStateForUpdate(
+            @Param("accountId") Long accountId,
+            @Param("state") GoogleCalendarConnectionState state
+    );
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @EntityGraph(attributePaths = "integration")
@@ -59,15 +66,19 @@ public interface GoogleCalendarConnectionRepository extends JpaRepository<Google
             from GoogleCalendarConnection connection
             where connection.id = :connectionId
             """)
-    Optional<GoogleCalendarConnection> findByIdForUpdate(@Param("connectionId") Long connectionId);
+    Optional<GoogleCalendarConnection> findWithIntegrationByIdForUpdate(@Param("connectionId") Long connectionId);
 
     @Query("""
             select connection.integration.accountId
             from GoogleCalendarConnection connection
             where connection.integration.accountId > :lastAccountId
-              and connection.state = com.calio.calendar.integration.connection.domain.GoogleCalendarConnectionState.CONNECTED
+              and connection.state = :state
             order by connection.integration.accountId
             """)
-    List<Long> findConnectedAccountIdsAfter(@Param("lastAccountId") Long lastAccountId, Pageable pageable);
+    List<Long> findAccountIdsByStateAfter(
+            @Param("lastAccountId") Long lastAccountId,
+            @Param("state") GoogleCalendarConnectionState state,
+            Pageable pageable
+    );
 
 }

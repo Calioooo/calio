@@ -3,6 +3,7 @@ package com.calio.calendar.integration.connection.service;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarConnection;
+import com.calio.calendar.integration.connection.domain.GoogleCalendarConnectionState;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.connection.repository.GoogleCalendarConnectionRepository;
 import com.calio.calendar.integration.sync.operation.GoogleOperationOwnershipLostException;
@@ -19,16 +20,20 @@ public class GoogleCalendarConnectionCommandService {
     }
 
     public GoogleCalendarConnection lockConnectedConnection(Long accountId) {
-        return connectionRepository.findConnectedByAccountIdForUpdate(accountId)
+        return connectionRepository.findWithIntegrationByAccountIdAndStateForUpdate(
+                        accountId, GoogleCalendarConnectionState.CONNECTED
+                )
                 .orElseThrow(() -> new CalioException(ErrorCode.GOOGLE_CALENDAR_NOT_CONNECTED));
     }
 
     public Optional<GoogleCalendarConnection> tryLockConnectedConnection(Long accountId) {
-        return connectionRepository.findConnectedByAccountIdForUpdate(accountId);
+        return connectionRepository.findWithIntegrationByAccountIdAndStateForUpdate(
+                accountId, GoogleCalendarConnectionState.CONNECTED
+        );
     }
 
     public Optional<GoogleCalendarConnection> tryLockConnection(Long accountId) {
-        return connectionRepository.findSingleConnectionByAccountIdForUpdate(accountId);
+        return connectionRepository.findWithIntegrationByAccountIdForUpdate(accountId);
     }
 
     public GoogleCalendarConnection lockConnectedConnectionById(Long connectionId) {
@@ -37,7 +42,7 @@ public class GoogleCalendarConnectionCommandService {
     }
 
     public Optional<GoogleCalendarConnection> tryLockConnectedConnectionById(Long connectionId) {
-        return connectionRepository.findByIdForUpdate(connectionId)
+        return connectionRepository.findWithIntegrationByIdForUpdate(connectionId)
                 .filter(GoogleCalendarConnection::isConnected);
     }
 
