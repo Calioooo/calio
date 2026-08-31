@@ -2,7 +2,6 @@ CREATE TABLE personal_event_group_shares (
     id BIGINT NOT NULL AUTO_INCREMENT,
     event_id BIGINT NOT NULL,
     group_space_id BIGINT NOT NULL,
-    is_anonymous BOOLEAN NOT NULL,
     public_share_id CHAR(36) NOT NULL,
     created_at DATETIME(6) NOT NULL,
     updated_at DATETIME(6) NOT NULL,
@@ -18,7 +17,6 @@ CREATE TABLE personal_recurrence_group_shares (
     id BIGINT NOT NULL AUTO_INCREMENT,
     recurrence_event_id BIGINT NOT NULL,
     group_space_id BIGINT NOT NULL,
-    is_anonymous BOOLEAN NOT NULL,
     public_share_id CHAR(36) NOT NULL,
     created_at DATETIME(6) NOT NULL,
     updated_at DATETIME(6) NOT NULL,
@@ -29,3 +27,6 @@ CREATE TABLE personal_recurrence_group_shares (
     CONSTRAINT fk_personal_recurrence_group_share_group FOREIGN KEY (group_space_id) REFERENCES group_spaces (id),
     INDEX ix_personal_recurrence_group_share_group (group_space_id)
 );
+
+ALTER TABLE group_members
+    ADD COLUMN is_anonymous BOOLEAN NOT NULL DEFAULT FALSE;

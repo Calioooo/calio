@@ -58,8 +58,8 @@ class PersonalScheduleGroupShareRepositoryTest {
     }
 
     @Test
-    @DisplayName("단건 일정 mapping은 target별 익명 상태와 변경되지 않는 공개 UUID를 가진다")
-    void eventShareKeepsTargetSpecificAnonymousStateAndPublicUuid() {
+    @DisplayName("단건 일정 mapping은 target별로 변경되지 않는 공개 UUID를 가진다")
+    void eventShareKeepsTargetSpecificPublicUuid() {
         Account account = accountRepository.saveAndFlush(new Account());
         Tag tag = tagRepository.saveAndFlush(Tag.personalDefault("기타", "#64748B"));
         Event event = eventRepository.saveAndFlush(new Event(
@@ -69,19 +69,16 @@ class PersonalScheduleGroupShareRepositoryTest {
         GroupSpace secondGroup = groupSpaceRepository.saveAndFlush(new GroupSpace(account.getId(), "second", null));
 
         PersonalEventGroupShare first = eventShareRepository.saveAndFlush(
-                PersonalEventGroupShare.create(event, firstGroup, true)
+                PersonalEventGroupShare.create(event, firstGroup)
         );
         PersonalEventGroupShare second = eventShareRepository.saveAndFlush(
-                PersonalEventGroupShare.create(event, secondGroup, false)
+                PersonalEventGroupShare.create(event, secondGroup)
         );
         var firstPublicShareId = first.getPublicShareId();
 
-        first.changeAnonymous(false);
         eventShareRepository.flush();
 
         assertThat(first.getPublicShareId()).isEqualTo(firstPublicShareId);
-        assertThat(first.isAnonymous()).isFalse();
-        assertThat(second.isAnonymous()).isFalse();
         assertThat(second.getPublicShareId()).isNotEqualTo(firstPublicShareId);
     }
 
@@ -94,10 +91,10 @@ class PersonalScheduleGroupShareRepositoryTest {
                 "일정", null, START_AT, START_AT.plusSeconds(3600), false, "UTC", null, tag, account
         ));
         GroupSpace groupSpace = groupSpaceRepository.saveAndFlush(new GroupSpace(account.getId(), "group", null));
-        eventShareRepository.saveAndFlush(PersonalEventGroupShare.create(event, groupSpace, false));
+        eventShareRepository.saveAndFlush(PersonalEventGroupShare.create(event, groupSpace));
 
         assertThatThrownBy(() -> eventShareRepository.saveAndFlush(
-                PersonalEventGroupShare.create(event, groupSpace, true)
+                PersonalEventGroupShare.create(event, groupSpace)
         )).isInstanceOf(DataIntegrityViolationException.class);
     }
 
@@ -114,12 +111,11 @@ class PersonalScheduleGroupShareRepositoryTest {
         GroupSpace groupSpace = groupSpaceRepository.saveAndFlush(new GroupSpace(account.getId(), "group", null));
 
         PersonalRecurrenceGroupShare share = recurrenceShareRepository.saveAndFlush(
-                PersonalRecurrenceGroupShare.create(recurrenceEvent, groupSpace, true)
+                PersonalRecurrenceGroupShare.create(recurrenceEvent, groupSpace)
         );
 
         assertThat(share.getRecurrenceEvent()).isSameAs(recurrenceEvent);
         assertThat(share.getGroupSpace()).isSameAs(groupSpace);
-        assertThat(share.isAnonymous()).isTrue();
         assertThat(share.getPublicShareId()).isNotNull();
     }
 }
