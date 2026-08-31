@@ -4,6 +4,7 @@ import com.calio.calendar.aicalendar.domain.CalendarMutationOperation;
 import com.calio.calendar.aicalendar.domain.CalendarMutationScope;
 import com.calio.calendar.aicalendar.domain.CalendarMutationType;
 import com.calio.calendar.aicalendar.service.dto.CalendarMutationPreview;
+import com.calio.calendar.aicalendar.service.dto.CalendarMutationRecurrencePreview;
 import com.calio.calendar.aicalendar.service.tool.dto.CalendarMutationToolRequest;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
@@ -135,7 +136,8 @@ public class CalendarMutationService {
                 CalendarMutationType.UPDATE,
                 CalendarMutationScope.ENTIRE_SERIES,
                 eventForSeries(before),
-                eventForSeriesUpdate(accountId, request, before, seriesRequest)
+                eventForSeriesUpdate(accountId, request, before, seriesRequest),
+                new CalendarMutationRecurrencePreview(before.recurrence(), seriesRequest.recurrence())
         );
     }
 

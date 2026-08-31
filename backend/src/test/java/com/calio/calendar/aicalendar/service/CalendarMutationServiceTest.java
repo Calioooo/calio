@@ -15,6 +15,7 @@ import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.event.controller.dto.EventResponse;
 import com.calio.calendar.event.service.EventService;
 import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceOccurrenceRequest;
+import com.calio.calendar.recurrence.controller.dto.RecurrenceEventResponse;
 import com.calio.calendar.recurrence.service.RecurrenceEventService;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.domain.TagType;
@@ -150,6 +151,48 @@ class CalendarMutationServiceTest {
                 .isInstanceOf(CalioException.class)
                 .extracting(exception -> ((CalioException) exception).getErrorCode())
                 .isEqualTo(ErrorCode.RECURRENCE_OCCURRENCE_TAG_CHANGE_NOT_SUPPORTED);
+    }
+
+    @Test
+    @DisplayName("전체 반복 일정 수정 Preview는 변경 전후 recurrence rule을 함께 반환한다")
+    void givenSeriesRuleChange_whenPreview_thenIncludesBeforeAndAfterRules() {
+        // given
+        RecurrenceEventResponse existingSeries = new RecurrenceEventResponse(
+                20L,
+                "기존 회의",
+                "기존 설명",
+                false,
+                Instant.parse("2026-08-21T05:00:00Z"),
+                Instant.parse("2026-08-21T06:00:00Z"),
+                "Asia/Seoul",
+                List.of("RRULE:FREQ=WEEKLY;BYDAY=FR"),
+                null,
+                Instant.parse("2026-08-01T00:00:00Z"),
+                Instant.parse("2026-08-01T00:00:00Z")
+        );
+        when(recurrenceEventService.getRecurrenceEvent(1L, 20L)).thenReturn(existingSeries);
+        CalendarMutationToolRequest request = new CalendarMutationToolRequest(
+                CalendarMutationOperation.UPDATE_RECURRENCE_SERIES,
+                null,
+                20L,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                List.of("RRULE:FREQ=DAILY")
+        );
+
+        // when
+        var preview = service().preview(1L, request);
+
+        // then
+        assertThat(preview.scope()).isEqualTo(CalendarMutationScope.ENTIRE_SERIES);
+        assertThat(preview.recurrence().before()).containsExactly("RRULE:FREQ=WEEKLY;BYDAY=FR");
+        assertThat(preview.recurrence().after()).containsExactly("RRULE:FREQ=DAILY");
     }
 
     private CalendarMutationService service() {
