@@ -58,8 +58,8 @@ class GoogleCalendarConnectionServiceTest {
                 .thenReturn(new GoogleTokenResponse("access-token", "refresh-token", 3600));
         when(oauthClient.fetchUserInfo("access-token"))
                 .thenReturn(new GoogleUserInfoResponse("google-subject", "google@example.com"));
-        when(connectionCommandService.findSingleConnectionForUpdate(ACCOUNT_ID)).thenReturn(Optional.empty());
-        when(integrationCommandService.findIntegrationForUpdate(ACCOUNT_ID)).thenReturn(Optional.empty());
+        when(connectionCommandService.tryLockConnection(ACCOUNT_ID)).thenReturn(Optional.empty());
+        when(integrationCommandService.tryLockIntegration(ACCOUNT_ID)).thenReturn(Optional.empty());
         when(integrationCommandService.createIntegration(ACCOUNT_ID)).thenReturn(integration);
         when(connectionCommandService.createConnection(eq(integration), eq("google-subject"), eq("google@example.com"),
                 anyString(), anyString(), eq(NOW.plusSeconds(3600)), eq(NOW))).thenReturn(connection);
@@ -82,11 +82,18 @@ class GoogleCalendarConnectionServiceTest {
                 .thenReturn(new GoogleTokenResponse("new-access-token", "new-refresh-token", 3600));
         when(oauthClient.fetchUserInfo("new-access-token"))
                 .thenReturn(new GoogleUserInfoResponse("google-subject", "new@example.com"));
-        when(connectionCommandService.findSingleConnectionForUpdate(ACCOUNT_ID)).thenReturn(Optional.of(connection));
+        when(connectionCommandService.tryLockConnection(ACCOUNT_ID)).thenReturn(Optional.of(connection));
 
         service().connect(ACCOUNT_ID, "authorization-code");
 
-        assertThat(connection.getGoogleEmail()).isEqualTo("new@example.com");
+        verify(connectionCommandService).replaceCredentials(
+                eq(connection),
+                eq("new@example.com"),
+                anyString(),
+                anyString(),
+                eq(NOW.plusSeconds(3600)),
+                eq(NOW)
+        );
         verify(integrationCommandService, org.mockito.Mockito.never()).createIntegration(any());
         verify(enqueueService).enqueueManualSync(ACCOUNT_ID);
     }
@@ -95,7 +102,7 @@ class GoogleCalendarConnectionServiceTest {
     @DisplayName("연결 해제는 Connection의 Job을 제거하고 credential을 지운 뒤 revoke한다")
     void givenConnectedConnection_whenDisconnect_thenCleansConnectionBeforeRevokingToken() {
         GoogleCalendarConnection connection = connection(new GoogleCalendarIntegration(ACCOUNT_ID));
-        when(connectionCommandService.findConnectedConnectionForUpdate(ACCOUNT_ID)).thenReturn(Optional.of(connection));
+        when(connectionCommandService.tryLockConnectedConnection(ACCOUNT_ID)).thenReturn(Optional.of(connection));
 
         service().disconnect(ACCOUNT_ID);
 
@@ -107,7 +114,7 @@ class GoogleCalendarConnectionServiceTest {
     @Test
     @DisplayName("연결되지 않은 Account를 해제해도 Job 삭제나 revoke를 수행하지 않는다")
     void givenNoConnectedConnection_whenDisconnect_thenDoesNothing() {
-        when(connectionCommandService.findConnectedConnectionForUpdate(ACCOUNT_ID)).thenReturn(Optional.empty());
+        when(connectionCommandService.tryLockConnectedConnection(ACCOUNT_ID)).thenReturn(Optional.empty());
 
         service().disconnect(ACCOUNT_ID);
 

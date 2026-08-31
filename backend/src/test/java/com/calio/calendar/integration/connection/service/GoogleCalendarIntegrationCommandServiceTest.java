@@ -38,6 +38,6 @@ class GoogleCalendarIntegrationCommandServiceTest {
         GoogleCalendarIntegration integration = new GoogleCalendarIntegration(1L);
         when(integrationRepository.findByAccountIdForUpdate(1L)).thenReturn(Optional.of(integration));
 
-        assertThat(commandService.findIntegrationForUpdate(1L)).containsSame(integration);
+        assertThat(commandService.tryLockIntegration(1L)).containsSame(integration);
     }
 }

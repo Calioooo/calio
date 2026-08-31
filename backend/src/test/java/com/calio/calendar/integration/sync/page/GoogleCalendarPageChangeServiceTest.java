@@ -167,7 +167,7 @@ class GoogleCalendarPageChangeServiceTest {
         assertThat(updatedImport.getTimeZone()).isNull();
         assertThat(updatedImport.importantEvent()).isTrue();
         assertThat(updatedImport.getTag().getId()).isEqualTo(fallbackTag.getId());
-        assertThat(mappingRepository.findEventIdsByIntegrationId(integration.getId()))
+        assertThat(mappingRepository.findEventIdsByConnectionId(integration.getId()))
                 .containsExactly(internalEventId);
         GoogleCalendarConnection finalized = connectionRepository.findById(integration.getId())
                 .orElseThrow();
@@ -439,7 +439,7 @@ class GoogleCalendarPageChangeServiceTest {
         )).isInstanceOfSatisfying(CalioException.class, exception ->
                 assertThat(exception.getErrorCode())
                         .isEqualTo(ErrorCode.GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID));
-        assertThat(mappingRepository.findEventIdsByIntegrationId(integration.getId())).isEmpty();
+        assertThat(mappingRepository.findEventIdsByConnectionId(integration.getId())).isEmpty();
     }
 
     @Test
@@ -465,7 +465,7 @@ class GoogleCalendarPageChangeServiceTest {
         )).isInstanceOfSatisfying(CalioException.class, exception ->
                 assertThat(exception.getErrorCode())
                         .isEqualTo(ErrorCode.GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID));
-        assertThat(mappingRepository.findEventIdsByIntegrationId(integration.getId())).isEmpty();
+        assertThat(mappingRepository.findEventIdsByConnectionId(integration.getId())).isEmpty();
     }
 
     @Test
@@ -502,7 +502,7 @@ class GoogleCalendarPageChangeServiceTest {
         );
 
         // then
-        assertThat(mappingRepository.findEventIdsByIntegrationId(integration.getId())).isEmpty();
+        assertThat(mappingRepository.findEventIdsByConnectionId(integration.getId())).isEmpty();
         assertThat(eventRepository.findNormalEvents(
                 account.getId(),
                 Instant.parse("2026-07-01T00:00:00Z"),
@@ -883,7 +883,7 @@ class GoogleCalendarPageChangeServiceTest {
         );
 
         // then
-        assertThat(mappingRepository.findEventIdsByIntegrationId(integration.getId())).isEmpty();
+        assertThat(mappingRepository.findEventIdsByConnectionId(integration.getId())).isEmpty();
         assertThat(eventRepository.findById(imported.getId())).isEmpty();
     }
 

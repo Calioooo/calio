@@ -395,6 +395,7 @@ class GoogleCalendarSyncMigrationTest {
         String url = "jdbc:h2:mem:google-calendar-integration-connection-model;MODE=MySQL;DB_CLOSE_DELAY=-1";
         migrateTo(url, MigrationVersion.fromVersion("20"));
         insertCurrentEventAndIntegration(url);
+        updateSyncToken(url, "retained-cursor");
 
         migrateTo(url, MigrationVersion.fromVersion("21"));
 
@@ -409,6 +410,26 @@ class GoogleCalendarSyncMigrationTest {
                     JOIN google_calendar_integrations integration ON integration.id = connection.integration_id
                     WHERE integration.account_id = 900
                     """)).isEqualTo("subject");
+            assertThat(singleString(connection, """
+                    SELECT encrypted_refresh_token
+                    FROM google_calendar_connections
+                    WHERE id = 900
+                    """)).isEqualTo("encrypted-refresh");
+            assertThat(singleString(connection, """
+                    SELECT encrypted_access_token
+                    FROM google_calendar_connections
+                    WHERE id = 900
+                    """)).isEqualTo("encrypted-access");
+            assertThat(singleString(connection, """
+                    SELECT connection_state
+                    FROM google_calendar_connections
+                    WHERE id = 900
+                    """)).isEqualTo("CONNECTED");
+            assertThat(singleString(connection, """
+                    SELECT next_sync_token
+                    FROM google_calendar_connections
+                    WHERE id = 900
+                    """)).isEqualTo("retained-cursor");
             assertThat(columnNames(connection, "GOOGLE_OPERATION_JOBS"))
                     .contains("CONNECTION_ID")
                     .doesNotContain("INTEGRATION_ID");
@@ -490,6 +511,17 @@ class GoogleCalendarSyncMigrationTest {
                         CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
                     )
                     """);
+        }
+    }
+
+    private void updateSyncToken(String url, String syncToken) throws Exception {
+        try (Connection connection = DriverManager.getConnection(url, "sa", "");
+             Statement statement = connection.createStatement()) {
+            statement.executeUpdate("""
+                    UPDATE google_calendar_integrations
+                    SET next_sync_token = '%s'
+                    WHERE id = 900
+                    """.formatted(syncToken));
         }
     }
 
