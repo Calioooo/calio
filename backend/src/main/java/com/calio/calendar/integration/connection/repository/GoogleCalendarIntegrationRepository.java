@@ -14,7 +14,11 @@ public interface GoogleCalendarIntegrationRepository extends JpaRepository<Googl
     Optional<GoogleCalendarIntegration> findByAccountId(Long accountId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select integration from GoogleCalendarIntegration integration where integration.accountId = :accountId")
+    @Query("""
+            select integration
+            from GoogleCalendarIntegration integration
+            where integration.accountId = :accountId
+            """)
     Optional<GoogleCalendarIntegration> findByAccountIdForUpdate(@Param("accountId") Long accountId);
 
     boolean existsByAccountId(Long accountId);
