@@ -398,6 +398,29 @@ class CalendarAssistantEvalTest {
     }
 
     @Test
+    @DisplayName("이번 반복 회차 태그 변경 요청은 Preview를 만들지 않고 제한을 안내한다")
+    void givenSingleRecurrenceOccurrenceTagChangeRequest_whenEvaluate_thenExplainsUnsupportedChange() {
+        // given
+        EventResponse occurrence = recurrenceOccurrence(
+                "팀 회의",
+                "2026-08-16T05:00:00Z",
+                "2026-08-16T06:00:00Z"
+        );
+        when(eventService.listEvents(any(), any(), any())).thenReturn(List.of(occurrence));
+
+        // when
+        CalendarAssistantAnswer answer = requestAnswer(
+                request("내일 반복 일정인 ‘팀 회의’의 이번 회차만 태그를 업무로 바꿔줘")
+        );
+
+        // then
+        assertThat(answer.mutationPreviews()).isEmpty();
+        assertThat(answer.message()).contains("태그");
+        verify(mutationService, never()).preview(any(), any());
+        verify(mutationService, never()).apply(any(), any());
+    }
+
+    @Test
     @DisplayName("전체 반복 일정 변경 요청은 ENTIRE_SERIES Mutation Preview를 반환한다")
     void givenEntireRecurrenceSeriesUpdateRequest_whenEvaluate_thenReturnsSeriesPreview() {
         // given
