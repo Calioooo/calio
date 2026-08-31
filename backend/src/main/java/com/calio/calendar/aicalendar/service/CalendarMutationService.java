@@ -403,9 +403,13 @@ public class CalendarMutationService {
             CalendarMutationToolRequest request,
             List<String> existingRules
     ) {
-        return request.recurrenceRules() == null || request.recurrenceRules().isEmpty()
-                ? existingRules
-                : request.recurrenceRules();
+        if (request.recurrenceRules() == null) {
+            return existingRules;
+        }
+        if (request.recurrenceRules().isEmpty()) {
+            throw new CalioException(ErrorCode.VALIDATION_FAILED);
+        }
+        return request.recurrenceRules();
     }
 
     private TagResponse tagResponseOrExisting(

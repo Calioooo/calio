@@ -206,6 +206,39 @@ class CalendarMutationServiceTest {
         assertThat(preview.recurrence().after()).containsExactly("RRULE:FREQ=DAILY");
     }
 
+    @Test
+    @DisplayName("전체 반복 일정 수정에서 recurrence rule을 생략하면 기존 규칙을 유지한다")
+    void givenOmittedSeriesRules_whenPreview_thenPreservesExistingRules() {
+        // given
+        RecurrenceEventResponse existingSeries = recurrenceSeries();
+        when(recurrenceEventService.getRecurrenceEvent(1L, 20L)).thenReturn(existingSeries);
+        CalendarMutationToolRequest request = seriesUpdateRequest(null);
+
+        // when
+        var preview = service().preview(1L, request);
+
+        // then
+        assertThat(preview.recurrence().after()).containsExactlyElementsOf(existingSeries.recurrence());
+    }
+
+    @Test
+    @DisplayName("전체 반복 일정 수정에서 빈 recurrence rule은 Preview와 적용 모두 거절한다")
+    void givenEmptySeriesRules_whenPreviewOrApply_thenRejectsValidationFailure() {
+        // given
+        when(recurrenceEventService.getRecurrenceEvent(1L, 20L)).thenReturn(recurrenceSeries());
+        CalendarMutationToolRequest request = seriesUpdateRequest(List.of());
+
+        // when, then
+        assertThatThrownBy(() -> service().preview(1L, request))
+                .isInstanceOf(CalioException.class)
+                .extracting(exception -> ((CalioException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.VALIDATION_FAILED);
+        assertThatThrownBy(() -> service().apply(1L, request))
+                .isInstanceOf(CalioException.class)
+                .extracting(exception -> ((CalioException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.VALIDATION_FAILED);
+    }
+
     private CalendarMutationService service() {
         return new CalendarMutationService(eventService, recurrenceEventService, tagService);
     }
@@ -241,6 +274,39 @@ class CalendarMutationServiceTest {
                 "Asia/Seoul",
                 null,
                 null
+        );
+    }
+
+    private CalendarMutationToolRequest seriesUpdateRequest(List<String> recurrenceRules) {
+        return new CalendarMutationToolRequest(
+                CalendarMutationOperation.UPDATE_RECURRENCE_SERIES,
+                null,
+                20L,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                recurrenceRules
+        );
+    }
+
+    private RecurrenceEventResponse recurrenceSeries() {
+        return new RecurrenceEventResponse(
+                20L,
+                "기존 회의",
+                "기존 설명",
+                false,
+                Instant.parse("2026-08-21T05:00:00Z"),
+                Instant.parse("2026-08-21T06:00:00Z"),
+                "Asia/Seoul",
+                List.of("RRULE:FREQ=WEEKLY;BYDAY=FR"),
+                null,
+                Instant.parse("2026-08-01T00:00:00Z"),
+                Instant.parse("2026-08-01T00:00:00Z")
         );
     }
 
