@@ -403,7 +403,8 @@ class GoogleCalendarSyncMigrationTest {
             assertThat(columnNames(connection, "GOOGLE_CALENDAR_INTEGRATIONS"))
                     .containsExactlyInAnyOrder("ID", "ACCOUNT_ID", "CREATED_AT", "UPDATED_AT");
             assertThat(columnNames(connection, "GOOGLE_CALENDAR_CONNECTIONS"))
-                    .contains("INTEGRATION_ID", "CONNECTION_STATE", "GOOGLE_SUBJECT", "NEXT_SYNC_TOKEN");
+                    .contains("INTEGRATION_ID", "CONNECTION_STATE", "GOOGLE_SUBJECT", "NEXT_SYNC_TOKEN")
+                    .doesNotContain("ACCOUNT_ID");
             assertThat(singleString(connection, """
                     SELECT connection.google_subject
                     FROM google_calendar_connections connection

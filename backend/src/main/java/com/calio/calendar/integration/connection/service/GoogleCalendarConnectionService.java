@@ -16,6 +16,7 @@ import java.time.Clock;
 import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -26,6 +27,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class GoogleCalendarConnectionService {
 
     private static final Logger log = LoggerFactory.getLogger(GoogleCalendarConnectionService.class);
+    private static final String INTEGRATION_ACCOUNT_CONSTRAINT = "uk_google_calendar_integration_account_id";
     private final GoogleOAuthProperties properties;
     private final GoogleOAuthClient oauthClient;
     private final TokenEncryptor encryptor;
@@ -114,12 +116,44 @@ public class GoogleCalendarConnectionService {
             Instant expiresAt,
             Instant connectedAt
     ) {
+        try {
+            return registerAndEnqueueInitialSyncInNewTransaction(
+                    accountId, user, token, expiresAt, connectedAt
+            );
+        } catch (DataIntegrityViolationException exception) {
+            if (!containsConstraint(exception, INTEGRATION_ACCOUNT_CONSTRAINT)) {
+                throw exception;
+            }
+            return registerAndEnqueueInitialSyncInNewTransaction(
+                    accountId, user, token, expiresAt, connectedAt
+            );
+        }
+    }
+
+    private GoogleCalendarConnection registerAndEnqueueInitialSyncInNewTransaction(
+            Long accountId,
+            GoogleUserInfoResponse user,
+            GoogleTokenResponse token,
+            Instant expiresAt,
+            Instant connectedAt
+    ) {
         return registrationTransaction.execute(status -> {
             GoogleCalendarConnection connection =
                     registerInTransaction(accountId, user, token, expiresAt, connectedAt);
             enqueueService.enqueueManualSync(accountId);
             return connection;
         });
+    }
+
+    private boolean containsConstraint(DataIntegrityViolationException exception, String constraintName) {
+        Throwable current = exception;
+        while (current != null) {
+            if (current.getMessage() != null && current.getMessage().contains(constraintName)) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     private GoogleCalendarConnection registerInTransaction(

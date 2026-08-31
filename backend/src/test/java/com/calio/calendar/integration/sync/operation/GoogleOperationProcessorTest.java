@@ -46,7 +46,7 @@ class GoogleOperationProcessorTest {
         integrationQueryService = mock(GoogleCalendarIntegrationQueryService.class);
         GoogleCalendarIntegration integration = mock(GoogleCalendarIntegration.class);
         when(integration.getId()).thenReturn(20L);
-        when(integrationQueryService.findIntegration(10L)).thenReturn(java.util.Optional.of(integration));
+        when(integrationQueryService.getIntegrationIfExists(10L)).thenReturn(java.util.Optional.of(integration));
         processor = new GoogleOperationProcessor(
                 jobPersistenceService,
                 operationLeaseService,
