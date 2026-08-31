@@ -35,7 +35,7 @@ import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.client.ResourceAccessException;
 
 @Service
-public class SpringAiCalendarAssistantAgent implements CalendarAssistantAgent, AutoCloseable {
+public class SpringAiCalendarAssistantAgent implements AutoCloseable {
 
     private static final int MAX_PROVIDER_REQUEST_ATTEMPTS = 2;
 
@@ -66,7 +66,6 @@ public class SpringAiCalendarAssistantAgent implements CalendarAssistantAgent, A
         this.modelName = modelName;
     }
 
-    @Override
     public CalendarAssistantAnswer answer(CalendarAssistantRequest request) {
         Instant startedAt = clock.instant();
         try {

@@ -12,7 +12,7 @@ import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.aicalendar.repository.CalendarConversationMessageRepository;
 import com.calio.calendar.aicalendar.repository.CalendarConversationRepository;
-import com.calio.calendar.aicalendar.service.CalendarAssistantAgent;
+import com.calio.calendar.aicalendar.service.SpringAiCalendarAssistantAgent;
 import com.calio.calendar.aicalendar.service.CalendarConversationService;
 import com.calio.calendar.aicalendar.service.dto.CalendarAssistantAnswer;
 import com.calio.calendar.common.error.CalioException;
@@ -65,7 +65,7 @@ class CalendarConversationControllerTest {
     private CalendarConversationService conversationService;
 
     @MockitoBean
-    private CalendarAssistantAgent assistantAgent;
+    private SpringAiCalendarAssistantAgent assistantAgent;
 
     @BeforeEach
     void setUp() {

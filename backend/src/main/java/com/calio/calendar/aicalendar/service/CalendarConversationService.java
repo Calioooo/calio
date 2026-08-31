@@ -25,14 +25,14 @@ public class CalendarConversationService {
 
     private final CalendarConversationQueryService conversationQueryService;
     private final CalendarConversationCommandService conversationCommandService;
-    private final CalendarAssistantAgent assistantAgent;
+    private final SpringAiCalendarAssistantAgent assistantAgent;
     private final Clock clock;
     private final TransactionTemplate transactionTemplate;
 
     public CalendarConversationService(
             CalendarConversationQueryService conversationQueryService,
             CalendarConversationCommandService conversationCommandService,
-            CalendarAssistantAgent assistantAgent,
+            SpringAiCalendarAssistantAgent assistantAgent,
             Clock clock,
             PlatformTransactionManager transactionManager
     ) {
