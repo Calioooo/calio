@@ -19,6 +19,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -69,7 +70,7 @@ public class PersonalEventGroupShareService {
     private Map<Long, Event> validateSources(Long accountId, List<Long> eventIds) {
         Map<Long, Event> eventsById = eventQueryService.listShareableEvents(accountId, eventIds)
                 .stream()
-                .collect(java.util.stream.Collectors.toMap(Event::getId, event -> event));
+                .collect(Collectors.toMap(Event::getId, event -> event));
         if (eventsById.size() != eventIds.size()) {
             throw new CalioException(ErrorCode.EVENT_NOT_FOUND);
         }
@@ -79,7 +80,7 @@ public class PersonalEventGroupShareService {
     private Map<Long, GroupSpace> activeGroupSpaces(Long accountId, List<Long> groupSpaceIds) {
         return membershipQueryService.listActiveMemberships(accountId, groupSpaceIds)
                 .stream()
-                .collect(java.util.stream.Collectors.toMap(
+                .collect(Collectors.toMap(
                         member -> member.getGroupSpace().getId(),
                         GroupMember::getGroupSpace
                 ));
@@ -89,7 +90,7 @@ public class PersonalEventGroupShareService {
         return shareQueryService.listExistingShares(eventIds, groupSpaceIds)
                 .stream()
                 .map(share -> new ShareKey(share.getEvent().getId(), share.getGroupSpace().getId()))
-                .collect(java.util.stream.Collectors.toSet());
+                .collect(Collectors.toSet());
     }
 
     private List<GroupShareTargetResponse> shareTargets(
