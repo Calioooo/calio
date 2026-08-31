@@ -94,8 +94,11 @@ class CalendarMutationServiceTest {
                 "변경 회의",
                 Instant.parse("2026-08-21T06:00:00Z")
         );
-        when(eventService.listEvents(org.mockito.ArgumentMatchers.eq(1L), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
-                .thenReturn(List.of(existingOccurrence));
+        when(recurrenceEventService.getRecurrenceOccurrence(
+                1L,
+                20L,
+                Instant.parse("2026-08-21T05:00:00Z")
+        )).thenReturn(existingOccurrence);
         when(recurrenceEventService.updateRecurrenceOccurrence(
                 org.mockito.ArgumentMatchers.eq(1L),
                 org.mockito.ArgumentMatchers.eq(20L),
@@ -119,6 +122,11 @@ class CalendarMutationServiceTest {
                 .isEqualTo(Instant.parse("2026-08-21T05:00:00Z"));
         assertThat(requestCaptor.getValue().startAt())
                 .isEqualTo(Instant.parse("2026-08-21T06:00:00Z"));
+        verify(eventService, never()).listEvents(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any()
+        );
     }
 
     @Test
@@ -129,8 +137,11 @@ class CalendarMutationServiceTest {
                 "기존 회의",
                 Instant.parse("2026-08-21T05:00:00Z")
         );
-        when(eventService.listEvents(org.mockito.ArgumentMatchers.eq(1L), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
-                .thenReturn(List.of(existingOccurrence));
+        when(recurrenceEventService.getRecurrenceOccurrence(
+                1L,
+                20L,
+                Instant.parse("2026-08-21T05:00:00Z")
+        )).thenReturn(existingOccurrence);
         CalendarMutationToolRequest request = new CalendarMutationToolRequest(
                 CalendarMutationOperation.UPDATE_RECURRENCE_OCCURRENCE,
                 null,

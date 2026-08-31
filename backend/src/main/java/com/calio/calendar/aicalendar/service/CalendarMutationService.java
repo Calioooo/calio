@@ -18,7 +18,6 @@ import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceOccurrenceRe
 import com.calio.calendar.recurrence.service.RecurrenceEventService;
 import com.calio.calendar.tag.controller.dto.TagResponse;
 import com.calio.calendar.tag.service.TagService;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import org.springframework.stereotype.Service;
@@ -192,19 +191,11 @@ public class CalendarMutationService {
     }
 
     private EventResponse getOccurrence(Long accountId, CalendarMutationToolRequest request) {
-        Long recurrenceId = requireRecurrenceId(request);
-        Instant originStartAt = requireOriginStartAt(request);
-        return eventService.listEvents(
-                        accountId,
-                        originStartAt.minus(Duration.ofDays(1)),
-                        originStartAt.plus(Duration.ofDays(1))
-                )
-                .stream()
-                .filter(EventResponse::isRecurrenceOccurrence)
-                .filter(event -> recurrenceId.equals(event.recurrenceId()))
-                .filter(event -> originStartAt.equals(event.originStartAt()))
-                .findFirst()
-                .orElseThrow(() -> new CalioException(ErrorCode.RECURRENCE_OCCURRENCE_NOT_FOUND));
+        return recurrenceEventService.getRecurrenceOccurrence(
+                accountId,
+                requireRecurrenceId(request),
+                requireOriginStartAt(request)
+        );
     }
 
     private EventUpdate prepareEventUpdate(Long accountId, CalendarMutationToolRequest request) {
