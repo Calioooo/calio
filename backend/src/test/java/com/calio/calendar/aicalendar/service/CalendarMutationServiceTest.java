@@ -165,6 +165,73 @@ class CalendarMutationServiceTest {
     }
 
     @Test
+    @DisplayName("확정된 반복 회차 삭제는 원래 회차 시작 시각으로 삭제 유스케이스를 호출한다")
+    void givenConfirmedRecurrenceOccurrenceDeletion_whenApply_thenDelegatesToRecurrenceService() {
+        // given
+        Instant originStartAt = Instant.parse("2026-08-21T05:00:00Z");
+
+        // when
+        List<EventResponse> result = service().apply(1L, occurrenceDeletionRequest(20L, originStartAt));
+
+        // then
+        assertThat(result).isEmpty();
+        verify(recurrenceEventService).deleteRecurrenceOccurrence(1L, 20L, originStartAt);
+    }
+
+    @Test
+    @DisplayName("확정된 전체 반복 일정 삭제는 시리즈 삭제 유스케이스를 호출한다")
+    void givenConfirmedRecurrenceSeriesDeletion_whenApply_thenDelegatesToRecurrenceService() {
+        // when
+        List<EventResponse> result = service().apply(1L, seriesDeletionRequest(20L));
+
+        // then
+        assertThat(result).isEmpty();
+        verify(recurrenceEventService).deleteRecurrenceEvent(1L, 20L);
+    }
+
+    @Test
+    @DisplayName("반복 회차 작업에 recurrenceId 또는 originStartAt이 없으면 거절한다")
+    void givenMissingOccurrenceIdentifier_whenPreview_thenRejectsValidationFailure() {
+        // when, then
+        assertThatThrownBy(() -> service().preview(
+                1L,
+                occurrenceDeletionRequest(null, Instant.parse("2026-08-21T05:00:00Z"))
+        ))
+                .isInstanceOf(CalioException.class)
+                .extracting(exception -> ((CalioException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.VALIDATION_FAILED);
+        assertThatThrownBy(() -> service().preview(1L, occurrenceDeletionRequest(20L, null)))
+                .isInstanceOf(CalioException.class)
+                .extracting(exception -> ((CalioException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.VALIDATION_FAILED);
+    }
+
+    @Test
+    @DisplayName("전체 반복 일정 작업에 recurrenceId가 없으면 거절한다")
+    void givenMissingSeriesIdentifier_whenPreview_thenRejectsValidationFailure() {
+        // when, then
+        assertThatThrownBy(() -> service().preview(1L, seriesDeletionRequest(null)))
+                .isInstanceOf(CalioException.class)
+                .extracting(exception -> ((CalioException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.VALIDATION_FAILED);
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 반복 회차는 Preview에서 not-found 오류를 유지한다")
+    void givenUnknownOccurrence_whenPreview_thenPropagatesNotFoundError() {
+        // given
+        Instant originStartAt = Instant.parse("2026-08-21T05:00:00Z");
+        when(recurrenceEventService.getRecurrenceOccurrence(1L, 20L, originStartAt))
+                .thenThrow(new CalioException(ErrorCode.RECURRENCE_OCCURRENCE_NOT_FOUND));
+
+        // when, then
+        assertThatThrownBy(() -> service().preview(1L, occurrenceDeletionRequest(20L, originStartAt)))
+                .isInstanceOf(CalioException.class)
+                .extracting(exception -> ((CalioException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.RECURRENCE_OCCURRENCE_NOT_FOUND);
+    }
+
+    @Test
     @DisplayName("전체 반복 일정 수정 Preview는 변경 전후 recurrence rule을 함께 반환한다")
     void givenSeriesRuleChange_whenPreview_thenIncludesBeforeAndAfterRules() {
         // given
@@ -291,6 +358,40 @@ class CalendarMutationServiceTest {
                 null,
                 null,
                 recurrenceRules
+        );
+    }
+
+    private CalendarMutationToolRequest occurrenceDeletionRequest(Long recurrenceId, Instant originStartAt) {
+        return new CalendarMutationToolRequest(
+                CalendarMutationOperation.DELETE_RECURRENCE_OCCURRENCE,
+                null,
+                recurrenceId,
+                originStartAt,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
+        );
+    }
+
+    private CalendarMutationToolRequest seriesDeletionRequest(Long recurrenceId) {
+        return new CalendarMutationToolRequest(
+                CalendarMutationOperation.DELETE_RECURRENCE_SERIES,
+                null,
+                recurrenceId,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
         );
     }
 
