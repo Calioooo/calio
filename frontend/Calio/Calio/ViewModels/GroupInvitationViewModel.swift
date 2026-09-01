@@ -6,6 +6,7 @@ import Combine
     @Published private(set) var issuedInvitation: IssuedGroupInvitation?
     @Published private(set) var preview: GroupInvitationPreview?
     @Published private(set) var acceptanceResult: GroupInvitationAcceptanceResult?
+    @Published private(set) var isLoadingInvitations = false
     @Published private(set) var isSubmitting = false
     @Published private(set) var errorMessage: String?
     private let service: GroupInvitationService
@@ -17,6 +18,12 @@ import Combine
     func load(groupSpaceId: Int64) async {
         latestLoadRequestID += 1
         let requestID = latestLoadRequestID
+        isLoadingInvitations = true
+        defer {
+            if requestID == latestLoadRequestID {
+                isLoadingInvitations = false
+            }
+        }
 
         do {
             let loadedInvitations = try await service.list(groupSpaceId: groupSpaceId)

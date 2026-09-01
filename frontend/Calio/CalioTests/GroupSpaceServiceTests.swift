@@ -285,6 +285,22 @@ struct GroupSpaceServiceTests {
         #expect(viewModel.errorMessage == nil)
     }
 
+    @MainActor @Test func invitationViewModelExposesLoadingUntilAnEmptyListCompletes() async {
+        let repository = GroupSpaceRepositoryStub(invitationFetchDelays: [50_000_000])
+        let viewModel = GroupInvitationViewModel(service: GroupInvitationService(repository: repository))
+
+        let load = Task { await viewModel.load(groupSpaceId: 7) }
+        while repository.invitationFetchCallCount == 0 { await Task.yield() }
+
+        #expect(viewModel.isLoadingInvitations)
+        #expect(viewModel.invitations.isEmpty)
+
+        await load.value
+
+        #expect(!viewModel.isLoadingInvitations)
+        #expect(viewModel.invitations.isEmpty)
+    }
+
     @MainActor @Test func removingMemberRefreshesGroupSpaceFromBackend() async throws {
         let repository = GroupSpaceRepositoryStub(memberCountAfterRemoval: 1)
         let viewModel = GroupSpaceDetailViewModel(

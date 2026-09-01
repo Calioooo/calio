@@ -111,7 +111,11 @@ struct GroupInvitationManagementView: View {
 
     @ViewBuilder
     private var invitationList: some View {
-        if viewModel.invitations.isEmpty {
+        if viewModel.isLoadingInvitations {
+            ProgressView()
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 24)
+        } else if viewModel.invitations.isEmpty {
             ContentUnavailableView(
                 "발급한 초대가 없습니다",
                 systemImage: "paperplane",
