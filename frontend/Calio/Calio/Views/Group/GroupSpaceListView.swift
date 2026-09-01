@@ -36,7 +36,7 @@ struct GroupSpaceListView: View {
                 } else {
                     List {
                         Section("내 그룹 공간") {
-                            ForEach(viewModel.spaces, id: \.groupSpaceId) { space in
+                            ForEach(viewModel.spaces) { space in
                                 NavigationLink {
                                     GroupSpaceDetailView(groupSpace: space) { result in
                                         switch result {
@@ -111,15 +111,18 @@ struct GroupSpaceListView: View {
 
     private var errorBinding: Binding<Bool> {
         Binding(
-            get: { viewModel.errorMessage != nil && !viewModel.didFailLoading },
+            get: { viewModel.errorMessage != nil && !(viewModel.didFailLoading && viewModel.failedOperation == .load) },
             set: { if !$0 { viewModel.clearError() } }
         )
     }
-    private func resetCreationFields() { groupName = ""; nickname = "" }
+    private func resetCreationFields() {
+        groupName = ""
+        nickname = ""
+    }
 }
 
 private struct GroupSpaceRow: View {
-    let space: GroupSpaceResponseDTO
+    let space: GroupSpace
     var body: some View {
         HStack(spacing: 12) {
             Text(space.emoji ?? String(space.name.prefix(1)))

@@ -568,6 +568,13 @@ struct NetworkRepositoryTests {
           "myMembership": { "nickname": "준하", "role": "OWNER", "createdAt": "2026-08-01T00:00:00Z", "updatedAt": "2026-08-01T00:00:00Z", "statusChangedAt": "2026-08-01T00:00:00Z" },
           "createdAt": "2026-08-01T00:00:00Z", "updatedAt": "2026-08-01T00:00:00Z" }
         """.data(using: .utf8)!
+        let groupSpaceListResponse = """
+        { "groupSpaces": [
+          { "groupSpaceId": 7, "name": "프로젝트 팀", "emoji": null, "memberCount": 2,
+            "myMembership": { "nickname": "준하", "role": "OWNER", "createdAt": "2026-08-01T00:00:00Z", "updatedAt": "2026-08-01T00:00:00Z", "statusChangedAt": "2026-08-01T00:00:00Z" },
+            "createdAt": "2026-08-01T00:00:00Z", "updatedAt": "2026-08-01T00:00:00Z" }
+        ] }
+        """.data(using: .utf8)!
         let membersResponse = """
         { "members": [ { "memberId": 10, "nickname": "준하", "role": "OWNER" }, { "memberId": 11, "nickname": "민지", "role": "MEMBER" } ] }
         """.data(using: .utf8)!
@@ -579,6 +586,7 @@ struct NetworkRepositoryTests {
             requests.append(request)
             let responseData: Data
             switch request.httpMethod {
+            case "GET" where request.url?.path == "/api/group-spaces": responseData = groupSpaceListResponse
             case "GET" where request.url?.path.hasSuffix("/members") == true: responseData = membersResponse
             case "POST" where request.url?.path.hasSuffix("/owner-transfer") == true: responseData = transferResponse
             default: responseData = groupSpaceResponse
@@ -590,6 +598,8 @@ struct NetworkRepositoryTests {
         configuration.protocolClasses = [MockURLProtocol.self]
         let repository = URLSessionGroupSpaceRepository(baseURL: URL(string: "https://example.test")!, session: URLSession(configuration: configuration), authTokenProvider: StaticAuthTokenProvider(accessToken: "test-token"))
 
+        let groupSpaces = try await repository.fetchGroupSpaces()
+        let groupSpace = try await repository.fetchGroupSpace(groupSpaceId: 7)
         _ = try await repository.createGroupSpace(.init(name: "프로젝트 팀", emoji: nil, nickname: "준하"))
         _ = try await repository.updateGroupSpace(groupSpaceId: 7, request: .init(name: "수정 팀", emoji: "🗓️"))
         _ = try await repository.fetchMembers(groupSpaceId: 7)
@@ -598,17 +608,19 @@ struct NetworkRepositoryTests {
         try await repository.removeMember(groupSpaceId: 7, memberId: 11)
         try await repository.deleteGroupSpace(groupSpaceId: 7)
 
-        #expect(requests.map { $0.url?.path } == ["/api/group-spaces", "/api/group-spaces/7", "/api/group-spaces/7/members", "/api/group-spaces/7/owner-transfer", "/api/group-spaces/7/members/me", "/api/group-spaces/7/members/11", "/api/group-spaces/7"])
-        #expect(requests.map { $0.httpMethod ?? "" } == ["POST", "PATCH", "GET", "POST", "DELETE", "DELETE", "DELETE"])
+        #expect(groupSpaces.groupSpaces.map(\.groupSpaceId) == [7])
+        #expect(groupSpace.groupSpaceId == 7)
+        #expect(requests.map { $0.url?.path } == ["/api/group-spaces", "/api/group-spaces/7", "/api/group-spaces", "/api/group-spaces/7", "/api/group-spaces/7/members", "/api/group-spaces/7/owner-transfer", "/api/group-spaces/7/members/me", "/api/group-spaces/7/members/11", "/api/group-spaces/7"])
+        #expect(requests.map { $0.httpMethod ?? "" } == ["GET", "GET", "POST", "PATCH", "GET", "POST", "DELETE", "DELETE", "DELETE"])
         #expect(requests.allSatisfy { $0.value(forHTTPHeaderField: "Authorization") == "Bearer test-token" })
-        let createBody = try #require(groupRequestBodyJSON(from: requests[0]))
-        let updateBody = try #require(groupRequestBodyJSON(from: requests[1]))
-        let transferBody = try #require(groupRequestBodyJSON(from: requests[3]))
+        let createBody = try groupRequestBodyJSON(from: requests[2])
+        let updateBody = try groupRequestBodyJSON(from: requests[3])
+        let transferBody = try groupRequestBodyJSON(from: requests[5])
         #expect(Set(createBody.keys) == ["name", "nickname"])
         #expect(createBody["emoji"] == nil)
         #expect(Set(updateBody.keys) == ["name", "emoji"])
         #expect(transferBody["targetMemberId"] as? Int == 11)
-        #expect(requests.dropFirst(4).allSatisfy { requestBodyData(from: $0) == nil })
+        #expect(requests.dropFirst(6).allSatisfy { requestBodyData(from: $0) == nil })
     }
 
     @Test func urlSessionGroupSpaceRepositoryUsesCanonicalInvitationPreviewAndAcceptanceContracts() async throws {
@@ -659,17 +671,18 @@ struct NetworkRepositoryTests {
         #expect(acceptance.groupSpace.name == "프로젝트 팀")
         #expect(requests.map { $0.url?.path } == ["/api/group-invitations/preview", "/api/group-invitations/preview", "/api/group-invitations/accept"])
         #expect(requests.map { $0.httpMethod } == ["POST", "POST", "POST"])
-        #expect(requests[0].value(forHTTPHeaderField: "Authorization") == "Bearer test-token")
-        #expect(requests[1].value(forHTTPHeaderField: "Authorization") == "Bearer test-token")
-        #expect(requests[2].value(forHTTPHeaderField: "Authorization") == "Bearer test-token")
-        let previewBody = try #require(groupRequestBodyJSON(from: requests[0]))
-        let acceptanceBody = try #require(groupRequestBodyJSON(from: requests[2]))
+        #expect(requests.allSatisfy { $0.value(forHTTPHeaderField: "Authorization") == "Bearer test-token" })
+        let previewBody = try groupRequestBodyJSON(from: requests[0])
+        let acceptanceBody = try groupRequestBodyJSON(from: requests[2])
         #expect(previewBody as NSDictionary == ["credentialType": "CODE", "credential": "CALIO-2026"])
         #expect(acceptanceBody as NSDictionary == ["credentialType": "INVITE_CODE", "credential": "CALIO-2026", "nickname": "준하"])
     }
 
-    private func groupRequestBodyJSON(from request: URLRequest) -> [String: Any]? {
-        guard let body = requestBodyData(from: request) else { return nil }
-        return try? JSONSerialization.jsonObject(with: body) as? [String: Any]
+    private func groupRequestBodyJSON(from request: URLRequest) throws -> [String: Any] {
+        guard let body = requestBodyData(from: request) else { throw GroupRequestBodyError.missing }
+        guard let json = try JSONSerialization.jsonObject(with: body) as? [String: Any] else { throw GroupRequestBodyError.invalid }
+        return json
     }
+
+    private enum GroupRequestBodyError: Error { case missing, invalid }
 }
