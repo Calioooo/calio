@@ -99,6 +99,21 @@ struct GroupSpaceServiceTests {
         #expect(viewModel.failure == nil)
     }
 
+    @MainActor @Test func listViewModelKeepsCreatedSpaceWhenAnOlderLoadFinishesLater() async {
+        let repository = CreateWhileLoadingGroupSpaceRepository()
+        let viewModel = GroupSpaceListViewModel(service: GroupSpaceService(repository: repository))
+
+        let load = Task { await viewModel.load() }
+        while await repository.startedFetchCount() == 0 { await Task.yield() }
+
+        let created = await viewModel.create(name: "새 그룹", nickname: "준하")
+        await load.value
+
+        #expect(created)
+        #expect(viewModel.spaces.map(\.name) == ["새 그룹"])
+        #expect(!viewModel.isLoading)
+    }
+
     @MainActor @Test func listViewModelDoesNotPublishFailureWhenLoadingIsCancelled() async {
         let repository = CancellableGroupSpaceRepository()
         let viewModel = GroupSpaceListViewModel(service: GroupSpaceService(repository: repository))
@@ -360,6 +375,30 @@ private actor OutOfOrderGroupSpaceRepository: GroupSpaceRepository {
 
     func fetchGroupSpace(groupSpaceId: Int64) async throws -> GroupSpaceResponseDTO { fatalError("Unexpected call") }
     func createGroupSpace(_ request: CreateGroupSpaceRequestDTO) async throws -> GroupSpaceResponseDTO { fatalError("Unexpected call") }
+    func updateGroupSpace(groupSpaceId: Int64, request: UpdateGroupSpaceRequestDTO) async throws -> GroupSpaceResponseDTO { fatalError("Unexpected call") }
+    func deleteGroupSpace(groupSpaceId: Int64) async throws { fatalError("Unexpected call") }
+    func fetchMembers(groupSpaceId: Int64) async throws -> GroupMemberListResponseDTO { fatalError("Unexpected call") }
+    func transferOwnership(groupSpaceId: Int64, request: TransferGroupOwnerRequestDTO) async throws -> TransferGroupOwnerResponseDTO { fatalError("Unexpected call") }
+    func leaveGroupSpace(groupSpaceId: Int64) async throws { fatalError("Unexpected call") }
+    func removeMember(groupSpaceId: Int64, memberId: Int64) async throws { fatalError("Unexpected call") }
+}
+
+private actor CreateWhileLoadingGroupSpaceRepository: GroupSpaceRepository {
+    private var fetchCount = 0
+
+    func startedFetchCount() -> Int { fetchCount }
+
+    func fetchGroupSpaces() async throws -> GroupSpaceListResponseDTO {
+        fetchCount += 1
+        try await Task.sleep(for: .milliseconds(50))
+        return .init(groupSpaces: [GroupSpaceRepositoryStub.sampleSpace(name: "이전 그룹")])
+    }
+
+    func createGroupSpace(_ request: CreateGroupSpaceRequestDTO) async throws -> GroupSpaceResponseDTO {
+        GroupSpaceRepositoryStub.sampleSpace(name: request.name)
+    }
+
+    func fetchGroupSpace(groupSpaceId: Int64) async throws -> GroupSpaceResponseDTO { fatalError("Unexpected call") }
     func updateGroupSpace(groupSpaceId: Int64, request: UpdateGroupSpaceRequestDTO) async throws -> GroupSpaceResponseDTO { fatalError("Unexpected call") }
     func deleteGroupSpace(groupSpaceId: Int64) async throws { fatalError("Unexpected call") }
     func fetchMembers(groupSpaceId: Int64) async throws -> GroupMemberListResponseDTO { fatalError("Unexpected call") }

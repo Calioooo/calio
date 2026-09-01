@@ -37,6 +37,8 @@ import Combine
     func create(name: String, nickname: String) async -> Bool {
         do {
             let space = try await service.create(name: name, emoji: nil, nickname: nickname)
+            latestLoadRequestID += 1
+            isLoading = false
             spaces.append(space)
             clearFailure()
             return true
