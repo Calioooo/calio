@@ -188,6 +188,29 @@ class GroupMembershipServiceTest {
                 .isEqualTo(ErrorCode.GROUP_MEMBER_NOT_FOUND);
     }
 
+    @Test
+    @DisplayName("익명 공유 정책은 일정별이 아니라 사용자와 Group Space 조합별로 관리한다")
+    void anonymousSharingPolicyIsIndependentForEachGroupMembership() {
+        // given
+        Account account = accountRepository.saveAndFlush(new Account());
+        GroupSpace firstGroup = groupSpaceRepository.saveAndFlush(new GroupSpace(account.getId(), "First", null));
+        GroupSpace secondGroup = groupSpaceRepository.saveAndFlush(new GroupSpace(account.getId(), "Second", null));
+        GroupMember firstMembership = groupMemberRepository.saveAndFlush(
+                new GroupMember(firstGroup, account.getId(), "first", MEMBER_CREATED_AT)
+        );
+        GroupMember secondMembership = groupMemberRepository.saveAndFlush(
+                new GroupMember(secondGroup, account.getId(), "second", MEMBER_CREATED_AT)
+        );
+
+        // when
+        var response = groupMembershipService.changeAnonymousSharing(account.getId(), firstGroup.getId(), true);
+
+        // then
+        assertThat(response.isAnonymous()).isTrue();
+        assertThat(groupMemberRepository.findById(firstMembership.getId()).orElseThrow().isAnonymous()).isTrue();
+        assertThat(groupMemberRepository.findById(secondMembership.getId()).orElseThrow().isAnonymous()).isFalse();
+    }
+
     private GroupFixture createFixture() {
         Account ownerAccount = accountRepository.saveAndFlush(new Account());
         Account targetAccount = accountRepository.saveAndFlush(new Account());

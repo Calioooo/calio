@@ -17,6 +17,7 @@ import com.calio.calendar.recurrence.domain.RecurrenceOccurrence;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
 import com.calio.calendar.recurrence.service.RecurrenceEventQueryService;
 import com.calio.calendar.recurrence.service.Rfc5545RecurrenceEngine;
+import com.calio.calendar.sharing.event.service.PersonalEventGroupShareCommandService;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.service.TagQueryService;
 import java.time.Duration;
@@ -45,6 +46,7 @@ public class EventService {
     private final TagQueryService tagQueryService;
     private final RecurrenceEventQueryService recurrenceEventQueryService;
     private final Rfc5545RecurrenceEngine recurrenceEngine;
+    private final PersonalEventGroupShareCommandService eventShareCommandService;
 
     public EventService(
             EventQueryService eventQueryService,
@@ -53,7 +55,8 @@ public class EventService {
             AccountQueryService accountQueryService,
             TagQueryService tagQueryService,
             RecurrenceEventQueryService recurrenceEventQueryService,
-            Rfc5545RecurrenceEngine recurrenceEngine
+            Rfc5545RecurrenceEngine recurrenceEngine,
+            PersonalEventGroupShareCommandService eventShareCommandService
     ) {
         this.eventQueryService = eventQueryService;
         this.eventCommandService = eventCommandService;
@@ -62,6 +65,7 @@ public class EventService {
         this.tagQueryService = tagQueryService;
         this.recurrenceEventQueryService = recurrenceEventQueryService;
         this.recurrenceEngine = recurrenceEngine;
+        this.eventShareCommandService = eventShareCommandService;
     }
 
     @Transactional
@@ -109,6 +113,7 @@ public class EventService {
     public void deleteEvent(Long accountId, Long eventId) {
         Event event = eventCommandService.lockEvent(accountId, eventId);
         rejectExternalEventMutation(accountId, eventId);
+        eventShareCommandService.deleteAllForSourceEvent(eventId);
         eventCommandService.deleteEvent(event);
     }
 

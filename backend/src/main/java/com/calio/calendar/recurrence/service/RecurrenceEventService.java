@@ -16,6 +16,7 @@ import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.event.service.EventCommandService;
 import com.calio.calendar.tag.service.TagQueryService;
+import com.calio.calendar.sharing.recurrence.service.PersonalRecurrenceGroupShareCommandService;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -34,6 +35,7 @@ public class RecurrenceEventService {
     private final EventCommandService eventCommandService;
     private final Rfc5545RecurrenceEngine recurrenceEngine;
     private final Clock clock;
+    private final PersonalRecurrenceGroupShareCommandService recurrenceShareCommandService;
 
     public RecurrenceEventService(
             RecurrenceEventQueryService recurrenceEventQueryService,
@@ -42,7 +44,8 @@ public class RecurrenceEventService {
             TagQueryService tagQueryService,
             EventCommandService eventCommandService,
             Rfc5545RecurrenceEngine recurrenceEngine,
-            Clock clock
+            Clock clock,
+            PersonalRecurrenceGroupShareCommandService recurrenceShareCommandService
     ) {
         this.recurrenceEventQueryService = recurrenceEventQueryService;
         this.recurrenceEventCommandService = recurrenceEventCommandService;
@@ -51,6 +54,7 @@ public class RecurrenceEventService {
         this.eventCommandService = eventCommandService;
         this.recurrenceEngine = recurrenceEngine;
         this.clock = clock;
+        this.recurrenceShareCommandService = recurrenceShareCommandService;
     }
 
     @Transactional
@@ -130,6 +134,7 @@ public class RecurrenceEventService {
     @Transactional
     public void deleteRecurrenceEvent(Long accountId, Long recurrenceId) {
         recurrenceEventCommandService.lockRecurrenceEvent(accountId, recurrenceId);
+        recurrenceShareCommandService.deleteAllForSourceRecurrence(recurrenceId);
         recurrenceEventCommandService.deleteRecurrenceOverridesByRecurrenceEventIds(List.of(recurrenceId));
         eventCommandService.deleteEventsByRecurrenceEventIds(List.of(recurrenceId));
         recurrenceEventCommandService.deleteRecurrenceEventsByIds(List.of(recurrenceId));

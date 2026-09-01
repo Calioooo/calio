@@ -11,6 +11,7 @@ import com.calio.calendar.groupspace.controller.dto.AcceptGroupInvitationRequest
 import com.calio.calendar.groupspace.controller.dto.AcceptGroupInvitationResponse;
 import com.calio.calendar.groupspace.controller.dto.GroupInvitationAcceptCredentialType;
 import com.calio.calendar.groupspace.controller.dto.GroupMemberListResponse;
+import com.calio.calendar.groupspace.controller.dto.GroupMembershipResponse;
 import com.calio.calendar.groupspace.controller.dto.TransferGroupOwnerResponse;
 import com.calio.calendar.groupspace.domain.GroupJoinResult;
 import com.calio.calendar.groupspace.domain.GroupMember;
@@ -128,6 +129,17 @@ public class GroupMembershipService {
                 .sorted(memberOrder(groupSpace))
                 .toList();
         return GroupMemberListResponse.from(activeMembers, groupSpace);
+    }
+
+    @Transactional
+    public GroupMembershipResponse changeAnonymousSharing(
+            Long accountId,
+            Long groupSpaceId,
+            boolean isAnonymous
+    ) {
+        GroupMember member = commandService.lockActiveMember(groupSpaceId, accountId);
+        commandService.changeAnonymous(member, isAnonymous);
+        return GroupMembershipResponse.from(member, member.getGroupSpace());
     }
 
     @Transactional

@@ -6,6 +6,9 @@ import com.calio.calendar.event.controller.dto.UpdateImportantEventRequest;
 import com.calio.calendar.event.controller.dto.UpdateEventRequest;
 import com.calio.calendar.security.AuthenticatedAccount;
 import com.calio.calendar.event.service.EventService;
+import com.calio.calendar.sharing.event.controller.dto.CreateEventGroupSharesRequest;
+import com.calio.calendar.sharing.event.controller.dto.CreateEventGroupSharesResponse;
+import com.calio.calendar.sharing.event.service.PersonalEventGroupShareService;
 import jakarta.validation.Valid;
 import java.time.Instant;
 import java.util.List;
@@ -31,9 +34,14 @@ import org.springframework.web.bind.annotation.RestController;
 public class EventController {
 
     private final EventService eventService;
+    private final PersonalEventGroupShareService eventGroupShareService;
 
-    public EventController(EventService eventService) {
+    public EventController(
+            EventService eventService,
+            PersonalEventGroupShareService eventGroupShareService
+    ) {
         this.eventService = eventService;
+        this.eventGroupShareService = eventGroupShareService;
     }
 
     @PostMapping
@@ -78,6 +86,15 @@ public class EventController {
     ) {
         eventService.deleteEvent(account.accountId(), eventId);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/group-shares")
+    public ResponseEntity<CreateEventGroupSharesResponse> createGroupShares(
+            @AuthenticationPrincipal AuthenticatedAccount account,
+            @Valid @RequestBody CreateEventGroupSharesRequest request
+    ) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(eventGroupShareService.create(account.accountId(), request));
     }
 
     @GetMapping
