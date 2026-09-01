@@ -3,7 +3,7 @@ import SwiftUI
 struct GroupInvitationJoinView: View {
     let onDismiss: () -> Void
     let onJoined: () -> Void
-    private let previewForEvidence: PreviewGroupInvitationResponseDTO?
+    private let previewForEvidence: GroupInvitationPreview?
     @StateObject private var viewModel = GroupInvitationViewModel()
     @State private var credentialType: GroupInvitationCredentialKind = .inviteCode
     @State private var credential = ""
@@ -12,7 +12,7 @@ struct GroupInvitationJoinView: View {
     init(
         onDismiss: @escaping () -> Void,
         onJoined: @escaping () -> Void = {},
-        previewForEvidence: PreviewGroupInvitationResponseDTO? = nil
+        previewForEvidence: GroupInvitationPreview? = nil
     ) {
         self.onDismiss = onDismiss
         self.onJoined = onJoined
@@ -77,7 +77,7 @@ struct GroupInvitationJoinView: View {
         }
     }
 
-    private var activePreview: PreviewGroupInvitationResponseDTO? {
+    private var activePreview: GroupInvitationPreview? {
         viewModel.preview ?? previewForEvidence
     }
 
@@ -141,7 +141,7 @@ struct GroupInvitationJoinView: View {
         }
     }
 
-    private func previewConfirmation(_ preview: PreviewGroupInvitationResponseDTO) -> some View {
+    private func previewConfirmation(_ preview: GroupInvitationPreview) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("이 그룹에 참여할까요?")
                 .font(.title3.weight(.semibold))
@@ -214,7 +214,7 @@ struct GroupInvitationJoinView: View {
         }
     }
 
-    private func memberPreviewSummary(_ members: [GroupInvitationMemberPreviewDTO], totalCount: Int) -> String {
+    private func memberPreviewSummary(_ members: [GroupInvitationMemberPreview], totalCount: Int) -> String {
         let visibleNames = members.prefix(3).map(\.nickname).joined(separator: "님, ")
         let remainingCount = max(totalCount - min(members.count, 3), 0)
         return remainingCount > 0 ? "\(visibleNames)님 외 \(remainingCount)명" : "\(visibleNames)님"
@@ -232,11 +232,11 @@ struct GroupInvitationJoinView: View {
     }()
 
     private var errorBinding: Binding<Bool> { Binding(get: { viewModel.errorMessage != nil }, set: { if !$0 { viewModel.clearError() } }) }
-    private var acceptanceResultBinding: Binding<AcceptGroupInvitationResponseDTO?> { Binding(get: { viewModel.acceptanceResult }, set: { if $0 == nil { viewModel.clearAcceptanceFlow() } }) }
+    private var acceptanceResultBinding: Binding<GroupInvitationAcceptanceResult?> { Binding(get: { viewModel.acceptanceResult }, set: { if $0 == nil { viewModel.clearAcceptanceFlow() } }) }
 }
 
 private struct GroupInvitationAcceptanceResultSheet: View {
-    let result: AcceptGroupInvitationResponseDTO
+    let result: GroupInvitationAcceptanceResult
     let onDone: () -> Void
     var body: some View {
         VStack(spacing: 16) {
@@ -245,7 +245,7 @@ private struct GroupInvitationAcceptanceResultSheet: View {
                 .foregroundStyle(.calioBrand)
             Text(result.joinResult == .alreadyMember ? "이미 참여한 그룹이에요" : "그룹에 참여했어요")
                 .font(.title3.weight(.semibold))
-            Text("\(result.groupSpace.name)에서 함께 일정을 관리할 수 있습니다.")
+            Text("\(result.groupSpaceName)에서 함께 일정을 관리할 수 있습니다.")
                 .font(.subheadline)
                 .foregroundStyle(.calioTextSecondary)
                 .multilineTextAlignment(.center)

@@ -5,7 +5,7 @@ struct GroupInvitationManagementView: View {
     let groupSpace: GroupSpaceResponseDTO
 
     @StateObject private var viewModel = GroupInvitationViewModel()
-    @State private var pendingRevocation: GroupInvitationSummaryResponseDTO?
+    @State private var pendingRevocation: GroupInvitationSummary?
     @State private var isPresentingIssuedInvitation = false
 
     var body: some View {
@@ -60,7 +60,7 @@ struct GroupInvitationManagementView: View {
                 Task {
                     await viewModel.revoke(
                         groupSpaceId: groupSpace.groupSpaceId,
-                        invitationId: invitation.invitationId
+                        invitationId: invitation.id
                     )
                     pendingRevocation = nil
                 }
@@ -118,7 +118,7 @@ struct GroupInvitationManagementView: View {
             )
             .padding(.vertical, 24)
         } else {
-            ForEach(viewModel.invitations, id: \.invitationId) { invitation in
+            ForEach(viewModel.invitations, id: \.id) { invitation in
                 HStack {
                     Image(systemName: "link")
                         .foregroundStyle(.calioBrand)
@@ -148,7 +148,7 @@ struct GroupInvitationManagementView: View {
 }
 
 private struct GroupInvitationIssuedSheet: View {
-    let invitation: GroupInvitationResponseDTO
+    let invitation: IssuedGroupInvitation
 
     @Environment(\.dismiss) private var dismiss
 
@@ -164,7 +164,7 @@ private struct GroupInvitationIssuedSheet: View {
             }
 
             VStack(spacing: 12) {
-                Text(invitation.inviteCode)
+                Text(invitation.code)
                     .font(.title3.monospaced().weight(.bold))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
@@ -173,14 +173,14 @@ private struct GroupInvitationIssuedSheet: View {
 
                 HStack(spacing: 12) {
                     Button {
-                        UIPasteboard.general.string = invitation.inviteCode
+                        UIPasteboard.general.string = invitation.code
                     } label: {
                         Label("코드 복사", systemImage: "doc.on.doc")
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.bordered)
 
-                    ShareLink(item: invitation.inviteUrl) {
+                    ShareLink(item: invitation.url) {
                         Label("링크 공유", systemImage: "square.and.arrow.up")
                             .frame(maxWidth: .infinity)
                     }

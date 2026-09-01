@@ -104,7 +104,7 @@ struct GroupSpaceServiceTests {
         #expect(accepted)
         #expect(viewModel.preview?.name == "프로젝트 팀")
         #expect(viewModel.acceptanceResult?.joinResult == .alreadyMember)
-        #expect(viewModel.acceptanceResult?.groupSpace.name == "프로젝트 팀")
+        #expect(viewModel.acceptanceResult?.groupSpaceName == "프로젝트 팀")
     }
 }
 
