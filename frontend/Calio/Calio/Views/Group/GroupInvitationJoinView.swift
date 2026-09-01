@@ -131,7 +131,9 @@ struct GroupInvitationJoinView: View {
             .frame(height: 50)
             .background(Color.calioSelection.opacity(0.72), in: RoundedRectangle(cornerRadius: 14))
             TextField(credentialType == .inviteCode ? "초대 코드" : "초대 링크", text: $credential)
-                .textInputAutocapitalization(.characters)
+                .textInputAutocapitalization(
+                    credentialType == .inviteCode ? .characters : .never
+                )
                 .autocorrectionDisabled()
                 .textFieldStyle(.plain)
                 .padding(.horizontal, 16)
