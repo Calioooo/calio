@@ -20,6 +20,9 @@ import Combine
             errorMessage = "그룹 공간을 불러오지 못했습니다. 다시 시도해 주세요."
         }
     }
+    func refreshAfterJoiningInvitation() async {
+        await load()
+    }
     func create(name: String, nickname: String) async -> Bool {
         do {
             let space = try await service.create(name: name, emoji: nil, nickname: nickname)

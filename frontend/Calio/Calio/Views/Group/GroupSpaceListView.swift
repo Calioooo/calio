@@ -95,7 +95,7 @@ struct GroupSpaceListView: View {
                         },
                         onJoined: {
                             Task {
-                                await viewModel.load()
+                                await viewModel.refreshAfterJoiningInvitation()
                             }
                         }
                     )

@@ -28,7 +28,7 @@ struct GroupSpaceServiceTests {
         let viewModel = GroupSpaceListViewModel(service: GroupSpaceService(repository: repository))
 
         await viewModel.load()
-        await viewModel.load()
+        await viewModel.refreshAfterJoiningInvitation()
 
         #expect(viewModel.spaces.map(\.name) == ["확정된 공간"])
         #expect(viewModel.errorMessage == "그룹 공간을 불러오지 못했습니다. 다시 시도해 주세요.")
@@ -43,7 +43,7 @@ struct GroupSpaceServiceTests {
         let viewModel = GroupSpaceListViewModel(service: GroupSpaceService(repository: repository))
 
         await viewModel.load()
-        await viewModel.load()
+        await viewModel.refreshAfterJoiningInvitation()
 
         #expect(viewModel.spaces.map(\.name) == ["기존 그룹", "새로 참여한 그룹"])
         #expect(viewModel.didFailLoading == false)
