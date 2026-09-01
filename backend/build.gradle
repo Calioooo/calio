@@ -19,6 +19,7 @@ repositories {
 }
 
 dependencies {
+    implementation platform('org.springframework.ai:spring-ai-bom:2.0.0')
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'org.springframework.boot:spring-boot-starter-restclient'
@@ -26,6 +27,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
     implementation 'org.springframework.boot:spring-boot-flyway'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'org.springframework.ai:spring-ai-starter-model-openai'
     implementation 'org.flywaydb:flyway-core'
     runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
     implementation 'org.mnode.ical4j:ical4j:4.3.0'
@@ -44,4 +46,31 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+    exclude '**/*EvalTest.class'
+}
+
+tasks.register('aiCalendarEval', Test) {
+    group = 'verification'
+    description = 'Runs AI calendar evaluations against the configured OpenAI model.'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    systemProperty 'spring.profiles.active', 'ai-calendar-eval'
+    useJUnitPlatform()
+    include '**/*EvalTest.class'
+    testLogging {
+        showStandardStreams = true
+    }
+    outputs.upToDateWhen { false }
+    doFirst {
+        if (System.getenv('OPENAI_API_KEY') == null || System.getenv('OPENAI_API_KEY').isBlank()) {
+            throw new GradleException('OPENAI_API_KEY is required to run aiCalendarEval.')
+        }
+        if (System.getenv('OPENAI_CHAT_MODEL') == null || System.getenv('OPENAI_CHAT_MODEL').isBlank()) {
+            throw new GradleException('OPENAI_CHAT_MODEL is required to run aiCalendarEval.')
+        }
+        if (System.getenv('OPENAI_CHAT_REASONING_EFFORT') == null
+                || System.getenv('OPENAI_CHAT_REASONING_EFFORT').isBlank()) {
+            throw new GradleException('OPENAI_CHAT_REASONING_EFFORT is required to run aiCalendarEval.')
+        }
+    }
 }

@@ -64,6 +64,10 @@ public enum ErrorCode {
             HttpStatus.BAD_REQUEST,
             "Recurrence occurrence limit exceeded."
     ),
+    RECURRENCE_OCCURRENCE_TAG_CHANGE_NOT_SUPPORTED(
+            HttpStatus.BAD_REQUEST,
+            "Recurrence occurrence tag change is not supported."
+    ),
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "Validation failed."),
     GOOGLE_CALENDAR_AUTHORIZATION_CODE_REQUIRED(
             HttpStatus.BAD_REQUEST,
@@ -106,6 +110,10 @@ public enum ErrorCode {
             "External event mutation is not supported."
     ),
     AI_CALENDAR_CONVERSATION_NOT_FOUND(HttpStatus.NOT_FOUND, "AI calendar conversation not found."),
+    AI_CALENDAR_PROVIDER_UNAVAILABLE(
+            HttpStatus.SERVICE_UNAVAILABLE,
+            "AI calendar provider is temporarily unavailable."
+    ),
 
     HOLIDAY_API_CONFIGURATION_MISSING(
             HttpStatus.INTERNAL_SERVER_ERROR,

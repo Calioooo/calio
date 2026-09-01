@@ -1,7 +1,7 @@
 package com.calio.calendar.aicalendar.scheduler;
 
 import com.calio.calendar.aicalendar.config.CalendarConversationProperties;
-import com.calio.calendar.aicalendar.service.CalendarConversationPersistenceService;
+import com.calio.calendar.aicalendar.service.CalendarConversationService;
 import java.time.Clock;
 import java.time.Instant;
 import org.slf4j.Logger;
@@ -14,16 +14,16 @@ public class CalendarConversationCleanupScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(CalendarConversationCleanupScheduler.class);
 
-    private final CalendarConversationPersistenceService persistenceService;
+    private final CalendarConversationService conversationService;
     private final CalendarConversationProperties properties;
     private final Clock clock;
 
     public CalendarConversationCleanupScheduler(
-            CalendarConversationPersistenceService persistenceService,
+            CalendarConversationService conversationService,
             CalendarConversationProperties properties,
             Clock clock
     ) {
-        this.persistenceService = persistenceService;
+        this.conversationService = conversationService;
         this.properties = properties;
         this.clock = clock;
     }
@@ -32,7 +32,7 @@ public class CalendarConversationCleanupScheduler {
     public void deleteInactiveConversations() {
         try {
             Instant cutoff = clock.instant().minus(properties.getRetention());
-            int deletedCount = persistenceService.deleteInactiveConversations(cutoff);
+            int deletedCount = conversationService.deleteInactiveConversations(cutoff);
             log.info("AI calendar conversation cleanup finished. deletedCount={}", deletedCount);
         } catch (RuntimeException exception) {
             log.error("AI calendar conversation cleanup failed. errorCode=AI_CALENDAR_CLEANUP_FAILED");

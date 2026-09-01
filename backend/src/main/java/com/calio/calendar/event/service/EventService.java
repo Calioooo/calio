@@ -10,6 +10,7 @@ import com.calio.calendar.event.controller.dto.EventResponse;
 import com.calio.calendar.event.controller.dto.UpdateEventRequest;
 import com.calio.calendar.event.controller.dto.UpdateImportantEventRequest;
 import com.calio.calendar.event.domain.Event;
+import com.calio.calendar.event.service.dto.CalendarFreeTime;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingQueryService;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
@@ -22,6 +23,12 @@ import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.service.TagQueryService;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -126,6 +133,179 @@ public class EventService {
         responses.addAll(listRecurrenceOccurrences(accountId, from, to));
         responses.sort(Comparator.comparing(EventResponse::startAt));
         return responses;
+    }
+
+    @Transactional(readOnly = true)
+    public List<CalendarFreeTime> findAvailableTimes(
+            Long accountId,
+            LocalDate startDate,
+            LocalDate endDate,
+            ZoneId timeZone,
+            LocalTime availableFrom,
+            LocalTime availableUntil,
+            Duration minimumDuration
+    ) {
+        validateAvailabilityCriteria(availableFrom, availableUntil, minimumDuration);
+        List<EventResponse> events = listEventsForDateRange(accountId, startDate, endDate, timeZone);
+        List<CalendarFreeTime> availableTimes = new ArrayList<>();
+        for (LocalDate date = startDate; !date.isAfter(endDate); date = date.plusDays(1)) {
+            addAvailableTimesForDate(
+                    events,
+                    date,
+                    timeZone,
+                    availableFrom,
+                    availableUntil,
+                    minimumDuration,
+                    availableTimes
+            );
+        }
+        return availableTimes;
+    }
+
+    private void validateAvailabilityCriteria(
+            LocalTime availableFrom,
+            LocalTime availableUntil,
+            Duration minimumDuration
+    ) {
+        if (!availableFrom.isBefore(availableUntil)
+                || minimumDuration.isZero()
+                || minimumDuration.isNegative()) {
+            throw new IllegalArgumentException("Availability window and duration must be positive.");
+        }
+    }
+
+    private List<EventResponse> listEventsForDateRange(
+            Long accountId,
+            LocalDate startDate,
+            LocalDate endDate,
+            ZoneId timeZone
+    ) {
+        Instant rangeStart = startDate.atStartOfDay(timeZone).toInstant();
+        Instant rangeEnd = endDate.plusDays(1).atStartOfDay(timeZone).toInstant();
+        return listEvents(accountId, rangeStart, rangeEnd);
+    }
+
+    private void addAvailableTimesForDate(
+            List<EventResponse> events,
+            LocalDate date,
+            ZoneId timeZone,
+            LocalTime availableFrom,
+            LocalTime availableUntil,
+            Duration minimumDuration,
+            List<CalendarFreeTime> availableTimes
+    ) {
+        Instant windowStart = LocalDateTime.of(date, availableFrom).atZone(timeZone).toInstant();
+        Instant windowEnd = LocalDateTime.of(date, availableUntil).atZone(timeZone).toInstant();
+        List<TimeRange> occupiedRanges = findOccupiedRanges(events, windowStart, windowEnd);
+        List<String> allDayEventTitles = findAllDayEventTitles(events, date);
+        addAvailableGaps(
+                windowStart,
+                windowEnd,
+                occupiedRanges,
+                minimumDuration,
+                allDayEventTitles,
+                timeZone,
+                availableTimes
+        );
+    }
+
+    private List<TimeRange> findOccupiedRanges(
+            List<EventResponse> events,
+            Instant windowStart,
+            Instant windowEnd
+    ) {
+        return events.stream()
+                .filter(event -> !event.allDay())
+                .map(event -> TimeRange.overlapping(event.startAt(), event.endAt(), windowStart, windowEnd))
+                .filter(TimeRange::hasDuration)
+                .sorted(Comparator.comparing(TimeRange::start))
+                .toList();
+    }
+
+    private List<String> findAllDayEventTitles(List<EventResponse> events, LocalDate date) {
+        return events.stream()
+                .filter(EventResponse::allDay)
+                .filter(event -> occursOnDate(event, date))
+                .map(EventResponse::title)
+                .toList();
+    }
+
+    private void addAvailableGaps(
+            Instant windowStart,
+            Instant windowEnd,
+            List<TimeRange> occupiedRanges,
+            Duration minimumDuration,
+            List<String> allDayEventTitles,
+            ZoneId timeZone,
+            List<CalendarFreeTime> availableTimes
+    ) {
+        Instant availableStart = windowStart;
+        for (TimeRange occupiedRange : occupiedRanges) {
+            addAvailableTimeWhenLongEnough(
+                    availableStart,
+                    occupiedRange.start(),
+                    minimumDuration,
+                    allDayEventTitles,
+                    timeZone,
+                    availableTimes
+            );
+            if (occupiedRange.end().isAfter(availableStart)) {
+                availableStart = occupiedRange.end();
+            }
+        }
+        addAvailableTimeWhenLongEnough(
+                availableStart,
+                windowEnd,
+                minimumDuration,
+                allDayEventTitles,
+                timeZone,
+                availableTimes
+        );
+    }
+
+    private void addAvailableTimeWhenLongEnough(
+            Instant start,
+            Instant end,
+            Duration minimumDuration,
+            List<String> allDayEventTitles,
+            ZoneId timeZone,
+            List<CalendarFreeTime> availableTimes
+    ) {
+        if (Duration.between(start, end).compareTo(minimumDuration) >= 0) {
+            availableTimes.add(new CalendarFreeTime(
+                    formatTime(start, timeZone),
+                    formatTime(end, timeZone),
+                    allDayEventTitles
+            ));
+        }
+    }
+
+    private boolean occursOnDate(EventResponse event, LocalDate date) {
+        LocalDate startDate = event.startAt().atZone(ZoneOffset.UTC).toLocalDate();
+        LocalDate endDate = event.endAt().atZone(ZoneOffset.UTC).toLocalDate();
+        return !date.isBefore(startDate) && date.isBefore(endDate);
+    }
+
+    private String formatTime(Instant instant, ZoneId timeZone) {
+        return instant.atZone(timeZone).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
+    }
+
+    private record TimeRange(Instant start, Instant end) {
+
+        private static TimeRange overlapping(
+                Instant start,
+                Instant end,
+                Instant rangeStart,
+                Instant rangeEnd
+        ) {
+            Instant overlapStart = start.isAfter(rangeStart) ? start : rangeStart;
+            Instant overlapEnd = end.isBefore(rangeEnd) ? end : rangeEnd;
+            return new TimeRange(overlapStart, overlapEnd);
+        }
+
+        private boolean hasDuration() {
+            return start.isBefore(end);
+        }
     }
 
     private List<EventResponse> listRecurrenceOccurrences(Long accountId, Instant from, Instant to) {

@@ -28,6 +28,8 @@
 - `recurrence-occurrence`: `recurrence-event`에 속하는 개별 일정 회차다.
 - `recurrence-event-override`: 특정 `recurrence-occurrence`의 시간이나 내용을 변경하거나 해당 회차를 제외한 상태다.
 - `all-day-event`: 특정 시각이 아니라 하나 이상의 날짜 전체를 차지하는 일정이다.
+- `conversation`: 하나의 계정이 AI 캘린더 도우미와 이어가는 대화 단위다. 여러 `message`를 시간순으로 포함하며, 계정 소유권과 대화 활동 시각을 가진다.
+- `message`: `conversation` 안에 기록되는 한 건의 사용자 또는 AI 캘린더 도우미 발화다. 역할(`USER` 또는 `ASSISTANT`)과 본문을 가진다.
 
 ## 테스트 원칙
 

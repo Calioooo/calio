@@ -4,7 +4,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.calio.calendar.aicalendar.config.CalendarConversationProperties;
-import com.calio.calendar.aicalendar.service.CalendarConversationPersistenceService;
+import com.calio.calendar.aicalendar.service.CalendarConversationService;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -19,7 +19,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class CalendarConversationCleanupSchedulerTest {
 
     @Mock
-    private CalendarConversationPersistenceService persistenceService;
+    private CalendarConversationService conversationService;
 
     @Test
     @DisplayName("cleanup scheduler는 실행 시각에서 retention을 뺀 cutoff로 대화 정리를 위임한다")
@@ -30,16 +30,16 @@ class CalendarConversationCleanupSchedulerTest {
         CalendarConversationProperties properties = new CalendarConversationProperties();
         properties.setRetention(Duration.ofDays(30));
         CalendarConversationCleanupScheduler scheduler = new CalendarConversationCleanupScheduler(
-                persistenceService,
+                conversationService,
                 properties,
                 Clock.fixed(now, ZoneOffset.UTC)
         );
-        when(persistenceService.deleteInactiveConversations(cutoff)).thenReturn(2);
+        when(conversationService.deleteInactiveConversations(cutoff)).thenReturn(2);
 
         // when
         scheduler.deleteInactiveConversations();
 
         // then
-        verify(persistenceService).deleteInactiveConversations(cutoff);
+        verify(conversationService).deleteInactiveConversations(cutoff);
     }
 }

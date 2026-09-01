@@ -32,17 +32,22 @@ public class CalendarConversationMessage extends BaseEntity {
     @Column(name = "message_text", nullable = false, columnDefinition = "TEXT")
     private String text;
 
+    @Column(name = "assistant_response_blocks_json", columnDefinition = "TEXT")
+    private String assistantResponseBlocksJson;
+
     protected CalendarConversationMessage() {
     }
 
     public CalendarConversationMessage(
             CalendarConversation conversation,
             CalendarConversationMessageRole role,
-            String text
+            String text,
+            String assistantResponseBlocksJson
     ) {
         this.conversation = conversation;
         this.role = role;
         this.text = text;
+        this.assistantResponseBlocksJson = assistantResponseBlocksJson;
     }
 
     public Long getId() {
@@ -55,5 +60,9 @@ public class CalendarConversationMessage extends BaseEntity {
 
     public String getText() {
         return text;
+    }
+
+    public String getAssistantResponseBlocksJson() {
+        return assistantResponseBlocksJson;
     }
 }
