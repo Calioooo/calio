@@ -94,7 +94,10 @@ struct GroupSpaceListView: View {
             set: { if !$0 { viewModel.clearError() } }
         )
     }
-    private func resetCreationFields() { groupName = ""; nickname = "" }
+    private func resetCreationFields() {
+        groupName = ""
+        nickname = ""
+    }
 }
 
 private struct GroupSpaceRow: View {

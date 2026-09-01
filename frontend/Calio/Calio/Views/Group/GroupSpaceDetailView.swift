@@ -104,10 +104,40 @@ struct GroupSpaceDetailView: View {
         case nil: EmptyView()
         }
     }
-    private var errorBinding: Binding<Bool> { Binding(get: { viewModel.errorMessage != nil }, set: { if !$0 { viewModel.clearError() } }) }
+    private var errorBinding: Binding<Bool> {
+        Binding(
+            get: { viewModel.errorMessage != nil },
+            set: { if !$0 { viewModel.clearError() } }
+        )
+    }
+
     private enum Confirmation {
         case delete, leave, remove(GroupMember), transfer(GroupMember)
-        var title: String { switch self { case .delete: "그룹을 삭제할까요?"; case .leave: "그룹에서 나갈까요?"; case .remove(let member): "\(member.nickname)님을 내보낼까요?"; case .transfer(let member): "\(member.nickname)님에게 소유권을 이전할까요?" } }
-        var message: String { switch self { case .delete: "삭제한 그룹 공간은 복구할 수 없습니다."; case .leave: "나간 뒤에는 초대를 통해 다시 참여할 수 있습니다."; case .remove: "내보낸 멤버는 그룹에 접근할 수 없습니다."; case .transfer: "이후에는 멤버 권한으로 전환됩니다." } }
+
+        var title: String {
+            switch self {
+            case .delete:
+                "그룹을 삭제할까요?"
+            case .leave:
+                "그룹에서 나갈까요?"
+            case .remove(let member):
+                "\(member.nickname)님을 내보낼까요?"
+            case .transfer(let member):
+                "\(member.nickname)님에게 소유권을 이전할까요?"
+            }
+        }
+
+        var message: String {
+            switch self {
+            case .delete:
+                "삭제한 그룹 공간은 복구할 수 없습니다."
+            case .leave:
+                "나간 뒤에는 초대를 통해 다시 참여할 수 있습니다."
+            case .remove:
+                "내보낸 멤버는 그룹에 접근할 수 없습니다."
+            case .transfer:
+                "이후에는 멤버 권한으로 전환됩니다."
+            }
+        }
     }
 }

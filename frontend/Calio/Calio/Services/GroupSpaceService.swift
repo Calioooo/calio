@@ -2,7 +2,9 @@ import Foundation
 
 struct GroupSpaceService {
     private let repository: GroupSpaceRepository
-    init(repository: GroupSpaceRepository = URLSessionGroupSpaceRepository()) { self.repository = repository }
+    init(repository: GroupSpaceRepository = URLSessionGroupSpaceRepository()) {
+        self.repository = repository
+    }
     func fetchGroupSpaces() async throws -> [GroupSpace] {
         let response = try await perform { try await repository.fetchGroupSpaces() }
         return response.groupSpaces.map(mapToGroupSpace(_:))

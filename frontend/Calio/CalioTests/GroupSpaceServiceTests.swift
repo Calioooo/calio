@@ -341,13 +341,51 @@ private final class GroupSpaceRepositoryStub: GroupSpaceRepository {
         )
         return response
     }
-    func createGroupSpace(_ request: CreateGroupSpaceRequestDTO) async throws -> GroupSpaceResponseDTO { operations.append("create"); return Self.sampleSpace(name: request.name) }
-    func updateGroupSpace(groupSpaceId: Int64, request: UpdateGroupSpaceRequestDTO) async throws -> GroupSpaceResponseDTO { operations.append("update:\(groupSpaceId)"); return Self.sampleSpace(name: request.name) }
-    func deleteGroupSpace(groupSpaceId: Int64) async throws { operations.append("delete:\(groupSpaceId)") }
-    func fetchMembers(groupSpaceId: Int64) async throws -> GroupMemberListResponseDTO { operations.append("members:\(groupSpaceId)"); return .init(members: [.init(memberId: 10, nickname: "준하", role: .owner), .init(memberId: 11, nickname: "민지", role: .member)]) }
-    func transferOwnership(groupSpaceId: Int64, request: TransferGroupOwnerRequestDTO) async throws -> TransferGroupOwnerResponseDTO { operations.append("transfer:\(groupSpaceId):\(request.targetMemberId)"); return .init(previousOwner: .init(memberId: 10, nickname: "준하", role: .member), owner: .init(memberId: request.targetMemberId, nickname: "민지", role: .owner)) }
-    func leaveGroupSpace(groupSpaceId: Int64) async throws { operations.append("leave:\(groupSpaceId)") }
-    func removeMember(groupSpaceId: Int64, memberId: Int64) async throws { operations.append("remove:\(groupSpaceId):\(memberId)") }
+    func createGroupSpace(_ request: CreateGroupSpaceRequestDTO) async throws -> GroupSpaceResponseDTO {
+        operations.append("create")
+        return Self.sampleSpace(name: request.name)
+    }
+
+    func updateGroupSpace(
+        groupSpaceId: Int64,
+        request: UpdateGroupSpaceRequestDTO
+    ) async throws -> GroupSpaceResponseDTO {
+        operations.append("update:\(groupSpaceId)")
+        return Self.sampleSpace(name: request.name)
+    }
+
+    func deleteGroupSpace(groupSpaceId: Int64) async throws {
+        operations.append("delete:\(groupSpaceId)")
+    }
+
+    func fetchMembers(groupSpaceId: Int64) async throws -> GroupMemberListResponseDTO {
+        operations.append("members:\(groupSpaceId)")
+        return .init(
+            members: [
+                .init(memberId: 10, nickname: "준하", role: .owner),
+                .init(memberId: 11, nickname: "민지", role: .member)
+            ]
+        )
+    }
+
+    func transferOwnership(
+        groupSpaceId: Int64,
+        request: TransferGroupOwnerRequestDTO
+    ) async throws -> TransferGroupOwnerResponseDTO {
+        operations.append("transfer:\(groupSpaceId):\(request.targetMemberId)")
+        return .init(
+            previousOwner: .init(memberId: 10, nickname: "준하", role: .member),
+            owner: .init(memberId: request.targetMemberId, nickname: "민지", role: .owner)
+        )
+    }
+
+    func leaveGroupSpace(groupSpaceId: Int64) async throws {
+        operations.append("leave:\(groupSpaceId)")
+    }
+
+    func removeMember(groupSpaceId: Int64, memberId: Int64) async throws {
+        operations.append("remove:\(groupSpaceId):\(memberId)")
+    }
 
     enum StubError: Error { case failed }
 

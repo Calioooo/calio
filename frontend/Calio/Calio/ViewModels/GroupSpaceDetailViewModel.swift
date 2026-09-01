@@ -110,8 +110,13 @@ import Foundation
         }
     }
 
-    func clearError() { clearFailure() }
-    func clearPostRemovalRefreshMessage() { postRemovalRefreshMessage = nil }
+    func clearError() {
+        clearFailure()
+    }
+
+    func clearPostRemovalRefreshMessage() {
+        postRemovalRefreshMessage = nil
+    }
 
     private func recordFailure(_ error: Error, for operation: GroupSpaceOperation) {
         let failure = error as? GroupSpaceFailure ?? .unexpected

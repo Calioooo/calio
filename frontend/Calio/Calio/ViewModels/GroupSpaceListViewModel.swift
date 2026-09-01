@@ -10,7 +10,9 @@ import Combine
     @Published var errorMessage: String?
     private let service: GroupSpaceService
     private var latestLoadRequestID = 0
-    init(service: GroupSpaceService = GroupSpaceService()) { self.service = service }
+    init(service: GroupSpaceService = GroupSpaceService()) {
+        self.service = service
+    }
     deinit {}
 
     func load() async {
@@ -56,7 +58,9 @@ import Combine
     func remove(groupSpaceId: Int64) {
         spaces.removeAll { $0.groupSpaceId == groupSpaceId }
     }
-    func clearError() { clearFailure() }
+    func clearError() {
+        clearFailure()
+    }
 
     private func recordFailure(_ error: Error, for operation: GroupSpaceOperation) {
         let failure = error as? GroupSpaceFailure ?? .unexpected
