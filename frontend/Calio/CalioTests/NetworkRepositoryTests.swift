@@ -678,6 +678,56 @@ struct NetworkRepositoryTests {
         #expect(acceptanceBody as NSDictionary == ["credentialType": "INVITE_CODE", "credential": "CALIO-2026", "nickname": "준하"])
     }
 
+    @Test func urlSessionGroupSpaceRepositoryUsesCanonicalInvitationManagementContracts() async throws {
+        let issueResponse = """
+        { "invitationId": 3, "inviteUrl": "https://calio.app/invite/token", "inviteCode": "CALIO-2026", "expiresAt": "2026-08-30T00:00:00Z" }
+        """.data(using: .utf8)!
+        let listResponse = """
+        { "invitations": [{ "invitationId": 3, "expiresAt": "2026-08-30T00:00:00Z" }] }
+        """.data(using: .utf8)!
+        var requests: [URLRequest] = []
+        MockURLProtocol.requestHandler = { request in
+            requests.append(request)
+            let data: Data
+            let statusCode: Int
+            switch request.httpMethod {
+            case "POST":
+                data = issueResponse
+                statusCode = 201
+            case "GET":
+                data = listResponse
+                statusCode = 200
+            default:
+                data = Data()
+                statusCode = 204
+            }
+            return (HTTPURLResponse(url: request.url!, statusCode: statusCode, httpVersion: nil, headerFields: nil)!, data)
+        }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        let repository = URLSessionGroupSpaceRepository(
+            baseURL: URL(string: "https://example.test")!,
+            session: URLSession(configuration: configuration),
+            authTokenProvider: StaticAuthTokenProvider(accessToken: "test-token")
+        )
+
+        let issuedInvitation = try await repository.issueInvitation(groupSpaceId: 7)
+        let invitations = try await repository.fetchInvitations(groupSpaceId: 7)
+        try await repository.revokeInvitation(groupSpaceId: 7, invitationId: 3)
+
+        #expect(issuedInvitation.invitationId == 3)
+        #expect(issuedInvitation.inviteCode == "CALIO-2026")
+        #expect(invitations.invitations.map(\.invitationId) == [3])
+        #expect(requests.map { $0.url?.path } == [
+            "/api/group-spaces/7/invitations",
+            "/api/group-spaces/7/invitations",
+            "/api/group-spaces/7/invitations/3"
+        ])
+        #expect(requests.map { $0.httpMethod } == ["POST", "GET", "DELETE"])
+        #expect(requests.allSatisfy { $0.value(forHTTPHeaderField: "Authorization") == "Bearer test-token" })
+        #expect(requests.allSatisfy { requestBodyData(from: $0) == nil })
+    }
+
     private func groupRequestBodyJSON(from request: URLRequest) throws -> [String: Any] {
         guard let body = requestBodyData(from: request) else { throw GroupRequestBodyError.missing }
         guard let json = try JSONSerialization.jsonObject(with: body) as? [String: Any] else { throw GroupRequestBodyError.invalid }
