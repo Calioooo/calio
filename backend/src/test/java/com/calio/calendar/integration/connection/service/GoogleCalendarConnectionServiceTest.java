@@ -271,15 +271,29 @@ class GoogleCalendarConnectionServiceTest {
         GoogleCalendarIntegration integration = integration();
         GoogleCalendarConnection connection = connection(integration);
         when(integrationCommandService.tryLockIntegration(ACCOUNT_ID)).thenReturn(Optional.of(integration));
-        when(connectionCommandService.tryLockConnectionByIntegrationAndState(
-                integration.getId(),
-                GoogleCalendarConnectionState.CONNECTED
-        ))
+        when(connectionCommandService.tryLockDisconnectableConnectionByIntegration(integration.getId()))
                 .thenReturn(Optional.of(connection));
 
         service().disconnect(ACCOUNT_ID);
 
         verify(jobCommandService).deleteJobsForIntegration(connection.getIntegration().getId());
+        verify(connectionCommandService).disconnect(connection, NOW);
+        verify(oauthClient).revokeToken("refresh-token");
+    }
+
+    @Test
+    @DisplayName("sync error Connection도 해제하면 Job과 credential을 정리한다")
+    void givenSyncErrorConnection_whenDisconnect_thenCleansConnectionBeforeRevokingToken() {
+        GoogleCalendarIntegration integration = integration();
+        GoogleCalendarConnection connection = connection(integration);
+        connection.markSyncError("GOOGLE_CALENDAR_RECONNECT_REQUIRED", NOW.minusSeconds(60));
+        when(integrationCommandService.tryLockIntegration(ACCOUNT_ID)).thenReturn(Optional.of(integration));
+        when(connectionCommandService.tryLockDisconnectableConnectionByIntegration(integration.getId()))
+                .thenReturn(Optional.of(connection));
+
+        service().disconnect(ACCOUNT_ID);
+
+        verify(jobCommandService).deleteJobsForIntegration(integration.getId());
         verify(connectionCommandService).disconnect(connection, NOW);
         verify(oauthClient).revokeToken("refresh-token");
     }

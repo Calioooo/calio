@@ -3,6 +3,7 @@ package com.calio.calendar.integration.connection.repository;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarConnection;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarConnectionState;
 import jakarta.persistence.LockModeType;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Pageable;
@@ -73,6 +74,19 @@ public interface GoogleCalendarConnectionRepository extends JpaRepository<Google
     Optional<GoogleCalendarConnection> findWithIntegrationByIntegrationIdAndStateForUpdate(
             @Param("integrationId") Long integrationId,
             @Param("state") GoogleCalendarConnectionState state
+    );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @EntityGraph(attributePaths = "integration")
+    @Query("""
+            select connection
+            from GoogleCalendarConnection connection
+            where connection.integration.id = :integrationId
+              and connection.state in :states
+            """)
+    Optional<GoogleCalendarConnection> findWithIntegrationByIntegrationIdAndStateInForUpdate(
+            @Param("integrationId") Long integrationId,
+            @Param("states") Collection<GoogleCalendarConnectionState> states
     );
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

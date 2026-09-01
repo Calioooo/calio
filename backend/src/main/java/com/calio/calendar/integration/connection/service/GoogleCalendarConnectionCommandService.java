@@ -8,6 +8,7 @@ import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegratio
 import com.calio.calendar.integration.connection.repository.GoogleCalendarConnectionRepository;
 import com.calio.calendar.integration.sync.operation.GoogleOperationOwnershipLostException;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
 
@@ -47,6 +48,16 @@ public class GoogleCalendarConnectionCommandService {
             GoogleCalendarConnectionState state
     ) {
         return connectionRepository.findWithIntegrationByIntegrationIdAndStateForUpdate(integrationId, state);
+    }
+
+    public Optional<GoogleCalendarConnection> tryLockDisconnectableConnectionByIntegration(Long integrationId) {
+        return connectionRepository.findWithIntegrationByIntegrationIdAndStateInForUpdate(
+                integrationId,
+                List.of(
+                        GoogleCalendarConnectionState.CONNECTED,
+                        GoogleCalendarConnectionState.SYNC_ERROR
+                )
+        );
     }
 
     public GoogleCalendarConnection lockConnectedConnectionById(Long connectionId) {

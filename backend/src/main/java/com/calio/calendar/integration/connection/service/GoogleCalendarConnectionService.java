@@ -102,10 +102,8 @@ public class GoogleCalendarConnectionService {
     private String disconnectLocally(Long accountId) {
         return disconnectTransaction.execute(status ->
                 integrationCommandService.tryLockIntegration(accountId)
-                        .flatMap(integration -> connectionCommandService.tryLockConnectionByIntegrationAndState(
-                                integration.getId(),
-                                GoogleCalendarConnectionState.CONNECTED
-                        ))
+                        .flatMap(integration -> connectionCommandService
+                                .tryLockDisconnectableConnectionByIntegration(integration.getId()))
                         .map(connection -> {
                             String refreshToken = connection.getEncryptedRefreshToken();
                             jobCommandService.deleteJobsForIntegration(connection.getIntegration().getId());
