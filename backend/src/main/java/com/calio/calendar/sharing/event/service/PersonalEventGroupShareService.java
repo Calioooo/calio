@@ -9,6 +9,8 @@ import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.service.GroupMembershipQueryService;
 import com.calio.calendar.sharing.controller.dto.GroupShareTargetResponse;
 import com.calio.calendar.sharing.controller.dto.GroupShareTargetStatus;
+import com.calio.calendar.sharing.controller.dto.GroupShareStatusResponse;
+import com.calio.calendar.sharing.controller.dto.UpdateGroupShareAnonymousRequest;
 import com.calio.calendar.sharing.event.controller.dto.CreateEventGroupSharesRequest;
 import com.calio.calendar.sharing.event.controller.dto.CreateEventGroupSharesResponse;
 import com.calio.calendar.sharing.event.controller.dto.EventGroupShareResultResponse;
@@ -52,7 +54,7 @@ public class PersonalEventGroupShareService {
         Set<ShareKey> existingKeys = existingKeys(eventIds, groupSpaceIds);
 
         List<EventGroupShareResultResponse> results = eventIds.stream()
-                .map(eventId -> new EventGroupShareResultResponse(
+                .map(eventId -> EventGroupShareResultResponse.from(
                         eventId,
                         shareTargets(
                                 eventsById.get(eventId),
@@ -63,7 +65,30 @@ public class PersonalEventGroupShareService {
                         )
                 ))
                 .toList();
-        return new CreateEventGroupSharesResponse(results);
+        return CreateEventGroupSharesResponse.from(results);
+    }
+
+    public List<GroupShareStatusResponse> list(Long eventId) {
+        return shareQueryService.listByEventId(eventId).stream()
+                .map(GroupShareStatusResponse::from)
+                .toList();
+    }
+
+    @Transactional
+    public GroupShareStatusResponse changeAnonymous(
+            Long eventId,
+            Long groupSpaceId,
+            UpdateGroupShareAnonymousRequest request
+    ) {
+        PersonalEventGroupShare share = shareQueryService.getByEventIdAndGroupSpaceId(eventId, groupSpaceId);
+        shareCommandService.changeAnonymous(share, request.isAnonymous());
+        return GroupShareStatusResponse.from(share);
+    }
+
+    @Transactional
+    public void remove(Long eventId, Long groupSpaceId) {
+        PersonalEventGroupShare share = shareQueryService.getByEventIdAndGroupSpaceId(eventId, groupSpaceId);
+        shareCommandService.delete(share);
     }
 
     private Map<Long, Event> validateSources(Long accountId, List<Long> eventIds) {
@@ -118,16 +143,16 @@ public class PersonalEventGroupShareService {
             boolean anonymous
     ) {
         if (groupSpace == null) {
-            return new GroupShareTargetResponse(groupSpaceId, GroupShareTargetStatus.NOT_ELIGIBLE);
+            return GroupShareTargetResponse.from(groupSpaceId, GroupShareTargetStatus.NOT_ELIGIBLE);
         }
         ShareKey key = new ShareKey(event.getId(), groupSpaceId);
         if (existingKeys.contains(key)) {
-            return new GroupShareTargetResponse(groupSpaceId, GroupShareTargetStatus.ALREADY_SHARED);
+            return GroupShareTargetResponse.from(groupSpaceId, GroupShareTargetStatus.ALREADY_SHARED);
         }
         boolean inserted = shareCommandService.createIfAbsent(
                 PersonalEventGroupShare.create(event, groupSpace, anonymous)
         );
-        return new GroupShareTargetResponse(
+        return GroupShareTargetResponse.from(
                 groupSpaceId,
                 inserted ? GroupShareTargetStatus.SHARED : GroupShareTargetStatus.ALREADY_SHARED
         );

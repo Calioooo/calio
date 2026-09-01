@@ -6,7 +6,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doAnswer;
 
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
@@ -16,6 +18,8 @@ import com.calio.calendar.groupspace.domain.GroupMember;
 import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.service.GroupMembershipQueryService;
 import com.calio.calendar.sharing.controller.dto.GroupShareTargetStatus;
+import com.calio.calendar.sharing.controller.dto.GroupShareStatusResponse;
+import com.calio.calendar.sharing.controller.dto.UpdateGroupShareAnonymousRequest;
 import com.calio.calendar.sharing.event.controller.dto.CreateEventGroupSharesRequest;
 import com.calio.calendar.sharing.event.controller.dto.CreateEventGroupSharesResponse;
 import java.util.List;
@@ -97,6 +101,76 @@ class PersonalEventGroupShareServiceTest {
         assertThat(response.results().getFirst().targets())
                 .extracting(target -> target.status())
                 .containsExactly(GroupShareTargetStatus.ALREADY_SHARED, GroupShareTargetStatus.ALREADY_SHARED);
+    }
+
+    @Test
+    @DisplayName("원본 소유자는 대상별 공유 상태를 조회한다")
+    void listReturnsTargetSpecificShareStatesForSourceOwner() {
+        Event event = event(1L);
+        GroupSpace groupSpace = groupSpace(10L);
+        var share = com.calio.calendar.sharing.event.domain.PersonalEventGroupShare.create(
+                event,
+                groupSpace,
+                true
+        );
+        when(shareQueryService.listByEventId(1L)).thenReturn(List.of(share));
+
+        List<GroupShareStatusResponse> response = service.list(1L);
+
+        assertThat(response).singleElement().satisfies(status -> {
+            assertThat(status.groupSpaceId()).isEqualTo(10L);
+            assertThat(status.groupSpaceName()).isEqualTo("group");
+            assertThat(status.isAnonymous()).isTrue();
+            assertThat(status.publicShareId()).isEqualTo(share.getPublicShareId());
+        });
+        verifyNoInteractions(shareCommandService);
+    }
+
+    @Test
+    @DisplayName("원본 소유자는 한 대상의 익명 여부만 변경한다")
+    void changeAnonymousUpdatesOnlyRequestedTargetMapping() {
+        Event event = event(1L);
+        GroupSpace firstGroup = groupSpace(10L);
+        GroupSpace secondGroup = groupSpace(20L);
+        var firstShare = com.calio.calendar.sharing.event.domain.PersonalEventGroupShare.create(
+                event, firstGroup, false
+        );
+        var secondShare = com.calio.calendar.sharing.event.domain.PersonalEventGroupShare.create(
+                event, secondGroup, false
+        );
+        when(shareQueryService.getByEventIdAndGroupSpaceId(1L, 10L)).thenReturn(firstShare);
+        doAnswer(invocation -> {
+            invocation.<com.calio.calendar.sharing.event.domain.PersonalEventGroupShare>getArgument(0)
+                    .changeAnonymous(invocation.getArgument(1));
+            return null;
+        }).when(shareCommandService).changeAnonymous(firstShare, true);
+
+        GroupShareStatusResponse response = service.changeAnonymous(
+                1L, 10L, new UpdateGroupShareAnonymousRequest(true)
+        );
+
+        assertThat(response.isAnonymous()).isTrue();
+        assertThat(firstShare.isAnonymous()).isTrue();
+        assertThat(secondShare.isAnonymous()).isFalse();
+        verify(shareCommandService).changeAnonymous(firstShare, true);
+    }
+
+    @Test
+    @DisplayName("원본 소유자는 지정한 대상 mapping만 해제한다")
+    void removeDeletesOnlyRequestedTargetMapping() {
+        Event event = event(1L);
+        var requestedShare = com.calio.calendar.sharing.event.domain.PersonalEventGroupShare.create(
+                event, groupSpace(10L), false
+        );
+        var remainingShare = com.calio.calendar.sharing.event.domain.PersonalEventGroupShare.create(
+                event, groupSpace(20L), false
+        );
+        when(shareQueryService.getByEventIdAndGroupSpaceId(1L, 10L)).thenReturn(requestedShare);
+
+        service.remove(1L, 10L);
+
+        verify(shareCommandService).delete(requestedShare);
+        verify(shareCommandService, never()).delete(remainingShare);
     }
 
     private Event event(Long id) {

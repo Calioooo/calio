@@ -24,6 +24,11 @@ public class EventQueryService {
                 .orElseThrow(() -> new CalioException(ErrorCode.EVENT_NOT_FOUND));
     }
 
+    public Event getEventById(Long eventId) {
+        return eventRepository.findById(eventId)
+                .orElseThrow(() -> new CalioException(ErrorCode.EVENT_NOT_FOUND));
+    }
+
     public List<Event> listShareableEvents(Long accountId, List<Long> eventIds) {
         return eventRepository.findAllShareableByIdsAndAccountId(eventIds, accountId);
     }

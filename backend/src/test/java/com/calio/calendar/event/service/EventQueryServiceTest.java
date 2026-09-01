@@ -62,6 +62,15 @@ class EventQueryServiceTest {
     }
 
     @Test
+    @DisplayName("일정 ID 조회는 소유권 판단 없이 entity를 반환한다")
+    void givenEventId_whenFindEventById_thenReturnsEntity() {
+        Event event = event();
+        when(eventRepository.findById(10L)).thenReturn(Optional.of(event));
+
+        assertThat(eventQueryService.getEventById(10L)).isSameAs(event);
+    }
+
+    @Test
     @DisplayName("일반 일정 조회는 범위 인수를 그대로 repository에 위임한다")
     void givenTimeRange_whenListEvents_thenReturnsRepositoryResult() {
         // given

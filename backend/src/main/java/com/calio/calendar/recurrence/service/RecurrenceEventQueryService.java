@@ -33,6 +33,11 @@ public class RecurrenceEventQueryService {
                 .orElseThrow(() -> new CalioException(ErrorCode.RECURRENCE_EVENT_NOT_FOUND));
     }
 
+    public RecurrenceEvent getRecurrenceEventById(Long recurrenceId) {
+        return recurrenceEventRepository.findById(recurrenceId)
+                .orElseThrow(() -> new CalioException(ErrorCode.RECURRENCE_EVENT_NOT_FOUND));
+    }
+
     public Optional<RecurrenceEventOverride> getOverrideIfExists(Long recurrenceId, Instant originStartAt) {
         return recurrenceEventOverrideRepository
                 .findByRecurrenceEvent_IdAndOriginStartAt(recurrenceId, originStartAt);
@@ -45,6 +50,14 @@ public class RecurrenceEventQueryService {
     public List<RecurrenceEventOverride> listOverrides(Long recurrenceId, Collection<Instant> originStartAts) {
         return recurrenceEventOverrideRepository
                 .findByRecurrenceEvent_IdAndOriginStartAtIn(recurrenceId, originStartAts);
+    }
+
+    public List<RecurrenceEventOverride> listOverridesForRecurrenceIdsInRange(
+            Collection<Long> recurrenceIds,
+            Instant from,
+            Instant to
+    ) {
+        return recurrenceEventOverrideRepository.findAllForRecurrenceIdsInRange(recurrenceIds, from, to);
     }
 
     public List<RecurrenceEventOverride> listActiveOverlappingOverrides(

@@ -10,6 +10,9 @@ import com.calio.calendar.security.AuthenticatedAccount;
 import com.calio.calendar.sharing.recurrence.controller.dto.CreateRecurrenceGroupSharesRequest;
 import com.calio.calendar.sharing.recurrence.controller.dto.CreateRecurrenceGroupSharesResponse;
 import com.calio.calendar.sharing.recurrence.service.PersonalRecurrenceGroupShareService;
+import com.calio.calendar.sharing.controller.dto.GroupShareStatusResponse;
+import com.calio.calendar.sharing.controller.dto.UpdateGroupShareAnonymousRequest;
+import java.util.List;
 import jakarta.validation.Valid;
 import java.time.Instant;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -80,6 +83,36 @@ public class RecurrenceEventController {
     ) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(recurrenceGroupShareService.create(account.accountId(), recurrenceId, request));
+    }
+
+    @GetMapping("/{recurrenceId}/group-shares")
+    public List<GroupShareStatusResponse> listGroupShares(
+            @AuthenticationPrincipal AuthenticatedAccount account,
+            @PathVariable("recurrenceId") Long recurrenceId
+    ) {
+        return recurrenceEventService.listGroupShares(account.accountId(), recurrenceId);
+    }
+
+    @PatchMapping("/{recurrenceId}/group-shares/{groupSpaceId}")
+    public GroupShareStatusResponse changeGroupShareAnonymous(
+            @AuthenticationPrincipal AuthenticatedAccount account,
+            @PathVariable("recurrenceId") Long recurrenceId,
+            @PathVariable("groupSpaceId") Long groupSpaceId,
+            @Valid @RequestBody UpdateGroupShareAnonymousRequest request
+    ) {
+        return recurrenceEventService.changeGroupShareAnonymous(
+                account.accountId(), recurrenceId, groupSpaceId, request
+        );
+    }
+
+    @DeleteMapping("/{recurrenceId}/group-shares/{groupSpaceId}")
+    public ResponseEntity<Void> removeGroupShare(
+            @AuthenticationPrincipal AuthenticatedAccount account,
+            @PathVariable("recurrenceId") Long recurrenceId,
+            @PathVariable("groupSpaceId") Long groupSpaceId
+    ) {
+        recurrenceEventService.removeGroupShare(account.accountId(), recurrenceId, groupSpaceId);
+        return ResponseEntity.noContent().build();
     }
 
     @PutMapping("/{recurrenceId}")

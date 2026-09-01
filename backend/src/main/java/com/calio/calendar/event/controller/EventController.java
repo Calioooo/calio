@@ -9,6 +9,8 @@ import com.calio.calendar.event.service.EventService;
 import com.calio.calendar.sharing.event.controller.dto.CreateEventGroupSharesRequest;
 import com.calio.calendar.sharing.event.controller.dto.CreateEventGroupSharesResponse;
 import com.calio.calendar.sharing.event.service.PersonalEventGroupShareService;
+import com.calio.calendar.sharing.controller.dto.GroupShareStatusResponse;
+import com.calio.calendar.sharing.controller.dto.UpdateGroupShareAnonymousRequest;
 import jakarta.validation.Valid;
 import java.time.Instant;
 import java.util.List;
@@ -95,6 +97,36 @@ public class EventController {
     ) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(eventGroupShareService.create(account.accountId(), request));
+    }
+
+    @GetMapping("/{eventId}/group-shares")
+    public List<GroupShareStatusResponse> listGroupShares(
+            @AuthenticationPrincipal AuthenticatedAccount account,
+            @PathVariable("eventId") Long eventId
+    ) {
+        return eventService.listGroupShares(account.accountId(), eventId);
+    }
+
+    @PatchMapping("/{eventId}/group-shares/{groupSpaceId}")
+    public GroupShareStatusResponse changeGroupShareAnonymous(
+            @AuthenticationPrincipal AuthenticatedAccount account,
+            @PathVariable("eventId") Long eventId,
+            @PathVariable("groupSpaceId") Long groupSpaceId,
+            @Valid @RequestBody UpdateGroupShareAnonymousRequest request
+    ) {
+        return eventService.changeGroupShareAnonymous(
+                account.accountId(), eventId, groupSpaceId, request
+        );
+    }
+
+    @DeleteMapping("/{eventId}/group-shares/{groupSpaceId}")
+    public ResponseEntity<Void> removeGroupShare(
+            @AuthenticationPrincipal AuthenticatedAccount account,
+            @PathVariable("eventId") Long eventId,
+            @PathVariable("groupSpaceId") Long groupSpaceId
+    ) {
+        eventService.removeGroupShare(account.accountId(), eventId, groupSpaceId);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping

@@ -85,6 +85,15 @@ class RecurrenceEventQueryServiceTest {
     }
 
     @Test
+    @DisplayName("반복 일정 ID 조회는 소유권 판단 없이 entity를 반환한다")
+    void givenRecurrenceEventId_whenFindRecurrenceEventById_thenReturnsEntity() {
+        RecurrenceEvent recurrenceEvent = recurrenceEvent();
+        when(recurrenceEventRepository.findById(10L)).thenReturn(Optional.of(recurrenceEvent));
+
+        assertThat(recurrenceEventQueryService.getRecurrenceEventById(10L)).isSameAs(recurrenceEvent);
+    }
+
+    @Test
     @DisplayName("반복 일정 확장 후보 조회는 계정과 종료 시각을 repository에 그대로 위임한다")
     void givenExpansionRange_whenFindCandidates_thenReturnsRepositoryResult() {
         // given

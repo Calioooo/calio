@@ -17,8 +17,12 @@ import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.event.service.EventCommandService;
 import com.calio.calendar.tag.service.TagQueryService;
 import com.calio.calendar.sharing.recurrence.service.PersonalRecurrenceGroupShareCommandService;
+import com.calio.calendar.sharing.recurrence.service.PersonalRecurrenceGroupShareService;
+import com.calio.calendar.sharing.controller.dto.GroupShareStatusResponse;
+import com.calio.calendar.sharing.controller.dto.UpdateGroupShareAnonymousRequest;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
@@ -36,6 +40,7 @@ public class RecurrenceEventService {
     private final Rfc5545RecurrenceEngine recurrenceEngine;
     private final Clock clock;
     private final PersonalRecurrenceGroupShareCommandService recurrenceShareCommandService;
+    private final PersonalRecurrenceGroupShareService recurrenceGroupShareService;
 
     public RecurrenceEventService(
             RecurrenceEventQueryService recurrenceEventQueryService,
@@ -45,7 +50,8 @@ public class RecurrenceEventService {
             EventCommandService eventCommandService,
             Rfc5545RecurrenceEngine recurrenceEngine,
             Clock clock,
-            PersonalRecurrenceGroupShareCommandService recurrenceShareCommandService
+            PersonalRecurrenceGroupShareCommandService recurrenceShareCommandService,
+            PersonalRecurrenceGroupShareService recurrenceGroupShareService
     ) {
         this.recurrenceEventQueryService = recurrenceEventQueryService;
         this.recurrenceEventCommandService = recurrenceEventCommandService;
@@ -55,6 +61,7 @@ public class RecurrenceEventService {
         this.recurrenceEngine = recurrenceEngine;
         this.clock = clock;
         this.recurrenceShareCommandService = recurrenceShareCommandService;
+        this.recurrenceGroupShareService = recurrenceGroupShareService;
     }
 
     @Transactional
@@ -155,6 +162,41 @@ public class RecurrenceEventService {
         );
     }
 
+    public List<GroupShareStatusResponse> listGroupShares(Long accountId, Long recurrenceId) {
+        RecurrenceEvent recurrenceEvent = getRecurrenceEventForShareManagement(accountId, recurrenceId);
+        return recurrenceGroupShareService.list(recurrenceEvent.getId());
+    }
+
+    public List<RecurrenceEventOverride> listOverridesForRecurrenceIdsInRange(
+            Collection<Long> recurrenceIds,
+            Instant from,
+            Instant to
+    ) {
+        if (recurrenceIds.isEmpty()) {
+            return List.of();
+        }
+        return recurrenceEventQueryService.listOverridesForRecurrenceIdsInRange(recurrenceIds, from, to);
+    }
+
+    @Transactional
+    public GroupShareStatusResponse changeGroupShareAnonymous(
+            Long accountId,
+            Long recurrenceId,
+            Long groupSpaceId,
+            UpdateGroupShareAnonymousRequest request
+    ) {
+        RecurrenceEvent recurrenceEvent = getRecurrenceEventForShareManagement(accountId, recurrenceId);
+        return recurrenceGroupShareService.changeAnonymous(
+                recurrenceEvent.getId(), groupSpaceId, request
+        );
+    }
+
+    @Transactional
+    public void removeGroupShare(Long accountId, Long recurrenceId, Long groupSpaceId) {
+        RecurrenceEvent recurrenceEvent = getRecurrenceEventForShareManagement(accountId, recurrenceId);
+        recurrenceGroupShareService.remove(recurrenceEvent.getId(), groupSpaceId);
+    }
+
     private RecurrenceSchedule createSchedule(CreateRecurrenceEventRequest request) {
         return RecurrenceSchedule.create(
                 request.allDay(),
@@ -191,5 +233,13 @@ public class RecurrenceEventService {
                 recurrenceEvent.getRecurrenceRules(),
                 originStartAt
         );
+    }
+
+    private RecurrenceEvent getRecurrenceEventForShareManagement(Long accountId, Long recurrenceId) {
+        RecurrenceEvent recurrenceEvent = recurrenceEventQueryService.getRecurrenceEventById(recurrenceId);
+        if (!recurrenceEvent.getAccount().getId().equals(accountId)) {
+            throw new CalioException(ErrorCode.PERSONAL_SCHEDULE_SHARE_FORBIDDEN);
+        }
+        return recurrenceEvent;
     }
 }

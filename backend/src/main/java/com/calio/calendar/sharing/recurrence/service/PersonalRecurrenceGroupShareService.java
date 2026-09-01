@@ -7,6 +7,8 @@ import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.service.RecurrenceEventQueryService;
 import com.calio.calendar.sharing.controller.dto.GroupShareTargetResponse;
 import com.calio.calendar.sharing.controller.dto.GroupShareTargetStatus;
+import com.calio.calendar.sharing.controller.dto.GroupShareStatusResponse;
+import com.calio.calendar.sharing.controller.dto.UpdateGroupShareAnonymousRequest;
 import com.calio.calendar.sharing.recurrence.controller.dto.CreateRecurrenceGroupSharesRequest;
 import com.calio.calendar.sharing.recurrence.controller.dto.CreateRecurrenceGroupSharesResponse;
 import com.calio.calendar.sharing.recurrence.domain.PersonalRecurrenceGroupShare;
@@ -62,7 +64,32 @@ public class PersonalRecurrenceGroupShareService {
                         request.isAnonymous()
                 ))
                 .toList();
-        return new CreateRecurrenceGroupSharesResponse(recurrenceId, targets);
+        return CreateRecurrenceGroupSharesResponse.from(recurrenceId, targets);
+    }
+
+    public List<GroupShareStatusResponse> list(Long recurrenceId) {
+        return shareQueryService.listByRecurrenceEventId(recurrenceId).stream()
+                .map(GroupShareStatusResponse::from)
+                .toList();
+    }
+
+    @Transactional
+    public GroupShareStatusResponse changeAnonymous(
+            Long recurrenceId,
+            Long groupSpaceId,
+            UpdateGroupShareAnonymousRequest request
+    ) {
+        PersonalRecurrenceGroupShare share = shareQueryService
+                .getByRecurrenceEventIdAndGroupSpaceId(recurrenceId, groupSpaceId);
+        shareCommandService.changeAnonymous(share, request.isAnonymous());
+        return GroupShareStatusResponse.from(share);
+    }
+
+    @Transactional
+    public void remove(Long recurrenceId, Long groupSpaceId) {
+        PersonalRecurrenceGroupShare share = shareQueryService
+                .getByRecurrenceEventIdAndGroupSpaceId(recurrenceId, groupSpaceId);
+        shareCommandService.delete(share);
     }
 
     private Map<Long, GroupSpace> activeGroupSpaces(Long accountId, List<Long> groupSpaceIds) {
@@ -82,15 +109,15 @@ public class PersonalRecurrenceGroupShareService {
             boolean anonymous
     ) {
         if (groupSpace == null) {
-            return new GroupShareTargetResponse(groupSpaceId, GroupShareTargetStatus.NOT_ELIGIBLE);
+            return GroupShareTargetResponse.from(groupSpaceId, GroupShareTargetStatus.NOT_ELIGIBLE);
         }
         if (existingGroupSpaceIds.contains(groupSpaceId)) {
-            return new GroupShareTargetResponse(groupSpaceId, GroupShareTargetStatus.ALREADY_SHARED);
+            return GroupShareTargetResponse.from(groupSpaceId, GroupShareTargetStatus.ALREADY_SHARED);
         }
         boolean inserted = shareCommandService.createIfAbsent(
                 PersonalRecurrenceGroupShare.create(recurrenceEvent, groupSpace, anonymous)
         );
-        return new GroupShareTargetResponse(
+        return GroupShareTargetResponse.from(
                 groupSpaceId,
                 inserted ? GroupShareTargetStatus.SHARED : GroupShareTargetStatus.ALREADY_SHARED
         );

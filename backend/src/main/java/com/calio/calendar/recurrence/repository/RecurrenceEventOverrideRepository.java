@@ -20,6 +20,26 @@ public interface RecurrenceEventOverrideRepository extends JpaRepository<Recurre
             Collection<Instant> originStartAt
     );
 
+    @EntityGraph(attributePaths = "recurrenceEvent")
+    @Query("""
+            select recurrenceOverride
+            from RecurrenceEventOverride recurrenceOverride
+            where recurrenceOverride.recurrenceEvent.id in :recurrenceIds
+              and (
+                    (recurrenceOverride.originStartAt >= :from and recurrenceOverride.originStartAt < :to)
+                 or (
+                        recurrenceOverride.deletedAt is null
+                    and recurrenceOverride.overrideStartAt < :to
+                    and recurrenceOverride.overrideEndAt > :from
+                 )
+              )
+            """)
+    List<RecurrenceEventOverride> findAllForRecurrenceIdsInRange(
+            @Param("recurrenceIds") Collection<Long> recurrenceIds,
+            @Param("from") Instant from,
+            @Param("to") Instant to
+    );
+
     @EntityGraph(attributePaths = {"recurrenceEvent", "recurrenceEvent.tag"})
     @Query("""
             select recurrenceOverride
