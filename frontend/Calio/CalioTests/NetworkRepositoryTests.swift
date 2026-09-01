@@ -667,7 +667,7 @@ struct NetworkRepositoryTests {
         #expect(preview.memberCount == 2)
         #expect(preview.memberPreviews?.map(\.nickname) == ["준하", "민지"])
         #expect(previewWithoutMemberPreviews.memberPreviews == nil)
-        #expect(acceptance.joinResult == "ALREADY_MEMBER")
+        #expect(acceptance.joinResult == .alreadyMember)
         #expect(acceptance.groupSpace.name == "프로젝트 팀")
         #expect(requests.map { $0.url?.path } == ["/api/group-invitations/preview", "/api/group-invitations/preview", "/api/group-invitations/accept"])
         #expect(requests.map { $0.httpMethod } == ["POST", "POST", "POST"])
