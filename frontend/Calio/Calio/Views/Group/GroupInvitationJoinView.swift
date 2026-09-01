@@ -223,8 +223,8 @@ struct GroupInvitationJoinView: View {
 
     private static let expiryDateFormatter: DateFormatter = {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "ko_KR")
-        formatter.dateFormat = "yyyy년 M월 d일 (EEE) a h:mm"
+        formatter.locale = .autoupdatingCurrent
+        formatter.setLocalizedDateFormatFromTemplate("yMMMEdjmm")
         return formatter
     }()
 
