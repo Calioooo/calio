@@ -44,6 +44,7 @@ import Combine
             let space = try await service.create(name: name, emoji: nil, nickname: nickname)
             latestLoadRequestID += 1
             isLoading = false
+            didFailLoading = false
             spaces.append(space)
             clearFailure()
             return true
