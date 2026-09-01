@@ -44,12 +44,12 @@ class TagControllerTest {
     }
 
     @Test
-    @DisplayName("사용자는 DEFAULT와 CUSTOM 태그 목록을 id, title, colorCode, tagType으로 조회한다")
-    void givenDefaultAndCustomTags_whenListTags_thenReturnsAllTags() throws Exception {
+    @DisplayName("사용자는 PERSONAL_DEFAULT와 CUSTOM 태그 목록을 id, title, colorCode, tagType으로 조회한다")
+    void givenPersonalDefaultAndCustomTags_whenListTags_thenReturnsAllTags() throws Exception {
         // given
-        tagRepository.save(new Tag(TagType.DEFAULT, "업무", "#2563eb"));
-        tagRepository.save(new Tag(TagType.DEFAULT, "기타", "#64748b"));
-        tagRepository.save(new Tag(TagType.CUSTOM, "사용자", "#111111", currentAccountReference()));
+        tagRepository.save(Tag.personalDefault("업무", "#2563eb"));
+        tagRepository.save(Tag.personalDefault("기타", "#64748b"));
+        tagRepository.save(Tag.personalCustom(currentAccountReference(), "사용자", "#111111"));
 
         // when
         mockMvc.perform(get("/api/tags"))
@@ -58,12 +58,12 @@ class TagControllerTest {
                 .andExpect(jsonPath("$", hasSize(3)))
                 .andExpect(jsonPath("$[0].title").value("업무"))
                 .andExpect(jsonPath("$[0].colorCode").value("#2563EB"))
-                .andExpect(jsonPath("$[0].tagType").value("DEFAULT"))
+                .andExpect(jsonPath("$[0].tagType").value("PERSONAL_DEFAULT"))
                 .andExpect(jsonPath("$[0].createdAt").doesNotExist())
                 .andExpect(jsonPath("$[0].updatedAt").doesNotExist())
                 .andExpect(jsonPath("$[1].title").value("기타"))
                 .andExpect(jsonPath("$[1].colorCode").value("#64748B"))
-                .andExpect(jsonPath("$[1].tagType").value("DEFAULT"))
+                .andExpect(jsonPath("$[1].tagType").value("PERSONAL_DEFAULT"))
                 .andExpect(jsonPath("$[2].title").value("사용자"))
                 .andExpect(jsonPath("$[2].colorCode").value("#111111"))
                 .andExpect(jsonPath("$[2].tagType").value("CUSTOM"));

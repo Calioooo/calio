@@ -49,15 +49,50 @@ public class TagQueryService {
     }
 
     public Tag getFallbackTag() {
-        return tagRepository.findFirstByTagTypeAndTitleAndAccountIsNullOrderByIdAsc(
-                        TagType.DEFAULT,
+        return tagRepository.findFirstByTagTypeAndTitleAndAccountIsNullAndGroupSpaceIsNullOrderByIdAsc(
+                        TagType.PERSONAL_DEFAULT,
                         FALLBACK_TAG_TITLE
                 )
                 .orElseThrow(() -> new CalioException(ErrorCode.DEFAULT_TAG_NOT_FOUND));
     }
 
+    public List<Tag> listGroupTags(Long groupSpaceId) {
+        return tagRepository.findByGroupSpace_IdOrderByIdAsc(groupSpaceId);
+    }
+
+    public Tag getGroupCustomTag(Long groupSpaceId, Long tagId) {
+        return tagRepository.findByIdAndGroupSpace_Id(tagId, groupSpaceId)
+                .filter(tag -> tag.getTagType() == TagType.CUSTOM)
+                .orElseThrow(() -> new CalioException(ErrorCode.GROUP_TAG_NOT_FOUND));
+    }
+
+    public Tag getGroupDefaultTag(Long groupSpaceId) {
+        return tagRepository.findByTagTypeAndGroupSpace_Id(TagType.GROUP_DEFAULT, groupSpaceId)
+                .orElseThrow(() -> new CalioException(ErrorCode.GROUP_DEFAULT_TAG_NOT_FOUND));
+    }
+
+    public Tag getGroupTagOrDefault(Long groupSpaceId, Long tagId) {
+        if (tagId == null) {
+            return getGroupDefaultTag(groupSpaceId);
+        }
+        return tagRepository.findByIdAndGroupSpace_Id(tagId, groupSpaceId)
+                .orElseThrow(() -> new CalioException(ErrorCode.GROUP_TAG_NOT_FOUND));
+    }
+
+    public boolean hasGroupCustomTagTitle(Long groupSpaceId, String title, Long excludedTagId) {
+        if (excludedTagId == null) {
+            return tagRepository.existsByTagTypeAndTitleAndGroupSpace_Id(TagType.CUSTOM, title, groupSpaceId);
+        }
+        return tagRepository.existsByTagTypeAndTitleAndGroupSpace_IdAndIdNot(
+                TagType.CUSTOM,
+                title,
+                groupSpaceId,
+                excludedTagId
+        );
+    }
+
     private List<Tag> listGlobalDefaultTags() {
-        return tagRepository.findByTagTypeAndAccountIsNullOrderByIdAsc(TagType.DEFAULT);
+        return tagRepository.findByTagTypeAndAccountIsNullAndGroupSpaceIsNullOrderByIdAsc(TagType.PERSONAL_DEFAULT);
     }
 
     private List<Tag> listAccountCustomTags(Long accountId) {
@@ -65,7 +100,7 @@ public class TagQueryService {
     }
 
     private Optional<Tag> getGlobalDefaultTagIfExists(Long tagId) {
-        return tagRepository.findByIdAndTagTypeAndAccountIsNull(tagId, TagType.DEFAULT);
+        return tagRepository.findByIdAndTagTypeAndAccountIsNullAndGroupSpaceIsNull(tagId, TagType.PERSONAL_DEFAULT);
     }
 
     private Optional<Tag> getAccountCustomTagIfExists(Long accountId, Long tagId) {

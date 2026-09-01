@@ -12,6 +12,7 @@ import com.calio.calendar.groupinvitation.service.GroupInvitationCommandService;
 import com.calio.calendar.groupspace.controller.dto.CreateGroupSpaceRequest;
 import com.calio.calendar.groupspace.repository.GroupMemberRepository;
 import com.calio.calendar.groupspace.repository.GroupSpaceRepository;
+import com.calio.calendar.tag.repository.TagRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -42,6 +43,9 @@ class GroupSpaceServiceTest {
     private GroupMemberRepository groupMemberRepository;
 
     @Autowired
+    private TagRepository tagRepository;
+
+    @Autowired
     private AccountRepository accountRepository;
 
     @Autowired
@@ -53,6 +57,7 @@ class GroupSpaceServiceTest {
     void setUp() {
         reset(invitationCommandService);
         groupMemberRepository.deleteAll();
+        tagRepository.deleteAll();
         groupSpaceRepository.deleteAll();
         account = accountRepository.saveAndFlush(new Account());
     }

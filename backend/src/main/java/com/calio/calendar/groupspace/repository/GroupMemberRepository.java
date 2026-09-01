@@ -64,6 +64,18 @@ public interface GroupMemberRepository extends JpaRepository<GroupMember, Long> 
     );
 
     @Query("""
+            select member
+            from GroupMember member
+            where member.accountId = :accountId
+              and member.groupSpace.id in :groupSpaceIds
+              and member.status = com.calio.calendar.groupspace.domain.GroupMemberStatus.ACTIVE
+            """)
+    List<GroupMember> findAllActiveByAccountIdAndGroupSpaceIds(
+            @Param("accountId") Long accountId,
+            @Param("groupSpaceIds") List<Long> groupSpaceIds
+    );
+
+    @Query("""
             select case when count(member) > 0 then true else false end
             from GroupMember member
             where member.groupSpace.id = :groupSpaceId

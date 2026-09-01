@@ -21,6 +21,7 @@ import com.calio.calendar.groupspace.repository.GroupMemberRepository;
 import com.calio.calendar.groupspace.repository.GroupSpaceRepository;
 import com.calio.calendar.security.AuthenticatedAccountMockMvcTestConfig;
 import com.calio.calendar.security.WithAuthenticatedAccount;
+import com.calio.calendar.tag.repository.TagRepository;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -62,9 +63,13 @@ class GroupSpaceControllerTest {
     @Autowired
     private GroupMemberRepository groupMemberRepository;
 
+    @Autowired
+    private TagRepository tagRepository;
+
     @BeforeEach
     void setUp() {
         groupMemberRepository.deleteAll();
+        tagRepository.deleteAll();
         groupSpaceRepository.deleteAll();
     }
 

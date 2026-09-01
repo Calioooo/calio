@@ -8,6 +8,7 @@ import java.time.Instant;
 public record GroupMembershipResponse(
         String nickname,
         GroupMemberRole role,
+        boolean isAnonymous,
         Instant createdAt,
         Instant updatedAt,
         Instant statusChangedAt
@@ -17,6 +18,7 @@ public record GroupMembershipResponse(
         return new GroupMembershipResponse(
                 member.getNickname(),
                 member.roleIn(groupSpace),
+                member.isAnonymous(),
                 member.getCreatedAt(),
                 member.getUpdatedAt(),
                 member.getStatusChangedAt()

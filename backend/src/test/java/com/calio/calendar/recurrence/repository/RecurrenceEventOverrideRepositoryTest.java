@@ -48,7 +48,7 @@ class RecurrenceEventOverrideRepositoryTest {
     void givenActiveAndDeletedOverrides_whenFindActiveOverlapping_thenReturnsLoadedActiveOverride() {
         // given
         Account account = accountRepository.save(new Account());
-        Tag tag = tagRepository.save(new Tag(TagType.DEFAULT, "기타", "#64748B"));
+        Tag tag = tagRepository.save(Tag.personalDefault("기타", "#64748B"));
         RecurrenceEvent recurrenceEvent = recurrenceEventRepository.save(new RecurrenceEvent(
                 "Rule",
                 null,

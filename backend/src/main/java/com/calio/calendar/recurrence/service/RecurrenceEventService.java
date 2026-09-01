@@ -17,6 +17,7 @@ import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.event.service.EventCommandService;
 import com.calio.calendar.tag.service.TagQueryService;
+import com.calio.calendar.sharing.recurrence.service.PersonalRecurrenceGroupShareCommandService;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -35,6 +36,7 @@ public class RecurrenceEventService {
     private final EventCommandService eventCommandService;
     private final Rfc5545RecurrenceEngine recurrenceEngine;
     private final Clock clock;
+    private final PersonalRecurrenceGroupShareCommandService recurrenceShareCommandService;
     private final GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService;
 
     public RecurrenceEventService(
@@ -45,6 +47,7 @@ public class RecurrenceEventService {
             EventCommandService eventCommandService,
             Rfc5545RecurrenceEngine recurrenceEngine,
             Clock clock,
+            PersonalRecurrenceGroupShareCommandService recurrenceShareCommandService,
             GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService
     ) {
         this.recurrenceEventQueryService = recurrenceEventQueryService;
@@ -54,6 +57,7 @@ public class RecurrenceEventService {
         this.eventCommandService = eventCommandService;
         this.recurrenceEngine = recurrenceEngine;
         this.clock = clock;
+        this.recurrenceShareCommandService = recurrenceShareCommandService;
         this.recurrenceMappingQueryService = recurrenceMappingQueryService;
     }
 
@@ -71,11 +75,14 @@ public class RecurrenceEventService {
                 tag,
                 account
         ));
-        return toResponse(recurrenceEvent, accountId);
+        return toResponseWithSeriesUpdatePermission(recurrenceEvent, accountId);
     }
 
     public RecurrenceEventResponse getRecurrenceEvent(Long accountId, Long recurrenceId) {
-        return toResponse(recurrenceEventQueryService.getRecurrenceEvent(accountId, recurrenceId), accountId);
+        return toResponseWithSeriesUpdatePermission(
+                recurrenceEventQueryService.getRecurrenceEvent(accountId, recurrenceId),
+                accountId
+        );
     }
 
     @Transactional
@@ -97,7 +104,7 @@ public class RecurrenceEventService {
                 recurrenceRules,
                 tag
         );
-        return toResponse(recurrenceEvent, accountId);
+        return toResponseWithSeriesUpdatePermission(recurrenceEvent, accountId);
     }
 
     @Transactional
@@ -134,6 +141,7 @@ public class RecurrenceEventService {
     public void deleteRecurrenceEvent(Long accountId, Long recurrenceId) {
         recurrenceEventCommandService.lockRecurrenceEvent(accountId, recurrenceId);
         rejectExternalSeriesMutation(accountId, recurrenceId);
+        recurrenceShareCommandService.deleteAllForSourceRecurrence(recurrenceId);
         recurrenceEventCommandService.deleteRecurrenceOverridesByRecurrenceEventIds(List.of(recurrenceId));
         eventCommandService.deleteEventsByRecurrenceEventIds(List.of(recurrenceId));
         recurrenceEventCommandService.deleteRecurrenceEventsByIds(List.of(recurrenceId));
@@ -191,7 +199,10 @@ public class RecurrenceEventService {
                 originStartAt
         );
     }
-    private RecurrenceEventResponse toResponse(RecurrenceEvent recurrenceEvent, Long accountId) {
+    private RecurrenceEventResponse toResponseWithSeriesUpdatePermission(
+            RecurrenceEvent recurrenceEvent,
+            Long accountId
+    ) {
         boolean canUpdateSeries = !recurrenceMappingQueryService
                 .hasExternalRecurrenceEventMapping(recurrenceEvent.getId(), accountId);
         return RecurrenceEventResponse.from(recurrenceEvent, canUpdateSeries);

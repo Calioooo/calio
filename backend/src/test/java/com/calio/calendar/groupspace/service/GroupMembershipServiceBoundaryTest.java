@@ -10,10 +10,13 @@ import com.calio.calendar.groupinvitation.domain.InvitationCredentialType;
 import com.calio.calendar.groupinvitation.service.GroupInvitationCommandService;
 import com.calio.calendar.groupinvitation.service.GroupInvitationQueryService;
 import com.calio.calendar.groupinvitation.service.InvitationCredentialService;
+import com.calio.calendar.groupcalendar.event.service.GroupCalendarEventCommandService;
+import com.calio.calendar.groupcalendar.recurrence.service.GroupCalendarRecurrenceCommandService;
 import com.calio.calendar.groupspace.controller.dto.AcceptGroupInvitationRequest;
 import com.calio.calendar.groupspace.controller.dto.GroupInvitationAcceptCredentialType;
 import com.calio.calendar.groupspace.domain.GroupMember;
 import com.calio.calendar.groupspace.domain.GroupSpace;
+import com.calio.calendar.tag.service.GroupTagService;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -44,6 +47,9 @@ class GroupMembershipServiceBoundaryTest {
                 invitationCommandService,
                 credentialService,
                 cleanupPort,
+                mock(GroupCalendarEventCommandService.class),
+                mock(GroupCalendarRecurrenceCommandService.class),
+                mock(GroupTagService.class),
                 Clock.fixed(Instant.parse("2026-08-14T00:00:00Z"), ZoneOffset.UTC)
         );
         GroupSpace groupSpace = new GroupSpace(1L, "group", null);

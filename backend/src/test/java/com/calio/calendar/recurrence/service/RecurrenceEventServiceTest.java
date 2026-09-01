@@ -29,6 +29,7 @@ import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.domain.TagType;
 import com.calio.calendar.tag.service.TagQueryService;
+import com.calio.calendar.sharing.recurrence.service.PersonalRecurrenceGroupShareCommandService;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -68,6 +69,9 @@ class RecurrenceEventServiceTest {
     private Clock clock;
 
     @Mock
+    private PersonalRecurrenceGroupShareCommandService recurrenceShareCommandService;
+
+    @Mock
     private GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService;
 
     private RecurrenceEventService recurrenceEventService;
@@ -90,6 +94,7 @@ class RecurrenceEventServiceTest {
                 eventCommandService,
                 recurrenceEngine,
                 clock,
+                recurrenceShareCommandService,
                 recurrenceMappingQueryService
         );
     }
@@ -217,9 +222,13 @@ class RecurrenceEventServiceTest {
         InOrder deletionOrder = inOrder(
                 recurrenceEventRepository,
                 recurrenceEventOverrideRepository,
-                eventCommandService
+                eventCommandService,
+                recurrenceShareCommandService,
+                recurrenceMappingQueryService
         );
         deletionOrder.verify(recurrenceEventRepository).findByIdAndAccountIdForUpdate(10L, 1L);
+        deletionOrder.verify(recurrenceMappingQueryService).hasExternalRecurrenceEventMapping(10L, 1L);
+        deletionOrder.verify(recurrenceShareCommandService).deleteAllForSourceRecurrence(10L);
         deletionOrder.verify(recurrenceEventOverrideRepository).deleteAllByRecurrenceEventIds(List.of(10L));
         deletionOrder.verify(eventCommandService).deleteEventsByRecurrenceEventIds(List.of(10L));
         deletionOrder.verify(recurrenceEventRepository).deleteAllByIds(List.of(10L));
@@ -242,6 +251,7 @@ class RecurrenceEventServiceTest {
         verify(recurrenceEventOverrideRepository, never()).deleteAllByRecurrenceEventIds(any());
         verify(eventCommandService, never()).deleteEventsByRecurrenceEventIds(any());
         verify(recurrenceEventRepository, never()).deleteAllByIds(any());
+        verify(recurrenceShareCommandService, never()).deleteAllForSourceRecurrence(any());
     }
 
     @Test
@@ -460,7 +470,7 @@ class RecurrenceEventServiceTest {
     }
 
     private Tag tag() {
-        return new Tag(TagType.DEFAULT, "기타", "#64748B");
+        return Tag.personalDefault("기타", "#64748B");
     }
 
     private Account account() {
