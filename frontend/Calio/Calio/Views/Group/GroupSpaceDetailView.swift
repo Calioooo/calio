@@ -32,11 +32,7 @@ struct GroupSpaceDetailView: View {
                 else { ForEach(viewModel.members, id: \.memberId) { member in memberRow(member) } }
             }
             Section("그룹 설정") {
-                if viewModel.groupSpace.canManageGroupSpace {
-                    Button("그룹 이름 수정") { editedName = viewModel.groupSpace.name; isEditing = true }
-                    NavigationLink("초대 관리") { GroupInvitationManagementView(groupSpace: viewModel.groupSpace) }
-                    Button("그룹 삭제", role: .destructive) { confirmation = .delete }
-                } else { Button("그룹 나가기", role: .destructive) { confirmation = .leave } }
+                groupSettings
             }
         }
         .listStyle(.insetGrouped).background(Color.calioBackground)
@@ -75,6 +71,25 @@ struct GroupSpaceDetailView: View {
         }
 
         return String(viewModel.groupSpace.name.prefix(1))
+    }
+
+    @ViewBuilder private var groupSettings: some View {
+        if viewModel.groupSpace.canManageGroupSpace {
+            Button("그룹 이름 수정") {
+                editedName = viewModel.groupSpace.name
+                isEditing = true
+            }
+            NavigationLink("초대 관리") {
+                GroupInvitationManagementView(groupSpace: viewModel.groupSpace)
+            }
+            Button("그룹 삭제", role: .destructive) {
+                confirmation = .delete
+            }
+        } else {
+            Button("그룹 나가기", role: .destructive) {
+                confirmation = .leave
+            }
+        }
     }
 
     @ViewBuilder private func memberRow(_ member: GroupMember) -> some View {
