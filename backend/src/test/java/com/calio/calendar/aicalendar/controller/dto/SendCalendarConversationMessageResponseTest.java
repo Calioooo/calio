@@ -3,7 +3,11 @@ package com.calio.calendar.aicalendar.controller.dto;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.calio.calendar.aicalendar.domain.CalendarAssistantBlockType;
+import com.calio.calendar.aicalendar.domain.CalendarMutationScope;
+import com.calio.calendar.aicalendar.domain.CalendarMutationType;
 import com.calio.calendar.aicalendar.service.dto.CalendarAssistantAnswer;
+import com.calio.calendar.aicalendar.service.dto.CalendarMutationPreview;
+import com.calio.calendar.aicalendar.service.dto.CalendarMutationRecurrencePreview;
 import com.calio.calendar.event.controller.dto.EventResponse;
 import com.calio.calendar.event.service.dto.CalendarFreeTime;
 import java.time.Instant;
@@ -24,6 +28,12 @@ class SendCalendarConversationMessageResponseTest {
                         "2026-07-01T09:00:00Z",
                         "2026-07-01T10:00:00Z",
                         List.of("Holiday")
+                )),
+                List.of(new CalendarMutationPreview(
+                        CalendarMutationType.UPDATE,
+                        CalendarMutationScope.EVENT,
+                        event(),
+                        updatedEvent()
                 ))
         );
 
@@ -33,7 +43,7 @@ class SendCalendarConversationMessageResponseTest {
 
         // then
         assertThat(response.assistantMessage()).isEqualTo("내일 오후에 시간이 비어 있어요.");
-        assertThat(response.blocks()).hasSize(2);
+        assertThat(response.blocks()).hasSize(3);
         assertThat(response.blocks().get(0).type()).isEqualTo(CalendarAssistantBlockType.EVENTS);
         assertThat(response.blocks().get(0).items()).isEqualTo(List.of(event()));
         assertThat(response.blocks().get(1).type()).isEqualTo(CalendarAssistantBlockType.FREE_TIMES);
@@ -42,6 +52,47 @@ class SendCalendarConversationMessageResponseTest {
                 "2026-07-01T10:00:00Z",
                 List.of("Holiday")
         )));
+        assertThat(response.blocks().get(2).type()).isEqualTo(CalendarAssistantBlockType.MUTATION_PREVIEW);
+        assertThat(response.blocks().get(2).items()).singleElement().satisfies(preview -> {
+            CalendarMutationPreviewResponse mutationPreview = (CalendarMutationPreviewResponse) preview;
+            assertThat(mutationPreview.type()).isEqualTo(CalendarMutationType.UPDATE);
+            assertThat(mutationPreview.scope()).isEqualTo(CalendarMutationScope.EVENT);
+            assertThat(mutationPreview.before().title()).isEqualTo("Planning");
+            assertThat(mutationPreview.after().startAt()).isEqualTo(Instant.parse("2026-07-01T11:00:00Z"));
+            assertThat(mutationPreview.recurrence()).isNull();
+        });
+    }
+
+    @Test
+    @DisplayName("전체 반복 일정 Preview는 변경 전후 recurrence rule을 응답 계약에 포함한다")
+    void givenSeriesPreview_whenCreateResponse_thenIncludesRecurrenceRules() {
+        // given
+        CalendarAssistantAnswer answer = new CalendarAssistantAnswer(
+                "반복 규칙 변경을 확인해 주세요.",
+                List.of(),
+                List.of(),
+                List.of(new CalendarMutationPreview(
+                        CalendarMutationType.UPDATE,
+                        CalendarMutationScope.ENTIRE_SERIES,
+                        event(),
+                        updatedEvent(),
+                        new CalendarMutationRecurrencePreview(
+                                List.of("RRULE:FREQ=WEEKLY;BYDAY=FR"),
+                                List.of("RRULE:FREQ=DAILY")
+                        )
+                ))
+        );
+
+        // when
+        SendCalendarConversationMessageResponse response =
+                SendCalendarConversationMessageResponse.from("conversation-id", answer);
+
+        // then
+        CalendarMutationPreviewResponse preview = (CalendarMutationPreviewResponse) response.blocks().get(0)
+                .items()
+                .get(0);
+        assertThat(preview.recurrence().before()).containsExactly("RRULE:FREQ=WEEKLY;BYDAY=FR");
+        assertThat(preview.recurrence().after()).containsExactly("RRULE:FREQ=DAILY");
     }
 
     private EventResponse event() {
@@ -51,6 +102,25 @@ class SendCalendarConversationMessageResponseTest {
                 "Planning details",
                 Instant.parse("2026-07-01T10:00:00Z"),
                 Instant.parse("2026-07-01T11:00:00Z"),
+                false,
+                "UTC",
+                false,
+                null,
+                false,
+                null,
+                null,
+                Instant.parse("2026-07-01T00:00:00Z"),
+                Instant.parse("2026-07-01T00:00:00Z")
+        );
+    }
+
+    private EventResponse updatedEvent() {
+        return new EventResponse(
+                1L,
+                "Planning",
+                "Planning details",
+                Instant.parse("2026-07-01T11:00:00Z"),
+                Instant.parse("2026-07-01T12:00:00Z"),
                 false,
                 "UTC",
                 false,
