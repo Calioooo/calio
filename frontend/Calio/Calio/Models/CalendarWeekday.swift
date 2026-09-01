@@ -39,6 +39,25 @@ enum CalendarWeekday: Int, CaseIterable, Identifiable {
         }
     }
 
+    var shortEnglishText: String {
+        switch self {
+        case .sunday:
+            return "SUN"
+        case .monday:
+            return "MON"
+        case .tuesday:
+            return "TUE"
+        case .wednesday:
+            return "WED"
+        case .thursday:
+            return "THU"
+        case .friday:
+            return "FRI"
+        case .saturday:
+            return "SAT"
+        }
+    }
+
     var fullKoreanText: String {
         switch self {
         case .sunday:

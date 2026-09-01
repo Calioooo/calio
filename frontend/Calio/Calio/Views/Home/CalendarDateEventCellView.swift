@@ -9,7 +9,7 @@ import SwiftUI
 import UIKit
 
 struct CalendarDateEventCellView: View {
-    private let chipLayoutBuilder = CalendarDateEventChipLayoutBuilder()
+    @Environment(\.sizeCategory) private var sizeCategory
     private let popoverEdgeResolver = CalendarDateEventPopoverEdgeResolver()
     
     let day: DayKey
@@ -53,63 +53,78 @@ struct CalendarDateEventCellView: View {
     }
     
     var body: some View {
-        GeometryReader { geometry in
-            let chipLayout = chipLayoutBuilder.make(
-                chips: calendarChips,
-                maxWidth: geometry.size.width
+        VStack(alignment: .leading, spacing: 14) {
+            agendaHeader
+
+            ForEach(holidays) { holiday in
+                holidayChip(holiday)
+            }
+
+            ForEach(events) { event in
+                eventChipButton(event)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .onTapGesture(perform: onTap)
+    }
+
+    private func holidayChip(_ holiday: NationalHoliday) -> some View {
+        HStack(spacing: 6) {
+            Text(holiday.title)
+                .font(.caption.weight(.semibold))
+                .lineLimit(1)
+
+            Text("종일")
+                .font(.caption2.weight(.medium))
+        }
+        .foregroundStyle(.white)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(
+                Capsule()
+                    .fill(Color.calendarHoliday)
             )
+            .accessibilityLabel("\(holiday.title) 공휴일, 종일")
+    }
 
-            ZStack(alignment: .topLeading) {
-                Color.clear
-                    .contentShape(Rectangle())
-                    .onTapGesture(perform: onTap)
-
-                VStack(spacing: 8) {
-                    Text("\(monthText) / \(dayText)")
-                        .font(.system(size: 18, weight: .medium))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                    FlowLayout(spacing: chipLayoutBuilder.spacing) {
-                        ForEach(chipLayout.visibleChips) { chip in
-                            switch chip.kind {
-                            case .holiday(let holiday):
-                                holidayChip(holiday)
-                            case .event(let event):
-                                eventChipButton(event)
-                            }
-                        }
-
-                        if chipLayout.hiddenChipCount > 0 {
-                            Text("+\(chipLayout.hiddenChipCount) more")
-                                .font(.system(size: 13, weight: .medium))
-                                .lineLimit(1)
-                                .foregroundStyle(.secondary)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 6)
-                                        .fill(Color.secondary.opacity(0.12))
-                                )
-                        }
-                    }
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    @ViewBuilder
+    private var agendaHeader: some View {
+        if sizeCategory.isAccessibilityCategory {
+            VStack(alignment: .leading, spacing: 4) {
+                dateTitle
+                eventCount
+            }
+        } else {
+            HStack(alignment: .firstTextBaseline) {
+                dateTitle
+                Spacer()
+                eventCount
             }
         }
     }
 
-    private func holidayChip(_ holiday: NationalHoliday) -> some View {
-        Text(holiday.title)
-            .font(.system(size: 13, weight: .medium))
-            .lineLimit(1)
-            .foregroundStyle(.white)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(Color.calendarHoliday)
-            )
-            .accessibilityLabel("\(holiday.title) 공휴일")
+    private var dateTitle: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 7) {
+            Text("\(monthText)월 \(dayText)일")
+                .font(.title3.weight(.bold))
+                .foregroundStyle(.calioTextPrimary)
+
+            Text(weekday.shortEnglishText)
+                .font(.caption2.weight(.semibold))
+                .tracking(0.4)
+                .foregroundStyle(.calioTextSecondary)
+        }
+        .accessibilityLabel("\(monthText)월 \(dayText)일 \(weekday.fullKoreanText)")
+    }
+
+    @ViewBuilder
+    private var eventCount: some View {
+        if !events.isEmpty {
+            Text("일정 \(events.count)개")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.calioTextSecondary)
+        }
     }
 
     private func eventChipButton(_ event: Event) -> some View {
@@ -117,15 +132,44 @@ struct CalendarDateEventCellView: View {
             selectedEvent = CalendarDateEventSelection(day: day, event: event)
             onEventSelected(event)
         } label: {
-            Text(event.title)
-                .font(.system(size: 13, weight: .medium))
-                .lineLimit(1)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(Color(hex: event.tag.colorCode))
-                )
+            HStack(alignment: .top, spacing: 12) {
+                Text(eventScheduleText(event))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.calioTextSecondary)
+                    .frame(width: 72, alignment: .leading)
+
+                Circle()
+                    .fill(Color(hex: event.tag.colorCode))
+                    .frame(width: 8, height: 8)
+                    .padding(.top, 6)
+
+                HStack(alignment: .firstTextBaseline, spacing: 5) {
+                    Text(event.title)
+                        .font(.subheadline.weight(.semibold))
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    if event.importantEvent {
+                        Image(systemName: "star.fill")
+                            .font(.caption)
+                            .foregroundStyle(Color.calioImportantStar)
+                            .accessibilityLabel("중요 일정")
+                    }
+                }
+
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(.calioTextPrimary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.calioSurface)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.calioDivider, lineWidth: 1)
+            }
         }
         .buttonStyle(.plain)
         .background {
@@ -178,6 +222,18 @@ struct CalendarDateEventCellView: View {
             for: eventChipFrames[event.id],
             screenHeight: UIScreen.main.bounds.height
         )
+    }
+
+    private func eventScheduleText(_ event: Event) -> String {
+        if event.isAllDay {
+            return "종일"
+        }
+
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ko_KR")
+        formatter.dateFormat = "a h:mm"
+        let time = formatter.string(from: event.startAt)
+        return time
     }
 
     var calendarChips: [CalendarDateEventChip] {

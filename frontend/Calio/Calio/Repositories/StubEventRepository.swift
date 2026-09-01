@@ -52,6 +52,8 @@ struct StubEventRepository: EventRepository, TagRepository {
             description: request.description,
             startAt: request.startAt,
             endAt: request.endAt,
+            allDay: request.allDay,
+            timeZone: request.timeZone,
             tag: tag(for: request.tagId),
             createdAt: Date(),
             updatedAt: Date()
@@ -61,28 +63,34 @@ struct StubEventRepository: EventRepository, TagRepository {
     func createRecurrenceEvent(_ request: CreateRecurrenceEventRequestDTO) async throws -> RecurrenceEventResponseDTO {
         RecurrenceEventResponseDTO(
             recurrenceId: Int64(Date().timeIntervalSince1970),
-            recurrenceTitle: request.recurrenceTitle,
-            recurrenceDescription: request.recurrenceDescription,
-            recurrenceStartDate: request.recurrenceStartDate,
-            recurrenceEndDate: request.recurrenceEndDate,
-            recurrenceStartTime: request.recurrenceStartTime,
-            recurrenceEndTime: request.recurrenceEndTime,
-            recurrenceFrequency: request.recurrenceFrequency,
-            tag: tag(for: request.tagId)
+            title: request.title,
+            description: request.description,
+            allDay: request.allDay,
+            firstOccurrenceStartAt: request.firstOccurrenceStartAt,
+            firstOccurrenceEndAt: request.firstOccurrenceEndAt,
+            timeZone: request.timeZone,
+            recurrence: request.recurrence,
+            tag: tag(for: request.tagId),
+            createdAt: Date(),
+            updatedAt: Date(),
+            canUpdateSeries: true
         )
     }
 
     func fetchRecurrenceEvent(recurrenceId: Int64) async throws -> RecurrenceEventResponseDTO {
         RecurrenceEventResponseDTO(
             recurrenceId: recurrenceId,
-            recurrenceTitle: "반복 일정",
-            recurrenceDescription: "",
-            recurrenceStartDate: "2026-01-01",
-            recurrenceEndDate: "2026-01-31",
-            recurrenceStartTime: "00:00:00",
-            recurrenceEndTime: "01:00:00",
-            recurrenceFrequency: .daily,
-            tag: Self.defaultTags[0]
+            title: "반복 일정",
+            description: "",
+            allDay: false,
+            firstOccurrenceStartAt: Date(),
+            firstOccurrenceEndAt: Date().addingTimeInterval(3600),
+            timeZone: calendar.timeZone.identifier,
+            recurrence: ["RRULE:FREQ=DAILY;UNTIL=20261231T000000Z"],
+            tag: Self.defaultTags[0],
+            createdAt: Date(),
+            updatedAt: Date(),
+            canUpdateSeries: true
         )
     }
 
@@ -93,7 +101,26 @@ struct StubEventRepository: EventRepository, TagRepository {
             description: request.description,
             startAt: request.startAt,
             endAt: request.endAt,
+            allDay: request.allDay,
+            timeZone: request.timeZone,
             tag: tag(for: request.tagId),
+            createdAt: Date(),
+            updatedAt: Date()
+        )
+    }
+
+    func updateImportantEvent(
+        eventId: Int64,
+        request: UpdateImportantEventRequestDTO
+    ) async throws -> EventResponseDTO {
+        EventResponseDTO(
+            id: eventId,
+            title: "일정",
+            description: nil,
+            startAt: Date(),
+            endAt: Date().addingTimeInterval(3600),
+            importantEvent: request.importantEvent,
+            tag: Self.defaultTags[0],
             createdAt: Date(),
             updatedAt: Date()
         )
@@ -105,14 +132,17 @@ struct StubEventRepository: EventRepository, TagRepository {
     ) async throws -> RecurrenceEventResponseDTO {
         RecurrenceEventResponseDTO(
             recurrenceId: recurrenceId,
-            recurrenceTitle: request.title,
-            recurrenceDescription: request.description,
-            recurrenceStartDate: request.startDate,
-            recurrenceEndDate: request.endDate,
-            recurrenceStartTime: request.startTime,
-            recurrenceEndTime: request.endTime,
-            recurrenceFrequency: request.recurrenceFrequency,
-            tag: tag(for: request.tagId)
+            title: request.title,
+            description: request.description,
+            allDay: request.allDay,
+            firstOccurrenceStartAt: request.firstOccurrenceStartAt,
+            firstOccurrenceEndAt: request.firstOccurrenceEndAt,
+            timeZone: request.timeZone,
+            recurrence: request.recurrence,
+            tag: tag(for: request.tagId),
+            createdAt: Date(),
+            updatedAt: Date(),
+            canUpdateSeries: true
         )
     }
 
@@ -122,10 +152,12 @@ struct StubEventRepository: EventRepository, TagRepository {
     ) async throws -> EventResponseDTO {
         return EventResponseDTO(
             id: nil,
-            title: "반복 일정",
-            description: nil,
+            title: request.title,
+            description: request.description,
             startAt: request.startAt,
             endAt: request.endAt,
+            allDay: request.allDay,
+            timeZone: request.timeZone,
             recurrenceId: recurrenceId,
             isRecurrenceOccurrence: true,
             originStartAt: request.originStartAt,

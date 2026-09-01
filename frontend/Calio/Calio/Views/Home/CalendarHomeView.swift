@@ -52,6 +52,7 @@ struct CalendarHomeView: View {
                     onResetEventMutation: viewModel.resetMutationState,
                     onResetTagMutation: viewModel.resetTagMutationState,
                     onFetchRecurrenceEvent: viewModel.fetchRecurrenceEvent(recurrenceId:),
+                    onUpdateImportantEvent: viewModel.updateImportantEvent(_:importantEvent:),
                     onUpdateSingleEvent: viewModel.updateSingleEvent(_:input:),
                     onUpdateRecurrenceOccurrence: viewModel.updateRecurrenceOccurrence(_:input:),
                     onUpdateRecurrenceSeries: viewModel.updateRecurrenceSeries(recurrenceId:input:),
@@ -63,6 +64,7 @@ struct CalendarHomeView: View {
                     onDeleteCustomTag: viewModel.deleteCustomTag(_:)
                 )
             }
+            .background(Color.calioBackground)
             .animation(.easeInOut(duration: 0.2), value: displayMode)
             .task {
                 viewModel.loadTagsIfNeeded()

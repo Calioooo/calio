@@ -1,419 +1,139 @@
-//
-//  URLSessionEventRepository.swift
-//  Calio
-//
-//  Created by Codex on 6/19/26.
-//
-
 import Foundation
 
 struct URLSessionEventRepository: EventRepository {
-    private let baseURL: URL
-    private let session: URLSession
-    private let jsonDecoder: JSONDecoder
-    private let jsonEncoder: JSONEncoder
-    private let authTokenProvider: AuthTokenProvider?
+    private let apiClient: APIClient
 
     init(
         baseURL: URL = CalioAPIConfig.baseURL,
         session: URLSession = .shared,
-        jsonDecoder: JSONDecoder = EventJSONCoding.makeDecoder(),
-        jsonEncoder: JSONEncoder = EventJSONCoding.makeEncoder(),
+        jsonDecoder: JSONDecoder = APIJSONCoding.makeDecoder(),
+        jsonEncoder: JSONEncoder = APIJSONCoding.makeEncoder(),
         authTokenProvider: AuthTokenProvider? = KeychainAuthTokenStore.shared
     ) {
-        self.baseURL = baseURL
-        self.session = session
-        self.jsonDecoder = jsonDecoder
-        self.jsonEncoder = jsonEncoder
-        self.authTokenProvider = authTokenProvider
+        self.apiClient = APIClient(
+            baseURL: baseURL,
+            session: session,
+            jsonDecoder: jsonDecoder,
+            jsonEncoder: jsonEncoder,
+            authTokenProvider: authTokenProvider
+        )
     }
 
     func fetchEvents(from startDate: Date, to endDate: Date) async throws -> [EventResponseDTO] {
-        let request = makeRequest(
-            method: "GET",
-            url: try eventsURL(
-                queryItems: [
-                    URLQueryItem(name: "from", value: EventJSONCoding.string(from: startDate)),
-                    URLQueryItem(name: "to", value: EventJSONCoding.string(from: endDate))
-                ]
-            )
+        try await apiClient.send(
+            [EventResponseDTO].self,
+            method: .get,
+            pathComponents: ["api", "events"],
+            queryItems: [
+                URLQueryItem(name: "from", value: APIJSONCoding.string(from: startDate)),
+                URLQueryItem(name: "to", value: APIJSONCoding.string(from: endDate))
+            ],
+            authorization: .bearer
         )
-
-        return try await response([EventResponseDTO].self, for: request)
     }
 
-    func createEvent(_ requestDTO: CreateEventRequestDTO) async throws -> EventResponseDTO {
-        let request = try makeRequest(
-            method: "POST",
-            url: eventsURL(),
-            body: requestDTO
+    func createEvent(_ request: CreateEventRequestDTO) async throws -> EventResponseDTO {
+        try await apiClient.send(
+            EventResponseDTO.self,
+            method: .post,
+            pathComponents: ["api", "events"],
+            authorization: .bearer,
+            body: request
         )
-
-        return try await response(EventResponseDTO.self, for: request)
     }
 
-    func createRecurrenceEvent(
-        _ requestDTO: CreateRecurrenceEventRequestDTO
-    ) async throws -> RecurrenceEventResponseDTO {
-        let request = try makeRequest(
-            method: "POST",
-            url: recurrenceEventsURL(),
-            body: requestDTO
+    func createRecurrenceEvent(_ request: CreateRecurrenceEventRequestDTO) async throws -> RecurrenceEventResponseDTO {
+        try await apiClient.send(
+            RecurrenceEventResponseDTO.self,
+            method: .post,
+            pathComponents: ["api", "recurrence-events"],
+            authorization: .bearer,
+            body: request
         )
-
-        return try await response(RecurrenceEventResponseDTO.self, for: request)
     }
 
     func fetchRecurrenceEvent(recurrenceId: Int64) async throws -> RecurrenceEventResponseDTO {
-        let request = try makeRequest(
-            method: "GET",
-            url: recurrenceEventURL(recurrenceId: recurrenceId)
+        try await apiClient.send(
+            RecurrenceEventResponseDTO.self,
+            method: .get,
+            pathComponents: ["api", "recurrence-events", String(recurrenceId)],
+            authorization: .bearer
         )
-
-        return try await response(RecurrenceEventResponseDTO.self, for: request)
     }
 
-    func updateEvent(eventId: Int64, request requestDTO: UpdateEventRequestDTO) async throws -> EventResponseDTO {
-        let request = try makeRequest(
-            method: "PUT",
-            url: eventURL(eventId: eventId),
-            body: requestDTO
+    func updateEvent(eventId: Int64, request: UpdateEventRequestDTO) async throws -> EventResponseDTO {
+        try await apiClient.send(
+            EventResponseDTO.self,
+            method: .put,
+            pathComponents: ["api", "events", String(eventId)],
+            authorization: .bearer,
+            body: request
         )
+    }
 
-        return try await response(EventResponseDTO.self, for: request)
+    func updateImportantEvent(
+        eventId: Int64,
+        request: UpdateImportantEventRequestDTO
+    ) async throws -> EventResponseDTO {
+        try await apiClient.send(
+            EventResponseDTO.self,
+            method: .patch,
+            pathComponents: ["api", "events", String(eventId), "important-event"],
+            authorization: .bearer,
+            body: request
+        )
     }
 
     func updateRecurrenceEvent(
         recurrenceId: Int64,
-        request requestDTO: UpdateRecurrenceEventRequestDTO
+        request: UpdateRecurrenceEventRequestDTO
     ) async throws -> RecurrenceEventResponseDTO {
-        let request = try makeRequest(
-            method: "PUT",
-            url: recurrenceEventURL(recurrenceId: recurrenceId),
-            body: requestDTO
+        try await apiClient.send(
+            RecurrenceEventResponseDTO.self,
+            method: .put,
+            pathComponents: ["api", "recurrence-events", String(recurrenceId)],
+            authorization: .bearer,
+            body: request
         )
-
-        return try await response(RecurrenceEventResponseDTO.self, for: request)
     }
 
     func updateRecurrenceOccurrence(
         recurrenceId: Int64,
-        request requestDTO: UpdateRecurrenceOccurrenceRequestDTO
+        request: UpdateRecurrenceOccurrenceRequestDTO
     ) async throws -> EventResponseDTO {
-        let request = try makeRequest(
-            method: "PATCH",
-            url: recurrenceOccurrenceURL(recurrenceId: recurrenceId),
-            body: requestDTO
+        try await apiClient.send(
+            EventResponseDTO.self,
+            method: .patch,
+            pathComponents: ["api", "recurrence-events", String(recurrenceId), "occurrences"],
+            authorization: .bearer,
+            body: request
         )
-
-        return try await response(EventResponseDTO.self, for: request)
     }
 
     func deleteEvent(eventId: Int64) async throws {
-        let request = try makeRequest(
-            method: "DELETE",
-            url: eventURL(eventId: eventId)
+        try await apiClient.sendWithoutResponse(
+            method: .delete,
+            pathComponents: ["api", "events", String(eventId)],
+            authorization: .bearer
         )
-
-        try await emptyResponse(for: request)
     }
 
     func deleteRecurrenceEvent(recurrenceId: Int64) async throws {
-        let request = try makeRequest(
-            method: "DELETE",
-            url: recurrenceEventURL(recurrenceId: recurrenceId)
+        try await apiClient.sendWithoutResponse(
+            method: .delete,
+            pathComponents: ["api", "recurrence-events", String(recurrenceId)],
+            authorization: .bearer
         )
-
-        try await emptyResponse(for: request)
     }
 
     func deleteRecurrenceOccurrence(recurrenceId: Int64, originStartAt: Date) async throws {
-        let request = try makeRequest(
-            method: "DELETE",
-            url: recurrenceOccurrenceURL(
-                recurrenceId: recurrenceId,
-                queryItems: [
-                    URLQueryItem(name: "originStartAt", value: EventJSONCoding.string(from: originStartAt))
-                ]
-            )
+        try await apiClient.sendWithoutResponse(
+            method: .delete,
+            pathComponents: ["api", "recurrence-events", String(recurrenceId), "occurrences"],
+            queryItems: [
+                URLQueryItem(name: "originStartAt", value: APIJSONCoding.string(from: originStartAt))
+            ],
+            authorization: .bearer
         )
-
-        try await emptyResponse(for: request)
-    }
-
-    private func eventsURL(queryItems: [URLQueryItem] = []) throws -> URL {
-        var components = URLComponents(
-            url: baseURL.appendingPathComponent("api/events"),
-            resolvingAgainstBaseURL: false
-        )
-        components?.queryItems = queryItems.isEmpty ? nil : queryItems
-
-        guard let url = components?.url else {
-            throw EventRepositoryError.invalidURL
-        }
-
-        return url
-    }
-
-    private func eventURL(eventId: Int64) throws -> URL {
-        try eventsURL().appendingPathComponent(String(eventId))
-    }
-
-    private func recurrenceEventsURL() throws -> URL {
-        let components = URLComponents(
-            url: baseURL.appendingPathComponent("api/recurrence-events"),
-            resolvingAgainstBaseURL: false
-        )
-
-        guard let url = components?.url else {
-            throw EventRepositoryError.invalidURL
-        }
-
-        return url
-    }
-
-    private func recurrenceEventURL(recurrenceId: Int64) throws -> URL {
-        try recurrenceEventsURL().appendingPathComponent(String(recurrenceId))
-    }
-
-    private func recurrenceOccurrenceURL(
-        recurrenceId: Int64,
-        queryItems: [URLQueryItem] = []
-    ) throws -> URL {
-        var components = URLComponents(
-            url: try recurrenceEventURL(recurrenceId: recurrenceId)
-                .appendingPathComponent("occurrences"),
-            resolvingAgainstBaseURL: false
-        )
-        components?.queryItems = queryItems.isEmpty ? nil : queryItems
-
-        guard let url = components?.url else {
-            throw EventRepositoryError.invalidURL
-        }
-
-        return url
-    }
-
-    private func makeRequest(method: String, url: URL) -> URLRequest {
-        var request = URLRequest(url: url)
-        request.httpMethod = method
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        setAuthorizationHeaderIfNeeded(on: &request)
-        return request
-    }
-
-    private func setAuthorizationHeaderIfNeeded(on request: inout URLRequest) {
-        guard let accessToken = authTokenProvider?.accessToken,
-              !accessToken.isEmpty else {
-            return
-        }
-
-        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-    }
-
-    private func makeRequest<Body: Encodable>(
-        method: String,
-        url: URL,
-        body: Body
-    ) throws -> URLRequest {
-        var request = makeRequest(method: method, url: url)
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        do {
-            request.httpBody = try jsonEncoder.encode(body)
-        } catch {
-            throw EventRepositoryError.encoding(error)
-        }
-
-        return request
-    }
-
-    private func response<T: Decodable>(_ type: T.Type, for request: URLRequest) async throws -> T {
-        let data = try await data(for: request)
-        return try decode(type, from: data)
-    }
-
-    private func emptyResponse(for request: URLRequest) async throws {
-        _ = try await data(for: request)
-    }
-
-    private func data(for request: URLRequest) async throws -> Data {
-        let response: URLResponse
-        let data: Data
-
-        do {
-            (data, response) = try await session.data(for: request)
-        } catch let error as URLError {
-            throw EventRepositoryError.network(error)
-        } catch {
-            throw EventRepositoryError.unexpected(error)
-        }
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw EventRepositoryError.invalidResponse
-        }
-
-        guard (200..<300).contains(httpResponse.statusCode) else {
-            throw EventRepositoryError.backend(
-                statusCode: httpResponse.statusCode,
-                response: try? jsonDecoder.decode(ErrorResponseDTO.self, from: data)
-            )
-        }
-
-        return data
-    }
-
-    private func decode<T: Decodable>(_ type: T.Type, from data: Data) throws -> T {
-        do {
-            return try jsonDecoder.decode(type, from: data)
-        } catch let error as DecodingError {
-            throw EventRepositoryError.decoding(error)
-        } catch {
-            throw EventRepositoryError.unexpected(error)
-        }
-    }
-}
-
-struct URLSessionTagRepository: TagRepository {
-    private let baseURL: URL
-    private let session: URLSession
-    private let jsonDecoder: JSONDecoder
-    private let jsonEncoder: JSONEncoder
-    private let authTokenProvider: AuthTokenProvider?
-
-    init(
-        baseURL: URL = CalioAPIConfig.baseURL,
-        session: URLSession = .shared,
-        jsonDecoder: JSONDecoder = EventJSONCoding.makeDecoder(),
-        jsonEncoder: JSONEncoder = EventJSONCoding.makeEncoder(),
-        authTokenProvider: AuthTokenProvider? = KeychainAuthTokenStore.shared
-    ) {
-        self.baseURL = baseURL
-        self.session = session
-        self.jsonDecoder = jsonDecoder
-        self.jsonEncoder = jsonEncoder
-        self.authTokenProvider = authTokenProvider
-    }
-
-    func fetchTags() async throws -> [TagResponseDTO] {
-        let request = makeRequest(
-            method: "GET",
-            url: baseURL.appendingPathComponent("api/tags")
-        )
-
-        return try await response([TagResponseDTO].self, for: request)
-    }
-
-    func createCustomTag(_ requestDTO: CustomTagRequestDTO) async throws -> TagResponseDTO {
-        let request = try makeRequest(
-            method: "POST",
-            url: customTagsURL(),
-            body: requestDTO
-        )
-
-        return try await response(TagResponseDTO.self, for: request)
-    }
-
-    func updateCustomTag(tagId: Int64, request requestDTO: CustomTagRequestDTO) async throws -> TagResponseDTO {
-        let request = try makeRequest(
-            method: "PUT",
-            url: customTagURL(tagId: tagId),
-            body: requestDTO
-        )
-
-        return try await response(TagResponseDTO.self, for: request)
-    }
-
-    func deleteCustomTag(tagId: Int64) async throws {
-        let request = makeRequest(
-            method: "DELETE",
-            url: customTagURL(tagId: tagId)
-        )
-
-        try await emptyResponse(for: request)
-    }
-
-    private func makeRequest(method: String, url: URL) -> URLRequest {
-        var request = URLRequest(url: url)
-        request.httpMethod = method
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        setAuthorizationHeaderIfNeeded(on: &request)
-        return request
-    }
-
-    private func setAuthorizationHeaderIfNeeded(on request: inout URLRequest) {
-        guard let accessToken = authTokenProvider?.accessToken,
-              !accessToken.isEmpty else {
-            return
-        }
-
-        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-    }
-
-    private func makeRequest<Body: Encodable>(
-        method: String,
-        url: URL,
-        body: Body
-    ) throws -> URLRequest {
-        var request = makeRequest(method: method, url: url)
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        do {
-            request.httpBody = try jsonEncoder.encode(body)
-        } catch {
-            throw EventRepositoryError.encoding(error)
-        }
-
-        return request
-    }
-
-    private func response<T: Decodable>(_ type: T.Type, for request: URLRequest) async throws -> T {
-        let data = try await data(for: request)
-
-        do {
-            return try jsonDecoder.decode(type, from: data)
-        } catch let error as DecodingError {
-            throw EventRepositoryError.decoding(error)
-        } catch {
-            throw EventRepositoryError.unexpected(error)
-        }
-    }
-
-    private func emptyResponse(for request: URLRequest) async throws {
-        _ = try await data(for: request)
-    }
-
-    private func data(for request: URLRequest) async throws -> Data {
-        let data: Data
-        let response: URLResponse
-
-        do {
-            (data, response) = try await session.data(for: request)
-        } catch let error as URLError {
-            throw EventRepositoryError.network(error)
-        } catch {
-            throw EventRepositoryError.unexpected(error)
-        }
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw EventRepositoryError.invalidResponse
-        }
-
-        guard (200..<300).contains(httpResponse.statusCode) else {
-            throw EventRepositoryError.backend(
-                statusCode: httpResponse.statusCode,
-                response: try? jsonDecoder.decode(ErrorResponseDTO.self, from: data)
-            )
-        }
-
-        return data
-    }
-
-    private func customTagsURL() -> URL {
-        baseURL.appendingPathComponent("api/custom-tags")
-    }
-
-    private func customTagURL(tagId: Int64) -> URL {
-        customTagsURL().appendingPathComponent(String(tagId))
     }
 }

@@ -32,10 +32,49 @@ jobs:
         )
         echo "id=$device_id" >> "$GITHUB_OUTPUT"
 
+    - name: Boot iOS simulator
+      run: |
+        device_id="${{ steps.simulator.outputs.id }}"
+
+        wait_for_boot() {
+          ruby -r timeout -e '
+            pid = Process.spawn(*ARGV)
+            begin
+              Timeout.timeout(120) { Process.wait(pid) }
+            rescue Timeout::Error
+              Process.kill("TERM", pid) rescue nil
+              Process.wait(pid) rescue nil
+              abort("Timed out waiting for iOS simulator to boot")
+            end
+            exit $?.exitstatus
+          ' xcrun simctl bootstatus "$1" -b
+        }
+
+        xcrun simctl shutdown "$device_id" || true
+        xcrun simctl boot "$device_id" || true
+
+        if ! wait_for_boot "$device_id"; then
+          echo "Initial iOS simulator boot failed; erasing and retrying once."
+          xcrun simctl shutdown "$device_id" || true
+          xcrun simctl erase "$device_id"
+          xcrun simctl boot "$device_id"
+          wait_for_boot "$device_id"
+        fi
+
     - name: Run iOS tests
       working-directory: frontend/Calio
       run: |
         xcodebuild test \
           -project Calio.xcodeproj \
           -scheme Calio \
-          -destination 'platform=iOS Simulator,id=${{ steps.simulator.outputs.id }}'
+          -destination 'platform=iOS Simulator,id=${{ steps.simulator.outputs.id }}' \
+          -parallel-testing-enabled NO \
+          -resultBundlePath TestResults.xcresult
+
+    - name: Upload iOS test results
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: ios-test-results
+        path: frontend/Calio/TestResults.xcresult
+        if-no-files-found: warn

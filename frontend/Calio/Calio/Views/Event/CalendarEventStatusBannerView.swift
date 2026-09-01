@@ -23,26 +23,27 @@ struct CalendarEventStatusBannerView: View {
 
                 Text("일정을 불러오는 중입니다.")
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.calioTextSecondary)
             }
             .frame(maxWidth: .infinity, minHeight: 36)
-            .background(Color(uiColor: .secondarySystemBackground))
+            .background(Color.calioSelection)
 
         case .failed(let message):
             HStack(spacing: 10) {
                 Text(message)
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.calioTextSecondary)
                     .lineLimit(2)
 
                 Spacer(minLength: 8)
 
                 Button("다시 시도", action: onRetry)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.calioPrimary)
             }
             .padding(.horizontal, 16)
             .frame(maxWidth: .infinity, minHeight: 44)
-            .background(Color(uiColor: .secondarySystemBackground))
+            .background(Color.calioSelection)
         }
     }
 }

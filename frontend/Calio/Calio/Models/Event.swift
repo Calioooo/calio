@@ -43,11 +43,16 @@ struct Event: Identifiable {
     let startAt: Date
     let endAt: Date
     let isAllDay: Bool
+    let timeZone: String?
     let tag: CalendarTag
     let importantEvent: Bool
     let recurrenceId: Int64?
     let isRecurrenceOccurrence: Bool
     let originStartAt: Date?
+
+    var isRepeated: Bool {
+        isRecurrenceOccurrence || recurrenceId != nil
+    }
     
     init(
         id: Int64? = nil,
@@ -56,6 +61,7 @@ struct Event: Identifiable {
         startAt: Date,
         endAt: Date,
         isAllDay: Bool = false,
+        timeZone: String? = nil,
         tag: CalendarTag = .fallback,
         importantEvent: Bool = false,
         recurrenceId: Int64? = nil,
@@ -68,6 +74,7 @@ struct Event: Identifiable {
         self.startAt = startAt
         self.endAt = endAt
         self.isAllDay = isAllDay
+        self.timeZone = timeZone
         self.tag = tag
         self.importantEvent = importantEvent
         self.recurrenceId = recurrenceId

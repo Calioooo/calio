@@ -17,10 +17,11 @@ public record RecurrenceEventResponse(
         List<String> recurrence,
         TagResponse tag,
         Instant createdAt,
-        Instant updatedAt
+        Instant updatedAt,
+        boolean canUpdateSeries
 ) {
 
-    public static RecurrenceEventResponse from(RecurrenceEvent recurrenceEvent) {
+    public static RecurrenceEventResponse from(RecurrenceEvent recurrenceEvent, boolean canUpdateSeries) {
         RecurrenceSchedule schedule = RecurrenceSchedule.from(recurrenceEvent);
         return new RecurrenceEventResponse(
                 recurrenceEvent.getId(),
@@ -33,7 +34,8 @@ public record RecurrenceEventResponse(
                 recurrenceEvent.getRecurrenceRules(),
                 TagResponse.from(recurrenceEvent.getTag()),
                 recurrenceEvent.getCreatedAt(),
-                recurrenceEvent.getUpdatedAt()
+                recurrenceEvent.getUpdatedAt(),
+                canUpdateSeries
         );
     }
 }

@@ -85,7 +85,7 @@ struct ContentView: View {
             )
                 .tabItem {
                     Image(systemName: "calendar")
-                    Text("Home")
+                    Text("홈")
                 }
                 .tag(0)
             
@@ -95,7 +95,7 @@ struct ContentView: View {
             )
                 .tabItem {
                     Image(systemName: "calendar.day.timeline.left")
-                    Text("Week")
+                    Text("주")
                 }
                 .tag(1)
             
@@ -105,7 +105,7 @@ struct ContentView: View {
             )
                 .tabItem {
                     Image(systemName: "calendar")
-                    Text("Month")
+                    Text("월")
                 }
                 .tag(2)
         }

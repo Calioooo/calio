@@ -24,6 +24,7 @@ struct CalendarScheduleDrawerView: View {
     let onResetEventMutation: () -> Void
     let onResetTagMutation: () -> Void
     let onFetchRecurrenceEvent: (Int64) async -> RecurrenceEventDetails?
+    let onUpdateImportantEvent: (Event, Bool) async -> Event?
     let onUpdateSingleEvent: (Event, EventUpdateInput) async -> Bool
     let onUpdateRecurrenceOccurrence: (Event, EventUpdateInput) async -> Bool
     let onUpdateRecurrenceSeries: (Int64, RecurrenceEventSeriesEditInput) async -> Bool
@@ -33,6 +34,8 @@ struct CalendarScheduleDrawerView: View {
     let onCreateCustomTag: (CustomTagInput) async -> Bool
     let onUpdateCustomTag: (CalendarTag, CustomTagInput) async -> Bool
     let onDeleteCustomTag: (CalendarTag) async -> Bool
+    let showsDragHandle: Bool
+    let showsSelectedDayOnly: Bool
 
     init(
         items: [CalendarDayItem],
@@ -51,6 +54,7 @@ struct CalendarScheduleDrawerView: View {
         onResetEventMutation: @escaping () -> Void = {},
         onResetTagMutation: @escaping () -> Void = {},
         onFetchRecurrenceEvent: @escaping (Int64) async -> RecurrenceEventDetails? = { _ in nil },
+        onUpdateImportantEvent: @escaping (Event, Bool) async -> Event? = { _, _ in nil },
         onUpdateSingleEvent: @escaping (Event, EventUpdateInput) async -> Bool = { _, _ in true },
         onUpdateRecurrenceOccurrence: @escaping (Event, EventUpdateInput) async -> Bool = { _, _ in true },
         onUpdateRecurrenceSeries: @escaping (Int64, RecurrenceEventSeriesEditInput) async -> Bool = { _, _ in true },
@@ -59,7 +63,9 @@ struct CalendarScheduleDrawerView: View {
         onDeleteRecurrenceSeries: @escaping (Event) async -> Bool = { _ in true },
         onCreateCustomTag: @escaping (CustomTagInput) async -> Bool = { _ in false },
         onUpdateCustomTag: @escaping (CalendarTag, CustomTagInput) async -> Bool = { _, _ in false },
-        onDeleteCustomTag: @escaping (CalendarTag) async -> Bool = { _ in false }
+        onDeleteCustomTag: @escaping (CalendarTag) async -> Bool = { _ in false },
+        showsDragHandle: Bool = true,
+        showsSelectedDayOnly: Bool = false
     ) {
         self.items = items
         self.tags = tags
@@ -77,6 +83,7 @@ struct CalendarScheduleDrawerView: View {
         self.onResetEventMutation = onResetEventMutation
         self.onResetTagMutation = onResetTagMutation
         self.onFetchRecurrenceEvent = onFetchRecurrenceEvent
+        self.onUpdateImportantEvent = onUpdateImportantEvent
         self.onUpdateSingleEvent = onUpdateSingleEvent
         self.onUpdateRecurrenceOccurrence = onUpdateRecurrenceOccurrence
         self.onUpdateRecurrenceSeries = onUpdateRecurrenceSeries
@@ -86,11 +93,15 @@ struct CalendarScheduleDrawerView: View {
         self.onCreateCustomTag = onCreateCustomTag
         self.onUpdateCustomTag = onUpdateCustomTag
         self.onDeleteCustomTag = onDeleteCustomTag
+        self.showsDragHandle = showsDragHandle
+        self.showsSelectedDayOnly = showsSelectedDayOnly
     }
 
     var body: some View {
         VStack(spacing: 0) {
-            dragHandle
+            if showsDragHandle {
+                dragHandle
+            }
 
             CalendarDateEventView(
                 items: items,
@@ -107,6 +118,7 @@ struct CalendarScheduleDrawerView: View {
                 onResetEventMutation: onResetEventMutation,
                 onResetTagMutation: onResetTagMutation,
                 onFetchRecurrenceEvent: onFetchRecurrenceEvent,
+                onUpdateImportantEvent: onUpdateImportantEvent,
                 onUpdateSingleEvent: onUpdateSingleEvent,
                 onUpdateRecurrenceOccurrence: onUpdateRecurrenceOccurrence,
                 onUpdateRecurrenceSeries: onUpdateRecurrenceSeries,
@@ -115,26 +127,27 @@ struct CalendarScheduleDrawerView: View {
                 onDeleteRecurrenceSeries: onDeleteRecurrenceSeries,
                 onCreateCustomTag: onCreateCustomTag,
                 onUpdateCustomTag: onUpdateCustomTag,
-                onDeleteCustomTag: onDeleteCustomTag
+                onDeleteCustomTag: onDeleteCustomTag,
+                showsSelectedDayOnly: showsSelectedDayOnly
             )
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(uiColor: .systemBackground))
+        .background(showsDragHandle ? Color.calioSurface : Color.calioBackground)
         .overlay(alignment: .top) {
-            Divider()
+            Rectangle().fill(Color.calioDivider).frame(height: 1)
         }
-        .accessibilityIdentifier("calendar_schedule_drawer")
+        .accessibilityIdentifier(showsDragHandle ? "calendar_schedule_drawer" : "calendar_selected_day_agenda")
     }
 
     private var dragHandle: some View {
         VStack(spacing: 6) {
             Capsule()
-                .fill(Color.secondary.opacity(0.35))
+                .fill(Color.calioTextSecondary.opacity(0.45))
                 .frame(width: 42, height: 5)
 
             Image(systemName: handleIconName)
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.calioTextSecondary)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
