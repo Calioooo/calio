@@ -55,6 +55,17 @@ struct GroupSpaceDetailView: View {
         }
         .confirmationDialog(confirmation?.title ?? "", isPresented: Binding(get: { confirmation != nil }, set: { if !$0 { confirmation = nil } })) { confirmationButtons } message: { Text(confirmation?.message ?? "") }
         .alert("그룹 공간을 처리하지 못했어요", isPresented: errorBinding) { Button("확인", role: .cancel) { viewModel.clearError() } } message: { Text(viewModel.errorMessage ?? "잠시 후 다시 시도해 주세요.") }
+        .alert(
+            "멤버를 내보냈어요",
+            isPresented: Binding(
+                get: { viewModel.postRemovalRefreshMessage != nil },
+                set: { if !$0 { viewModel.clearPostRemovalRefreshMessage() } }
+            )
+        ) {
+            Button("확인", role: .cancel) { viewModel.clearPostRemovalRefreshMessage() }
+        } message: {
+            Text(viewModel.postRemovalRefreshMessage ?? "")
+        }
     }
 
     @ViewBuilder private func memberRow(_ member: GroupMember) -> some View {

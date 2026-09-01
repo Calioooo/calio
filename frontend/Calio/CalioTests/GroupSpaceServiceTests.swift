@@ -184,6 +184,25 @@ struct GroupSpaceServiceTests {
         #expect(repository.operations == ["members:7", "remove:7:11", "fetch:7"])
     }
 
+    @MainActor @Test func removingMemberRemainsSuccessfulWhenThePostRemovalRefreshFails() async throws {
+        let repository = GroupSpaceRepositoryStub(fetchGroupSpaceError: .network(URLError(.notConnectedToInternet)))
+        let viewModel = GroupSpaceDetailViewModel(
+            groupSpace: GroupSpaceRepositoryStub.sampleGroupSpace(),
+            service: GroupSpaceService(repository: repository)
+        )
+
+        await viewModel.loadMembers()
+        let member = try #require(viewModel.members.first { $0.memberId == 11 })
+        let succeeded = await viewModel.remove(member: member)
+
+        #expect(succeeded)
+        #expect(viewModel.members.map(\.memberId) == [10])
+        #expect(viewModel.groupSpace.memberCount == 2)
+        #expect(viewModel.postRemovalRefreshMessage == "멤버를 내보냈지만 최신 그룹 정보를 불러오지 못했습니다.")
+        #expect(viewModel.failure == nil)
+        #expect(viewModel.failedOperation == nil)
+    }
+
     @MainActor @Test func detailViewModelRecordsOperationFailuresWithoutDiscardingBackendErrorCode() async {
         let viewModel = GroupSpaceDetailViewModel(
             groupSpace: GroupSpaceRepositoryStub.sampleGroupSpace(),
@@ -241,16 +260,19 @@ private final class GroupSpaceRepositoryStub: GroupSpaceRepository {
     private var fetchResponses: [[GroupSpaceResponseDTO]]
     private let fetchErrorOnCall: Int?
     private let memberCountAfterRemoval: Int
+    private let fetchGroupSpaceError: APIError?
     private var fetchCallCount = 0
 
     init(
         fetchResponses: [[GroupSpaceResponseDTO]] = [],
         fetchErrorOnCall: Int? = nil,
-        memberCountAfterRemoval: Int = 2
+        memberCountAfterRemoval: Int = 2,
+        fetchGroupSpaceError: APIError? = nil
     ) {
         self.fetchResponses = fetchResponses
         self.fetchErrorOnCall = fetchErrorOnCall
         self.memberCountAfterRemoval = memberCountAfterRemoval
+        self.fetchGroupSpaceError = fetchGroupSpaceError
     }
 
     static func sampleSpace(name: String = "프로젝트 팀") -> GroupSpaceResponseDTO {
@@ -284,6 +306,7 @@ private final class GroupSpaceRepositoryStub: GroupSpaceRepository {
     }
     func fetchGroupSpace(groupSpaceId: Int64) async throws -> GroupSpaceResponseDTO {
         operations.append("fetch:\(groupSpaceId)")
+        if let fetchGroupSpaceError { throw fetchGroupSpaceError }
         var response = Self.sampleSpace()
         response = .init(
             groupSpaceId: response.groupSpaceId,

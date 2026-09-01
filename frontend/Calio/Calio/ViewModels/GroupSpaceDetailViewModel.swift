@@ -8,6 +8,7 @@ import Foundation
     @Published private(set) var failure: GroupSpaceFailure?
     @Published private(set) var failedOperation: GroupSpaceOperation?
     @Published var errorMessage: String?
+    @Published private(set) var postRemovalRefreshMessage: String?
 
     private let service: GroupSpaceService
 
@@ -71,10 +72,17 @@ import Foundation
     }
 
     func remove(member: GroupMember) async -> Bool {
+        postRemovalRefreshMessage = nil
         do {
             try await service.removeMember(groupSpaceId: groupSpace.groupSpaceId, memberId: member.memberId)
-            groupSpace = try await service.fetchGroupSpace(groupSpaceId: groupSpace.groupSpaceId)
             members.removeAll { $0.memberId == member.memberId }
+            do {
+                groupSpace = try await service.fetchGroupSpace(groupSpaceId: groupSpace.groupSpaceId)
+            } catch is CancellationError {
+                postRemovalRefreshMessage = "멤버를 내보냈지만 최신 그룹 정보를 불러오지 못했습니다."
+            } catch {
+                postRemovalRefreshMessage = "멤버를 내보냈지만 최신 그룹 정보를 불러오지 못했습니다."
+            }
             clearFailure()
             return true
         } catch is CancellationError {
@@ -103,6 +111,7 @@ import Foundation
     }
 
     func clearError() { clearFailure() }
+    func clearPostRemovalRefreshMessage() { postRemovalRefreshMessage = nil }
 
     private func recordFailure(_ error: Error, for operation: GroupSpaceOperation) {
         let failure = error as? GroupSpaceFailure ?? .unexpected
