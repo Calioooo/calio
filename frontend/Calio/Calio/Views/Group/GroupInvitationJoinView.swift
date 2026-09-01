@@ -20,7 +20,10 @@ struct GroupInvitationJoinView: View {
         ZStack {
             Color.black.opacity(0.28)
                 .ignoresSafeArea()
-                .onTapGesture(perform: onDismiss)
+                .onTapGesture {
+                    guard !viewModel.isSubmitting else { return }
+                    onDismiss()
+                }
 
             NavigationStack {
                 ScrollView {
@@ -41,13 +44,23 @@ struct GroupInvitationJoinView: View {
                 .toolbar {
                     if activePreview != nil {
                         ToolbarItem(placement: .topBarLeading) {
-                            Button { viewModel.clearAcceptanceFlow() } label: { Image(systemName: "chevron.left") }
+                            Button {
+                                viewModel.clearAcceptanceFlow()
+                            } label: {
+                                Image(systemName: "chevron.left")
+                            }
                                 .accessibilityLabel("초대 정보 다시 입력")
+                                .disabled(viewModel.isSubmitting)
                         }
                     }
                     ToolbarItem(placement: .topBarTrailing) {
-                        Button { onDismiss() } label: { Image(systemName: "xmark") }
+                        Button {
+                            onDismiss()
+                        } label: {
+                            Image(systemName: "xmark")
+                        }
                             .accessibilityLabel("닫기")
+                            .disabled(viewModel.isSubmitting)
                     }
                 }
                 .alert("초대를 처리하지 못했어요", isPresented: errorBinding) {
