@@ -322,6 +322,22 @@ struct GroupSpaceServiceTests {
         #expect(viewModel.errorMessage == "초대 목록을 불러오지 못했습니다.")
     }
 
+    @Test func invitationServiceForwardsCanonicalCredentialContracts() async throws {
+        let repository = GroupSpaceRepositoryStub()
+        let service = GroupInvitationService(repository: repository)
+
+        _ = try await service.preview(type: .inviteCode, credential: "CALIO-2026")
+        _ = try await service.preview(type: .linkToken, credential: "token")
+        _ = try await service.accept(type: .inviteCode, credential: "CALIO-2026", nickname: "준하")
+        _ = try await service.accept(type: .linkToken, credential: "token", nickname: "민지")
+
+        #expect(repository.previewRequests.map(\.credentialType) == [.code, .linkToken])
+        #expect(repository.previewRequests.map(\.credential) == ["CALIO-2026", "token"])
+        #expect(repository.acceptRequests.map(\.credentialType) == [.inviteCode, .linkToken])
+        #expect(repository.acceptRequests.map(\.credential) == ["CALIO-2026", "token"])
+        #expect(repository.acceptRequests.map(\.nickname) == ["준하", "민지"])
+    }
+
     @MainActor @Test func removingMemberRefreshesGroupSpaceFromBackend() async throws {
         let repository = GroupSpaceRepositoryStub(memberCountAfterRemoval: 1)
         let viewModel = GroupSpaceDetailViewModel(
@@ -433,6 +449,8 @@ private final class GroupSpaceRepositoryStub: GroupSpaceRepository {
     private var fetchCallCount = 0
     private(set) var issueCallCount = 0
     private(set) var invitationFetchCallCount = 0
+    private(set) var previewRequests: [PreviewGroupInvitationRequestDTO] = []
+    private(set) var acceptRequests: [AcceptGroupInvitationRequestDTO] = []
 
     init(
         fetchResponses: [[GroupSpaceResponseDTO]] = [],
@@ -585,11 +603,13 @@ private final class GroupSpaceRepositoryStub: GroupSpaceRepository {
     }
 
     func previewInvitation(_ request: PreviewGroupInvitationRequestDTO) async throws -> PreviewGroupInvitationResponseDTO {
+        previewRequests.append(request)
         if let invitationError { throw invitationError }
         return previewResponse
     }
 
     func acceptInvitation(_ request: AcceptGroupInvitationRequestDTO) async throws -> AcceptGroupInvitationResponseDTO {
+        acceptRequests.append(request)
         if let acceptError { throw acceptError }
         if let invitationError { throw invitationError }
         return acceptResponse
