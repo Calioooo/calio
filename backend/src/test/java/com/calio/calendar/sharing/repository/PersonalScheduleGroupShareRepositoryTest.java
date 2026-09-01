@@ -31,6 +31,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -107,13 +108,12 @@ class PersonalScheduleGroupShareRepositoryTest {
 
         assertThatThrownBy(() -> eventShareRepository.saveAndFlush(
                 PersonalEventGroupShare.create(event, groupSpace, true)
-        )).isInstanceOf(RuntimeException.class);
+        )).isInstanceOf(DataIntegrityViolationException.class);
     }
 
     @Test
-    @Transactional
-    @DisplayName("단건 mapping의 idempotent insert는 기존 source-target 조합을 무시한다")
-    void eventShareInsertIgnoreDoesNotRaiseUniqueConstraintFailure() {
+    @DisplayName("동시 단건 mapping insert는 하나만 저장하고 나머지는 idempotent 결과로 수렴한다")
+    void eventShareInsertIgnoreDoesNotRaiseUniqueConstraintFailure() throws Exception {
         Account account = accountRepository.saveAndFlush(new Account());
         Tag tag = tagRepository.saveAndFlush(Tag.personalDefault("기타", "#64748B"));
         Event event = eventRepository.saveAndFlush(new Event(
@@ -121,11 +121,16 @@ class PersonalScheduleGroupShareRepositoryTest {
         ));
         GroupSpace groupSpace = groupSpaceRepository.saveAndFlush(new GroupSpace(account.getId(), "group", null));
 
-        int first = eventShareRepository.insertIgnore(event.getId(), groupSpace.getId(), false, "00000000-0000-0000-0000-000000000001");
-        int duplicate = eventShareRepository.insertIgnore(event.getId(), groupSpace.getId(), true, "00000000-0000-0000-0000-000000000002");
+        List<Integer> results = executeConcurrently(
+                () -> eventShareRepository.insertIgnore(
+                        event.getId(), groupSpace.getId(), false, "00000000-0000-0000-0000-000000000001"
+                ),
+                () -> eventShareRepository.insertIgnore(
+                        event.getId(), groupSpace.getId(), true, "00000000-0000-0000-0000-000000000002"
+                )
+        );
 
-        assertThat(first).isEqualTo(1);
-        assertThat(duplicate).isZero();
+        assertThat(results).containsExactlyInAnyOrder(0, 1);
         assertThat(eventShareRepository.count()).isEqualTo(1);
     }
 

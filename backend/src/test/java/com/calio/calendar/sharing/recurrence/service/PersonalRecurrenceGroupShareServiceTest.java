@@ -18,8 +18,10 @@ import com.calio.calendar.sharing.controller.dto.GroupShareStatusResponse;
 import com.calio.calendar.sharing.controller.dto.UpdateGroupShareAnonymousRequest;
 import com.calio.calendar.sharing.recurrence.controller.dto.CreateRecurrenceGroupSharesRequest;
 import com.calio.calendar.sharing.recurrence.controller.dto.CreateRecurrenceGroupSharesResponse;
+import com.calio.calendar.sharing.recurrence.domain.PersonalRecurrenceGroupShare;
 import java.time.Instant;
 import java.util.List;
+import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -59,7 +61,11 @@ class PersonalRecurrenceGroupShareServiceTest {
         assertThat(response.recurrenceId()).isEqualTo(30L);
         assertThat(response.targets()).extracting(target -> target.status())
                 .containsExactly(GroupShareTargetStatus.SHARED, GroupShareTargetStatus.NOT_ELIGIBLE);
-        verify(shareCommandService).createIfAbsent(any());
+        ArgumentCaptor<PersonalRecurrenceGroupShare> shareCaptor = ArgumentCaptor.forClass(
+                PersonalRecurrenceGroupShare.class
+        );
+        verify(shareCommandService).createIfAbsent(shareCaptor.capture());
+        assertThat(shareCaptor.getValue().isAnonymous()).isTrue();
     }
 
     @Test
