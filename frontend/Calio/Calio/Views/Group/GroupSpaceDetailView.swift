@@ -34,6 +34,7 @@ struct GroupSpaceDetailView: View {
             Section("그룹 설정") {
                 if viewModel.groupSpace.canManageGroupSpace {
                     Button("그룹 이름 수정") { editedName = viewModel.groupSpace.name; isEditing = true }
+                    NavigationLink("초대 관리") { GroupInvitationManagementView(groupSpace: viewModel.groupSpace) }
                     Button("그룹 삭제", role: .destructive) { confirmation = .delete }
                 } else { Button("그룹 나가기", role: .destructive) { confirmation = .leave } }
             }

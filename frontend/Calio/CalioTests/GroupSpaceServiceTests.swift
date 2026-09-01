@@ -82,6 +82,21 @@ struct GroupSpaceServiceTests {
         #expect(viewModel.errorMessage == "그룹 공간을 불러오지 못했습니다. 다시 시도해 주세요.")
     }
 
+    @MainActor @Test func listViewModelRefreshesToIncludeGroupJoinedByInvitation() async {
+        let existingSpace = GroupSpaceRepositoryStub.sampleSpace(name: "기존 그룹")
+        let joinedSpace = GroupSpaceRepositoryStub.sampleSpace(name: "새로 참여한 그룹")
+        let repository = GroupSpaceRepositoryStub(
+            fetchResponses: [[existingSpace], [existingSpace, joinedSpace]]
+        )
+        let viewModel = GroupSpaceListViewModel(service: GroupSpaceService(repository: repository))
+
+        await viewModel.load()
+        await viewModel.refreshAfterJoiningInvitation()
+
+        #expect(viewModel.spaces.map(\.name) == ["기존 그룹", "새로 참여한 그룹"])
+        #expect(viewModel.didFailLoading == false)
+    }
+
     @MainActor @Test func listViewModelIgnoresAnOlderLoadThatFinishesAfterTheLatestLoad() async {
         let repository = OutOfOrderGroupSpaceRepository()
         let viewModel = GroupSpaceListViewModel(service: GroupSpaceService(repository: repository))
@@ -184,6 +199,72 @@ struct GroupSpaceServiceTests {
         #expect(viewModel.members.first { $0.memberId == 11 }?.role == .owner)
     }
 
+    @MainActor @Test func invitationViewModelRetainsPreviewAfterAcceptanceErrorAndClearsItOnDismissal() async {
+        let repository = GroupSpaceRepositoryStub(acceptError: GroupSpaceRepositoryStub.StubError.failed)
+        let viewModel = GroupInvitationViewModel(service: GroupInvitationService(repository: repository))
+
+        let previewed = await viewModel.preview(type: .inviteCode, credential: "CALIO-2026")
+        let accepted = await viewModel.accept(type: .inviteCode, credential: "CALIO-2026", nickname: "준하")
+
+        #expect(previewed)
+        #expect(!accepted)
+        #expect(viewModel.preview?.name == "프로젝트 팀")
+        #expect(viewModel.acceptanceResult == nil)
+        #expect(viewModel.errorMessage == "그룹 공간에 참여하지 못했습니다. 다시 시도해 주세요.")
+
+        viewModel.clearAcceptanceFlow()
+
+        #expect(viewModel.preview == nil)
+        #expect(viewModel.acceptanceResult == nil)
+        #expect(viewModel.errorMessage == nil)
+    }
+
+    @MainActor @Test func invitationViewModelPublishesBackendConfirmedAlreadyMemberResult() async {
+        let repository = GroupSpaceRepositoryStub(
+            previewResponse: .init(name: "프로젝트 팀", emoji: "🗓️", memberCount: 2, expiresAt: GroupSpaceRepositoryStub.date),
+            acceptResponse: .init(
+                joinResult: .alreadyMember,
+                groupSpace: .init(id: 7, name: "프로젝트 팀", emoji: "🗓️", myMembership: .init(memberId: 10, nickname: "준하", role: .member), memberCount: 2, createdAt: GroupSpaceRepositoryStub.date),
+                membership: .init(memberId: 10, nickname: "준하", role: .member)
+            )
+        )
+        let viewModel = GroupInvitationViewModel(service: GroupInvitationService(repository: repository))
+
+        let previewed = await viewModel.preview(type: .linkToken, credential: "token")
+        let accepted = await viewModel.accept(type: .linkToken, credential: "token", nickname: "준하")
+
+        #expect(previewed)
+        #expect(accepted)
+        #expect(viewModel.preview?.name == "프로젝트 팀")
+        #expect(viewModel.acceptanceResult?.joinResult == .alreadyMember)
+        #expect(viewModel.acceptanceResult?.groupSpaceName == "프로젝트 팀")
+    }
+
+    @MainActor @Test func invitationViewModelIgnoresIssueRequestsWhileAnotherIssueIsInProgress() async {
+        let repository = GroupSpaceRepositoryStub(issueDelayNanoseconds: 100_000_000)
+        let viewModel = GroupInvitationViewModel(service: GroupInvitationService(repository: repository))
+
+        let firstIssue = Task { await viewModel.issue(groupSpaceId: 7) }
+        await Task.yield()
+        await viewModel.issue(groupSpaceId: 7)
+        await firstIssue.value
+
+        #expect(repository.issueCallCount == 1)
+    }
+
+    @MainActor @Test func invitationViewModelClearsPriorIssuedInvitationWhenTheNextIssueFails() async {
+        let repository = GroupSpaceRepositoryStub(issueErrorOnCall: 2)
+        let viewModel = GroupInvitationViewModel(service: GroupInvitationService(repository: repository))
+
+        await viewModel.issue(groupSpaceId: 7)
+        #expect(viewModel.issuedInvitation?.code == "CALIO-2026")
+
+        await viewModel.issue(groupSpaceId: 7)
+
+        #expect(viewModel.issuedInvitation == nil)
+        #expect(viewModel.errorMessage == "초대를 만들지 못했습니다.")
+    }
+
     @MainActor @Test func removingMemberRefreshesGroupSpaceFromBackend() async throws {
         let repository = GroupSpaceRepositoryStub(memberCountAfterRemoval: 1)
         let viewModel = GroupSpaceDetailViewModel(
@@ -283,18 +364,41 @@ private final class GroupSpaceRepositoryStub: GroupSpaceRepository {
     private let fetchErrorOnCall: Int?
     private let memberCountAfterRemoval: Int
     private let fetchGroupSpaceError: APIError?
+    private let previewResponse: PreviewGroupInvitationResponseDTO
+    private let acceptResponse: AcceptGroupInvitationResponseDTO
+    private let invitationError: Error?
+    private let acceptError: Error?
+    private let issueDelayNanoseconds: UInt64
+    private let issueErrorOnCall: Int?
     private var fetchCallCount = 0
+    private(set) var issueCallCount = 0
 
     init(
         fetchResponses: [[GroupSpaceResponseDTO]] = [],
         fetchErrorOnCall: Int? = nil,
         memberCountAfterRemoval: Int = 2,
-        fetchGroupSpaceError: APIError? = nil
+        fetchGroupSpaceError: APIError? = nil,
+        previewResponse: PreviewGroupInvitationResponseDTO = .init(name: "프로젝트 팀", emoji: nil, memberCount: 2, expiresAt: Date(timeIntervalSince1970: 0)),
+        acceptResponse: AcceptGroupInvitationResponseDTO = .init(
+            joinResult: .joined,
+            groupSpace: .init(id: 7, name: "프로젝트 팀", emoji: nil, myMembership: .init(memberId: 10, nickname: "준하", role: .member), memberCount: 2, createdAt: Date(timeIntervalSince1970: 0)),
+            membership: .init(memberId: 10, nickname: "준하", role: .member)
+        ),
+        invitationError: Error? = nil,
+        acceptError: Error? = nil,
+        issueDelayNanoseconds: UInt64 = 0,
+        issueErrorOnCall: Int? = nil
     ) {
         self.fetchResponses = fetchResponses
         self.fetchErrorOnCall = fetchErrorOnCall
         self.memberCountAfterRemoval = memberCountAfterRemoval
         self.fetchGroupSpaceError = fetchGroupSpaceError
+        self.previewResponse = previewResponse
+        self.acceptResponse = acceptResponse
+        self.invitationError = invitationError
+        self.acceptError = acceptError
+        self.issueDelayNanoseconds = issueDelayNanoseconds
+        self.issueErrorOnCall = issueErrorOnCall
     }
 
     static func sampleSpace(name: String = "프로젝트 팀") -> GroupSpaceResponseDTO {
@@ -387,9 +491,59 @@ private final class GroupSpaceRepositoryStub: GroupSpaceRepository {
         operations.append("remove:\(groupSpaceId):\(memberId)")
     }
 
+    func issueInvitation(groupSpaceId: Int64) async throws -> GroupInvitationResponseDTO {
+        issueCallCount += 1
+        if issueErrorOnCall == issueCallCount { throw StubError.failed }
+        if issueDelayNanoseconds > 0 {
+            try? await Task.sleep(nanoseconds: issueDelayNanoseconds)
+        }
+        return .init(invitationId: 3, inviteUrl: "https://calio.app/invite/token", inviteCode: "CALIO-2026", expiresAt: Self.date)
+    }
+
+    func fetchInvitations(groupSpaceId: Int64) async throws -> GroupInvitationListResponseDTO {
+        throw StubError.failed
+    }
+
+    func revokeInvitation(groupSpaceId: Int64, invitationId: Int64) async throws {
+        throw StubError.failed
+    }
+
+    func previewInvitation(_ request: PreviewGroupInvitationRequestDTO) async throws -> PreviewGroupInvitationResponseDTO {
+        if let invitationError { throw invitationError }
+        return previewResponse
+    }
+
+    func acceptInvitation(_ request: AcceptGroupInvitationRequestDTO) async throws -> AcceptGroupInvitationResponseDTO {
+        if let acceptError { throw acceptError }
+        if let invitationError { throw invitationError }
+        return acceptResponse
+    }
+
     enum StubError: Error { case failed }
 
     deinit {}
+}
+
+private extension GroupSpaceRepository {
+    func issueInvitation(groupSpaceId: Int64) async throws -> GroupInvitationResponseDTO {
+        throw GroupSpaceRepositoryStub.StubError.failed
+    }
+
+    func fetchInvitations(groupSpaceId: Int64) async throws -> GroupInvitationListResponseDTO {
+        throw GroupSpaceRepositoryStub.StubError.failed
+    }
+
+    func revokeInvitation(groupSpaceId: Int64, invitationId: Int64) async throws {
+        throw GroupSpaceRepositoryStub.StubError.failed
+    }
+
+    func previewInvitation(_ request: PreviewGroupInvitationRequestDTO) async throws -> PreviewGroupInvitationResponseDTO {
+        throw GroupSpaceRepositoryStub.StubError.failed
+    }
+
+    func acceptInvitation(_ request: AcceptGroupInvitationRequestDTO) async throws -> AcceptGroupInvitationResponseDTO {
+        throw GroupSpaceRepositoryStub.StubError.failed
+    }
 }
 
 private struct FailingGroupSpaceRepository: GroupSpaceRepository {

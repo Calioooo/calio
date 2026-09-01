@@ -36,6 +36,9 @@ import Combine
             isLoading = false
         }
     }
+    func refreshAfterJoiningInvitation() async {
+        await load()
+    }
     func create(name: String, nickname: String) async -> Bool {
         do {
             let space = try await service.create(name: name, emoji: nil, nickname: nickname)

@@ -104,4 +104,54 @@ struct URLSessionGroupSpaceRepository: GroupSpaceRepository {
             authorization: .bearer
         )
     }
+
+    func issueInvitation(groupSpaceId: Int64) async throws -> GroupInvitationResponseDTO {
+        try await apiClient.send(
+            GroupInvitationResponseDTO.self,
+            method: .post,
+            pathComponents: ["api", "group-spaces", String(groupSpaceId), "invitations"],
+            authorization: .bearer
+        )
+    }
+
+    func fetchInvitations(groupSpaceId: Int64) async throws -> GroupInvitationListResponseDTO {
+        try await apiClient.send(
+            GroupInvitationListResponseDTO.self,
+            method: .get,
+            pathComponents: ["api", "group-spaces", String(groupSpaceId), "invitations"],
+            authorization: .bearer
+        )
+    }
+
+    func revokeInvitation(groupSpaceId: Int64, invitationId: Int64) async throws {
+        try await apiClient.sendWithoutResponse(
+            method: .delete,
+            pathComponents: ["api", "group-spaces", String(groupSpaceId), "invitations", String(invitationId)],
+            authorization: .bearer
+        )
+    }
+
+    func previewInvitation(
+        _ request: PreviewGroupInvitationRequestDTO
+    ) async throws -> PreviewGroupInvitationResponseDTO {
+        try await apiClient.send(
+            PreviewGroupInvitationResponseDTO.self,
+            method: .post,
+            pathComponents: ["api", "group-invitations", "preview"],
+            authorization: .bearer,
+            body: request
+        )
+    }
+
+    func acceptInvitation(
+        _ request: AcceptGroupInvitationRequestDTO
+    ) async throws -> AcceptGroupInvitationResponseDTO {
+        try await apiClient.send(
+            AcceptGroupInvitationResponseDTO.self,
+            method: .post,
+            pathComponents: ["api", "group-invitations", "accept"],
+            authorization: .bearer,
+            body: request
+        )
+    }
 }
