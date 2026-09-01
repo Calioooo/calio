@@ -90,7 +90,7 @@ struct GroupSpaceServiceTests {
         let repository = GroupSpaceRepositoryStub(
             previewResponse: .init(name: "프로젝트 팀", emoji: "🗓️", memberCount: 2, expiresAt: GroupSpaceRepositoryStub.date),
             acceptResponse: .init(
-                joinResult: "ALREADY_MEMBER",
+                joinResult: .alreadyMember,
                 groupSpace: .init(id: 7, name: "프로젝트 팀", emoji: "🗓️", myMembership: .init(memberId: 10, nickname: "준하", role: .member), memberCount: 2, createdAt: GroupSpaceRepositoryStub.date),
                 membership: .init(memberId: 10, nickname: "준하", role: .member)
             )
@@ -103,7 +103,7 @@ struct GroupSpaceServiceTests {
         #expect(previewed)
         #expect(accepted)
         #expect(viewModel.preview?.name == "프로젝트 팀")
-        #expect(viewModel.acceptanceResult?.joinResult == "ALREADY_MEMBER")
+        #expect(viewModel.acceptanceResult?.joinResult == .alreadyMember)
         #expect(viewModel.acceptanceResult?.groupSpace.name == "프로젝트 팀")
     }
 }
@@ -123,7 +123,7 @@ private final class GroupSpaceRepositoryStub: GroupSpaceRepository {
         fetchErrorOnCall: Int? = nil,
         previewResponse: PreviewGroupInvitationResponseDTO = .init(name: "프로젝트 팀", emoji: nil, memberCount: 2, expiresAt: Date(timeIntervalSince1970: 0)),
         acceptResponse: AcceptGroupInvitationResponseDTO = .init(
-            joinResult: "JOINED",
+            joinResult: .joined,
             groupSpace: .init(id: 7, name: "프로젝트 팀", emoji: nil, myMembership: .init(memberId: 10, nickname: "준하", role: .member), memberCount: 2, createdAt: Date(timeIntervalSince1970: 0)),
             membership: .init(memberId: 10, nickname: "준하", role: .member)
         ),

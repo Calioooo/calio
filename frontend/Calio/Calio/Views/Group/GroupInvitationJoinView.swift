@@ -240,10 +240,10 @@ private struct GroupInvitationAcceptanceResultSheet: View {
     let onDone: () -> Void
     var body: some View {
         VStack(spacing: 16) {
-            Image(systemName: result.joinResult == "ALREADY_MEMBER" ? "person.crop.circle.badge.checkmark" : "checkmark.circle.fill")
+            Image(systemName: result.joinResult == .alreadyMember ? "person.crop.circle.badge.checkmark" : "checkmark.circle.fill")
                 .font(.system(size: 40))
                 .foregroundStyle(.calioBrand)
-            Text(result.joinResult == "ALREADY_MEMBER" ? "이미 참여한 그룹이에요" : "그룹에 참여했어요")
+            Text(result.joinResult == .alreadyMember ? "이미 참여한 그룹이에요" : "그룹에 참여했어요")
                 .font(.title3.weight(.semibold))
             Text("\(result.groupSpace.name)에서 함께 일정을 관리할 수 있습니다.")
                 .font(.subheadline)

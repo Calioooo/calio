@@ -16,6 +16,7 @@ enum GroupInvitationCredentialKind: Hashable {
 
 enum GroupInvitationPreviewCredentialTypeDTO: String, Encodable { case linkToken = "LINK_TOKEN", code = "CODE" }
 enum GroupInvitationAcceptanceCredentialTypeDTO: String, Encodable { case linkToken = "LINK_TOKEN", inviteCode = "INVITE_CODE" }
+enum GroupInvitationJoinResultDTO: String, Decodable { case joined = "JOINED", alreadyMember = "ALREADY_MEMBER", rejoined = "REJOINED" }
 
 struct GroupMembershipResponseDTO: Decodable { let nickname: String; let role: GroupMemberRoleDTO; let createdAt: Date; let updatedAt: Date; let statusChangedAt: Date }
 struct GroupSpaceResponseDTO: Decodable { let groupSpaceId: Int64; let name: String; let emoji: String?; let memberCount: Int; let myMembership: GroupMembershipResponseDTO; let createdAt: Date; let updatedAt: Date }
@@ -53,7 +54,7 @@ struct PreviewGroupInvitationResponseDTO: Decodable {
     }
 }
 struct AcceptGroupInvitationRequestDTO: Encodable { let credentialType: GroupInvitationAcceptanceCredentialTypeDTO; let credential: String; let nickname: String }
-struct AcceptGroupInvitationResponseDTO: Decodable { let joinResult: String; let groupSpace: GroupSpaceJoinResponseDTO; let membership: GroupMemberResponseDTO }
+struct AcceptGroupInvitationResponseDTO: Decodable { let joinResult: GroupInvitationJoinResultDTO; let groupSpace: GroupSpaceJoinResponseDTO; let membership: GroupMemberResponseDTO }
 struct GroupSpaceJoinResponseDTO: Decodable { let id: Int64; let name: String; let emoji: String?; let myMembership: GroupMemberResponseDTO; let memberCount: Int; let createdAt: Date }
 
 extension AcceptGroupInvitationResponseDTO: Identifiable { var id: Int64 { groupSpace.id } }
