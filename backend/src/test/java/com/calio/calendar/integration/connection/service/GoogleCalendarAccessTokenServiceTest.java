@@ -2,7 +2,11 @@ package com.calio.calendar.integration.connection.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -11,6 +15,7 @@ import com.calio.calendar.external.google.GoogleOAuthClient;
 import com.calio.calendar.external.google.GoogleCalendarInvalidGrantException;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
+import com.calio.calendar.external.google.dto.GoogleAccessTokenRefreshResponse;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarConnection;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobCommandService;
@@ -79,6 +84,40 @@ class GoogleCalendarAccessTokenServiceTest {
                         assertThat(exception.getErrorCode())
                                 .isEqualTo(ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED));
         verifyNoInteractions(jobCommandService);
+    }
+
+    @Test
+    @DisplayName("token 갱신 중 재연결되면 이전 refresh 응답으로 새 Connection을 덮어쓰지 않는다")
+    void givenReconnectedConnectionDuringRefresh_whenForceRefresh_thenRejectsStaleTokenUpdate() {
+        TokenEncryptor encryptor = encryptor();
+        GoogleCalendarConnection previousConnection = mock(GoogleCalendarConnection.class);
+        GoogleCalendarConnection reconnectedConnection = mock(GoogleCalendarConnection.class);
+        GoogleCalendarConnectionQueryService connectionQueryService = mock(GoogleCalendarConnectionQueryService.class);
+        GoogleCalendarConnectionCommandService connectionCommandService = mock(GoogleCalendarConnectionCommandService.class);
+        GoogleOAuthClient oauthClient = mock(GoogleOAuthClient.class);
+        GoogleOperationJobCommandService jobCommandService = mock(GoogleOperationJobCommandService.class);
+        String previousRefreshToken = encryptor.encryptRefreshToken("previous-refresh-token");
+        when(previousConnection.getId()).thenReturn(10L);
+        when(previousConnection.getEncryptedRefreshToken()).thenReturn(previousRefreshToken);
+        when(previousConnection.getEncryptedAccessToken())
+                .thenReturn(encryptor.encryptAccessToken("expired-access-token"));
+        when(previousConnection.getAccessTokenExpiresAt()).thenReturn(Instant.parse("2026-08-27T00:00:00Z"));
+        when(connectionQueryService.getConnectedConnectionById(10L)).thenReturn(previousConnection);
+        when(oauthClient.refreshAccessToken("previous-refresh-token"))
+                .thenReturn(new GoogleAccessTokenRefreshResponse("refreshed-access-token", 3600));
+        when(connectionCommandService.lockConnectedConnectionById(10L)).thenReturn(reconnectedConnection);
+        when(reconnectedConnection.getEncryptedRefreshToken())
+                .thenReturn(encryptor.encryptRefreshToken("new-refresh-token"));
+        GoogleCalendarAccessTokenService service = new GoogleCalendarAccessTokenService(
+                connectionQueryService, connectionCommandService, oauthClient, encryptor, jobCommandService,
+                new NoOpTransactionManager(), Clock.fixed(Instant.parse("2026-08-28T00:00:00Z"), ZoneOffset.UTC));
+
+        assertThatThrownBy(() -> service.forceRefresh(10L))
+                .isInstanceOfSatisfying(CalioException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED));
+        verify(connectionCommandService, never())
+                .replaceAccessToken(eq(reconnectedConnection), anyString(), any());
     }
 
     private TokenEncryptor encryptor() {
