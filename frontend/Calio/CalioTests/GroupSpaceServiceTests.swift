@@ -105,8 +105,10 @@ struct GroupSpaceServiceTests {
         while await repository.startedFetchCount() == 0 { await Task.yield() }
         let secondLoad = Task { await viewModel.load() }
 
-        await firstLoad.value
+        while await repository.startedFetchCount() < 2 { await Task.yield() }
         await secondLoad.value
+        await repository.finishFirstFetch()
+        await firstLoad.value
 
         #expect(viewModel.spaces.map(\.name) == ["최신 공간"])
         #expect(!viewModel.isLoading)
@@ -658,13 +660,23 @@ private struct FailingGroupSpaceRepository: GroupSpaceRepository {
 
 private actor OutOfOrderGroupSpaceRepository: GroupSpaceRepository {
     private var fetchCount = 0
+    private var firstFetchContinuation: CheckedContinuation<Void, Never>?
 
     func startedFetchCount() -> Int { fetchCount }
+
+    func finishFirstFetch() {
+        firstFetchContinuation?.resume()
+        firstFetchContinuation = nil
+    }
 
     func fetchGroupSpaces() async throws -> GroupSpaceListResponseDTO {
         fetchCount += 1
         let requestNumber = fetchCount
-        try await Task.sleep(for: requestNumber == 1 ? .milliseconds(50) : .milliseconds(1))
+        if requestNumber == 1 {
+            await withCheckedContinuation { continuation in
+                firstFetchContinuation = continuation
+            }
+        }
         return .init(groupSpaces: [GroupSpaceRepositoryStub.sampleSpace(name: requestNumber == 1 ? "이전 공간" : "최신 공간")])
     }
 
