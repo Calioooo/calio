@@ -9,8 +9,17 @@ import Combine
     @Published private(set) var isSubmitting = false
     @Published private(set) var errorMessage: String?
     private let service: GroupInvitationService
-    init(service: GroupInvitationService = GroupInvitationService()) { self.service = service }
-    func load(groupSpaceId: Int64) async { do { invitations = try await service.list(groupSpaceId: groupSpaceId) } catch { errorMessage = "초대 목록을 불러오지 못했습니다." } }
+    init(service: GroupInvitationService = GroupInvitationService()) {
+        self.service = service
+    }
+
+    func load(groupSpaceId: Int64) async {
+        do {
+            invitations = try await service.list(groupSpaceId: groupSpaceId)
+        } catch {
+            errorMessage = "초대 목록을 불러오지 못했습니다."
+        }
+    }
     func issue(groupSpaceId: Int64) async {
         guard !isSubmitting else { return }
         isSubmitting = true
@@ -23,7 +32,14 @@ import Combine
             errorMessage = "초대를 만들지 못했습니다."
         }
     }
-    func revoke(groupSpaceId: Int64, invitationId: Int64) async { do { try await service.revoke(groupSpaceId: groupSpaceId, invitationId: invitationId); invitations.removeAll { $0.id == invitationId } } catch { errorMessage = "초대를 취소하지 못했습니다." } }
+    func revoke(groupSpaceId: Int64, invitationId: Int64) async {
+        do {
+            try await service.revoke(groupSpaceId: groupSpaceId, invitationId: invitationId)
+            invitations.removeAll { $0.id == invitationId }
+        } catch {
+            errorMessage = "초대를 취소하지 못했습니다."
+        }
+    }
     func preview(type: GroupInvitationCredentialKind, credential: String) async -> Bool {
         isSubmitting = true
         defer { isSubmitting = false }
@@ -53,5 +69,7 @@ import Combine
         acceptanceResult = nil
         errorMessage = nil
     }
-    func clearError() { errorMessage = nil }
+    func clearError() {
+        errorMessage = nil
+    }
 }

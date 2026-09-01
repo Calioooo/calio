@@ -199,8 +199,28 @@ private final class GroupSpaceRepositoryStub: GroupSpaceRepository {
     }
     func fetchInvitations(groupSpaceId: Int64) async throws -> GroupInvitationListResponseDTO { throw StubError.failed }
     func revokeInvitation(groupSpaceId: Int64, invitationId: Int64) async throws { throw StubError.failed }
-    func previewInvitation(_ request: PreviewGroupInvitationRequestDTO) async throws -> PreviewGroupInvitationResponseDTO { if let invitationError { throw invitationError }; return previewResponse }
-    func acceptInvitation(_ request: AcceptGroupInvitationRequestDTO) async throws -> AcceptGroupInvitationResponseDTO { if let acceptError { throw acceptError }; if let invitationError { throw invitationError }; return acceptResponse }
+    func previewInvitation(
+        _ request: PreviewGroupInvitationRequestDTO
+    ) async throws -> PreviewGroupInvitationResponseDTO {
+        if let invitationError {
+            throw invitationError
+        }
+
+        return previewResponse
+    }
+
+    func acceptInvitation(
+        _ request: AcceptGroupInvitationRequestDTO
+    ) async throws -> AcceptGroupInvitationResponseDTO {
+        if let acceptError {
+            throw acceptError
+        }
+        if let invitationError {
+            throw invitationError
+        }
+
+        return acceptResponse
+    }
 
     enum StubError: Error { case failed }
 }

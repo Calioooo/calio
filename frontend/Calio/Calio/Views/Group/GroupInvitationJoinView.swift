@@ -228,8 +228,19 @@ struct GroupInvitationJoinView: View {
         return formatter
     }()
 
-    private var errorBinding: Binding<Bool> { Binding(get: { viewModel.errorMessage != nil }, set: { if !$0 { viewModel.clearError() } }) }
-    private var acceptanceResultBinding: Binding<GroupInvitationAcceptanceResult?> { Binding(get: { viewModel.acceptanceResult }, set: { if $0 == nil { viewModel.clearAcceptanceFlow() } }) }
+    private var errorBinding: Binding<Bool> {
+        Binding(
+            get: { viewModel.errorMessage != nil },
+            set: { if !$0 { viewModel.clearError() } }
+        )
+    }
+
+    private var acceptanceResultBinding: Binding<GroupInvitationAcceptanceResult?> {
+        Binding(
+            get: { viewModel.acceptanceResult },
+            set: { if $0 == nil { viewModel.clearAcceptanceFlow() } }
+        )
+    }
 }
 
 private struct GroupInvitationAcceptanceResultSheet: View {
