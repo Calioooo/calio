@@ -66,16 +66,16 @@ struct GroupSpaceServiceTests {
         #expect(viewModel.members.first { $0.memberId == 11 }?.role == .owner)
     }
 
-    @MainActor @Test func invitationViewModelRetainsAcceptanceContextAfterRecoverableErrorAndClearsItOnDismissal() async {
-        let repository = GroupSpaceRepositoryStub(invitationError: GroupSpaceRepositoryStub.StubError.failed)
+    @MainActor @Test func invitationViewModelRetainsPreviewAfterAcceptanceErrorAndClearsItOnDismissal() async {
+        let repository = GroupSpaceRepositoryStub(acceptError: GroupSpaceRepositoryStub.StubError.failed)
         let viewModel = GroupInvitationViewModel(service: GroupInvitationService(repository: repository))
 
         let previewed = await viewModel.preview(type: .inviteCode, credential: "CALIO-2026")
         let accepted = await viewModel.accept(type: .inviteCode, credential: "CALIO-2026", nickname: "준하")
 
-        #expect(!previewed)
+        #expect(previewed)
         #expect(!accepted)
-        #expect(viewModel.preview == nil)
+        #expect(viewModel.preview?.name == "프로젝트 팀")
         #expect(viewModel.acceptanceResult == nil)
         #expect(viewModel.errorMessage == "그룹 공간에 참여하지 못했습니다. 다시 시도해 주세요.")
 
@@ -141,6 +141,7 @@ private final class GroupSpaceRepositoryStub: GroupSpaceRepository {
     private let previewResponse: PreviewGroupInvitationResponseDTO
     private let acceptResponse: AcceptGroupInvitationResponseDTO
     private let invitationError: Error?
+    private let acceptError: Error?
     private let issueDelayNanoseconds: UInt64
     private let issueErrorOnCall: Int?
     private var fetchCallCount = 0
@@ -156,6 +157,7 @@ private final class GroupSpaceRepositoryStub: GroupSpaceRepository {
             membership: .init(memberId: 10, nickname: "준하", role: .member)
         ),
         invitationError: Error? = nil,
+        acceptError: Error? = nil,
         issueDelayNanoseconds: UInt64 = 0,
         issueErrorOnCall: Int? = nil
     ) {
@@ -164,6 +166,7 @@ private final class GroupSpaceRepositoryStub: GroupSpaceRepository {
         self.previewResponse = previewResponse
         self.acceptResponse = acceptResponse
         self.invitationError = invitationError
+        self.acceptError = acceptError
         self.issueDelayNanoseconds = issueDelayNanoseconds
         self.issueErrorOnCall = issueErrorOnCall
     }
@@ -197,7 +200,7 @@ private final class GroupSpaceRepositoryStub: GroupSpaceRepository {
     func fetchInvitations(groupSpaceId: Int64) async throws -> GroupInvitationListResponseDTO { throw StubError.failed }
     func revokeInvitation(groupSpaceId: Int64, invitationId: Int64) async throws { throw StubError.failed }
     func previewInvitation(_ request: PreviewGroupInvitationRequestDTO) async throws -> PreviewGroupInvitationResponseDTO { if let invitationError { throw invitationError }; return previewResponse }
-    func acceptInvitation(_ request: AcceptGroupInvitationRequestDTO) async throws -> AcceptGroupInvitationResponseDTO { if let invitationError { throw invitationError }; return acceptResponse }
+    func acceptInvitation(_ request: AcceptGroupInvitationRequestDTO) async throws -> AcceptGroupInvitationResponseDTO { if let acceptError { throw acceptError }; if let invitationError { throw invitationError }; return acceptResponse }
 
     enum StubError: Error { case failed }
 }
