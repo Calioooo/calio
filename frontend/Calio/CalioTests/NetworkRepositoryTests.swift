@@ -599,6 +599,7 @@ struct NetworkRepositoryTests {
         let repository = URLSessionGroupSpaceRepository(baseURL: URL(string: "https://example.test")!, session: URLSession(configuration: configuration), authTokenProvider: StaticAuthTokenProvider(accessToken: "test-token"))
 
         let groupSpaces = try await repository.fetchGroupSpaces()
+        let groupSpace = try await repository.fetchGroupSpace(groupSpaceId: 7)
         _ = try await repository.createGroupSpace(.init(name: "프로젝트 팀", emoji: nil, nickname: "준하"))
         _ = try await repository.updateGroupSpace(groupSpaceId: 7, request: .init(name: "수정 팀", emoji: "🗓️"))
         _ = try await repository.fetchMembers(groupSpaceId: 7)
@@ -608,17 +609,18 @@ struct NetworkRepositoryTests {
         try await repository.deleteGroupSpace(groupSpaceId: 7)
 
         #expect(groupSpaces.groupSpaces.map(\.groupSpaceId) == [7])
-        #expect(requests.map { $0.url?.path } == ["/api/group-spaces", "/api/group-spaces", "/api/group-spaces/7", "/api/group-spaces/7/members", "/api/group-spaces/7/owner-transfer", "/api/group-spaces/7/members/me", "/api/group-spaces/7/members/11", "/api/group-spaces/7"])
-        #expect(requests.map { $0.httpMethod ?? "" } == ["GET", "POST", "PATCH", "GET", "POST", "DELETE", "DELETE", "DELETE"])
+        #expect(groupSpace.groupSpaceId == 7)
+        #expect(requests.map { $0.url?.path } == ["/api/group-spaces", "/api/group-spaces/7", "/api/group-spaces", "/api/group-spaces/7", "/api/group-spaces/7/members", "/api/group-spaces/7/owner-transfer", "/api/group-spaces/7/members/me", "/api/group-spaces/7/members/11", "/api/group-spaces/7"])
+        #expect(requests.map { $0.httpMethod ?? "" } == ["GET", "GET", "POST", "PATCH", "GET", "POST", "DELETE", "DELETE", "DELETE"])
         #expect(requests.allSatisfy { $0.value(forHTTPHeaderField: "Authorization") == "Bearer test-token" })
-        let createBody = try groupRequestBodyJSON(from: requests[1])
-        let updateBody = try groupRequestBodyJSON(from: requests[2])
-        let transferBody = try groupRequestBodyJSON(from: requests[4])
+        let createBody = try groupRequestBodyJSON(from: requests[2])
+        let updateBody = try groupRequestBodyJSON(from: requests[3])
+        let transferBody = try groupRequestBodyJSON(from: requests[5])
         #expect(Set(createBody.keys) == ["name", "nickname"])
         #expect(createBody["emoji"] == nil)
         #expect(Set(updateBody.keys) == ["name", "emoji"])
         #expect(transferBody["targetMemberId"] as? Int == 11)
-        #expect(requests.dropFirst(5).allSatisfy { requestBodyData(from: $0) == nil })
+        #expect(requests.dropFirst(6).allSatisfy { requestBodyData(from: $0) == nil })
     }
 
     private func groupRequestBodyJSON(from request: URLRequest) throws -> [String: Any] {
