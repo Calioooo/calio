@@ -10,11 +10,21 @@ enum GroupInvitationCredentialKind: Hashable {
     case inviteCode
 
     var previewType: GroupInvitationPreviewCredentialTypeDTO {
-        self == .linkToken ? .linkToken : .code
+        switch self {
+        case .linkToken:
+            return .linkToken
+        case .inviteCode:
+            return .code
+        }
     }
 
     var acceptanceType: GroupInvitationAcceptanceCredentialTypeDTO {
-        self == .linkToken ? .linkToken : .inviteCode
+        switch self {
+        case .linkToken:
+            return .linkToken
+        case .inviteCode:
+            return .inviteCode
+        }
     }
 }
 
