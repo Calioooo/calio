@@ -1,5 +1,6 @@
 package com.calio.calendar.aicalendar.service;
 
+import com.calio.calendar.aicalendar.controller.dto.CalendarAssistantBlockResponse;
 import com.calio.calendar.aicalendar.controller.dto.SendCalendarConversationMessageResponse;
 import com.calio.calendar.aicalendar.domain.CalendarAssistantRequestClassification;
 import com.calio.calendar.aicalendar.domain.CalendarConversation;
@@ -18,6 +19,8 @@ import java.util.concurrent.ThreadLocalRandom;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 
 @Service
 public class CalendarConversationService {
@@ -25,15 +28,16 @@ public class CalendarConversationService {
     private static final int MAX_MESSAGE_LENGTH = 2_000;
     private static final int MAX_HISTORY_SIZE = 20;
     private static final List<String> UNSUPPORTED_MESSAGES = List.of(
-            "일정 조회와 빈 시간 찾기를 도와드릴 수 있어요.",
-            "캘린더의 일정 확인이나 빈 시간 찾기를 요청해 주세요.",
-            "일정 조회와 빈 시간 찾기 기능을 지원해요."
+            "일정 조회, 빈 시간 찾기, 일정 생성·수정·삭제를 도와드릴 수 있어요.",
+            "캘린더의 일정 확인, 빈 시간 찾기, 일정 생성·수정·삭제를 요청해 주세요.",
+            "일정 조회, 빈 시간 찾기, 일정 생성·수정·삭제 기능을 지원해요."
     );
 
     private final CalendarConversationQueryService conversationQueryService;
     private final CalendarConversationCommandService conversationCommandService;
     private final CalendarAssistantRequestClassifier requestClassifier;
     private final CalendarAssistantAgent assistantAgent;
+    private final ObjectMapper objectMapper;
     private final Clock clock;
     private final TransactionTemplate transactionTemplate;
 
@@ -42,6 +46,7 @@ public class CalendarConversationService {
             CalendarConversationCommandService conversationCommandService,
             CalendarAssistantRequestClassifier requestClassifier,
             CalendarAssistantAgent assistantAgent,
+            ObjectMapper objectMapper,
             Clock clock,
             PlatformTransactionManager transactionManager
     ) {
@@ -49,6 +54,7 @@ public class CalendarConversationService {
         this.conversationCommandService = conversationCommandService;
         this.requestClassifier = requestClassifier;
         this.assistantAgent = assistantAgent;
+        this.objectMapper = objectMapper;
         this.clock = clock;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
@@ -86,8 +92,7 @@ public class CalendarConversationService {
                 history
         );
         CalendarAssistantAnswer answer = assistantAgent.answer(request);
-        recordAssistantMessage(conversation.getId(), answer.message());
-        return SendCalendarConversationMessageResponse.from(conversationId, answer);
+        return recordAssistantResponse(conversation.getId(), conversationId, answer);
     }
 
     private SendCalendarConversationMessageResponse recordUnsupportedResponse(
@@ -97,10 +102,21 @@ public class CalendarConversationService {
         CalendarAssistantAnswer answer = new CalendarAssistantAnswer(
                 selectUnsupportedMessage(),
                 List.of(),
+                List.of(),
                 List.of()
         );
-        recordAssistantMessage(conversationId, answer.message());
-        return SendCalendarConversationMessageResponse.from(externalConversationId, answer);
+        return recordAssistantResponse(conversationId, externalConversationId, answer);
+    }
+
+    private SendCalendarConversationMessageResponse recordAssistantResponse(
+            Long conversationId,
+            String externalConversationId,
+            CalendarAssistantAnswer answer
+    ) {
+        SendCalendarConversationMessageResponse response =
+                SendCalendarConversationMessageResponse.from(externalConversationId, answer);
+        recordAssistantMessage(conversationId, response.assistantMessage(), response.blocks());
+        return response;
     }
 
     private String selectUnsupportedMessage() {
@@ -122,6 +138,7 @@ public class CalendarConversationService {
                 conversationId,
                 CalendarConversationMessageRole.USER,
                 message,
+                null,
                 clock.instant()
         );
     }
@@ -131,12 +148,29 @@ public class CalendarConversationService {
     }
 
     void recordAssistantMessage(Long conversationId, String message) {
+        recordAssistantMessage(conversationId, message, List.of());
+    }
+
+    private void recordAssistantMessage(
+            Long conversationId,
+            String message,
+            List<CalendarAssistantBlockResponse<?>> responseBlocks
+    ) {
         transactionTemplate.executeWithoutResult(status -> conversationCommandService.recordMessage(
                 conversationId,
                 CalendarConversationMessageRole.ASSISTANT,
                 message,
+                serializeResponseBlocks(responseBlocks),
                 clock.instant()
         ));
+    }
+
+    private String serializeResponseBlocks(List<CalendarAssistantBlockResponse<?>> responseBlocks) {
+        try {
+            return objectMapper.writeValueAsString(responseBlocks);
+        } catch (JacksonException exception) {
+            throw new IllegalStateException("Assistant response blocks cannot be stored.", exception);
+        }
     }
 
     public int deleteInactiveConversations(Instant cutoff) {

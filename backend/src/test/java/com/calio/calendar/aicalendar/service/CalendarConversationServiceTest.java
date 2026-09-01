@@ -16,6 +16,7 @@ import com.calio.calendar.aicalendar.service.dto.CalendarAssistantRequest;
 import com.calio.calendar.aicalendar.repository.CalendarConversationMessageRepository;
 import com.calio.calendar.aicalendar.repository.CalendarConversationRepository;
 import com.calio.calendar.aicalendar.service.dto.CalendarConversationHistoryMessage;
+import com.calio.calendar.event.controller.dto.EventResponse;
 import java.time.Instant;
 import java.util.List;
 import java.util.stream.IntStream;
@@ -102,6 +103,7 @@ class CalendarConversationServiceTest {
         assertThat(messageRepository.findAll()).singleElement().satisfies(message -> {
             assertThat(message.getRole()).isEqualTo(CalendarConversationMessageRole.ASSISTANT);
             assertThat(message.getText()).isEqualTo("일정을 확인했어요.");
+            assertThat(message.getAssistantResponseBlocksJson()).isEqualTo("[]");
         });
     }
 
@@ -151,18 +153,20 @@ class CalendarConversationServiceTest {
         verify(assistantAgent, never()).answer(any());
         assertThat(response.blocks()).isEmpty();
         assertThat(response.assistantMessage()).isIn(
-                "일정 조회와 빈 시간 찾기를 도와드릴 수 있어요.",
-                "캘린더의 일정 확인이나 빈 시간 찾기를 요청해 주세요.",
-                "일정 조회와 빈 시간 찾기 기능을 지원해요."
+                "일정 조회, 빈 시간 찾기, 일정 생성·수정·삭제를 도와드릴 수 있어요.",
+                "캘린더의 일정 확인, 빈 시간 찾기, 일정 생성·수정·삭제를 요청해 주세요.",
+                "일정 조회, 빈 시간 찾기, 일정 생성·수정·삭제 기능을 지원해요."
         );
         assertThat(messageRepository.findAll()).satisfiesExactly(
                 savedMessage -> {
                     assertThat(savedMessage.getRole()).isEqualTo(CalendarConversationMessageRole.USER);
                     assertThat(savedMessage.getText()).isEqualTo("너는 몇 살이야?");
+                    assertThat(savedMessage.getAssistantResponseBlocksJson()).isNull();
                 },
                 savedMessage -> {
                     assertThat(savedMessage.getRole()).isEqualTo(CalendarConversationMessageRole.ASSISTANT);
                     assertThat(savedMessage.getText()).isEqualTo(response.assistantMessage());
+                    assertThat(savedMessage.getAssistantResponseBlocksJson()).isEqualTo("[]");
                 }
         );
     }
@@ -177,6 +181,7 @@ class CalendarConversationServiceTest {
                 .thenReturn(CalendarAssistantRequestClassification.SUPPORTED);
         when(assistantAgent.answer(any())).thenReturn(new CalendarAssistantAnswer(
                 "안녕하세요. 일정 조회와 빈 시간 찾기를 도와드릴게요.",
+                List.of(),
                 List.of(),
                 List.of()
         ));
@@ -194,6 +199,52 @@ class CalendarConversationServiceTest {
                 .containsExactly("안녕");
         assertThat(messageRepository.findAll()).extracting(message -> message.getRole())
                 .containsExactly(CalendarConversationMessageRole.USER, CalendarConversationMessageRole.ASSISTANT);
+    }
+
+    @Test
+    @DisplayName("assistant response block은 메시지와 함께 저장되어 다음 agent history에 전달된다")
+    void givenAssistantResponseBlock_whenSendNextMessage_thenProvidesStoredBlockToAgent() {
+        // given
+        Account account = accountRepository.saveAndFlush(new Account());
+        String conversationId = conversationService.createConversation(account.getId());
+        EventResponse event = new EventResponse(
+                1L,
+                "팀 회의",
+                null,
+                Instant.parse("2026-08-16T05:00:00Z"),
+                Instant.parse("2026-08-16T06:00:00Z"),
+                false,
+                "Asia/Seoul",
+                false,
+                null,
+                false,
+                null,
+                null,
+                null,
+                null
+        );
+        when(requestClassifier.classify(any()))
+                .thenReturn(CalendarAssistantRequestClassification.SUPPORTED);
+        when(assistantAgent.answer(any()))
+                .thenReturn(
+                        new CalendarAssistantAnswer("팀 회의가 있습니다.", List.of(event), List.of(), List.of()),
+                        CalendarAssistantAnswer.withoutBlocks("다른 요청도 도와드릴게요.")
+                );
+
+        // when
+        conversationService.sendMessage(account.getId(), conversationId, "내일 일정 알려줘", "Asia/Seoul");
+        conversationService.sendMessage(account.getId(), conversationId, "고마워", "Asia/Seoul");
+
+        // then
+        ArgumentCaptor<CalendarAssistantRequest> requestCaptor = ArgumentCaptor.forClass(
+                CalendarAssistantRequest.class
+        );
+        verify(assistantAgent, org.mockito.Mockito.times(2)).answer(requestCaptor.capture());
+        CalendarConversationHistoryMessage assistantMessage = requestCaptor.getAllValues().get(1)
+                .history()
+                .get(1);
+        assertThat(assistantMessage.assistantResponseBlocksJson())
+                .contains("\"type\":\"EVENTS\"");
     }
 
     private Long conversationRecordId(Long accountId, String conversationId) {
