@@ -7,8 +7,8 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import java.time.Instant;
 import jakarta.persistence.UniqueConstraint;
+import java.time.Instant;
 
 @Entity
 @Table(
@@ -35,12 +35,22 @@ public class GoogleCalendarIntegration extends BaseEntity {
     @Column(name = "google_operation_lease_expires_at")
     private Instant googleOperationLeaseExpiresAt;
 
-    protected GoogleCalendarIntegration() { }
-    public GoogleCalendarIntegration(Long accountId) { this.accountId = accountId; }
+    protected GoogleCalendarIntegration() {
+    }
+
+    public GoogleCalendarIntegration(Long accountId) {
+        this.accountId = accountId;
+    }
 
     public long allocateGoogleOperationSequence() {
         return nextGoogleOperationSequence++;
     }
-    public Long getId() { return id; }
-    public Long getAccountId() { return accountId; }
+
+    public Long getId() {
+        return id;
+    }
+
+    public Long getAccountId() {
+        return accountId;
+    }
 }

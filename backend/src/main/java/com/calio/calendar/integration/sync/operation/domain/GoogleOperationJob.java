@@ -168,19 +168,62 @@ public class GoogleOperationJob extends BaseEntity {
         conflictDetected = true;
     }
 
-    public Long getId() { return id; }
-    public String getOperationId() { return operationId; }
-    public Long getIntegrationId() { return integrationId; }
-    public Long getAccountId() { return accountId; }
-    public long getIntegrationSequence() { return integrationSequence; }
-    public String getKind() { return kind; }
-    public GoogleOperationJobTrigger getTrigger() { return trigger; }
-    public GoogleOperationJobState getState() { return state; }
-    public Instant getRunnableAt() { return runnableAt; }
-    public int getRetryCount() { return retryCount; }
-    public String getLastErrorReason() { return lastErrorReason; }
-    public String getOwnerToken() { return ownerToken; }
-    public String getEffectiveResourceScope() { return effectiveResourceScope; }
-    public String getEffectiveResourceKey() { return effectiveResourceKey; }
-    public boolean isConflictDetected() { return conflictDetected; }
+    public Long getId() {
+        return id;
+    }
+
+    public String getOperationId() {
+        return operationId;
+    }
+
+    public Long getIntegrationId() {
+        return integrationId;
+    }
+
+    public Long getAccountId() {
+        return accountId;
+    }
+
+    public long getIntegrationSequence() {
+        return integrationSequence;
+    }
+
+    public String getKind() {
+        return kind;
+    }
+
+    public GoogleOperationJobTrigger getTrigger() {
+        return trigger;
+    }
+
+    public GoogleOperationJobState getState() {
+        return state;
+    }
+
+    public Instant getRunnableAt() {
+        return runnableAt;
+    }
+
+    public int getRetryCount() {
+        return retryCount;
+    }
+    public String getLastErrorReason() {
+        return lastErrorReason;
+    }
+
+    public String getOwnerToken() {
+        return ownerToken;
+    }
+
+    public String getEffectiveResourceScope() {
+        return effectiveResourceScope;
+    }
+
+    public String getEffectiveResourceKey() {
+        return effectiveResourceKey;
+    }
+
+    public boolean isConflictDetected() {
+        return conflictDetected;
+    }
 }
