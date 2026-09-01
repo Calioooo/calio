@@ -14,7 +14,7 @@ class CalendarConversationMigrationTest {
     @DisplayName("AI calendar conversation migration은 account ownership, chronological messages와 cleanup index를 정의한다")
     void migrationDefinesConversationPersistenceContract() throws IOException {
         // when
-        String migration = new ClassPathResource("db/migration/V17__ai_calendar_conversations.sql")
+        String migration = new ClassPathResource("db/migration/V22__ai_calendar_conversations.sql")
                 .getContentAsString(StandardCharsets.UTF_8);
 
         // then
