@@ -86,7 +86,7 @@ struct GroupInvitationManagementView: View {
 
     private var groupSummary: some View {
         HStack(spacing: 14) {
-            Text(String(groupSpace.name.prefix(1)))
+            Text(groupSpace.emoji ?? String(groupSpace.name.prefix(1)))
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(.calioPrimary)
                 .frame(width: 52, height: 52)
