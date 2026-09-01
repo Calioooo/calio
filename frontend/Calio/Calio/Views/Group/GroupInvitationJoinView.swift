@@ -3,7 +3,6 @@ import SwiftUI
 struct GroupInvitationJoinView: View {
     let onDismiss: () -> Void
     let onJoined: () -> Void
-    private let previewForEvidence: GroupInvitationPreview?
     @StateObject private var viewModel = GroupInvitationViewModel()
     @State private var credentialType: GroupInvitationCredentialKind = .inviteCode
     @State private var credential = ""
@@ -11,12 +10,10 @@ struct GroupInvitationJoinView: View {
 
     init(
         onDismiss: @escaping () -> Void,
-        onJoined: @escaping () -> Void = {},
-        previewForEvidence: GroupInvitationPreview? = nil
+        onJoined: @escaping () -> Void = {}
     ) {
         self.onDismiss = onDismiss
         self.onJoined = onJoined
-        self.previewForEvidence = previewForEvidence
     }
 
     var body: some View {
@@ -78,7 +75,7 @@ struct GroupInvitationJoinView: View {
     }
 
     private var activePreview: GroupInvitationPreview? {
-        viewModel.preview ?? previewForEvidence
+        viewModel.preview
     }
 
     private var cardHeight: CGFloat {
