@@ -20,12 +20,14 @@ import java.time.ZoneId;
 import java.time.temporal.TemporalAdjusters;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.ai.chat.client.ChatClient;
@@ -44,7 +46,7 @@ public class SpringAiCalendarAssistantAgent implements CalendarAssistantAgent, A
     private static final int MAX_PROVIDER_REQUEST_ATTEMPTS = 2;
     private static final String ASSISTANT_RESPONSE_BLOCKS_MARKER = "ASSISTANT_RESPONSE_BLOCKS";
     private static final String LEGACY_CALIO_RESPONSE_STATE_TAG = "<calio_response_state>";
-    private static final String CALENDAR_RESPONSE_HISTORY_TAG = "<calendar_response_history>";
+    private static final String CALENDAR_RESPONSE_HISTORY_TAG = "calendar_response_history";
     private static final String TOOL_REQUEST_JSON_PREFIX = "{\"request\":";
 
     private final ObjectProvider<ChatModel> chatModelProvider;
@@ -237,7 +239,7 @@ public class SpringAiCalendarAssistantAgent implements CalendarAssistantAgent, A
         }
         if (answer.contains(ASSISTANT_RESPONSE_BLOCKS_MARKER)
                 || answer.contains(LEGACY_CALIO_RESPONSE_STATE_TAG)
-                || answer.contains(CALENDAR_RESPONSE_HISTORY_TAG)
+                || answer.contains("<" + CALENDAR_RESPONSE_HISTORY_TAG + ">")
                 || answer.stripLeading().startsWith(TOOL_REQUEST_JSON_PREFIX)) {
             throw new IllegalStateException("AI calendar provider returned internal response data.");
         }
@@ -261,16 +263,16 @@ public class SpringAiCalendarAssistantAgent implements CalendarAssistantAgent, A
         String responseBlocks = history.stream()
                 .filter(message -> message.role() == CalendarConversationMessageRole.ASSISTANT)
                 .map(CalendarConversationHistoryMessage::assistantResponseBlocksJson)
-                .filter(java.util.Objects::nonNull)
-                .collect(java.util.stream.Collectors.joining("\n"));
+                .filter(Objects::nonNull)
+                .collect(Collectors.joining("\n"));
         if (responseBlocks.isBlank()) {
             return "";
         }
         return """
-                <calendar_response_history>
+                <%s>
                 %s
-                </calendar_response_history>
-                """.formatted(responseBlocks);
+                </%s>
+                """.formatted(CALENDAR_RESPONSE_HISTORY_TAG, responseBlocks, CALENDAR_RESPONSE_HISTORY_TAG);
     }
 
     private boolean isTransient(Throwable exception) {
