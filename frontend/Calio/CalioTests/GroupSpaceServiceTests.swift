@@ -144,6 +144,8 @@ struct GroupSpaceServiceTests {
 
         #expect(viewModel.spaces.map(\.name) == ["프로젝트 팀"])
         #expect(!viewModel.didFailLoading)
+        #expect(viewModel.failure == nil)
+        #expect(viewModel.failedOperation == nil)
         #expect(viewModel.errorMessage == nil)
     }
 
@@ -235,18 +237,23 @@ struct GroupSpaceServiceTests {
         let updateSucceeded = await viewModel.update(name: "수정 팀")
         #expect(!updateSucceeded)
         #expect(viewModel.failedOperation == .update)
+        #expect(viewModel.failure == .backend(errorCode: "GROUP_SPACE_FORBIDDEN"))
         let deletionSucceeded = await viewModel.delete()
         #expect(!deletionSucceeded)
         #expect(viewModel.failedOperation == .delete)
+        #expect(viewModel.failure == .backend(errorCode: "GROUP_SPACE_FORBIDDEN"))
         let leaveSucceeded = await viewModel.leave()
         #expect(!leaveSucceeded)
         #expect(viewModel.failedOperation == .leave)
+        #expect(viewModel.failure == .backend(errorCode: "GROUP_SPACE_FORBIDDEN"))
         let removalSucceeded = await viewModel.remove(member: member)
         #expect(!removalSucceeded)
         #expect(viewModel.failedOperation == .removeMember)
+        #expect(viewModel.failure == .backend(errorCode: "GROUP_SPACE_FORBIDDEN"))
         let transferSucceeded = await viewModel.transferOwnership(to: member)
         #expect(!transferSucceeded)
         #expect(viewModel.failedOperation == .transferOwnership)
+        #expect(viewModel.failure == .backend(errorCode: "GROUP_SPACE_FORBIDDEN"))
     }
 
     @Test func groupSpaceManagementPermissionFollowsCanonicalMembershipRole() {
