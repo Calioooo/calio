@@ -243,12 +243,15 @@ class CalendarAgentToolsTest {
         return new CalendarMutationToolRequest(
                 CalendarMutationOperation.UPDATE_EVENT,
                 1L,
+                null,
+                null,
                 "Planning",
                 "Planning details",
                 Instant.parse("2026-07-01T10:00:00Z"),
                 Instant.parse("2026-07-01T11:00:00Z"),
                 false,
                 "UTC",
+                null,
                 null
         );
     }

@@ -2,13 +2,18 @@ package com.calio.calendar.aicalendar.service.tool.dto;
 
 import com.calio.calendar.aicalendar.domain.CalendarMutationOperation;
 import java.time.Instant;
+import java.util.List;
 import org.springframework.ai.tool.annotation.ToolParam;
 
 public record CalendarMutationToolRequest(
-        @ToolParam(description = "Mutation operation. Choose CREATE_EVENT for creation, UPDATE_EVENT for one normal event update, or DELETE_EVENT for one normal event deletion.", required = true)
+        @ToolParam(description = "Mutation operation. Choose CREATE_EVENT, UPDATE_EVENT, or DELETE_EVENT for a normal event. Choose UPDATE_RECURRENCE_OCCURRENCE or DELETE_RECURRENCE_OCCURRENCE for one occurrence, and UPDATE_RECURRENCE_SERIES or DELETE_RECURRENCE_SERIES for the entire recurrence series.", required = true)
         CalendarMutationOperation operation,
         @ToolParam(description = "ID of the normal event. Required for UPDATE_EVENT and DELETE_EVENT. Obtain it from lookup_calendar_events.", required = false)
         Long eventId,
+        @ToolParam(description = "ID of the recurrence event. Required for recurrence occurrence and entire series operations. Obtain it from lookup_calendar_events.", required = false)
+        Long recurrenceId,
+        @ToolParam(description = "Original UTC start instant of one recurrence occurrence. Required for UPDATE_RECURRENCE_OCCURRENCE and DELETE_RECURRENCE_OCCURRENCE. Obtain it from lookup_calendar_events.", required = false)
+        Instant originStartAt,
         @ToolParam(description = "Event title. Required for CREATE_EVENT; optional replacement title for updates.", required = false)
         String title,
         @ToolParam(description = "Optional event description. For updates, omit it to preserve the existing description.", required = false)
@@ -21,7 +26,9 @@ public record CalendarMutationToolRequest(
         Boolean allDay,
         @ToolParam(description = "IANA timezone identifier. Required when creating a timed event; optional replacement timezone for updates.", required = false)
         String timeZone,
-        @ToolParam(description = "Optional Calio tag ID for creation or update. Omit it to preserve the existing tag on updates.", required = false)
-        Long tagId
+        @ToolParam(description = "Optional Calio tag ID for creation, normal event updates, or entire recurrence series updates. A single recurrence occurrence cannot change its tag. Omit it to preserve the existing tag on updates.", required = false)
+        Long tagId,
+        @ToolParam(description = "RFC 5545 recurrence rules. Required only when replacing recurrence rules for UPDATE_RECURRENCE_SERIES; omit to preserve existing rules.", required = false)
+        List<String> recurrenceRules
 ) {
 }

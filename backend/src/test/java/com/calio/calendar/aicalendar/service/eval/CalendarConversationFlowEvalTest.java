@@ -207,6 +207,59 @@ class CalendarConversationFlowEvalTest {
     }
 
     @Test
+    @DisplayName("반복 일정 범위가 없으면 재질문 후 이전 맥락으로 회차 Preview를 만든다")
+    void givenRecurringUpdateWithoutScope_whenUserChoosesOccurrence_thenCreatesOccurrencePreviewFromConversationHistory() {
+        // given
+        Account account = accountRepository.saveAndFlush(new Account());
+        String conversationId = conversationService.createConversation(account.getId());
+        EventResponse before = recurrenceOccurrence(
+                "팀 회의",
+                "2026-08-16T05:00:00Z",
+                "2026-08-16T05:00:00Z",
+                "2026-08-16T06:00:00Z"
+        );
+        EventResponse after = recurrenceOccurrence(
+                "팀 회의",
+                "2026-08-16T05:00:00Z",
+                "2026-08-16T06:00:00Z",
+                "2026-08-16T07:00:00Z"
+        );
+        when(eventService.listEvents(any(), any(), any())).thenReturn(List.of(before));
+        when(mutationService.preview(eq(account.getId()), any())).thenReturn(new CalendarMutationPreview(
+                CalendarMutationType.UPDATE,
+                CalendarMutationScope.THIS_OCCURRENCE,
+                before,
+                after
+        ));
+
+        // when
+        SendCalendarConversationMessageResponse first = send(
+                account,
+                conversationId,
+                "내일의 반복 일정인 팀 회의를 오후 3시로 옮겨줘"
+        );
+        SendCalendarConversationMessageResponse second = send(account, conversationId, "이번 회차만 변경해줘");
+
+        // then
+        assertResponseMatchesReference(
+                "내일의 반복 일정인 팀 회의를 오후 3시로 옮겨줘",
+                "The requested new time is known, but the scope of a recurring event change is missing. "
+                        + "Ask the user to choose between this occurrence and the entire series. Do not create a preview yet.",
+                first
+        );
+        assertThat(first.blocks()).noneMatch(block -> block.type() == CalendarAssistantBlockType.MUTATION_PREVIEW);
+        assertThat(second.assistantMessage()).isNotBlank();
+        assertThat(second.blocks()).extracting(block -> block.type())
+                .contains(CalendarAssistantBlockType.MUTATION_PREVIEW);
+        CalendarMutationToolRequest mutationRequest = capturedPreviewRequest();
+        assertThat(mutationRequest.operation())
+                .isEqualTo(CalendarMutationOperation.UPDATE_RECURRENCE_OCCURRENCE);
+        assertThat(mutationRequest.recurrenceId()).isEqualTo(10L);
+        assertThat(mutationRequest.originStartAt()).isEqualTo(Instant.parse("2026-08-16T05:00:00Z"));
+        verify(mutationService, never()).apply(any(), any());
+    }
+
+    @Test
     @DisplayName("여러 Mutation Preview 뒤 대상 없는 적용 요청은 변경 대상을 다시 묻는다")
     void givenMultipleMutationPreviews_whenUserConfirmsWithoutTarget_thenAsksWhichChangeToApply() {
         // given
@@ -350,6 +403,30 @@ class CalendarConversationFlowEvalTest {
                 false,
                 null,
                 null,
+                Instant.parse("2026-08-01T00:00:00Z"),
+                Instant.parse("2026-08-01T00:00:00Z")
+        );
+    }
+
+    private EventResponse recurrenceOccurrence(
+            String title,
+            String originStartAt,
+            String startAt,
+            String endAt
+    ) {
+        return new EventResponse(
+                null,
+                title,
+                null,
+                Instant.parse(originStartAt),
+                Instant.parse(endAt),
+                false,
+                "Asia/Seoul",
+                false,
+                10L,
+                true,
+                null,
+                Instant.parse(startAt),
                 Instant.parse("2026-08-01T00:00:00Z"),
                 Instant.parse("2026-08-01T00:00:00Z")
         );

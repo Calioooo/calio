@@ -8,6 +8,16 @@ public record CalendarMutationPreview(
         CalendarMutationType type,
         CalendarMutationScope scope,
         EventResponse before,
-        EventResponse after
+        EventResponse after,
+        CalendarMutationRecurrencePreview recurrence
 ) {
+
+    public CalendarMutationPreview(
+            CalendarMutationType type,
+            CalendarMutationScope scope,
+            EventResponse before,
+            EventResponse after
+    ) {
+        this(type, scope, before, after, null);
+    }
 }

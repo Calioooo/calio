@@ -7,6 +7,7 @@ import com.calio.calendar.aicalendar.domain.CalendarMutationScope;
 import com.calio.calendar.aicalendar.domain.CalendarMutationType;
 import com.calio.calendar.aicalendar.service.dto.CalendarAssistantAnswer;
 import com.calio.calendar.aicalendar.service.dto.CalendarMutationPreview;
+import com.calio.calendar.aicalendar.service.dto.CalendarMutationRecurrencePreview;
 import com.calio.calendar.event.controller.dto.EventResponse;
 import com.calio.calendar.event.service.dto.CalendarFreeTime;
 import java.time.Instant;
@@ -58,7 +59,40 @@ class SendCalendarConversationMessageResponseTest {
             assertThat(mutationPreview.scope()).isEqualTo(CalendarMutationScope.EVENT);
             assertThat(mutationPreview.before().title()).isEqualTo("Planning");
             assertThat(mutationPreview.after().startAt()).isEqualTo(Instant.parse("2026-07-01T11:00:00Z"));
+            assertThat(mutationPreview.recurrence()).isNull();
         });
+    }
+
+    @Test
+    @DisplayName("전체 반복 일정 Preview는 변경 전후 recurrence rule을 응답 계약에 포함한다")
+    void givenSeriesPreview_whenCreateResponse_thenIncludesRecurrenceRules() {
+        // given
+        CalendarAssistantAnswer answer = new CalendarAssistantAnswer(
+                "반복 규칙 변경을 확인해 주세요.",
+                List.of(),
+                List.of(),
+                List.of(new CalendarMutationPreview(
+                        CalendarMutationType.UPDATE,
+                        CalendarMutationScope.ENTIRE_SERIES,
+                        event(),
+                        updatedEvent(),
+                        new CalendarMutationRecurrencePreview(
+                                List.of("RRULE:FREQ=WEEKLY;BYDAY=FR"),
+                                List.of("RRULE:FREQ=DAILY")
+                        )
+                ))
+        );
+
+        // when
+        SendCalendarConversationMessageResponse response =
+                SendCalendarConversationMessageResponse.from("conversation-id", answer);
+
+        // then
+        CalendarMutationPreviewResponse preview = (CalendarMutationPreviewResponse) response.blocks().get(0)
+                .items()
+                .get(0);
+        assertThat(preview.recurrence().before()).containsExactly("RRULE:FREQ=WEEKLY;BYDAY=FR");
+        assertThat(preview.recurrence().after()).containsExactly("RRULE:FREQ=DAILY");
     }
 
     private EventResponse event() {
