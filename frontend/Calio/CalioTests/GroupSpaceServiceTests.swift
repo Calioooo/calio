@@ -265,6 +265,26 @@ struct GroupSpaceServiceTests {
         #expect(viewModel.errorMessage == "초대를 만들지 못했습니다.")
     }
 
+    @MainActor @Test func invitationViewModelIgnoresAnOlderInvitationLoadThatFinishesLast() async {
+        let oldInvitation = GroupInvitationSummaryResponseDTO(invitationId: 1, expiresAt: GroupSpaceRepositoryStub.date)
+        let latestInvitation = GroupInvitationSummaryResponseDTO(invitationId: 2, expiresAt: GroupSpaceRepositoryStub.date)
+        let repository = GroupSpaceRepositoryStub(
+            invitationFetchResponses: [[oldInvitation], [latestInvitation]],
+            invitationFetchDelays: [50_000_000, 1_000_000]
+        )
+        let viewModel = GroupInvitationViewModel(service: GroupInvitationService(repository: repository))
+
+        let firstLoad = Task { await viewModel.load(groupSpaceId: 7) }
+        while repository.invitationFetchCallCount == 0 { await Task.yield() }
+        let secondLoad = Task { await viewModel.load(groupSpaceId: 7) }
+
+        await firstLoad.value
+        await secondLoad.value
+
+        #expect(viewModel.invitations.map(\.id) == [2])
+        #expect(viewModel.errorMessage == nil)
+    }
+
     @MainActor @Test func removingMemberRefreshesGroupSpaceFromBackend() async throws {
         let repository = GroupSpaceRepositoryStub(memberCountAfterRemoval: 1)
         let viewModel = GroupSpaceDetailViewModel(
@@ -370,8 +390,11 @@ private final class GroupSpaceRepositoryStub: GroupSpaceRepository {
     private let acceptError: Error?
     private let issueDelayNanoseconds: UInt64
     private let issueErrorOnCall: Int?
+    private var invitationFetchResponses: [[GroupInvitationSummaryResponseDTO]]
+    private let invitationFetchDelays: [UInt64]
     private var fetchCallCount = 0
     private(set) var issueCallCount = 0
+    private(set) var invitationFetchCallCount = 0
 
     init(
         fetchResponses: [[GroupSpaceResponseDTO]] = [],
@@ -387,7 +410,9 @@ private final class GroupSpaceRepositoryStub: GroupSpaceRepository {
         invitationError: Error? = nil,
         acceptError: Error? = nil,
         issueDelayNanoseconds: UInt64 = 0,
-        issueErrorOnCall: Int? = nil
+        issueErrorOnCall: Int? = nil,
+        invitationFetchResponses: [[GroupInvitationSummaryResponseDTO]] = [[]],
+        invitationFetchDelays: [UInt64] = []
     ) {
         self.fetchResponses = fetchResponses
         self.fetchErrorOnCall = fetchErrorOnCall
@@ -399,6 +424,8 @@ private final class GroupSpaceRepositoryStub: GroupSpaceRepository {
         self.acceptError = acceptError
         self.issueDelayNanoseconds = issueDelayNanoseconds
         self.issueErrorOnCall = issueErrorOnCall
+        self.invitationFetchResponses = invitationFetchResponses
+        self.invitationFetchDelays = invitationFetchDelays
     }
 
     static func sampleSpace(name: String = "프로젝트 팀") -> GroupSpaceResponseDTO {
@@ -501,7 +528,13 @@ private final class GroupSpaceRepositoryStub: GroupSpaceRepository {
     }
 
     func fetchInvitations(groupSpaceId: Int64) async throws -> GroupInvitationListResponseDTO {
-        throw StubError.failed
+        invitationFetchCallCount += 1
+        let responseIndex = invitationFetchCallCount - 1
+        if invitationFetchDelays.indices.contains(responseIndex) {
+            try? await Task.sleep(nanoseconds: invitationFetchDelays[responseIndex])
+        }
+        let invitations = invitationFetchResponses.isEmpty ? [] : invitationFetchResponses.removeFirst()
+        return .init(invitations: invitations)
     }
 
     func revokeInvitation(groupSpaceId: Int64, invitationId: Int64) async throws {

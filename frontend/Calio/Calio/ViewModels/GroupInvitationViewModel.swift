@@ -9,19 +9,30 @@ import Combine
     @Published private(set) var isSubmitting = false
     @Published private(set) var errorMessage: String?
     private let service: GroupInvitationService
+    private var latestLoadRequestID = 0
     init(service: GroupInvitationService = GroupInvitationService()) {
         self.service = service
     }
 
     func load(groupSpaceId: Int64) async {
+        latestLoadRequestID += 1
+        let requestID = latestLoadRequestID
+
         do {
-            invitations = try await service.list(groupSpaceId: groupSpaceId)
+            let loadedInvitations = try await service.list(groupSpaceId: groupSpaceId)
+            guard requestID == latestLoadRequestID else { return }
+
+            invitations = loadedInvitations
+            errorMessage = nil
         } catch {
+            guard requestID == latestLoadRequestID else { return }
+
             errorMessage = "초대 목록을 불러오지 못했습니다."
         }
     }
     func issue(groupSpaceId: Int64) async {
         guard !isSubmitting else { return }
+        invalidateInvitationLoads()
         isSubmitting = true
         defer { isSubmitting = false }
         issuedInvitation = nil
@@ -33,6 +44,8 @@ import Combine
         }
     }
     func revoke(groupSpaceId: Int64, invitationId: Int64) async {
+        invalidateInvitationLoads()
+
         do {
             try await service.revoke(groupSpaceId: groupSpaceId, invitationId: invitationId)
             invitations.removeAll { $0.id == invitationId }
@@ -71,5 +84,9 @@ import Combine
     }
     func clearError() {
         errorMessage = nil
+    }
+
+    private func invalidateInvitationLoads() {
+        latestLoadRequestID += 1
     }
 }
