@@ -57,6 +57,9 @@ tasks.register('aiCalendarEval', Test) {
     systemProperty 'spring.profiles.active', 'ai-calendar-eval'
     useJUnitPlatform()
     include '**/*EvalTest.class'
+    testLogging {
+        showStandardStreams = true
+    }
     outputs.upToDateWhen { false }
     doFirst {
         if (System.getenv('OPENAI_API_KEY') == null || System.getenv('OPENAI_API_KEY').isBlank()) {

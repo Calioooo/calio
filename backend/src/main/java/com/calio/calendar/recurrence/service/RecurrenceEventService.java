@@ -13,6 +13,7 @@ import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceEventRequest
 import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceOccurrenceRequest;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
+import com.calio.calendar.recurrence.domain.RecurrenceOccurrence;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
 import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
@@ -70,6 +71,22 @@ public class RecurrenceEventService {
 
     public RecurrenceEventResponse getRecurrenceEvent(Long accountId, Long recurrenceId) {
         return RecurrenceEventResponse.from(findRecurrenceEvent(accountId, recurrenceId));
+    }
+
+    public EventResponse getRecurrenceOccurrence(Long accountId, Long recurrenceId, Instant originStartAt) {
+        RecurrenceEvent recurrenceEvent = findRecurrenceEvent(accountId, recurrenceId);
+        Optional<RecurrenceEventOverride> override = recurrenceEventOverrideRepository
+                .findByRecurrenceEvent_IdAndOriginStartAt(recurrenceId, originStartAt);
+        if (override.isPresent()) {
+            if (override.get().isDeleted()) {
+                throw new CalioException(ErrorCode.RECURRENCE_OCCURRENCE_NOT_FOUND);
+            }
+            return EventResponse.recurrenceOverride(override.get());
+        }
+        return EventResponse.recurrenceOccurrence(
+                recurrenceEvent,
+                findGeneratedOccurrence(recurrenceEvent, originStartAt)
+        );
     }
 
     @Transactional
@@ -182,6 +199,22 @@ public class RecurrenceEventService {
                 recurrenceEvent.getRecurrenceRules(),
                 originStartAt
         );
+    }
+
+    private RecurrenceOccurrence findGeneratedOccurrence(
+            RecurrenceEvent recurrenceEvent,
+            Instant originStartAt
+    ) {
+        return recurrenceEngine.expand(
+                        RecurrenceSchedule.from(recurrenceEvent),
+                        recurrenceEvent.getRecurrenceRules(),
+                        originStartAt,
+                        originStartAt.plusNanos(1)
+                )
+                .stream()
+                .filter(occurrence -> originStartAt.equals(occurrence.originStartAt()))
+                .findFirst()
+                .orElseThrow(() -> new CalioException(ErrorCode.RECURRENCE_OCCURRENCE_NOT_FOUND));
     }
 
     private RecurrenceEvent findRecurrenceEvent(Long accountId, Long recurrenceId) {

@@ -116,7 +116,7 @@ public class CalendarAgentTools {
 
     @Tool(
             name = PREVIEW_MUTATION_TOOL_NAME,
-            description = "Prepare a non-mutating Preview for one fully specified and unambiguous normal Calio event creation, update, or deletion. For CREATE_EVENT, a user-stated event name and date or time resolved from system context are complete input; do not ask the user to confirm a relative date or ask permission to prepare the Preview. For UPDATE_EVENT or DELETE_EVENT, use an eventId from lookup_calendar_events. Use this immediately after resolving exactly one target."
+            description = "Prepare a non-mutating Preview for one fully specified and unambiguous Calio calendar creation, update, or deletion. For CREATE_EVENT, a user-stated event name and date or time resolved from system context are complete input; do not ask the user to confirm a relative date or ask permission to prepare the Preview. For UPDATE_EVENT or DELETE_EVENT, use an eventId from lookup_calendar_events. For a recurrence occurrence or entire series operation, use recurrenceId and, for an occurrence, originStartAt from lookup_calendar_events. Use this immediately after resolving exactly one target and recurrence scope."
     )
     public CalendarMutationPreview previewCalendarMutation(
             CalendarMutationToolRequest request,

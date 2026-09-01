@@ -2,15 +2,25 @@ package com.calio.calendar.aicalendar.service.eval;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 
+import com.calio.calendar.aicalendar.controller.dto.SendCalendarConversationMessageResponse;
 import com.calio.calendar.aicalendar.domain.CalendarConversationMessageRole;
+import com.calio.calendar.aicalendar.domain.CalendarMutationOperation;
+import com.calio.calendar.aicalendar.domain.CalendarMutationScope;
+import com.calio.calendar.aicalendar.domain.CalendarMutationType;
 import com.calio.calendar.aicalendar.service.CalendarAssistantAgent;
+import com.calio.calendar.aicalendar.service.CalendarMutationService;
 import com.calio.calendar.aicalendar.service.dto.CalendarAssistantAnswer;
 import com.calio.calendar.aicalendar.service.dto.CalendarAssistantRequest;
 import com.calio.calendar.aicalendar.service.dto.CalendarConversationHistoryMessage;
+import com.calio.calendar.aicalendar.service.dto.CalendarMutationPreview;
+import com.calio.calendar.aicalendar.service.dto.CalendarMutationRecurrencePreview;
+import com.calio.calendar.aicalendar.service.tool.dto.CalendarMutationToolRequest;
 import com.calio.calendar.event.controller.dto.EventResponse;
 import com.calio.calendar.event.service.EventService;
 import com.calio.calendar.event.service.dto.CalendarFreeTime;
@@ -19,8 +29,11 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.List;
+import org.mockito.ArgumentCaptor;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.evaluation.FactCheckingEvaluator;
@@ -59,6 +72,27 @@ class CalendarAssistantEvalTest {
 
     @MockitoBean
     private EventService eventService;
+
+    @MockitoBean
+    private CalendarMutationService mutationService;
+
+    private CalendarAssistantAnswer lastAssistantAnswer;
+
+    @AfterEach
+    void printAssistantResponse(TestInfo testInfo) {
+        if (lastAssistantAnswer == null) {
+            return;
+        }
+        System.out.printf(
+                """
+                AI calendar eval response.
+                test: %s
+                response: %s%n
+                """,
+                testInfo.getDisplayName(),
+                SendCalendarConversationMessageResponse.from("eval-conversation", lastAssistantAnswer)
+        );
+    }
 
     @Test
     @DisplayName("시간 지정 일정은 사용자 시간대로 변환하고 근거 없는 시간대를 추정하지 않는다")
@@ -208,7 +242,7 @@ class CalendarAssistantEvalTest {
                 .thenReturn(freeTimes);
 
         // when
-        CalendarAssistantAnswer answer = assistantAgent.answer(request);
+        CalendarAssistantAnswer answer = requestAnswer(request);
         EvaluationResponse factCheck = evaluateFacts(request.history().getFirst().text(), expectedFreeTimes, answer.message());
 
         // then
@@ -217,7 +251,7 @@ class CalendarAssistantEvalTest {
                 .withFailMessage(() -> evaluationFailureDetails(
                         request.history().getFirst().text(),
                         expectedFreeTimes,
-                        answer.message(),
+                        answer,
                         factCheck.getFeedback()
                 ))
                 .containsExactlyElementsOf(freeTimes);
@@ -225,7 +259,7 @@ class CalendarAssistantEvalTest {
                 .withFailMessage(() -> evaluationFailureDetails(
                         request.history().getFirst().text(),
                         expectedFreeTimes,
-                        answer.message(),
+                        answer,
                         factCheck.getFeedback()
                 ))
                 .isTrue();
@@ -233,22 +267,328 @@ class CalendarAssistantEvalTest {
     }
 
     @Test
-    @DisplayName("일정 변경 요청은 calendar tool과 blocks 없이 지원 범위를 안내한다")
-    void givenCalendarWriteRequest_whenEvaluate_thenReturnsAnswerWithoutToolResults() {
+    @DisplayName("일정 생성 요청은 실제 생성 없이 Mutation Preview를 반환한다")
+    void givenEventCreationRequest_whenEvaluate_thenReturnsPreviewWithoutApplyingChange() {
+        // given
+        CalendarMutationPreview preview = creationPreview();
+        when(mutationService.preview(any(), any())).thenReturn(preview);
+
         // when
-        CalendarAssistantAnswer answer = assistantAgent.answer(request("내일 오후 2시에 회의 만들어줘"));
+        CalendarAssistantAnswer answer = requestAnswer(request("내일 오후 2시부터 3시까지 팀 회의 만들어줘"));
 
         // then
-        verifyNoInteractions(eventService);
+        assertThat(answer.mutationPreviews()).containsExactly(preview);
         assertThat(answer.events()).isEmpty();
         assertThat(answer.freeTimes()).isEmpty();
+        assertMutationOperation(CalendarMutationOperation.CREATE_EVENT);
+        verify(mutationService, never()).apply(any(), any());
+        verifyNoInteractions(eventService);
+    }
+
+    @Test
+    @DisplayName("대상이 하나인 일정 수정 요청은 변경 전후 Mutation Preview를 반환한다")
+    void givenSingleMatchingEventUpdateRequest_whenEvaluate_thenReturnsUpdatePreview() {
+        // given
+        EventResponse before = timedEvent(
+                "팀 회의",
+                null,
+                "2026-08-16T05:00:00Z",
+                "2026-08-16T06:00:00Z",
+                "Asia/Seoul"
+        );
+        EventResponse after = timedEvent(
+                "팀 회의",
+                null,
+                "2026-08-16T06:00:00Z",
+                "2026-08-16T07:00:00Z",
+                "Asia/Seoul"
+        );
+        CalendarMutationPreview preview = new CalendarMutationPreview(
+                CalendarMutationType.UPDATE,
+                CalendarMutationScope.EVENT,
+                before,
+                after
+        );
+        when(eventService.listEvents(any(), any(), any())).thenReturn(List.of(before));
+        when(mutationService.preview(any(), any())).thenReturn(preview);
+
+        // when
+        CalendarAssistantAnswer answer = requestAnswer(request("내일 팀 회의를 오후 3시로 옮겨줘"));
+
+        // then
+        assertThat(answer.events()).containsExactly(before);
+        assertThat(answer.mutationPreviews()).containsExactly(preview);
+        assertMutationOperation(CalendarMutationOperation.UPDATE_EVENT);
+        verify(mutationService, never()).apply(any(), any());
+    }
+
+    @Test
+    @DisplayName("여러 일정이 일치하는 삭제 요청은 후보를 반환하고 Preview를 만들지 않는다")
+    void givenMultipleMatchingEventDeletionRequest_whenEvaluate_thenReturnsCandidatesWithoutPreview() {
+        // given
+        EventResponse firstEvent = timedEvent(
+                "팀 회의",
+                null,
+                "2026-08-16T05:00:00Z",
+                "2026-08-16T06:00:00Z",
+                "Asia/Seoul"
+        );
+        EventResponse secondEvent = timedEvent(
+                "팀 회의",
+                null,
+                "2026-08-16T08:00:00Z",
+                "2026-08-16T09:00:00Z",
+                "Asia/Seoul"
+        );
+        when(eventService.listEvents(any(), any(), any())).thenReturn(List.of(firstEvent, secondEvent));
+
+        // when
+        CalendarAssistantAnswer answer = requestAnswer(request("내일 팀 회의 삭제해줘"));
+
+        // then
+        assertThat(answer.events()).containsExactly(firstEvent, secondEvent);
+        assertThat(answer.mutationPreviews()).isEmpty();
+        verifyNoInteractions(mutationService);
+    }
+
+    @Test
+    @DisplayName("반복 일정 변경 범위가 없으면 Preview 없이 범위를 되묻는다")
+    void givenRecurringEventUpdateWithoutScope_whenEvaluate_thenAsksForScopeWithoutPreview() {
+        // when
+        CalendarAssistantAnswer answer = requestAnswer(request("매주 팀 회의를 오후 3시로 옮겨줘"));
+
+        // then
+        assertThat(answer.events()).isEmpty();
+        assertThat(answer.mutationPreviews()).isEmpty();
+        verifyNoInteractions(mutationService);
+    }
+
+    @Test
+    @DisplayName("이번 반복 회차 변경 요청은 THIS_OCCURRENCE Mutation Preview를 반환한다")
+    void givenSingleRecurrenceOccurrenceUpdateRequest_whenEvaluate_thenReturnsOccurrencePreview() {
+        // given
+        EventResponse before = recurrenceOccurrence(
+                "팀 회의",
+                "2026-08-16T05:00:00Z",
+                "2026-08-16T06:00:00Z"
+        );
+        EventResponse after = recurrenceOccurrence(
+                "팀 회의",
+                "2026-08-16T06:00:00Z",
+                "2026-08-16T07:00:00Z"
+        );
+        CalendarMutationPreview preview = new CalendarMutationPreview(
+                CalendarMutationType.UPDATE,
+                CalendarMutationScope.THIS_OCCURRENCE,
+                before,
+                after
+        );
+        when(eventService.listEvents(any(), any(), any())).thenReturn(List.of(before));
+        when(mutationService.preview(any(), any())).thenReturn(preview);
+
+        // when
+        CalendarAssistantAnswer answer = requestAnswer(
+                request("내일의 반복 일정인 ‘팀 회의’를 이번 회차만 오후 3시로 옮겨줘")
+        );
+
+        // then
+        assertThat(answer.mutationPreviews()).containsExactly(preview);
+        CalendarMutationToolRequest mutationRequest = assertMutationOperation(
+                CalendarMutationOperation.UPDATE_RECURRENCE_OCCURRENCE
+        );
+        assertThat(mutationRequest.recurrenceId()).isEqualTo(10L);
+        assertThat(mutationRequest.originStartAt()).isEqualTo(Instant.parse("2026-08-16T05:00:00Z"));
+        verify(mutationService, never()).apply(any(), any());
+    }
+
+    @Test
+    @DisplayName("이번 반복 회차 태그 변경 요청은 Preview를 만들지 않고 제한을 안내한다")
+    void givenSingleRecurrenceOccurrenceTagChangeRequest_whenEvaluate_thenExplainsUnsupportedChange() {
+        // given
+        EventResponse occurrence = recurrenceOccurrence(
+                "팀 회의",
+                "2026-08-16T05:00:00Z",
+                "2026-08-16T06:00:00Z"
+        );
+        when(eventService.listEvents(any(), any(), any())).thenReturn(List.of(occurrence));
+
+        // when
+        CalendarAssistantAnswer answer = requestAnswer(
+                request("내일 반복 일정인 ‘팀 회의’의 이번 회차만 태그를 업무로 바꿔줘")
+        );
+
+        // then
+        assertThat(answer.mutationPreviews()).isEmpty();
+        assertThat(answer.message()).contains("태그");
+        verify(mutationService, never()).preview(any(), any());
+        verify(mutationService, never()).apply(any(), any());
+    }
+
+    @Test
+    @DisplayName("전체 반복 일정 변경 요청은 ENTIRE_SERIES Mutation Preview를 반환한다")
+    void givenEntireRecurrenceSeriesUpdateRequest_whenEvaluate_thenReturnsSeriesPreview() {
+        // given
+        EventResponse before = recurrenceOccurrence(
+                "팀 회의",
+                "2026-08-16T05:00:00Z",
+                "2026-08-16T06:00:00Z"
+        );
+        EventResponse after = recurrenceOccurrence(
+                "팀 회의",
+                "2026-08-16T06:00:00Z",
+                "2026-08-16T07:00:00Z"
+        );
+        CalendarMutationPreview preview = new CalendarMutationPreview(
+                CalendarMutationType.UPDATE,
+                CalendarMutationScope.ENTIRE_SERIES,
+                before,
+                after,
+                new CalendarMutationRecurrencePreview(
+                        List.of("RRULE:FREQ=WEEKLY;BYDAY=SUN"),
+                        List.of("RRULE:FREQ=WEEKLY;BYDAY=SUN;BYHOUR=6")
+                )
+        );
+        when(eventService.listEvents(any(), any(), any())).thenReturn(List.of(before));
+        when(mutationService.preview(any(), any())).thenReturn(preview);
+
+        // when
+        CalendarAssistantAnswer answer = requestAnswer(
+                request("내일부터 매주 반복되는 팀 회의 전체를 오후 3시로 옮겨줘")
+        );
+
+        // then
+        assertThat(answer.mutationPreviews()).containsExactly(preview);
+        assertThat(answer.mutationPreviews()).singleElement().satisfies(seriesPreview ->
+                assertThat(seriesPreview.recurrence().after())
+                        .containsExactly("RRULE:FREQ=WEEKLY;BYDAY=SUN;BYHOUR=6")
+        );
+        CalendarMutationToolRequest mutationRequest = assertMutationOperation(
+                CalendarMutationOperation.UPDATE_RECURRENCE_SERIES
+        );
+        assertThat(mutationRequest.recurrenceId()).isEqualTo(10L);
+        assertThat(mutationRequest.originStartAt()).isNull();
+        verify(mutationService, never()).apply(any(), any());
+    }
+
+    @Test
+    @DisplayName("직전 Mutation Preview 뒤의 적용 요청은 기존 변경 결과를 반환한다")
+    void givenPreviousMutationPreview_whenEvaluateConfirmation_thenAppliesMutation() {
+        // given
+        EventResponse originalEvent = timedEvent(
+                "팀 회의",
+                null,
+                "2026-08-16T05:00:00Z",
+                "2026-08-16T06:00:00Z",
+                "Asia/Seoul"
+        );
+        EventResponse updatedEvent = timedEvent(
+                "팀 회의",
+                null,
+                "2026-08-16T06:00:00Z",
+                "2026-08-16T07:00:00Z",
+                "Asia/Seoul"
+        );
+        CalendarMutationPreview preview = new CalendarMutationPreview(
+                CalendarMutationType.UPDATE,
+                CalendarMutationScope.EVENT,
+                originalEvent,
+                updatedEvent
+        );
+        when(eventService.listEvents(any(), any(), any())).thenReturn(List.of(originalEvent));
+        when(mutationService.apply(eq(1L), any())).thenReturn(List.of(updatedEvent));
+        CalendarAssistantRequest request = requestWithHistory(
+                new CalendarConversationHistoryMessage(
+                        CalendarConversationMessageRole.USER,
+                        "내일 팀 회의를 오후 3시로 옮겨줘"
+                ),
+                mutationPreviewMessage("팀 회의를 오후 2시에서 오후 3시로 변경할까요?", preview),
+                new CalendarConversationHistoryMessage(
+                        CalendarConversationMessageRole.USER,
+                        "적용해줘"
+                )
+        );
+
+        // when
+        CalendarAssistantAnswer answer = requestAnswer(request);
+
+        // then
+        assertThat(answer.events()).containsExactly(updatedEvent);
+        verify(mutationService).apply(eq(1L), any());
+    }
+
+    @Test
+    @DisplayName("직전 삭제 Mutation Preview 뒤의 확인 요청은 삭제를 적용하고 EVENTS 블록을 비운다")
+    void givenPreviousDeletionPreview_whenEvaluateConfirmation_thenAppliesDeletionWithoutEvents() {
+        // given
+        EventResponse deletedEvent = timedEvent(
+                "팀 회의",
+                null,
+                "2026-08-16T05:00:00Z",
+                "2026-08-16T06:00:00Z",
+                "Asia/Seoul"
+        );
+        CalendarMutationPreview preview = new CalendarMutationPreview(
+                CalendarMutationType.DELETE,
+                CalendarMutationScope.EVENT,
+                deletedEvent,
+                null
+        );
+        when(eventService.listEvents(any(), any(), any())).thenReturn(List.of(deletedEvent));
+        when(mutationService.apply(eq(1L), any())).thenReturn(List.of());
+        CalendarAssistantRequest request = requestWithHistory(
+                new CalendarConversationHistoryMessage(
+                        CalendarConversationMessageRole.USER,
+                        "내일 팀 회의 삭제해줘"
+                ),
+                mutationPreviewMessage("내일 오후 2시 팀 회의를 삭제할까요?", preview),
+                new CalendarConversationHistoryMessage(
+                        CalendarConversationMessageRole.USER,
+                        "응"
+                )
+        );
+
+        // when
+        CalendarAssistantAnswer answer = requestAnswer(request);
+
+        // then
+        assertThat(answer.events()).isEmpty();
+        assertThat(answer.mutationPreviews()).isEmpty();
+        verify(mutationService).apply(eq(1L), any());
+    }
+
+    @Test
+    @DisplayName("직전 Mutation Preview가 없는 적용 요청은 변경을 실행하지 않는다")
+    void givenNoPreviousMutationPreview_whenEvaluateConfirmation_thenDoesNotApplyMutation() {
+        // given
+        CalendarAssistantRequest request = requestWithHistory(
+                new CalendarConversationHistoryMessage(
+                        CalendarConversationMessageRole.USER,
+                        "내일 일정 알려줘"
+                ),
+                new CalendarConversationHistoryMessage(
+                        CalendarConversationMessageRole.ASSISTANT,
+                        "내일은 팀 회의가 있어요."
+                ),
+                new CalendarConversationHistoryMessage(
+                        CalendarConversationMessageRole.USER,
+                        "적용해줘"
+                )
+        );
+
+        // when
+        CalendarAssistantAnswer answer = requestAnswer(request);
+
+        // then
+        assertThat(answer.events()).isEmpty();
+        assertThat(answer.mutationPreviews()).isEmpty();
+        verifyNoInteractions(mutationService);
     }
 
     @Test
     @DisplayName("무관한 요청은 calendar tool과 blocks 없이 지원 범위를 안내한다")
     void givenUnrelatedRequest_whenEvaluate_thenReturnsAnswerWithoutToolResults() {
         // when
-        CalendarAssistantAnswer answer = assistantAgent.answer(request("오늘 점심 메뉴 추천해줘"));
+        CalendarAssistantAnswer answer = requestAnswer(request("오늘 점심 메뉴 추천해줘"));
 
         // then
         verifyNoInteractions(eventService);
@@ -261,19 +601,82 @@ class CalendarAssistantEvalTest {
     }
 
     private CalendarAssistantRequest request(String message, String timeZone) {
+        return requestWithHistory(timeZone, new CalendarConversationHistoryMessage(
+                CalendarConversationMessageRole.USER,
+                message
+        ));
+    }
+
+    private CalendarAssistantRequest requestWithHistory(CalendarConversationHistoryMessage... history) {
+        return requestWithHistory("Asia/Seoul", history);
+    }
+
+    private CalendarAssistantRequest requestWithHistory(
+            String timeZone,
+            CalendarConversationHistoryMessage... history
+    ) {
         return new CalendarAssistantRequest(
                 1L,
                 "eval-conversation",
                 ZoneId.of(timeZone),
-                List.of(new CalendarConversationHistoryMessage(
-                        CalendarConversationMessageRole.USER,
-                        message
-                ))
+                List.of(history)
         );
+    }
+
+    private CalendarConversationHistoryMessage mutationPreviewMessage(
+            String text,
+            CalendarMutationPreview preview
+    ) {
+        return new CalendarConversationHistoryMessage(
+                CalendarConversationMessageRole.ASSISTANT,
+                text,
+                mutationPreviewBlocksJson(preview)
+        );
+    }
+
+    private String mutationPreviewBlocksJson(CalendarMutationPreview preview) {
+        return """
+                [{"type":"MUTATION_PREVIEW","items":[{"type":"%s","scope":"%s","before":%s,"after":%s}]}]
+                """.formatted(
+                preview.type(),
+                preview.scope(),
+                mutationPreviewEventJson(preview.before()),
+                mutationPreviewEventJson(preview.after())
+        );
+    }
+
+    private String mutationPreviewEventJson(EventResponse event) {
+        if (event == null) {
+            return "null";
+        }
+        return """
+                {"title":"%s","startAt":"%s","endAt":"%s","allDay":%s,"tag":null}
+                """.formatted(
+                event.title(),
+                event.startAt(),
+                event.endAt(),
+                event.allDay()
+        );
+    }
+
+    private CalendarMutationToolRequest assertMutationOperation(CalendarMutationOperation expectedOperation) {
+        ArgumentCaptor<CalendarMutationToolRequest> requestCaptor = ArgumentCaptor.forClass(
+                CalendarMutationToolRequest.class
+        );
+        verify(mutationService).preview(eq(1L), requestCaptor.capture());
+        CalendarMutationToolRequest request = requestCaptor.getValue();
+        assertThat(request.operation()).isEqualTo(expectedOperation);
+        return request;
     }
 
     private FactCheckingEvaluator factCheckingEvaluator() {
         return FactCheckingEvaluator.builder(ChatClient.builder(chatModel)).build();
+    }
+
+    private CalendarAssistantAnswer requestAnswer(CalendarAssistantRequest request) {
+        lastAssistantAnswer = assistantAgent.answer(request);
+        assertThat(lastAssistantAnswer.message()).doesNotContain("ASSISTANT_RESPONSE_BLOCKS");
+        return lastAssistantAnswer;
     }
 
     private AgendaEvaluation evaluateAgenda(
@@ -282,7 +685,7 @@ class CalendarAssistantEvalTest {
             String expectedSchedule
     ) {
         when(eventService.listEvents(any(), any(), any())).thenReturn(events);
-        CalendarAssistantAnswer answer = assistantAgent.answer(request);
+        CalendarAssistantAnswer answer = requestAnswer(request);
         return new AgendaEvaluation(
                 answer,
                 evaluateFacts(request.history().getFirst().text(), expectedSchedule, answer.message())
@@ -307,7 +710,7 @@ class CalendarAssistantEvalTest {
                 .withFailMessage(() -> evaluationFailureDetails(
                         request.history().getFirst().text(),
                         expectedSchedule,
-                        evaluation.answer().message(),
+                        evaluation.answer(),
                         evaluation.factCheck().getFeedback()
                 ))
                 .containsExactlyElementsOf(expectedEvents);
@@ -316,7 +719,7 @@ class CalendarAssistantEvalTest {
                 .withFailMessage(() -> evaluationFailureDetails(
                         request.history().getFirst().text(),
                         expectedSchedule,
-                        evaluation.answer().message(),
+                        evaluation.answer(),
                         evaluation.factCheck().getFeedback()
                 ))
                 .isTrue();
@@ -325,7 +728,7 @@ class CalendarAssistantEvalTest {
     private String evaluationFailureDetails(
             String question,
             String reference,
-            String assistantAnswer,
+            CalendarAssistantAnswer assistantAnswer,
             String judgeFeedback
     ) {
         return """
@@ -333,10 +736,15 @@ class CalendarAssistantEvalTest {
                 question: %s
                 evaluation reference:
                 %s
-                assistant answer:
+                assistant response:
                 %s
                 judge feedback: %s
-                """.formatted(question, reference, assistantAnswer, judgeFeedback);
+                """.formatted(
+                question,
+                reference,
+                SendCalendarConversationMessageResponse.from("eval-conversation", assistantAnswer),
+                judgeFeedback
+        );
     }
 
     private EventResponse timedEvent(
@@ -378,6 +786,40 @@ class CalendarAssistantEvalTest {
                 false,
                 null,
                 null,
+                Instant.parse("2026-08-01T00:00:00Z"),
+                Instant.parse("2026-08-01T00:00:00Z")
+        );
+    }
+
+    private CalendarMutationPreview creationPreview() {
+        return new CalendarMutationPreview(
+                CalendarMutationType.CREATE,
+                CalendarMutationScope.EVENT,
+                null,
+                timedEvent(
+                        "팀 회의",
+                        null,
+                        "2026-08-16T05:00:00Z",
+                        "2026-08-16T06:00:00Z",
+                        "Asia/Seoul"
+                )
+        );
+    }
+
+    private EventResponse recurrenceOccurrence(String title, String startAt, String endAt) {
+        return new EventResponse(
+                null,
+                title,
+                null,
+                Instant.parse(startAt),
+                Instant.parse(endAt),
+                false,
+                "Asia/Seoul",
+                false,
+                10L,
+                true,
+                null,
+                Instant.parse("2026-08-16T05:00:00Z"),
                 Instant.parse("2026-08-01T00:00:00Z"),
                 Instant.parse("2026-08-01T00:00:00Z")
         );
