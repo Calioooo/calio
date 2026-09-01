@@ -18,4 +18,10 @@ public record CalendarAssistantBlockResponse<T>(
     ) {
         return new CalendarAssistantBlockResponse<>(CalendarAssistantBlockType.FREE_TIMES, freeTimes);
     }
+
+    public static CalendarAssistantBlockResponse<CalendarMutationPreviewResponse> mutationPreviews(
+            List<CalendarMutationPreviewResponse> mutationPreviews
+    ) {
+        return new CalendarAssistantBlockResponse<>(CalendarAssistantBlockType.MUTATION_PREVIEW, mutationPreviews);
+    }
 }

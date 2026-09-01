@@ -28,9 +28,9 @@ public class CalendarConversationService {
     private static final int MAX_MESSAGE_LENGTH = 2_000;
     private static final int MAX_HISTORY_SIZE = 20;
     private static final List<String> UNSUPPORTED_MESSAGES = List.of(
-            "일정 조회와 빈 시간 찾기를 도와드릴 수 있어요.",
-            "캘린더의 일정 확인이나 빈 시간 찾기를 요청해 주세요.",
-            "일정 조회와 빈 시간 찾기 기능을 지원해요."
+            "일정 조회, 빈 시간 찾기, 일정 생성·수정·삭제를 도와드릴 수 있어요.",
+            "캘린더의 일정 확인, 빈 시간 찾기, 일정 생성·수정·삭제를 요청해 주세요.",
+            "일정 조회, 빈 시간 찾기, 일정 생성·수정·삭제 기능을 지원해요."
     );
 
     private final CalendarConversationQueryService conversationQueryService;
@@ -101,6 +101,7 @@ public class CalendarConversationService {
     ) {
         CalendarAssistantAnswer answer = new CalendarAssistantAnswer(
                 selectUnsupportedMessage(),
+                List.of(),
                 List.of(),
                 List.of()
         );

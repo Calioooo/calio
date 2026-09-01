@@ -23,6 +23,11 @@ public record SendCalendarConversationMessageResponse(
                     .map(FreeTimeResponse::from)
                     .toList()));
         }
+        if (!answer.mutationPreviews().isEmpty()) {
+            blocks.add(CalendarAssistantBlockResponse.mutationPreviews(answer.mutationPreviews().stream()
+                    .map(CalendarMutationPreviewResponse::from)
+                    .toList()));
+        }
         return new SendCalendarConversationMessageResponse(conversationId, answer.message(), blocks);
     }
 }

@@ -48,6 +48,10 @@ public enum ErrorCode {
             HttpStatus.BAD_REQUEST,
             "Recurrence occurrence limit exceeded."
     ),
+    RECURRENCE_OCCURRENCE_TAG_CHANGE_NOT_SUPPORTED(
+            HttpStatus.BAD_REQUEST,
+            "Recurrence occurrence tag change is not supported."
+    ),
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "Validation failed."),
     GOOGLE_CALENDAR_AUTHORIZATION_CODE_REQUIRED(
             HttpStatus.BAD_REQUEST,
