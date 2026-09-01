@@ -106,6 +106,18 @@ struct GroupSpaceServiceTests {
         #expect(viewModel.acceptanceResult?.joinResult == .alreadyMember)
         #expect(viewModel.acceptanceResult?.groupSpaceName == "프로젝트 팀")
     }
+
+    @MainActor @Test func invitationViewModelIgnoresIssueRequestsWhileAnotherIssueIsInProgress() async {
+        let repository = GroupSpaceRepositoryStub(issueDelayNanoseconds: 100_000_000)
+        let viewModel = GroupInvitationViewModel(service: GroupInvitationService(repository: repository))
+
+        let firstIssue = Task { await viewModel.issue(groupSpaceId: 7) }
+        await Task.yield()
+        await viewModel.issue(groupSpaceId: 7)
+        await firstIssue.value
+
+        #expect(repository.issueCallCount == 1)
+    }
 }
 
 private final class GroupSpaceRepositoryStub: GroupSpaceRepository {
@@ -116,7 +128,9 @@ private final class GroupSpaceRepositoryStub: GroupSpaceRepository {
     private let previewResponse: PreviewGroupInvitationResponseDTO
     private let acceptResponse: AcceptGroupInvitationResponseDTO
     private let invitationError: Error?
+    private let issueDelayNanoseconds: UInt64
     private var fetchCallCount = 0
+    private(set) var issueCallCount = 0
 
     init(
         fetchResponses: [[GroupSpaceResponseDTO]] = [],
@@ -127,13 +141,15 @@ private final class GroupSpaceRepositoryStub: GroupSpaceRepository {
             groupSpace: .init(id: 7, name: "프로젝트 팀", emoji: nil, myMembership: .init(memberId: 10, nickname: "준하", role: .member), memberCount: 2, createdAt: Date(timeIntervalSince1970: 0)),
             membership: .init(memberId: 10, nickname: "준하", role: .member)
         ),
-        invitationError: Error? = nil
+        invitationError: Error? = nil,
+        issueDelayNanoseconds: UInt64 = 0
     ) {
         self.fetchResponses = fetchResponses
         self.fetchErrorOnCall = fetchErrorOnCall
         self.previewResponse = previewResponse
         self.acceptResponse = acceptResponse
         self.invitationError = invitationError
+        self.issueDelayNanoseconds = issueDelayNanoseconds
     }
 
     static func sampleSpace(name: String = "프로젝트 팀") -> GroupSpaceResponseDTO {
@@ -154,7 +170,13 @@ private final class GroupSpaceRepositoryStub: GroupSpaceRepository {
     func transferOwnership(groupSpaceId: Int64, request: TransferGroupOwnerRequestDTO) async throws -> TransferGroupOwnerResponseDTO { operations.append("transfer:\(groupSpaceId):\(request.targetMemberId)"); return .init(previousOwner: .init(memberId: 10, nickname: "준하", role: .member), owner: .init(memberId: request.targetMemberId, nickname: "민지", role: .owner)) }
     func leaveGroupSpace(groupSpaceId: Int64) async throws { operations.append("leave:\(groupSpaceId)") }
     func removeMember(groupSpaceId: Int64, memberId: Int64) async throws { operations.append("remove:\(groupSpaceId):\(memberId)") }
-    func issueInvitation(groupSpaceId: Int64) async throws -> GroupInvitationResponseDTO { throw StubError.failed }
+    func issueInvitation(groupSpaceId: Int64) async throws -> GroupInvitationResponseDTO {
+        issueCallCount += 1
+        if issueDelayNanoseconds > 0 {
+            try? await Task.sleep(nanoseconds: issueDelayNanoseconds)
+        }
+        return .init(invitationId: 3, inviteUrl: "https://calio.app/invite/token", inviteCode: "CALIO-2026", expiresAt: Self.date)
+    }
     func fetchInvitations(groupSpaceId: Int64) async throws -> GroupInvitationListResponseDTO { throw StubError.failed }
     func revokeInvitation(groupSpaceId: Int64, invitationId: Int64) async throws { throw StubError.failed }
     func previewInvitation(_ request: PreviewGroupInvitationRequestDTO) async throws -> PreviewGroupInvitationResponseDTO { if let invitationError { throw invitationError }; return previewResponse }

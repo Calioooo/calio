@@ -26,6 +26,7 @@ struct GroupInvitationManagementView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(.calioBrand)
+                .disabled(viewModel.isSubmitting)
 
                 Text("발급한 초대")
                     .font(.headline)
