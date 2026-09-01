@@ -22,7 +22,6 @@ import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceOccurrenceRe
 import com.calio.calendar.recurrence.controller.dto.RecurrenceEventResponse;
 import com.calio.calendar.recurrence.service.RecurrenceEventService;
 import com.calio.calendar.tag.domain.Tag;
-import com.calio.calendar.tag.domain.TagType;
 import com.calio.calendar.tag.service.TagService;
 import java.time.Instant;
 import java.util.List;
@@ -51,7 +50,7 @@ class CalendarMutationServiceTest {
         // given
         EventResponse existingEvent = event("기존 회의", Instant.parse("2026-08-21T05:00:00Z"));
         when(eventService.getEvent(1L, 10L)).thenReturn(existingEvent);
-        when(tagService.getTagOrDefault(1L, 1L)).thenReturn(new Tag(TagType.DEFAULT, "업무", "#64748B"));
+        when(tagService.getTagOrDefault(1L, 1L)).thenReturn(Tag.personalDefault("업무", "#64748B"));
 
         // when
         var preview = service().preview(1L, updateRequest());
@@ -89,7 +88,7 @@ class CalendarMutationServiceTest {
     @DisplayName("일정 생성 Preview는 생성하지 않고 생성될 일정을 반환한다")
     void givenEventCreation_whenPreview_thenReturnsAfterWithoutCreatingEvent() {
         // given
-        when(tagService.getTagOrDefault(1L, 1L)).thenReturn(new Tag(TagType.DEFAULT, "업무", "#64748B"));
+        when(tagService.getTagOrDefault(1L, 1L)).thenReturn(Tag.personalDefault("업무", "#64748B"));
 
         // when
         var preview = service().preview(1L, createRequest());
@@ -350,7 +349,8 @@ class CalendarMutationServiceTest {
                 List.of("RRULE:FREQ=WEEKLY;BYDAY=FR"),
                 null,
                 Instant.parse("2026-08-01T00:00:00Z"),
-                Instant.parse("2026-08-01T00:00:00Z")
+                Instant.parse("2026-08-01T00:00:00Z"),
+                true
         );
         when(recurrenceEventService.getRecurrenceEvent(1L, 20L)).thenReturn(existingSeries);
         CalendarMutationToolRequest request = new CalendarMutationToolRequest(
@@ -545,7 +545,8 @@ class CalendarMutationServiceTest {
                 List.of("RRULE:FREQ=WEEKLY;BYDAY=FR"),
                 null,
                 Instant.parse("2026-08-01T00:00:00Z"),
-                Instant.parse("2026-08-01T00:00:00Z")
+                Instant.parse("2026-08-01T00:00:00Z"),
+                true
         );
     }
 
