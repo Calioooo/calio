@@ -2,7 +2,7 @@ import SwiftUI
 import UIKit
 
 struct GroupInvitationManagementView: View {
-    let groupSpace: GroupSpaceResponseDTO
+    let groupSpace: GroupSpace
 
     @StateObject private var viewModel = GroupInvitationViewModel()
     @State private var pendingRevocation: GroupInvitationSummary?
