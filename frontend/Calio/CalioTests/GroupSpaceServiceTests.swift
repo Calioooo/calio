@@ -34,6 +34,21 @@ struct GroupSpaceServiceTests {
         #expect(viewModel.errorMessage == "그룹 공간을 불러오지 못했습니다. 다시 시도해 주세요.")
     }
 
+    @MainActor @Test func listViewModelRefreshesToIncludeGroupJoinedByInvitation() async {
+        let existingSpace = GroupSpaceRepositoryStub.sampleSpace(name: "기존 그룹")
+        let joinedSpace = GroupSpaceRepositoryStub.sampleSpace(name: "새로 참여한 그룹")
+        let repository = GroupSpaceRepositoryStub(
+            fetchResponses: [[existingSpace], [existingSpace, joinedSpace]]
+        )
+        let viewModel = GroupSpaceListViewModel(service: GroupSpaceService(repository: repository))
+
+        await viewModel.load()
+        await viewModel.load()
+
+        #expect(viewModel.spaces.map(\.name) == ["기존 그룹", "새로 참여한 그룹"])
+        #expect(viewModel.didFailLoading == false)
+    }
+
     @MainActor @Test func ownershipTransferAppliesBackendConfirmedRolesToDetailState() async throws {
         let repository = GroupSpaceRepositoryStub()
         let viewModel = GroupSpaceDetailViewModel(

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct GroupInvitationJoinView: View {
     let onDismiss: () -> Void
+    let onJoined: () -> Void
     private let previewForEvidence: PreviewGroupInvitationResponseDTO?
     @StateObject private var viewModel = GroupInvitationViewModel()
     @State private var credentialType: GroupInvitationCredentialKind = .inviteCode
@@ -10,9 +11,11 @@ struct GroupInvitationJoinView: View {
 
     init(
         onDismiss: @escaping () -> Void,
+        onJoined: @escaping () -> Void = {},
         previewForEvidence: PreviewGroupInvitationResponseDTO? = nil
     ) {
         self.onDismiss = onDismiss
+        self.onJoined = onJoined
         self.previewForEvidence = previewForEvidence
     }
 
@@ -54,7 +57,13 @@ struct GroupInvitationJoinView: View {
                     Button("확인", role: .cancel) { viewModel.clearError() }
                 } message: { Text(viewModel.errorMessage ?? "잠시 후 다시 시도해 주세요.") }
                 .sheet(item: acceptanceResultBinding, onDismiss: viewModel.clearAcceptanceFlow) { result in
-                    GroupInvitationAcceptanceResultSheet(result: result, onDone: onDismiss)
+                    GroupInvitationAcceptanceResultSheet(
+                        result: result,
+                        onDone: {
+                            onJoined()
+                            onDismiss()
+                        }
+                    )
                         .presentationDetents([.height(300)])
                         .presentationDragIndicator(.visible)
                 }

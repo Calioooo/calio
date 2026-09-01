@@ -89,9 +89,16 @@ struct GroupSpaceListView: View {
             }
             .overlay {
                 if isPresentingInvitationJoin {
-                    GroupInvitationJoinView {
-                        isPresentingInvitationJoin = false
-                    }
+                    GroupInvitationJoinView(
+                        onDismiss: {
+                            isPresentingInvitationJoin = false
+                        },
+                        onJoined: {
+                            Task {
+                                await viewModel.load()
+                            }
+                        }
+                    )
                     .transition(.opacity.combined(with: .scale(scale: 0.96)))
                 }
             }
