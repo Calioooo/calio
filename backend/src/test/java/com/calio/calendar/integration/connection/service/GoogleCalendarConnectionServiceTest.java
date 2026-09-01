@@ -5,10 +5,13 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.calio.calendar.account.service.AccountCommandService;
 import com.calio.calendar.external.google.GoogleOAuthClient;
 import com.calio.calendar.external.google.GoogleOAuthProperties;
 import com.calio.calendar.external.google.dto.GoogleTokenResponse;
@@ -27,7 +30,6 @@ import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.AbstractPlatformTransactionManager;
 import org.springframework.transaction.support.DefaultTransactionStatus;
@@ -41,6 +43,7 @@ class GoogleCalendarConnectionServiceTest {
     private final GoogleOAuthClient oauthClient = mock(GoogleOAuthClient.class);
     private final TokenEncryptor encryptor = new TokenEncryptor(new TokenEncryptionConfig()
             .googleTokenBytesEncryptor(encryptionProperties()));
+    private final AccountCommandService accountCommandService = mock(AccountCommandService.class);
     private final GoogleCalendarIntegrationCommandService integrationCommandService =
             mock(GoogleCalendarIntegrationCommandService.class);
     private final GoogleCalendarConnectionQueryService connectionQueryService =
@@ -76,8 +79,8 @@ class GoogleCalendarConnectionServiceTest {
     }
 
     @Test
-    @DisplayName("동시 최초 연결로 Integration 생성 충돌이 나면 다시 조회해 연결을 완료한다")
-    void givenConcurrentFirstConnection_whenConnect_thenRetriesAccountIntegrationCreation() {
+    @DisplayName("Account 잠금 뒤 이미 생성된 Integration을 조회하면 새 Integration을 만들지 않는다")
+    void givenIntegrationCreatedWhileWaitingForAccountLock_whenConnect_thenUsesExistingIntegration() {
         GoogleCalendarIntegration integration = new GoogleCalendarIntegration(ACCOUNT_ID);
         GoogleCalendarConnection connection = connection(integration);
         when(oauthClient.exchangeAuthorizationCode("authorization-code"))
@@ -85,21 +88,22 @@ class GoogleCalendarConnectionServiceTest {
         when(oauthClient.fetchUserInfo("access-token"))
                 .thenReturn(new GoogleUserInfoResponse("google-subject", "google@example.com"));
         when(connectionCommandService.tryLockConnection(ACCOUNT_ID))
-                .thenReturn(Optional.empty(), Optional.empty());
+                .thenReturn(Optional.empty());
         when(integrationCommandService.tryLockIntegration(ACCOUNT_ID))
-                .thenReturn(Optional.empty(), Optional.of(integration));
-        when(integrationCommandService.createIntegration(ACCOUNT_ID))
-                .thenThrow(new DataIntegrityViolationException(
-                        "Duplicate entry for key 'uk_google_calendar_integration_account_id'"
-                ));
+                .thenReturn(Optional.of(integration));
         when(connectionCommandService.createConnection(eq(integration), eq("google-subject"), eq("google@example.com"),
                 anyString(), anyString(), eq(NOW.plusSeconds(3600)), eq(NOW))).thenReturn(connection);
 
         var response = service().connect(ACCOUNT_ID, "authorization-code");
 
         assertThat(response.connected()).isTrue();
+        var callOrder = inOrder(accountCommandService, connectionCommandService, integrationCommandService);
+        callOrder.verify(accountCommandService).lockAccount(ACCOUNT_ID);
+        callOrder.verify(connectionCommandService).tryLockConnection(ACCOUNT_ID);
+        callOrder.verify(integrationCommandService).tryLockIntegration(ACCOUNT_ID);
         verify(connectionCommandService).createConnection(eq(integration), eq("google-subject"), eq("google@example.com"),
                 anyString(), anyString(), eq(NOW.plusSeconds(3600)), eq(NOW));
+        verify(integrationCommandService, never()).createIntegration(ACCOUNT_ID);
         verify(enqueueService).enqueueManualSync(ACCOUNT_ID);
     }
 
@@ -151,7 +155,8 @@ class GoogleCalendarConnectionServiceTest {
     }
 
     private GoogleCalendarConnectionService service() {
-        return new GoogleCalendarConnectionService(properties, oauthClient, encryptor, integrationCommandService,
+        return new GoogleCalendarConnectionService(properties, oauthClient, encryptor, accountCommandService,
+                integrationCommandService,
                 connectionQueryService, connectionCommandService, jobCommandService, enqueueService,
                 new NoOpTransactionManager(), Clock.fixed(NOW, ZoneOffset.UTC));
     }

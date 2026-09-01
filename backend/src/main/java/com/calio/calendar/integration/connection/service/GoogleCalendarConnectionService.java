@@ -2,6 +2,7 @@ package com.calio.calendar.integration.connection.service;
 
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
+import com.calio.calendar.account.service.AccountCommandService;
 import com.calio.calendar.external.google.GoogleOAuthClient;
 import com.calio.calendar.external.google.GoogleOAuthProperties;
 import com.calio.calendar.external.google.dto.GoogleTokenResponse;
@@ -16,7 +17,6 @@ import java.time.Clock;
 import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -27,10 +27,10 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class GoogleCalendarConnectionService {
 
     private static final Logger log = LoggerFactory.getLogger(GoogleCalendarConnectionService.class);
-    private static final String INTEGRATION_ACCOUNT_CONSTRAINT = "uk_google_calendar_integration_account_id";
     private final GoogleOAuthProperties properties;
     private final GoogleOAuthClient oauthClient;
     private final TokenEncryptor encryptor;
+    private final AccountCommandService accountCommandService;
     private final GoogleCalendarIntegrationCommandService integrationCommandService;
     private final GoogleCalendarConnectionQueryService connectionQueryService;
     private final GoogleCalendarConnectionCommandService connectionCommandService;
@@ -44,6 +44,7 @@ public class GoogleCalendarConnectionService {
             GoogleOAuthProperties properties,
             GoogleOAuthClient oauthClient,
             TokenEncryptor encryptor,
+            AccountCommandService accountCommandService,
             GoogleCalendarIntegrationCommandService integrationCommandService,
             GoogleCalendarConnectionQueryService connectionQueryService,
             GoogleCalendarConnectionCommandService connectionCommandService,
@@ -55,6 +56,7 @@ public class GoogleCalendarConnectionService {
         this.properties = properties;
         this.oauthClient = oauthClient;
         this.encryptor = encryptor;
+        this.accountCommandService = accountCommandService;
         this.integrationCommandService = integrationCommandService;
         this.connectionQueryService = connectionQueryService;
         this.connectionCommandService = connectionCommandService;
@@ -116,44 +118,13 @@ public class GoogleCalendarConnectionService {
             Instant expiresAt,
             Instant connectedAt
     ) {
-        try {
-            return registerAndEnqueueInitialSyncInNewTransaction(
-                    accountId, user, token, expiresAt, connectedAt
-            );
-        } catch (DataIntegrityViolationException exception) {
-            if (!containsConstraint(exception, INTEGRATION_ACCOUNT_CONSTRAINT)) {
-                throw exception;
-            }
-            return registerAndEnqueueInitialSyncInNewTransaction(
-                    accountId, user, token, expiresAt, connectedAt
-            );
-        }
-    }
-
-    private GoogleCalendarConnection registerAndEnqueueInitialSyncInNewTransaction(
-            Long accountId,
-            GoogleUserInfoResponse user,
-            GoogleTokenResponse token,
-            Instant expiresAt,
-            Instant connectedAt
-    ) {
         return registrationTransaction.execute(status -> {
+            accountCommandService.lockAccount(accountId);
             GoogleCalendarConnection connection =
                     registerInTransaction(accountId, user, token, expiresAt, connectedAt);
             enqueueService.enqueueManualSync(accountId);
             return connection;
         });
-    }
-
-    private boolean containsConstraint(DataIntegrityViolationException exception, String constraintName) {
-        Throwable current = exception;
-        while (current != null) {
-            if (current.getMessage() != null && current.getMessage().contains(constraintName)) {
-                return true;
-            }
-            current = current.getCause();
-        }
-        return false;
     }
 
     private GoogleCalendarConnection registerInTransaction(
