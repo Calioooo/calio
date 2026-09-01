@@ -15,6 +15,7 @@ import Combine
         guard !isSubmitting else { return }
         isSubmitting = true
         defer { isSubmitting = false }
+        issuedInvitation = nil
         do {
             issuedInvitation = try await service.issue(groupSpaceId: groupSpaceId)
             await load(groupSpaceId: groupSpaceId)

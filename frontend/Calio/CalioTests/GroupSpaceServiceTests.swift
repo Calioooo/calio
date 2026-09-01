@@ -118,6 +118,19 @@ struct GroupSpaceServiceTests {
 
         #expect(repository.issueCallCount == 1)
     }
+
+    @MainActor @Test func invitationViewModelClearsPriorIssuedInvitationWhenTheNextIssueFails() async {
+        let repository = GroupSpaceRepositoryStub(issueErrorOnCall: 2)
+        let viewModel = GroupInvitationViewModel(service: GroupInvitationService(repository: repository))
+
+        await viewModel.issue(groupSpaceId: 7)
+        #expect(viewModel.issuedInvitation?.code == "CALIO-2026")
+
+        await viewModel.issue(groupSpaceId: 7)
+
+        #expect(viewModel.issuedInvitation == nil)
+        #expect(viewModel.errorMessage == "초대를 만들지 못했습니다.")
+    }
 }
 
 private final class GroupSpaceRepositoryStub: GroupSpaceRepository {
@@ -129,6 +142,7 @@ private final class GroupSpaceRepositoryStub: GroupSpaceRepository {
     private let acceptResponse: AcceptGroupInvitationResponseDTO
     private let invitationError: Error?
     private let issueDelayNanoseconds: UInt64
+    private let issueErrorOnCall: Int?
     private var fetchCallCount = 0
     private(set) var issueCallCount = 0
 
@@ -142,7 +156,8 @@ private final class GroupSpaceRepositoryStub: GroupSpaceRepository {
             membership: .init(memberId: 10, nickname: "준하", role: .member)
         ),
         invitationError: Error? = nil,
-        issueDelayNanoseconds: UInt64 = 0
+        issueDelayNanoseconds: UInt64 = 0,
+        issueErrorOnCall: Int? = nil
     ) {
         self.fetchResponses = fetchResponses
         self.fetchErrorOnCall = fetchErrorOnCall
@@ -150,6 +165,7 @@ private final class GroupSpaceRepositoryStub: GroupSpaceRepository {
         self.acceptResponse = acceptResponse
         self.invitationError = invitationError
         self.issueDelayNanoseconds = issueDelayNanoseconds
+        self.issueErrorOnCall = issueErrorOnCall
     }
 
     static func sampleSpace(name: String = "프로젝트 팀") -> GroupSpaceResponseDTO {
@@ -172,6 +188,7 @@ private final class GroupSpaceRepositoryStub: GroupSpaceRepository {
     func removeMember(groupSpaceId: Int64, memberId: Int64) async throws { operations.append("remove:\(groupSpaceId):\(memberId)") }
     func issueInvitation(groupSpaceId: Int64) async throws -> GroupInvitationResponseDTO {
         issueCallCount += 1
+        if issueErrorOnCall == issueCallCount { throw StubError.failed }
         if issueDelayNanoseconds > 0 {
             try? await Task.sleep(nanoseconds: issueDelayNanoseconds)
         }
