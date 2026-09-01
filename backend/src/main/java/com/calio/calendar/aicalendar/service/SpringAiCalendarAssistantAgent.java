@@ -45,7 +45,7 @@ public class SpringAiCalendarAssistantAgent implements CalendarAssistantAgent, A
 
     private static final int MAX_PROVIDER_REQUEST_ATTEMPTS = 2;
     private static final String ASSISTANT_RESPONSE_BLOCKS_MARKER = "ASSISTANT_RESPONSE_BLOCKS";
-    private static final String LEGACY_CALIO_RESPONSE_STATE_TAG = "<calio_response_state>";
+    private static final String LEGACY_CALIO_RESPONSE_STATE_TAG = "calio_response_state";
     private static final String CALENDAR_RESPONSE_HISTORY_TAG = "calendar_response_history";
     private static final String TOOL_REQUEST_JSON_PREFIX = "{\"request\":";
 
@@ -238,7 +238,7 @@ public class SpringAiCalendarAssistantAgent implements CalendarAssistantAgent, A
             throw new IllegalStateException("AI calendar provider returned an empty response.");
         }
         if (answer.contains(ASSISTANT_RESPONSE_BLOCKS_MARKER)
-                || answer.contains(LEGACY_CALIO_RESPONSE_STATE_TAG)
+                || answer.contains("<" + LEGACY_CALIO_RESPONSE_STATE_TAG + ">")
                 || answer.contains("<" + CALENDAR_RESPONSE_HISTORY_TAG + ">")
                 || answer.stripLeading().startsWith(TOOL_REQUEST_JSON_PREFIX)) {
             throw new IllegalStateException("AI calendar provider returned internal response data.");
