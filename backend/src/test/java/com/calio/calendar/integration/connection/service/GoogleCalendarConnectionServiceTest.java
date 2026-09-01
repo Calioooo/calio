@@ -81,6 +81,7 @@ class GoogleCalendarConnectionServiceTest {
     @Test
     @DisplayName("Account 잠금 뒤 이미 생성된 Integration을 조회하면 새 Integration을 만들지 않는다")
     void givenIntegrationCreatedWhileWaitingForAccountLock_whenConnect_thenUsesExistingIntegration() {
+        // given
         GoogleCalendarIntegration integration = new GoogleCalendarIntegration(ACCOUNT_ID);
         GoogleCalendarConnection connection = connection(integration);
         when(oauthClient.exchangeAuthorizationCode("authorization-code"))
@@ -91,18 +92,34 @@ class GoogleCalendarConnectionServiceTest {
                 .thenReturn(Optional.empty());
         when(integrationCommandService.tryLockIntegration(ACCOUNT_ID))
                 .thenReturn(Optional.of(integration));
-        when(connectionCommandService.createConnection(eq(integration), eq("google-subject"), eq("google@example.com"),
-                anyString(), anyString(), eq(NOW.plusSeconds(3600)), eq(NOW))).thenReturn(connection);
+        when(connectionCommandService.createConnection(
+                eq(integration),
+                eq("google-subject"),
+                eq("google@example.com"),
+                anyString(),
+                anyString(),
+                eq(NOW.plusSeconds(3600)),
+                eq(NOW)
+        )).thenReturn(connection);
 
+        // when
         var response = service().connect(ACCOUNT_ID, "authorization-code");
 
+        // then
         assertThat(response.connected()).isTrue();
         var callOrder = inOrder(accountCommandService, connectionCommandService, integrationCommandService);
         callOrder.verify(accountCommandService).lockAccount(ACCOUNT_ID);
         callOrder.verify(connectionCommandService).tryLockConnection(ACCOUNT_ID);
         callOrder.verify(integrationCommandService).tryLockIntegration(ACCOUNT_ID);
-        verify(connectionCommandService).createConnection(eq(integration), eq("google-subject"), eq("google@example.com"),
-                anyString(), anyString(), eq(NOW.plusSeconds(3600)), eq(NOW));
+        verify(connectionCommandService).createConnection(
+                eq(integration),
+                eq("google-subject"),
+                eq("google@example.com"),
+                anyString(),
+                anyString(),
+                eq(NOW.plusSeconds(3600)),
+                eq(NOW)
+        );
         verify(integrationCommandService, never()).createIntegration(ACCOUNT_ID);
         verify(enqueueService).enqueueManualSync(ACCOUNT_ID);
     }
