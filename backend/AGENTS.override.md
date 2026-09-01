@@ -97,6 +97,14 @@
 - 기존 클라이언트를 깨는 rename/remove보다 additive field 추가를 우선한다.
 - 응답 구조와 필드 의미는 backend가 일관되게 관리한다
 
+## AI Agent Prompt / Tool 규칙
+
+- system prompt는 제품 역할, 사용자 노출 규칙, 권한과 승인 경계처럼 모든 tool에 공통인 정책만 간결하게 소유한다.
+- tool 설명과 입력 schema는 해당 tool의 호출 조건, 필요한 입력, 반환 의미, 부작용을 구체적으로 설명한다.
+- 대화 이력은 USER와 ASSISTANT 역할을 보존한 `Message` 목록으로 provider에 전달하며, 역할을 문자열로 합쳐 하나의 user message로 만들지 않는다.
+- assistant response block 같은 내부 상태는 별도의 내부 대화 맥락으로만 전달하고 사용자 응답에 노출하지 않는다.
+- prompt 또는 tool 변경은 한 그룹씩 적용하고, 동일한 eval과 별도 holdout eval로 일반화 여부를 확인한다.
+
 ## 테스트 기대치
 
 - 테스트는 `unit test`와 `integration test` 두 종류로 구분한다.

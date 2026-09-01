@@ -18,6 +18,18 @@ spring:
   sql:
     init:
       mode: never
+  ai:
+    model:
+      chat: openai
+    openai:
+      api-key: ${OPENAI_API_KEY:}
+      timeout: 30s
+      max-retries: 0
+      chat:
+        model: ${OPENAI_CHAT_MODEL:}
+        max-completion-tokens: 512
+        parallel-tool-calls: false
+        store: false
 
 logging:
   structured:
@@ -55,3 +67,12 @@ group-invitation:
   expired-retention: PT24H
   cleanup-batch-size: 1000
   cleanup-max-batches-per-run: 100
+
+ai-calendar:
+  conversation:
+    retention: P30D
+  agent:
+    run-timeout: PT30S
+    connection-timeout: PT5S
+    max-tool-calls: 2
+    maximum-query-days: 14

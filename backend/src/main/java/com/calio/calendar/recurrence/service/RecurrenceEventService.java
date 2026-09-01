@@ -13,6 +13,7 @@ import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceEventRequest
 import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceOccurrenceRequest;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
+import com.calio.calendar.recurrence.domain.RecurrenceOccurrence;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.event.service.EventCommandService;
@@ -82,6 +83,22 @@ public class RecurrenceEventService {
         return toResponseWithSeriesUpdatePermission(
                 recurrenceEventQueryService.getRecurrenceEvent(accountId, recurrenceId),
                 accountId
+        );
+    }
+
+    public EventResponse getRecurrenceOccurrence(Long accountId, Long recurrenceId, Instant originStartAt) {
+        RecurrenceEvent recurrenceEvent = recurrenceEventQueryService.getRecurrenceEvent(accountId, recurrenceId);
+        Optional<RecurrenceEventOverride> override = recurrenceEventQueryService
+                .getOverrideIfExists(recurrenceId, originStartAt);
+        if (override.isPresent()) {
+            if (override.get().isDeleted()) {
+                throw new CalioException(ErrorCode.RECURRENCE_OCCURRENCE_NOT_FOUND);
+            }
+            return EventResponse.recurrenceOverride(override.get());
+        }
+        return EventResponse.recurrenceOccurrence(
+                recurrenceEvent,
+                findGeneratedOccurrence(recurrenceEvent, originStartAt)
         );
     }
 
@@ -206,6 +223,22 @@ public class RecurrenceEventService {
         boolean canUpdateSeries = !recurrenceMappingQueryService
                 .hasExternalRecurrenceEventMapping(recurrenceEvent.getId(), accountId);
         return RecurrenceEventResponse.from(recurrenceEvent, canUpdateSeries);
+    }
+
+    private RecurrenceOccurrence findGeneratedOccurrence(
+            RecurrenceEvent recurrenceEvent,
+            Instant originStartAt
+    ) {
+        return recurrenceEngine.expand(
+                        RecurrenceSchedule.from(recurrenceEvent),
+                        recurrenceEvent.getRecurrenceRules(),
+                        originStartAt,
+                        originStartAt.plusNanos(1)
+                )
+                .stream()
+                .filter(occurrence -> originStartAt.equals(occurrence.originStartAt()))
+                .findFirst()
+                .orElseThrow(() -> new CalioException(ErrorCode.RECURRENCE_OCCURRENCE_NOT_FOUND));
     }
 
     private void rejectExternalSeriesMutation(Long accountId, Long recurrenceId) {
