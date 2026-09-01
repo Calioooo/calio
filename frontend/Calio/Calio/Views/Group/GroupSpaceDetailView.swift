@@ -18,7 +18,7 @@ struct GroupSpaceDetailView: View {
         List {
             Section {
                 HStack(spacing: 14) {
-                    Text(viewModel.groupSpace.emoji ?? String(viewModel.groupSpace.name.prefix(1)))
+                    Text(groupSpaceSymbol)
                         .font(.title3.weight(.semibold)).foregroundStyle(.calioPrimary)
                         .frame(width: 56, height: 56).background(Color.calioSelection, in: Circle())
                     VStack(alignment: .leading, spacing: 4) {
@@ -67,6 +67,14 @@ struct GroupSpaceDetailView: View {
         } message: {
             Text(viewModel.postRemovalRefreshMessage ?? "")
         }
+    }
+
+    private var groupSpaceSymbol: String {
+        if let emoji = viewModel.groupSpace.emoji {
+            return emoji
+        }
+
+        return String(viewModel.groupSpace.name.prefix(1))
     }
 
     @ViewBuilder private func memberRow(_ member: GroupMember) -> some View {
