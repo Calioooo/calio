@@ -75,11 +75,14 @@ public class RecurrenceEventService {
                 tag,
                 account
         ));
-        return toResponse(recurrenceEvent, accountId);
+        return toResponseWithSeriesUpdatePermission(recurrenceEvent, accountId);
     }
 
     public RecurrenceEventResponse getRecurrenceEvent(Long accountId, Long recurrenceId) {
-        return toResponse(recurrenceEventQueryService.getRecurrenceEvent(accountId, recurrenceId), accountId);
+        return toResponseWithSeriesUpdatePermission(
+                recurrenceEventQueryService.getRecurrenceEvent(accountId, recurrenceId),
+                accountId
+        );
     }
 
     @Transactional
@@ -101,7 +104,7 @@ public class RecurrenceEventService {
                 recurrenceRules,
                 tag
         );
-        return toResponse(recurrenceEvent, accountId);
+        return toResponseWithSeriesUpdatePermission(recurrenceEvent, accountId);
     }
 
     @Transactional
@@ -196,7 +199,10 @@ public class RecurrenceEventService {
                 originStartAt
         );
     }
-    private RecurrenceEventResponse toResponse(RecurrenceEvent recurrenceEvent, Long accountId) {
+    private RecurrenceEventResponse toResponseWithSeriesUpdatePermission(
+            RecurrenceEvent recurrenceEvent,
+            Long accountId
+    ) {
         boolean canUpdateSeries = !recurrenceMappingQueryService
                 .hasExternalRecurrenceEventMapping(recurrenceEvent.getId(), accountId);
         return RecurrenceEventResponse.from(recurrenceEvent, canUpdateSeries);
