@@ -130,6 +130,21 @@ class RecurrenceEventServiceTest {
     }
 
     @Test
+    @DisplayName("공유 반복 일정이 없으면 override 조회를 생략한다")
+    void givenEmptyRecurrenceIds_whenListOverridesForRange_thenSkipsQuery() {
+        // when
+        List<RecurrenceEventOverride> result = recurrenceEventService.listOverridesForRecurrenceIdsInRange(
+                List.of(),
+                Instant.parse("2027-01-01T00:00:00Z"),
+                Instant.parse("2027-01-02T00:00:00Z")
+        );
+
+        // then
+        assertThat(result).isEmpty();
+        verifyNoInteractions(recurrenceEventOverrideRepository);
+    }
+
+    @Test
     @DisplayName("반복 일정 조회는 QueryService의 domain entity를 응답 DTO로 변환한다")
     void givenOwnedRecurrenceEvent_whenGet_thenCreatesResponse() {
         // given

@@ -34,4 +34,8 @@ public class PersonalEventGroupShareQueryService {
         return shareRepository.findByEvent_IdAndGroupSpace_Id(eventId, groupSpaceId)
                 .orElseThrow(() -> new CalioException(ErrorCode.PERSONAL_SCHEDULE_SHARE_NOT_FOUND));
     }
+
+    public List<PersonalEventGroupShare> listByGroupSpaceId(Long groupSpaceId) {
+        return shareRepository.findAllByGroupSpaceId(groupSpaceId);
+    }
 }
