@@ -43,7 +43,8 @@ public class CalendarConversationQueryService {
                         .thenComparing(CalendarConversationMessage::getId))
                 .map(message -> new CalendarConversationHistoryMessage(
                         message.getRole(),
-                        message.getText()
+                        message.getText(),
+                        message.getAssistantResponseBlocksJson()
                 ))
                 .toList();
     }

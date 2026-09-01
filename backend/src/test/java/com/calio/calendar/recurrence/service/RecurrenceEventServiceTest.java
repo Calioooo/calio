@@ -288,6 +288,39 @@ class RecurrenceEventServiceTest {
     }
 
     @Test
+    @DisplayName("다른 날짜로 이동된 recurrence-occurrence는 origin identity로 현재 override를 조회한다")
+    void givenMovedOccurrenceOverride_whenGetOccurrence_thenReturnsOverrideRegardlessOfOriginalRange() {
+        // given
+        RecurrenceEvent recurrenceEvent = recurrenceEvent();
+        Instant originStartAt = Instant.parse("2027-01-01T00:00:00Z");
+        RecurrenceEventOverride movedOverride = RecurrenceEventOverride.active(
+                recurrenceEvent,
+                originStartAt,
+                "이동한 회의",
+                "변경된 설명",
+                CanonicalSchedule.recurrenceOverride(
+                        Instant.parse("2027-01-05T02:00:00Z"),
+                        Instant.parse("2027-01-05T03:00:00Z"),
+                        false,
+                        "Asia/Seoul"
+                )
+        );
+        when(recurrenceEventRepository.findByIdAndAccount_Id(10L, 1L))
+                .thenReturn(Optional.of(recurrenceEvent));
+        when(recurrenceEventOverrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(10L, originStartAt))
+                .thenReturn(Optional.of(movedOverride));
+
+        // when
+        EventResponse occurrence = recurrenceEventService.getRecurrenceOccurrence(1L, 10L, originStartAt);
+
+        // then
+        assertThat(occurrence.title()).isEqualTo("이동한 회의");
+        assertThat(occurrence.startAt()).isEqualTo(Instant.parse("2027-01-05T02:00:00Z"));
+        assertThat(occurrence.originStartAt()).isEqualTo(originStartAt);
+        verify(recurrenceEngine, never()).expand(any(), any(), any(), any());
+    }
+
+    @Test
     @DisplayName("현재 rule과 exact override에 없는 origin은 상태를 만들지 않고 거절한다")
     void givenUnknownOriginWithoutOverride_whenDelete_thenRejectsWithoutStateChange() {
         // given

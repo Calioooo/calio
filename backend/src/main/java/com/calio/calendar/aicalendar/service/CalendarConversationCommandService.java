@@ -38,10 +38,16 @@ public class CalendarConversationCommandService {
             Long conversationId,
             CalendarConversationMessageRole role,
             String message,
+            String assistantResponseBlocksJson,
             Instant recordedAt
     ) {
         CalendarConversation conversation = conversationRepository.getReferenceById(conversationId);
-        messageRepository.save(new CalendarConversationMessage(conversation, role, message));
+        messageRepository.save(new CalendarConversationMessage(
+                conversation,
+                role,
+                message,
+                assistantResponseBlocksJson
+        ));
         conversation.touch(recordedAt);
     }
 
