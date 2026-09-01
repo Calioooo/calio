@@ -441,9 +441,13 @@ class GoogleCalendarSyncMigrationTest {
     }
 
     @Test
-    @DisplayName("V22는 Job sequence와 operation lease를 Integration으로 옮긴다")
-    void givenV21Schema_whenMigrateToV22_thenMovesGoogleOperationRuntimeToIntegration() throws Exception {
+    @DisplayName("V22는 기존 Connection runtime을 Integration으로 보존해 옮긴다")
+    void givenV21ConnectionRuntime_whenMigrateToV22_thenMovesRuntimeToIntegration() throws Exception {
         String url = "jdbc:h2:mem:google-integration-job-runtime;MODE=MySQL;DB_CLOSE_DELAY=-1";
+        migrateTo(url, MigrationVersion.fromVersion("16"));
+        insertV16IntegrationRuntime(url);
+        migrateTo(url, MigrationVersion.fromVersion("21"));
+
         migrateTo(url, MigrationVersion.fromVersion("22"));
 
         try (Connection connection = DriverManager.getConnection(url, "sa", "")) {
@@ -460,6 +464,21 @@ class GoogleCalendarSyncMigrationTest {
             assertThat(columnNames(connection, "GOOGLE_OPERATION_JOBS"))
                     .contains("INTEGRATION_ID", "INTEGRATION_SEQUENCE")
                     .doesNotContain("CONNECTION_ID", "ACCOUNT_SEQUENCE");
+            assertThat(singleString(connection, """
+                    SELECT next_google_operation_sequence
+                    FROM google_calendar_integrations
+                    WHERE account_id = 901
+                    """)).isEqualTo("29");
+            assertThat(singleString(connection, """
+                    SELECT google_operation_lease_owner
+                    FROM google_calendar_integrations
+                    WHERE account_id = 901
+                    """)).isEqualTo("worker-token");
+            assertThat(singleString(connection, """
+                    SELECT google_operation_lease_expires_at
+                    FROM google_calendar_integrations
+                    WHERE account_id = 901
+                    """)).startsWith("2026-09-01 01:00:00");
         }
     }
 
@@ -546,6 +565,32 @@ class GoogleCalendarSyncMigrationTest {
                     SET next_sync_token = '%s'
                     WHERE id = 900
                     """.formatted(syncToken));
+        }
+    }
+
+    private void insertV16IntegrationRuntime(String url) throws Exception {
+        try (Connection connection = DriverManager.getConnection(url, "sa", "");
+             Statement statement = connection.createStatement()) {
+            statement.executeUpdate("""
+                    INSERT INTO accounts (id, created_at, updated_at)
+                    VALUES (901, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))
+                    """);
+            statement.executeUpdate("""
+                    INSERT INTO google_calendar_integrations (
+                        id, account_id, google_subject, google_email,
+                        encrypted_refresh_token, encrypted_access_token, access_token_expires_at,
+                        connected_at, next_sync_token, next_google_operation_sequence,
+                        google_operation_lease_owner, google_operation_lease_expires_at,
+                        created_at, updated_at
+                    )
+                    VALUES (
+                        902, 901, 'subject-901', 'user-901@example.com',
+                        'encrypted-refresh', 'encrypted-access', '2026-09-01 01:00:00',
+                        '2026-09-01 00:00:00', 'cursor-901', 29,
+                        'worker-token', '2026-09-01 01:00:00',
+                        CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+                    )
+                    """);
         }
     }
 
