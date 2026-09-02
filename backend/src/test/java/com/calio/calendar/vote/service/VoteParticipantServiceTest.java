@@ -39,6 +39,9 @@ class VoteParticipantServiceTest {
     @Mock
     private VoteParticipantCommandService voteParticipantCommandService;
 
+    @Mock
+    private VoteCommandService voteCommandService;
+
     private VoteParticipantService voteParticipantService;
     private PasswordEncoder passwordEncoder;
 
@@ -48,6 +51,7 @@ class VoteParticipantServiceTest {
         voteParticipantService = new VoteParticipantService(
                 voteParticipantQueryService,
                 voteParticipantCommandService,
+                voteCommandService,
                 passwordEncoder
         );
     }
