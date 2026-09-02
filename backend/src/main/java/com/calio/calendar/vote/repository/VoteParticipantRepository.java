@@ -15,7 +15,7 @@ public interface VoteParticipantRepository extends JpaRepository<VoteParticipant
             select participant
             from VoteParticipant participant
             where participant.voteRoom.publicId = :voteRoomPublicId
-              and participant.nickname = :nickname
+              and lower(participant.nickname) = lower(:nickname)
             """)
     Optional<VoteParticipant> findByVoteRoomPublicIdAndNickname(
             @Param("voteRoomPublicId") UUID voteRoomPublicId,

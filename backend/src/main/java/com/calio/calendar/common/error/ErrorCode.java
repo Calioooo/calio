@@ -9,6 +9,8 @@ public enum ErrorCode {
     EVENT_NOT_FOUND(HttpStatus.NOT_FOUND, "Event not found."),
     RECURRENCE_EVENT_NOT_FOUND(HttpStatus.NOT_FOUND, "Recurrence event not found."),
     RECURRENCE_OCCURRENCE_NOT_FOUND(HttpStatus.NOT_FOUND, "Recurrence occurrence not found."),
+    VOTE_ROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "Vote room not found."),
+    VOTE_PARTICIPANT_NICKNAME_CONFLICT(HttpStatus.CONFLICT, "Vote participant nickname already exists."),
     TASK_NOT_FOUND(HttpStatus.NOT_FOUND, "Task not found."),
     COMPLETED_TASK_TITLE_UPDATE_NOT_ALLOWED(
             HttpStatus.CONFLICT,
