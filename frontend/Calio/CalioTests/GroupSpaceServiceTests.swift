@@ -593,10 +593,12 @@ private final class GroupSpaceRepositoryStub: GroupSpaceRepository {
         if invitationFetchErrorOnCall == invitationFetchCallCount {
             throw StubError.failed
         }
+        let invitations = invitationFetchResponses.isEmpty
+            ? []
+            : invitationFetchResponses.removeFirst()
         if invitationFetchDelays.indices.contains(responseIndex) {
             try? await Task.sleep(nanoseconds: invitationFetchDelays[responseIndex])
         }
-        let invitations = invitationFetchResponses.isEmpty ? [] : invitationFetchResponses.removeFirst()
         return .init(invitations: invitations)
     }
 
