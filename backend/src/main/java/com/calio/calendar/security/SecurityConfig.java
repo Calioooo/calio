@@ -49,6 +49,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/tags").authenticated()
                         .requestMatchers("/api/custom-tags").authenticated()
                         .requestMatchers("/api/custom-tags/**").authenticated()
+                        .requestMatchers("/api/vote-rooms").authenticated()
+                        .requestMatchers("/api/vote-rooms/**").authenticated()
                         .requestMatchers("/api/integrations/**").authenticated()
                         .requestMatchers("/api/group-spaces").authenticated()
                         .requestMatchers("/api/group-spaces/**").authenticated()
