@@ -7,7 +7,6 @@ import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.vote.controller.dto.CreateVoteRoomRequest;
 import com.calio.calendar.vote.controller.dto.VoteRoomResponse;
 import com.calio.calendar.vote.domain.VoteRoom;
-import com.calio.calendar.vote.repository.VoteRoomRepository;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -21,12 +20,14 @@ import org.springframework.transaction.annotation.Transactional;
 public class VoteRoomService {
     private static final ZoneId KOREA_ZONE = ZoneId.of("Asia/Seoul");
     private static final int MAX_CANDIDATE_DAYS = 31;
-    private final VoteRoomRepository voteRoomRepository;
+    private final VoteRoomQueryService voteRoomQueryService;
+    private final VoteRoomCommandService voteRoomCommandService;
     private final AccountQueryService accountQueryService;
     private final Clock clock;
 
-    public VoteRoomService(VoteRoomRepository voteRoomRepository, AccountQueryService accountQueryService, Clock clock) {
-        this.voteRoomRepository = voteRoomRepository;
+    public VoteRoomService(VoteRoomQueryService voteRoomQueryService, VoteRoomCommandService voteRoomCommandService, AccountQueryService accountQueryService, Clock clock) {
+        this.voteRoomQueryService = voteRoomQueryService;
+        this.voteRoomCommandService = voteRoomCommandService;
         this.accountQueryService = accountQueryService;
         this.clock = clock;
     }
@@ -38,11 +39,11 @@ public class VoteRoomService {
             throw new CalioException(ErrorCode.VALIDATION_FAILED);
         }
         Account account = accountQueryService.getAccount(accountId);
-        VoteRoom voteRoom = voteRoomRepository.save(new VoteRoom(UUID.randomUUID(), request.name(), start, request.candidateEndDate(), account));
+        VoteRoom voteRoom = voteRoomCommandService.create(new VoteRoom(UUID.randomUUID(), request.name(), start, request.candidateEndDate(), account));
         return VoteRoomResponse.from(voteRoom);
     }
 
     public List<VoteRoomResponse> listMine(Long accountId) {
-        return voteRoomRepository.findByCreatedByAccount_IdOrderByIdDesc(accountId).stream().map(VoteRoomResponse::from).toList();
+        return voteRoomQueryService.listByCreatedByAccountId(accountId).stream().map(VoteRoomResponse::from).toList();
     }
 }
