@@ -3,8 +3,7 @@ package com.calio.calendar.vote.service;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.vote.domain.VoteRoom;
-import com.calio.calendar.vote.repository.VoteDateCountProjection;
-import com.calio.calendar.vote.repository.VoteDateNicknameProjection;
+import com.calio.calendar.vote.domain.Vote;
 import com.calio.calendar.vote.repository.VoteParticipantRepository;
 import com.calio.calendar.vote.repository.VoteRepository;
 import com.calio.calendar.vote.repository.VoteRoomRepository;
@@ -36,12 +35,8 @@ public class VoteResultQueryService {
                 .orElseThrow(() -> new CalioException(ErrorCode.VOTE_ROOM_NOT_FOUND));
     }
 
-    public List<VoteDateCountProjection> listSubmittedVoteDateCounts(UUID publicId) {
-        return voteRepository.findSubmittedVoteDateCountsByVoteRoomPublicId(publicId);
-    }
-
-    public List<VoteDateNicknameProjection> listSubmittedVoteDateNicknames(UUID publicId) {
-        return voteRepository.findSubmittedVoteDateNicknamesByVoteRoomPublicId(publicId);
+    public List<Vote> listSubmittedVotes(UUID publicId) {
+        return voteRepository.findAllSubmittedByVoteRoomPublicId(publicId);
     }
 
     public List<String> listSubmittedNicknames(UUID publicId) {

@@ -3,8 +3,7 @@ package com.calio.calendar.vote.service;
 import com.calio.calendar.vote.controller.dto.VoteDateResultResponse;
 import com.calio.calendar.vote.controller.dto.VoteResultResponse;
 import com.calio.calendar.vote.domain.VoteRoom;
-import com.calio.calendar.vote.repository.VoteDateCountProjection;
-import com.calio.calendar.vote.repository.VoteDateNicknameProjection;
+import com.calio.calendar.vote.domain.Vote;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -25,18 +24,19 @@ public class VoteResultService {
 
     public VoteResultResponse getResult(UUID publicId) {
         VoteRoom voteRoom = voteResultQueryService.getVoteRoom(publicId);
-        Map<LocalDate, Long> unavailableCounts = voteResultQueryService.listSubmittedVoteDateCounts(publicId)
+        List<Vote> submittedVotes = voteResultQueryService.listSubmittedVotes(publicId);
+        Map<LocalDate, Long> unavailableCounts = submittedVotes
                 .stream()
                 .collect(Collectors.toMap(
-                        VoteDateCountProjection::unavailableDate,
-                        VoteDateCountProjection::unavailableCount
+                        Vote::getUnavailableDate,
+                        vote -> 1L,
+                        Long::sum
                 ));
-        Map<LocalDate, List<String>> unavailableNicknames = voteResultQueryService
-                .listSubmittedVoteDateNicknames(publicId)
+        Map<LocalDate, List<String>> unavailableNicknames = submittedVotes
                 .stream()
                 .collect(Collectors.groupingBy(
-                        VoteDateNicknameProjection::unavailableDate,
-                        Collectors.mapping(VoteDateNicknameProjection::nickname, Collectors.toList())
+                        Vote::getUnavailableDate,
+                        Collectors.mapping(vote -> vote.getVoteParticipant().getNickname(), Collectors.toList())
                 ));
 
         List<VoteDateResultResponse> dates = voteRoom.getCandidateStartDate()

@@ -9,8 +9,6 @@ import com.calio.calendar.vote.domain.Vote;
 import com.calio.calendar.vote.domain.VoteParticipant;
 import com.calio.calendar.vote.domain.VoteParticipantStatus;
 import com.calio.calendar.vote.domain.VoteRoom;
-import com.calio.calendar.vote.repository.VoteDateCountProjection;
-import com.calio.calendar.vote.repository.VoteDateNicknameProjection;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -148,10 +146,12 @@ class VoteParticipantRepositoryTest {
                 new Vote(registeredParticipant, selectedDate)
         ));
 
-        assertThat(voteRepository.findSubmittedVoteDateCountsByVoteRoomPublicId(voteRoom.getPublicId()))
-                .containsExactly(new VoteDateCountProjection(selectedDate, 1));
-        assertThat(voteRepository.findSubmittedVoteDateNicknamesByVoteRoomPublicId(voteRoom.getPublicId()))
-                .containsExactly(new VoteDateNicknameProjection(selectedDate, "submitted"));
+        assertThat(voteRepository.findAllSubmittedByVoteRoomPublicId(voteRoom.getPublicId()))
+                .extracting(Vote::getUnavailableDate)
+                .containsExactly(selectedDate);
+        assertThat(voteRepository.findAllSubmittedByVoteRoomPublicId(voteRoom.getPublicId()))
+                .extracting(vote -> vote.getVoteParticipant().getNickname())
+                .containsExactly("submitted");
         assertThat(voteParticipantRepository.findSubmittedNicknamesByVoteRoomPublicId(voteRoom.getPublicId()))
                 .containsExactly("submitted");
     }

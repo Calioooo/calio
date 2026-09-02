@@ -3,6 +3,7 @@ package com.calio.calendar.vote.repository;
 import com.calio.calendar.vote.domain.Vote;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -18,33 +19,16 @@ public interface VoteRepository extends JpaRepository<Vote, Long> {
             """)
     List<Vote> findAllByVoteParticipantId(@Param("voteParticipantId") Long voteParticipantId);
 
+    @EntityGraph(attributePaths = {"voteParticipant", "voteParticipant.voteRoom"})
     @Query("""
-            select new com.calio.calendar.vote.repository.VoteDateCountProjection(
-                vote.unavailableDate,
-                count(vote)
-            )
+            select vote
             from Vote vote
             join vote.voteParticipant participant
             where participant.voteRoom.publicId = :voteRoomPublicId
               and participant.status = com.calio.calendar.vote.domain.VoteParticipantStatus.SUBMITTED
-            group by vote.unavailableDate
             order by vote.unavailableDate
             """)
-    List<VoteDateCountProjection> findSubmittedVoteDateCountsByVoteRoomPublicId(
-            @Param("voteRoomPublicId") UUID voteRoomPublicId
-    );
-
-    @Query("""
-            select new com.calio.calendar.vote.repository.VoteDateNicknameProjection(
-                vote.unavailableDate,
-                participant.nickname
-            )
-            from Vote vote
-            join vote.voteParticipant participant
-            where participant.voteRoom.publicId = :voteRoomPublicId
-              and participant.status = com.calio.calendar.vote.domain.VoteParticipantStatus.SUBMITTED
-            """)
-    List<VoteDateNicknameProjection> findSubmittedVoteDateNicknamesByVoteRoomPublicId(
+    List<Vote> findAllSubmittedByVoteRoomPublicId(
             @Param("voteRoomPublicId") UUID voteRoomPublicId
     );
 

@@ -5,9 +5,9 @@ import static org.mockito.Mockito.when;
 
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.vote.controller.dto.VoteResultResponse;
+import com.calio.calendar.vote.domain.Vote;
+import com.calio.calendar.vote.domain.VoteParticipant;
 import com.calio.calendar.vote.domain.VoteRoom;
-import com.calio.calendar.vote.repository.VoteDateCountProjection;
-import com.calio.calendar.vote.repository.VoteDateNicknameProjection;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -44,10 +44,10 @@ class VoteResultServiceTest {
                 new Account()
         );
         when(voteResultQueryService.getVoteRoom(VOTE_ROOM_PUBLIC_ID)).thenReturn(voteRoom);
-        when(voteResultQueryService.listSubmittedVoteDateCounts(VOTE_ROOM_PUBLIC_ID))
-                .thenReturn(List.of(new VoteDateCountProjection(LocalDate.of(2026, 8, 15), 1)));
-        when(voteResultQueryService.listSubmittedVoteDateNicknames(VOTE_ROOM_PUBLIC_ID))
-                .thenReturn(List.of(new VoteDateNicknameProjection(LocalDate.of(2026, 8, 15), "submitted")));
+        VoteParticipant submittedParticipant = new VoteParticipant(voteRoom, "submitted", null);
+        submittedParticipant.submit();
+        when(voteResultQueryService.listSubmittedVotes(VOTE_ROOM_PUBLIC_ID))
+                .thenReturn(List.of(new Vote(submittedParticipant, LocalDate.of(2026, 8, 15))));
         when(voteResultQueryService.listSubmittedNicknames(VOTE_ROOM_PUBLIC_ID))
                 .thenReturn(List.of("submitted"));
 
