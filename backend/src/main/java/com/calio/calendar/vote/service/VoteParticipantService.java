@@ -6,6 +6,7 @@ import com.calio.calendar.vote.controller.dto.CreateVoteParticipantRequest;
 import com.calio.calendar.vote.controller.dto.SubmitVoteRequest;
 import com.calio.calendar.vote.controller.dto.VoteParticipantResponse;
 import com.calio.calendar.vote.controller.dto.VoteSubmissionResponse;
+import com.calio.calendar.vote.domain.Vote;
 import com.calio.calendar.vote.domain.VoteParticipant;
 import com.calio.calendar.vote.domain.VoteRoom;
 import java.time.LocalDate;
@@ -68,7 +69,10 @@ public class VoteParticipantService {
                 .sorted()
                 .toList();
         requireDatesInCandidateRange(participant.getVoteRoom(), unavailableDates);
-        voteCommandService.replaceUnavailableDates(participant, unavailableDates);
+        List<Vote> votes = unavailableDates.stream()
+                .map(date -> new Vote(participant, date))
+                .toList();
+        voteCommandService.replaceVotes(participant, votes);
         return VoteSubmissionResponse.from(participant, unavailableDates);
     }
 

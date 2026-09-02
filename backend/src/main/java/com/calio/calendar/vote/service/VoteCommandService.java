@@ -3,8 +3,7 @@ package com.calio.calendar.vote.service;
 import com.calio.calendar.vote.domain.Vote;
 import com.calio.calendar.vote.domain.VoteParticipant;
 import com.calio.calendar.vote.repository.VoteRepository;
-import java.time.LocalDate;
-import java.util.Collection;
+import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,11 +17,9 @@ public class VoteCommandService {
         this.voteRepository = voteRepository;
     }
 
-    public void replaceUnavailableDates(VoteParticipant participant, Collection<LocalDate> unavailableDates) {
+    public void replaceVotes(VoteParticipant participant, List<Vote> votes) {
         voteRepository.deleteAllByVoteParticipantId(participant.getId());
-        voteRepository.saveAll(unavailableDates.stream()
-                .map(date -> new Vote(participant, date))
-                .toList());
+        voteRepository.saveAll(votes);
         participant.submit();
     }
 }
