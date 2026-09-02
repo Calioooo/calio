@@ -2,13 +2,14 @@ package com.calio.calendar.groupspace.domain;
 
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
-import com.calio.calendar.common.domain.NicknameFields;
 import java.text.Normalizer;
+import java.util.regex.Pattern;
 
 public final class GroupSpaceFields {
 
     private static final int MAX_NAME_CODE_POINTS = 30;
     private static final int MAX_EMOJI_CODE_POINTS = 64;
+    private static final Pattern NICKNAME_PATTERN = Pattern.compile("^[A-Za-z0-9가-힣]{1,9}$");
     private GroupSpaceFields() {
     }
 
@@ -24,7 +25,14 @@ public final class GroupSpaceFields {
     }
 
     public static String normalizeNickname(String value) {
-        return NicknameFields.normalize(value);
+        if (value == null) {
+            throw validationFailed();
+        }
+        String normalized = Normalizer.normalize(value, Normalizer.Form.NFC);
+        if (!NICKNAME_PATTERN.matcher(normalized).matches()) {
+            throw validationFailed();
+        }
+        return normalized;
     }
 
     public static String canonicalizeEmoji(String value) {

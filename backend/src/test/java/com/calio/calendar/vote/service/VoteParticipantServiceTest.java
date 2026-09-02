@@ -132,6 +132,24 @@ class VoteParticipantServiceTest {
     }
 
     @Test
+    @DisplayName("참여자 닉네임은 기존 Group Space와 같은 형식 규칙을 적용한다")
+    void givenInvalidNickname_whenCreate_thenRejectsBeforeNicknameLookup() {
+        // given
+        VoteRoom voteRoom = voteRoom();
+        when(voteParticipantQueryService.getVoteRoomForParticipantCreation(VOTE_ROOM_PUBLIC_ID))
+                .thenReturn(voteRoom);
+
+        // when, then
+        assertThatThrownBy(() -> voteParticipantService.create(VOTE_ROOM_PUBLIC_ID, "calio-user", null))
+                .isInstanceOfSatisfying(CalioException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.VALIDATION_FAILED)
+                );
+        verify(voteParticipantQueryService, never())
+                .findParticipantByVoteRoomPublicIdAndNickname(any(), any());
+        verifyNoInteractions(voteParticipantCommandService, passwordHasher);
+    }
+
+    @Test
     @DisplayName("존재하지 않는 공개 VoteRoom에는 참여자를 생성할 수 없다")
     void givenMissingVoteRoom_whenCreate_thenRejectsBeforeNicknameLookup() {
         // given
