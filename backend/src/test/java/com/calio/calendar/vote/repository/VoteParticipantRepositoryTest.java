@@ -9,6 +9,8 @@ import com.calio.calendar.vote.domain.Vote;
 import com.calio.calendar.vote.domain.VoteParticipant;
 import com.calio.calendar.vote.domain.VoteParticipantStatus;
 import com.calio.calendar.vote.domain.VoteRoom;
+import com.calio.calendar.vote.repository.VoteDateCountProjection;
+import com.calio.calendar.vote.repository.VoteDateNicknameProjection;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -127,5 +129,30 @@ class VoteParticipantRepositoryTest {
                         LocalDate.of(2026, 8, 15),
                         LocalDate.of(2026, 8, 20)
                 );
+    }
+
+    @Test
+    @DisplayName("제출한 참여자의 Vote만 날짜별 집계와 닉네임 projection으로 조회한다")
+    void givenSubmittedAndRegisteredParticipants_whenFindResultProjections_thenExcludesRegisteredParticipant() {
+        VoteParticipant submittedParticipant = voteParticipantRepository.saveAndFlush(
+                new VoteParticipant(voteRoom, "submitted", null)
+        );
+        submittedParticipant.submit();
+        voteParticipantRepository.saveAndFlush(submittedParticipant);
+        VoteParticipant registeredParticipant = voteParticipantRepository.saveAndFlush(
+                new VoteParticipant(voteRoom, "register", null)
+        );
+        LocalDate selectedDate = LocalDate.of(2026, 8, 15);
+        voteRepository.saveAllAndFlush(List.of(
+                new Vote(submittedParticipant, selectedDate),
+                new Vote(registeredParticipant, selectedDate)
+        ));
+
+        assertThat(voteRepository.findSubmittedVoteDateCountsByVoteRoomPublicId(voteRoom.getPublicId()))
+                .containsExactly(new VoteDateCountProjection(selectedDate, 1));
+        assertThat(voteRepository.findSubmittedVoteDateNicknamesByVoteRoomPublicId(voteRoom.getPublicId()))
+                .containsExactly(new VoteDateNicknameProjection(selectedDate, "submitted"));
+        assertThat(voteParticipantRepository.findSubmittedNicknamesByVoteRoomPublicId(voteRoom.getPublicId()))
+                .containsExactly("submitted");
     }
 }

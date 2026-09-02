@@ -2,6 +2,7 @@ package com.calio.calendar.vote.repository;
 
 import com.calio.calendar.vote.domain.VoteParticipant;
 import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -35,5 +36,15 @@ public interface VoteParticipantRepository extends JpaRepository<VoteParticipant
     Optional<VoteParticipant> findByVoteRoomPublicIdAndNicknameForUpdate(
             @Param("voteRoomPublicId") UUID voteRoomPublicId,
             @Param("nickname") String nickname
+    );
+
+    @Query("""
+            select participant.nickname
+            from VoteParticipant participant
+            where participant.voteRoom.publicId = :voteRoomPublicId
+              and participant.status = com.calio.calendar.vote.domain.VoteParticipantStatus.SUBMITTED
+            """)
+    List<String> findSubmittedNicknamesByVoteRoomPublicId(
+            @Param("voteRoomPublicId") UUID voteRoomPublicId
     );
 }
