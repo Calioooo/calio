@@ -23,9 +23,8 @@ public interface VoteRepository extends JpaRepository<Vote, Long> {
     @Query("""
             select vote
             from Vote vote
-            join vote.voteParticipant participant
-            where participant.voteRoom.publicId = :voteRoomPublicId
-              and participant.status = com.calio.calendar.vote.domain.VoteParticipantStatus.SUBMITTED
+            where vote.voteParticipant.voteRoom.publicId = :voteRoomPublicId
+              and vote.voteParticipant.status = com.calio.calendar.vote.domain.VoteParticipantStatus.SUBMITTED
             order by vote.unavailableDate
             """)
     List<Vote> findAllSubmittedByVoteRoomPublicId(
