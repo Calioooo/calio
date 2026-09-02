@@ -15,6 +15,13 @@ public interface VoteRoomRepository extends JpaRepository<VoteRoom, Long> {
     @Query("select voteRoom from VoteRoom voteRoom where voteRoom.createdByAccount.id = :accountId order by voteRoom.id desc")
     List<VoteRoom> findAllByCreatedByAccountId(@Param("accountId") Long accountId);
 
+    @Query("""
+            select voteRoom
+            from VoteRoom voteRoom
+            where voteRoom.publicId = :publicId
+            """)
+    Optional<VoteRoom> findByPublicId(@Param("publicId") UUID publicId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             select voteRoom
