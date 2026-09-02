@@ -24,6 +24,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 @ExtendWith(MockitoExtension.class)
 class VoteParticipantServiceTest {
@@ -36,17 +37,13 @@ class VoteParticipantServiceTest {
     @Mock
     private VoteParticipantCommandService voteParticipantCommandService;
 
-    @Mock
-    private VoteParticipantPasswordHasher passwordHasher;
-
     private VoteParticipantService voteParticipantService;
 
     @BeforeEach
     void setUp() {
         voteParticipantService = new VoteParticipantService(
                 voteParticipantQueryService,
-                voteParticipantCommandService,
-                passwordHasher
+                voteParticipantCommandService
         );
     }
 
@@ -75,7 +72,6 @@ class VoteParticipantServiceTest {
         assertThat(participant.getNickname()).isEqualTo("calio");
         assertThat(participant.getPasswordHash()).isNull();
         assertThat(participant.getStatus()).isEqualTo(VoteParticipantStatus.REGISTERED);
-        verifyNoInteractions(passwordHasher);
     }
 
     @Test
@@ -89,7 +85,6 @@ class VoteParticipantServiceTest {
                 VOTE_ROOM_PUBLIC_ID,
                 "calio"
         )).thenReturn(Optional.empty());
-        when(passwordHasher.hash("participant-password")).thenReturn("$2a$hashed-password");
         when(voteParticipantCommandService.create(any(VoteParticipant.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -101,9 +96,10 @@ class VoteParticipantServiceTest {
         );
 
         // then
-        assertThat(participant.getPasswordHash()).isEqualTo("$2a$hashed-password");
         assertThat(participant.getPasswordHash()).isNotEqualTo("participant-password");
-        verify(passwordHasher).hash("participant-password");
+        assertThat(participant.getPasswordHash()).startsWith("$2");
+        assertThat(new BCryptPasswordEncoder()
+                .matches("participant-password", participant.getPasswordHash())).isTrue();
     }
 
     @Test
@@ -127,7 +123,6 @@ class VoteParticipantServiceTest {
                 assertThat(exception.getErrorCode())
                         .isEqualTo(ErrorCode.VOTE_PARTICIPANT_NICKNAME_CONFLICT)
         );
-        verify(passwordHasher, never()).hash(any());
         verify(voteParticipantCommandService, never()).create(any());
     }
 
@@ -146,7 +141,7 @@ class VoteParticipantServiceTest {
                 );
         verify(voteParticipantQueryService, never())
                 .findParticipantByVoteRoomPublicIdAndNickname(any(), any());
-        verifyNoInteractions(voteParticipantCommandService, passwordHasher);
+        verifyNoInteractions(voteParticipantCommandService);
     }
 
     @Test
@@ -161,7 +156,7 @@ class VoteParticipantServiceTest {
                 .isInstanceOfSatisfying(CalioException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.VOTE_ROOM_NOT_FOUND)
                 );
-        verifyNoInteractions(voteParticipantCommandService, passwordHasher);
+        verifyNoInteractions(voteParticipantCommandService);
     }
 
     private VoteRoom voteRoom() {

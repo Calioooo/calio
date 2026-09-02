@@ -8,6 +8,8 @@ import java.text.Normalizer;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import org.springframework.stereotype.Service;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -18,16 +20,14 @@ public class VoteParticipantService {
 
     private final VoteParticipantQueryService voteParticipantQueryService;
     private final VoteParticipantCommandService voteParticipantCommandService;
-    private final VoteParticipantPasswordHasher passwordHasher;
+    private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     public VoteParticipantService(
             VoteParticipantQueryService voteParticipantQueryService,
-            VoteParticipantCommandService voteParticipantCommandService,
-            VoteParticipantPasswordHasher passwordHasher
+            VoteParticipantCommandService voteParticipantCommandService
     ) {
         this.voteParticipantQueryService = voteParticipantQueryService;
         this.voteParticipantCommandService = voteParticipantCommandService;
-        this.passwordHasher = passwordHasher;
     }
 
     @Transactional
@@ -36,7 +36,7 @@ public class VoteParticipantService {
                 .getVoteRoomForParticipantCreation(voteRoomPublicId);
         String normalizedNickname = normalizeNickname(nickname);
         requireNicknameAvailable(voteRoomPublicId, normalizedNickname);
-        String passwordHash = password == null ? null : passwordHasher.hash(password);
+        String passwordHash = password == null ? null : hashPassword(password);
         return voteParticipantCommandService.create(
                 new VoteParticipant(voteRoom, normalizedNickname, passwordHash)
         );
@@ -63,5 +63,9 @@ public class VoteParticipantService {
 
     private CalioException validationFailed() {
         return new CalioException(ErrorCode.VALIDATION_FAILED);
+    }
+
+    private String hashPassword(String password) {
+        return passwordEncoder.encode(password);
     }
 }
