@@ -62,7 +62,7 @@ class VoteParticipantRepositoryTest {
 
     @Test
     @Transactional
-    @DisplayName("참여자는 VoteRoom 공개 ID와 닉네임으로 VoteRoom을 함께 조회한다")
+    @DisplayName("참여자는 VoteRoom 공개 ID와 대소문자 무관 닉네임으로 VoteRoom을 함께 조회한다")
     void givenParticipant_whenFindByVoteRoomPublicIdAndNickname_thenLoadsVoteRoom() {
         // given
         VoteParticipant participant = voteParticipantRepository.saveAndFlush(
@@ -71,7 +71,7 @@ class VoteParticipantRepositoryTest {
 
         // when
         VoteParticipant foundParticipant = voteParticipantRepository
-                .findByVoteRoomPublicIdAndNickname(voteRoom.getPublicId(), "calio")
+                .findByVoteRoomPublicIdAndNickname(voteRoom.getPublicId(), "CALIO")
                 .orElseThrow();
 
         // then
