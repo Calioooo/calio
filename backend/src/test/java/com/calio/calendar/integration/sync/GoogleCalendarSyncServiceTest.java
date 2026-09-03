@@ -417,7 +417,7 @@ class GoogleCalendarSyncServiceTest {
         public void completeSyncRun(
                 Long jobId,
                 Long accountId,
-                Long integrationId,
+                Long connectionId,
                 String workerToken,
                 GoogleCalendarSyncMode syncMode,
                 Set<String> seenEventIds,
@@ -530,7 +530,7 @@ class GoogleCalendarSyncServiceTest {
 
         @Override
         public void applyNormalizedPage(
-                Long integrationId,
+                Long connectionId,
                 Long accountId,
                 GoogleCalendarPageOwnership ownership,
                 GoogleCalendarNormalizedPage page
