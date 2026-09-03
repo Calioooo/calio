@@ -15,6 +15,7 @@ import com.calio.calendar.vote.domain.VoteParticipant;
 import com.calio.calendar.vote.domain.VoteParticipantStatus;
 import com.calio.calendar.vote.domain.VoteRoom;
 import java.time.LocalDate;
+import java.text.Normalizer;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -103,6 +104,34 @@ class VoteParticipantServiceTest {
         assertThat(participant.getPasswordHash()).isNotEqualTo("participant-password");
         assertThat(participant.getPasswordHash()).startsWith("$2");
         assertThat(passwordEncoder.matches("participant-password", participant.getPasswordHash())).isTrue();
+    }
+
+    @Test
+    @DisplayName("분해형 한글 닉네임은 NFC로 정규화한 값으로 중복을 조회하고 저장한다")
+    void givenDecomposedKoreanNickname_whenCreate_thenUsesNfcNormalizedNickname() {
+        // given
+        VoteRoom voteRoom = voteRoom();
+        String normalizedNickname = "캘리오";
+        String decomposedNickname = Normalizer.normalize(normalizedNickname, Normalizer.Form.NFD);
+        when(voteParticipantCommandService.getVoteRoomForParticipantCreation(VOTE_ROOM_PUBLIC_ID))
+                .thenReturn(voteRoom);
+        when(voteParticipantQueryService.getParticipantByVoteRoomPublicIdAndNicknameIfExists(
+                VOTE_ROOM_PUBLIC_ID,
+                normalizedNickname
+        )).thenReturn(Optional.empty());
+        when(voteParticipantCommandService.create(any(VoteParticipant.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        // when
+        VoteParticipant participant = voteParticipantService.create(VOTE_ROOM_PUBLIC_ID, decomposedNickname, null);
+
+        // then
+        verify(voteParticipantQueryService)
+                .getParticipantByVoteRoomPublicIdAndNicknameIfExists(VOTE_ROOM_PUBLIC_ID, normalizedNickname);
+        ArgumentCaptor<VoteParticipant> participantCaptor = ArgumentCaptor.forClass(VoteParticipant.class);
+        verify(voteParticipantCommandService).create(participantCaptor.capture());
+        assertThat(participantCaptor.getValue().getNickname()).isEqualTo(normalizedNickname);
+        assertThat(participant.getNickname()).isEqualTo(normalizedNickname);
     }
 
     @Test
