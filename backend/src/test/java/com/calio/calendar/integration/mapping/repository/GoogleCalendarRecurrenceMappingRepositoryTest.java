@@ -86,14 +86,12 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
         );
         String externalRecurrenceEventId = "m".repeat(1024);
         String externalRecurrenceOverrideId = "e".repeat(1024);
-        String etag = "t".repeat(1024);
         GoogleCalendarRecurrenceEventMapping eventMapping = eventMappingRepository.saveAndFlush(
                 new GoogleCalendarRecurrenceEventMapping(
                         integration,
                         recurrenceEvent,
                         externalRecurrenceEventId,
-                        etag,
-                        null
+                        "a".repeat(64)
                 )
         );
         GoogleCalendarRecurrenceOverrideMapping overrideMapping =
@@ -102,8 +100,7 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
                                 eventMapping,
                                 recurrenceOverride,
                                 externalRecurrenceOverrideId,
-                                etag,
-                                null
+                                "a".repeat(64)
                         )
                 );
 
@@ -111,14 +108,6 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
         assertThat(eventMappingRepository.findByRecurrenceEvent_Id(recurrenceEvent.getId()))
                 .map(GoogleCalendarRecurrenceEventMapping::getExternalEventId)
                 .contains(externalRecurrenceEventId);
-        assertThat(eventMappingRepository
-                .findByIntegration_IdAndCalendarKeyAndExternalEventId(
-                        integration.getId(),
-                        GoogleCalendarRecurrenceEventMapping.PRIMARY_CALENDAR_KEY,
-                        externalRecurrenceEventId
-                ))
-                .map(GoogleCalendarRecurrenceEventMapping::getProviderEtag)
-                .contains(etag);
         assertThat(overrideMappingRepository.findAllWithRecurrenceEventMappingByExternalEventIds(
                 integration.getId(),
                 GoogleCalendarRecurrenceEventMapping.PRIMARY_CALENDAR_KEY,
@@ -129,8 +118,6 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
         assertThat(eventMapping.getUpdatedAt()).isNotNull();
         assertThat(overrideMapping.getCreatedAt()).isNotNull();
         assertThat(overrideMapping.getUpdatedAt()).isNotNull();
-        assertThat(overrideMapping.getProviderEtag()).isEqualTo(etag);
-        assertThat(overrideMapping.getProviderUpdatedAt()).isNull();
 
         overrideMappingRepository.delete(overrideMapping);
         overrideMappingRepository.flush();
@@ -141,35 +128,6 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
                 recurrenceEvent.getId(),
                 recurrenceOverride.getOriginStartAt()
         )).isPresent();
-    }
-
-    @Test
-    @DisplayName("recurrence mapping의 nullable provider metadata를 그대로 저장한다")
-    void givenNullProviderMetadata_whenSaveRecurrenceMappings_thenPreservesNulls() {
-        // given
-        RecurrenceFixture fixture = recurrenceFixture();
-        GoogleCalendarRecurrenceEventMapping eventMapping =
-                eventMappingRepository.saveAndFlush(eventMapping(
-                        fixture,
-                        fixture.recurrenceEvent(),
-                        "recurrence-event-id"
-                ));
-        RecurrenceEventOverride recurrenceOverride = recurrenceOverride(
-                fixture.recurrenceEvent(),
-                "2026-07-21T00:00:00Z"
-        );
-        GoogleCalendarRecurrenceOverrideMapping overrideMapping =
-                overrideMappingRepository.saveAndFlush(overrideMapping(
-                        eventMapping,
-                        recurrenceOverride,
-                        "recurrence-override-id"
-                ));
-
-        // when, then
-        assertThat(eventMapping.getProviderEtag()).isNull();
-        assertThat(eventMapping.getProviderUpdatedAt()).isNull();
-        assertThat(overrideMapping.getProviderEtag()).isNull();
-        assertThat(overrideMapping.getProviderUpdatedAt()).isNull();
     }
 
     @Test
@@ -367,8 +325,7 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
                 fixture.integration(),
                 recurrenceEvent,
                 externalEventId,
-                null,
-                null
+                "a".repeat(64)
         );
     }
 
@@ -401,8 +358,7 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
                 parentMapping,
                 recurrenceOverride,
                 externalEventId,
-                null,
-                null
+                "a".repeat(64)
         );
     }
 

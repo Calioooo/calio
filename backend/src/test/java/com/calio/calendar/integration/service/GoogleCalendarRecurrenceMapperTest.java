@@ -267,6 +267,33 @@ class GoogleCalendarRecurrenceMapperTest {
         assertThatThrownBy(() -> failingMapper.mapRecurrenceEvent(item)).isSameAs(failure);
     }
 
+    @Test
+    @DisplayName("최대 길이를 초과한 recurrence provider ETag는 정규화 전에 거절한다")
+    void givenTooLongRecurrenceEtag_whenMap_thenRejectsInvalidProviderResponse() {
+        GoogleCalendarEventResponse recurrenceEvent = new GoogleCalendarEventResponse(
+                "recurrence-event-id", "confirmed", "e".repeat(1025), Instant.now(), "Title", null,
+                List.of("RRULE:FREQ=DAILY"), null, null,
+                googleEventTime("2026-07-20T09:00:00+09:00", "Asia/Seoul"),
+                googleEventTime("2026-07-20T10:00:00+09:00", "Asia/Seoul")
+        );
+        GoogleCalendarEventResponse override = new GoogleCalendarEventResponse(
+                "recurrence-override-id", "confirmed", "e".repeat(1025), Instant.now(), "Title", null,
+                List.of(), "recurrence-event-id",
+                googleEventTime("2026-07-21T09:00:00+09:00", "Asia/Seoul"),
+                googleEventTime("2026-07-21T10:00:00+09:00", "Asia/Seoul"),
+                googleEventTime("2026-07-21T11:00:00+09:00", "Asia/Seoul")
+        );
+
+        assertThatThrownBy(() -> mapper.mapRecurrenceEvent(recurrenceEvent))
+                .isInstanceOfSatisfying(CalioException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID));
+        assertThatThrownBy(() -> mapper.mapRecurrenceOverride(override))
+                .isInstanceOfSatisfying(CalioException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID));
+    }
+
     private GoogleCalendarEventResponse item(
             String id,
             String status,

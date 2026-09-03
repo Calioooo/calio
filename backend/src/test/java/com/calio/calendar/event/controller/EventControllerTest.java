@@ -1035,8 +1035,7 @@ class EventControllerTest {
                 integration,
                 event,
                 "external-" + eventId,
-                null,
-                null
+                "a".repeat(64)
         ));
     }
 

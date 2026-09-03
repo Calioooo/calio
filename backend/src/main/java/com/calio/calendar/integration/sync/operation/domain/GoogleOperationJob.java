@@ -51,8 +51,11 @@ public class GoogleOperationJob extends BaseEntity {
     @Column(name = "provider_identity", updatable = false, length = 1024)
     private String providerIdentity;
 
-    @Column(name = "desired_payload", updatable = false, columnDefinition = "JSON")
-    private String desiredPayload;
+    @Column(name = "target_payload", updatable = false, columnDefinition = "JSON")
+    private String targetPayload;
+
+    @Column(name = "conflict_detected", nullable = false)
+    private boolean conflictDetected;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "job_state", nullable = false, length = 32)
@@ -111,10 +114,10 @@ public class GoogleOperationJob extends BaseEntity {
             String resourceScope,
             String resourceKey,
             String providerIdentity,
-            String desiredPayload,
+            String targetPayload,
             Instant runnableAt
     ) {
-        validateOutboundFields(kind, resourceScope, resourceKey, desiredPayload);
+        validateOutboundFields(kind, resourceScope, resourceKey, targetPayload);
         GoogleOperationJob job = new GoogleOperationJob();
         job.operationId = operationId;
         job.integrationId = integrationId;
@@ -125,7 +128,7 @@ public class GoogleOperationJob extends BaseEntity {
         job.effectiveResourceScope = resourceScope;
         job.effectiveResourceKey = resourceKey;
         job.providerIdentity = providerIdentity;
-        job.desiredPayload = desiredPayload;
+        job.targetPayload = targetPayload;
         job.state = GoogleOperationJobState.PENDING;
         job.runnableAt = runnableAt;
         return job;
@@ -142,12 +145,12 @@ public class GoogleOperationJob extends BaseEntity {
             String kind,
             String resourceScope,
             String resourceKey,
-            String desiredPayload
+            String targetPayload
     ) {
         if (kind == null || kind.isBlank() || SYNC_KIND.equals(kind)
                 || resourceScope == null || resourceScope.isBlank()
                 || resourceKey == null || resourceKey.isBlank()
-                || desiredPayload == null || desiredPayload.isBlank()) {
+                || targetPayload == null || targetPayload.isBlank()) {
             throw new IllegalArgumentException("Outbound Google operation fields are required");
         }
     }
@@ -159,6 +162,10 @@ public class GoogleOperationJob extends BaseEntity {
     public void claim(String workerToken) {
         state = GoogleOperationJobState.PROCESSING;
         ownerToken = workerToken;
+    }
+
+    public void markConflictDetected() {
+        conflictDetected = true;
     }
 
     public Long getId() { return id; }
@@ -173,4 +180,7 @@ public class GoogleOperationJob extends BaseEntity {
     public int getRetryCount() { return retryCount; }
     public String getLastErrorReason() { return lastErrorReason; }
     public String getOwnerToken() { return ownerToken; }
+    public String getEffectiveResourceScope() { return effectiveResourceScope; }
+    public String getEffectiveResourceKey() { return effectiveResourceKey; }
+    public boolean isConflictDetected() { return conflictDetected; }
 }

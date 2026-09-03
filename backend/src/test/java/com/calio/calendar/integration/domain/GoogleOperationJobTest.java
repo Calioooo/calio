@@ -87,7 +87,7 @@ class GoogleOperationJobTest {
     }
 
     @Test
-    @DisplayName("Outbound Job은 immutable desired payload를 요구한다")
+    @DisplayName("Outbound Job은 immutable target payload를 요구한다")
     void givenMissingPayload_whenCreatingOutboundJob_thenRejectsPayload() {
         assertThatThrownBy(() -> GoogleOperationJob.outbound(
                 "operation-id",

@@ -4,6 +4,7 @@ import com.calio.calendar.common.domain.BaseEntity;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -13,7 +14,6 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
-import java.time.Instant;
 
 @Entity
 @Table(
@@ -49,11 +49,8 @@ public class GoogleCalendarRecurrenceOverrideMapping extends BaseEntity {
     @Column(name = "external_event_id", nullable = false, length = 1024)
     private String externalEventId;
 
-    @Column(name = "provider_etag", length = 1024)
-    private String providerEtag;
-
-    @Column(name = "provider_updated_at")
-    private Instant providerUpdatedAt;
+    @Embedded
+    private GoogleCalendarMappingSyncState syncState;
 
     protected GoogleCalendarRecurrenceOverrideMapping() {
     }
@@ -62,19 +59,12 @@ public class GoogleCalendarRecurrenceOverrideMapping extends BaseEntity {
             GoogleCalendarRecurrenceEventMapping recurrenceEventMapping,
             RecurrenceEventOverride recurrenceEventOverride,
             String externalEventId,
-            String providerEtag,
-            Instant providerUpdatedAt
+            String providerEtag
     ) {
         this.recurrenceEventMapping = recurrenceEventMapping;
         this.recurrenceEventOverride = recurrenceEventOverride;
         this.externalEventId = externalEventId;
-        this.providerEtag = providerEtag;
-        this.providerUpdatedAt = providerUpdatedAt;
-    }
-
-    public void updateProviderVersion(String providerEtag, Instant providerUpdatedAt) {
-        this.providerEtag = providerEtag;
-        this.providerUpdatedAt = providerUpdatedAt;
+        this.syncState = GoogleCalendarMappingSyncState.active(providerEtag);
     }
 
     public Long getId() {
@@ -93,11 +83,19 @@ public class GoogleCalendarRecurrenceOverrideMapping extends BaseEntity {
         return externalEventId;
     }
 
-    public String getProviderEtag() {
-        return providerEtag;
+    public void updateProviderEtag(String providerEtag) {
+        syncState.updateProviderEtag(providerEtag);
     }
 
-    public Instant getProviderUpdatedAt() {
-        return providerUpdatedAt;
+    public void markConflicted() {
+        syncState.markConflicted();
+    }
+
+    public boolean isConflicted() {
+        return syncState.isConflicted();
+    }
+
+    public String getProviderEtag() {
+        return syncState.getProviderEtag();
     }
 }

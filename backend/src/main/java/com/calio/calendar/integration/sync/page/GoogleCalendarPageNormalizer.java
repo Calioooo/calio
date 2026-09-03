@@ -7,6 +7,7 @@ import com.calio.calendar.external.google.dto.GoogleCalendarEventResponse;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventPage;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarRecurrenceEventMapping;
+import com.calio.calendar.integration.mapping.domain.GoogleCalendarMappingSyncState;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingQueryService;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarRecurrenceMappingQueryService;
 import com.calio.calendar.integration.sync.GoogleCalendarSyncRunContext;
@@ -259,8 +260,7 @@ public class GoogleCalendarPageNormalizer {
         );
         return new EventUpsert(
                 item.id(),
-                item.etag(),
-                item.updatedAt(),
+                requireProviderEtag(item),
                 eventTitle(item.summary()),
                 item.description(),
                 schedule
@@ -281,7 +281,7 @@ public class GoogleCalendarPageNormalizer {
                 && item.isRecurrenceOverride();
         boolean hasOrphanOrigin = item.originalStartTime() != null
                 && !item.isRecurrenceOverride();
-        if (isMixedRecurrenceShape || hasOrphanOrigin) {
+        if (isMixedRecurrenceShape || hasOrphanOrigin || !hasText(item.etag())) {
             throw invalidResponse();
         }
     }
@@ -376,6 +376,14 @@ public class GoogleCalendarPageNormalizer {
 
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
+    }
+
+    private String requireProviderEtag(GoogleCalendarEventResponse item) {
+        if (!hasText(item.etag())
+                || item.etag().length() > GoogleCalendarMappingSyncState.PROVIDER_ETAG_LENGTH) {
+            throw invalidResponse();
+        }
+        return item.etag();
     }
 
     private CalioException invalidResponse() {
