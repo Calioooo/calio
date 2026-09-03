@@ -28,7 +28,6 @@ spring:
       chat:
         model: ${OPENAI_CHAT_MODEL:}
         max-completion-tokens: 512
-        parallel-tool-calls: false
         store: false
 
 logging:

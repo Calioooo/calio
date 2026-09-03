@@ -153,5 +153,9 @@ class SpringAiCalendarAssistantAgentTest {
         ).anySatisfy(message -> assertThat(message)
                 .contains("<calendar_response_history>")
                 .contains("EVENTS"));
+        assertThat(promptCaptor.getValue().getOptions())
+                .isInstanceOf(OpenAiChatOptions.class);
+        assertThat(((OpenAiChatOptions) promptCaptor.getValue().getOptions()).getParallelToolCalls())
+                .isFalse();
     }
 }

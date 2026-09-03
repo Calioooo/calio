@@ -35,6 +35,7 @@ import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientResponseException;
@@ -180,6 +181,9 @@ public class SpringAiCalendarAssistantAgent implements AutoCloseable {
                         .params(systemPromptParameters)
                 )
                 .messages(history)
+                .options(OpenAiChatOptions.builder()
+                        .parallelToolCalls(false)
+                )
                 .tools(calendarAgentTools)
                 .toolContext(toolContext)
                 .call()
