@@ -6,7 +6,7 @@ import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.event.service.EventCommandService;
 import com.calio.calendar.external.google.service.dto.NormalizedEventSchedule;
-import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
+import com.calio.calendar.integration.connection.domain.GoogleCalendarConnection;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarRecurrenceEventMapping;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarRecurrenceOverrideMapping;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarRecurrenceMappingCommandService;
@@ -57,7 +57,7 @@ public class GoogleCalendarRecurrenceChangeService {
     }
 
     public void applyUpsert(
-            GoogleCalendarIntegration integration,
+            GoogleCalendarConnection connection,
             RecurrenceEventUpsert item,
             GoogleCalendarPageRecordCache cache,
             Account account,
@@ -82,7 +82,7 @@ public class GoogleCalendarRecurrenceChangeService {
         GoogleCalendarRecurrenceEventMapping mapping =
                 recurrenceMappingCommandService.createRecurrenceEventMapping(
                         new GoogleCalendarRecurrenceEventMapping(
-                                integration,
+                                connection,
                                 recurrenceEvent,
                                 item.externalEventId(),
                                 item.providerEtag()
@@ -106,7 +106,7 @@ public class GoogleCalendarRecurrenceChangeService {
             return;
         }
         if (operationJobQueryService.hasPendingOutboundJob(
-                mapping.getIntegration().getAccountId(), mapping.getIntegration().getId(), scope)) {
+                mapping.getConnection().getAccountId(), mapping.getConnection().getId(), scope)) {
             mapping.markConflicted();
             recordSyncConflict(mapping, ownership);
             return;
@@ -132,8 +132,8 @@ public class GoogleCalendarRecurrenceChangeService {
         GoogleCalendarEffectiveScope scope = GoogleCalendarEffectiveScope.recurrenceEvent(
                 recurrenceEventMapping.getRecurrenceEvent().getId());
         if (operationJobQueryService.hasPendingOutboundJob(
-                recurrenceEventMapping.getIntegration().getAccountId(),
-                recurrenceEventMapping.getIntegration().getId(), scope)) {
+                recurrenceEventMapping.getConnection().getAccountId(),
+                recurrenceEventMapping.getConnection().getId(), scope)) {
             recurrenceEventMapping.markConflicted();
             recordSyncConflict(recurrenceEventMapping, ownership);
             return;
@@ -293,8 +293,8 @@ public class GoogleCalendarRecurrenceChangeService {
             return;
         }
         if (operationJobQueryService.hasPendingOutboundJob(
-                recurrenceEventMapping.getIntegration().getAccountId(),
-                recurrenceEventMapping.getIntegration().getId(), scope)) {
+                recurrenceEventMapping.getConnection().getAccountId(),
+                recurrenceEventMapping.getConnection().getId(), scope)) {
             mapping.markConflicted();
             recordSyncConflict(mapping, ownership);
             return;
@@ -399,7 +399,7 @@ public class GoogleCalendarRecurrenceChangeService {
     ) {
         operationJobService.recordSyncConflict(
                 ownership.jobId(),
-                mapping.getIntegration().getAccountId(),
+                mapping.getConnection().getAccountId(),
                 ownership.workerToken()
         );
     }

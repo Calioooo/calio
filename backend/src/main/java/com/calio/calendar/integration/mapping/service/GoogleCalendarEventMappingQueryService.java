@@ -21,32 +21,32 @@ public class GoogleCalendarEventMappingQueryService {
     }
 
     public boolean hasExternalEventMapping(Long eventId, Long accountId) {
-        return eventMappingRepository.existsByEvent_IdAndIntegration_AccountId(eventId, accountId);
+        return eventMappingRepository.existsByEvent_IdAndConnection_Integration_AccountId(eventId, accountId);
     }
 
     public List<GoogleCalendarEventMapping> listEventMappings(
-            Long integrationId,
+            Long connectionId,
             String calendarKey,
             Collection<String> externalEventIds
     ) {
         return eventMappingRepository.findAllWithEventByExternalIdentity(
-                integrationId,
+                connectionId,
                 calendarKey,
                 externalEventIds
         );
     }
 
-    public List<GoogleCalendarEventMapping> listEventMappings(Long integrationId) {
-        return eventMappingRepository.findAllWithEventByIntegrationId(integrationId);
+    public List<GoogleCalendarEventMapping> listEventMappings(Long connectionId) {
+        return eventMappingRepository.findAllWithEventByConnectionId(connectionId);
     }
 
     public List<GoogleCalendarEventMapping> listEventMappingBatch(
-            Long integrationId,
+            Long connectionId,
             Long afterId,
             int limit
     ) {
-        return eventMappingRepository.findNextBatchWithEventByIntegrationId(
-                integrationId,
+        return eventMappingRepository.findNextBatchWithEventByConnectionId(
+                connectionId,
                 afterId,
                 PageRequest.of(0, limit)
         );

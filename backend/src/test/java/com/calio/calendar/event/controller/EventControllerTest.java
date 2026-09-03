@@ -16,8 +16,10 @@ import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.event.repository.EventRepository;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
+import com.calio.calendar.integration.connection.domain.GoogleCalendarConnection;
 import com.calio.calendar.integration.mapping.repository.GoogleCalendarEventMappingRepository;
 import com.calio.calendar.integration.connection.repository.GoogleCalendarIntegrationRepository;
+import com.calio.calendar.integration.connection.repository.GoogleCalendarConnectionRepository;
 import com.calio.calendar.tag.repository.TagRepository;
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.tag.domain.Tag;
@@ -69,6 +71,9 @@ class EventControllerTest {
 
     @Autowired
     private GoogleCalendarIntegrationRepository googleCalendarIntegrationRepository;
+
+    @Autowired
+    private GoogleCalendarConnectionRepository googleCalendarConnectionRepository;
 
     @Autowired
     private GoogleCalendarEventMappingRepository googleCalendarEventMappingRepository;
@@ -1021,18 +1026,13 @@ class EventControllerTest {
     private void mapAsGoogleEvent(long eventId) {
         Event event = eventRepository.findById(eventId).orElseThrow();
         GoogleCalendarIntegration integration = googleCalendarIntegrationRepository.saveAndFlush(
-                new GoogleCalendarIntegration(
-                        event.getAccount().getId(),
-                        "google-subject-" + eventId,
-                        "user@example.com",
-                        "encrypted-refresh-token",
-                        "encrypted-access-token",
-                        Instant.parse("2026-06-21T02:00:00Z"),
-                        Instant.parse("2026-06-21T00:00:00Z")
-                )
-        );
+                new GoogleCalendarIntegration(event.getAccount().getId()));
+        GoogleCalendarConnection connection = googleCalendarConnectionRepository.saveAndFlush(
+                new GoogleCalendarConnection(integration, "google-subject-" + eventId, "user@example.com",
+                        "encrypted-refresh-token", "encrypted-access-token",
+                        Instant.parse("2026-06-21T02:00:00Z"), Instant.parse("2026-06-21T00:00:00Z")));
         googleCalendarEventMappingRepository.saveAndFlush(new GoogleCalendarEventMapping(
-                integration,
+                connection,
                 event,
                 "external-" + eventId,
                 "a".repeat(64)

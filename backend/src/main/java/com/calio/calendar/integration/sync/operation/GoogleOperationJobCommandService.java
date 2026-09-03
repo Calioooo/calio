@@ -73,8 +73,8 @@ public class GoogleOperationJobCommandService {
         }
     }
 
-    public void deleteJobsForIntegration(Long integrationId) {
-        jobRepository.deleteByIntegrationId(integrationId);
+    public void deleteJobsForConnection(Long connectionId) {
+        jobRepository.deleteByConnectionId(connectionId);
     }
 
     public void deleteOperationJobs(Collection<Long> jobIds) {

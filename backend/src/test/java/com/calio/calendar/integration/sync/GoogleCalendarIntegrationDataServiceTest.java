@@ -2,6 +2,7 @@ package com.calio.calendar.integration.sync;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -9,7 +10,8 @@ import static org.mockito.Mockito.when;
 
 import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.event.service.EventCommandService;
-import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrationCommandService;
+import com.calio.calendar.integration.connection.service.GoogleCalendarConnectionCommandService;
+import com.calio.calendar.integration.connection.domain.GoogleCalendarConnection;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingCommandService;
@@ -24,11 +26,12 @@ import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
 
 class GoogleCalendarIntegrationDataServiceTest {
 
-    private final GoogleCalendarIntegrationCommandService integrationCommandService =
-            mock(GoogleCalendarIntegrationCommandService.class);
+    private final GoogleCalendarConnectionCommandService connectionCommandService =
+            mock(GoogleCalendarConnectionCommandService.class);
     private final GoogleCalendarEventMappingQueryService eventMappingQueryService =
             mock(GoogleCalendarEventMappingQueryService.class);
     private final GoogleCalendarEventMappingCommandService eventMappingCommandService =
@@ -53,13 +56,14 @@ class GoogleCalendarIntegrationDataServiceTest {
     void givenUnseenMappings_whenFinalizeFullSync_thenDeletesByBatchAndRenewsLease() {
         // given
         Event event = mock(Event.class);
-        GoogleCalendarIntegration integration = mock(GoogleCalendarIntegration.class);
+        GoogleCalendarConnection connection = mock(GoogleCalendarConnection.class);
         when(eventMapping.getId()).thenReturn(10L);
         when(eventMapping.getExternalEventId()).thenReturn("unseen-event");
         when(eventMapping.getEvent()).thenReturn(event);
-        when(eventMapping.getIntegration()).thenReturn(integration);
-        when(integration.getId()).thenReturn(1L);
-        when(integration.getAccountId()).thenReturn(2L);
+        when(eventMapping.getConnection()).thenReturn(connection);
+        when(connection.getId()).thenReturn(1L);
+        when(connection.getAccountId()).thenReturn(2L);
+        when(connectionCommandService.lockConnectedConnectionById(1L)).thenReturn(connection);
         when(event.getId()).thenReturn(20L);
         when(operationJobQueryService.hasPendingOutboundJob(any(), any(), any())).thenReturn(false);
         when(recurrenceMappingQueryService.listOverrideMappingBatch(1L, 0L, 500))
@@ -72,7 +76,7 @@ class GoogleCalendarIntegrationDataServiceTest {
                 .thenReturn(List.of());
 
         GoogleCalendarIntegrationDataService service = new GoogleCalendarIntegrationDataService(
-                integrationCommandService,
+                connectionCommandService,
                 eventMappingQueryService,
                 eventMappingCommandService,
                 recurrenceMappingQueryService,
@@ -103,7 +107,9 @@ class GoogleCalendarIntegrationDataServiceTest {
         verify(eventCommandService).deleteEventsByIds(List.of(20L));
         verify(eventMappingQueryService, times(2))
                 .listEventMappingBatch(eq(1L), any(Long.class), eq(500));
-        verify(integrationCommandService).changeNextSyncToken(1L, "next-token");
+        InOrder syncTokenUpdate = inOrder(connectionCommandService);
+        syncTokenUpdate.verify(connectionCommandService).lockConnectedConnectionById(1L);
+        syncTokenUpdate.verify(connectionCommandService).changeNextSyncToken(connection, "next-token");
         verify(operationLeaseService, times(6)).extend(9L, 2L, "run-1");
         verify(operationJobPersistenceService).completeSyncRun(9L, 2L, "run-1");
     }

@@ -16,11 +16,13 @@ import com.calio.calendar.external.google.dto.GoogleCalendarEventPage;
 import com.calio.calendar.external.google.dto.GoogleTokenResponse;
 import com.calio.calendar.external.google.dto.GoogleUserInfoResponse;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
+import com.calio.calendar.integration.connection.domain.GoogleCalendarConnection;
 import com.calio.calendar.integration.sync.GoogleCalendarSyncMode;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJob;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobTrigger;
 import com.calio.calendar.integration.connection.repository.GoogleCalendarIntegrationRepository;
+import com.calio.calendar.integration.connection.repository.GoogleCalendarConnectionRepository;
 import com.calio.calendar.integration.sync.operation.repository.GoogleOperationJobRepository;
 import com.calio.calendar.integration.sync.operation.GoogleOperationWorker;
 import com.calio.calendar.security.AuthenticatedAccountMockMvcTestConfig;
@@ -75,6 +77,9 @@ class GoogleCalendarIntegrationControllerTest {
     private GoogleCalendarIntegrationRepository googleCalendarIntegrationRepository;
 
     @Autowired
+    private GoogleCalendarConnectionRepository googleCalendarConnectionRepository;
+
+    @Autowired
     private GoogleOperationJobRepository googleOperationJobRepository;
 
     @MockitoBean
@@ -83,6 +88,7 @@ class GoogleCalendarIntegrationControllerTest {
     @BeforeEach
     void setUp() {
         googleOperationJobRepository.deleteAll();
+        googleCalendarConnectionRepository.deleteAll();
         googleCalendarIntegrationRepository.deleteAll();
         googleOAuthClient.reset();
         googleCalendarEventsClient.reset();
@@ -166,6 +172,7 @@ class GoogleCalendarIntegrationControllerTest {
                 .andExpect(result -> assertThat(result.getResponse().getContentAsByteArray()).isEmpty());
 
         GoogleCalendarIntegration integration = googleCalendarIntegrationRepository.findAll().getFirst();
+        GoogleCalendarConnection connection = googleCalendarConnectionRepository.findAll().getFirst();
         List<GoogleOperationJob> jobs = googleOperationJobRepository.findAll();
         assertThat(jobs).hasSize(2);
         GoogleOperationJob job = jobs.stream()
@@ -173,7 +180,8 @@ class GoogleCalendarIntegrationControllerTest {
                 .findFirst()
                 .orElseThrow();
         assertThat(job.getOperationId()).isNotBlank();
-        assertThat(job.getIntegrationId()).isEqualTo(integration.getId());
+        assertThat(connection.getIntegration().getId()).isEqualTo(integration.getId());
+        assertThat(job.getConnectionId()).isEqualTo(connection.getId());
         assertThat(job.getAccountId()).isEqualTo(integration.getAccountId());
         assertThat(job.getAccountSequence()).isEqualTo(2L);
         assertThat(job.getKind()).isEqualTo(GoogleOperationJob.SYNC_KIND);

@@ -26,8 +26,8 @@ public class GoogleOperationJob extends BaseEntity {
     @Column(name = "operation_id", nullable = false, updatable = false, length = 36)
     private String operationId;
 
-    @Column(name = "integration_id", nullable = false, updatable = false)
-    private Long integrationId;
+    @Column(name = "connection_id", nullable = false, updatable = false)
+    private Long connectionId;
 
     @Column(name = "account_id", nullable = false, updatable = false)
     private Long accountId;
@@ -84,7 +84,7 @@ public class GoogleOperationJob extends BaseEntity {
 
     public static GoogleOperationJob sync(
             String operationId,
-            Long integrationId,
+            Long connectionId,
             Long accountId,
             long accountSequence,
             GoogleOperationJobTrigger trigger,
@@ -93,7 +93,7 @@ public class GoogleOperationJob extends BaseEntity {
         validateSyncTrigger(trigger);
         GoogleOperationJob job = new GoogleOperationJob();
         job.operationId = operationId;
-        job.integrationId = integrationId;
+        job.connectionId = connectionId;
         job.accountId = accountId;
         job.accountSequence = accountSequence;
         job.kind = SYNC_KIND;
@@ -107,7 +107,7 @@ public class GoogleOperationJob extends BaseEntity {
 
     public static GoogleOperationJob outbound(
             String operationId,
-            Long integrationId,
+            Long connectionId,
             Long accountId,
             long accountSequence,
             String kind,
@@ -120,7 +120,7 @@ public class GoogleOperationJob extends BaseEntity {
         validateOutboundFields(kind, resourceScope, resourceKey, targetPayload);
         GoogleOperationJob job = new GoogleOperationJob();
         job.operationId = operationId;
-        job.integrationId = integrationId;
+        job.connectionId = connectionId;
         job.accountId = accountId;
         job.accountSequence = accountSequence;
         job.kind = kind;
@@ -170,7 +170,7 @@ public class GoogleOperationJob extends BaseEntity {
 
     public Long getId() { return id; }
     public String getOperationId() { return operationId; }
-    public Long getIntegrationId() { return integrationId; }
+    public Long getConnectionId() { return connectionId; }
     public Long getAccountId() { return accountId; }
     public long getAccountSequence() { return accountSequence; }
     public String getKind() { return kind; }

@@ -1,6 +1,6 @@
 package com.calio.calendar.integration.sync.operation.scheduler;
 
-import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrationQueryService;
+import com.calio.calendar.integration.connection.service.GoogleCalendarConnectionQueryService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobEnqueueService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationWorker;
@@ -22,20 +22,20 @@ public class GoogleOperationScheduler {
     private static final int TERMINAL_CLEANUP_BATCH_SIZE = 500;
     private static final long FIRST_ACCOUNT_ID = 0L;
 
-    private final GoogleCalendarIntegrationQueryService integrationQueryService;
+    private final GoogleCalendarConnectionQueryService connectionQueryService;
     private final GoogleOperationJobEnqueueService enqueueService;
     private final GoogleOperationJobService jobService;
     private final GoogleOperationWorker worker;
     private final Clock clock;
 
     public GoogleOperationScheduler(
-            GoogleCalendarIntegrationQueryService integrationQueryService,
+            GoogleCalendarConnectionQueryService connectionQueryService,
             GoogleOperationJobEnqueueService enqueueService,
             GoogleOperationJobService jobService,
             GoogleOperationWorker worker,
             Clock clock
     ) {
-        this.integrationQueryService = integrationQueryService;
+        this.connectionQueryService = connectionQueryService;
         this.enqueueService = enqueueService;
         this.jobService = jobService;
         this.worker = worker;
@@ -51,7 +51,7 @@ public class GoogleOperationScheduler {
     private void enqueuePeriodicSyncsInBatches() {
         long lastAccountId = FIRST_ACCOUNT_ID;
         while (true) {
-            List<Long> accountIds = integrationQueryService.listConnectedAccountIds(
+            List<Long> accountIds = connectionQueryService.listConnectedAccountIds(
                     lastAccountId,
                     PERIODIC_ENQUEUE_BATCH_SIZE
             );

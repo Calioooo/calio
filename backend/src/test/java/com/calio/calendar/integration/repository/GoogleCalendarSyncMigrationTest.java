@@ -320,7 +320,7 @@ class GoogleCalendarSyncMigrationTest {
     void givenV18Schema_whenInsertInvalidMappingState_thenRejectsIt() throws Exception {
         String url = "jdbc:h2:mem:google-mapping-conflict-constraints;MODE=MySQL;DB_CLOSE_DELAY=-1";
         migrateTo(url, MigrationVersion.fromVersion("17"));
-        insertCurrentEventAndIntegration(url);
+        insertCurrentEventAndIntegration(url, false);
         migrateTo(url, MigrationVersion.fromVersion("18"));
 
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
@@ -357,7 +357,7 @@ class GoogleCalendarSyncMigrationTest {
     void givenV19Schema_whenMigrateToV20_thenEnforcesRetainedIntegrationLifecycle() throws Exception {
         String url = "jdbc:h2:mem:google-retained-integration-lifecycle;MODE=MySQL;DB_CLOSE_DELAY=-1";
         migrateTo(url, MigrationVersion.fromVersion("19"));
-        insertCurrentEventAndIntegration(url);
+        insertCurrentEventAndIntegration(url, false);
 
         migrateTo(url, MigrationVersion.fromVersion("20"));
 
@@ -385,6 +385,67 @@ class GoogleCalendarSyncMigrationTest {
                         disconnected_at = CURRENT_TIMESTAMP
                     WHERE id = 900
                     """);
+        }
+    }
+
+    @Test
+    @DisplayName("V21은 기존 Google 연결을 Connection으로 보존하고 Account Integration을 분리한다")
+    void givenV20ConnectedIntegration_whenMigrateToV21_thenKeepsConnectionRuntimeAndCreatesAccountIntegration()
+            throws Exception {
+        String url = "jdbc:h2:mem:google-calendar-integration-connection-model;MODE=MySQL;DB_CLOSE_DELAY=-1";
+        migrateTo(url, MigrationVersion.fromVersion("20"));
+        insertCurrentEventAndIntegration(url, true);
+        updateSyncToken(url, "retained-cursor");
+
+        migrateTo(url, MigrationVersion.fromVersion("21"));
+
+        try (Connection connection = DriverManager.getConnection(url, "sa", "")) {
+            assertThat(columnNames(connection, "GOOGLE_CALENDAR_INTEGRATIONS"))
+                    .containsExactlyInAnyOrder("ID", "ACCOUNT_ID", "CREATED_AT", "UPDATED_AT");
+            assertThat(columnNames(connection, "GOOGLE_CALENDAR_CONNECTIONS"))
+                    .contains("INTEGRATION_ID", "CONNECTION_STATE", "GOOGLE_SUBJECT", "NEXT_SYNC_TOKEN");
+            assertThat(singleString(connection, """
+                    SELECT connection.google_subject
+                    FROM google_calendar_connections connection
+                    JOIN google_calendar_integrations integration ON integration.id = connection.integration_id
+                    WHERE integration.account_id = 900
+                    """)).isEqualTo("subject");
+            assertThat(singleString(connection, """
+                    SELECT encrypted_refresh_token
+                    FROM google_calendar_connections
+                    WHERE id = 900
+                    """)).isEqualTo("encrypted-refresh");
+            assertThat(singleString(connection, """
+                    SELECT encrypted_access_token
+                    FROM google_calendar_connections
+                    WHERE id = 900
+                    """)).isEqualTo("encrypted-access");
+            assertThat(singleString(connection, """
+                    SELECT connection_state
+                    FROM google_calendar_connections
+                    WHERE id = 900
+                    """)).isEqualTo("CONNECTED");
+            assertThat(singleString(connection, """
+                    SELECT next_sync_token
+                    FROM google_calendar_connections
+                    WHERE id = 900
+                    """)).isEqualTo("retained-cursor");
+            assertThat(columnNames(connection, "GOOGLE_OPERATION_JOBS"))
+                    .contains("CONNECTION_ID")
+                    .doesNotContain("INTEGRATION_ID");
+            assertThat(columnNames(connection, "GOOGLE_CALENDAR_EVENT_MAPPINGS"))
+                    .contains("CONNECTION_ID")
+                    .doesNotContain("INTEGRATION_ID");
+            assertThat(singleString(connection, """
+                    SELECT connection_id
+                    FROM google_operation_jobs
+                    WHERE id = 900
+                    """)).isEqualTo("900");
+            assertThat(singleString(connection, """
+                    SELECT connection_id
+                    FROM google_calendar_event_mappings
+                    WHERE id = 900
+                    """)).isEqualTo("900");
         }
     }
 
@@ -430,7 +491,7 @@ class GoogleCalendarSyncMigrationTest {
         }
     }
 
-    private void insertCurrentEventAndIntegration(String url) throws Exception {
+    private void insertCurrentEventAndIntegration(String url, boolean includesJobAndMapping) throws Exception {
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
              Statement statement = connection.createStatement()) {
             statement.executeUpdate("""
@@ -460,6 +521,58 @@ class GoogleCalendarSyncMigrationTest {
                         CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
                     )
                     """);
+            if (includesJobAndMapping) {
+                insertCurrentOperationJobAndEventMapping(statement);
+            }
+        }
+    }
+
+    private void insertCurrentOperationJobAndEventMapping(Statement statement) throws Exception {
+        // H2 2.4 closes the in-memory database while evaluating these legacy generated/check constraints.
+        statement.executeUpdate("""
+                ALTER TABLE google_operation_jobs
+                    DROP CONSTRAINT uk_google_operation_jobs_active_periodic_sync
+                """);
+        statement.executeUpdate("""
+                ALTER TABLE google_operation_jobs
+                    DROP COLUMN active_periodic_sync_account_id
+                """);
+        statement.executeUpdate("""
+                ALTER TABLE google_calendar_event_mappings
+                    DROP CONSTRAINT ck_google_calendar_event_mappings_sync_status
+                """);
+        statement.executeUpdate("""
+                INSERT INTO google_operation_jobs (
+                    id, operation_id, integration_id, account_id, account_sequence,
+                    job_kind, job_trigger, effective_resource_scope, effective_resource_key,
+                    target_payload, job_state, runnable_at, retry_count, conflict_detected, created_at, updated_at
+                )
+                VALUES (
+                    900, 'migration-job', 900, 900, 1,
+                    'EVENT_UPSERT', 'CANONICAL_MUTATION', 'EVENT', '900', '{}',
+                    'PENDING', CURRENT_TIMESTAMP(6), 0, FALSE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+                )
+                """);
+        statement.executeUpdate("""
+                INSERT INTO google_calendar_event_mappings (
+                    id, integration_id, event_id, calendar_key, external_event_id,
+                    provider_etag, sync_status, created_at, updated_at
+                )
+                VALUES (
+                    900, 900, 900, 'primary', 'migration-event',
+                    'migration-etag', 'ACTIVE', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+                )
+                """);
+    }
+
+    private void updateSyncToken(String url, String syncToken) throws Exception {
+        try (Connection connection = DriverManager.getConnection(url, "sa", "");
+             Statement statement = connection.createStatement()) {
+            statement.executeUpdate("""
+                    UPDATE google_calendar_integrations
+                    SET next_sync_token = '%s'
+                    WHERE id = 900
+                    """.formatted(syncToken));
         }
     }
 

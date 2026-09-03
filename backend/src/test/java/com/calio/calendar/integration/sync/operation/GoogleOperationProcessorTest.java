@@ -13,7 +13,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.calio.calendar.integration.sync.GoogleCalendarSyncService;
-import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrationCommandService;
+import com.calio.calendar.integration.connection.service.GoogleCalendarConnectionService;
 import com.calio.calendar.external.google.GoogleCalendarInvalidGrantException;
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEffectiveScopeType;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJob;
@@ -30,7 +30,7 @@ class GoogleOperationProcessorTest {
     private GoogleOperationLeaseService operationLeaseService;
     private GoogleCalendarSyncService syncService;
     private GoogleOperationFailureClassifier failureClassifier;
-    private GoogleCalendarIntegrationCommandService integrationCommandService;
+    private GoogleCalendarConnectionService connectionService;
     private GoogleOperationProcessor processor;
 
     @BeforeEach
@@ -39,13 +39,13 @@ class GoogleOperationProcessorTest {
         operationLeaseService = mock(GoogleOperationLeaseService.class);
         syncService = mock(GoogleCalendarSyncService.class);
         failureClassifier = mock(GoogleOperationFailureClassifier.class);
-        integrationCommandService = mock(GoogleCalendarIntegrationCommandService.class);
+        connectionService = mock(GoogleCalendarConnectionService.class);
         processor = new GoogleOperationProcessor(
                 jobPersistenceService,
                 operationLeaseService,
                 syncService,
                 failureClassifier,
-                integrationCommandService,
+                connectionService,
                 Clock.systemUTC()
         );
     }
@@ -118,8 +118,8 @@ class GoogleOperationProcessorTest {
     }
 
     @Test
-    @DisplayName("재연결이 필요한 provider 오류는 Job을 종료한 뒤 Integration을 SYNC_ERROR로 pause한다")
-    void givenReconnectRequiredFailure_whenProcess_thenPausesIntegrationAndStopsAccount() {
+    @DisplayName("재연결이 필요한 provider 오류는 Job을 종료한 뒤 Connection을 SYNC_ERROR로 pause한다")
+    void givenReconnectRequiredFailure_whenProcess_thenPausesConnectionAndStopsAccount() {
         GoogleOperationJob job = syncJob(1L, 10L);
         com.calio.calendar.common.error.CalioException failure =
                 new com.calio.calendar.common.error.CalioException(
@@ -134,7 +134,7 @@ class GoogleOperationProcessorTest {
 
         verify(jobPersistenceService).terminate(eq(1L), eq(10L), anyString(),
                 eq("GOOGLE_CALENDAR_RECONNECT_REQUIRED"));
-        verify(integrationCommandService).markConnectedIntegrationSyncError(eq(10L),
+        verify(connectionService).pauseConnectedConnectionForReconnect(eq(10L),
                 eq("GOOGLE_CALENDAR_RECONNECT_REQUIRED"), any());
         verify(jobPersistenceService, times(1)).claimNextJob(eq(10L), anyString());
     }
@@ -156,7 +156,7 @@ class GoogleOperationProcessorTest {
 
         verifyNoInteractions(failureClassifier);
         verify(jobPersistenceService, never()).terminate(eq(1L), eq(10L), anyString(), anyString());
-        verifyNoInteractions(integrationCommandService);
+        verifyNoInteractions(connectionService);
         verify(jobPersistenceService, times(1)).claimNextJob(eq(10L), anyString());
     }
 
@@ -226,7 +226,7 @@ class GoogleOperationProcessorTest {
         when(job.getId()).thenReturn(jobId);
         when(job.getAccountId()).thenReturn(accountId);
         when(job.getKind()).thenReturn(kind);
-        when(job.getIntegrationId()).thenReturn(20L);
+        when(job.getConnectionId()).thenReturn(20L);
         when(job.getEffectiveResourceScope()).thenReturn(
                 GoogleCalendarEffectiveScopeType.EVENT.getStoredValue());
         when(job.getEffectiveResourceKey()).thenReturn("1");
