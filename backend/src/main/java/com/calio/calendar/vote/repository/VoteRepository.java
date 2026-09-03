@@ -17,7 +17,7 @@ public interface VoteRepository extends JpaRepository<Vote, Long> {
             """)
     List<Vote> findAllByVoteParticipantId(@Param("voteParticipantId") Long voteParticipantId);
 
-    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Modifying(flushAutomatically = true)
     @Query("delete from Vote vote where vote.voteParticipant.id = :voteParticipantId")
     int deleteAllByVoteParticipantId(@Param("voteParticipantId") Long voteParticipantId);
 }
