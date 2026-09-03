@@ -100,6 +100,16 @@ class VoteResultControllerTest {
     }
 
     @Test
+    @DisplayName("캐시 무효화 쿼리가 포함된 공개 결과 조회는 익명으로 성공한다")
+    void givenCacheBustQuery_whenAnonymousGetsPublicResult_thenReturnsOk() throws Exception {
+        mockMvc.perform(get("/api/vote-rooms/{publicId}", voteRoom.getPublicId())
+                        .queryParam("cacheBust", "1")
+                        .with(anonymous()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.publicId").value(voteRoom.getPublicId().toString()));
+    }
+
+    @Test
     @DisplayName("없는 공개 VoteRoom 결과는 not found 오류를 반환한다")
     void givenMissingVoteRoom_whenGetPublicResult_thenReturnsNotFound() throws Exception {
         mockMvc.perform(get("/api/vote-rooms/{publicId}", UUID.randomUUID()).with(anonymous()))

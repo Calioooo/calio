@@ -55,7 +55,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/vote-rooms/*/participants").permitAll()
                         .requestMatchers(HttpMethod.PUT, "/api/vote-rooms/*/votes").permitAll()
                         .requestMatchers(new RegexRequestMatcher(
-                                "^/api/vote-rooms/[0-9a-fA-F-]{36}$",
+                                "^/api/vote-rooms/[0-9a-fA-F-]{36}(?:\\?.*)?$",
                                 HttpMethod.GET.name()
                         )).permitAll()
                         .requestMatchers("/api/vote-rooms").authenticated()
