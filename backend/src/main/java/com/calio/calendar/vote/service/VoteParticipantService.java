@@ -32,9 +32,9 @@ public class VoteParticipantService {
 
     @Transactional
     public VoteParticipant create(UUID voteRoomPublicId, String nickname, String password) {
-        VoteRoom voteRoom = voteParticipantQueryService
-                .getVoteRoomForParticipantCreation(voteRoomPublicId);
         String normalizedNickname = normalizeNickname(nickname);
+        VoteRoom voteRoom = voteParticipantCommandService
+                .getVoteRoomForParticipantCreation(voteRoomPublicId);
         requireNicknameAvailable(voteRoomPublicId, normalizedNickname);
         String passwordHash = password == null ? null : hashPassword(password);
         return voteParticipantCommandService.create(
@@ -44,7 +44,7 @@ public class VoteParticipantService {
 
     private void requireNicknameAvailable(UUID voteRoomPublicId, String nickname) {
         if (voteParticipantQueryService
-                .findParticipantByVoteRoomPublicIdAndNickname(voteRoomPublicId, nickname)
+                .getParticipantByVoteRoomPublicIdAndNicknameIfExists(voteRoomPublicId, nickname)
                 .isPresent()) {
             throw new CalioException(ErrorCode.VOTE_PARTICIPANT_NICKNAME_CONFLICT);
         }
