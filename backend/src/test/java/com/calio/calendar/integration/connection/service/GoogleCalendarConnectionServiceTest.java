@@ -138,8 +138,8 @@ class GoogleCalendarConnectionServiceTest {
     }
 
     @Test
-    @DisplayName("같은 Google subject 재연결은 기존 Connection의 credential만 교체한다")
-    void givenSameSubjectConnection_whenConnect_thenReplacesCredentials() {
+    @DisplayName("연결된 같은 Google subject를 다시 연결하려면 먼저 해제해야 한다")
+    void givenConnectedSameSubject_whenConnect_thenRequiresDisconnectFirst() {
         GoogleCalendarIntegration integration = integration();
         GoogleCalendarConnection connection = connection(integration);
         when(oauthClient.exchangeAuthorizationCode("authorization-code"))
@@ -152,21 +152,17 @@ class GoogleCalendarConnectionServiceTest {
                 GoogleCalendarConnectionState.CONNECTED
         ))
                 .thenReturn(Optional.of(connection));
-        when(connectionCommandService.tryLockConnection(integration.getId(), "google-subject"))
-                .thenReturn(Optional.of(connection));
 
-        service().connect(ACCOUNT_ID, "authorization-code");
+        assertThatThrownBy(() -> service().connect(ACCOUNT_ID, "authorization-code"))
+                .isInstanceOf(CalioException.class)
+                .extracting(exception -> ((CalioException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED);
 
-        verify(connectionCommandService).replaceCredentials(
-                eq(connection),
-                eq("new@example.com"),
-                anyString(),
-                anyString(),
-                eq(NOW.plusSeconds(3600)),
-                eq(NOW)
-        );
-        verify(integrationCommandService, org.mockito.Mockito.never()).createIntegration(any());
-        verify(enqueueService).enqueueManualSync(ACCOUNT_ID);
+        verify(connectionCommandService, never()).replaceCredentials(
+                any(), anyString(), anyString(), anyString(), any(), any());
+        verify(connectionCommandService, never()).createConnection(
+                any(), anyString(), anyString(), anyString(), anyString(), any(), any());
+        verifyNoInteractions(enqueueService);
     }
 
     @Test

@@ -142,7 +142,7 @@ public class GoogleCalendarConnectionService {
         GoogleCalendarConnection active = connectionCommandService
                 .tryLockConnectionByIntegrationAndState(integration.getId(), GoogleCalendarConnectionState.CONNECTED)
                 .orElse(null);
-        if (active != null && !active.getGoogleSubject().equals(user.subject())) {
+        if (active != null) {
             throw new CalioException(ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED);
         }
         GoogleCalendarConnection retained = connectionCommandService
