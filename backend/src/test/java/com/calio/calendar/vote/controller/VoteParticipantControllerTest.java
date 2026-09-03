@@ -66,10 +66,12 @@ class VoteParticipantControllerTest {
 
         mockMvc.perform(put("/api/vote-rooms/{publicId}/votes", voteRoom.getPublicId())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"nickname\":\"calio\",\"password\":\"secret\",\"unavailableDates\":[\"2026-08-15\",\"2026-08-17\"]}"))
+                        .content("{\"nickname\":\"calio\",\"password\":\"secret\",\"unavailableDates\":[\"2026-08-17\",\"2026-08-15\",\"2026-08-17\"]}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("SUBMITTED"))
-                .andExpect(jsonPath("$.unavailableDates", hasSize(2)));
+                .andExpect(jsonPath("$.unavailableDates", hasSize(2)))
+                .andExpect(jsonPath("$.unavailableDates[0]").value("2026-08-15"))
+                .andExpect(jsonPath("$.unavailableDates[1]").value("2026-08-17"));
 
         mockMvc.perform(put("/api/vote-rooms/{publicId}/votes", voteRoom.getPublicId())
                         .contentType(MediaType.APPLICATION_JSON)
