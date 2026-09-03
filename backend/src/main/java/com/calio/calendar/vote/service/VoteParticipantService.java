@@ -8,7 +8,6 @@ import java.text.Normalizer;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import org.springframework.stereotype.Service;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,14 +19,16 @@ public class VoteParticipantService {
 
     private final VoteParticipantQueryService voteParticipantQueryService;
     private final VoteParticipantCommandService voteParticipantCommandService;
-    private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+    private final PasswordEncoder passwordEncoder;
 
     public VoteParticipantService(
             VoteParticipantQueryService voteParticipantQueryService,
-            VoteParticipantCommandService voteParticipantCommandService
+            VoteParticipantCommandService voteParticipantCommandService,
+            PasswordEncoder passwordEncoder
     ) {
         this.voteParticipantQueryService = voteParticipantQueryService;
         this.voteParticipantCommandService = voteParticipantCommandService;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @Transactional

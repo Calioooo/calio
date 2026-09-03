@@ -25,6 +25,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 @ExtendWith(MockitoExtension.class)
 class VoteParticipantServiceTest {
@@ -38,12 +39,15 @@ class VoteParticipantServiceTest {
     private VoteParticipantCommandService voteParticipantCommandService;
 
     private VoteParticipantService voteParticipantService;
+    private PasswordEncoder passwordEncoder;
 
     @BeforeEach
     void setUp() {
+        passwordEncoder = new BCryptPasswordEncoder();
         voteParticipantService = new VoteParticipantService(
                 voteParticipantQueryService,
-                voteParticipantCommandService
+                voteParticipantCommandService,
+                passwordEncoder
         );
     }
 
@@ -98,8 +102,7 @@ class VoteParticipantServiceTest {
         // then
         assertThat(participant.getPasswordHash()).isNotEqualTo("participant-password");
         assertThat(participant.getPasswordHash()).startsWith("$2");
-        assertThat(new BCryptPasswordEncoder()
-                .matches("participant-password", participant.getPasswordHash())).isTrue();
+        assertThat(passwordEncoder.matches("participant-password", participant.getPasswordHash())).isTrue();
     }
 
     @Test
