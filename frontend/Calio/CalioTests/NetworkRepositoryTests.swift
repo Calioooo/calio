@@ -613,4 +613,178 @@ struct NetworkRepositoryTests {
         #expect(request.httpMethod == "GET")
         #expect(request.value(forHTTPHeaderField: "Accept") == "application/json")
     }
+
+    @Test func urlSessionGroupSpaceRepositoryUsesAuthenticatedLifecycleAndMembershipContracts() async throws {
+        let groupSpaceResponse = """
+        { "groupSpaceId": 7, "name": "프로젝트 팀", "emoji": null, "memberCount": 2,
+          "myMembership": { "nickname": "준하", "role": "OWNER", "createdAt": "2026-08-01T00:00:00Z", "updatedAt": "2026-08-01T00:00:00Z", "statusChangedAt": "2026-08-01T00:00:00Z" },
+          "createdAt": "2026-08-01T00:00:00Z", "updatedAt": "2026-08-01T00:00:00Z" }
+        """.data(using: .utf8)!
+        let groupSpaceListResponse = """
+        { "groupSpaces": [
+          { "groupSpaceId": 7, "name": "프로젝트 팀", "emoji": null, "memberCount": 2,
+            "myMembership": { "nickname": "준하", "role": "OWNER", "createdAt": "2026-08-01T00:00:00Z", "updatedAt": "2026-08-01T00:00:00Z", "statusChangedAt": "2026-08-01T00:00:00Z" },
+            "createdAt": "2026-08-01T00:00:00Z", "updatedAt": "2026-08-01T00:00:00Z" }
+        ] }
+        """.data(using: .utf8)!
+        let membersResponse = """
+        { "members": [ { "memberId": 10, "nickname": "준하", "role": "OWNER" }, { "memberId": 11, "nickname": "민지", "role": "MEMBER" } ] }
+        """.data(using: .utf8)!
+        let transferResponse = """
+        { "previousOwner": { "memberId": 10, "nickname": "준하", "role": "MEMBER" }, "owner": { "memberId": 11, "nickname": "민지", "role": "OWNER" } }
+        """.data(using: .utf8)!
+        var requests: [URLRequest] = []
+        MockURLProtocol.requestHandler = { request in
+            requests.append(request)
+            let responseData: Data
+            switch request.httpMethod {
+            case "GET" where request.url?.path == "/api/group-spaces": responseData = groupSpaceListResponse
+            case "GET" where request.url?.path.hasSuffix("/members") == true: responseData = membersResponse
+            case "POST" where request.url?.path.hasSuffix("/owner-transfer") == true: responseData = transferResponse
+            default: responseData = groupSpaceResponse
+            }
+            let status = request.httpMethod == "POST" && request.url?.path == "/api/group-spaces" ? 201 : 200
+            return (HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: nil)!, responseData)
+        }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        let repository = URLSessionGroupSpaceRepository(baseURL: URL(string: "https://example.test")!, session: URLSession(configuration: configuration), authTokenProvider: StaticAuthTokenProvider(accessToken: "test-token"))
+
+        let groupSpaces = try await repository.fetchGroupSpaces()
+        let groupSpace = try await repository.fetchGroupSpace(groupSpaceId: 7)
+        _ = try await repository.createGroupSpace(.init(name: "프로젝트 팀", emoji: nil, nickname: "준하"))
+        _ = try await repository.updateGroupSpace(groupSpaceId: 7, request: .init(name: "수정 팀", emoji: "🗓️"))
+        _ = try await repository.fetchMembers(groupSpaceId: 7)
+        _ = try await repository.transferOwnership(groupSpaceId: 7, request: .init(targetMemberId: 11))
+        try await repository.leaveGroupSpace(groupSpaceId: 7)
+        try await repository.removeMember(groupSpaceId: 7, memberId: 11)
+        try await repository.deleteGroupSpace(groupSpaceId: 7)
+
+        #expect(groupSpaces.groupSpaces.map(\.groupSpaceId) == [7])
+        #expect(groupSpace.groupSpaceId == 7)
+        #expect(requests.map { $0.url?.path } == ["/api/group-spaces", "/api/group-spaces/7", "/api/group-spaces", "/api/group-spaces/7", "/api/group-spaces/7/members", "/api/group-spaces/7/owner-transfer", "/api/group-spaces/7/members/me", "/api/group-spaces/7/members/11", "/api/group-spaces/7"])
+        #expect(requests.map { $0.httpMethod ?? "" } == ["GET", "GET", "POST", "PATCH", "GET", "POST", "DELETE", "DELETE", "DELETE"])
+        #expect(requests.allSatisfy { $0.value(forHTTPHeaderField: "Authorization") == "Bearer test-token" })
+        let createBody = try groupRequestBodyJSON(from: requests[2])
+        let updateBody = try groupRequestBodyJSON(from: requests[3])
+        let transferBody = try groupRequestBodyJSON(from: requests[5])
+        #expect(Set(createBody.keys) == ["name", "nickname"])
+        #expect(createBody["emoji"] == nil)
+        #expect(Set(updateBody.keys) == ["name", "emoji"])
+        #expect(transferBody["targetMemberId"] as? Int == 11)
+        #expect(requests.dropFirst(6).allSatisfy { requestBodyData(from: $0) == nil })
+    }
+
+    @Test func urlSessionGroupSpaceRepositoryUsesCanonicalInvitationPreviewAndAcceptanceContracts() async throws {
+        let previewResponse = """
+        { "name": "프로젝트 팀", "emoji": "🗓️", "memberCount": 2,
+          "memberPreviews": [{ "nickname": "준하" }, { "nickname": "민지" }],
+          "expiresAt": "2026-08-30T00:00:00Z" }
+        """.data(using: .utf8)!
+        let previewResponseWithoutMemberPreviews = """
+        { "name": "프로젝트 팀", "emoji": "🗓️", "memberCount": 2,
+          "expiresAt": "2026-08-30T00:00:00Z" }
+        """.data(using: .utf8)!
+        let acceptanceResponse = """
+        { "joinResult": "ALREADY_MEMBER",
+          "groupSpace": { "id": 7, "name": "프로젝트 팀", "emoji": "🗓️", "myMembership": { "memberId": 10, "nickname": "준하", "role": "MEMBER" }, "memberCount": 2, "createdAt": "2026-08-01T00:00:00Z" },
+          "membership": { "memberId": 10, "nickname": "준하", "role": "MEMBER" } }
+        """.data(using: .utf8)!
+        var requests: [URLRequest] = []
+        var previewRequestCount = 0
+        MockURLProtocol.requestHandler = { request in
+            requests.append(request)
+            let data: Data
+            if request.url?.path.hasSuffix("/preview") == true {
+                previewRequestCount += 1
+                data = previewRequestCount == 1 ? previewResponse : previewResponseWithoutMemberPreviews
+            } else {
+                data = acceptanceResponse
+            }
+            return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, data)
+        }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        let repository = URLSessionGroupSpaceRepository(
+            baseURL: URL(string: "https://example.test")!,
+            session: URLSession(configuration: configuration),
+            authTokenProvider: StaticAuthTokenProvider(accessToken: "test-token")
+        )
+
+        let preview = try await repository.previewInvitation(.init(credentialType: .code, credential: "CALIO-2026"))
+        let previewWithoutMemberPreviews = try await repository.previewInvitation(.init(credentialType: .code, credential: "CALIO-2026"))
+        let acceptance = try await repository.acceptInvitation(.init(credentialType: .inviteCode, credential: "CALIO-2026", nickname: "준하"))
+
+        #expect(preview.name == "프로젝트 팀")
+        #expect(preview.memberCount == 2)
+        #expect(preview.memberPreviews?.map(\.nickname) == ["준하", "민지"])
+        #expect(previewWithoutMemberPreviews.memberPreviews == nil)
+        #expect(acceptance.joinResult == .alreadyMember)
+        #expect(acceptance.groupSpace.name == "프로젝트 팀")
+        #expect(requests.map { $0.url?.path } == ["/api/group-invitations/preview", "/api/group-invitations/preview", "/api/group-invitations/accept"])
+        #expect(requests.map { $0.httpMethod } == ["POST", "POST", "POST"])
+        #expect(requests.allSatisfy { $0.value(forHTTPHeaderField: "Authorization") == "Bearer test-token" })
+        let previewBody = try groupRequestBodyJSON(from: requests[0])
+        let acceptanceBody = try groupRequestBodyJSON(from: requests[2])
+        #expect(previewBody as NSDictionary == ["credentialType": "CODE", "credential": "CALIO-2026"])
+        #expect(acceptanceBody as NSDictionary == ["credentialType": "INVITE_CODE", "credential": "CALIO-2026", "nickname": "준하"])
+    }
+
+    @Test func urlSessionGroupSpaceRepositoryUsesCanonicalInvitationManagementContracts() async throws {
+        let issueResponse = """
+        { "invitationId": 3, "inviteUrl": "https://calio.app/invite/token", "inviteCode": "CALIO-2026", "expiresAt": "2026-08-30T00:00:00Z" }
+        """.data(using: .utf8)!
+        let listResponse = """
+        { "invitations": [{ "invitationId": 3, "expiresAt": "2026-08-30T00:00:00Z" }] }
+        """.data(using: .utf8)!
+        var requests: [URLRequest] = []
+        MockURLProtocol.requestHandler = { request in
+            requests.append(request)
+            let data: Data
+            let statusCode: Int
+            switch request.httpMethod {
+            case "POST":
+                data = issueResponse
+                statusCode = 201
+            case "GET":
+                data = listResponse
+                statusCode = 200
+            default:
+                data = Data()
+                statusCode = 204
+            }
+            return (HTTPURLResponse(url: request.url!, statusCode: statusCode, httpVersion: nil, headerFields: nil)!, data)
+        }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        let repository = URLSessionGroupSpaceRepository(
+            baseURL: URL(string: "https://example.test")!,
+            session: URLSession(configuration: configuration),
+            authTokenProvider: StaticAuthTokenProvider(accessToken: "test-token")
+        )
+
+        let issuedInvitation = try await repository.issueInvitation(groupSpaceId: 7)
+        let invitations = try await repository.fetchInvitations(groupSpaceId: 7)
+        try await repository.revokeInvitation(groupSpaceId: 7, invitationId: 3)
+
+        #expect(issuedInvitation.invitationId == 3)
+        #expect(issuedInvitation.inviteCode == "CALIO-2026")
+        #expect(invitations.invitations.map(\.invitationId) == [3])
+        #expect(requests.map { $0.url?.path } == [
+            "/api/group-spaces/7/invitations",
+            "/api/group-spaces/7/invitations",
+            "/api/group-spaces/7/invitations/3"
+        ])
+        #expect(requests.map { $0.httpMethod } == ["POST", "GET", "DELETE"])
+        #expect(requests.allSatisfy { $0.value(forHTTPHeaderField: "Authorization") == "Bearer test-token" })
+        #expect(requests.allSatisfy { requestBodyData(from: $0) == nil })
+    }
+
+    private func groupRequestBodyJSON(from request: URLRequest) throws -> [String: Any] {
+        guard let body = requestBodyData(from: request) else { throw GroupRequestBodyError.missing }
+        guard let json = try JSONSerialization.jsonObject(with: body) as? [String: Any] else { throw GroupRequestBodyError.invalid }
+        return json
+    }
+
+    private enum GroupRequestBodyError: Error { case missing, invalid }
 }
