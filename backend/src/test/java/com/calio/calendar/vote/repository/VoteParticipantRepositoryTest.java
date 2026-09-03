@@ -9,6 +9,7 @@ import com.calio.calendar.vote.domain.Vote;
 import com.calio.calendar.vote.domain.VoteParticipant;
 import com.calio.calendar.vote.domain.VoteParticipantStatus;
 import com.calio.calendar.vote.domain.VoteRoom;
+import jakarta.persistence.EntityManager;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -40,6 +41,9 @@ class VoteParticipantRepositoryTest {
 
     @Autowired
     private AccountRepository accountRepository;
+
+    @Autowired
+    private EntityManager entityManager;
 
     private VoteRoom voteRoom;
 
@@ -79,6 +83,25 @@ class VoteParticipantRepositoryTest {
         assertThat(foundParticipant.getVoteRoom().getId()).isEqualTo(voteRoom.getId());
         assertThat(foundParticipant.getPasswordHash()).isNull();
         assertThat(foundParticipant.getStatus()).isEqualTo(VoteParticipantStatus.REGISTERED);
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("참여자가 투표를 제출하면 SUBMITTED 상태로 저장된다")
+    void givenRegisteredParticipant_whenSubmit_thenPersistsSubmittedStatus() {
+        // given
+        VoteParticipant participant = voteParticipantRepository.saveAndFlush(
+                new VoteParticipant(voteRoom, "calio", null)
+        );
+
+        // when
+        participant.submit();
+        voteParticipantRepository.flush();
+        entityManager.clear();
+
+        // then
+        VoteParticipant foundParticipant = voteParticipantRepository.findById(participant.getId()).orElseThrow();
+        assertThat(foundParticipant.getStatus()).isEqualTo(VoteParticipantStatus.SUBMITTED);
     }
 
     @Test
