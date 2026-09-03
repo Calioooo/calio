@@ -1,5 +1,6 @@
 package com.calio.calendar.vote.scheduler;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
@@ -11,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.scheduling.annotation.Scheduled;
 
 @ExtendWith(MockitoExtension.class)
 class VoteRoomCleanupSchedulerTest {
@@ -27,6 +29,18 @@ class VoteRoomCleanupSchedulerTest {
         scheduler.deleteExpiredVoteRooms();
 
         verify(voteRoomCleanupService).deleteExpiredVoteRooms();
+    }
+
+    @Test
+    @DisplayName("VoteRoom cleanup scheduler는 매일 KST 04시 30분에 실행된다")
+    void deleteExpiredVoteRoomsHasKoreaDailySchedule() throws NoSuchMethodException {
+        Scheduled scheduled = VoteRoomCleanupScheduler.class
+                .getDeclaredMethod("deleteExpiredVoteRooms")
+                .getAnnotation(Scheduled.class);
+
+        assertThat(scheduled).isNotNull();
+        assertThat(scheduled.cron()).isEqualTo("0 30 4 * * *");
+        assertThat(scheduled.zone()).isEqualTo("Asia/Seoul");
     }
 
     @Test
