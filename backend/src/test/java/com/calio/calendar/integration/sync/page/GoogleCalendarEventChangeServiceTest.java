@@ -47,8 +47,10 @@ class GoogleCalendarEventChangeServiceTest {
         GoogleCalendarConnection connection = mock(GoogleCalendarConnection.class);
         Event event = mock(Event.class);
         when(integration.getAccountId()).thenReturn(10L);
+        when(integration.getId()).thenReturn(21L);
         when(connection.getId()).thenReturn(20L);
         when(connection.getAccountId()).thenReturn(10L);
+        when(connection.getIntegration()).thenReturn(integration);
         when(event.getId()).thenReturn(30L);
         GoogleCalendarEventMapping mapping = new GoogleCalendarEventMapping(
                 connection,
@@ -76,7 +78,7 @@ class GoogleCalendarEventChangeServiceTest {
         );
         GoogleCalendarPageOwnership ownership = new GoogleCalendarPageOwnership(40L, "worker-token");
         GoogleCalendarEffectiveScope scope = GoogleCalendarEffectiveScope.event(30L);
-        when(operationJobQueryService.hasPendingOutboundJob(10L, 20L, scope)).thenReturn(true);
+        when(operationJobQueryService.hasPendingOutboundJob(10L, 21L, scope)).thenReturn(true);
 
         // when
         service.applyUpsert(connection, upsert, cache, null, null, ownership);

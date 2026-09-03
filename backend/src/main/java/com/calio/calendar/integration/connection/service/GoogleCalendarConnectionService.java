@@ -9,6 +9,7 @@ import com.calio.calendar.external.google.dto.GoogleTokenResponse;
 import com.calio.calendar.external.google.dto.GoogleUserInfoResponse;
 import com.calio.calendar.integration.connection.controller.dto.GoogleCalendarConnectionResponse;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarConnection;
+import com.calio.calendar.integration.connection.domain.GoogleCalendarConnectionState;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobCommandService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobEnqueueService;
@@ -100,7 +101,9 @@ public class GoogleCalendarConnectionService {
 
     private String disconnectLocally(Long accountId) {
         return disconnectTransaction.execute(status ->
-                connectionCommandService.tryLockConnectedConnection(accountId)
+                integrationCommandService.tryLockIntegration(accountId)
+                        .flatMap(integration -> connectionCommandService
+                                .tryLockDisconnectableConnectionByIntegration(integration.getId()))
                         .map(connection -> {
                             String refreshToken = connection.getEncryptedRefreshToken();
                             jobCommandService.deleteJobsForIntegration(connection.getIntegration().getId());
@@ -134,24 +137,28 @@ public class GoogleCalendarConnectionService {
             Instant expiresAt,
             Instant connectedAt
     ) {
-        GoogleCalendarConnection current = connectionCommandService.tryLockConnection(accountId)
+        GoogleCalendarIntegration integration = integrationCommandService.tryLockIntegration(accountId)
+                .orElseGet(() -> integrationCommandService.createIntegration(accountId));
+        GoogleCalendarConnection active = connectionCommandService
+                .tryLockConnectionByIntegrationAndState(integration.getId(), GoogleCalendarConnectionState.CONNECTED)
                 .orElse(null);
-        if (current != null) {
-            if (!current.getGoogleSubject().equals(user.subject())) {
-                throw new CalioException(ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED);
-            }
+        if (active != null) {
+            throw new CalioException(ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED);
+        }
+        GoogleCalendarConnection retained = connectionCommandService
+                .tryLockConnection(integration.getId(), user.subject())
+                .orElse(null);
+        if (retained != null) {
             connectionCommandService.replaceCredentials(
-                    current,
+                    retained,
                     user.email(),
                     encryptor.encryptRefreshToken(token.refreshToken()),
                     encryptor.encryptAccessToken(token.accessToken()),
                     expiresAt,
                     connectedAt
             );
-            return current;
+            return retained;
         }
-        GoogleCalendarIntegration integration = integrationCommandService.tryLockIntegration(accountId)
-                .orElseGet(() -> integrationCommandService.createIntegration(accountId));
         return connectionCommandService.createConnection(
                 integration,
                 user.subject(),
