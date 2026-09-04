@@ -19,11 +19,14 @@ import com.calio.calendar.event.controller.dto.EventResponse;
 import com.calio.calendar.event.controller.dto.UpdateEventRequest;
 import com.calio.calendar.event.service.EventService;
 import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceOccurrenceRequest;
+import com.calio.calendar.recurrence.controller.dto.CreateRecurrenceEventRequest;
 import com.calio.calendar.recurrence.controller.dto.RecurrenceEventResponse;
 import com.calio.calendar.recurrence.service.RecurrenceEventService;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.service.TagService;
+import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -116,6 +119,59 @@ class CalendarMutationServiceTest {
         ArgumentCaptor<CreateEventRequest> requestCaptor = ArgumentCaptor.forClass(CreateEventRequest.class);
         verify(eventService).createEvent(eq(1L), requestCaptor.capture());
         assertThat(requestCaptor.getValue().title()).isEqualTo("새 회의");
+    }
+
+    @Test
+    @DisplayName("반복 일정 생성 Preview는 단일 RRULE을 만들지만 저장하지 않는다")
+    void givenRecurrenceCreation_whenPreview_thenReturnsEntireSeriesPreviewWithoutCreating() {
+        when(tagService.getTagOrDefault(1L, 1L)).thenReturn(Tag.personalDefault("업무", "#64748B"));
+
+        var preview = service().preview(1L, recurrenceCreateRequest());
+
+        assertThat(preview.type()).isEqualTo(CalendarMutationType.CREATE);
+        assertThat(preview.scope()).isEqualTo(CalendarMutationScope.ENTIRE_SERIES);
+        assertThat(preview.before()).isNull();
+        assertThat(preview.after().title()).isEqualTo("매주 회의");
+        assertThat(preview.recurrence().before()).isEmpty();
+        assertThat(preview.recurrence().after()).containsExactly("RRULE:FREQ=WEEKLY;UNTIL=20261225T091800Z");
+        verify(recurrenceEventService, never()).createRecurrenceEvent(any(), any());
+    }
+
+    @Test
+    @DisplayName("종일 반복 일정 생성 Preview는 UTC 자정 규약과 날짜 UNTIL을 사용한다")
+    void givenAllDayRecurrenceCreation_whenPreview_thenUsesCanonicalAllDaySchedule() {
+        when(tagService.getTagOrDefault(1L, null)).thenReturn(Tag.personalDefault("업무", "#64748B"));
+        CalendarMutationToolRequest request = new CalendarMutationToolRequest(
+                CalendarMutationOperation.CREATE_RECURRENCE_EVENT,
+                null, null, null,
+                "종일 반복", null,
+                Instant.parse("2026-08-07T00:00:00Z"),
+                Instant.parse("2026-08-08T00:00:00Z"),
+                true, null, null, List.of("RRULE:FREQ=DAILY;UNTIL=20260831")
+        );
+
+        var preview = service().preview(1L, request);
+
+        assertThat(preview.after().allDay()).isTrue();
+        assertThat(preview.after().timeZone()).isNull();
+        assertThat(preview.recurrence().after()).containsExactly("RRULE:FREQ=DAILY;UNTIL=20260831");
+        verify(recurrenceEventService, never()).createRecurrenceEvent(any(), any());
+    }
+
+    @Test
+    @DisplayName("확정된 반복 일정 생성은 기존 RecurrenceEventService를 호출한다")
+    void givenConfirmedRecurrenceCreation_whenApply_thenDelegatesToRecurrenceEventService() {
+        when(recurrenceEventService.createRecurrenceEvent(eq(1L), any())).thenReturn(createdRecurrenceSeries());
+
+        List<EventResponse> result = service().apply(1L, recurrenceCreateRequest());
+
+        assertThat(result).singleElement().satisfies(event -> {
+            assertThat(event.recurrenceId()).isEqualTo(30L);
+            assertThat(event.isRecurrenceOccurrence()).isTrue();
+        });
+        ArgumentCaptor<CreateRecurrenceEventRequest> captor = ArgumentCaptor.forClass(CreateRecurrenceEventRequest.class);
+        verify(recurrenceEventService).createRecurrenceEvent(eq(1L), captor.capture());
+        assertThat(captor.getValue().recurrence()).containsExactly("RRULE:FREQ=WEEKLY;UNTIL=20261225T091800Z");
     }
 
     @Test
@@ -411,7 +467,14 @@ class CalendarMutationServiceTest {
     }
 
     private CalendarMutationService service() {
-        return new CalendarMutationService(eventService, recurrenceEventService, tagService);
+        return new CalendarMutationService(
+                eventService,
+                recurrenceEventService,
+                tagService,
+                new CalendarAiMutationPolicy(
+                        Clock.fixed(Instant.parse("2026-08-01T00:00:00Z"), ZoneOffset.UTC)
+                )
+        );
     }
 
     private CalendarMutationToolRequest updateRequest() {
@@ -445,6 +508,17 @@ class CalendarMutationServiceTest {
                 "Asia/Seoul",
                 1L,
                 null
+        );
+    }
+
+    private CalendarMutationToolRequest recurrenceCreateRequest() {
+        return new CalendarMutationToolRequest(
+                CalendarMutationOperation.CREATE_RECURRENCE_EVENT,
+                null, null, null,
+                "매주 회의", null,
+                Instant.parse("2026-08-07T09:18:00Z"),
+                Instant.parse("2026-08-07T10:18:00Z"),
+                false, "UTC", 1L, List.of("RRULE:FREQ=WEEKLY;UNTIL=20261225T091800Z")
         );
     }
 
@@ -547,6 +621,15 @@ class CalendarMutationServiceTest {
                 Instant.parse("2026-08-01T00:00:00Z"),
                 Instant.parse("2026-08-01T00:00:00Z"),
                 true
+        );
+    }
+
+    private RecurrenceEventResponse createdRecurrenceSeries() {
+        return new RecurrenceEventResponse(
+                30L, "매주 회의", null, false,
+                Instant.parse("2026-08-07T09:18:00Z"), Instant.parse("2026-08-07T10:18:00Z"),
+                "UTC", List.of("RRULE:FREQ=WEEKLY;UNTIL=20261225T091800Z"), null,
+                Instant.parse("2026-08-01T00:00:00Z"), Instant.parse("2026-08-01T00:00:00Z"), true
         );
     }
 

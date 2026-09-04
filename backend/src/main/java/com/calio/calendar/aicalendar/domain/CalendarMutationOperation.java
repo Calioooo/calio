@@ -3,6 +3,7 @@ package com.calio.calendar.aicalendar.domain;
 public enum CalendarMutationOperation {
 
     CREATE_EVENT,
+    CREATE_RECURRENCE_EVENT,
     UPDATE_EVENT,
     DELETE_EVENT,
     UPDATE_RECURRENCE_OCCURRENCE,
