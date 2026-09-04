@@ -10,7 +10,7 @@ import com.calio.calendar.event.controller.dto.EventResponse;
 import com.calio.calendar.event.controller.dto.UpdateEventRequest;
 import com.calio.calendar.event.controller.dto.UpdateImportantEventRequest;
 import com.calio.calendar.event.domain.Event;
-import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingQueryService;
+import com.calio.calendar.integration.sync.operation.GoogleOperationJobEnqueueService;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceOccurrence;
@@ -40,7 +40,7 @@ public class EventService {
 
     private final EventQueryService eventQueryService;
     private final EventCommandService eventCommandService;
-    private final GoogleCalendarEventMappingQueryService eventMappingQueryService;
+    private final GoogleOperationJobEnqueueService jobEnqueueService;
     private final AccountQueryService accountQueryService;
     private final TagQueryService tagQueryService;
     private final RecurrenceEventQueryService recurrenceEventQueryService;
@@ -49,7 +49,7 @@ public class EventService {
     public EventService(
             EventQueryService eventQueryService,
             EventCommandService eventCommandService,
-            GoogleCalendarEventMappingQueryService eventMappingQueryService,
+            GoogleOperationJobEnqueueService jobEnqueueService,
             AccountQueryService accountQueryService,
             TagQueryService tagQueryService,
             RecurrenceEventQueryService recurrenceEventQueryService,
@@ -57,7 +57,7 @@ public class EventService {
     ) {
         this.eventQueryService = eventQueryService;
         this.eventCommandService = eventCommandService;
-        this.eventMappingQueryService = eventMappingQueryService;
+        this.jobEnqueueService = jobEnqueueService;
         this.accountQueryService = accountQueryService;
         this.tagQueryService = tagQueryService;
         this.recurrenceEventQueryService = recurrenceEventQueryService;
@@ -75,6 +75,7 @@ public class EventService {
         Account account = accountQueryService.getAccount(accountId);
         Tag tag = tagQueryService.getTagOrDefault(accountId, request.tagId());
         Event event = eventCommandService.createEvent(request.toEntity(tag, account));
+        jobEnqueueService.enqueueEventCreated(accountId, event);
         return EventResponse.from(event);
     }
 
@@ -85,7 +86,6 @@ public class EventService {
     @Transactional
     public EventResponse updateEvent(Long accountId, Long eventId, UpdateEventRequest request) {
         Event event = eventCommandService.lockEvent(accountId, eventId);
-        rejectExternalEventMutation(accountId, eventId);
         CanonicalSchedule schedule = CanonicalSchedule.event(
                 request.startAt(),
                 request.endAt(),
@@ -94,13 +94,13 @@ public class EventService {
         );
         Tag tag = tagQueryService.getTagOrDefault(accountId, request.tagId());
         eventCommandService.updateEvent(event, request, schedule, tag);
+        jobEnqueueService.enqueueEventUpdated(accountId, event);
         return EventResponse.from(event);
     }
 
     @Transactional
     public EventResponse updateImportantEvent(Long accountId, Long eventId, UpdateImportantEventRequest request) {
         Event event = eventCommandService.lockEvent(accountId, eventId);
-        rejectExternalEventMutation(accountId, eventId);
         eventCommandService.updateImportantEvent(event, request.importantEvent());
         return EventResponse.from(event);
     }
@@ -108,8 +108,8 @@ public class EventService {
     @Transactional
     public void deleteEvent(Long accountId, Long eventId) {
         Event event = eventCommandService.lockEvent(accountId, eventId);
-        rejectExternalEventMutation(accountId, eventId);
         eventCommandService.deleteEvent(event);
+        jobEnqueueService.enqueueEventDeleted(accountId, eventId);
     }
 
     public List<EventResponse> listEvents(Long accountId, Instant from, Instant to) {
@@ -213,12 +213,6 @@ public class EventService {
         }
         if (Duration.between(from, to).compareTo(MAX_EVENT_QUERY_RANGE) > 0) {
             throw new CalioException(ErrorCode.EVENT_QUERY_RANGE_TOO_LARGE);
-        }
-    }
-
-    private void rejectExternalEventMutation(Long accountId, Long eventId) {
-        if (eventMappingQueryService.hasExternalEventMapping(eventId, accountId)) {
-            throw new CalioException(ErrorCode.EXTERNAL_EVENT_MUTATION_NOT_SUPPORTED);
         }
     }
 

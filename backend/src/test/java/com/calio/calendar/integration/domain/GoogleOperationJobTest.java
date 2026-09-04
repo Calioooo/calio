@@ -4,6 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJob;
+import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEventJob;
+import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarSyncJob;
+import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEventJobKind;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobTrigger;
 import java.time.Instant;
@@ -42,7 +45,7 @@ class GoogleOperationJobTest {
     @Test
     @DisplayName("Sync Job을 CANONICAL_MUTATION trigger로 생성하면 예외를 반환한다")
     void givenCanonicalMutationTrigger_whenCreatingSyncJob_thenRejectsTrigger() {
-        assertThatThrownBy(() -> GoogleOperationJob.sync(
+        assertThatThrownBy(() -> GoogleCalendarSyncJob.create(
                 "operation-id",
                 1L,
                 2L,
@@ -53,16 +56,15 @@ class GoogleOperationJobTest {
     }
 
     @Test
-    @DisplayName("Outbound Job은 SYNC kind를 허용하지 않는다")
-    void givenSyncKind_whenCreatingOutboundJob_thenRejectsKind() {
-        assertThatThrownBy(() -> GoogleOperationJob.outbound(
+    @DisplayName("Event Job은 mutation kind를 요구한다")
+    void givenMissingKind_whenCreatingEventJob_thenRejectsKind() {
+        assertThatThrownBy(() -> GoogleCalendarEventJob.create(
                 "operation-id",
                 1L,
                 2L,
                 3L,
-                GoogleOperationJob.SYNC_KIND,
-                "EVENT",
-                "event-id",
+                null,
+                4L,
                 null,
                 "{}",
                 NOW
@@ -70,16 +72,15 @@ class GoogleOperationJobTest {
     }
 
     @Test
-    @DisplayName("Outbound Job은 실행 대상(resourceScope)을 요구한다")
-    void givenMissingResourceScope_whenCreatingOutboundJob_thenRejectsTarget() {
-        assertThatThrownBy(() -> GoogleOperationJob.outbound(
+    @DisplayName("Event Job은 event ID를 요구한다")
+    void givenMissingEventId_whenCreatingEventJob_thenRejectsTarget() {
+        assertThatThrownBy(() -> GoogleCalendarEventJob.create(
                 "operation-id",
                 1L,
                 2L,
                 3L,
-                "EVENT_UPSERT",
-                "",
-                "event-id",
+                GoogleCalendarEventJobKind.UPDATE,
+                null,
                 null,
                 "{}",
                 NOW
@@ -87,24 +88,39 @@ class GoogleOperationJobTest {
     }
 
     @Test
-    @DisplayName("Outbound Job은 immutable target payload를 요구한다")
+    @DisplayName("Event Job은 immutable target payload를 요구한다")
     void givenMissingPayload_whenCreatingOutboundJob_thenRejectsPayload() {
-        assertThatThrownBy(() -> GoogleOperationJob.outbound(
+        assertThatThrownBy(() -> GoogleCalendarEventJob.create(
                 "operation-id",
                 1L,
                 2L,
                 3L,
-                "EVENT_UPSERT",
-                "EVENT",
-                "event-id",
+                GoogleCalendarEventJobKind.UPDATE,
+                4L,
                 null,
                 "",
+                NOW
+        )).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("CREATE Job은 재시도에 사용할 provider identity를 요구한다")
+    void givenMissingProviderIdentity_whenCreatingCreateJob_thenRejectsJob() {
+        assertThatThrownBy(() -> GoogleCalendarEventJob.create(
+                "operation-id",
+                1L,
+                2L,
+                3L,
+                GoogleCalendarEventJobKind.CREATE,
+                4L,
+                null,
+                "{}",
                 NOW
         )).isInstanceOf(IllegalArgumentException.class);
     }
 
     private GoogleOperationJob syncJob(Instant runnableAt) {
-        return GoogleOperationJob.sync(
+        return GoogleCalendarSyncJob.create(
                 "operation-id",
                 1L,
                 2L,

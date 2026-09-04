@@ -46,4 +46,8 @@ public class GoogleCalendarConnectionQueryService {
                 PageRequest.of(0, limit)
         );
     }
+
+    public List<GoogleCalendarConnection> listConnections(Long integrationId) {
+        return connectionRepository.findAllWithIntegrationByIntegrationId(integrationId);
+    }
 }

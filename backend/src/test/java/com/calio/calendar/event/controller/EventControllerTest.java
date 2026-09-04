@@ -873,8 +873,8 @@ class EventControllerTest {
     }
 
     @Test
-    @DisplayName("Google mapping 일정은 모든 변경 요청을 차단한다")
-    void givenGoogleMappedEvent_whenMutate_thenAppliesExternalMutationPolicy() throws Exception {
+    @DisplayName("Google Calendar와 매핑된 Event도 Calio API에서 변경할 수 있다")
+    void givenGoogleMappedEvent_whenMutate_thenAppliesEventMutation() throws Exception {
         // given
         long eventId = createEvent(
                 "Google import",
@@ -888,26 +888,22 @@ class EventControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "title": "Blocked update",
+                                  "title": "Updated from Calio",
                                   "startAt": "2026-06-21T02:00:00Z",
                                   "endAt": "2026-06-21T03:00:00Z",
                                   "allDay": false,
                                   "timeZone": "UTC"
                                 }
                                 """))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.title")
-                        .value("EXTERNAL_EVENT_MUTATION_NOT_SUPPORTED"));
-
-        mockMvc.perform(delete("/api/events/{eventId}", eventId))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.title")
-                        .value("EXTERNAL_EVENT_MUTATION_NOT_SUPPORTED"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("Updated from Calio"));
 
         updateImportantEventResult(eventId, true)
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.title")
-                        .value("EXTERNAL_EVENT_MUTATION_NOT_SUPPORTED"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.importantEvent").value(true));
+
+        mockMvc.perform(delete("/api/events/{eventId}", eventId))
+                .andExpect(status().isNoContent());
     }
 
     @Test
@@ -1033,7 +1029,7 @@ class EventControllerTest {
                         Instant.parse("2026-06-21T02:00:00Z"), Instant.parse("2026-06-21T00:00:00Z")));
         googleCalendarEventMappingRepository.saveAndFlush(new GoogleCalendarEventMapping(
                 connection,
-                event,
+                event.getId(),
                 "external-" + eventId,
                 "a".repeat(64)
         ));

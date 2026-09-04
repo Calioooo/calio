@@ -69,6 +69,7 @@ public class GoogleOperationFailureClassifier {
 
     private boolean isNonRetryable(ErrorCode errorCode) {
         return errorCode == ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED
+                || errorCode == ErrorCode.GOOGLE_CALENDAR_REQUEST_INVALID
                 || errorCode == ErrorCode.GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID
                 || errorCode == ErrorCode.GOOGLE_CALENDAR_SYNC_TOKEN_MISSING;
     }

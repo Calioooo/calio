@@ -3,6 +3,7 @@ package com.calio.calendar.integration.sync;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -53,19 +54,17 @@ class GoogleCalendarIntegrationDataServiceTest {
     @DisplayName("FULL SYNC시 각 mapping batch에서 operation lease를 갱신한다")
     void givenUnseenMappings_whenFinalizeFullSync_thenDeletesByBatchAndRenewsLease() {
         // given
-        Event event = mock(Event.class);
         GoogleCalendarConnection connection = mock(GoogleCalendarConnection.class);
         GoogleCalendarIntegration integration = mock(GoogleCalendarIntegration.class);
         when(eventMapping.getId()).thenReturn(10L);
         when(eventMapping.getExternalEventId()).thenReturn("unseen-event");
-        when(eventMapping.getEvent()).thenReturn(event);
+        when(eventMapping.getEventId()).thenReturn(20L);
         when(eventMapping.getConnection()).thenReturn(connection);
         when(connection.getId()).thenReturn(1L);
         when(connection.getAccountId()).thenReturn(2L);
         when(connection.getIntegration()).thenReturn(integration);
         when(integration.getId()).thenReturn(3L);
         when(connectionCommandService.lockConnectedConnectionById(1L)).thenReturn(connection);
-        when(event.getId()).thenReturn(20L);
         when(operationJobQueryService.hasPendingOutboundJob(any(), any(), any())).thenReturn(false);
         when(recurrenceMappingQueryService.listOverrideMappingBatch(1L, 0L, 500))
                 .thenReturn(List.of());
@@ -73,6 +72,7 @@ class GoogleCalendarIntegrationDataServiceTest {
                 .thenReturn(List.of(eventMapping));
         when(eventMappingQueryService.listEventMappingBatch(1L, 10L, 500))
                 .thenReturn(List.of());
+        when(eventMappingQueryService.listEventIdsWithMappings(List.of(20L))).thenReturn(List.of());
         when(recurrenceMappingQueryService.listRecurrenceEventMappingBatch(1L, 0L, 500))
                 .thenReturn(List.of());
 
@@ -111,5 +111,56 @@ class GoogleCalendarIntegrationDataServiceTest {
         verify(connectionCommandService).changeNextSyncToken(connection, "next-token");
         verify(operationLeaseService, times(6)).extend(9L, 2L, "run-1");
         verify(operationJobPersistenceService).completeSyncRun(9L, 2L, "run-1");
+    }
+
+    @Test
+    @DisplayName("다른 connection mapping이 남아 있으면 FULL SYNC cleanup은 Event를 삭제하지 않는다")
+    void givenUnseenMappingWithAnotherConnectionMapping_whenFinalizeFullSync_thenKeepsEvent() {
+        // given
+        GoogleCalendarConnection connection = mock(GoogleCalendarConnection.class);
+        GoogleCalendarIntegration integration = mock(GoogleCalendarIntegration.class);
+        when(eventMapping.getId()).thenReturn(10L);
+        when(eventMapping.getExternalEventId()).thenReturn("unseen-event");
+        when(eventMapping.getEventId()).thenReturn(20L);
+        when(eventMapping.getConnection()).thenReturn(connection);
+        when(connection.getId()).thenReturn(1L);
+        when(connection.getAccountId()).thenReturn(2L);
+        when(connection.getIntegration()).thenReturn(integration);
+        when(integration.getId()).thenReturn(3L);
+        when(connectionCommandService.lockConnectedConnectionById(1L)).thenReturn(connection);
+        when(operationJobQueryService.hasPendingOutboundJob(any(), any(), any())).thenReturn(false);
+        when(recurrenceMappingQueryService.listOverrideMappingBatch(1L, 0L, 500))
+                .thenReturn(List.of());
+        when(eventMappingQueryService.listEventMappingBatch(1L, 0L, 500))
+                .thenReturn(List.of(eventMapping));
+        when(eventMappingQueryService.listEventMappingBatch(1L, 10L, 500))
+                .thenReturn(List.of());
+        when(eventMappingQueryService.listEventIdsWithMappings(List.of(20L)))
+                .thenReturn(List.of(20L));
+        when(recurrenceMappingQueryService.listRecurrenceEventMappingBatch(1L, 0L, 500))
+                .thenReturn(List.of());
+        GoogleCalendarIntegrationDataService service = new GoogleCalendarIntegrationDataService(
+                connectionCommandService,
+                eventMappingQueryService,
+                eventMappingCommandService,
+                recurrenceMappingQueryService,
+                recurrenceMappingCommandService,
+                eventCommandService,
+                recurrenceEventCommandService,
+                null,
+                operationLeaseService,
+                operationJobPersistenceService,
+                operationJobQueryService
+        );
+
+        // when
+        service.completeSyncRun(
+                9L, 2L, 1L, "run-1", GoogleCalendarSyncMode.FULL,
+                Set.of(), Set.of(), Set.of(), "next-token"
+        );
+
+        // then
+        verify(eventMappingCommandService).deleteEventMappingsWithIds(List.of(10L));
+        verify(eventCommandService, never()).deleteEventsByIds(any());
     }
 }

@@ -1,6 +1,5 @@
 package com.calio.calendar.integration.sync.operation;
 
-import com.calio.calendar.integration.sync.GoogleCalendarSyncService;
 import com.calio.calendar.integration.connection.service.GoogleCalendarConnectionCommandService;
 import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrationQueryService;
 import com.calio.calendar.external.google.GoogleCalendarInvalidGrantException;
@@ -16,11 +15,11 @@ import org.springframework.stereotype.Service;
 @Service
 public class GoogleOperationProcessor {
 
-    private static final String UNSUPPORTED_JOB_KIND = "UNSUPPORTED_JOB_KIND";
+    private static final String UNSUPPORTED_JOB_SCOPE = "UNSUPPORTED_JOB_SCOPE";
 
     private final GoogleOperationJobService jobService;
     private final GoogleOperationLeaseService operationLeaseService;
-    private final GoogleCalendarSyncService syncService;
+    private final GoogleOperationJobHandlerRegistry handlerRegistry;
     private final GoogleOperationFailureClassifier failureClassifier;
     private final GoogleCalendarConnectionCommandService connectionCommandService;
     private final GoogleCalendarIntegrationQueryService integrationQueryService;
@@ -29,7 +28,7 @@ public class GoogleOperationProcessor {
     public GoogleOperationProcessor(
             GoogleOperationJobService jobService,
             GoogleOperationLeaseService operationLeaseService,
-            GoogleCalendarSyncService syncService,
+            GoogleOperationJobHandlerRegistry handlerRegistry,
             GoogleOperationFailureClassifier failureClassifier,
             GoogleCalendarConnectionCommandService connectionCommandService,
             GoogleCalendarIntegrationQueryService integrationQueryService,
@@ -37,7 +36,7 @@ public class GoogleOperationProcessor {
     ) {
         this.jobService = jobService;
         this.operationLeaseService = operationLeaseService;
-        this.syncService = syncService;
+        this.handlerRegistry = handlerRegistry;
         this.failureClassifier = failureClassifier;
         this.connectionCommandService = connectionCommandService;
         this.integrationQueryService = integrationQueryService;
@@ -67,22 +66,24 @@ public class GoogleOperationProcessor {
         if (job == null) {
             return JobExecutionResult.STOP_ACCOUNT_PROCESSING;
         }
-        if (!GoogleOperationJob.SYNC_KIND.equals(job.getKind())) {
-            jobService.terminate(
-                    job.getId(),
-                    job.getAccountId(),
-                    workerToken,
-                    UNSUPPORTED_JOB_KIND
-            );
-            return JobExecutionResult.CONTINUE_WITH_NEXT_JOB;
-        }
-        return executeSync(job, workerToken);
+        return execute(job, workerToken);
     }
 
-    private JobExecutionResult executeSync(GoogleOperationJob job, String workerToken) {
+    private JobExecutionResult terminateUnsupported(
+            GoogleOperationJob job,
+            String workerToken,
+            String reason
+    ) {
+        jobService.terminate(job.getId(), job.getAccountId(), workerToken, reason);
+        return JobExecutionResult.CONTINUE_WITH_NEXT_JOB;
+    }
+
+    private JobExecutionResult execute(GoogleOperationJob job, String workerToken) {
         try {
-            syncService.synchronize(job.getId(), job.getAccountId(), workerToken);
+            handlerRegistry.execute(job, workerToken);
             return JobExecutionResult.CONTINUE_WITH_NEXT_JOB;
+        } catch (GoogleOperationJobHandlerNotFoundException exception) {
+            return terminateUnsupported(job, workerToken, UNSUPPORTED_JOB_SCOPE);
         } catch (RuntimeException failure) {
             return handleSyncFailure(job, workerToken, failure);
         }

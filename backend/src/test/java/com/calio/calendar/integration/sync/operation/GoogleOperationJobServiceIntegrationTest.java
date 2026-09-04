@@ -8,6 +8,7 @@ import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarConnection;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJob;
+import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarSyncJob;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobTrigger;
 import com.calio.calendar.integration.connection.repository.GoogleCalendarIntegrationRepository;
@@ -228,7 +229,7 @@ class GoogleOperationJobServiceIntegrationTest {
         Long firstJobId = null;
         Long secondJobId = null;
         for (int index = 0; index < runnableTimes.length; index++) {
-            GoogleOperationJob job = jobRepository.saveAndFlush(GoogleOperationJob.sync(
+            GoogleOperationJob job = jobRepository.saveAndFlush(GoogleCalendarSyncJob.create(
                     "operation-" + index,
                     connection.getIntegration().getId(),
                     account.getId(),
