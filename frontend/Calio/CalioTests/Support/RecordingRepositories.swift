@@ -579,6 +579,17 @@ final class RecordingEventRepository: EventRepository {
         }
     }
 
+    func finishNextSuspendedRequest(returning response: [EventResponseDTO]) {
+        let continuation: CheckedContinuation<[EventResponseDTO], Error>? = locked {
+            guard !suspendedContinuations.isEmpty else {
+                return nil
+            }
+
+            return suspendedContinuations.removeFirst()
+        }
+        continuation?.resume(returning: response)
+    }
+
     func waitForCreateRequestCount(
         _ count: Int,
         timeoutNanoseconds: UInt64 = 5_000_000_000
