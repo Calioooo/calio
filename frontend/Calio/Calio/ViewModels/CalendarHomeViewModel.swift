@@ -224,6 +224,11 @@ final class CalendarHomeViewModel: ObservableObject {
         requestMonths([YearMonthKey(day: referenceDay)], retryFailed: true)
     }
 
+    func refreshAfterAssistantResponse() {
+        invalidateMonthEventCache()
+        prefetchReferenceMonthAndAdjacent(retryFailed: true)
+    }
+
     func resetCreateState() {
         createState = .idle
     }

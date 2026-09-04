@@ -12,6 +12,7 @@ struct CalendarMonthScheduleScreen: View {
     @State private var isShowingEventCreationView = false
     @State private var selectedDateRange: CalendarDateRange?
     @State private var selectedDay: DayKey?
+    @State private var isShowingAssistant = false
     private let onGoogleCalendarConnectTapped: () -> Void
 
     init(
@@ -51,6 +52,10 @@ struct CalendarMonthScheduleScreen: View {
             viewModel: viewModel,
             referenceDay: selectedDateRange?.startDay ?? selectedDay ?? viewModel.referenceDay,
             initialDateRange: selectedDateRange
+        )
+        .calendarAssistantFloatingEntry(
+            isPresented: $isShowingAssistant,
+            onCalendarRefreshNeeded: viewModel.refreshAfterAssistantResponse
         )
     }
 

@@ -10,6 +10,7 @@ import SwiftUI
 struct CalendarWeekTimelineScreen: View {
     @ObservedObject var viewModel: CalendarHomeViewModel
     @State private var isShowingEventCreationView = false
+    @State private var isShowingAssistant = false
     private let onGoogleCalendarConnectTapped: () -> Void
 
     init(
@@ -60,6 +61,10 @@ struct CalendarWeekTimelineScreen: View {
             isPresented: $isShowingEventCreationView,
             viewModel: viewModel,
             referenceDay: viewModel.referenceDay
+        )
+        .calendarAssistantFloatingEntry(
+            isPresented: $isShowingAssistant,
+            onCalendarRefreshNeeded: viewModel.refreshAfterAssistantResponse
         )
     }
 
