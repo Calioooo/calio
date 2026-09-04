@@ -60,7 +60,7 @@ class GoogleOperationJobServiceIntegrationTest {
 
         // when
         GoogleOperationJob claimed = jobService.claimNextJob(
-                fixture.accountId(),
+                fixture.accountId(), fixture.integrationId(),
                 "worker-a"
         );
 
@@ -88,12 +88,12 @@ class GoogleOperationJobServiceIntegrationTest {
 
         // when
         GoogleOperationJob first = jobService.claimNextJob(
-                fixture.accountId(),
+                fixture.accountId(), fixture.integrationId(),
                 "worker-a"
         );
         jobService.succeed(first.getId(), fixture.accountId(), "worker-a");
         GoogleOperationJob second = jobService.claimNextJob(
-                fixture.accountId(),
+                fixture.accountId(), fixture.integrationId(),
                 "worker-a"
         );
 
@@ -112,7 +112,7 @@ class GoogleOperationJobServiceIntegrationTest {
         JobFixture fixture = jobs(Instant.now().minusSeconds(60));
         assertThat(leaseService.acquire(fixture.accountId(), "worker-a")).isTrue();
         GoogleOperationJob claimed = jobService.claimNextJob(
-                fixture.accountId(),
+                fixture.accountId(), fixture.integrationId(),
                 "worker-a"
         );
         Instant beforeRetry = Instant.now();
@@ -139,7 +139,7 @@ class GoogleOperationJobServiceIntegrationTest {
         JobFixture fixture = jobs(Instant.now().minusSeconds(60));
         assertThat(leaseService.acquire(fixture.accountId(), "worker-a")).isTrue();
         GoogleOperationJob claimed = jobService.claimNextJob(
-                fixture.accountId(),
+                fixture.accountId(), fixture.integrationId(),
                 "worker-a"
         );
 
@@ -175,7 +175,7 @@ class GoogleOperationJobServiceIntegrationTest {
         JobFixture fixture = jobs(Instant.now().minusSeconds(60));
         assertThat(leaseService.acquire(fixture.accountId(), "worker-a")).isTrue();
         GoogleOperationJob claimed = jobService.claimNextJob(
-                fixture.accountId(),
+                fixture.accountId(), fixture.integrationId(),
                 "worker-a"
         );
         leaseService.extend(
@@ -200,7 +200,7 @@ class GoogleOperationJobServiceIntegrationTest {
         JobFixture fixture = jobs(Instant.now().minusSeconds(60));
         assertThat(leaseService.acquire(fixture.accountId(), "worker-a")).isTrue();
         GoogleOperationJob claimed = jobService.claimNextJob(
-                fixture.accountId(),
+                fixture.accountId(), fixture.integrationId(),
                 "worker-a"
         );
 
@@ -230,9 +230,9 @@ class GoogleOperationJobServiceIntegrationTest {
         for (int index = 0; index < runnableTimes.length; index++) {
             GoogleOperationJob job = jobRepository.saveAndFlush(GoogleOperationJob.sync(
                     "operation-" + index,
-                    connection.getId(),
+                    connection.getIntegration().getId(),
                     account.getId(),
-                    connection.allocateGoogleOperationSequence(),
+                    connection.getIntegration().allocateGoogleOperationSequence(),
                     GoogleOperationJobTrigger.MANUAL,
                     runnableTimes[index]
             ));
@@ -242,7 +242,12 @@ class GoogleOperationJobServiceIntegrationTest {
                 secondJobId = job.getId();
             }
         }
-        return new JobFixture(account.getId(), firstJobId, secondJobId);
+        return new JobFixture(
+                account.getId(),
+                connection.getIntegration().getId(),
+                firstJobId,
+                secondJobId
+        );
     }
 
     private GoogleCalendarConnection connection(Long accountId) {
@@ -260,6 +265,7 @@ class GoogleOperationJobServiceIntegrationTest {
 
     private record JobFixture(
             Long accountId,
+            Long integrationId,
             Long firstJobId,
             Long secondJobId
     ) {

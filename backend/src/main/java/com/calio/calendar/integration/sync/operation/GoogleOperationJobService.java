@@ -35,8 +35,8 @@ public class GoogleOperationJobService {
     }
 
     @Transactional
-    public GoogleOperationJob claimNextJob(Long accountId, String workerToken) {
-        GoogleOperationJob head = jobCommandService.tryLockNextOperationJob(accountId).orElse(null);
+    public GoogleOperationJob claimNextJob(Long accountId, Long integrationId, String workerToken) {
+        GoogleOperationJob head = jobCommandService.tryLockNextOperationJob(integrationId).orElse(null);
         if (head == null) {
             log.debug("Google operation head not found. accountId={} state=EMPTY", accountId);
             return null;

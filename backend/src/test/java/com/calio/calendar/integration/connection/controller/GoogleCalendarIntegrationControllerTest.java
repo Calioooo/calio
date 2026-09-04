@@ -176,14 +176,14 @@ class GoogleCalendarIntegrationControllerTest {
         List<GoogleOperationJob> jobs = googleOperationJobRepository.findAll();
         assertThat(jobs).hasSize(2);
         GoogleOperationJob job = jobs.stream()
-                .filter(candidate -> candidate.getAccountSequence() == 2L)
+                .filter(candidate -> candidate.getIntegrationSequence() == 2L)
                 .findFirst()
                 .orElseThrow();
         assertThat(job.getOperationId()).isNotBlank();
         assertThat(connection.getIntegration().getId()).isEqualTo(integration.getId());
-        assertThat(job.getConnectionId()).isEqualTo(connection.getId());
+        assertThat(job.getIntegrationId()).isEqualTo(integration.getId());
         assertThat(job.getAccountId()).isEqualTo(integration.getAccountId());
-        assertThat(job.getAccountSequence()).isEqualTo(2L);
+        assertThat(job.getIntegrationSequence()).isEqualTo(2L);
         assertThat(job.getKind()).isEqualTo(GoogleOperationJob.SYNC_KIND);
         assertThat(job.getTrigger()).isEqualTo(GoogleOperationJobTrigger.MANUAL);
         assertThat(job.getState()).isEqualTo(GoogleOperationJobState.PENDING);

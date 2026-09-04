@@ -84,7 +84,7 @@ public class GoogleCalendarAccessTokenService {
         disconnectTransaction.executeWithoutResult(status -> {
             connectionCommandService.tryLockConnectedConnectionById(connectionId)
                     .ifPresent(connection -> {
-                        jobCommandService.deleteJobsForConnection(connection.getId());
+                        jobCommandService.deleteJobsForIntegration(connection.getIntegration().getId());
                         connectionCommandService.disconnect(connection, disconnectedAt);
                     });
         });
