@@ -6,7 +6,11 @@ struct CalendarConversationService {
     self.repository = repository
   }
   func createConversation() async throws -> String {
-    do { return try await repository.createConversation().conversationId } catch {
+    do {
+      return try await repository.createConversation().conversationId
+    } catch let failure as CalendarAssistantFailure {
+      throw failure
+    } catch {
       throw CalendarAssistantFailure.connection
     }
   }
@@ -18,7 +22,9 @@ struct CalendarConversationService {
         conversationId: conversationId,
         request: .init(message: message, timeZone: timeZone.identifier))
       return (response.assistantMessage, try response.blocks.map(mapBlock))
-    } catch is CalendarAssistantFailure { throw CalendarAssistantFailure.message } catch {
+    } catch let failure as CalendarAssistantFailure {
+      throw failure
+    } catch {
       throw CalendarAssistantFailure.message
     }
   }

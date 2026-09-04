@@ -10,6 +10,10 @@ struct CalendarAssistantConversationTests {
     let malformed = CalendarAssistantMarkdown.attributedText(from: "[닫히지 않은 링크](")
 
     #expect(String(formatted.characters) == "중요 일정")
+    #expect(
+      formatted.runs.contains {
+        $0.inlinePresentationIntent?.contains(.stronglyEmphasized) == true
+      })
     #expect(String(malformed.characters) == "[닫히지 않은 링크](")
   }
 
@@ -149,6 +153,12 @@ struct CalendarAssistantConversationTests {
   }
 
   @Test func servicePreservesNaturalLanguageApprovalAndMapsBlocksInOrder() async throws {
+    let previewAfter = CalendarMutationEventResponseDTO(
+      title: "팀 회의",
+      startAt: Date(timeIntervalSince1970: 1_788_501_600),
+      endAt: Date(timeIntervalSince1970: 1_788_505_200),
+      allDay: false,
+      tag: .init(id: 1, title: "기타", colorCode: "#64748B", tagType: .defaultTag))
     let repository = CalendarConversationRepositoryStub(
       conversationIds: ["conversation-7"],
       responses: [
@@ -160,6 +170,14 @@ struct CalendarAssistantConversationTests {
               .init(
                 start: "2026-09-04T13:00:00+09:00", end: "2026-09-04T14:00:00+09:00",
                 allDayNotices: [])
+            ]),
+            .mutationPreviews([
+              .init(
+                type: "CREATE",
+                scope: "EVENT",
+                before: nil,
+                after: previewAfter,
+                recurrence: .init(before: [], after: ["RRULE:FREQ=WEEKLY"]))
             ]),
             .unsupported("FUTURE_BLOCK"),
           ]
@@ -179,10 +197,22 @@ struct CalendarAssistantConversationTests {
         .init(conversationId: "conversation-7", message: "네, 이 제안을 적용해줘", timeZone: "Asia/Seoul")
       ])
     #expect(response.0 == "적용을 준비했어요.")
-    guard case .freeTimes = response.1[0], case .unsupported("FUTURE_BLOCK") = response.1[1] else {
+    guard case .freeTimes = response.1[0],
+      case .mutationPreviews(let previews) = response.1[1],
+      case .unsupported("FUTURE_BLOCK") = response.1[2],
+      let preview = previews.first,
+      let after = preview.after
+    else {
       Issue.record("Expected service results to preserve canonical block order")
       return
     }
+    #expect(preview.type == "CREATE")
+    #expect(preview.scope == "EVENT")
+    #expect(preview.before == nil)
+    #expect(after.title == "팀 회의")
+    #expect(after.tag.tagType == .defaultTag)
+    #expect(preview.recurrenceBefore == [])
+    #expect(preview.recurrenceAfter == ["RRULE:FREQ=WEEKLY"])
   }
 
   @MainActor @Test func viewModelCreatesFreshSessionAndOnlyRefreshesAfterSuccessfulMessage() async {
@@ -299,6 +329,44 @@ struct CalendarAssistantConversationTests {
     await firstSend.value
     #expect(viewModel.messages.map(\.role) == [.user, .assistant])
   }
+
+  @MainActor @Test func viewModelIgnoresLateMessageFromClosedSession() async {
+    let repository = CalendarConversationRepositoryStub(
+      conversationIds: ["first", "second"],
+      responses: [
+        .init(conversationId: "first", assistantMessage: "이전 대화 응답", blocks: []),
+        .init(conversationId: "second", assistantMessage: "새 대화 응답", blocks: []),
+      ],
+      shouldSuspendResponses: true
+    )
+    var refreshCount = 0
+    let viewModel = CalendarAssistantConversationViewModel(service: .init(repository: repository)) {
+      refreshCount += 1
+    }
+
+    await viewModel.start()
+    let firstSend = Task { await viewModel.send("첫 번째 요청") }
+    #expect(await waitUntil { repository.sentMessages.count == 1 })
+
+    viewModel.endSession()
+    await viewModel.start()
+    let secondSend = Task { await viewModel.send("두 번째 요청") }
+    #expect(await waitUntil { repository.sentMessages.count == 2 })
+
+    repository.finishNextSuspendedResponse()
+    await Task.yield()
+
+    #expect(viewModel.state == .ready)
+    #expect(viewModel.messages.map(\.text) == ["두 번째 요청"])
+    #expect(refreshCount == 0)
+
+    repository.finishNextSuspendedResponse()
+    await secondSend.value
+    await firstSend.value
+
+    #expect(viewModel.messages.map(\.text) == ["두 번째 요청", "새 대화 응답"])
+    #expect(refreshCount == 1)
+  }
 }
 
 private final class CalendarConversationRepositoryStub: CalendarConversationRepository {
@@ -314,29 +382,36 @@ private final class CalendarConversationRepositoryStub: CalendarConversationRepo
   private(set) var sentMessages: [SentMessage] = []
   private var creationFailuresRemaining: Int
   private let responseDelayNanoseconds: UInt64
+  private let shouldSuspendResponses: Bool
+  private var suspendedResponseContinuations:
+    [CheckedContinuation<SendCalendarConversationMessageResponseDTO, Error>] = []
 
   init(
     conversationIds: [String],
     responses: [SendCalendarConversationMessageResponseDTO],
     creationFailuresRemaining: Int = 0,
-    responseDelayNanoseconds: UInt64 = 0
+    responseDelayNanoseconds: UInt64 = 0,
+    shouldSuspendResponses: Bool = false
   ) {
     self.conversationIds = conversationIds
     self.responses = responses.map(Result.success)
     self.creationFailuresRemaining = creationFailuresRemaining
     self.responseDelayNanoseconds = responseDelayNanoseconds
+    self.shouldSuspendResponses = shouldSuspendResponses
   }
 
   init(
     conversationIds: [String],
     responses: [Result<SendCalendarConversationMessageResponseDTO, Error>],
     creationFailuresRemaining: Int = 0,
-    responseDelayNanoseconds: UInt64 = 0
+    responseDelayNanoseconds: UInt64 = 0,
+    shouldSuspendResponses: Bool = false
   ) {
     self.conversationIds = conversationIds
     self.responses = responses
     self.creationFailuresRemaining = creationFailuresRemaining
     self.responseDelayNanoseconds = responseDelayNanoseconds
+    self.shouldSuspendResponses = shouldSuspendResponses
   }
 
   func createConversation() async throws -> CreateCalendarConversationResponseDTO {
@@ -356,6 +431,17 @@ private final class CalendarConversationRepositoryStub: CalendarConversationRepo
     if responseDelayNanoseconds > 0 {
       try await Task.sleep(nanoseconds: responseDelayNanoseconds)
     }
+    if shouldSuspendResponses {
+      return try await withCheckedThrowingContinuation { continuation in
+        suspendedResponseContinuations.append(continuation)
+      }
+    }
     return try responses.removeFirst().get()
+  }
+
+  func finishNextSuspendedResponse() {
+    guard !suspendedResponseContinuations.isEmpty else { return }
+    let continuation = suspendedResponseContinuations.removeFirst()
+    continuation.resume(with: responses.removeFirst())
   }
 }
