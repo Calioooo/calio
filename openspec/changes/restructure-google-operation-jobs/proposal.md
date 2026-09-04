@@ -20,8 +20,10 @@ execution rules must not be inferred from a growing collection of string fields.
 - Add concrete `GoogleCalendarSyncJob` and `GoogleCalendarEventJob` types for
   the scopes that can currently be enqueued.
 - Replace mutation-kind strings with a closed `GoogleOperationJobKind` enum.
-- Dispatch claimed jobs by concrete type. The event executor dispatches its own
-  CREATE, UPDATE, and DELETE operations directly.
+- Remove persisted `effectiveResourceScope` and `effectiveResourceKey`; jobs
+  own typed identifiers instead.
+- Dispatch claimed jobs through a scope handler registry. A handler owns its
+  scope's CREATE, UPDATE, and DELETE operations directly.
 - Preserve every existing event-write policy: enqueue snapshot, deterministic
   create identity, integration sequence ordering, provider calls outside the
   transaction, mapping finalization in a transaction, and conflict/retry

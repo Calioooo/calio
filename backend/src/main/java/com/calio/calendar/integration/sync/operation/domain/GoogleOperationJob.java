@@ -21,10 +21,6 @@ import java.time.Instant;
 @DiscriminatorColumn(name = "job_scope", discriminatorType = DiscriminatorType.STRING, length = 64)
 public abstract class GoogleOperationJob extends BaseEntity {
 
-    static final String SYNC_SCOPE = "SYNC";
-    static final String EVENT_SCOPE = "GENERAL_EVENT";
-    static final String SYNC_KEY = "sync";
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -40,16 +36,6 @@ public abstract class GoogleOperationJob extends BaseEntity {
 
     @Column(name = "integration_sequence", nullable = false, updatable = false)
     private long integrationSequence;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "job_kind", nullable = false, updatable = false, length = 64)
-    private GoogleOperationJobKind kind;
-
-    @Column(name = "effective_resource_scope", nullable = false, updatable = false, length = 64)
-    private String effectiveResourceScope;
-
-    @Column(name = "effective_resource_key", nullable = false, updatable = false, length = 1024)
-    private String effectiveResourceKey;
 
     @Column(name = "conflict_detected", nullable = false)
     private boolean conflictDetected;
@@ -84,18 +70,12 @@ public abstract class GoogleOperationJob extends BaseEntity {
             Long integrationId,
             Long accountId,
             long integrationSequence,
-            GoogleOperationJobKind kind,
-            String effectiveResourceScope,
-            String effectiveResourceKey,
             Instant runnableAt
     ) {
         this.operationId = operationId;
         this.integrationId = integrationId;
         this.accountId = accountId;
         this.integrationSequence = integrationSequence;
-        this.kind = kind;
-        this.effectiveResourceScope = effectiveResourceScope;
-        this.effectiveResourceKey = effectiveResourceKey;
         this.state = GoogleOperationJobState.PENDING;
         this.runnableAt = runnableAt;
     }
@@ -114,7 +94,6 @@ public abstract class GoogleOperationJob extends BaseEntity {
     public Long getIntegrationId() { return integrationId; }
     public Long getAccountId() { return accountId; }
     public long getIntegrationSequence() { return integrationSequence; }
-    protected GoogleOperationJobKind getJobKind() { return kind; }
     public GoogleOperationJobState getState() { return state; }
     public Instant getRunnableAt() { return runnableAt; }
     public int getRetryCount() { return retryCount; }

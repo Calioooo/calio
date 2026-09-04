@@ -6,7 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJob;
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEventJob;
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarSyncJob;
-import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobKind;
+import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEventJobKind;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobTrigger;
 import java.time.Instant;
@@ -56,14 +56,14 @@ class GoogleOperationJobTest {
     }
 
     @Test
-    @DisplayName("Event Job은 SYNC kind를 허용하지 않는다")
-    void givenSyncKind_whenCreatingOutboundJob_thenRejectsKind() {
+    @DisplayName("Event Job은 mutation kind를 요구한다")
+    void givenMissingKind_whenCreatingEventJob_thenRejectsKind() {
         assertThatThrownBy(() -> GoogleCalendarEventJob.create(
                 "operation-id",
                 1L,
                 2L,
                 3L,
-                GoogleOperationJobKind.SYNC,
+                null,
                 4L,
                 null,
                 "{}",
@@ -79,7 +79,7 @@ class GoogleOperationJobTest {
                 1L,
                 2L,
                 3L,
-                GoogleOperationJobKind.UPDATE,
+                GoogleCalendarEventJobKind.UPDATE,
                 null,
                 null,
                 "{}",
@@ -95,7 +95,7 @@ class GoogleOperationJobTest {
                 1L,
                 2L,
                 3L,
-                GoogleOperationJobKind.UPDATE,
+                GoogleCalendarEventJobKind.UPDATE,
                 4L,
                 null,
                 "",
@@ -111,7 +111,7 @@ class GoogleOperationJobTest {
                 1L,
                 2L,
                 3L,
-                GoogleOperationJobKind.CREATE,
+                GoogleCalendarEventJobKind.CREATE,
                 4L,
                 null,
                 "{}",

@@ -1,15 +1,11 @@
 package com.calio.calendar.integration.sync.operation;
 
-import com.calio.calendar.integration.sync.GoogleCalendarSyncService;
-import com.calio.calendar.integration.sync.GoogleCalendarEventJobService;
 import com.calio.calendar.integration.connection.service.GoogleCalendarConnectionCommandService;
 import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrationQueryService;
 import com.calio.calendar.external.google.GoogleCalendarInvalidGrantException;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJob;
-import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEventJob;
-import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarSyncJob;
 import com.calio.calendar.integration.sync.operation.dto.GoogleOperationFailureDecision;
 import java.time.Clock;
 import java.time.Instant;
@@ -23,31 +19,28 @@ public class GoogleOperationProcessor {
 
     private final GoogleOperationJobService jobService;
     private final GoogleOperationLeaseService operationLeaseService;
-    private final GoogleCalendarSyncService syncService;
+    private final GoogleOperationJobHandlerRegistry handlerRegistry;
     private final GoogleOperationFailureClassifier failureClassifier;
     private final GoogleCalendarConnectionCommandService connectionCommandService;
     private final GoogleCalendarIntegrationQueryService integrationQueryService;
     private final Clock clock;
-    private final GoogleCalendarEventJobService eventJobService;
 
     public GoogleOperationProcessor(
             GoogleOperationJobService jobService,
             GoogleOperationLeaseService operationLeaseService,
-            GoogleCalendarSyncService syncService,
+            GoogleOperationJobHandlerRegistry handlerRegistry,
             GoogleOperationFailureClassifier failureClassifier,
             GoogleCalendarConnectionCommandService connectionCommandService,
             GoogleCalendarIntegrationQueryService integrationQueryService,
-            Clock clock,
-            GoogleCalendarEventJobService eventJobService
+            Clock clock
     ) {
         this.jobService = jobService;
         this.operationLeaseService = operationLeaseService;
-        this.syncService = syncService;
+        this.handlerRegistry = handlerRegistry;
         this.failureClassifier = failureClassifier;
         this.connectionCommandService = connectionCommandService;
         this.integrationQueryService = integrationQueryService;
         this.clock = clock;
-        this.eventJobService = eventJobService;
     }
 
     public void processAccount(Long accountId) {
@@ -73,13 +66,7 @@ public class GoogleOperationProcessor {
         if (job == null) {
             return JobExecutionResult.STOP_ACCOUNT_PROCESSING;
         }
-        if (job instanceof GoogleCalendarSyncJob syncJob) {
-            return executeSync(syncJob, workerToken);
-        }
-        if (job instanceof GoogleCalendarEventJob eventJob) {
-            return executeEvent(eventJob, workerToken);
-        }
-        return terminateUnsupported(job, workerToken, UNSUPPORTED_JOB_SCOPE);
+        return execute(job, workerToken);
     }
 
     private JobExecutionResult terminateUnsupported(
@@ -91,19 +78,12 @@ public class GoogleOperationProcessor {
         return JobExecutionResult.CONTINUE_WITH_NEXT_JOB;
     }
 
-    private JobExecutionResult executeEvent(GoogleCalendarEventJob job, String workerToken) {
+    private JobExecutionResult execute(GoogleOperationJob job, String workerToken) {
         try {
-            eventJobService.apply(job, workerToken);
+            handlerRegistry.execute(job, workerToken);
             return JobExecutionResult.CONTINUE_WITH_NEXT_JOB;
-        } catch (RuntimeException failure) {
-            return handleSyncFailure(job, workerToken, failure);
-        }
-    }
-
-    private JobExecutionResult executeSync(GoogleCalendarSyncJob job, String workerToken) {
-        try {
-            syncService.synchronize(job.getId(), job.getAccountId(), workerToken);
-            return JobExecutionResult.CONTINUE_WITH_NEXT_JOB;
+        } catch (GoogleOperationJobHandlerNotFoundException exception) {
+            return terminateUnsupported(job, workerToken, UNSUPPORTED_JOB_SCOPE);
         } catch (RuntimeException failure) {
             return handleSyncFailure(job, workerToken, failure);
         }

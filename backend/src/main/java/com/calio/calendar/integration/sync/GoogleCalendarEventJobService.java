@@ -11,7 +11,9 @@ import com.calio.calendar.integration.mapping.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingCommandService;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingQueryService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobService;
+import com.calio.calendar.integration.sync.operation.GoogleOperationJobHandler;
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEventJob;
+import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJob;
 import com.calio.calendar.integration.sync.operation.dto.GoogleEventJobPayload;
 import java.util.HashMap;
 import java.util.List;
@@ -23,7 +25,7 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
 @Service
-public class GoogleCalendarEventJobService {
+public class GoogleCalendarEventJobService implements GoogleOperationJobHandler {
 
     private final GoogleCalendarConnectionQueryService connectionQueryService;
     private final GoogleCalendarEventMappingQueryService mappingQueryService;
@@ -52,6 +54,16 @@ public class GoogleCalendarEventJobService {
         this.objectMapper = objectMapper;
         this.jobService = jobService;
         this.transactionTemplate = transactionTemplate;
+    }
+
+    @Override
+    public Class<GoogleCalendarEventJob> jobType() {
+        return GoogleCalendarEventJob.class;
+    }
+
+    @Override
+    public void execute(GoogleOperationJob job, String workerToken) {
+        apply((GoogleCalendarEventJob) job, workerToken);
     }
 
     public void apply(GoogleCalendarEventJob job, String workerToken) {

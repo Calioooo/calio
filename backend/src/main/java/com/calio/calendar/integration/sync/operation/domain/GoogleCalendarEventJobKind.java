@@ -1,7 +1,6 @@
 package com.calio.calendar.integration.sync.operation.domain;
 
-public enum GoogleOperationJobKind {
-    SYNC,
+public enum GoogleCalendarEventJobKind {
     CREATE,
     UPDATE,
     DELETE

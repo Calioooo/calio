@@ -7,7 +7,7 @@ import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJob;
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEventJob;
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarSyncJob;
-import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobKind;
+import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEventJobKind;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobTrigger;
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEffectiveScope;
 import com.calio.calendar.integration.sync.operation.dto.GoogleEventJobPayload;
@@ -75,20 +75,20 @@ public class GoogleOperationJobEnqueueService {
 
     @Transactional
     public boolean enqueueEventCreated(Long accountId, Event event) {
-        return enqueueEventSnapshot(accountId, event, GoogleOperationJobKind.CREATE);
+        return enqueueEventSnapshot(accountId, event, GoogleCalendarEventJobKind.CREATE);
     }
 
     @Transactional
     public boolean enqueueEventUpdated(Long accountId, Event event) {
-        return enqueueEventSnapshot(accountId, event, GoogleOperationJobKind.UPDATE);
+        return enqueueEventSnapshot(accountId, event, GoogleCalendarEventJobKind.UPDATE);
     }
 
     @Transactional
     public boolean enqueueEventDeleted(Long accountId, Long eventId) {
-        return enqueueEventJob(accountId, eventId, GoogleOperationJobKind.DELETE, "{}");
+        return enqueueEventJob(accountId, eventId, GoogleCalendarEventJobKind.DELETE, "{}");
     }
 
-    private boolean enqueueEventSnapshot(Long accountId, Event event, GoogleOperationJobKind kind) {
+    private boolean enqueueEventSnapshot(Long accountId, Event event, GoogleCalendarEventJobKind kind) {
         return enqueueEventJob(
                 accountId,
                 event.getId(),
@@ -100,7 +100,7 @@ public class GoogleOperationJobEnqueueService {
     private boolean enqueueEventJob(
             Long accountId,
             Long eventId,
-            GoogleOperationJobKind kind,
+            GoogleCalendarEventJobKind kind,
             String targetPayload
     ) {
         var integration = integrationCommandService.tryLockIntegration(accountId).orElse(null);
@@ -120,8 +120,8 @@ public class GoogleOperationJobEnqueueService {
         return true;
     }
 
-    private String providerIdentity(GoogleOperationJobKind kind, Long integrationId, Long eventId) {
-        if (kind != GoogleOperationJobKind.CREATE) {
+    private String providerIdentity(GoogleCalendarEventJobKind kind, Long integrationId, Long eventId) {
+        if (kind != GoogleCalendarEventJobKind.CREATE) {
             return null;
         }
         return "c1" + "%016x".formatted(integrationId) + "%016x".formatted(eventId);

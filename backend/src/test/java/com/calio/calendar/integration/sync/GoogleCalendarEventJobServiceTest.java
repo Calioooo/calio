@@ -21,7 +21,7 @@ import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMapping
 import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingQueryService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobService;
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEventJob;
-import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobKind;
+import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEventJobKind;
 import com.calio.calendar.integration.sync.operation.dto.GoogleEventJobPayload;
 import java.time.Instant;
 import java.util.List;
@@ -83,7 +83,7 @@ class GoogleCalendarEventJobServiceTest {
         connection.disconnect(Instant.parse("2026-09-01T00:00:00Z"));
         GoogleCalendarEventMapping mapping = new GoogleCalendarEventMapping(
                 connection, 40L, "external-1", "etag-1");
-        GoogleCalendarEventJob job = job(GoogleOperationJobKind.UPDATE);
+        GoogleCalendarEventJob job = job(GoogleCalendarEventJobKind.UPDATE);
         when(mappingQueryService.listEventMappingsForEvent(20L, 40L))
                 .thenReturn(List.of(mapping));
 
@@ -103,7 +103,7 @@ class GoogleCalendarEventJobServiceTest {
         GoogleCalendarConnection connection = connection(30L);
         GoogleCalendarEventMapping mapping = new GoogleCalendarEventMapping(
                 connection, 40L, "external-1", "etag-1");
-        GoogleCalendarEventJob job = job(GoogleOperationJobKind.UPDATE);
+        GoogleCalendarEventJob job = job(GoogleCalendarEventJobKind.UPDATE);
         when(mappingQueryService.listEventMappingsForEvent(20L, 40L))
                 .thenReturn(List.of(mapping));
         when(accessTokenService.getAccessToken(30L)).thenReturn("token");
@@ -131,7 +131,7 @@ class GoogleCalendarEventJobServiceTest {
         GoogleCalendarConnection connection = connection(30L);
         GoogleCalendarEventMapping mapping = new GoogleCalendarEventMapping(
                 connection, 40L, "external-1", "etag-1");
-        GoogleCalendarEventJob job = job(GoogleOperationJobKind.CREATE);
+        GoogleCalendarEventJob job = job(GoogleCalendarEventJobKind.CREATE);
         when(mappingQueryService.listEventMappingsForEvent(20L, 40L))
                 .thenReturn(List.of(mapping));
         when(accessTokenService.getAccessToken(30L)).thenReturn("token");
@@ -157,7 +157,7 @@ class GoogleCalendarEventJobServiceTest {
         GoogleCalendarConnection connection = connection(30L);
         GoogleCalendarEventMapping mapping = new GoogleCalendarEventMapping(
                 connection, 40L, "external-1", "etag-1");
-        GoogleCalendarEventJob job = job(GoogleOperationJobKind.DELETE);
+        GoogleCalendarEventJob job = job(GoogleCalendarEventJobKind.DELETE);
         when(mappingQueryService.listEventMappingsForEvent(20L, 40L))
                 .thenReturn(List.of(mapping));
         when(accessTokenService.getAccessToken(30L)).thenReturn("token");
@@ -176,7 +176,7 @@ class GoogleCalendarEventJobServiceTest {
     void givenDeletedEvent_whenApplyCreate_thenCreatesGoogleEventWithoutEventLookup() {
         // given
         GoogleCalendarConnection connection = connection(30L);
-        GoogleCalendarEventJob job = job(GoogleOperationJobKind.CREATE);
+        GoogleCalendarEventJob job = job(GoogleCalendarEventJobKind.CREATE);
         when(mappingQueryService.listEventMappingsForEvent(20L, 40L)).thenReturn(List.of());
         when(connectionQueryService.listConnections(20L)).thenReturn(List.of(connection));
         when(accessTokenService.getAccessToken(30L)).thenReturn("token");
@@ -198,14 +198,14 @@ class GoogleCalendarEventJobServiceTest {
                 writeRequestCaptor = ArgumentCaptor.forClass(
                         com.calio.calendar.external.google.dto.GoogleCalendarEventWriteRequest.class);
         verify(eventsClient).insertEvent(org.mockito.ArgumentMatchers.eq("token"), writeRequestCaptor.capture());
-        assertThat(writeRequestCaptor.getValue().id()).isEqualTo(providerIdentity(GoogleOperationJobKind.CREATE));
+        assertThat(writeRequestCaptor.getValue().id()).isEqualTo(providerIdentity(GoogleCalendarEventJobKind.CREATE));
         verify(mappingCommandService).createEventMapping(mappingCaptor.capture());
         assertThat(mappingCaptor.getValue().getEventId()).isEqualTo(40L);
         assertThat(mappingCaptor.getValue().getExternalEventId()).isEqualTo("external-1");
         verify(jobService).succeed(50L, 10L, "worker");
     }
 
-    private GoogleCalendarEventJob job(GoogleOperationJobKind kind) {
+    private GoogleCalendarEventJob job(GoogleCalendarEventJobKind kind) {
         GoogleCalendarEventJob job = GoogleCalendarEventJob.create(
                 "operation", 20L, 10L, 1L, kind, 40L, providerIdentity(kind),
                 "payload", Instant.parse("2026-09-03T00:00:00Z"));
@@ -223,8 +223,8 @@ class GoogleCalendarEventJobServiceTest {
         return connection;
     }
 
-    private String providerIdentity(GoogleOperationJobKind kind) {
-        return kind == GoogleOperationJobKind.CREATE ? "c10000000000000014000000000000028" : null;
+    private String providerIdentity(GoogleCalendarEventJobKind kind) {
+        return kind == GoogleCalendarEventJobKind.CREATE ? "c10000000000000014000000000000028" : null;
     }
 
     private GoogleEventJobPayload payload() {

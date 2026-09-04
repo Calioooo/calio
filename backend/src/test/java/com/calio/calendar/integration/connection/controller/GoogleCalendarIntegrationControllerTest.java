@@ -20,7 +20,6 @@ import com.calio.calendar.integration.connection.domain.GoogleCalendarConnection
 import com.calio.calendar.integration.sync.GoogleCalendarSyncMode;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJob;
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarSyncJob;
-import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobKind;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobTrigger;
 import com.calio.calendar.integration.connection.repository.GoogleCalendarIntegrationRepository;

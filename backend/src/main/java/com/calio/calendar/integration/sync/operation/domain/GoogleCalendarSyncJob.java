@@ -25,8 +25,7 @@ public class GoogleCalendarSyncJob extends GoogleOperationJob {
             throw new IllegalArgumentException("Sync Google operation trigger must be MANUAL or PERIODIC");
         }
         GoogleCalendarSyncJob job = new GoogleCalendarSyncJob();
-        job.initialize(operationId, integrationId, accountId, integrationSequence,
-                GoogleOperationJobKind.SYNC, SYNC_SCOPE, SYNC_KEY, runnableAt);
+        job.initialize(operationId, integrationId, accountId, integrationSequence, runnableAt);
         job.trigger = trigger;
         return job;
     }

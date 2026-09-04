@@ -24,6 +24,12 @@ generic queue-job fields.
 - **THEN** the same deterministic provider identity is used for recovery
 - **AND** the event snapshot remains the snapshot captured when it was enqueued.
 
+#### Scenario: legacy resource keys are removed
+
+- **WHEN** typed job persistence is enabled
+- **THEN** an Event job stores its Event ID in its own typed field
+- **AND** no Job entity field represents a resource scope or resource key as a string.
+
 ## Requirement: Typed dispatch preserves queue policy
 
 The system SHALL dispatch by concrete job scope while retaining existing lease,
@@ -36,3 +42,14 @@ failure classification, retry, and integration ordering behavior.
   mutation kind
 - **AND** provider calls are outside database transactions
 - **AND** mapping finalization remains transactional.
+
+## Requirement: Scope handlers are extensible without processor changes
+
+The system SHALL select a single scope handler from a claimed Job's concrete
+entity type, while retaining queue lifecycle policy in the processor.
+
+#### Scenario: a new scope handler is registered
+
+- **WHEN** a future Job subtype and its handler are registered
+- **THEN** the registry selects that handler for the subtype
+- **AND** the processor does not require a scope-specific branch.

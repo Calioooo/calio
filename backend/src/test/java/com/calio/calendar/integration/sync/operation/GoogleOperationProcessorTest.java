@@ -12,8 +12,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import com.calio.calendar.integration.sync.GoogleCalendarSyncService;
-import com.calio.calendar.integration.sync.GoogleCalendarEventJobService;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.connection.service.GoogleCalendarConnectionCommandService;
 import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrationQueryService;
@@ -21,7 +19,7 @@ import com.calio.calendar.external.google.GoogleCalendarInvalidGrantException;
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEventJob;
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarSyncJob;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJob;
-import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobKind;
+import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEventJobKind;
 import com.calio.calendar.integration.sync.operation.dto.GoogleOperationFailureDecision;
 import java.time.Clock;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,34 +31,31 @@ class GoogleOperationProcessorTest {
 
     private GoogleOperationJobService jobPersistenceService;
     private GoogleOperationLeaseService operationLeaseService;
-    private GoogleCalendarSyncService syncService;
+    private GoogleOperationJobHandlerRegistry handlerRegistry;
     private GoogleOperationFailureClassifier failureClassifier;
     private GoogleCalendarConnectionCommandService connectionCommandService;
     private GoogleCalendarIntegrationQueryService integrationQueryService;
     private GoogleOperationProcessor processor;
-    private GoogleCalendarEventJobService eventJobService;
 
     @BeforeEach
     void setUp() {
         jobPersistenceService = mock(GoogleOperationJobService.class);
         operationLeaseService = mock(GoogleOperationLeaseService.class);
-        syncService = mock(GoogleCalendarSyncService.class);
+        handlerRegistry = mock(GoogleOperationJobHandlerRegistry.class);
         failureClassifier = mock(GoogleOperationFailureClassifier.class);
         connectionCommandService = mock(GoogleCalendarConnectionCommandService.class);
         integrationQueryService = mock(GoogleCalendarIntegrationQueryService.class);
-        eventJobService = mock(GoogleCalendarEventJobService.class);
         GoogleCalendarIntegration integration = mock(GoogleCalendarIntegration.class);
         when(integration.getId()).thenReturn(20L);
         when(integrationQueryService.getIntegrationIfExists(10L)).thenReturn(java.util.Optional.of(integration));
         processor = new GoogleOperationProcessor(
                 jobPersistenceService,
                 operationLeaseService,
-                syncService,
+                handlerRegistry,
                 failureClassifier,
                 connectionCommandService,
                 integrationQueryService,
-                Clock.systemUTC(),
-                eventJobService
+                Clock.systemUTC()
         );
     }
 
@@ -78,9 +73,9 @@ class GoogleOperationProcessorTest {
         processor.processAccount(10L);
 
         // then
-        InOrder executionOrder = inOrder(syncService);
-        executionOrder.verify(syncService).synchronize(eq(1L), eq(10L), anyString());
-        executionOrder.verify(syncService).synchronize(eq(2L), eq(10L), anyString());
+        InOrder executionOrder = inOrder(handlerRegistry);
+        executionOrder.verify(handlerRegistry).execute(eq(firstJob), anyString());
+        executionOrder.verify(handlerRegistry).execute(eq(secondJob), anyString());
         verify(operationLeaseService).release(eq(10L), anyString());
     }
 
@@ -92,7 +87,7 @@ class GoogleOperationProcessorTest {
         RuntimeException failure = new RuntimeException("temporary failure");
         when(operationLeaseService.acquire(eq(10L), anyString())).thenReturn(true);
         when(jobPersistenceService.claimNextJob(eq(10L), eq(20L), anyString())).thenReturn(job);
-        doThrow(failure).when(syncService).synchronize(eq(1L), eq(10L), anyString());
+        doThrow(failure).when(handlerRegistry).execute(eq(job), anyString());
         when(failureClassifier.classify(failure))
                 .thenReturn(GoogleOperationFailureDecision.retry("temporary"));
 
@@ -117,7 +112,7 @@ class GoogleOperationProcessorTest {
         when(jobPersistenceService.claimNextJob(eq(10L), eq(20L), anyString()))
                 .thenReturn(job)
                 .thenReturn(null);
-        doThrow(failure).when(syncService).synchronize(eq(1L), eq(10L), anyString());
+        doThrow(failure).when(handlerRegistry).execute(eq(job), anyString());
         when(failureClassifier.classify(failure))
                 .thenReturn(GoogleOperationFailureDecision.fail("permanent"));
 
@@ -140,7 +135,7 @@ class GoogleOperationProcessorTest {
                         com.calio.calendar.common.error.ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED);
         when(operationLeaseService.acquire(eq(10L), anyString())).thenReturn(true);
         when(jobPersistenceService.claimNextJob(eq(10L), eq(20L), anyString())).thenReturn(job);
-        doThrow(failure).when(syncService).synchronize(eq(1L), eq(10L), anyString());
+        doThrow(failure).when(handlerRegistry).execute(eq(job), anyString());
         when(failureClassifier.classify(failure))
                 .thenReturn(GoogleOperationFailureDecision.fail("GOOGLE_CALENDAR_RECONNECT_REQUIRED"));
 
@@ -164,7 +159,7 @@ class GoogleOperationProcessorTest {
                 );
         when(operationLeaseService.acquire(eq(10L), anyString())).thenReturn(true);
         when(jobPersistenceService.claimNextJob(eq(10L), eq(20L), anyString())).thenReturn(job);
-        doThrow(failure).when(syncService).synchronize(eq(1L), eq(10L), anyString());
+        doThrow(failure).when(handlerRegistry).execute(eq(job), anyString());
 
         processor.processAccount(10L);
 
@@ -182,7 +177,7 @@ class GoogleOperationProcessorTest {
         RuntimeException failure = new RuntimeException("ownership lost");
         when(operationLeaseService.acquire(eq(10L), anyString())).thenReturn(true);
         when(jobPersistenceService.claimNextJob(eq(10L), eq(20L), anyString())).thenReturn(job);
-        doThrow(failure).when(syncService).synchronize(eq(1L), eq(10L), anyString());
+        doThrow(failure).when(handlerRegistry).execute(eq(job), anyString());
         when(failureClassifier.classify(failure))
                 .thenReturn(GoogleOperationFailureDecision.skip());
 
@@ -201,6 +196,8 @@ class GoogleOperationProcessorTest {
     void givenUnsupportedJobKind_whenProcess_thenTerminatesWithoutSync() {
         // given
         GoogleOperationJob job = unsupportedJob(1L, 10L);
+        doThrow(new GoogleOperationJobHandlerNotFoundException(GoogleOperationJob.class))
+                .when(handlerRegistry).execute(eq(job), anyString());
         when(operationLeaseService.acquire(eq(10L), anyString())).thenReturn(true);
         when(jobPersistenceService.claimNextJob(eq(10L), eq(20L), anyString()))
                 .thenReturn(job)
@@ -213,7 +210,7 @@ class GoogleOperationProcessorTest {
         verify(jobPersistenceService).terminate(
                 eq(1L), eq(10L), anyString(), eq("UNSUPPORTED_JOB_SCOPE")
         );
-        verify(syncService, never()).synchronize(eq(1L), eq(10L), anyString());
+        verify(handlerRegistry).execute(eq(job), anyString());
         verifyNoInteractions(failureClassifier);
     }
 
@@ -231,8 +228,7 @@ class GoogleOperationProcessorTest {
         processor.processAccount(10L);
 
         // then
-        verify(eventJobService).apply(eq(job), anyString());
-        verifyNoInteractions(syncService);
+        verify(handlerRegistry).execute(eq(job), anyString());
     }
 
     @Test
@@ -240,6 +236,8 @@ class GoogleOperationProcessorTest {
     void givenUnsupportedRecurrenceScope_whenProcess_thenTerminatesWithScopeReason() {
         // given
         GoogleOperationJob job = unsupportedJob(1L, 10L);
+        doThrow(new GoogleOperationJobHandlerNotFoundException(GoogleOperationJob.class))
+                .when(handlerRegistry).execute(eq(job), anyString());
         when(operationLeaseService.acquire(eq(10L), anyString())).thenReturn(true);
         when(jobPersistenceService.claimNextJob(eq(10L), eq(20L), anyString()))
                 .thenReturn(job)
@@ -252,7 +250,7 @@ class GoogleOperationProcessorTest {
         verify(jobPersistenceService).terminate(
                 eq(1L), eq(10L), anyString(), eq("UNSUPPORTED_JOB_SCOPE")
         );
-        verifyNoInteractions(eventJobService, syncService);
+        verify(handlerRegistry).execute(eq(job), anyString());
     }
 
     @Test
@@ -282,7 +280,7 @@ class GoogleOperationProcessorTest {
         when(job.getId()).thenReturn(jobId);
         when(job.getAccountId()).thenReturn(accountId);
         when(job.getIntegrationId()).thenReturn(20L);
-        when(job.getKind()).thenReturn(GoogleOperationJobKind.CREATE);
+        when(job.getKind()).thenReturn(GoogleCalendarEventJobKind.CREATE);
         return job;
     }
 

@@ -19,20 +19,25 @@ recurrence-event or recurrence-override job can use another discriminator value
 and subtype without changing the queue table or its claim queries.
 
 The migration assigns existing `SYNC` jobs to `SYNC` and existing event resource
-scope rows to `EVENT`, while retaining existing fields for backwards-compatible
-data reads.
+scope rows to `EVENT`, copies the event ID to the typed Event column, and then
+removes the legacy resource scope/key columns.
 
 ## Execution model
 
 `GoogleOperationProcessor` retains all queue ownership, lease, retry,
-termination, and reconnect handling. It dispatches once by concrete job type:
-`GoogleCalendarSyncJob` invokes the current sync service; `GoogleCalendarEventJob`
-invokes the event job service. The event service switches on its closed mutation
-kind to CREATE, UPDATE, or DELETE.
+termination, and reconnect handling. A `GoogleOperationJobHandlerRegistry`
+selects a single handler from the concrete job type. `GoogleCalendarSyncJobHandler`
+invokes the current sync service; `GoogleCalendarEventJobService` is the Event
+handler and switches on its closed mutation kind to CREATE, UPDATE, or DELETE.
 
-No general executor registry is introduced. Adding a scope requires an explicit
-producer, subtype, processor branch, migration contract, and tests, so a dynamic
-registry would hide rather than reduce required change.
+The registry validates duplicate handled types at application startup. Adding a
+scope requires an explicit producer, subtype, handler, migration contract, and
+tests, but does not require a processor change. A handler must own meaningful
+scope behavior; no forwarding executor/service pair is introduced.
+
+Until recurrence jobs are implemented, recurrence pending-job checks return
+false because no recurrence subtype can be persisted. The recurrence PR must add
+the subtype fields and corresponding typed pending-job queries in the same change.
 
 ## Transaction and idempotency invariants
 
