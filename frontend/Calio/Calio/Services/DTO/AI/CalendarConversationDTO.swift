@@ -40,8 +40,8 @@ enum CalendarAssistantBlockDTO: Decodable {
 }
 
 struct FreeTimeResponseDTO: Decodable {
-  let start: String
-  let end: String
+  let start: Date
+  let end: Date
   let allDayNotices: [String]
 }
 struct CalendarMutationPreviewResponseDTO: Decodable {

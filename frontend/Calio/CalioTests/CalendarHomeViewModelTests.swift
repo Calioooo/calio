@@ -207,25 +207,36 @@ struct CalendarHomeViewModelTests {
 
         viewModel.loadInitialIfNeeded()
         #expect(await repository.waitForRequestCount(3))
+        let juneKey = YearMonthKey(date: june, calendar: calendar)
+        #expect(await waitUntil {
+            repository.suspendedRequestCount(for: juneKey, calendar: calendar) == 1
+        })
 
         viewModel.refreshAfterAssistantResponse()
         #expect(await repository.waitForRequestCount(6))
+        #expect(await waitUntil {
+            repository.suspendedRequestCount(for: juneKey, calendar: calendar) == 2
+        })
 
-        repository.finishNextSuspendedRequest(returning: [])
-        repository.finishNextSuspendedRequest(returning: [makeEventResponse(from: staleEvent)])
+        repository.finishSuspendedRequest(
+            for: juneKey,
+            calendar: calendar,
+            returning: [makeEventResponse(from: staleEvent)]
+        )
         await Task.yield()
 
-        let juneKey = YearMonthKey(date: june, calendar: calendar)
         #expect(viewModel.state.monthEventCache[juneKey]?.isLoading == true)
         #expect(viewModel.state.monthEventCache[juneKey]?.loadedEvents.isEmpty == true)
 
-        repository.finishNextSuspendedRequest(returning: [])
-        repository.finishNextSuspendedRequest(returning: [])
-        repository.finishNextSuspendedRequest(returning: [makeEventResponse(from: freshEvent)])
-        repository.finishNextSuspendedRequest(returning: [])
+        repository.finishSuspendedRequest(
+            for: juneKey,
+            calendar: calendar,
+            returning: [makeEventResponse(from: freshEvent)]
+        )
         #expect(await waitUntil {
             viewModel.state.monthEventCache[juneKey]?.loadedEvents.map(\.backendId) == [freshEvent.backendId]
         })
+        repository.finishSuspendedRequests()
     }
 
     @MainActor

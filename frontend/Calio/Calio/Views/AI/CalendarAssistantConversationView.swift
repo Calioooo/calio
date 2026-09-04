@@ -34,9 +34,13 @@ struct CalendarAssistantConversationView: View {
           VStack(spacing: 14) {
             ContentUnavailableView(
               "대화를 준비하지 못했어요", systemImage: "sparkles", description: Text(failure.message))
-            Button("다시 시도") { Task { await viewModel.retryConnection() } }.buttonStyle(
-              .borderedProminent
-            ).tint(.calioBrand)
+            Button("다시 시도") {
+              Task {
+                await viewModel.retryConnection()
+              }
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.calioBrand)
           }.accessibilityIdentifier("calendar_assistant_connection_failed")
         case .ready:
           conversation
@@ -165,18 +169,22 @@ struct CalendarAssistantConversationView: View {
             "\($0.title) · \(CalendarEventDisplayText.compactDateTimeRange(startAt: $0.startAt, endAt: $0.endAt))"
           )
         }
-      }.resultCard(title: "일정", icon: "calendar", label: "일정 결과")
+      }.resultCard(title: "일정", icon: "calendar", label: eventResultAccessibilityLabel(events))
     case .freeTimes(let times):
       VStack(alignment: .leading, spacing: 8) {
         ForEach(times) {
-          Text("\($0.start) ~ \($0.end)")
+          Text(CalendarEventDisplayText.compactDateTimeRange(startAt: $0.start, endAt: $0.end))
           ForEach($0.allDayNotices, id: \.self) {
             Text($0).font(.caption).foregroundStyle(.calioTextSecondary)
           }
         }
-      }.resultCard(title: "빈 시간", icon: "clock", label: "빈 시간 결과")
+      }.resultCard(title: "빈 시간", icon: "clock", label: freeTimeResultAccessibilityLabel(times))
     case .mutationPreviews(let previews):
-      VStack(alignment: .leading, spacing: 14) { ForEach(previews) { mutationPreviewView($0) } }
+      VStack(alignment: .leading, spacing: 14) {
+        ForEach(Array(previews.enumerated()), id: \.offset) { _, preview in
+          mutationPreviewView(preview)
+        }
+      }
     case .unsupported:
       Text("지원되지 않는 AI 결과입니다.").resultCard(
         title: "지원되지 않는 결과", icon: "exclamationmark.circle", label: "지원되지 않는 결과")
@@ -217,8 +225,7 @@ struct CalendarAssistantConversationView: View {
       RoundedRectangle(cornerRadius: 16).stroke(Color.calioDivider.opacity(0.75), lineWidth: 1)
     )
     .accessibilityElement(children: .combine)
-    .accessibilityLabel(
-      "\(mutationTypeLabel(preview.type)) 일정 변경 제안, \(mutationScopeLabel(preview.scope))")
+    .accessibilityLabel(mutationPreviewAccessibilityLabel(preview))
   }
 
   private func mutationEventView(_ event: CalendarAssistantMutationEvent, label: String)
@@ -258,6 +265,41 @@ struct CalendarAssistantConversationView: View {
     case "ENTIRE_SERIES": return "전체 반복 일정"
     default: return scope
     }
+  }
+
+  private func eventResultAccessibilityLabel(_ events: [Event]) -> String {
+    let details = events.map {
+      "\($0.title), \(CalendarEventDisplayText.compactDateTimeRange(startAt: $0.startAt, endAt: $0.endAt))"
+    }.joined(separator: ". ")
+    return details.isEmpty ? "일정 결과" : "일정 결과. \(details)"
+  }
+
+  private func freeTimeResultAccessibilityLabel(_ times: [CalendarAssistantFreeTime]) -> String {
+    let details = times.map {
+      CalendarEventDisplayText.compactDateTimeRange(startAt: $0.start, endAt: $0.end)
+    }.joined(separator: ". ")
+    return details.isEmpty ? "빈 시간 결과" : "빈 시간 결과. \(details)"
+  }
+
+  private func mutationPreviewAccessibilityLabel(_ preview: CalendarAssistantMutationPreview) -> String {
+    var details = ["\(mutationTypeLabel(preview.type)) 일정 변경 제안", mutationScopeLabel(preview.scope)]
+    if let before = preview.before {
+      details.append(mutationEventAccessibilityLabel(before, label: "변경 전"))
+    }
+    if let after = preview.after {
+      details.append(mutationEventAccessibilityLabel(after, label: "변경 후"))
+    }
+    if let before = preview.recurrenceBefore, let after = preview.recurrenceAfter {
+      details.append("반복 규칙 변경 전 \(before.joined(separator: ", ")), 변경 후 \(after.joined(separator: ", "))")
+    }
+    return details.joined(separator: ". ")
+  }
+
+  private func mutationEventAccessibilityLabel(_ event: CalendarAssistantMutationEvent, label: String) -> String {
+    let dateTime = event.allDay
+      ? "종일"
+      : CalendarEventDisplayText.compactDateTimeRange(startAt: event.startAt, endAt: event.endAt)
+    return "\(label) \(event.title), \(dateTime), 태그 \(event.tag.title)"
   }
 
   private var messageAnimation: Animation {

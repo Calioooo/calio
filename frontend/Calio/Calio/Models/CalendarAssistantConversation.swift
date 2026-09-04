@@ -7,19 +7,18 @@ enum CalendarAssistantResult {
   case unsupported(String)
 }
 struct CalendarAssistantFreeTime: Identifiable, Equatable {
-  let start: String
-  let end: String
+  let start: Date
+  let end: Date
   let allDayNotices: [String]
-  var id: String { "\(start)-\(end)" }
+  var id: String { "\(start.timeIntervalSince1970)-\(end.timeIntervalSince1970)" }
 }
-struct CalendarAssistantMutationPreview: Identifiable, Equatable {
+struct CalendarAssistantMutationPreview: Equatable {
   let type: String
   let scope: String
   let before: CalendarAssistantMutationEvent?
   let after: CalendarAssistantMutationEvent?
   let recurrenceBefore: [String]?
   let recurrenceAfter: [String]?
-  var id: String { "\(type)-\(scope)-\(after?.title ?? before?.title ?? "event")" }
 }
 struct CalendarAssistantMutationEvent: Equatable {
   let title: String

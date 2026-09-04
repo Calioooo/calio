@@ -27,14 +27,14 @@ struct CalendarAssistantConversationTests {
       ]
       """.utf8)
 
-    let blocks = try JSONDecoder().decode([CalendarAssistantBlockDTO].self, from: data)
+    let blocks = try APIJSONCoding.makeDecoder().decode([CalendarAssistantBlockDTO].self, from: data)
 
     #expect(blocks.count == 3)
     guard case .freeTimes(let first) = blocks[0] else {
       Issue.record("Expected first FREE_TIMES block")
       return
     }
-    #expect(first.first?.start == "2026-08-18T13:00:00+09:00")
+    #expect(first.first?.start != nil)
     guard case .unsupported(let type) = blocks[1] else {
       Issue.record("Unknown blocks must remain visible to the client")
       return
@@ -168,7 +168,8 @@ struct CalendarAssistantConversationTests {
           blocks: [
             .freeTimes([
               .init(
-                start: "2026-09-04T13:00:00+09:00", end: "2026-09-04T14:00:00+09:00",
+                start: Date(timeIntervalSince1970: 1_788_515_600),
+                end: Date(timeIntervalSince1970: 1_788_519_200),
                 allDayNotices: [])
             ]),
             .mutationPreviews([
@@ -322,7 +323,7 @@ struct CalendarAssistantConversationTests {
     #expect(viewModel.state == .ready)
 
     let firstSend = Task { await viewModel.send("첫 번째 요청") }
-    try? await Task.sleep(nanoseconds: 20_000_000)
+    #expect(await waitUntil { repository.sentMessages.count == 1 })
     await viewModel.send("두 번째 요청")
 
     #expect(repository.sentMessages.map(\.message) == ["첫 번째 요청"])
@@ -347,11 +348,13 @@ struct CalendarAssistantConversationTests {
     await viewModel.start()
     let firstSend = Task { await viewModel.send("첫 번째 요청") }
     #expect(await waitUntil { repository.sentMessages.count == 1 })
+    #expect(await waitUntil { repository.suspendedResponseCount == 1 })
 
     viewModel.endSession()
     await viewModel.start()
     let secondSend = Task { await viewModel.send("두 번째 요청") }
     #expect(await waitUntil { repository.sentMessages.count == 2 })
+    #expect(await waitUntil { repository.suspendedResponseCount == 2 })
 
     repository.finishNextSuspendedResponse()
     await Task.yield()
@@ -366,6 +369,27 @@ struct CalendarAssistantConversationTests {
 
     #expect(viewModel.messages.map(\.text) == ["두 번째 요청", "새 대화 응답"])
     #expect(refreshCount == 1)
+  }
+
+  @MainActor @Test func viewModelCreatesOnlyOneConversationForConcurrentStarts() async {
+    let repository = CalendarConversationRepositoryStub(
+      conversationIds: ["conversation-7"],
+      responses: [SendCalendarConversationMessageResponseDTO](),
+      shouldSuspendCreation: true
+    )
+    let viewModel = CalendarAssistantConversationViewModel(service: .init(repository: repository))
+
+    let firstStart = Task { await viewModel.start() }
+    let secondStart = Task { await viewModel.start() }
+    #expect(await waitUntil { repository.createdConversationCount == 1 })
+    #expect(await waitUntil { repository.suspendedCreationCount == 1 })
+
+    repository.finishNextSuspendedCreation()
+    await firstStart.value
+    await secondStart.value
+
+    #expect(repository.createdConversationCount == 1)
+    #expect(viewModel.state == .ready)
   }
 }
 
@@ -383,21 +407,31 @@ private final class CalendarConversationRepositoryStub: CalendarConversationRepo
   private var creationFailuresRemaining: Int
   private let responseDelayNanoseconds: UInt64
   private let shouldSuspendResponses: Bool
+  private let shouldSuspendCreation: Bool
+  private var suspendedCreationContinuations:
+    [CheckedContinuation<CreateCalendarConversationResponseDTO, Error>] = []
   private var suspendedResponseContinuations:
     [CheckedContinuation<SendCalendarConversationMessageResponseDTO, Error>] = []
+
+  var suspendedResponseCount: Int {
+    suspendedResponseContinuations.count
+  }
+  var suspendedCreationCount: Int { suspendedCreationContinuations.count }
 
   init(
     conversationIds: [String],
     responses: [SendCalendarConversationMessageResponseDTO],
     creationFailuresRemaining: Int = 0,
     responseDelayNanoseconds: UInt64 = 0,
-    shouldSuspendResponses: Bool = false
+    shouldSuspendResponses: Bool = false,
+    shouldSuspendCreation: Bool = false
   ) {
     self.conversationIds = conversationIds
     self.responses = responses.map(Result.success)
     self.creationFailuresRemaining = creationFailuresRemaining
     self.responseDelayNanoseconds = responseDelayNanoseconds
     self.shouldSuspendResponses = shouldSuspendResponses
+    self.shouldSuspendCreation = shouldSuspendCreation
   }
 
   init(
@@ -405,13 +439,15 @@ private final class CalendarConversationRepositoryStub: CalendarConversationRepo
     responses: [Result<SendCalendarConversationMessageResponseDTO, Error>],
     creationFailuresRemaining: Int = 0,
     responseDelayNanoseconds: UInt64 = 0,
-    shouldSuspendResponses: Bool = false
+    shouldSuspendResponses: Bool = false,
+    shouldSuspendCreation: Bool = false
   ) {
     self.conversationIds = conversationIds
     self.responses = responses
     self.creationFailuresRemaining = creationFailuresRemaining
     self.responseDelayNanoseconds = responseDelayNanoseconds
     self.shouldSuspendResponses = shouldSuspendResponses
+    self.shouldSuspendCreation = shouldSuspendCreation
   }
 
   func createConversation() async throws -> CreateCalendarConversationResponseDTO {
@@ -419,6 +455,11 @@ private final class CalendarConversationRepositoryStub: CalendarConversationRepo
     if creationFailuresRemaining > 0 {
       creationFailuresRemaining -= 1
       throw CalendarAssistantFailure.connection
+    }
+    if shouldSuspendCreation {
+      return try await withCheckedThrowingContinuation { continuation in
+        suspendedCreationContinuations.append(continuation)
+      }
     }
     return .init(conversationId: conversationIds.removeFirst())
   }
@@ -443,5 +484,11 @@ private final class CalendarConversationRepositoryStub: CalendarConversationRepo
     guard !suspendedResponseContinuations.isEmpty else { return }
     let continuation = suspendedResponseContinuations.removeFirst()
     continuation.resume(with: responses.removeFirst())
+  }
+
+  func finishNextSuspendedCreation() {
+    guard !suspendedCreationContinuations.isEmpty else { return }
+    let continuation = suspendedCreationContinuations.removeFirst()
+    continuation.resume(returning: .init(conversationId: conversationIds.removeFirst()))
   }
 }

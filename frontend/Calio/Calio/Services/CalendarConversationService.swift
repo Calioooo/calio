@@ -10,8 +10,10 @@ struct CalendarConversationService {
       return try await repository.createConversation().conversationId
     } catch let failure as CalendarAssistantFailure {
       throw failure
+    } catch let error as APIError {
+      throw mapCreateFailure(error)
     } catch {
-      throw CalendarAssistantFailure.connection
+      throw CalendarAssistantFailure.unexpected
     }
   }
   func send(message: String, conversationId: String, timeZone: TimeZone = .current) async throws
@@ -24,8 +26,10 @@ struct CalendarConversationService {
       return (response.assistantMessage, try response.blocks.map(mapBlock))
     } catch let failure as CalendarAssistantFailure {
       throw failure
+    } catch let error as APIError {
+      throw mapMessageFailure(error)
     } catch {
-      throw CalendarAssistantFailure.message
+      throw CalendarAssistantFailure.unexpected
     }
   }
   private func mapBlock(_ block: CalendarAssistantBlockDTO) throws -> CalendarAssistantResult {
@@ -37,6 +41,14 @@ struct CalendarConversationService {
     case .mutationPreviews(let values): return .mutationPreviews(try values.map(mapPreview))
     case .unsupported(let type): return .unsupported(type)
     }
+  }
+  private func mapCreateFailure(_ error: APIError) -> CalendarAssistantFailure {
+    if case .network = error { return .connection }
+    return .unexpected
+  }
+  private func mapMessageFailure(_ error: APIError) -> CalendarAssistantFailure {
+    if case .network = error { return .message }
+    return .unexpected
   }
   private func mapEvent(_ dto: EventResponseDTO) throws -> Event {
     Event(

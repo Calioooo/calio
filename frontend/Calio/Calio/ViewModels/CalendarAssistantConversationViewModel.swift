@@ -15,6 +15,8 @@ final class CalendarAssistantConversationViewModel: ObservableObject {
   private var conversationId: String?
   private var retryMessage: String?
   private var sessionGeneration = 0
+  private var creationTask: Task<Void, Never>?
+  private var creationTaskGeneration: Int?
 
   init(
     service: CalendarConversationService = CalendarConversationService(),
@@ -25,14 +27,21 @@ final class CalendarAssistantConversationViewModel: ObservableObject {
   }
   func start() async {
     guard case .connecting = state else { return }
-    await createConversation()
+    await createConversationIfNeeded()
   }
   func retryConnection() async {
+    if let creationTask {
+      await creationTask.value
+      return
+    }
     state = .connecting
-    await createConversation()
+    await createConversationIfNeeded()
   }
   func endSession() {
     sessionGeneration &+= 1
+    creationTask?.cancel()
+    creationTask = nil
+    creationTaskGeneration = nil
     conversationId = nil
     messages = []
     isSending = false
@@ -75,8 +84,28 @@ final class CalendarAssistantConversationViewModel: ObservableObject {
     guard let retryMessage else { return }
     await send(retryMessage)
   }
-  private func createConversation() async {
+  private func createConversationIfNeeded() async {
+    if let creationTask {
+      await creationTask.value
+      return
+    }
+
     let generation = sessionGeneration
+    creationTaskGeneration = generation
+    let task = Task { [weak self] in
+      guard let self else { return }
+      await self.createConversation(for: generation)
+    }
+    creationTask = task
+    await task.value
+  }
+  private func createConversation(for generation: Int) async {
+    defer {
+      if creationTaskGeneration == generation {
+        creationTask = nil
+        creationTaskGeneration = nil
+      }
+    }
     do {
       let identifier = try await service.createConversation()
       guard generation == sessionGeneration else { return }
