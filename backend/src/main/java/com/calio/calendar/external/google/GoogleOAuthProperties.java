@@ -1,5 +1,6 @@
 package com.calio.calendar.external.google;
 
+import java.net.URI;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
@@ -49,6 +50,7 @@ public class GoogleOAuthProperties {
     }
 
     public void setCalendarEventsUrl(String calendarEventsUrl) {
+        requireHttpsCalendarEventsUrl(calendarEventsUrl);
         this.calendarEventsUrl = calendarEventsUrl;
     }
 
@@ -84,5 +86,20 @@ public class GoogleOAuthProperties {
 
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
+    }
+
+    private void requireHttpsCalendarEventsUrl(String calendarEventsUrl) {
+        if (!hasText(calendarEventsUrl)) {
+            return;
+        }
+        URI uri;
+        try {
+            uri = URI.create(calendarEventsUrl);
+        } catch (IllegalArgumentException exception) {
+            throw new IllegalArgumentException("Google Calendar Events URL must be a valid HTTPS URL", exception);
+        }
+        if (!"https".equalsIgnoreCase(uri.getScheme())) {
+            throw new IllegalArgumentException("Google Calendar Events URL must use HTTPS");
+        }
     }
 }

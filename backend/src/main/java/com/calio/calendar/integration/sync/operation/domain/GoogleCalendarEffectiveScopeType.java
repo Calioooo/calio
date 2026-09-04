@@ -16,4 +16,13 @@ public enum GoogleCalendarEffectiveScopeType {
         return storedValue;
     }
 
+    public static GoogleCalendarEffectiveScopeType from(String storedValue) {
+        for (GoogleCalendarEffectiveScopeType type : values()) {
+            if (type.storedValue.equals(storedValue)) {
+                return type;
+            }
+        }
+        throw new IllegalArgumentException("Unsupported Google Calendar resource scope: " + storedValue);
+    }
+
 }
