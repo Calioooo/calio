@@ -3,6 +3,9 @@ package com.calio.calendar.vote.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -11,6 +14,7 @@ import static org.mockito.Mockito.when;
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
+import com.calio.calendar.vote.controller.dto.SubmitVoteRequest;
 import com.calio.calendar.vote.domain.VoteParticipant;
 import com.calio.calendar.vote.domain.VoteParticipantStatus;
 import com.calio.calendar.vote.domain.VoteRoom;
@@ -23,6 +27,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -39,15 +44,19 @@ class VoteParticipantServiceTest {
     @Mock
     private VoteParticipantCommandService voteParticipantCommandService;
 
+    @Mock
+    private VoteCommandService voteCommandService;
+
     private VoteParticipantService voteParticipantService;
     private PasswordEncoder passwordEncoder;
 
     @BeforeEach
     void setUp() {
-        passwordEncoder = new BCryptPasswordEncoder();
+        passwordEncoder = org.mockito.Mockito.spy(new BCryptPasswordEncoder());
         voteParticipantService = new VoteParticipantService(
                 voteParticipantQueryService,
                 voteParticipantCommandService,
+                voteCommandService,
                 passwordEncoder
         );
     }
@@ -184,6 +193,63 @@ class VoteParticipantServiceTest {
                         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.VOTE_ROOM_NOT_FOUND)
                 );
         verifyNoInteractions(voteParticipantQueryService);
+    }
+
+    @Test
+    @DisplayName("투표 제출은 비잠금 인증을 마친 뒤 참여자 쓰기 잠금을 획득한다")
+    void givenValidCredential_whenSubmitVotes_thenVerifiesCredentialBeforeAcquiringLock() {
+        // given
+        VoteParticipant participant = new VoteParticipant(voteRoom(), "calio", passwordEncoder.encode("secret"));
+        when(voteParticipantQueryService.getParticipantByVoteRoomPublicIdAndNicknameIfExists(
+                VOTE_ROOM_PUBLIC_ID,
+                "calio"
+        )).thenReturn(Optional.of(participant));
+        when(voteParticipantCommandService.getParticipantForVoteSubmission(VOTE_ROOM_PUBLIC_ID, "calio"))
+                .thenReturn(participant);
+
+        // when
+        voteParticipantService.submitVotes(VOTE_ROOM_PUBLIC_ID, new SubmitVoteRequest(
+                "calio",
+                "secret",
+                java.util.List.of(LocalDate.of(2026, 8, 15))
+        ));
+
+        // then
+        InOrder inOrder = inOrder(
+                voteParticipantQueryService,
+                passwordEncoder,
+                voteParticipantCommandService,
+                voteCommandService
+        );
+        inOrder.verify(voteParticipantQueryService)
+                .getParticipantByVoteRoomPublicIdAndNicknameIfExists(VOTE_ROOM_PUBLIC_ID, "calio");
+        inOrder.verify(passwordEncoder).matches("secret", participant.getPasswordHash());
+        inOrder.verify(voteParticipantCommandService)
+                .getParticipantForVoteSubmission(VOTE_ROOM_PUBLIC_ID, "calio");
+        inOrder.verify(voteCommandService).replaceVotes(eq(participant), anyList());
+    }
+
+    @Test
+    @DisplayName("잘못된 비밀번호의 투표 제출은 참여자 잠금과 Vote 교체를 실행하지 않는다")
+    void givenInvalidPassword_whenSubmitVotes_thenRejectsBeforeAcquiringLock() {
+        // given
+        VoteParticipant participant = new VoteParticipant(voteRoom(), "calio", passwordEncoder.encode("secret"));
+        when(voteParticipantQueryService.getParticipantByVoteRoomPublicIdAndNicknameIfExists(
+                VOTE_ROOM_PUBLIC_ID,
+                "calio"
+        )).thenReturn(Optional.of(participant));
+
+        // when, then
+        assertThatThrownBy(() -> voteParticipantService.submitVotes(VOTE_ROOM_PUBLIC_ID, new SubmitVoteRequest(
+                "calio",
+                "wrong",
+                java.util.List.of(LocalDate.of(2026, 8, 15))
+        ))).isInstanceOfSatisfying(CalioException.class, exception ->
+                assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.VOTE_PARTICIPANT_CREDENTIAL_INVALID)
+        );
+        verify(voteParticipantCommandService, never())
+                .getParticipantForVoteSubmission(VOTE_ROOM_PUBLIC_ID, "calio");
+        verifyNoInteractions(voteCommandService);
     }
 
     private VoteRoom voteRoom() {

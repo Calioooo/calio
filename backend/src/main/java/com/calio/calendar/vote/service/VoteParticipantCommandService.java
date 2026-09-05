@@ -30,6 +30,14 @@ public class VoteParticipantCommandService {
                 .orElseThrow(() -> new CalioException(ErrorCode.VOTE_ROOM_NOT_FOUND));
     }
 
+    public VoteParticipant getParticipantForVoteSubmission(UUID voteRoomPublicId, String nickname) {
+        return voteParticipantRepository.findByVoteRoomPublicIdAndNicknameForUpdate(
+                        voteRoomPublicId,
+                        nickname
+                )
+                .orElseThrow(() -> new CalioException(ErrorCode.VOTE_PARTICIPANT_CREDENTIAL_INVALID));
+    }
+
     public VoteParticipant create(VoteParticipant participant) {
         return voteParticipantRepository.save(participant);
     }

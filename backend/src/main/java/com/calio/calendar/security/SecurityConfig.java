@@ -13,6 +13,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.util.matcher.RegexRequestMatcher;
 
 @Configuration
 @EnableWebSecurity
@@ -51,6 +52,12 @@ public class SecurityConfig {
                         .requestMatchers("/api/tags").authenticated()
                         .requestMatchers("/api/custom-tags").authenticated()
                         .requestMatchers("/api/custom-tags/**").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/vote-rooms/*/participants").permitAll()
+                        .requestMatchers(HttpMethod.PUT, "/api/vote-rooms/*/votes").permitAll()
+                        .requestMatchers(new RegexRequestMatcher(
+                                "^/api/vote-rooms/[0-9a-fA-F-]{36}(?:\\?.*)?$",
+                                HttpMethod.GET.name()
+                        )).permitAll()
                         .requestMatchers("/api/vote-rooms").authenticated()
                         .requestMatchers("/api/vote-rooms/**").authenticated()
                         .requestMatchers("/api/integrations/**").authenticated()

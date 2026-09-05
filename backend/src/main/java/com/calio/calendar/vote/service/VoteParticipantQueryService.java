@@ -23,4 +23,5 @@ public class VoteParticipantQueryService {
     ) {
         return voteParticipantRepository.findByVoteRoomPublicIdAndNickname(voteRoomPublicId, nickname);
     }
+
 }
