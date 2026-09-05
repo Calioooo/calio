@@ -128,4 +128,31 @@ class VoteParticipantRepositoryTest {
                         LocalDate.of(2026, 8, 20)
                 );
     }
+
+    @Test
+    @DisplayName("제출한 참여자의 Vote만 날짜별 집계와 닉네임 projection으로 조회한다")
+    void givenSubmittedAndRegisteredParticipants_whenFindResultProjections_thenExcludesRegisteredParticipant() {
+        VoteParticipant submittedParticipant = voteParticipantRepository.saveAndFlush(
+                new VoteParticipant(voteRoom, "submitted", null)
+        );
+        submittedParticipant.submit();
+        voteParticipantRepository.saveAndFlush(submittedParticipant);
+        VoteParticipant registeredParticipant = voteParticipantRepository.saveAndFlush(
+                new VoteParticipant(voteRoom, "register", null)
+        );
+        LocalDate selectedDate = LocalDate.of(2026, 8, 15);
+        voteRepository.saveAllAndFlush(List.of(
+                new Vote(submittedParticipant, selectedDate),
+                new Vote(registeredParticipant, selectedDate)
+        ));
+
+        assertThat(voteRepository.findAllSubmittedByVoteRoomPublicId(voteRoom.getPublicId()))
+                .extracting(Vote::getUnavailableDate)
+                .containsExactly(selectedDate);
+        assertThat(voteRepository.findAllSubmittedByVoteRoomPublicId(voteRoom.getPublicId()))
+                .extracting(vote -> vote.getVoteParticipant().getNickname())
+                .containsExactly("submitted");
+        assertThat(voteParticipantRepository.findSubmittedNicknamesByVoteRoomPublicId(voteRoom.getPublicId()))
+                .containsExactly("submitted");
+    }
 }

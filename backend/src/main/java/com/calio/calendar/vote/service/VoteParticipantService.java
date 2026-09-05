@@ -62,18 +62,21 @@ public class VoteParticipantService {
     @Transactional
     public VoteSubmissionResponse submitVotes(UUID voteRoomPublicId, SubmitVoteRequest request) {
         String nickname = normalizeNickname(request.nickname());
-        VoteParticipant participant = voteParticipantCommandService
-                .getParticipantForVoteSubmission(voteRoomPublicId, nickname);
+        VoteParticipant participant = voteParticipantQueryService
+                .getParticipantByVoteRoomPublicIdAndNicknameIfExists(voteRoomPublicId, nickname)
+                .orElseThrow(() -> new CalioException(ErrorCode.VOTE_PARTICIPANT_CREDENTIAL_INVALID));
         requireValidPassword(participant, request.password());
+        VoteParticipant lockedParticipant = voteParticipantCommandService
+                .getParticipantForVoteSubmission(voteRoomPublicId, nickname);
         List<LocalDate> unavailableDates = new LinkedHashSet<>(request.unavailableDates()).stream()
                 .sorted()
                 .toList();
-        requireDatesInCandidateRange(participant.getVoteRoom(), unavailableDates);
+        requireDatesInCandidateRange(lockedParticipant.getVoteRoom(), unavailableDates);
         List<Vote> votes = unavailableDates.stream()
-                .map(date -> new Vote(participant, date))
+                .map(date -> new Vote(lockedParticipant, date))
                 .toList();
-        voteCommandService.replaceVotes(participant, votes);
-        return VoteSubmissionResponse.from(participant, unavailableDates);
+        voteCommandService.replaceVotes(lockedParticipant, votes);
+        return VoteSubmissionResponse.from(lockedParticipant, unavailableDates);
     }
 
     private void requireNicknameAvailable(UUID voteRoomPublicId, String nickname) {
