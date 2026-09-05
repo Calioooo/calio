@@ -154,6 +154,9 @@ class CalendarMutationServiceTest {
 
         assertThat(preview.after().allDay()).isTrue();
         assertThat(preview.after().timeZone()).isNull();
+        assertThat(preview.after().startAt()).isEqualTo(Instant.parse("2026-08-07T00:00:00Z"));
+        assertThat(preview.after().endAt()).isEqualTo(Instant.parse("2026-08-08T00:00:00Z"));
+        assertThat(preview.after().originStartAt()).isEqualTo(Instant.parse("2026-08-07T00:00:00Z"));
         assertThat(preview.recurrence().after()).containsExactly("RRULE:FREQ=DAILY;UNTIL=20260831");
         verify(recurrenceEventService, never()).createRecurrenceEvent(any(), any());
     }

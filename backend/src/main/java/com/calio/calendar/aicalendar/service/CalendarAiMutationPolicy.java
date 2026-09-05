@@ -67,23 +67,33 @@ public class CalendarAiMutationPolicy {
         if (until == null) {
             return;
         }
-        LocalDate endDate = parseEndDate(until);
-        if (endDate.isAfter(maximumEndDate()) || endDate.isBefore(firstOccurrenceDate(schedule))) {
+        LocalDate endDate = recurrenceEndDate(until, schedule);
+        if (endDate.isAfter(maximumEndDate()) || endDate.isBefore(schedule.firstOccurrenceLocalStart().toLocalDate())) {
             throw new CalioException(ErrorCode.INVALID_RECURRENCE_SCHEDULE);
         }
         requireUntilMatchesFirstOccurrenceTime(until, endDate, schedule);
     }
 
-    private LocalDate parseEndDate(String until) {
+    private LocalDate recurrenceEndDate(String until, RecurrenceSchedule schedule) {
+        return schedule.allDay()
+                ? parseAllDayEndDate(until)
+                : parseTimedUntil(until).atZone(schedule.zoneId()).toLocalDate();
+    }
+
+    private LocalDate parseAllDayEndDate(String until) {
         try {
-            return LocalDate.parse(until.substring(0, 8), DateTimeFormatter.BASIC_ISO_DATE);
+            return LocalDate.parse(until, DateTimeFormatter.BASIC_ISO_DATE);
         } catch (DateTimeException exception) {
             throw new CalioException(ErrorCode.INVALID_RECURRENCE_SCHEDULE, exception);
         }
     }
 
-    private LocalDate firstOccurrenceDate(RecurrenceSchedule schedule) {
-        return schedule.firstOccurrenceLocalStart().toLocalDate();
+    private Instant parseTimedUntil(String until) {
+        try {
+            return java.time.LocalDateTime.parse(until, UNTIL_FORMATTER).toInstant(ZoneOffset.UTC);
+        } catch (DateTimeException exception) {
+            throw new CalioException(ErrorCode.INVALID_RECURRENCE_SCHEDULE, exception);
+        }
     }
 
     private void requireUntilMatchesFirstOccurrenceTime(

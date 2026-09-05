@@ -46,6 +46,22 @@ class CalendarAiMutationPolicyTest {
     }
 
     @Test
+    @DisplayName("AI 반복 생성은 timed UNTIL을 일정 timezone의 종료일로 판단한다")
+    void givenTimedUntilOnPreviousUtcDate_whenValidateCreateRecurrence_thenAcceptsLocalStartDate() {
+        RecurrenceSchedule schedule = RecurrenceSchedule.create(
+                false,
+                Instant.parse("2026-08-06T10:30:00Z"),
+                Instant.parse("2026-08-06T11:30:00Z"),
+                "Pacific/Kiritimati"
+        );
+
+        policy.validateCreateRecurrence(
+                List.of("RRULE:FREQ=WEEKLY;UNTIL=20260806T103000Z"),
+                schedule
+        );
+    }
+
+    @Test
     @DisplayName("AI 반복 생성은 최대 종료일 이후와 초 단위 시간을 거절한다")
     void givenUnsupportedBoundaryOrPrecision_whenValidateCreateRecurrence_thenRejects() {
         assertThatThrownBy(() -> policy.validateCreateRecurrence(
