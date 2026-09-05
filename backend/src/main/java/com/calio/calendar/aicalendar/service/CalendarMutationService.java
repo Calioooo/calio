@@ -123,7 +123,7 @@ public class CalendarMutationService {
             CalendarMutationToolRequest request
     ) {
         EventResponse before = getOccurrence(accountId, request);
-        rejectOccurrenceTagChange(request, before);
+        aiMutationPolicy.validateOccurrenceTagChange(request.tagId(), tagIdOf(before));
         UpdateRecurrenceOccurrenceRequest occurrenceRequest = updateOccurrenceRequest(request, before);
         return new CalendarMutationPreview(
                 CalendarMutationType.UPDATE,
@@ -175,7 +175,7 @@ public class CalendarMutationService {
 
     private List<EventResponse> applyOccurrenceUpdate(Long accountId, CalendarMutationToolRequest request) {
         EventResponse before = getOccurrence(accountId, request);
-        rejectOccurrenceTagChange(request, before);
+        aiMutationPolicy.validateOccurrenceTagChange(request.tagId(), tagIdOf(before));
         return List.of(recurrenceEventService.updateRecurrenceOccurrence(
                 accountId,
                 requireRecurrenceId(request),
@@ -456,17 +456,11 @@ public class CalendarMutationService {
         if (request.tagId() != null) {
             return request.tagId();
         }
-        return before.tag() == null ? null : before.tag().id();
+        return tagIdOf(before);
     }
 
-    private void rejectOccurrenceTagChange(
-            CalendarMutationToolRequest request,
-            EventResponse before
-    ) {
-        Long existingTagId = before.tag() == null ? null : before.tag().id();
-        if (request.tagId() != null && !request.tagId().equals(existingTagId)) {
-            throw new CalioException(ErrorCode.RECURRENCE_OCCURRENCE_TAG_CHANGE_NOT_SUPPORTED);
-        }
+    private Long tagIdOf(EventResponse event) {
+        return event.tag() == null ? null : event.tag().id();
     }
 
     private List<String> recurrenceRulesOrExisting(

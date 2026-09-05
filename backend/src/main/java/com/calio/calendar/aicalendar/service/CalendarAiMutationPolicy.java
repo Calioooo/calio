@@ -38,6 +38,12 @@ public class CalendarAiMutationPolicy {
         requireAllowedEndDate(until, schedule);
     }
 
+    public void validateOccurrenceTagChange(Long requestedTagId, Long existingTagId) {
+        if (requestedTagId != null && !requestedTagId.equals(existingTagId)) {
+            throw new CalioException(ErrorCode.RECURRENCE_OCCURRENCE_TAG_CHANGE_NOT_SUPPORTED);
+        }
+    }
+
     private String requireSimpleRecurrenceRule(List<String> recurrenceRules) {
         if (recurrenceRules == null || recurrenceRules.size() != 1) {
             throw new CalioException(ErrorCode.INVALID_RECURRENCE_SCHEDULE);

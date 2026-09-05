@@ -62,6 +62,15 @@ class CalendarAiMutationPolicyTest {
     }
 
     @Test
+    @DisplayName("AI 반복 회차 태그 변경은 기존 태그와 다르면 거절한다")
+    void givenDifferentOccurrenceTag_whenValidateOccurrenceTagChange_thenRejects() {
+        assertThatThrownBy(() -> policy.validateOccurrenceTagChange(2L, 1L))
+                .isInstanceOf(CalioException.class)
+                .extracting(exception -> ((CalioException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.RECURRENCE_OCCURRENCE_TAG_CHANGE_NOT_SUPPORTED);
+    }
+
+    @Test
     @DisplayName("AI 반복 생성은 최대 종료일 이후와 초 단위 시간을 거절한다")
     void givenUnsupportedBoundaryOrPrecision_whenValidateCreateRecurrence_thenRejects() {
         assertThatThrownBy(() -> policy.validateCreateRecurrence(
