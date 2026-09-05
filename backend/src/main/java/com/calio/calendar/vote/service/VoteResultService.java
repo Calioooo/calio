@@ -25,13 +25,6 @@ public class VoteResultService {
     public VoteResultResponse getResult(UUID publicId) {
         VoteRoom voteRoom = voteResultQueryService.getVoteRoom(publicId);
         List<Vote> submittedVotes = voteResultQueryService.listSubmittedVotes(publicId);
-        Map<LocalDate, Long> unavailableCounts = submittedVotes
-                .stream()
-                .collect(Collectors.toMap(
-                        Vote::getUnavailableDate,
-                        vote -> 1L,
-                        Long::sum
-                ));
         Map<LocalDate, List<String>> unavailableNicknames = submittedVotes
                 .stream()
                 .collect(Collectors.groupingBy(
@@ -41,11 +34,10 @@ public class VoteResultService {
 
         List<VoteDateResultResponse> dates = voteRoom.getCandidateStartDate()
                 .datesUntil(voteRoom.getCandidateEndDate().plusDays(1))
-                .map(date -> VoteDateResultResponse.from(
-                        date,
-                        unavailableCounts.getOrDefault(date, 0L),
-                        unavailableNicknames.getOrDefault(date, List.of())
-                ))
+                .map(date -> {
+                    List<String> nicknames = unavailableNicknames.getOrDefault(date, List.of());
+                    return VoteDateResultResponse.from(date, nicknames.size(), nicknames);
+                })
                 .toList();
         return VoteResultResponse.from(voteRoom, dates, voteResultQueryService.listSubmittedNicknames(publicId));
     }
