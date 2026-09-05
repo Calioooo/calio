@@ -286,6 +286,33 @@ class CalendarAssistantEvalTest {
     }
 
     @Test
+    @DisplayName("종일 일정 생성 요청은 UTC 자정과 exclusive end로만 Preview한다")
+    void givenAllDayEventCreationRequest_whenEvaluate_thenPreviewsCanonicalUtcMidnightRange() {
+        // given
+        CalendarMutationPreview preview = new CalendarMutationPreview(
+                CalendarMutationType.CREATE,
+                CalendarMutationScope.EVENT,
+                null,
+                allDayEvent("광복절", "2026-08-16T00:00:00Z", "2026-08-17T00:00:00Z")
+        );
+        when(mutationService.preview(any(), any())).thenReturn(preview);
+
+        // when
+        CalendarAssistantAnswer answer = requestAnswer(request("내일 광복절 종일 일정 만들어줘"));
+
+        // then
+        assertThat(answer.mutationPreviews()).containsExactly(preview);
+        CalendarMutationToolRequest mutationRequest = assertMutationOperation(
+                CalendarMutationOperation.CREATE_EVENT
+        );
+        assertThat(mutationRequest.allDay()).isTrue();
+        assertThat(mutationRequest.startAt()).isEqualTo(Instant.parse("2026-08-16T00:00:00Z"));
+        assertThat(mutationRequest.endAt()).isEqualTo(Instant.parse("2026-08-17T00:00:00Z"));
+        assertThat(mutationRequest.timeZone()).isNull();
+        verify(mutationService, never()).apply(any(), any());
+    }
+
+    @Test
     @DisplayName("지원 범위의 반복 일정 생성 요청은 전체 시리즈 Mutation Preview를 반환한다")
     void givenSupportedRecurrenceCreationRequest_whenEvaluate_thenReturnsSeriesPreview() {
         CalendarMutationPreview preview = new CalendarMutationPreview(
