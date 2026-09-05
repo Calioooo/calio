@@ -191,6 +191,92 @@ struct CalendarHomeViewModelTests {
     }
 
     @MainActor
+    @Test func calendarHomeViewModelDiscardsEventResponseStartedBeforeGlobalCacheInvalidation() async throws {
+        let calendar = fixedCalendar
+        let june = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8)))
+        let staleEvent = makeEvent(id: 1, title: "이전 응답", on: june)
+        let freshEvent = makeEvent(id: 2, title: "새 응답", on: june)
+        let repository = RecordingEventRepository(shouldSuspend: true)
+        let viewModel = CalendarHomeViewModel(
+            calendar: calendar,
+            dateService: CalendarDateService(calendar: calendar),
+            eventService: EventService(repository: repository),
+            nationalHolidayService: makeNationalHolidayService(calendar: calendar),
+            initialReferenceDate: june
+        )
+
+        viewModel.loadInitialIfNeeded()
+        #expect(await repository.waitForRequestCount(3))
+        let juneKey = YearMonthKey(date: june, calendar: calendar)
+        #expect(await waitUntil {
+            repository.suspendedRequestCount(for: juneKey, calendar: calendar) == 1
+        })
+
+        viewModel.refreshAfterAssistantResponse()
+        #expect(await repository.waitForRequestCount(6))
+        #expect(await waitUntil {
+            repository.suspendedRequestCount(for: juneKey, calendar: calendar) == 2
+        })
+
+        repository.finishSuspendedRequest(
+            for: juneKey,
+            calendar: calendar,
+            returning: [makeEventResponse(from: staleEvent)]
+        )
+        await Task.yield()
+
+        #expect(viewModel.state.monthEventCache[juneKey]?.isLoading == true)
+        #expect(viewModel.state.monthEventCache[juneKey]?.loadedEvents.isEmpty == true)
+
+        repository.finishSuspendedRequest(
+            for: juneKey,
+            calendar: calendar,
+            returning: [makeEventResponse(from: freshEvent)]
+        )
+        #expect(await waitUntil {
+            viewModel.state.monthEventCache[juneKey]?.loadedEvents.map(\.backendId) == [freshEvent.backendId]
+        })
+        repository.finishSuspendedRequests()
+    }
+
+    @MainActor
+    @Test func calendarHomeViewModelRefreshesVisibleMonthPrefetchRangeAfterAssistantResponse() async throws {
+        let calendar = fixedCalendar
+        let december = try #require(calendar.date(from: DateComponents(year: 2026, month: 12, day: 8)))
+        let june = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8)))
+        let repository = RecordingEventRepository(shouldSuspend: true)
+        let viewModel = CalendarHomeViewModel(
+            calendar: calendar,
+            dateService: CalendarDateService(calendar: calendar),
+            eventService: EventService(repository: repository),
+            nationalHolidayService: makeNationalHolidayService(calendar: calendar),
+            initialState: makeLoadedState(dayOffsets: 0...10, from: december, calendar: calendar)
+        )
+
+        viewModel.loadAdditionalEventsIfNeeded(
+            visibleRange: CalendarVisibleIndexRange(startIndex: 0, endIndex: 10)
+        )
+        #expect(await repository.waitForRequestCount(3))
+        repository.finishSuspendedRequests()
+
+        viewModel.setReferenceDay(DayKey(date: june, calendar: calendar))
+        viewModel.refreshAfterAssistantResponse()
+        #expect(await repository.waitForRequestCount(9))
+
+        let requestedMonths = Set(repository.requestMonthKeys(calendar: calendar))
+        #expect(requestedMonths.isSuperset(of: [
+            YearMonthKey(year: 2026, month: 5),
+            YearMonthKey(year: 2026, month: 6),
+            YearMonthKey(year: 2026, month: 7),
+            YearMonthKey(year: 2026, month: 11),
+            YearMonthKey(year: 2026, month: 12),
+            YearMonthKey(year: 2027, month: 1),
+        ]))
+        #expect(viewModel.referenceDay == DayKey(date: june, calendar: calendar))
+        repository.finishSuspendedRequests()
+    }
+
+    @MainActor
     @Test func calendarHomeViewModelKeepsReferenceAndExposesRetryStateWhenTargetMonthFails() async throws {
         let calendar = fixedCalendar
         let baseDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8)))

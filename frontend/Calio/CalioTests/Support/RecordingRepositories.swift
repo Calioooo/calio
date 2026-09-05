@@ -185,6 +185,11 @@ final class RecordingTagRepository: TagRepository {
 }
 
 final class RecordingEventRepository: EventRepository {
+    private struct SuspendedEventRequest {
+        let startDate: Date
+        let continuation: CheckedContinuation<[EventResponseDTO], Error>
+    }
+
     private let lock = NSLock()
     private var storedRequests: [(startDate: Date, endDate: Date)] = []
     private var storedCreateRequests: [CreateEventRequestDTO] = []
@@ -197,7 +202,7 @@ final class RecordingEventRepository: EventRepository {
     private var storedDeleteEventIDs: [Int64] = []
     private var storedDeleteRecurrenceEventIDs: [Int64] = []
     private var storedDeleteRecurrenceOccurrenceRequests: [(recurrenceId: Int64, originStartAt: Date)] = []
-    private var suspendedContinuations: [CheckedContinuation<[EventResponseDTO], Error>] = []
+    private var suspendedContinuations: [SuspendedEventRequest] = []
     private var suspendedCreateContinuations: [CheckedContinuation<EventResponseDTO, Error>] = []
     private var suspendedImportantEventContinuations: [CheckedContinuation<EventResponseDTO, Error>] = []
     private var requestCountWaiters: [CountWaiter] = []
@@ -395,7 +400,9 @@ final class RecordingEventRepository: EventRepository {
         if shouldSuspend {
             return try await withCheckedThrowingContinuation { continuation in
                 locked {
-                    suspendedContinuations.append(continuation)
+                    suspendedContinuations.append(
+                        .init(startDate: startDate, continuation: continuation)
+                    )
                 }
             }
         }
@@ -574,9 +581,45 @@ final class RecordingEventRepository: EventRepository {
             suspendedContinuations.removeAll()
             return continuations
         }
-        continuations.forEach { continuation in
-            continuation.resume(returning: [])
+        continuations.forEach { request in
+            request.continuation.resume(returning: [])
         }
+    }
+
+    func finishNextSuspendedRequest(returning response: [EventResponseDTO]) {
+        let request: SuspendedEventRequest? = locked {
+            guard !suspendedContinuations.isEmpty else {
+                return nil
+            }
+
+            return suspendedContinuations.removeFirst()
+        }
+        request?.continuation.resume(returning: response)
+    }
+
+    func suspendedRequestCount(for key: YearMonthKey, calendar: Calendar) -> Int {
+        locked {
+            suspendedContinuations.count {
+                YearMonthKey(date: $0.startDate, calendar: calendar) == key
+            }
+        }
+    }
+
+    func finishSuspendedRequest(
+        for key: YearMonthKey,
+        calendar: Calendar,
+        returning response: [EventResponseDTO]
+    ) {
+        let request: SuspendedEventRequest? = locked {
+            guard let index = suspendedContinuations.firstIndex(where: {
+                YearMonthKey(date: $0.startDate, calendar: calendar) == key
+            }) else {
+                return nil
+            }
+
+            return suspendedContinuations.remove(at: index)
+        }
+        request?.continuation.resume(returning: response)
     }
 
     func waitForCreateRequestCount(

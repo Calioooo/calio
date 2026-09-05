@@ -11,6 +11,7 @@ struct CalendarHomeView: View {
     @StateObject private var viewModel: CalendarHomeViewModel
     @State private var displayMode: CalendarDisplayMode = .week
     @State private var isShowingEventCreationView = false
+    @State private var isShowingAssistant = false
     private let onGoogleCalendarConnectTapped: () -> Void
     
     private let minimumStripViewHeight: CGFloat = 110
@@ -74,6 +75,10 @@ struct CalendarHomeView: View {
                 isPresented: $isShowingEventCreationView,
                 viewModel: viewModel,
                 referenceDay: viewModel.referenceDay
+            )
+            .calendarAssistantFloatingEntry(
+                isPresented: $isShowingAssistant,
+                onCalendarRefreshNeeded: viewModel.refreshAfterAssistantResponse
             )
         }
     }

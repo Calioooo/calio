@@ -35,6 +35,7 @@ final class CalendarHomeViewModel: ObservableObject {
     private var lastVisibleMonthKeys: Set<YearMonthKey> = []
     private var lastHandledVisibleRange: CalendarVisibleIndexRange?
     private var monthEventCache: [YearMonthKey: CalendarMonthEventCacheEntry]
+    private var activeEventRequestIDs: [YearMonthKey: UUID] = [:]
     private var monthHolidayCache: [YearMonthKey: CalendarMonthHolidayCacheEntry]
     private var pendingCreatedEventsByMonth: [YearMonthKey: [Event]] = [:]
     private var isLoadingTags = false
@@ -222,6 +223,11 @@ final class CalendarHomeViewModel: ObservableObject {
 
     func retryEventLoading() {
         requestMonths([YearMonthKey(day: referenceDay)], retryFailed: true)
+    }
+
+    func refreshAfterAssistantResponse() {
+        invalidateMonthEventCache()
+        refetchDefaultPrefetchRange()
     }
 
     func resetCreateState() {
@@ -673,20 +679,35 @@ final class CalendarHomeViewModel: ObservableObject {
         )
     }
     
-    private func fetchMonth(_ key: YearMonthKey) {
+    private func fetchMonth(_ key: YearMonthKey, requestID: UUID) {
         let range = key.dateRange(calendar: calendar)
 
         Task {
             do {
                 let events = try await eventService.fetchEvents(from: range.from, to: range.to)
+                guard isActiveEventRequest(requestID, for: key) else {
+                    return
+                }
+
+                activeEventRequestIDs.removeValue(forKey: key)
                 let pendingEvents = self.pendingCreatedEventsByMonth.removeValue(forKey: key) ?? []
                 self.setMonthCacheEntry(
                     .loaded(self.mergedSortedEvents(events, with: pendingEvents)),
                     for: key
                 )
             } catch let error as EventServiceError {
+                guard isActiveEventRequest(requestID, for: key) else {
+                    return
+                }
+
+                activeEventRequestIDs.removeValue(forKey: key)
                 self.setFailedMonthCacheEntry(CalendarMonthEventFailure(error: error), for: key)
             } catch {
+                guard isActiveEventRequest(requestID, for: key) else {
+                    return
+                }
+
+                activeEventRequestIDs.removeValue(forKey: key)
                 self.setFailedMonthCacheEntry(.unexpected, for: key)
             }
         }
@@ -929,6 +950,7 @@ final class CalendarHomeViewModel: ObservableObject {
     }
 
     private func invalidateMonthEventCache() {
+        activeEventRequestIDs.removeAll()
         monthEventCache.removeAll()
         pendingCreatedEventsByMonth.removeAll()
         state = state.replacingMonthEventCache(
@@ -949,6 +971,7 @@ final class CalendarHomeViewModel: ObservableObject {
 
     private func invalidateMonthEventCache(for keys: Set<YearMonthKey>) {
         keys.forEach { key in
+            activeEventRequestIDs.removeValue(forKey: key)
             monthEventCache.removeValue(forKey: key)
             pendingCreatedEventsByMonth.removeValue(forKey: key)
         }
@@ -972,7 +995,9 @@ final class CalendarHomeViewModel: ObservableObject {
     }
 
     private func refetchDefaultPrefetchRange() {
-        prefetchReferenceMonthAndAdjacent(retryFailed: false)
+        let referenceKeys = adjacentMonthKeys(around: YearMonthKey(day: referenceDay))
+        let visibleKeys = lastVisibleMonthKeys.flatMap(adjacentMonthKeys(around:))
+        requestMonths(referenceKeys + visibleKeys, retryFailed: false)
     }
 
     private func prefetchMonthsForVisibleItemsIfNeeded(_ visibleItems: [CalendarDayItem]) {
@@ -1003,8 +1028,10 @@ final class CalendarHomeViewModel: ObservableObject {
             return
         }
 
+        let requestID = UUID()
+        activeEventRequestIDs[key] = requestID
         setMonthCacheEntry(.loading, for: key)
-        fetchMonth(key)
+        fetchMonth(key, requestID: requestID)
     }
 
     private func requestHolidayMonth(_ key: YearMonthKey) {
@@ -1038,6 +1065,10 @@ final class CalendarHomeViewModel: ObservableObject {
         case .loading, .loaded:
             return false
         }
+    }
+
+    private func isActiveEventRequest(_ requestID: UUID, for key: YearMonthKey) -> Bool {
+        activeEventRequestIDs[key] == requestID
     }
 
     private func adjacentMonthKeys(around key: YearMonthKey) -> [YearMonthKey] {

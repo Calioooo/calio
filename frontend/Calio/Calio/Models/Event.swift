@@ -10,6 +10,21 @@ import Foundation
 enum CalendarTagType: String, Decodable, Equatable {
     case defaultTag = "DEFAULT"
     case custom = "CUSTOM"
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        switch try container.decode(String.self) {
+        case "DEFAULT", "PERSONAL_DEFAULT", "GROUP_DEFAULT":
+            self = .defaultTag
+        case "CUSTOM":
+            self = .custom
+        default:
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "Unsupported calendar tag type."
+            )
+        }
+    }
 }
 
 struct CalendarTag: Identifiable, Equatable {
