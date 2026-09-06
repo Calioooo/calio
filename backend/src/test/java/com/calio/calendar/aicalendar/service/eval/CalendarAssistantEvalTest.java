@@ -286,6 +286,75 @@ class CalendarAssistantEvalTest {
     }
 
     @Test
+    @DisplayName("종일 일정 생성 요청은 UTC 자정과 exclusive end로만 Preview한다")
+    void givenAllDayEventCreationRequest_whenEvaluate_thenPreviewsCanonicalUtcMidnightRange() {
+        // given
+        CalendarMutationPreview preview = new CalendarMutationPreview(
+                CalendarMutationType.CREATE,
+                CalendarMutationScope.EVENT,
+                null,
+                allDayEvent("광복절", "2026-08-16T00:00:00Z", "2026-08-17T00:00:00Z")
+        );
+        when(mutationService.preview(any(), any())).thenReturn(preview);
+
+        // when
+        CalendarAssistantAnswer answer = requestAnswer(request("내일 광복절 종일 일정 만들어줘"));
+
+        // then
+        assertThat(answer.mutationPreviews()).containsExactly(preview);
+        CalendarMutationToolRequest mutationRequest = assertMutationOperation(
+                CalendarMutationOperation.CREATE_EVENT
+        );
+        assertThat(mutationRequest.allDay()).isTrue();
+        assertThat(mutationRequest.startAt()).isEqualTo(Instant.parse("2026-08-16T00:00:00Z"));
+        assertThat(mutationRequest.endAt()).isEqualTo(Instant.parse("2026-08-17T00:00:00Z"));
+        assertThat(mutationRequest.timeZone()).isNull();
+        verify(mutationService, never()).apply(any(), any());
+    }
+
+    @Test
+    @DisplayName("지원 범위의 반복 일정 생성 요청은 전체 시리즈 Mutation Preview를 반환한다")
+    void givenSupportedRecurrenceCreationRequest_whenEvaluate_thenReturnsSeriesPreview() {
+        CalendarMutationPreview preview = new CalendarMutationPreview(
+                CalendarMutationType.CREATE,
+                CalendarMutationScope.ENTIRE_SERIES,
+                null,
+                recurrenceOccurrence("팀 회의", "2026-08-21T09:18:00Z", "2026-08-21T10:18:00Z"),
+                new CalendarMutationRecurrencePreview(List.of(), List.of("RRULE:FREQ=WEEKLY;UNTIL=20261225T091800Z"))
+        );
+        when(mutationService.preview(any(), any())).thenReturn(preview);
+
+        CalendarAssistantAnswer answer = requestAnswer(request(
+                "2026년 8월 21일부터 2026년 12월 25일까지 매주 금요일 오후 6시 18분에 팀 회의 반복 일정 만들어줘"
+        ));
+
+        assertThat(answer.mutationPreviews()).containsExactly(preview);
+        CalendarMutationToolRequest mutationRequest = assertMutationOperation(
+                CalendarMutationOperation.CREATE_RECURRENCE_EVENT
+        );
+        assertThat(mutationRequest.recurrenceRules())
+                .containsExactly("RRULE:FREQ=WEEKLY;UNTIL=20261225T091800Z");
+        verify(mutationService, never()).apply(any(), any());
+    }
+
+    @Test
+    @DisplayName("지원하지 않는 반복 생성 요청은 Mutation Preview를 만들지 않는다")
+    void givenUnsupportedRecurrenceCreationRequests_whenEvaluate_thenDoesNotPreview() {
+        List<String> requests = List.of(
+                "지금부터 3000년 이후의 8월 28일까지 매주 금요일 오후 6시 18분에 진행하는 반복 일정을 만들어줘",
+                "27년도 1월 1일날 부터 12월 31일까지 00시 부터 24시까지 1초 단위로 일정을 만들어줘",
+                "1.5초짜리의 반복 일정을 만들어줘"
+        );
+
+        for (String request : requests) {
+            CalendarAssistantAnswer answer = requestAnswer(request(request));
+            assertThat(answer.mutationPreviews()).isEmpty();
+        }
+        verify(mutationService, never()).preview(any(), any());
+        verify(mutationService, never()).apply(any(), any());
+    }
+
+    @Test
     @DisplayName("대상이 하나인 일정 수정 요청은 변경 전후 Mutation Preview를 반환한다")
     void givenSingleMatchingEventUpdateRequest_whenEvaluate_thenReturnsUpdatePreview() {
         // given
