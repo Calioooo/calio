@@ -3,7 +3,6 @@ package com.calio.calendar.integration.sync;
 import com.calio.calendar.external.google.GoogleCalendarEventsClient;
 import com.calio.calendar.external.google.GoogleCalendarEventPreconditionFailedException;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventResponse;
-import com.calio.calendar.external.google.dto.GoogleCalendarEventWriteRequest;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarConnection;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarConnectionState;
 import com.calio.calendar.integration.connection.service.GoogleCalendarAccessTokenService;
@@ -154,8 +153,8 @@ public class GoogleCalendarEventJobService {
             updatedEvent = eventsClient.patchEvent(
                     accessToken,
                     mapping.externalEventId(),
-                    GoogleCalendarEventWriteRequest.from(eventSnapshot),
-                    mapping.providerEtag()
+                    mapping.providerEtag(),
+                    eventSnapshot
             );
         } catch (GoogleCalendarEventPreconditionFailedException exception) {
             return MappingExecutionResult.conflictDetected(mapping.mappingId());
@@ -190,7 +189,8 @@ public class GoogleCalendarEventJobService {
         String accessToken = accessTokenService.getAccessToken(targetConnectionId);
         return eventsClient.insertEvent(
                 accessToken,
-                GoogleCalendarEventWriteRequest.forCreate(eventSnapshot, job.getProviderIdentity())
+                job.getProviderIdentity(),
+                eventSnapshot
         );
     }
 

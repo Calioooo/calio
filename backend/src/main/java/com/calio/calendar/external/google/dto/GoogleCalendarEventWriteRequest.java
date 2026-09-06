@@ -12,7 +12,7 @@ public record GoogleCalendarEventWriteRequest(
         GoogleCalendarEventTimeResponse start,
         GoogleCalendarEventTimeResponse end
 ) {
-    public static GoogleCalendarEventWriteRequest from(GoogleEventJobPayload payload) {
+    public static GoogleCalendarEventWriteRequest forUpdate(GoogleEventJobPayload payload) {
         return from(payload, null);
     }
 

@@ -15,12 +15,12 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 
 import com.calio.calendar.external.google.dto.GoogleCalendarEventPage;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventResponse;
-import com.calio.calendar.external.google.dto.GoogleCalendarEventTimeResponse;
-import com.calio.calendar.external.google.dto.GoogleCalendarEventWriteRequest;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.integration.sync.GoogleCalendarSyncMode;
+import com.calio.calendar.integration.sync.operation.dto.GoogleEventJobPayload;
 import java.io.IOException;
+import java.time.Instant;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
@@ -52,13 +52,8 @@ class GoogleCalendarEventsClientTest {
         // when
         GoogleCalendarEventResponse response = client.insertEvent(
                 "current-token",
-                new GoogleCalendarEventWriteRequest(
-                        providerIdentity,
-                        "title",
-                        null,
-                        new GoogleCalendarEventTimeResponse(null, "2026-09-04T00:00:00Z", "UTC"),
-                        new GoogleCalendarEventTimeResponse(null, "2026-09-04T01:00:00Z", "UTC")
-                )
+                providerIdentity,
+                payload()
         );
 
         // then
@@ -81,8 +76,8 @@ class GoogleCalendarEventsClientTest {
         client.patchEvent(
                 "current-token",
                 "event-1",
-                writeRequest(),
-                "etag-1"
+                "etag-1",
+                payload()
         );
 
         // then
@@ -103,8 +98,8 @@ class GoogleCalendarEventsClientTest {
         assertThatThrownBy(() -> client.patchEvent(
                 "current-token",
                 "event-1",
-                writeRequest(),
-                "etag-1"
+                "etag-1",
+                payload()
         )).isInstanceOf(GoogleCalendarEventPreconditionFailedException.class);
         server.verify();
     }
@@ -522,13 +517,13 @@ class GoogleCalendarEventsClientTest {
                 """.formatted(eventId);
     }
 
-    private GoogleCalendarEventWriteRequest writeRequest() {
-        return new GoogleCalendarEventWriteRequest(
-                null,
-                "title",
-                null,
-                new GoogleCalendarEventTimeResponse(null, "2026-09-04T00:00:00Z", "UTC"),
-                new GoogleCalendarEventTimeResponse(null, "2026-09-04T01:00:00Z", "UTC")
+    private GoogleEventJobPayload payload() {
+        return new GoogleEventJobPayload(
+                "title", null,
+                Instant.parse("2026-09-04T00:00:00Z"),
+                Instant.parse("2026-09-04T01:00:00Z"),
+                false,
+                "UTC"
         );
     }
 }
