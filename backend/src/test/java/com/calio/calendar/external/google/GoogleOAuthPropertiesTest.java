@@ -37,6 +37,16 @@ class GoogleOAuthPropertiesTest {
     }
 
     @Test
+    @DisplayName("host가 없는 HTTPS Calendar Events URL은 application binding 단계에서 시작을 막는다")
+    void givenHttpsCalendarEventsUrlWithoutHost_whenBindingProperties_thenFailsApplicationStartup() {
+        contextRunner.withPropertyValues(
+                "external.google.oauth.calendar-events-url=https:/events")
+                .run(context -> assertThat(context.getStartupFailure())
+                        .hasRootCauseInstanceOf(IllegalArgumentException.class)
+                        .hasRootCauseMessage("Google Calendar Events URL must use HTTPS"));
+    }
+
+    @Test
     @DisplayName("Calendar Events URL은 HTTPS 설정을 유지한다")
     void givenHttpsCalendarEventsUrl_whenConfigured_thenStoresSetting() {
         // given

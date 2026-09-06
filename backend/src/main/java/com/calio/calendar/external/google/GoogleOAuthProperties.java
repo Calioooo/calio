@@ -98,7 +98,7 @@ public class GoogleOAuthProperties {
         } catch (IllegalArgumentException exception) {
             throw new IllegalArgumentException("Google Calendar Events URL must be a valid HTTPS URL", exception);
         }
-        if (!"https".equalsIgnoreCase(uri.getScheme())) {
+        if (!"https".equalsIgnoreCase(uri.getScheme()) || uri.getHost() == null) {
             throw new IllegalArgumentException("Google Calendar Events URL must use HTTPS");
         }
     }
