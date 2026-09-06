@@ -105,6 +105,40 @@ class GoogleCalendarEventsClientTest {
     }
 
     @Test
+    @DisplayName("DELETE는 읽은 provider ETag를 If-Match precondition으로 보낸다")
+    void givenExpectedProviderEtag_whenDeleteEvent_thenSendsConditionalRequest() {
+        // given
+        RestClient.Builder restClientBuilder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
+        GoogleCalendarEventsClient client = client(restClientBuilder);
+        server.expect(method(HttpMethod.DELETE))
+                .andExpect(header(HttpHeaders.IF_MATCH, "etag-1"))
+                .andRespond(withSuccess());
+
+        // when
+        client.deleteEvent("current-token", "event-1", "etag-1");
+
+        // then
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("DELETE의 412 precondition 실패는 provider conflict 예외로 구분한다")
+    void givenPreconditionFailed_whenDeleteEvent_thenReturnsProviderConflict() {
+        // given
+        RestClient.Builder restClientBuilder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
+        GoogleCalendarEventsClient client = client(restClientBuilder);
+        server.expect(method(HttpMethod.DELETE))
+                .andRespond(withStatus(HttpStatus.PRECONDITION_FAILED));
+
+        // when, then
+        assertThatThrownBy(() -> client.deleteEvent("current-token", "event-1", "etag-1"))
+                .isInstanceOf(GoogleCalendarEventVersionConflictException.class);
+        server.verify();
+    }
+
+    @Test
     @DisplayName("FULL SYNC 요청은 공통 query만 보내고 syncToken과 range parameter를 보내지 않는다")
     void givenFullMode_whenListEvents_thenUsesFullQueryContract() {
         // given

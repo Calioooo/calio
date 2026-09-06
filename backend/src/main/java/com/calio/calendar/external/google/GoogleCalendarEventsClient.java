@@ -138,16 +138,26 @@ public class GoogleCalendarEventsClient {
         }
     }
 
-    public boolean deleteEvent(String accessToken, String externalEventId) {
-        validateExternalEventId(externalEventId);
+    public boolean deleteEvent(
+            String accessToken,
+            String externalEventId,
+            String expectedProviderEtag
+    ) {
+        if (!hasText(externalEventId) || !hasText(expectedProviderEtag)) {
+            throw new CalioException(ErrorCode.GOOGLE_CALENDAR_REQUEST_INVALID);
+        }
         try {
             restClient.delete().uri(existingEventWriteUri(externalEventId))
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .header(HttpHeaders.IF_MATCH, expectedProviderEtag)
                     .retrieve().toBodilessEntity();
             return true;
         } catch (RestClientResponseException exception) {
             if (exception.getStatusCode().value() == HttpStatus.NOT_FOUND.value()) {
                 return false;
+            }
+            if (exception.getStatusCode().value() == HttpStatus.PRECONDITION_FAILED.value()) {
+                throw new GoogleCalendarEventVersionConflictException(exception);
             }
             throw translateEventResponseFailure(exception);
         } catch (RestClientException exception) {

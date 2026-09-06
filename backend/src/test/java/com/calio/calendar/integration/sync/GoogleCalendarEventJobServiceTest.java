@@ -200,14 +200,37 @@ class GoogleCalendarEventJobServiceTest {
         service.execute(job, "worker");
 
         // then
-        verify(eventsClient).deleteEvent("token", "external-1");
+        verify(eventsClient).deleteEvent("token", "external-1", "etag-1");
         verifyNoInteractions(objectMapper);
         verify(jobService).succeed(50L, 10L, "worker");
     }
 
     @Test
-    @DisplayName("삭제된 Event의 CREATE Job도 snapshot으로 Google Event와 durable mapping을 생성한다")
-    void givenDeletedEvent_whenApplyCreate_thenCreatesGoogleEventWithoutEventLookup() {
+    @DisplayName("DELETE precondition 실패는 Google 삭제 없이 Calio 삭제를 conflict로 보존한다")
+    void givenDeletePreconditionFailure_whenExecute_thenMarksConflict() {
+        // given
+        GoogleCalendarConnection connection = connection(30L);
+        GoogleCalendarEventMapping mapping = new GoogleCalendarEventMapping(
+                connection, 40L, "external-1", "etag-1");
+        GoogleCalendarEventJob job = job(GoogleCalendarEventJobKind.DELETE);
+        when(mappingQueryService.listEventMappingsForEvent(20L, 40L))
+                .thenReturn(List.of(mapping));
+        when(accessTokenService.getAccessToken(30L)).thenReturn("token");
+        when(eventsClient.deleteEvent("token", "external-1", "etag-1"))
+                .thenThrow(new GoogleCalendarEventVersionConflictException(new RuntimeException()));
+
+        // when
+        service.execute(job, "worker");
+
+        // then
+        assertThat(mapping.isConflicted()).isTrue();
+        verify(jobService).recordSyncConflict(50L, 10L, "worker");
+        verify(jobService).completeSyncRun(50L, 10L, "worker");
+    }
+
+    @Test
+    @DisplayName("CREATE Job 실행 전에 Calio Event가 삭제되어도 저장된 snapshot으로 Google Event와 mapping을 생성한다")
+    void givenEventDeletedAfterCreateJobEnqueued_whenExecute_thenCreatesGoogleEventFromSnapshot() {
         // given
         GoogleCalendarConnection connection = connection(30L);
         GoogleCalendarEventJob job = job(GoogleCalendarEventJobKind.CREATE);

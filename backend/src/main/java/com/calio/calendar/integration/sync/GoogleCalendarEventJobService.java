@@ -177,7 +177,15 @@ public class GoogleCalendarEventJobService {
             return MappingExecutionResult.markedLocalChange(mapping.mappingId());
         }
         String accessToken = accessTokenService.getAccessToken(mapping.connectionId());
-        eventsClient.deleteEvent(accessToken, mapping.externalEventId());
+        try {
+            eventsClient.deleteEvent(
+                    accessToken,
+                    mapping.externalEventId(),
+                    mapping.providerEtag()
+            );
+        } catch (GoogleCalendarEventVersionConflictException exception) {
+            return MappingExecutionResult.conflictDetected(mapping.mappingId());
+        }
         return MappingExecutionResult.applied(mapping.mappingId());
     }
 

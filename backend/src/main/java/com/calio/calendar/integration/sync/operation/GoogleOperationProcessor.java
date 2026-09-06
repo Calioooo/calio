@@ -100,7 +100,7 @@ public class GoogleOperationProcessor {
             syncService.synchronize(job.getId(), job.getAccountId(), workerToken);
             return JobExecutionResult.CONTINUE_WITH_NEXT_JOB;
         } catch (RuntimeException failure) {
-            return handleSyncFailure(job, workerToken, failure);
+            return handleJobFailure(job, workerToken, failure);
         }
     }
 
@@ -109,11 +109,11 @@ public class GoogleOperationProcessor {
             eventJobService.execute(job, workerToken);
             return JobExecutionResult.CONTINUE_WITH_NEXT_JOB;
         } catch (RuntimeException failure) {
-            return handleSyncFailure(job, workerToken, failure);
+            return handleJobFailure(job, workerToken, failure);
         }
     }
 
-    private JobExecutionResult handleSyncFailure(
+    private JobExecutionResult handleJobFailure(
             GoogleOperationJob job,
             String workerToken,
             RuntimeException failure
