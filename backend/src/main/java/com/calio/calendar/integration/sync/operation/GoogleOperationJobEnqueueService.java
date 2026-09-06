@@ -120,8 +120,6 @@ public class GoogleOperationJobEnqueueService {
         return true;
     }
 
-    // A stable Google event ID lets a retried CREATE recover from a prior request that timed out:
-    // Google returns 409, then the worker can fetch the event instead of creating a duplicate.
     private String providerIdentity(GoogleCalendarEventJobKind kind, Long integrationId, Long eventId) {
         if (kind != GoogleCalendarEventJobKind.CREATE) {
             return null;
