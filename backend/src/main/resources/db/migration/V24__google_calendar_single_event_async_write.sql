@@ -10,3 +10,6 @@ ALTER TABLE google_calendar_event_mappings
 ALTER TABLE google_calendar_event_mappings
     ADD CONSTRAINT uk_google_calendar_mapping_connection_event
         UNIQUE (connection_id, event_id);
+
+CREATE INDEX idx_google_calendar_mapping_event_id
+    ON google_calendar_event_mappings (event_id);
