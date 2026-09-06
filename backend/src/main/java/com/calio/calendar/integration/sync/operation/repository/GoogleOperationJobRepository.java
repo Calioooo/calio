@@ -149,49 +149,19 @@ public interface GoogleOperationJobRepository extends JpaRepository<GoogleOperat
 
     @Query("""
             select (count(job) > 0)
-            from GoogleOperationJob job
+            from GoogleCalendarEventJob job
             where job.accountId = :accountId
               and job.integrationId = :integrationId
-              and job.kind <> 'SYNC'
-              and job.effectiveResourceScope = :scope
-              and job.effectiveResourceKey = :key
+              and job.eventId = :eventId
               and job.state in (
                   com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState.PENDING,
                   com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState.PROCESSING
               )
             """)
-    boolean existsPendingOutboundJob(
+    boolean existsPendingEventJob(
             @Param("accountId") Long accountId,
             @Param("integrationId") Long integrationId,
-            @Param("scope") String scope,
-            @Param("key") String key
-    );
-
-    @Query("""
-            select (count(job) > 0)
-            from GoogleOperationJob job
-            where job.accountId = :accountId
-              and job.integrationId = :integrationId
-              and job.kind <> 'SYNC'
-              and job.state in (
-                  com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState.PENDING,
-                  com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState.PROCESSING
-              )
-              and (
-                  (job.effectiveResourceScope = :recurrenceEventScope
-                   and job.effectiveResourceKey = :recurrenceEventKey)
-                  or
-                  (job.effectiveResourceScope = :recurrenceOverrideScope
-                   and job.effectiveResourceKey like concat(:overrideKeyPrefix, '%'))
-              )
-            """)
-    boolean existsPendingOutboundJobForRecurrenceAggregate(
-            @Param("accountId") Long accountId,
-            @Param("integrationId") Long integrationId,
-            @Param("recurrenceEventScope") String recurrenceEventScope,
-            @Param("recurrenceEventKey") String recurrenceEventKey,
-            @Param("recurrenceOverrideScope") String recurrenceOverrideScope,
-            @Param("overrideKeyPrefix") String overrideKeyPrefix
+            @Param("eventId") Long eventId
     );
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)

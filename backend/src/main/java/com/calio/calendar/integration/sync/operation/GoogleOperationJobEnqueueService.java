@@ -3,7 +3,7 @@ package com.calio.calendar.integration.sync.operation;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.connection.service.GoogleCalendarConnectionCommandService;
 import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrationCommandService;
-import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJob;
+import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarSyncJob;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobTrigger;
 import java.time.Clock;
 import java.time.Instant;
@@ -50,7 +50,7 @@ public class GoogleOperationJobEnqueueService {
         connectionCommandService.lockConnectedConnection(accountId);
         GoogleCalendarIntegration integration = integrationCommandService.tryLockIntegration(accountId)
                 .orElseThrow();
-        GoogleOperationJob job = GoogleOperationJob.sync(
+        GoogleCalendarSyncJob job = GoogleCalendarSyncJob.create(
                 UUID.randomUUID().toString(),
                 integration.getId(),
                 accountId,

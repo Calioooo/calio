@@ -12,12 +12,12 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import com.calio.calendar.integration.sync.GoogleCalendarSyncService;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.connection.service.GoogleCalendarConnectionCommandService;
 import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrationQueryService;
 import com.calio.calendar.external.google.GoogleCalendarInvalidGrantException;
-import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEffectiveScopeType;
+import com.calio.calendar.integration.sync.GoogleCalendarSyncService;
+import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarSyncJob;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJob;
 import com.calio.calendar.integration.sync.operation.dto.GoogleOperationFailureDecision;
 import java.time.Clock;
@@ -194,7 +194,7 @@ class GoogleOperationProcessorTest {
     @DisplayName("지원하지 않는 Job kind는 종료 상태로 변경하고 Provider Sync를 호출하지 않는다")
     void givenUnsupportedJobKind_whenProcess_thenTerminatesWithoutSync() {
         // given
-        GoogleOperationJob job = job(1L, 10L, "EVENT_UPSERT");
+        GoogleOperationJob job = unsupportedJob(1L, 10L);
         when(operationLeaseService.acquire(eq(10L), anyString())).thenReturn(true);
         when(jobPersistenceService.claimNextJob(eq(10L), eq(20L), anyString()))
                 .thenReturn(job)
@@ -205,10 +205,30 @@ class GoogleOperationProcessorTest {
 
         // then
         verify(jobPersistenceService).terminate(
-                eq(1L), eq(10L), anyString(), eq("UNSUPPORTED_JOB_KIND")
+                eq(1L), eq(10L), anyString(), eq("UNSUPPORTED_JOB_SCOPE")
         );
-        verify(syncService, never()).synchronize(eq(1L), eq(10L), anyString());
+        verifyNoInteractions(syncService);
         verifyNoInteractions(failureClassifier);
+    }
+
+    @Test
+    @DisplayName("아직 지원하지 않는 recurrence scope Job은 명시적으로 종료한다")
+    void givenUnsupportedRecurrenceScope_whenProcess_thenTerminatesWithScopeReason() {
+        // given
+        GoogleOperationJob job = unsupportedJob(1L, 10L);
+        when(operationLeaseService.acquire(eq(10L), anyString())).thenReturn(true);
+        when(jobPersistenceService.claimNextJob(eq(10L), eq(20L), anyString()))
+                .thenReturn(job)
+                .thenReturn(null);
+
+        // when
+        processor.processAccount(10L);
+
+        // then
+        verify(jobPersistenceService).terminate(
+                eq(1L), eq(10L), anyString(), eq("UNSUPPORTED_JOB_SCOPE")
+        );
+        verifyNoInteractions(syncService);
     }
 
     @Test
@@ -225,19 +245,19 @@ class GoogleOperationProcessorTest {
         verify(jobPersistenceService, never()).claimNextJob(eq(10L), eq(20L), anyString());
     }
 
-    private GoogleOperationJob syncJob(Long jobId, Long accountId) {
-        return job(jobId, accountId, GoogleOperationJob.SYNC_KIND);
+    private GoogleCalendarSyncJob syncJob(Long jobId, Long accountId) {
+        GoogleCalendarSyncJob job = mock(GoogleCalendarSyncJob.class);
+        when(job.getId()).thenReturn(jobId);
+        when(job.getAccountId()).thenReturn(accountId);
+        when(job.getIntegrationId()).thenReturn(20L);
+        return job;
     }
 
-    private GoogleOperationJob job(Long jobId, Long accountId, String kind) {
+    private GoogleOperationJob unsupportedJob(Long jobId, Long accountId) {
         GoogleOperationJob job = mock(GoogleOperationJob.class);
         when(job.getId()).thenReturn(jobId);
         when(job.getAccountId()).thenReturn(accountId);
-        when(job.getKind()).thenReturn(kind);
         when(job.getIntegrationId()).thenReturn(20L);
-        when(job.getEffectiveResourceScope()).thenReturn(
-                GoogleCalendarEffectiveScopeType.EVENT.getStoredValue());
-        when(job.getEffectiveResourceKey()).thenReturn("1");
         return job;
     }
 }
