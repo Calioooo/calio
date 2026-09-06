@@ -1,6 +1,6 @@
 package com.calio.calendar.integration.sync;
 
-import com.calio.calendar.external.google.GoogleCalendarEventPreconditionFailedException;
+import com.calio.calendar.external.google.GoogleCalendarEventVersionConflictException;
 import com.calio.calendar.external.google.GoogleCalendarEventsClient;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventResponse;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarConnection;
@@ -165,7 +165,7 @@ class GoogleCalendarEventJobSupport {
             );
             return MappingExecutionResult.updated(
                     mapping.mappingId(), mapping.providerEtag(), updatedEvent.etag());
-        } catch (GoogleCalendarEventPreconditionFailedException exception) {
+        } catch (GoogleCalendarEventVersionConflictException exception) {
             return MappingExecutionResult.conflictDetected(mapping.mappingId());
         }
     }

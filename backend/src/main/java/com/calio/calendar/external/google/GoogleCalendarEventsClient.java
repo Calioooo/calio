@@ -132,7 +132,7 @@ public class GoogleCalendarEventsClient {
             );
         } catch (RestClientResponseException exception) {
             if (exception.getStatusCode().value() == HttpStatus.PRECONDITION_FAILED.value()) {
-                throw new GoogleCalendarEventPreconditionFailedException(exception);
+                throw new GoogleCalendarEventVersionConflictException(exception);
             }
             throw translateEventResponseFailure(exception);
         }

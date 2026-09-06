@@ -11,7 +11,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.calio.calendar.external.google.GoogleCalendarEventsClient;
-import com.calio.calendar.external.google.GoogleCalendarEventPreconditionFailedException;
+import com.calio.calendar.external.google.GoogleCalendarEventVersionConflictException;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventResponse;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarConnection;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
@@ -178,7 +178,7 @@ class GoogleCalendarEventJobOperationsTest {
                 org.mockito.ArgumentMatchers.eq("external-1"),
                 org.mockito.ArgumentMatchers.eq("etag-1"),
                 org.mockito.ArgumentMatchers.any()
-        )).thenThrow(new GoogleCalendarEventPreconditionFailedException(new RuntimeException()));
+        )).thenThrow(new GoogleCalendarEventVersionConflictException(new RuntimeException()));
 
         // when
         execute(job, "worker");

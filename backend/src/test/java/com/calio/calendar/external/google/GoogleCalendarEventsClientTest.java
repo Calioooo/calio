@@ -100,7 +100,7 @@ class GoogleCalendarEventsClientTest {
                 "event-1",
                 "etag-1",
                 payload()
-        )).isInstanceOf(GoogleCalendarEventPreconditionFailedException.class);
+        )).isInstanceOf(GoogleCalendarEventVersionConflictException.class);
         server.verify();
     }
 
