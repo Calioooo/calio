@@ -16,12 +16,9 @@ import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegratio
 import com.calio.calendar.integration.connection.service.GoogleCalendarConnectionCommandService;
 import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrationQueryService;
 import com.calio.calendar.external.google.GoogleCalendarInvalidGrantException;
-import com.calio.calendar.integration.sync.GoogleCalendarEventCreateJobService;
-import com.calio.calendar.integration.sync.GoogleCalendarEventDeleteJobService;
+import com.calio.calendar.integration.sync.GoogleCalendarEventJobService;
 import com.calio.calendar.integration.sync.GoogleCalendarSyncService;
-import com.calio.calendar.integration.sync.GoogleCalendarEventUpdateJobService;
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEventJob;
-import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEventJobKind;
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarSyncJob;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJob;
 import com.calio.calendar.integration.sync.operation.dto.GoogleOperationFailureDecision;
@@ -36,9 +33,7 @@ class GoogleOperationProcessorTest {
     private GoogleOperationJobService jobPersistenceService;
     private GoogleOperationLeaseService operationLeaseService;
     private GoogleCalendarSyncService syncService;
-    private GoogleCalendarEventCreateJobService eventCreateJobService;
-    private GoogleCalendarEventUpdateJobService eventUpdateJobService;
-    private GoogleCalendarEventDeleteJobService eventDeleteJobService;
+    private GoogleCalendarEventJobService eventJobService;
     private GoogleOperationFailureClassifier failureClassifier;
     private GoogleCalendarConnectionCommandService connectionCommandService;
     private GoogleCalendarIntegrationQueryService integrationQueryService;
@@ -49,9 +44,7 @@ class GoogleOperationProcessorTest {
         jobPersistenceService = mock(GoogleOperationJobService.class);
         operationLeaseService = mock(GoogleOperationLeaseService.class);
         syncService = mock(GoogleCalendarSyncService.class);
-        eventCreateJobService = mock(GoogleCalendarEventCreateJobService.class);
-        eventUpdateJobService = mock(GoogleCalendarEventUpdateJobService.class);
-        eventDeleteJobService = mock(GoogleCalendarEventDeleteJobService.class);
+        eventJobService = mock(GoogleCalendarEventJobService.class);
         failureClassifier = mock(GoogleOperationFailureClassifier.class);
         connectionCommandService = mock(GoogleCalendarConnectionCommandService.class);
         integrationQueryService = mock(GoogleCalendarIntegrationQueryService.class);
@@ -62,9 +55,7 @@ class GoogleOperationProcessorTest {
                 jobPersistenceService,
                 operationLeaseService,
                 syncService,
-                eventCreateJobService,
-                eventUpdateJobService,
-                eventDeleteJobService,
+                eventJobService,
                 failureClassifier,
                 connectionCommandService,
                 integrationQueryService,
@@ -222,7 +213,7 @@ class GoogleOperationProcessorTest {
                 eq(1L), eq(10L), anyString(), eq("UNSUPPORTED_JOB_SCOPE")
         );
         verifyNoInteractions(syncService);
-        verifyNoInteractions(eventCreateJobService, eventUpdateJobService, eventDeleteJobService);
+        verifyNoInteractions(eventJobService);
         verifyNoInteractions(failureClassifier);
     }
 
@@ -237,38 +228,8 @@ class GoogleOperationProcessorTest {
 
         processor.processAccount(10L);
 
-        verify(eventCreateJobService).execute(eq(job), anyString());
+        verify(eventJobService).execute(eq(job), anyString());
         verifyNoInteractions(syncService);
-    }
-
-    @Test
-    @DisplayName("UPDATE Event Job은 update job service가 직접 처리한다")
-    void givenUpdateEventJob_whenProcess_thenExecutesUpdateJobService() {
-        GoogleCalendarEventJob job = eventJob(1L, 10L, GoogleCalendarEventJobKind.UPDATE);
-        when(operationLeaseService.acquire(eq(10L), anyString())).thenReturn(true);
-        when(jobPersistenceService.claimNextJob(eq(10L), eq(20L), anyString()))
-                .thenReturn(job)
-                .thenReturn(null);
-
-        processor.processAccount(10L);
-
-        verify(eventUpdateJobService).execute(eq(job), anyString());
-        verifyNoInteractions(eventCreateJobService, eventDeleteJobService, syncService);
-    }
-
-    @Test
-    @DisplayName("DELETE Event Job은 delete job service가 직접 처리한다")
-    void givenDeleteEventJob_whenProcess_thenExecutesDeleteJobService() {
-        GoogleCalendarEventJob job = eventJob(1L, 10L, GoogleCalendarEventJobKind.DELETE);
-        when(operationLeaseService.acquire(eq(10L), anyString())).thenReturn(true);
-        when(jobPersistenceService.claimNextJob(eq(10L), eq(20L), anyString()))
-                .thenReturn(job)
-                .thenReturn(null);
-
-        processor.processAccount(10L);
-
-        verify(eventDeleteJobService).execute(eq(job), anyString());
-        verifyNoInteractions(eventCreateJobService, eventUpdateJobService, syncService);
     }
 
     @Test
@@ -289,7 +250,7 @@ class GoogleOperationProcessorTest {
                 eq(1L), eq(10L), anyString(), eq("UNSUPPORTED_JOB_SCOPE")
         );
         verifyNoInteractions(syncService);
-        verifyNoInteractions(eventCreateJobService, eventUpdateJobService, eventDeleteJobService);
+        verifyNoInteractions(eventJobService);
     }
 
     @Test
@@ -315,19 +276,10 @@ class GoogleOperationProcessorTest {
     }
 
     private GoogleCalendarEventJob eventJob(Long jobId, Long accountId) {
-        return eventJob(jobId, accountId, GoogleCalendarEventJobKind.CREATE);
-    }
-
-    private GoogleCalendarEventJob eventJob(
-            Long jobId,
-            Long accountId,
-            GoogleCalendarEventJobKind kind
-    ) {
         GoogleCalendarEventJob job = mock(GoogleCalendarEventJob.class);
         when(job.getId()).thenReturn(jobId);
         when(job.getAccountId()).thenReturn(accountId);
         when(job.getIntegrationId()).thenReturn(20L);
-        when(job.getKind()).thenReturn(kind);
         return job;
     }
 

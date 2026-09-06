@@ -5,10 +5,8 @@ import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrati
 import com.calio.calendar.external.google.GoogleCalendarInvalidGrantException;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
-import com.calio.calendar.integration.sync.GoogleCalendarEventCreateJobService;
-import com.calio.calendar.integration.sync.GoogleCalendarEventDeleteJobService;
+import com.calio.calendar.integration.sync.GoogleCalendarEventJobService;
 import com.calio.calendar.integration.sync.GoogleCalendarSyncService;
-import com.calio.calendar.integration.sync.GoogleCalendarEventUpdateJobService;
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEventJob;
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarSyncJob;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJob;
@@ -26,9 +24,7 @@ public class GoogleOperationProcessor {
     private final GoogleOperationJobService jobService;
     private final GoogleOperationLeaseService operationLeaseService;
     private final GoogleCalendarSyncService syncService;
-    private final GoogleCalendarEventCreateJobService eventCreateJobService;
-    private final GoogleCalendarEventUpdateJobService eventUpdateJobService;
-    private final GoogleCalendarEventDeleteJobService eventDeleteJobService;
+    private final GoogleCalendarEventJobService eventJobService;
     private final GoogleOperationFailureClassifier failureClassifier;
     private final GoogleCalendarConnectionCommandService connectionCommandService;
     private final GoogleCalendarIntegrationQueryService integrationQueryService;
@@ -38,9 +34,7 @@ public class GoogleOperationProcessor {
             GoogleOperationJobService jobService,
             GoogleOperationLeaseService operationLeaseService,
             GoogleCalendarSyncService syncService,
-            GoogleCalendarEventCreateJobService eventCreateJobService,
-            GoogleCalendarEventUpdateJobService eventUpdateJobService,
-            GoogleCalendarEventDeleteJobService eventDeleteJobService,
+            GoogleCalendarEventJobService eventJobService,
             GoogleOperationFailureClassifier failureClassifier,
             GoogleCalendarConnectionCommandService connectionCommandService,
             GoogleCalendarIntegrationQueryService integrationQueryService,
@@ -49,9 +43,7 @@ public class GoogleOperationProcessor {
         this.jobService = jobService;
         this.operationLeaseService = operationLeaseService;
         this.syncService = syncService;
-        this.eventCreateJobService = eventCreateJobService;
-        this.eventUpdateJobService = eventUpdateJobService;
-        this.eventDeleteJobService = eventDeleteJobService;
+        this.eventJobService = eventJobService;
         this.failureClassifier = failureClassifier;
         this.connectionCommandService = connectionCommandService;
         this.integrationQueryService = integrationQueryService;
@@ -114,11 +106,7 @@ public class GoogleOperationProcessor {
 
     private JobExecutionResult executeEventJob(GoogleCalendarEventJob job, String workerToken) {
         try {
-            switch (job.getKind()) {
-                case CREATE -> eventCreateJobService.execute(job, workerToken);
-                case UPDATE -> eventUpdateJobService.execute(job, workerToken);
-                case DELETE -> eventDeleteJobService.execute(job, workerToken);
-            }
+            eventJobService.execute(job, workerToken);
             return JobExecutionResult.CONTINUE_WITH_NEXT_JOB;
         } catch (RuntimeException failure) {
             return handleSyncFailure(job, workerToken, failure);
