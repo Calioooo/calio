@@ -67,6 +67,49 @@ class GoogleCalendarEventsClientTest {
     }
 
     @Test
+    @DisplayName("PATCH는 읽은 provider ETag를 If-Match precondition으로 보낸다")
+    void givenExpectedProviderEtag_whenPatchEvent_thenSendsConditionalRequest() {
+        // given
+        RestClient.Builder restClientBuilder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
+        GoogleCalendarEventsClient client = client(restClientBuilder);
+        server.expect(method(HttpMethod.PATCH))
+                .andExpect(header(HttpHeaders.IF_MATCH, "etag-1"))
+                .andRespond(withSuccess(eventResponse("event-1"), MediaType.APPLICATION_JSON));
+
+        // when
+        client.patchEvent(
+                "current-token",
+                "event-1",
+                writeRequest(),
+                "etag-1"
+        );
+
+        // then
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("PATCH의 412 precondition 실패는 provider conflict 예외로 구분한다")
+    void givenPreconditionFailed_whenPatchEvent_thenReturnsProviderConflict() {
+        // given
+        RestClient.Builder restClientBuilder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
+        GoogleCalendarEventsClient client = client(restClientBuilder);
+        server.expect(method(HttpMethod.PATCH))
+                .andRespond(withStatus(HttpStatus.PRECONDITION_FAILED));
+
+        // when, then
+        assertThatThrownBy(() -> client.patchEvent(
+                "current-token",
+                "event-1",
+                writeRequest(),
+                "etag-1"
+        )).isInstanceOf(GoogleCalendarEventPreconditionFailedException.class);
+        server.verify();
+    }
+
+    @Test
     @DisplayName("FULL SYNC 요청은 공통 query만 보내고 syncToken과 range parameter를 보내지 않는다")
     void givenFullMode_whenListEvents_thenUsesFullQueryContract() {
         // given
@@ -477,5 +520,15 @@ class GoogleCalendarEventsClientTest {
                   "end": {"dateTime": "2026-09-04T01:00:00Z", "timeZone": "UTC"}
                 }
                 """.formatted(eventId);
+    }
+
+    private GoogleCalendarEventWriteRequest writeRequest() {
+        return new GoogleCalendarEventWriteRequest(
+                null,
+                "title",
+                null,
+                new GoogleCalendarEventTimeResponse(null, "2026-09-04T00:00:00Z", "UTC"),
+                new GoogleCalendarEventTimeResponse(null, "2026-09-04T01:00:00Z", "UTC")
+        );
     }
 }

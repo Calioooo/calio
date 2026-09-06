@@ -11,6 +11,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.calio.calendar.external.google.GoogleCalendarEventsClient;
+import com.calio.calendar.external.google.GoogleCalendarEventPreconditionFailedException;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventResponse;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarConnection;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
@@ -119,7 +120,8 @@ class GoogleCalendarEventJobServiceTest {
         verify(eventsClient, never()).patchEvent(
                 org.mockito.ArgumentMatchers.anyString(),
                 org.mockito.ArgumentMatchers.anyString(),
-                org.mockito.ArgumentMatchers.any());
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.anyString());
         verify(jobService).recordSyncConflict(50L, 10L, "worker");
         verify(jobService).completeSyncRun(50L, 10L, "worker");
     }
@@ -147,6 +149,36 @@ class GoogleCalendarEventJobServiceTest {
                 org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any());
         verify(mappingCommandService, never()).createEventMapping(
                 org.mockito.ArgumentMatchers.any(GoogleCalendarEventMapping.class));
+        verify(jobService).completeSyncRun(50L, 10L, "worker");
+    }
+
+    @Test
+    @DisplayName("PATCH precondition 실패는 provider 변경 충돌로 보존한다")
+    void givenPatchPreconditionFailure_whenApplyUpdate_thenMarksConflict() {
+        // given
+        GoogleCalendarConnection connection = connection(30L);
+        GoogleCalendarEventMapping mapping = new GoogleCalendarEventMapping(
+                connection, 40L, "external-1", "etag-1");
+        GoogleCalendarEventJob job = job(GoogleCalendarEventJobKind.UPDATE);
+        when(mappingQueryService.listEventMappingsForEvent(20L, 40L))
+                .thenReturn(List.of(mapping));
+        when(accessTokenService.getAccessToken(30L)).thenReturn("token");
+        when(objectMapper.readValue("payload", GoogleEventJobPayload.class)).thenReturn(payload());
+        when(eventsClient.getEvent("token", "external-1"))
+                .thenReturn(Optional.of(providerEvent("etag-1")));
+        when(eventsClient.patchEvent(
+                org.mockito.ArgumentMatchers.eq("token"),
+                org.mockito.ArgumentMatchers.eq("external-1"),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.eq("etag-1")
+        )).thenThrow(new GoogleCalendarEventPreconditionFailedException(new RuntimeException()));
+
+        // when
+        service.apply(job, "worker");
+
+        // then
+        assertThat(mapping.isConflicted()).isTrue();
+        verify(jobService).recordSyncConflict(50L, 10L, "worker");
         verify(jobService).completeSyncRun(50L, 10L, "worker");
     }
 

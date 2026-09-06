@@ -1,6 +1,7 @@
 package com.calio.calendar.integration.sync;
 
 import com.calio.calendar.external.google.GoogleCalendarEventsClient;
+import com.calio.calendar.external.google.GoogleCalendarEventPreconditionFailedException;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventResponse;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventWriteRequest;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarConnection;
@@ -160,11 +161,17 @@ public class GoogleCalendarEventJobService implements GoogleOperationJobHandler 
         if (providerEvent == null || !mapping.providerEtag().equals(providerEvent.etag())) {
             return MappingExecutionResult.conflictDetected(mapping.mappingId());
         }
-        GoogleCalendarEventResponse updatedEvent = eventsClient.patchEvent(
-                accessToken,
-                mapping.externalEventId(),
-                GoogleCalendarEventWriteRequest.from(eventSnapshot)
-        );
+        GoogleCalendarEventResponse updatedEvent;
+        try {
+            updatedEvent = eventsClient.patchEvent(
+                    accessToken,
+                    mapping.externalEventId(),
+                    GoogleCalendarEventWriteRequest.from(eventSnapshot),
+                    mapping.providerEtag()
+            );
+        } catch (GoogleCalendarEventPreconditionFailedException exception) {
+            return MappingExecutionResult.conflictDetected(mapping.mappingId());
+        }
         return MappingExecutionResult.updated(
                 mapping.mappingId(), mapping.providerEtag(), updatedEvent.etag());
     }
