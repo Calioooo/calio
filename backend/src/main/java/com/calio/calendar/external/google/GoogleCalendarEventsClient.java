@@ -153,10 +153,11 @@ public class GoogleCalendarEventsClient {
                     .retrieve().toBodilessEntity();
             return true;
         } catch (RestClientResponseException exception) {
-            if (exception.getStatusCode().value() == HttpStatus.NOT_FOUND.value()) {
+            int status = exception.getStatusCode().value();
+            if (status == HttpStatus.NOT_FOUND.value() || status == HttpStatus.GONE.value()) {
                 return false;
             }
-            if (exception.getStatusCode().value() == HttpStatus.PRECONDITION_FAILED.value()) {
+            if (status == HttpStatus.PRECONDITION_FAILED.value()) {
                 throw new GoogleCalendarEventVersionConflictException(exception);
             }
             throw translateEventResponseFailure(exception);

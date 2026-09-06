@@ -139,6 +139,24 @@ class GoogleCalendarEventsClientTest {
     }
 
     @Test
+    @DisplayName("DELETE의 410 응답은 이미 삭제된 일정으로 처리한다")
+    void givenGoneResponse_whenDeleteEvent_thenTreatsDeletionAsComplete() {
+        // given
+        RestClient.Builder restClientBuilder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
+        GoogleCalendarEventsClient client = client(restClientBuilder);
+        server.expect(method(HttpMethod.DELETE))
+                .andRespond(withStatus(HttpStatus.GONE));
+
+        // when
+        boolean deleted = client.deleteEvent("current-token", "event-1", "etag-1");
+
+        // then
+        assertThat(deleted).isFalse();
+        server.verify();
+    }
+
+    @Test
     @DisplayName("FULL SYNC 요청은 공통 query만 보내고 syncToken과 range parameter를 보내지 않는다")
     void givenFullMode_whenListEvents_thenUsesFullQueryContract() {
         // given

@@ -202,6 +202,7 @@ class GoogleCalendarEventJobServiceTest {
         // then
         verify(eventsClient).deleteEvent("token", "external-1", "etag-1");
         verifyNoInteractions(objectMapper);
+        verify(mappingCommandService).deleteEventMappings(List.of(mapping));
         verify(jobService).succeed(50L, 10L, "worker");
     }
 

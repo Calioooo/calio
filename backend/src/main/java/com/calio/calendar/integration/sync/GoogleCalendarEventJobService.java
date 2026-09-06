@@ -186,7 +186,7 @@ public class GoogleCalendarEventJobService {
         } catch (GoogleCalendarEventVersionConflictException exception) {
             return MappingExecutionResult.conflictDetected(mapping.mappingId());
         }
-        return MappingExecutionResult.applied(mapping.mappingId());
+        return MappingExecutionResult.deleted(mapping.mappingId());
     }
 
     private GoogleCalendarEventResponse insertEvent(
@@ -235,11 +235,27 @@ public class GoogleCalendarEventJobService {
             String workerToken,
             List<MappingExecutionResult> mappingResults
     ) {
-        MappingOutcome outcome = applyMappingResults(mappingResults, findMappingsById(job));
+        Map<Long, GoogleCalendarEventMapping> mappingsById = findMappingsById(job);
+        MappingOutcome outcome = applyMappingResults(mappingResults, mappingsById);
         if (completeConflictOrSkip(job, workerToken, outcome)) {
             return;
         }
+        deleteCompletedMappings(mappingResults, mappingsById);
         jobService.succeed(job.getId(), job.getAccountId(), workerToken);
+    }
+
+    private void deleteCompletedMappings(
+            List<MappingExecutionResult> mappingResults,
+            Map<Long, GoogleCalendarEventMapping> mappingsById
+    ) {
+        List<GoogleCalendarEventMapping> completedMappings = mappingResults.stream()
+                .filter(MappingExecutionResult::providerDeleted)
+                .map(result -> mappingsById.get(result.mappingId()))
+                .filter(Objects::nonNull)
+                .toList();
+        if (!completedMappings.isEmpty()) {
+            mappingCommandService.deleteEventMappings(completedMappings);
+        }
     }
 
     private boolean completeConflictOrSkip(
@@ -371,14 +387,19 @@ public class GoogleCalendarEventJobService {
             MappingOutcome outcome,
             boolean localChangeDetected,
             String expectedProviderEtag,
-            String updatedProviderEtag
+            String updatedProviderEtag,
+            boolean providerDeleted
     ) {
         private static MappingExecutionResult applied(Long mappingId) {
-            return new MappingExecutionResult(mappingId, MappingOutcome.APPLIED, false, null, null);
+            return new MappingExecutionResult(mappingId, MappingOutcome.APPLIED, false, null, null, false);
+        }
+
+        private static MappingExecutionResult deleted(Long mappingId) {
+            return new MappingExecutionResult(mappingId, MappingOutcome.APPLIED, false, null, null, true);
         }
 
         private static MappingExecutionResult markedLocalChange(Long mappingId) {
-            return new MappingExecutionResult(mappingId, MappingOutcome.APPLIED, true, null, null);
+            return new MappingExecutionResult(mappingId, MappingOutcome.APPLIED, true, null, null, false);
         }
 
         private static MappingExecutionResult updated(
@@ -387,17 +408,17 @@ public class GoogleCalendarEventJobService {
                 String updatedProviderEtag
         ) {
             return new MappingExecutionResult(
-                    mappingId, MappingOutcome.APPLIED, false, expectedProviderEtag, updatedProviderEtag);
+                    mappingId, MappingOutcome.APPLIED, false, expectedProviderEtag, updatedProviderEtag, false);
         }
 
         private static MappingExecutionResult conflictDetected(Long mappingId) {
             return new MappingExecutionResult(
-                    mappingId, MappingOutcome.CONFLICT_DETECTED, false, null, null);
+                    mappingId, MappingOutcome.CONFLICT_DETECTED, false, null, null, false);
         }
 
         private static MappingExecutionResult alreadyConflicted(Long mappingId) {
             return new MappingExecutionResult(
-                    mappingId, MappingOutcome.ALREADY_CONFLICTED, false, null, null);
+                    mappingId, MappingOutcome.ALREADY_CONFLICTED, false, null, null, false);
         }
     }
 
