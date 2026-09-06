@@ -1,6 +1,7 @@
 package com.calio.calendar.integration.sync.operation;
 
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEffectiveScope;
+import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEffectiveScopeType;
 import com.calio.calendar.integration.sync.operation.repository.GoogleOperationJobRepository;
 import java.time.Instant;
 import java.util.List;
@@ -31,7 +32,7 @@ public class GoogleOperationJobQueryService {
             Long integrationId,
             GoogleCalendarEffectiveScope scope
     ) {
-        if (scope.type() != com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEffectiveScopeType.EVENT) {
+        if (scope.type() != GoogleCalendarEffectiveScopeType.EVENT) {
             return false;
         }
         return jobRepository.existsPendingEventJob(accountId, integrationId, scope.canonicalId());
