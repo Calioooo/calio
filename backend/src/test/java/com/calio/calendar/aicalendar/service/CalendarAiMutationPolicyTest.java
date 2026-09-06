@@ -71,6 +71,17 @@ class CalendarAiMutationPolicyTest {
     }
 
     @Test
+    @DisplayName("AI 반복 생성은 null recurrence rule을 안정적인 검증 오류로 거절한다")
+    void givenNullRecurrenceRule_whenValidateCreateRecurrence_thenRejectsValidationFailure() {
+        assertThatThrownBy(() -> policy.validateCreateRecurrence(
+                java.util.Collections.singletonList(null),
+                timedSchedule("2026-08-07T09:18:00Z", "2026-08-07T10:18:00Z")
+        )).isInstanceOf(CalioException.class)
+                .extracting(exception -> ((CalioException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.INVALID_RECURRENCE_SCHEDULE);
+    }
+
+    @Test
     @DisplayName("AI 반복 생성은 최대 종료일 이후와 초 단위 시간을 거절한다")
     void givenUnsupportedBoundaryOrPrecision_whenValidateCreateRecurrence_thenRejects() {
         assertThatThrownBy(() -> policy.validateCreateRecurrence(

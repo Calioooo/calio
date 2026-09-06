@@ -48,7 +48,11 @@ public class CalendarAiMutationPolicy {
         if (recurrenceRules == null || recurrenceRules.size() != 1) {
             throw new CalioException(ErrorCode.INVALID_RECURRENCE_SCHEDULE);
         }
-        Matcher matcher = SIMPLE_RECURRENCE_RULE.matcher(recurrenceRules.getFirst());
+        String recurrenceRule = recurrenceRules.getFirst();
+        if (recurrenceRule == null) {
+            throw new CalioException(ErrorCode.INVALID_RECURRENCE_SCHEDULE);
+        }
+        Matcher matcher = SIMPLE_RECURRENCE_RULE.matcher(recurrenceRule);
         if (!matcher.matches()) {
             throw new CalioException(ErrorCode.INVALID_RECURRENCE_SCHEDULE);
         }
