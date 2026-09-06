@@ -225,6 +225,7 @@ class GoogleCalendarEventJobServiceTest {
 
         // then
         assertThat(mapping.isConflicted()).isTrue();
+        verify(mappingCommandService, never()).deleteEventMappings(any());
         verify(jobService).recordSyncConflict(50L, 10L, "worker");
         verify(jobService).completeSyncRun(50L, 10L, "worker");
     }
