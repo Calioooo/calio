@@ -1,0 +1,345 @@
+package com.calio.calendar.integration.sync;
+
+import com.calio.calendar.external.google.GoogleCalendarEventPreconditionFailedException;
+import com.calio.calendar.external.google.GoogleCalendarEventsClient;
+import com.calio.calendar.external.google.dto.GoogleCalendarEventResponse;
+import com.calio.calendar.integration.connection.domain.GoogleCalendarConnection;
+import com.calio.calendar.integration.connection.domain.GoogleCalendarConnectionState;
+import com.calio.calendar.integration.connection.service.GoogleCalendarAccessTokenService;
+import com.calio.calendar.integration.connection.service.GoogleCalendarConnectionQueryService;
+import com.calio.calendar.integration.mapping.domain.GoogleCalendarEventMapping;
+import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingCommandService;
+import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingQueryService;
+import com.calio.calendar.integration.sync.operation.GoogleOperationJobService;
+import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEventJob;
+import com.calio.calendar.integration.sync.operation.dto.GoogleEventJobPayload;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionTemplate;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
+
+@Service
+class GoogleCalendarEventJobSupport {
+
+    private final GoogleCalendarConnectionQueryService connectionQueryService;
+    private final GoogleCalendarEventMappingQueryService mappingQueryService;
+    private final GoogleCalendarEventMappingCommandService mappingCommandService;
+    private final GoogleCalendarAccessTokenService accessTokenService;
+    private final GoogleCalendarEventsClient eventsClient;
+    private final ObjectMapper objectMapper;
+    private final GoogleOperationJobService jobService;
+    private final TransactionTemplate transactionTemplate;
+
+    GoogleCalendarEventJobSupport(
+            GoogleCalendarConnectionQueryService connectionQueryService,
+            GoogleCalendarEventMappingQueryService mappingQueryService,
+            GoogleCalendarEventMappingCommandService mappingCommandService,
+            GoogleCalendarAccessTokenService accessTokenService,
+            GoogleCalendarEventsClient eventsClient,
+            ObjectMapper objectMapper,
+            GoogleOperationJobService jobService,
+            TransactionTemplate transactionTemplate
+    ) {
+        this.connectionQueryService = connectionQueryService;
+        this.mappingQueryService = mappingQueryService;
+        this.mappingCommandService = mappingCommandService;
+        this.accessTokenService = accessTokenService;
+        this.eventsClient = eventsClient;
+        this.objectMapper = objectMapper;
+        this.jobService = jobService;
+        this.transactionTemplate = transactionTemplate;
+    }
+
+    GoogleEventJobPayload readEventSnapshot(GoogleCalendarEventJob job) {
+        try {
+            return objectMapper.readValue(job.getTargetPayload(), GoogleEventJobPayload.class);
+        } catch (JacksonException exception) {
+            throw new IllegalArgumentException("Google Event job payload cannot be decoded", exception);
+        }
+    }
+
+    List<EventMappingSnapshot> loadMappingSnapshots(GoogleCalendarEventJob job) {
+        return Objects.requireNonNull(transactionTemplate.execute(status ->
+                mappingQueryService.listEventMappingsForEvent(job.getIntegrationId(), job.getEventId())
+                        .stream()
+                        .map(EventMappingSnapshot::from)
+                        .toList()
+        ));
+    }
+
+    Long findCreationTarget(GoogleCalendarEventJob job, List<EventMappingSnapshot> mappings) {
+        return transactionTemplate.execute(status -> {
+            if (mappings.stream().anyMatch(EventMappingSnapshot::conflicted)) {
+                return null;
+            }
+            return connectionQueryService.listConnections(job.getIntegrationId()).stream()
+                    .filter(GoogleCalendarConnection::isConnected)
+                    .filter(connection -> hasNoMapping(mappings, connection.getId()))
+                    .map(GoogleCalendarConnection::getId)
+                    .findFirst()
+                    .orElse(null);
+        });
+    }
+
+    List<MappingExecutionResult> patchMappedEvents(
+            GoogleEventJobPayload eventSnapshot,
+            List<EventMappingSnapshot> mappings
+    ) {
+        return mappings.stream()
+                .map(mapping -> patchMappedEvent(eventSnapshot, mapping))
+                .toList();
+    }
+
+    List<MappingExecutionResult> deleteMappedEvents(List<EventMappingSnapshot> mappings) {
+        return mappings.stream()
+                .map(this::deleteMappedEvent)
+                .toList();
+    }
+
+    GoogleCalendarEventResponse insertEvent(
+            GoogleCalendarEventJob job,
+            GoogleEventJobPayload eventSnapshot,
+            Long targetConnectionId
+    ) {
+        String accessToken = accessTokenService.getAccessToken(targetConnectionId);
+        return eventsClient.insertEvent(accessToken, job.getProviderIdentity(), eventSnapshot);
+    }
+
+    void completeCreate(
+            GoogleCalendarEventJob job,
+            String workerToken,
+            List<MappingExecutionResult> mappingResults,
+            Long targetConnectionId,
+            GoogleCalendarEventResponse createdEvent
+    ) {
+        transactionTemplate.executeWithoutResult(status -> {
+            Map<Long, GoogleCalendarEventMapping> mappingsById = findMappingsById(job);
+            MappingOutcome outcome = applyMappingResults(mappingResults, mappingsById);
+            if (completeConflictOrSkip(job, workerToken, outcome)) {
+                return;
+            }
+            createEventMapping(job, targetConnectionId, createdEvent, mappingsById);
+            jobService.succeed(job.getId(), job.getAccountId(), workerToken);
+        });
+    }
+
+    void complete(GoogleCalendarEventJob job, String workerToken, List<MappingExecutionResult> mappingResults) {
+        transactionTemplate.executeWithoutResult(status -> {
+            MappingOutcome outcome = applyMappingResults(mappingResults, findMappingsById(job));
+            if (!completeConflictOrSkip(job, workerToken, outcome)) {
+                jobService.succeed(job.getId(), job.getAccountId(), workerToken);
+            }
+        });
+    }
+
+    private boolean hasNoMapping(List<EventMappingSnapshot> mappings, Long connectionId) {
+        return mappings.stream().noneMatch(mapping -> mapping.connectionId().equals(connectionId));
+    }
+
+    private MappingExecutionResult patchMappedEvent(
+            GoogleEventJobPayload eventSnapshot,
+            EventMappingSnapshot mapping
+    ) {
+        if (mapping.conflicted()) {
+            return MappingExecutionResult.alreadyConflicted(mapping.mappingId());
+        }
+        if (mapping.connectionState() != GoogleCalendarConnectionState.CONNECTED) {
+            return MappingExecutionResult.markedLocalChange(mapping.mappingId());
+        }
+        String accessToken = accessTokenService.getAccessToken(mapping.connectionId());
+        GoogleCalendarEventResponse providerEvent = eventsClient
+                .getEvent(accessToken, mapping.externalEventId()).orElse(null);
+        if (providerEvent == null || !mapping.providerEtag().equals(providerEvent.etag())) {
+            return MappingExecutionResult.conflictDetected(mapping.mappingId());
+        }
+        try {
+            GoogleCalendarEventResponse updatedEvent = eventsClient.patchEvent(
+                    accessToken,
+                    mapping.externalEventId(),
+                    mapping.providerEtag(),
+                    eventSnapshot
+            );
+            return MappingExecutionResult.updated(
+                    mapping.mappingId(), mapping.providerEtag(), updatedEvent.etag());
+        } catch (GoogleCalendarEventPreconditionFailedException exception) {
+            return MappingExecutionResult.conflictDetected(mapping.mappingId());
+        }
+    }
+
+    private MappingExecutionResult deleteMappedEvent(EventMappingSnapshot mapping) {
+        if (mapping.conflicted()) {
+            return MappingExecutionResult.alreadyConflicted(mapping.mappingId());
+        }
+        if (mapping.connectionState() != GoogleCalendarConnectionState.CONNECTED) {
+            return MappingExecutionResult.markedLocalChange(mapping.mappingId());
+        }
+        String accessToken = accessTokenService.getAccessToken(mapping.connectionId());
+        eventsClient.deleteEvent(accessToken, mapping.externalEventId());
+        return MappingExecutionResult.applied(mapping.mappingId());
+    }
+
+    private Map<Long, GoogleCalendarEventMapping> findMappingsById(GoogleCalendarEventJob job) {
+        Map<Long, GoogleCalendarEventMapping> mappingsById = new HashMap<>();
+        mappingQueryService.listEventMappingsForEvent(job.getIntegrationId(), job.getEventId())
+                .forEach(mapping -> mappingsById.put(mapping.getId(), mapping));
+        return mappingsById;
+    }
+
+    private MappingOutcome applyMappingResults(
+            List<MappingExecutionResult> mappingResults,
+            Map<Long, GoogleCalendarEventMapping> mappingsById
+    ) {
+        MappingOutcome outcome = MappingOutcome.APPLIED;
+        for (MappingExecutionResult result : mappingResults) {
+            GoogleCalendarEventMapping mapping = mappingsById.get(result.mappingId());
+            if (mapping != null) {
+                outcome = outcome.merge(applyMappingResult(mapping, result));
+            }
+        }
+        return outcome;
+    }
+
+    private MappingOutcome applyMappingResult(
+            GoogleCalendarEventMapping mapping,
+            MappingExecutionResult result
+    ) {
+        if (mapping.isConflicted() && result.outcome() == MappingOutcome.APPLIED) {
+            return MappingOutcome.ALREADY_CONFLICTED;
+        }
+        if (result.outcome() == MappingOutcome.CONFLICT_DETECTED) {
+            mapping.markConflicted();
+            return MappingOutcome.CONFLICT_DETECTED;
+        }
+        if (result.localChangeDetected()) {
+            mapping.markLocalChanged();
+        }
+        if (result.updatedProviderEtag() != null) {
+            if (!mapping.getProviderEtag().equals(result.expectedProviderEtag())) {
+                mapping.markConflicted();
+                return MappingOutcome.CONFLICT_DETECTED;
+            }
+            mapping.updateProviderEtag(result.updatedProviderEtag());
+        }
+        return result.outcome();
+    }
+
+    private boolean completeConflictOrSkip(
+            GoogleCalendarEventJob job,
+            String workerToken,
+            MappingOutcome outcome
+    ) {
+        if (outcome == MappingOutcome.ALREADY_CONFLICTED) {
+            jobService.skipConflictedScope(job.getId(), job.getAccountId(), workerToken);
+            return true;
+        }
+        if (outcome == MappingOutcome.CONFLICT_DETECTED) {
+            jobService.recordSyncConflict(job.getId(), job.getAccountId(), workerToken);
+            jobService.completeSyncRun(job.getId(), job.getAccountId(), workerToken);
+            return true;
+        }
+        return false;
+    }
+
+    private void createEventMapping(
+            GoogleCalendarEventJob job,
+            Long targetConnectionId,
+            GoogleCalendarEventResponse createdEvent,
+            Map<Long, GoogleCalendarEventMapping> mappingsById
+    ) {
+        if (createdEvent == null || targetConnectionId == null) {
+            return;
+        }
+        if (mappingsById.values().stream()
+                .anyMatch(mapping -> mapping.getConnection().getId().equals(targetConnectionId))) {
+            return;
+        }
+        GoogleCalendarConnection connection = connectionQueryService.listConnections(job.getIntegrationId()).stream()
+                .filter(candidate -> candidate.getId().equals(targetConnectionId))
+                .findFirst()
+                .orElse(null);
+        if (connection != null) {
+            mappingCommandService.createEventMapping(new GoogleCalendarEventMapping(
+                    connection,
+                    job.getEventId(),
+                    createdEvent.id(),
+                    createdEvent.etag()
+            ));
+        }
+    }
+
+}
+
+record EventMappingSnapshot(
+        Long mappingId,
+        Long connectionId,
+        GoogleCalendarConnectionState connectionState,
+        String externalEventId,
+        String providerEtag,
+        boolean conflicted
+) {
+    static EventMappingSnapshot from(GoogleCalendarEventMapping mapping) {
+        return new EventMappingSnapshot(
+                mapping.getId(),
+                mapping.getConnection().getId(),
+                mapping.getConnection().getState(),
+                mapping.getExternalEventId(),
+                mapping.getProviderEtag(),
+                mapping.isConflicted()
+        );
+    }
+}
+
+record MappingExecutionResult(
+        Long mappingId,
+        MappingOutcome outcome,
+        boolean localChangeDetected,
+        String expectedProviderEtag,
+        String updatedProviderEtag
+) {
+    static MappingExecutionResult applied(Long mappingId) {
+        return new MappingExecutionResult(mappingId, MappingOutcome.APPLIED, false, null, null);
+    }
+
+    static MappingExecutionResult markedLocalChange(Long mappingId) {
+        return new MappingExecutionResult(mappingId, MappingOutcome.APPLIED, true, null, null);
+    }
+
+    static MappingExecutionResult updated(
+            Long mappingId,
+            String expectedProviderEtag,
+            String updatedProviderEtag
+    ) {
+        return new MappingExecutionResult(
+                mappingId, MappingOutcome.APPLIED, false, expectedProviderEtag, updatedProviderEtag);
+    }
+
+    static MappingExecutionResult conflictDetected(Long mappingId) {
+        return new MappingExecutionResult(
+                mappingId, MappingOutcome.CONFLICT_DETECTED, false, null, null);
+    }
+
+    static MappingExecutionResult alreadyConflicted(Long mappingId) {
+        return new MappingExecutionResult(
+                mappingId, MappingOutcome.ALREADY_CONFLICTED, false, null, null);
+    }
+}
+
+enum MappingOutcome {
+    APPLIED,
+    CONFLICT_DETECTED,
+    ALREADY_CONFLICTED;
+
+    MappingOutcome merge(MappingOutcome other) {
+        if (this == ALREADY_CONFLICTED || other == ALREADY_CONFLICTED) {
+            return ALREADY_CONFLICTED;
+        }
+        if (this == CONFLICT_DETECTED || other == CONFLICT_DETECTED) {
+            return CONFLICT_DETECTED;
+        }
+        return APPLIED;
+    }
+}

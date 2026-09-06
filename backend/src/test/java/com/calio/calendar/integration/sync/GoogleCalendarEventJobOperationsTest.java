@@ -38,7 +38,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.mockito.ArgumentCaptor;
 import tools.jackson.databind.ObjectMapper;
 
-class GoogleCalendarEventJobServiceTest {
+class GoogleCalendarEventJobOperationsTest {
 
     private final GoogleCalendarConnectionQueryService connectionQueryService = mock();
     private final GoogleCalendarEventMappingQueryService mappingQueryService = mock();
@@ -49,7 +49,9 @@ class GoogleCalendarEventJobServiceTest {
     private final GoogleOperationJobService jobService = mock();
     private final TransactionTemplate jobTransaction = mock();
     private final AtomicBoolean transactionActive = new AtomicBoolean();
-    private GoogleCalendarEventJobService service;
+    private GoogleCalendarEventCreateJobService createJobService;
+    private GoogleCalendarEventUpdateJobService updateJobService;
+    private GoogleCalendarEventDeleteJobService deleteJobService;
 
     @BeforeEach
     void setUp() {
@@ -71,9 +73,12 @@ class GoogleCalendarEventJobServiceTest {
                 transactionActive.set(false);
             }
         }).when(jobTransaction).executeWithoutResult(any());
-        service = new GoogleCalendarEventJobService(
+        GoogleCalendarEventJobSupport jobSupport = new GoogleCalendarEventJobSupport(
                 connectionQueryService, mappingQueryService, mappingCommandService,
                 accessTokenService, eventsClient, objectMapper, jobService, jobTransaction);
+        createJobService = new GoogleCalendarEventCreateJobService(jobSupport);
+        updateJobService = new GoogleCalendarEventUpdateJobService(jobSupport);
+        deleteJobService = new GoogleCalendarEventDeleteJobService(jobSupport);
     }
 
     @Test
@@ -89,7 +94,7 @@ class GoogleCalendarEventJobServiceTest {
                 .thenReturn(List.of(mapping));
 
         // when
-        service.apply(job, "worker");
+        execute(job, "worker");
 
         // then
         assertThat(mapping.isLocalChanged()).isTrue();
@@ -113,7 +118,7 @@ class GoogleCalendarEventJobServiceTest {
                 .thenReturn(Optional.of(providerEvent("etag-2")));
 
         // when
-        service.apply(job, "worker");
+        execute(job, "worker");
 
         // then
         assertThat(mapping.isConflicted()).isTrue();
@@ -142,7 +147,7 @@ class GoogleCalendarEventJobServiceTest {
                 .thenReturn(Optional.of(providerEvent("etag-2")));
 
         // when
-        service.apply(job, "worker");
+        execute(job, "worker");
 
         // then
         verify(eventsClient, never()).insertEvent(
@@ -176,7 +181,7 @@ class GoogleCalendarEventJobServiceTest {
         )).thenThrow(new GoogleCalendarEventPreconditionFailedException(new RuntimeException()));
 
         // when
-        service.apply(job, "worker");
+        execute(job, "worker");
 
         // then
         assertThat(mapping.isConflicted()).isTrue();
@@ -197,7 +202,7 @@ class GoogleCalendarEventJobServiceTest {
         when(accessTokenService.getAccessToken(30L)).thenReturn("token");
 
         // when
-        service.apply(job, "worker");
+        execute(job, "worker");
 
         // then
         verify(eventsClient).deleteEvent("token", "external-1");
@@ -225,7 +230,7 @@ class GoogleCalendarEventJobServiceTest {
                 });
 
         // when
-        service.apply(job, "worker");
+        execute(job, "worker");
 
         // then
         ArgumentCaptor<GoogleCalendarEventMapping> mappingCaptor =
@@ -249,6 +254,14 @@ class GoogleCalendarEventJobServiceTest {
                 "payload", Instant.parse("2026-09-03T00:00:00Z"));
         ReflectionTestUtils.setField(job, "id", 50L);
         return job;
+    }
+
+    private void execute(GoogleCalendarEventJob job, String workerToken) {
+        switch (job.getKind()) {
+            case CREATE -> createJobService.execute(job, workerToken);
+            case UPDATE -> updateJobService.execute(job, workerToken);
+            case DELETE -> deleteJobService.execute(job, workerToken);
+        }
     }
 
     private GoogleCalendarConnection connection(Long id) {
