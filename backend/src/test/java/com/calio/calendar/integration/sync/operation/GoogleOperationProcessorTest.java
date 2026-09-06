@@ -16,7 +16,9 @@ import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegratio
 import com.calio.calendar.integration.connection.service.GoogleCalendarConnectionCommandService;
 import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrationQueryService;
 import com.calio.calendar.external.google.GoogleCalendarInvalidGrantException;
+import com.calio.calendar.integration.sync.GoogleCalendarEventJobService;
 import com.calio.calendar.integration.sync.GoogleCalendarSyncService;
+import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEventJob;
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarSyncJob;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJob;
 import com.calio.calendar.integration.sync.operation.dto.GoogleOperationFailureDecision;
@@ -31,6 +33,7 @@ class GoogleOperationProcessorTest {
     private GoogleOperationJobService jobPersistenceService;
     private GoogleOperationLeaseService operationLeaseService;
     private GoogleCalendarSyncService syncService;
+    private GoogleCalendarEventJobService eventJobService;
     private GoogleOperationFailureClassifier failureClassifier;
     private GoogleCalendarConnectionCommandService connectionCommandService;
     private GoogleCalendarIntegrationQueryService integrationQueryService;
@@ -41,6 +44,7 @@ class GoogleOperationProcessorTest {
         jobPersistenceService = mock(GoogleOperationJobService.class);
         operationLeaseService = mock(GoogleOperationLeaseService.class);
         syncService = mock(GoogleCalendarSyncService.class);
+        eventJobService = mock(GoogleCalendarEventJobService.class);
         failureClassifier = mock(GoogleOperationFailureClassifier.class);
         connectionCommandService = mock(GoogleCalendarConnectionCommandService.class);
         integrationQueryService = mock(GoogleCalendarIntegrationQueryService.class);
@@ -51,6 +55,7 @@ class GoogleOperationProcessorTest {
                 jobPersistenceService,
                 operationLeaseService,
                 syncService,
+                eventJobService,
                 failureClassifier,
                 connectionCommandService,
                 integrationQueryService,
@@ -208,7 +213,23 @@ class GoogleOperationProcessorTest {
                 eq(1L), eq(10L), anyString(), eq("UNSUPPORTED_JOB_SCOPE")
         );
         verifyNoInteractions(syncService);
+        verifyNoInteractions(eventJobService);
         verifyNoInteractions(failureClassifier);
+    }
+
+    @Test
+    @DisplayName("Event Job은 Event job service가 직접 처리한다")
+    void givenEventJob_whenProcess_thenAppliesEventJob() {
+        GoogleCalendarEventJob job = eventJob(1L, 10L);
+        when(operationLeaseService.acquire(eq(10L), anyString())).thenReturn(true);
+        when(jobPersistenceService.claimNextJob(eq(10L), eq(20L), anyString()))
+                .thenReturn(job)
+                .thenReturn(null);
+
+        processor.processAccount(10L);
+
+        verify(eventJobService).apply(eq(job), anyString());
+        verifyNoInteractions(syncService);
     }
 
     @Test
@@ -229,6 +250,7 @@ class GoogleOperationProcessorTest {
                 eq(1L), eq(10L), anyString(), eq("UNSUPPORTED_JOB_SCOPE")
         );
         verifyNoInteractions(syncService);
+        verifyNoInteractions(eventJobService);
     }
 
     @Test
@@ -247,6 +269,14 @@ class GoogleOperationProcessorTest {
 
     private GoogleCalendarSyncJob syncJob(Long jobId, Long accountId) {
         GoogleCalendarSyncJob job = mock(GoogleCalendarSyncJob.class);
+        when(job.getId()).thenReturn(jobId);
+        when(job.getAccountId()).thenReturn(accountId);
+        when(job.getIntegrationId()).thenReturn(20L);
+        return job;
+    }
+
+    private GoogleCalendarEventJob eventJob(Long jobId, Long accountId) {
+        GoogleCalendarEventJob job = mock(GoogleCalendarEventJob.class);
         when(job.getId()).thenReturn(jobId);
         when(job.getAccountId()).thenReturn(accountId);
         when(job.getIntegrationId()).thenReturn(20L);
