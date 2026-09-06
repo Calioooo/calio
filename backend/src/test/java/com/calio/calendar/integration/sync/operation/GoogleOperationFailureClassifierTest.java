@@ -75,6 +75,19 @@ class GoogleOperationFailureClassifierTest {
     }
 
     @Test
+    @DisplayName("잘못된 Google 요청은 재시도 없이 fail 처리한다")
+    void givenInvalidGoogleRequest_whenClassify_thenFails() {
+        // when
+        GoogleOperationFailureDecision decision = classifier.classify(
+                new CalioException(ErrorCode.GOOGLE_CALENDAR_REQUEST_INVALID)
+        );
+
+        // then
+        assertThat(decision.action()).isEqualTo(Action.FAIL);
+        assertThat(decision.reason()).isEqualTo(ErrorCode.GOOGLE_CALENDAR_REQUEST_INVALID.name());
+    }
+
+    @Test
     @DisplayName("원인이 있는 Google Sync 실패는 root cause를 포함해 retry한다")
     void givenCausedSyncFailure_whenClassify_thenRetriesWithCause() {
         // when

@@ -83,6 +83,10 @@ public enum ErrorCode {
             HttpStatus.CONFLICT,
             "Google Calendar reconnection is required."
     ),
+    GOOGLE_CALENDAR_REQUEST_INVALID(
+            HttpStatus.INTERNAL_SERVER_ERROR,
+            "Google Calendar request is invalid."
+    ),
     GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID(
             HttpStatus.BAD_GATEWAY,
             "Google Calendar event response is invalid."
@@ -93,10 +97,6 @@ public enum ErrorCode {
             "Google Calendar sync token is missing."
     ),
     GOOGLE_CALENDAR_SYNC_CONFLICT(HttpStatus.CONFLICT, "Google Calendar sync is already running."),
-    EXTERNAL_EVENT_MUTATION_NOT_SUPPORTED(
-            HttpStatus.CONFLICT,
-            "External event mutation is not supported."
-    ),
 
     HOLIDAY_API_CONFIGURATION_MISSING(
             HttpStatus.INTERNAL_SERVER_ERROR,

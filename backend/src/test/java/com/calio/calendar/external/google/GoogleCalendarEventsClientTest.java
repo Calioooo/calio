@@ -4,7 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.jsonPath;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
@@ -12,6 +14,9 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import com.calio.calendar.external.google.dto.GoogleCalendarEventPage;
+import com.calio.calendar.external.google.dto.GoogleCalendarEventResponse;
+import com.calio.calendar.external.google.dto.GoogleCalendarEventTimeResponse;
+import com.calio.calendar.external.google.dto.GoogleCalendarEventWriteRequest;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.integration.sync.GoogleCalendarSyncMode;
@@ -28,6 +33,38 @@ import org.springframework.web.client.RestClientResponseException;
 import tools.jackson.databind.ObjectMapper;
 
 class GoogleCalendarEventsClientTest {
+
+    @Test
+    @DisplayName("CREATE 재시도에서 동일한 Google Event ID가 이미 존재하면 기존 이벤트를 조회해 성공 처리한다")
+    void givenExistingDeterministicEventId_whenInsertEvent_thenRecoversExistingEvent() {
+        // given
+        String providerIdentity = "c10000000000000014000000000000028";
+        RestClient.Builder restClientBuilder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
+        GoogleCalendarEventsClient client = client(restClientBuilder);
+        server.expect(method(HttpMethod.POST))
+                .andExpect(jsonPath("$.id", is(providerIdentity)))
+                .andRespond(withStatus(HttpStatus.CONFLICT));
+        server.expect(requestTo(containsString("/events/" + providerIdentity)))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess(eventResponse(providerIdentity), MediaType.APPLICATION_JSON));
+
+        // when
+        GoogleCalendarEventResponse response = client.insertEvent(
+                "current-token",
+                new GoogleCalendarEventWriteRequest(
+                        providerIdentity,
+                        "title",
+                        null,
+                        new GoogleCalendarEventTimeResponse(null, "2026-09-04T00:00:00Z", "UTC"),
+                        new GoogleCalendarEventTimeResponse(null, "2026-09-04T01:00:00Z", "UTC")
+                )
+        );
+
+        // then
+        assertThat(response.id()).isEqualTo(providerIdentity);
+        server.verify();
+    }
 
     @Test
     @DisplayName("FULL SYNC 요청은 공통 query만 보내고 syncToken과 range parameter를 보내지 않는다")
@@ -147,7 +184,7 @@ class GoogleCalendarEventsClientTest {
     }
 
     @Test
-    @DisplayName("INCREMENTAL 요청에 cursor가 없으면 외부 호출 없이 invalid response 예외를 반환한다")
+    @DisplayName("INCREMENTAL 요청에 cursor가 없으면 외부 호출 없이 invalid request 예외를 반환한다")
     void givenIncrementalModeWithoutCursor_whenListEvents_thenRejectsClosedQueryContract() {
         // given
         RestClient.Builder restClientBuilder = RestClient.builder();
@@ -161,7 +198,20 @@ class GoogleCalendarEventsClientTest {
                 null
         )).isInstanceOfSatisfying(CalioException.class, exception ->
                 assertThat(exception.getErrorCode())
-                        .isEqualTo(ErrorCode.GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID));
+                        .isEqualTo(ErrorCode.GOOGLE_CALENDAR_REQUEST_INVALID));
+    }
+
+    @Test
+    @DisplayName("단건 조회에 external event ID가 없으면 외부 호출 없이 invalid request 예외를 반환한다")
+    void givenMissingExternalEventId_whenGetEvent_thenRejectsRequestContract() {
+        // given
+        GoogleCalendarEventsClient client = client(RestClient.builder());
+
+        // when, then
+        assertThatThrownBy(() -> client.getEvent("current-token", " "))
+                .isInstanceOfSatisfying(CalioException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.GOOGLE_CALENDAR_REQUEST_INVALID));
     }
 
     @Test
@@ -415,5 +465,17 @@ class GoogleCalendarEventsClientTest {
                 new ObjectMapper(),
                 restClientBuilder.build()
         );
+    }
+
+    private String eventResponse(String eventId) {
+        return """
+                {
+                  "id": "%s",
+                  "status": "confirmed",
+                  "etag": "etag",
+                  "start": {"dateTime": "2026-09-04T00:00:00Z", "timeZone": "UTC"},
+                  "end": {"dateTime": "2026-09-04T01:00:00Z", "timeZone": "UTC"}
+                }
+                """.formatted(eventId);
     }
 }

@@ -1,7 +1,6 @@
 package com.calio.calendar.integration.mapping.domain;
 
 import com.calio.calendar.common.domain.BaseEntity;
-import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarConnection;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -12,7 +11,6 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 
@@ -25,8 +23,8 @@ import jakarta.persistence.UniqueConstraint;
                         columnNames = {"connection_id", "calendar_key", "external_event_id"}
                 ),
                 @UniqueConstraint(
-                        name = "uk_google_calendar_mapping_event_id",
-                        columnNames = "event_id"
+                        name = "uk_google_calendar_mapping_connection_event",
+                        columnNames = {"connection_id", "event_id"}
                 )
         }
 )
@@ -42,9 +40,8 @@ public class GoogleCalendarEventMapping extends BaseEntity {
     @JoinColumn(name = "connection_id", nullable = false)
     private GoogleCalendarConnection connection;
 
-    @OneToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "event_id", nullable = false)
-    private Event event;
+    @Column(name = "event_id", nullable = false, updatable = false)
+    private Long eventId;
 
     @Column(name = "calendar_key", nullable = false, length = 32)
     private String calendarKey;
@@ -55,17 +52,20 @@ public class GoogleCalendarEventMapping extends BaseEntity {
     @Embedded
     private GoogleCalendarMappingSyncState syncState;
 
+    @Column(name = "local_changed", nullable = false)
+    private boolean localChanged;
+
     protected GoogleCalendarEventMapping() {
     }
 
     public GoogleCalendarEventMapping(
             GoogleCalendarConnection connection,
-            Event event,
+            Long eventId,
             String externalEventId,
             String providerEtag
     ) {
         this.connection = connection;
-        this.event = event;
+        this.eventId = eventId;
         this.calendarKey = PRIMARY_CALENDAR_KEY;
         this.externalEventId = externalEventId;
         this.syncState = GoogleCalendarMappingSyncState.active(providerEtag);
@@ -79,8 +79,8 @@ public class GoogleCalendarEventMapping extends BaseEntity {
         return connection;
     }
 
-    public Event getEvent() {
-        return event;
+    public Long getEventId() {
+        return eventId;
     }
 
     public String getExternalEventId() {
@@ -93,6 +93,14 @@ public class GoogleCalendarEventMapping extends BaseEntity {
 
     public void markConflicted() {
         syncState.markConflicted();
+    }
+
+    public void markLocalChanged() {
+        localChanged = true;
+    }
+
+    public boolean isLocalChanged() {
+        return localChanged;
     }
 
     public boolean isConflicted() {
