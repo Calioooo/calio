@@ -5,6 +5,8 @@ import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrati
 import com.calio.calendar.external.google.GoogleCalendarInvalidGrantException;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
+import com.calio.calendar.integration.sync.GoogleCalendarSyncService;
+import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarSyncJob;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJob;
 import com.calio.calendar.integration.sync.operation.dto.GoogleOperationFailureDecision;
 import java.time.Clock;
@@ -19,7 +21,7 @@ public class GoogleOperationProcessor {
 
     private final GoogleOperationJobService jobService;
     private final GoogleOperationLeaseService operationLeaseService;
-    private final GoogleOperationJobHandlerRegistry handlerRegistry;
+    private final GoogleCalendarSyncService syncService;
     private final GoogleOperationFailureClassifier failureClassifier;
     private final GoogleCalendarConnectionCommandService connectionCommandService;
     private final GoogleCalendarIntegrationQueryService integrationQueryService;
@@ -28,7 +30,7 @@ public class GoogleOperationProcessor {
     public GoogleOperationProcessor(
             GoogleOperationJobService jobService,
             GoogleOperationLeaseService operationLeaseService,
-            GoogleOperationJobHandlerRegistry handlerRegistry,
+            GoogleCalendarSyncService syncService,
             GoogleOperationFailureClassifier failureClassifier,
             GoogleCalendarConnectionCommandService connectionCommandService,
             GoogleCalendarIntegrationQueryService integrationQueryService,
@@ -36,7 +38,7 @@ public class GoogleOperationProcessor {
     ) {
         this.jobService = jobService;
         this.operationLeaseService = operationLeaseService;
-        this.handlerRegistry = handlerRegistry;
+        this.syncService = syncService;
         this.failureClassifier = failureClassifier;
         this.connectionCommandService = connectionCommandService;
         this.integrationQueryService = integrationQueryService;
@@ -79,11 +81,12 @@ public class GoogleOperationProcessor {
     }
 
     private JobExecutionResult execute(GoogleOperationJob job, String workerToken) {
-        try {
-            handlerRegistry.execute(job, workerToken);
-            return JobExecutionResult.CONTINUE_WITH_NEXT_JOB;
-        } catch (GoogleOperationJobHandlerNotFoundException exception) {
+        if (!(job instanceof GoogleCalendarSyncJob syncJob)) {
             return terminateUnsupported(job, workerToken, UNSUPPORTED_JOB_SCOPE);
+        }
+        try {
+            syncService.synchronize(syncJob.getId(), syncJob.getAccountId(), workerToken);
+            return JobExecutionResult.CONTINUE_WITH_NEXT_JOB;
         } catch (RuntimeException failure) {
             return handleSyncFailure(job, workerToken, failure);
         }
