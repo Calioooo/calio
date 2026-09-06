@@ -105,6 +105,48 @@ class GoogleCalendarEventsClientTest {
     }
 
     @Test
+    @DisplayName("CREATE 재시도의 409 뒤 기존 Google Event를 찾지 못하면 sync failed를 반환한다")
+    void givenMissingEventAfterCreateConflict_whenInsertEvent_thenReturnsSyncFailed() {
+        // given
+        String providerIdentity = "c10000000000000014000000000000028";
+        RestClient.Builder restClientBuilder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
+        GoogleCalendarEventsClient client = client(restClientBuilder);
+        server.expect(method(HttpMethod.POST))
+                .andRespond(withStatus(HttpStatus.CONFLICT));
+        server.expect(method(HttpMethod.GET))
+                .andRespond(withStatus(HttpStatus.NOT_FOUND));
+
+        // when, then
+        assertThatThrownBy(() -> client.insertEvent("current-token", providerIdentity, payload()))
+                .isInstanceOfSatisfying(CalioException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.GOOGLE_CALENDAR_SYNC_FAILED));
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("CREATE 재시도의 기존 Google Event ID가 요청 ID와 다르면 invalid response를 반환한다")
+    void givenMismatchedEventAfterCreateConflict_whenInsertEvent_thenReturnsInvalidResponse() {
+        // given
+        String providerIdentity = "c10000000000000014000000000000028";
+        RestClient.Builder restClientBuilder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
+        GoogleCalendarEventsClient client = client(restClientBuilder);
+        server.expect(method(HttpMethod.POST))
+                .andRespond(withStatus(HttpStatus.CONFLICT));
+        server.expect(method(HttpMethod.GET))
+                .andRespond(withSuccess(eventResponse("different-event-id"), MediaType.APPLICATION_JSON));
+
+        // when, then
+        assertThatThrownBy(() -> client.insertEvent("current-token", providerIdentity, payload()))
+                .isInstanceOfSatisfying(CalioException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID));
+        server.verify();
+    }
+
+    @Test
     @DisplayName("DELETE는 읽은 provider ETag를 If-Match precondition으로 보낸다")
     void givenExpectedProviderEtag_whenDeleteEvent_thenSendsConditionalRequest() {
         // given
