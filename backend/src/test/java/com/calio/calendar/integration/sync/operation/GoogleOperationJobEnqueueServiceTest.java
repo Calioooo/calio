@@ -48,8 +48,8 @@ class GoogleOperationJobEnqueueServiceTest {
     }
 
     @Test
-    @DisplayName("Event CREATE Job은 integration과 Event에 고정된 provider identity를 저장한다")
-    void givenEventCreate_whenEnqueued_thenStoresDeterministicProviderIdentity() {
+    @DisplayName("Event CREATE Job은 재시도에 사용할 provider identity를 operation ID에서 생성해 저장한다")
+    void givenEventCreate_whenEnqueued_thenStoresProviderIdentityIndependentOfEventId() {
         // given
         Event event = mock();
         GoogleCalendarIntegration integration = mock();
@@ -67,7 +67,8 @@ class GoogleOperationJobEnqueueServiceTest {
         ArgumentCaptor<GoogleOperationJob> jobCaptor = ArgumentCaptor.forClass(GoogleOperationJob.class);
         verify(jobCommandService).enqueueOperationJob(jobCaptor.capture());
         assertThat(enqueued).isTrue();
-        assertThat(((GoogleCalendarEventJob) jobCaptor.getValue()).getProviderIdentity())
-                .isEqualTo("c100000000000000140000000000000028");
+        GoogleCalendarEventJob job = (GoogleCalendarEventJob) jobCaptor.getValue();
+        assertThat(job.getProviderIdentity())
+                .isEqualTo("c1" + job.getOperationId().replace("-", ""));
     }
 }

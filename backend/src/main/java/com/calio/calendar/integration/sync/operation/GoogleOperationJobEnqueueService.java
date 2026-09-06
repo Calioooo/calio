@@ -107,11 +107,12 @@ public class GoogleOperationJobEnqueueService {
         if (integration == null) {
             return false;
         }
+        String operationId = UUID.randomUUID().toString();
         GoogleCalendarEventJob job = GoogleCalendarEventJob.create(
-                UUID.randomUUID().toString(), integration.getId(), accountId,
+                operationId, integration.getId(), accountId,
                 integration.allocateGoogleOperationSequence(), kind,
                 eventId,
-                providerIdentity(kind, integration.getId(), eventId),
+                providerIdentity(kind, operationId),
                 targetPayload,
                 Instant.now(clock)
         );
@@ -120,11 +121,11 @@ public class GoogleOperationJobEnqueueService {
         return true;
     }
 
-    private String providerIdentity(GoogleCalendarEventJobKind kind, Long integrationId, Long eventId) {
+    private String providerIdentity(GoogleCalendarEventJobKind kind, String operationId) {
         if (kind != GoogleCalendarEventJobKind.CREATE) {
             return null;
         }
-        return "c1" + "%016x".formatted(integrationId) + "%016x".formatted(eventId);
+        return "c1" + operationId.replace("-", "");
     }
 
     private String serializePayload(GoogleEventJobPayload payload) {
