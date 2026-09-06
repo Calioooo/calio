@@ -31,12 +31,11 @@ public class GoogleCalendarEventJob extends GoogleOperationJob {
                                                  long integrationSequence, GoogleCalendarEventJobKind kind,
                                                  Long eventId, String providerIdentity, String targetPayload,
                                                  Instant runnableAt) {
-        if ((kind != GoogleCalendarEventJobKind.CREATE && kind != GoogleCalendarEventJobKind.UPDATE
-                && kind != GoogleCalendarEventJobKind.DELETE) || eventId == null
-                || (kind == GoogleCalendarEventJobKind.CREATE
-                && (providerIdentity == null || providerIdentity.isBlank()))
-                || targetPayload == null || targetPayload.isBlank()) {
+        if (kind == null || eventId == null || !hasText(targetPayload)) {
             throw new IllegalArgumentException("Google Event job fields are required");
+        }
+        if (kind == GoogleCalendarEventJobKind.CREATE && !hasText(providerIdentity)) {
+            throw new IllegalArgumentException("Google Event CREATE job requires provider identity");
         }
         GoogleCalendarEventJob job = new GoogleCalendarEventJob();
         job.initialize(operationId, integrationId, accountId, integrationSequence, runnableAt);
@@ -45,6 +44,10 @@ public class GoogleCalendarEventJob extends GoogleOperationJob {
         job.providerIdentity = providerIdentity;
         job.targetPayload = targetPayload;
         return job;
+    }
+
+    private static boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 
     public GoogleCalendarEventJobKind getKind() { return kind; }
