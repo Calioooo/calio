@@ -1,7 +1,6 @@
 package com.calio.calendar.integration.sync.operation;
 
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEffectiveScope;
-import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEffectiveScopeType;
 import com.calio.calendar.integration.sync.operation.repository.GoogleOperationJobRepository;
 import java.time.Instant;
 import java.util.List;
@@ -32,21 +31,9 @@ public class GoogleOperationJobQueryService {
             Long integrationId,
             GoogleCalendarEffectiveScope scope
     ) {
-        if (scope.isRecurrenceEventAggregate()) {
-            return jobRepository.existsPendingOutboundJobForRecurrenceAggregate(
-                    accountId,
-                    integrationId,
-                    GoogleCalendarEffectiveScopeType.RECURRENCE_EVENT.getStoredValue(),
-                    scope.storedKey(),
-                    GoogleCalendarEffectiveScopeType.RECURRENCE_OVERRIDE.getStoredValue(),
-                    scope.childOverrideKeyPrefix()
-            );
+        if (scope.type() != com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEffectiveScopeType.EVENT) {
+            return false;
         }
-        return jobRepository.existsPendingOutboundJob(
-                accountId,
-                integrationId,
-                scope.storedScope(),
-                scope.storedKey()
-        );
+        return jobRepository.existsPendingEventJob(accountId, integrationId, scope.canonicalId());
     }
 }

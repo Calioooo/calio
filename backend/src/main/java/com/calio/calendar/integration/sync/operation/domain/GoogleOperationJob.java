@@ -2,22 +2,24 @@ package com.calio.calendar.integration.sync.operation.domain;
 
 import com.calio.calendar.common.domain.BaseEntity;
 import jakarta.persistence.Column;
+import jakarta.persistence.DiscriminatorColumn;
+import jakarta.persistence.DiscriminatorType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Inheritance;
+import jakarta.persistence.InheritanceType;
 import jakarta.persistence.Table;
 import java.time.Instant;
 
 @Entity
 @Table(name = "google_operation_jobs")
-public class GoogleOperationJob extends BaseEntity {
-
-    public static final String SYNC_KIND = "SYNC";
-    public static final String PRIMARY_CALENDAR_SCOPE = "PRIMARY_CALENDAR";
-    public static final String PRIMARY_CALENDAR_KEY = "primary";
+@Inheritance(strategy = InheritanceType.SINGLE_TABLE)
+@DiscriminatorColumn(name = "job_scope", discriminatorType = DiscriminatorType.STRING, length = 64)
+public abstract class GoogleOperationJob extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -34,25 +36,6 @@ public class GoogleOperationJob extends BaseEntity {
 
     @Column(name = "integration_sequence", nullable = false, updatable = false)
     private long integrationSequence;
-
-    @Column(name = "job_kind", nullable = false, updatable = false, length = 64)
-    private String kind;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "job_trigger", nullable = false, updatable = false, length = 32)
-    private GoogleOperationJobTrigger trigger;
-
-    @Column(name = "effective_resource_scope", nullable = false, updatable = false, length = 64)
-    private String effectiveResourceScope;
-
-    @Column(name = "effective_resource_key", nullable = false, updatable = false, length = 1024)
-    private String effectiveResourceKey;
-
-    @Column(name = "provider_identity", updatable = false, length = 1024)
-    private String providerIdentity;
-
-    @Column(name = "target_payload", updatable = false, columnDefinition = "JSON")
-    private String targetPayload;
 
     @Column(name = "conflict_detected", nullable = false)
     private boolean conflictDetected;
@@ -82,77 +65,19 @@ public class GoogleOperationJob extends BaseEntity {
     protected GoogleOperationJob() {
     }
 
-    public static GoogleOperationJob sync(
+    protected final void initialize(
             String operationId,
             Long integrationId,
             Long accountId,
             long integrationSequence,
-            GoogleOperationJobTrigger trigger,
             Instant runnableAt
     ) {
-        validateSyncTrigger(trigger);
-        GoogleOperationJob job = new GoogleOperationJob();
-        job.operationId = operationId;
-        job.integrationId = integrationId;
-        job.accountId = accountId;
-        job.integrationSequence = integrationSequence;
-        job.kind = SYNC_KIND;
-        job.trigger = trigger;
-        job.effectiveResourceScope = PRIMARY_CALENDAR_SCOPE;
-        job.effectiveResourceKey = PRIMARY_CALENDAR_KEY;
-        job.state = GoogleOperationJobState.PENDING;
-        job.runnableAt = runnableAt;
-        return job;
-    }
-
-    public static GoogleOperationJob outbound(
-            String operationId,
-            Long integrationId,
-            Long accountId,
-            long integrationSequence,
-            String kind,
-            String resourceScope,
-            String resourceKey,
-            String providerIdentity,
-            String targetPayload,
-            Instant runnableAt
-    ) {
-        validateOutboundFields(kind, resourceScope, resourceKey, targetPayload);
-        GoogleOperationJob job = new GoogleOperationJob();
-        job.operationId = operationId;
-        job.integrationId = integrationId;
-        job.accountId = accountId;
-        job.integrationSequence = integrationSequence;
-        job.kind = kind;
-        job.trigger = GoogleOperationJobTrigger.CANONICAL_MUTATION;
-        job.effectiveResourceScope = resourceScope;
-        job.effectiveResourceKey = resourceKey;
-        job.providerIdentity = providerIdentity;
-        job.targetPayload = targetPayload;
-        job.state = GoogleOperationJobState.PENDING;
-        job.runnableAt = runnableAt;
-        return job;
-    }
-
-    private static void validateSyncTrigger(GoogleOperationJobTrigger trigger) {
-        if (trigger != GoogleOperationJobTrigger.MANUAL
-                && trigger != GoogleOperationJobTrigger.PERIODIC) {
-            throw new IllegalArgumentException("Sync Google operation trigger must be MANUAL or PERIODIC");
-        }
-    }
-
-    private static void validateOutboundFields(
-            String kind,
-            String resourceScope,
-            String resourceKey,
-            String targetPayload
-    ) {
-        if (kind == null || kind.isBlank() || SYNC_KIND.equals(kind)
-                || resourceScope == null || resourceScope.isBlank()
-                || resourceKey == null || resourceKey.isBlank()
-                || targetPayload == null || targetPayload.isBlank()) {
-            throw new IllegalArgumentException("Outbound Google operation fields are required");
-        }
+        this.operationId = operationId;
+        this.integrationId = integrationId;
+        this.accountId = accountId;
+        this.integrationSequence = integrationSequence;
+        this.state = GoogleOperationJobState.PENDING;
+        this.runnableAt = runnableAt;
     }
 
     public boolean canBeClaimedAt(Instant now) {
@@ -164,66 +89,14 @@ public class GoogleOperationJob extends BaseEntity {
         ownerToken = workerToken;
     }
 
-    public void markConflictDetected() {
-        conflictDetected = true;
-    }
-
-    public Long getId() {
-        return id;
-    }
-
-    public String getOperationId() {
-        return operationId;
-    }
-
-    public Long getIntegrationId() {
-        return integrationId;
-    }
-
-    public Long getAccountId() {
-        return accountId;
-    }
-
-    public long getIntegrationSequence() {
-        return integrationSequence;
-    }
-
-    public String getKind() {
-        return kind;
-    }
-
-    public GoogleOperationJobTrigger getTrigger() {
-        return trigger;
-    }
-
-    public GoogleOperationJobState getState() {
-        return state;
-    }
-
-    public Instant getRunnableAt() {
-        return runnableAt;
-    }
-
-    public int getRetryCount() {
-        return retryCount;
-    }
-    public String getLastErrorReason() {
-        return lastErrorReason;
-    }
-
-    public String getOwnerToken() {
-        return ownerToken;
-    }
-
-    public String getEffectiveResourceScope() {
-        return effectiveResourceScope;
-    }
-
-    public String getEffectiveResourceKey() {
-        return effectiveResourceKey;
-    }
-
-    public boolean isConflictDetected() {
-        return conflictDetected;
-    }
+    public Long getId() { return id; }
+    public String getOperationId() { return operationId; }
+    public Long getIntegrationId() { return integrationId; }
+    public Long getAccountId() { return accountId; }
+    public long getIntegrationSequence() { return integrationSequence; }
+    public GoogleOperationJobState getState() { return state; }
+    public Instant getRunnableAt() { return runnableAt; }
+    public int getRetryCount() { return retryCount; }
+    public String getLastErrorReason() { return lastErrorReason; }
+    public String getOwnerToken() { return ownerToken; }
 }
