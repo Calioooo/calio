@@ -19,6 +19,17 @@ public interface GoogleCalendarConnectionRepository extends JpaRepository<Google
     @Query("""
             select connection
             from GoogleCalendarConnection connection
+            where connection.integration.id = :integrationId
+            order by connection.id
+            """)
+    List<GoogleCalendarConnection> findAllWithIntegrationByIntegrationId(
+            @Param("integrationId") Long integrationId
+    );
+
+    @EntityGraph(attributePaths = "integration")
+    @Query("""
+            select connection
+            from GoogleCalendarConnection connection
             join connection.integration integration
             where integration.accountId = :accountId
               and connection.state = :state

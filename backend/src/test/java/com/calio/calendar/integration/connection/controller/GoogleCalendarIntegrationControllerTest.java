@@ -186,8 +186,8 @@ class GoogleCalendarIntegrationControllerTest {
         assertThat(job.getAccountId()).isEqualTo(integration.getAccountId());
         assertThat(job.getIntegrationSequence()).isEqualTo(2L);
         assertThat(job).isInstanceOf(GoogleCalendarSyncJob.class);
-        assertThat(((GoogleCalendarSyncJob) job).getTrigger())
-                .isEqualTo(GoogleOperationJobTrigger.MANUAL);
+        GoogleCalendarSyncJob syncJob = (GoogleCalendarSyncJob) job;
+        assertThat(syncJob.getTrigger()).isEqualTo(GoogleOperationJobTrigger.MANUAL);
         assertThat(job.getState()).isEqualTo(GoogleOperationJobState.PENDING);
         assertThat(job.getRunnableAt()).isNotNull();
         assertThat(job.getRetryCount()).isZero();

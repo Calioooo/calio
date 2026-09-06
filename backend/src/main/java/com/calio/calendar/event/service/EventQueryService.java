@@ -6,6 +6,7 @@ import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.event.repository.EventRepository;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,6 +23,10 @@ public class EventQueryService {
     public Event getEvent(Long accountId, Long eventId) {
         return eventRepository.findByIdAndAccount_Id(eventId, accountId)
                 .orElseThrow(() -> new CalioException(ErrorCode.EVENT_NOT_FOUND));
+    }
+
+    public Optional<Event> getEventIfExists(Long accountId, Long eventId) {
+        return eventRepository.findByIdAndAccount_Id(eventId, accountId);
     }
 
     public List<Event> listEvents(Long accountId, Instant from, Instant to) {

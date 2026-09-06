@@ -20,8 +20,10 @@ public class GoogleCalendarEventMappingQueryService {
         this.eventMappingRepository = eventMappingRepository;
     }
 
-    public boolean hasExternalEventMapping(Long eventId, Long accountId) {
-        return eventMappingRepository.existsByEvent_IdAndConnection_Integration_AccountId(eventId, accountId);
+    public List<GoogleCalendarEventMapping> listEventMappingsForEvent(
+            Long integrationId, Long eventId) {
+        return eventMappingRepository
+                .findAllWithConnectionAndIntegrationByIntegrationIdAndEventId(integrationId, eventId);
     }
 
     public List<GoogleCalendarEventMapping> listEventMappings(
@@ -29,7 +31,7 @@ public class GoogleCalendarEventMappingQueryService {
             String calendarKey,
             Collection<String> externalEventIds
     ) {
-        return eventMappingRepository.findAllWithEventByExternalIdentity(
+        return eventMappingRepository.findAllByExternalIdentity(
                 connectionId,
                 calendarKey,
                 externalEventIds
@@ -37,7 +39,14 @@ public class GoogleCalendarEventMappingQueryService {
     }
 
     public List<GoogleCalendarEventMapping> listEventMappings(Long connectionId) {
-        return eventMappingRepository.findAllWithEventByConnectionId(connectionId);
+        return eventMappingRepository.findAllByConnectionId(connectionId);
+    }
+
+    public List<Long> listEventIdsWithMappings(Collection<Long> eventIds) {
+        if (eventIds.isEmpty()) {
+            return List.of();
+        }
+        return eventMappingRepository.findDistinctEventIdsByEventIdIn(eventIds);
     }
 
     public List<GoogleCalendarEventMapping> listEventMappingBatch(
@@ -45,7 +54,7 @@ public class GoogleCalendarEventMappingQueryService {
             Long afterId,
             int limit
     ) {
-        return eventMappingRepository.findNextBatchWithEventByConnectionId(
+        return eventMappingRepository.findNextBatchByConnectionId(
                 connectionId,
                 afterId,
                 PageRequest.of(0, limit)

@@ -319,7 +319,7 @@ class GoogleCalendarPageChangeServiceTest {
         );
         GoogleCalendarEventMapping existingMapping = mappingRepository.findAll().getFirst();
         Long existingMappingId = existingMapping.getId();
-        Long existingEventId = existingMapping.getEvent().getId();
+        Long existingEventId = existingMapping.getEventId();
         when(operationJobQueryService.hasPendingOutboundJob(any(), any(), any())).thenReturn(true);
 
         // when
@@ -352,8 +352,9 @@ class GoogleCalendarPageChangeServiceTest {
                     assertThat(mapping.isConflicted()).isTrue();
                     assertThat(mapping.getId()).isEqualTo(existingMappingId);
                     assertThat(mapping.getExternalEventId()).isEqualTo(externalEventId);
-                    assertThat(mapping.getEvent().getId()).isEqualTo(existingEventId);
-                    assertThat(mapping.getEvent().getTitle()).isEqualTo("Standalone event");
+                    assertThat(mapping.getEventId()).isEqualTo(existingEventId);
+                    assertThat(eventRepository.findById(existingEventId))
+                            .get().extracting(Event::getTitle).isEqualTo("Standalone event");
                     assertThat(mapping.getProviderEtag()).isEqualTo("etag-event");
                 });
         assertThat(recurrenceEventMappingRepository.findAll()).isEmpty();
@@ -379,7 +380,7 @@ class GoogleCalendarPageChangeServiceTest {
         );
 
         // then
-        assertThat(mappingRepository.findAllWithEventByExternalIdentity(
+        assertThat(mappingRepository.findAllByExternalIdentity(
                 integration.getId(),
                 GoogleCalendarEventMapping.PRIMARY_CALENDAR_KEY,
                 List.of(externalEventId)
@@ -778,7 +779,7 @@ class GoogleCalendarPageChangeServiceTest {
         for (int index = 0; index < events.size(); index++) {
             mappings.add(new GoogleCalendarEventMapping(
                     integration,
-                    events.get(index),
+                    events.get(index).getId(),
                     "event-" + index,
                     "etag-event-" + index
             ));
