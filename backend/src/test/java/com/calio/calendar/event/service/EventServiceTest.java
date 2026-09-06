@@ -162,14 +162,14 @@ class EventServiceTest {
         EventResponse response = eventService.updateEvent(1L, 10L, request);
 
         // then
-        InOrder order = inOrder(tagQueryService, eventCommandService);
+        InOrder order = inOrder(tagQueryService, eventCommandService, jobEnqueueService);
         order.verify(eventCommandService).lockEvent(1L, 10L);
         order.verify(tagQueryService).getTagOrDefault(1L, 30L);
         order.verify(eventCommandService).updateEvent(any(), any(), any(), any());
+        order.verify(jobEnqueueService).enqueueEventUpdated(eq(1L), same(event));
         assertThat(response.title()).isEqualTo("After");
         assertThat(response.startAt()).isEqualTo(request.startAt());
         assertThat(response.tag().title()).isEqualTo("변경");
-        verify(jobEnqueueService).enqueueEventUpdated(eq(1L), same(event));
     }
 
     @Test
