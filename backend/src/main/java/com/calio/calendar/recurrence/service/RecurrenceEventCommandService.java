@@ -71,6 +71,20 @@ public class RecurrenceEventCommandService {
         }
     }
 
+    public void deleteRecurrenceOverridesByRecurrenceEventIdAndOriginStartAts(
+            Long recurrenceEventId,
+            Collection<Instant> originStartAts
+    ) {
+        if (originStartAts.isEmpty()) {
+            return;
+        }
+        List<Long> ids = recurrenceEventOverrideRepository
+                .findByRecurrenceEvent_IdAndOriginStartAtIn(recurrenceEventId, originStartAts).stream()
+                .map(RecurrenceEventOverride::getOverrideId)
+                .toList();
+        deleteRecurrenceOverridesByIds(ids);
+    }
+
     public RecurrenceEventOverride createOrUpdateRecurrenceOverride(RecurrenceEventOverride override) {
         return recurrenceEventOverrideRepository.saveAndFlush(override);
     }

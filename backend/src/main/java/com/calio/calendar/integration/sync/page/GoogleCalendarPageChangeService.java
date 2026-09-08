@@ -288,7 +288,7 @@ public class GoogleCalendarPageChangeService {
                     .map(RecurrenceEventOverrideUpsert::originStartAt)
                     .collect(Collectors.toSet());
             recurrenceEventQueryService.listOverrides(
-                    recurrenceEventMapping.getRecurrenceEvent().getId(),
+                    recurrenceEventMapping.getRecurrenceEventId(),
                     originStartTimes
             ).forEach(recurrenceEventOverride -> recurrenceEventOverrides.put(
                     new RecurrenceEventOverrideKey(

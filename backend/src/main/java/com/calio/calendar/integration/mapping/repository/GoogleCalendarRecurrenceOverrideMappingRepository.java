@@ -1,6 +1,7 @@
 package com.calio.calendar.integration.mapping.repository;
 
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarRecurrenceOverrideMapping;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -30,7 +31,20 @@ public interface GoogleCalendarRecurrenceOverrideMappingRepository
             @Param("externalEventIds") Collection<String> externalEventIds
     );
 
-    @EntityGraph(attributePaths = {"recurrenceEventMapping", "recurrenceEventOverride"})
+    Optional<GoogleCalendarRecurrenceOverrideMapping>
+    findByRecurrenceEventMapping_IdAndOriginStartAt(Long recurrenceEventMappingId, Instant originStartAt);
+
+    @EntityGraph(attributePaths = "recurrenceEventMapping")
+    @Query("""
+            select overrideMapping
+            from GoogleCalendarRecurrenceOverrideMapping overrideMapping
+            join overrideMapping.recurrenceEventMapping recurrenceEventMapping
+            where recurrenceEventMapping.recurrenceEventId in :recurrenceEventIds
+            """)
+    List<GoogleCalendarRecurrenceOverrideMapping> findAllWithRecurrenceEventMappingByRecurrenceEventIds(
+            @Param("recurrenceEventIds") Collection<Long> recurrenceEventIds);
+
+    @EntityGraph(attributePaths = "recurrenceEventMapping")
     @Query("""
             select overrideMapping
             from GoogleCalendarRecurrenceOverrideMapping overrideMapping
@@ -42,7 +56,7 @@ public interface GoogleCalendarRecurrenceOverrideMappingRepository
             @Param("recurrenceEventMappingIds") Collection<Long> recurrenceEventMappingIds
     );
 
-    @EntityGraph(attributePaths = {"recurrenceEventMapping", "recurrenceEventOverride"})
+    @EntityGraph(attributePaths = "recurrenceEventMapping")
     @Query("""
             select overrideMapping
             from GoogleCalendarRecurrenceOverrideMapping overrideMapping
@@ -54,7 +68,7 @@ public interface GoogleCalendarRecurrenceOverrideMappingRepository
             @Param("connectionId") Long connectionId
     );
 
-    @EntityGraph(attributePaths = {"recurrenceEventMapping", "recurrenceEventOverride"})
+    @EntityGraph(attributePaths = "recurrenceEventMapping")
     @Query("""
             select mapping
             from GoogleCalendarRecurrenceOverrideMapping mapping
