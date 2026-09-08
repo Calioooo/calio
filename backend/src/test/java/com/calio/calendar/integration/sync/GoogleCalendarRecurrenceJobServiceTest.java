@@ -127,6 +127,41 @@ class GoogleCalendarRecurrenceJobServiceTest {
     }
 
     @Test
+    @DisplayName("기존 master mapping이 있는 CREATE는 기존 connection을 갱신하고 새 connection에 master mapping을 만든다")
+    void givenExistingMasterMapping_whenCreateMaster_thenUpdatesAndCreatesMappings() {
+        // given
+        GoogleCalendarConnection existingConnection = connection(30L);
+        GoogleCalendarConnection creationConnection = connection(31L);
+        GoogleCalendarRecurrenceEventMapping existingMaster = master(existingConnection);
+        when(mappings.listRecurrenceEventMappingsForJob(20L, 40L))
+                .thenReturn(List.of(existingMaster));
+        when(connections.listConnections(20L))
+                .thenReturn(List.of(existingConnection, creationConnection));
+        when(tokens.getAccessToken(30L)).thenReturn("existing-token");
+        when(tokens.getAccessToken(31L)).thenReturn("creation-token");
+        when(objectMapper.readValue("payload", GoogleRecurrenceMasterJobPayload.class))
+                .thenReturn(masterPayload());
+        when(client.getEvent("existing-token", "master-1"))
+                .thenReturn(Optional.of(provider("master-1", "master-etag", null)));
+        when(client.patchRecurrenceEvent(
+                "existing-token", "master-1", "master-etag", masterPayload()))
+                .thenReturn(provider("master-1", "updated-etag", null));
+        when(client.insertRecurrenceEvent("creation-token", "provider-id", masterPayload()))
+                .thenReturn(provider("created-master", "created-etag", null));
+
+        // when
+        service.execute(job(GoogleCalendarRecurrenceJobKind.MASTER_CREATE, null), "worker");
+
+        // then
+        assertThat(existingMaster.getProviderEtag()).isEqualTo("updated-etag");
+        ArgumentCaptor<GoogleCalendarRecurrenceEventMapping> captor =
+                ArgumentCaptor.forClass(GoogleCalendarRecurrenceEventMapping.class);
+        verify(mappingCommands).createRecurrenceEventMapping(captor.capture());
+        assertThat(captor.getValue().getConnection()).isSameAs(creationConnection);
+        assertThat(captor.getValue().getExternalEventId()).isEqualTo("created-master");
+    }
+
+    @Test
     @DisplayName("master CREATE 후 기존 mapping이 충돌해도 생성한 provider master mapping을 보존한다")
     void givenConflictAfterMasterCreate_whenComplete_thenPreservesCreatedProviderMapping() {
         // given
@@ -275,6 +310,24 @@ class GoogleCalendarRecurrenceJobServiceTest {
     }
 
     @Test
+    @DisplayName("이미 conflicted master scope의 후속 Job은 provider 작업 없이 skip한다")
+    void givenAlreadyConflictedMaster_whenExecute_thenSkipsConflictedScope() {
+        // given
+        GoogleCalendarRecurrenceEventMapping master = master(connection(30L));
+        master.markConflicted();
+        when(mappings.listRecurrenceEventMappingsForJob(20L, 40L)).thenReturn(List.of(master));
+        when(objectMapper.readValue("payload", GoogleRecurrenceMasterJobPayload.class))
+                .thenReturn(masterPayload());
+
+        // when
+        service.execute(job(GoogleCalendarRecurrenceJobKind.MASTER_UPDATE, null), "worker");
+
+        // then
+        verifyNoInteractions(tokens, client);
+        verify(jobs).skipConflictedScope(50L, 10L, "worker");
+    }
+
+    @Test
     @DisplayName("새 exception PATCH의 412도 exact origin mapping으로 격리하고 master를 오염시키지 않는다")
     void newOverridePatchConflictCreatesExactConflictedMapping() {
         Instant origin = Instant.parse("2026-09-03T00:00:00Z");
@@ -330,8 +383,8 @@ class GoogleCalendarRecurrenceJobServiceTest {
     }
 
     @Test
-    @DisplayName("connected master delete는 external master만 삭제하고 child와 parent mapping을 함께 제거한다")
-    void masterDeleteRemovesAggregateMappingsWithoutChildProviderDeletes() {
+    @DisplayName("provider가 404 또는 410으로 이미 삭제됐음을 반환해도 master delete는 mapping을 함께 제거한다")
+    void givenAlreadyDeletedProviderMaster_whenDeleteMaster_thenRemovesAggregateMappings() {
         GoogleCalendarConnection connection = connection(30L);
         GoogleCalendarRecurrenceEventMapping master = master(connection);
         when(mappings.listRecurrenceEventMappingsForJob(20L, 40L)).thenReturn(List.of(master));
@@ -344,6 +397,23 @@ class GoogleCalendarRecurrenceJobServiceTest {
         verify(client).deleteEvent("token", "master-1", "master-etag");
         verify(mappingCommands).deleteRecurrenceAggregateMappings(master);
         verify(client, never()).cancelRecurrenceInstance(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("provider master delete가 성공해도 child와 parent mapping을 함께 제거한다")
+    void givenDeletedProviderMaster_whenDeleteMaster_thenRemovesAggregateMappings() {
+        // given
+        GoogleCalendarConnection connection = connection(30L);
+        GoogleCalendarRecurrenceEventMapping master = master(connection);
+        when(mappings.listRecurrenceEventMappingsForJob(20L, 40L)).thenReturn(List.of(master));
+        when(tokens.getAccessToken(30L)).thenReturn("token");
+        when(client.deleteEvent("token", "master-1", "master-etag")).thenReturn(true);
+
+        // when
+        service.execute(job(GoogleCalendarRecurrenceJobKind.MASTER_DELETE, null), "worker");
+
+        // then
+        verify(mappingCommands).deleteRecurrenceAggregateMappings(master);
     }
 
     @Test
