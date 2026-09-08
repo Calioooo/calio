@@ -73,7 +73,12 @@ public class IosNotificationEndpointService {
     ) {
         endpointRepository.findByApnsToken(apnsToken)
                 .filter(endpoint -> !isSameInstallation(endpoint, accountId, installationId))
-                .ifPresent(endpoint -> endpoint.deactivate(Instant.now()));
+                .ifPresent(endpoint -> deactivateAndClearToken(endpoint, Instant.now()));
+    }
+
+    private void deactivateAndClearToken(IosNotificationEndpoint endpoint, Instant now) {
+        endpoint.deactivate(now);
+        endpoint.clearApnsToken();
     }
 
     private boolean isSameInstallation(

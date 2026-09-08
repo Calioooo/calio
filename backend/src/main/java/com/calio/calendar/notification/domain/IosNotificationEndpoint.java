@@ -77,6 +77,10 @@ public class IosNotificationEndpoint extends BaseEntity {
         deactivatedAt = now;
     }
 
+    public void clearApnsToken() {
+        apnsToken = null;
+    }
+
     public Long getId() {
         return id;
     }
