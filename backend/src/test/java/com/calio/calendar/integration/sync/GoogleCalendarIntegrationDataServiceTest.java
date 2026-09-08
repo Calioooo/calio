@@ -2,6 +2,7 @@ package com.calio.calendar.integration.sync;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -23,12 +24,14 @@ import com.calio.calendar.integration.mapping.service.GoogleCalendarRecurrenceMa
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobQueryService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationLeaseService;
+import com.calio.calendar.integration.sync.page.GoogleCalendarRecurrenceChangeService;
 import com.calio.calendar.recurrence.service.RecurrenceEventCommandService;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
 
 class GoogleCalendarIntegrationDataServiceTest {
 
@@ -251,6 +254,49 @@ class GoogleCalendarIntegrationDataServiceTest {
                 Set.of(), Set.of(), Set.of(), "next-token");
 
         verify(recurrenceMappingCommandService).deleteOverrideMappingsWithIds(List.of(10L));
+        verify(recurrenceEventCommandService, never())
+                .deleteRecurrenceOverridesByRecurrenceEventIdAndOriginStartAts(any(), any());
+    }
+
+    @Test
+    @DisplayName("integration 데이터를 삭제할 때 다른 connection mapping이 남아 있으면 canonical override를 삭제하지 않는다")
+    void givenOtherConnectionOverrideMapping_whenDeleteIntegrationData_thenKeepsCanonicalOverride() {
+        // given
+        Instant originStartAt = Instant.parse("2026-09-01T00:00:00Z");
+        GoogleCalendarRecurrenceEventMapping otherConnectionRecurrenceMapping =
+                mock(GoogleCalendarRecurrenceEventMapping.class);
+        GoogleCalendarRecurrenceOverrideMapping otherConnectionOverrideMapping =
+                mock(GoogleCalendarRecurrenceOverrideMapping.class);
+        GoogleCalendarRecurrenceChangeService recurrenceChangeService =
+                mock(GoogleCalendarRecurrenceChangeService.class);
+        when(recurrenceMapping.getRecurrenceEventId()).thenReturn(40L);
+        when(recurrenceOverrideMapping.getOriginStartAt()).thenReturn(originStartAt);
+        when(recurrenceOverrideMapping.getRecurrenceEventMapping()).thenReturn(recurrenceMapping);
+        when(otherConnectionRecurrenceMapping.getRecurrenceEventId()).thenReturn(40L);
+        when(otherConnectionOverrideMapping.getOriginStartAt()).thenReturn(originStartAt);
+        when(otherConnectionOverrideMapping.getRecurrenceEventMapping())
+                .thenReturn(otherConnectionRecurrenceMapping);
+        when(recurrenceMappingQueryService.listOverrideMappings(1L))
+                .thenReturn(List.of(recurrenceOverrideMapping));
+        when(recurrenceMappingQueryService.listOverrideMappingsByRecurrenceEventIds(List.of(40L)))
+                .thenReturn(List.of(otherConnectionOverrideMapping));
+        when(recurrenceMappingQueryService.listRecurrenceEventMappings(1L)).thenReturn(List.of());
+
+        GoogleCalendarIntegrationDataService service = new GoogleCalendarIntegrationDataService(
+                connectionCommandService, eventMappingQueryService, eventMappingCommandService,
+                recurrenceMappingQueryService, recurrenceMappingCommandService, eventCommandService,
+                recurrenceEventCommandService, recurrenceChangeService, operationLeaseService,
+                operationJobPersistenceService, operationJobQueryService);
+
+        // when
+        service.deleteIntegrationData(1L);
+
+        // then
+        InOrder deletionOrder = inOrder(recurrenceMappingCommandService, recurrenceMappingQueryService);
+        deletionOrder.verify(recurrenceMappingCommandService)
+                .deleteOverrideMappings(List.of(recurrenceOverrideMapping));
+        deletionOrder.verify(recurrenceMappingQueryService)
+                .listOverrideMappingsByRecurrenceEventIds(List.of(40L));
         verify(recurrenceEventCommandService, never())
                 .deleteRecurrenceOverridesByRecurrenceEventIdAndOriginStartAts(any(), any());
     }
