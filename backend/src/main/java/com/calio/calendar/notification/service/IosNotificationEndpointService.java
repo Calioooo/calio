@@ -1,11 +1,14 @@
 package com.calio.calendar.notification.service;
 
 import com.calio.calendar.account.service.AccountQueryService;
+import com.calio.calendar.common.error.CalioException;
+import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.notification.client.ApnsProperties;
 import com.calio.calendar.notification.domain.IosNotificationAuthorizationStatus;
 import com.calio.calendar.notification.domain.IosNotificationEndpoint;
 import java.time.Instant;
 import java.util.List;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,10 +50,7 @@ public class IosNotificationEndpointService {
                         authorizationStatus,
                         apnsProperties.environment()
                 ));
-        endpoint.refresh(apnsToken, authorizationStatus, apnsProperties.environment());
-        if (endpoint.getId() == null) {
-            endpointCommandService.create(endpoint);
-        }
+        refreshEndpoint(endpoint, apnsToken, authorizationStatus);
     }
 
     public void deactivate(Long accountId, String installationId) {
@@ -79,6 +79,23 @@ public class IosNotificationEndpointService {
 
     private void deactivateAndClearToken(IosNotificationEndpoint endpoint, Instant now) {
         endpointCommandService.deactivateAndReleaseToken(endpoint, now);
+    }
+
+    private void refreshEndpoint(
+            IosNotificationEndpoint endpoint,
+            String apnsToken,
+            IosNotificationAuthorizationStatus authorizationStatus
+    ) {
+        endpoint.refresh(apnsToken, authorizationStatus, apnsProperties.environment());
+        try {
+            if (endpoint.getId() == null) {
+                endpointCommandService.create(endpoint);
+                return;
+            }
+            endpointCommandService.change(endpoint);
+        } catch (DataIntegrityViolationException exception) {
+            throw new CalioException(ErrorCode.NOTIFICATION_ENDPOINT_TOKEN_CONFLICT, exception);
+        }
     }
 
     private boolean isSameInstallation(

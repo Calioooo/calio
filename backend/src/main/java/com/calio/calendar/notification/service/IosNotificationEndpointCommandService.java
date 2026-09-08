@@ -17,7 +17,11 @@ public class IosNotificationEndpointCommandService {
     }
 
     public IosNotificationEndpoint create(IosNotificationEndpoint endpoint) {
-        return endpointRepository.save(endpoint);
+        return endpointRepository.saveAndFlush(endpoint);
+    }
+
+    public void change(IosNotificationEndpoint endpoint) {
+        endpointRepository.saveAndFlush(endpoint);
     }
 
     public void deactivateAndReleaseToken(IosNotificationEndpoint endpoint, Instant now) {
