@@ -2,7 +2,6 @@ package com.calio.calendar.notification.service;
 
 import com.calio.calendar.account.service.AccountQueryService;
 import com.calio.calendar.notification.domain.AccountNotificationSettings;
-import com.calio.calendar.notification.repository.AccountNotificationSettingsRepository;
 import java.time.LocalTime;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -11,19 +10,22 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class AccountNotificationSettingsService {
 
-    private final AccountNotificationSettingsRepository settingsRepository;
     private final AccountQueryService accountQueryService;
+    private final AccountNotificationSettingsQueryService settingsQueryService;
+    private final AccountNotificationSettingsCommandService settingsCommandService;
 
     public AccountNotificationSettingsService(
-            AccountNotificationSettingsRepository settingsRepository,
-            AccountQueryService accountQueryService
+            AccountQueryService accountQueryService,
+            AccountNotificationSettingsQueryService settingsQueryService,
+            AccountNotificationSettingsCommandService settingsCommandService
     ) {
-        this.settingsRepository = settingsRepository;
         this.accountQueryService = accountQueryService;
+        this.settingsQueryService = settingsQueryService;
+        this.settingsCommandService = settingsCommandService;
     }
 
     public AccountNotificationSettings get(Long accountId) {
-        return settingsRepository.findByAccount_Id(accountId)
+        return settingsQueryService.getSettingsIfExists(accountId)
                 .orElseGet(() -> createDefaultSettings(accountId));
     }
 
@@ -52,6 +54,6 @@ public class AccountNotificationSettingsService {
         AccountNotificationSettings settings = new AccountNotificationSettings(
                 accountQueryService.getAccount(accountId)
         );
-        return settingsRepository.save(settings);
+        return settingsCommandService.create(settings);
     }
 }
