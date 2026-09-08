@@ -11,6 +11,8 @@ import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJob;
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarSyncJob;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobTrigger;
+import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarRecurrenceJob;
+import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarRecurrenceJobKind;
 import com.calio.calendar.integration.connection.repository.GoogleCalendarIntegrationRepository;
 import com.calio.calendar.integration.connection.repository.GoogleCalendarConnectionRepository;
 import com.calio.calendar.integration.sync.operation.repository.GoogleOperationJobRepository;
@@ -48,6 +50,31 @@ class GoogleOperationJobServiceIntegrationTest {
 
     @Autowired
     private AccountRepository accountRepository;
+
+    @Test
+    @DisplayName("recurrence discriminator는 concrete subtype과 exact origin payload를 다시 hydrate한다")
+    void recurrenceJobRoundTripsAsConcreteSubtype() {
+        Account account = accountRepository.saveAndFlush(new Account());
+        GoogleCalendarConnection connection = connection(account.getId());
+        Instant origin = Instant.parse("2026-09-04T00:00:00Z");
+        GoogleCalendarRecurrenceJob saved = jobRepository.saveAndFlush(
+                GoogleCalendarRecurrenceJob.create("recurrence-operation",
+                        connection.getIntegration().getId(), account.getId(),
+                        connection.getIntegration().allocateGoogleOperationSequence(),
+                        GoogleCalendarRecurrenceJobKind.OVERRIDE_UPSERT, 40L, origin,
+                        "{\"title\":\"moved\"}", null, Instant.now()));
+        org.springframework.test.context.transaction.TestTransaction.flagForCommit();
+        org.springframework.test.context.transaction.TestTransaction.end();
+        org.springframework.test.context.transaction.TestTransaction.start();
+
+        GoogleOperationJob loaded = jobRepository.findById(saved.getId()).orElseThrow();
+
+        assertThat(loaded).isInstanceOfSatisfying(GoogleCalendarRecurrenceJob.class, recurrence -> {
+            assertThat(recurrence.getKind()).isEqualTo(GoogleCalendarRecurrenceJobKind.OVERRIDE_UPSERT);
+            assertThat(recurrence.getRecurrenceEventId()).isEqualTo(40L);
+            assertThat(recurrence.getOriginStartAt()).isEqualTo(origin);
+        });
+    }
 
     @Test
     @DisplayName("앞선 Job의 실행 시각이 남아 있으면 뒤의 실행 가능한 Job을 먼저 실행하지 않는다")

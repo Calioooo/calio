@@ -19,8 +19,11 @@ import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.integration.sync.GoogleCalendarSyncMode;
 import com.calio.calendar.integration.sync.operation.dto.GoogleEventJobPayload;
+import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceMasterJobPayload;
+import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceOverrideJobPayload;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
@@ -33,6 +36,89 @@ import org.springframework.web.client.RestClientResponseException;
 import tools.jackson.databind.ObjectMapper;
 
 class GoogleCalendarEventsClientTest {
+
+    @Test
+    @DisplayName("recurring master CREATE는 RRULE과 sendUpdates=none을 보낸다")
+    void recurrenceCreateSendsRulesWithoutOverrides() {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        GoogleCalendarEventsClient client = client(builder);
+        server.expect(requestTo(containsString("sendUpdates=none")))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(jsonPath("$.id", is("provider-id")))
+                .andExpect(jsonPath("$.recurrence[0]", is("RRULE:FREQ=DAILY")))
+                .andExpect(jsonPath("$.originalStartTime").doesNotExist())
+                .andRespond(withSuccess(eventResponse("provider-id"), MediaType.APPLICATION_JSON));
+
+        client.insertRecurrenceEvent("token", "provider-id", new GoogleRecurrenceMasterJobPayload(
+                "daily", null, Instant.parse("2026-09-04T00:00:00Z"),
+                Instant.parse("2026-09-04T01:00:00Z"), false, "UTC",
+                List.of("RRULE:FREQ=DAILY")));
+
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("exact instance resolve는 master instances endpoint와 immutable originalStart를 사용한다")
+    void resolvesExactRecurrenceInstanceByOriginalStart() {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        GoogleCalendarEventsClient client = client(builder);
+        server.expect(requestTo(allOf(containsString("/events/master-1/instances"),
+                        containsString("originalStart=2026-09-04T00:00:00Z"))))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess("""
+                        {"items":[{"id":"instance-1","status":"confirmed","etag":"etag-i",
+                        "recurringEventId":"master-1",
+                        "originalStartTime":{"dateTime":"2026-09-04T00:00:00Z","timeZone":"UTC"},
+                        "start":{"dateTime":"2026-09-04T02:00:00Z","timeZone":"UTC"},
+                        "end":{"dateTime":"2026-09-04T03:00:00Z","timeZone":"UTC"}}]}
+                        """, MediaType.APPLICATION_JSON));
+
+        assertThat(client.resolveRecurrenceInstance("token", "master-1",
+                Instant.parse("2026-09-04T00:00:00Z"))).isPresent();
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("override PATCH는 full final schedule을 보내고 RRULE은 보내지 않는다")
+    void overridePatchSendsFullSnapshotWithoutRecurrenceRules() {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        GoogleCalendarEventsClient client = client(builder);
+        server.expect(requestTo(containsString("sendUpdates=none")))
+                .andExpect(method(HttpMethod.PATCH))
+                .andExpect(header(HttpHeaders.IF_MATCH, "etag-i"))
+                .andExpect(jsonPath("$.start.dateTime", is("2026-09-04T02:00:00Z")))
+                .andExpect(jsonPath("$.recurrence").doesNotExist())
+                .andRespond(withSuccess(eventResponse("instance-1"), MediaType.APPLICATION_JSON));
+
+        client.patchRecurrenceInstance("token", "instance-1", "etag-i",
+                new GoogleRecurrenceOverrideJobPayload("moved", null,
+                        Instant.parse("2026-09-04T02:00:00Z"),
+                        Instant.parse("2026-09-04T03:00:00Z"), false, "UTC"));
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("all-day override 전환은 timed field를 상속하지 않고 exclusive date snapshot을 보낸다")
+    void allDayOverridePatchUsesCanonicalDateSnapshot() {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        GoogleCalendarEventsClient client = client(builder);
+        server.expect(method(HttpMethod.PATCH))
+                .andExpect(jsonPath("$.start.date", is("2026-09-04")))
+                .andExpect(jsonPath("$.end.date", is("2026-09-06")))
+                .andExpect(jsonPath("$.start.dateTime").doesNotExist())
+                .andRespond(withSuccess(eventResponse("instance-1"), MediaType.APPLICATION_JSON));
+
+        client.patchRecurrenceInstance("token", "instance-1", "etag-i",
+                new GoogleRecurrenceOverrideJobPayload("offsite", null,
+                        Instant.parse("2026-09-04T00:00:00Z"),
+                        Instant.parse("2026-09-06T00:00:00Z"), true, null));
+
+        server.verify();
+    }
 
     @Test
     @DisplayName("CREATE 재시도에서 동일한 Google Event ID가 이미 존재하면 기존 이벤트를 조회해 성공 처리한다")
