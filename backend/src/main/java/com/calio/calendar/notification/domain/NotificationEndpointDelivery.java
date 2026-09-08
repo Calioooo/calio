@@ -10,9 +10,16 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 
 @Entity
-@Table(name = "notification_endpoint_deliveries")
+@Table(
+        name = "notification_endpoint_deliveries",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_notification_endpoint_deliveries",
+                columnNames = {"notification_delivery_id", "endpoint_id"}
+        )
+)
 public class NotificationEndpointDelivery extends BaseEntity {
 
     @Id
