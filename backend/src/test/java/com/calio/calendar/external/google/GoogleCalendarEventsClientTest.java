@@ -59,6 +59,23 @@ class GoogleCalendarEventsClientTest {
     }
 
     @Test
+    @DisplayName("recurrence PATCH는 null payload를 invalid request로 거부한다")
+    void givenNullRecurrencePayload_whenPatch_thenRejectsInvalidRequest() {
+        // given
+        GoogleCalendarEventsClient client = client(RestClient.builder());
+
+        // when, then
+        assertThatThrownBy(() -> client.patchRecurrenceEvent("token", "master-1", "etag-1", null))
+                .isInstanceOfSatisfying(CalioException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.GOOGLE_CALENDAR_REQUEST_INVALID));
+        assertThatThrownBy(() -> client.patchRecurrenceInstance("token", "instance-1", "etag-1", null))
+                .isInstanceOfSatisfying(CalioException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.GOOGLE_CALENDAR_REQUEST_INVALID));
+    }
+
+    @Test
     @DisplayName("exact instance resolve는 master instances endpoint와 immutable originalStart를 사용한다")
     void resolvesExactRecurrenceInstanceByOriginalStart() {
         RestClient.Builder builder = RestClient.builder();

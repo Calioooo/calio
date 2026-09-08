@@ -1,5 +1,7 @@
 package com.calio.calendar.integration.sync;
 
+import com.calio.calendar.common.error.CalioException;
+import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.external.google.GoogleCalendarEventVersionConflictException;
 import com.calio.calendar.external.google.GoogleCalendarEventsClient;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventResponse;
@@ -308,9 +310,15 @@ public class GoogleCalendarRecurrenceJobService {
     }
 
     private <T> T read(GoogleCalendarRecurrenceJob job, Class<T> type) {
-        try { return objectMapper.readValue(job.getTargetPayload(), type); }
+        try {
+            T payload = objectMapper.readValue(job.getTargetPayload(), type);
+            if (payload == null) {
+                throw new CalioException(ErrorCode.GOOGLE_CALENDAR_REQUEST_INVALID);
+            }
+            return payload;
+        }
         catch (JacksonException exception) {
-            throw new IllegalArgumentException("Google recurrence job payload cannot be decoded", exception);
+            throw new CalioException(ErrorCode.GOOGLE_CALENDAR_REQUEST_INVALID, exception);
         }
     }
 
