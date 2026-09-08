@@ -17,9 +17,12 @@ import com.calio.calendar.integration.connection.service.GoogleCalendarConnectio
 import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrationQueryService;
 import com.calio.calendar.external.google.GoogleCalendarInvalidGrantException;
 import com.calio.calendar.integration.sync.GoogleCalendarEventJobService;
+import com.calio.calendar.integration.sync.GoogleCalendarRecurrenceJobService;
 import com.calio.calendar.integration.sync.GoogleCalendarSyncService;
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEventJob;
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarSyncJob;
+import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarRecurrenceJob;
+import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarRecurrenceJobKind;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJob;
 import com.calio.calendar.integration.sync.operation.dto.GoogleOperationFailureDecision;
 import java.time.Clock;
@@ -34,6 +37,7 @@ class GoogleOperationProcessorTest {
     private GoogleOperationLeaseService operationLeaseService;
     private GoogleCalendarSyncService syncService;
     private GoogleCalendarEventJobService eventJobService;
+    private GoogleCalendarRecurrenceJobService recurrenceJobService;
     private GoogleOperationFailureClassifier failureClassifier;
     private GoogleCalendarConnectionCommandService connectionCommandService;
     private GoogleCalendarIntegrationQueryService integrationQueryService;
@@ -45,6 +49,7 @@ class GoogleOperationProcessorTest {
         operationLeaseService = mock(GoogleOperationLeaseService.class);
         syncService = mock(GoogleCalendarSyncService.class);
         eventJobService = mock(GoogleCalendarEventJobService.class);
+        recurrenceJobService = mock(GoogleCalendarRecurrenceJobService.class);
         failureClassifier = mock(GoogleOperationFailureClassifier.class);
         connectionCommandService = mock(GoogleCalendarConnectionCommandService.class);
         integrationQueryService = mock(GoogleCalendarIntegrationQueryService.class);
@@ -56,6 +61,7 @@ class GoogleOperationProcessorTest {
                 operationLeaseService,
                 syncService,
                 eventJobService,
+                recurrenceJobService,
                 failureClassifier,
                 connectionCommandService,
                 integrationQueryService,
@@ -81,6 +87,24 @@ class GoogleOperationProcessorTest {
         executionOrder.verify(syncService).synchronize(eq(1L), eq(10L), anyString());
         executionOrder.verify(syncService).synchronize(eq(2L), eq(10L), anyString());
         verify(operationLeaseService).release(eq(10L), anyString());
+    }
+
+    @Test
+    @DisplayName("concrete recurrence Job은 generic scope 해석 없이 recurrence handler로 직접 dispatch한다")
+    void recurrenceJobDispatchesDirectlyToRecurrenceHandler() {
+        GoogleCalendarRecurrenceJob job = GoogleCalendarRecurrenceJob.create(
+                "operation", 20L, 10L, 1L, GoogleCalendarRecurrenceJobKind.MASTER_UPDATE,
+                40L, null, "payload", null, java.time.Instant.parse("2026-09-01T00:00:00Z"));
+        org.springframework.test.util.ReflectionTestUtils.setField(job, "id", 50L);
+        when(operationLeaseService.acquire(eq(10L), anyString())).thenReturn(true);
+        when(jobPersistenceService.claimNextJob(eq(10L), eq(20L), anyString()))
+                .thenReturn(job)
+                .thenReturn((GoogleOperationJob) null);
+
+        processor.processAccount(10L);
+
+        verify(recurrenceJobService).execute(eq(job), anyString());
+        verifyNoInteractions(eventJobService);
     }
 
     @Test

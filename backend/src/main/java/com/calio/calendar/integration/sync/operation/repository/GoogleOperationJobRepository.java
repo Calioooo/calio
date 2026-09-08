@@ -164,6 +164,40 @@ public interface GoogleOperationJobRepository extends JpaRepository<GoogleOperat
             @Param("eventId") Long eventId
     );
 
+    @Query("""
+            select (count(job) > 0)
+            from GoogleCalendarRecurrenceJob job
+            where job.accountId = :accountId
+              and job.integrationId = :integrationId
+              and job.recurrenceEventId = :recurrenceEventId
+              and job.state in (
+                  com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState.PENDING,
+                  com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState.PROCESSING
+              )
+            """)
+    boolean existsPendingRecurrenceAggregateJob(
+            @Param("accountId") Long accountId,
+            @Param("integrationId") Long integrationId,
+            @Param("recurrenceEventId") Long recurrenceEventId);
+
+    @Query("""
+            select (count(job) > 0)
+            from GoogleCalendarRecurrenceJob job
+            where job.accountId = :accountId
+              and job.integrationId = :integrationId
+              and job.recurrenceEventId = :recurrenceEventId
+              and job.originStartAt = :originStartAt
+              and job.state in (
+                  com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState.PENDING,
+                  com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState.PROCESSING
+              )
+            """)
+    boolean existsPendingRecurrenceOverrideJob(
+            @Param("accountId") Long accountId,
+            @Param("integrationId") Long integrationId,
+            @Param("recurrenceEventId") Long recurrenceEventId,
+            @Param("originStartAt") Instant originStartAt);
+
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("delete from GoogleOperationJob job where job.integrationId = :integrationId")
     int deleteByIntegrationId(@Param("integrationId") Long integrationId);
