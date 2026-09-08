@@ -61,6 +61,26 @@ class HttpApnsGatewayTest {
     }
 
     @Test
+    @DisplayName("APNs server error는 transient failure로 분류한다")
+    void givenServerErrorResponse_whenSend_thenReturnsTransientFailure() throws Exception {
+        stubResponse(503, "{\"reason\":\"ServiceUnavailable\"}", null);
+
+        ApnsSendResult result = gateway().send(message());
+
+        assertThat(result.type()).isEqualTo(ApnsSendResultType.TRANSIENT_FAILURE);
+    }
+
+    @Test
+    @DisplayName("APNs terminal rejection은 rejected로 분류한다")
+    void givenTerminalRejectionResponse_whenSend_thenReturnsRejected() throws Exception {
+        stubResponse(400, "{\"reason\":\"BadTopic\"}", null);
+
+        ApnsSendResult result = gateway().send(message());
+
+        assertThat(result.type()).isEqualTo(ApnsSendResultType.REJECTED);
+    }
+
+    @Test
     @DisplayName("APNs 전송이 interrupt되면 thread interrupt 상태를 복원하고 transient failure를 반환한다")
     void givenInterruptedSend_whenSend_thenRestoresInterruptedState() throws Exception {
         when(client.send(any(), any())).thenThrow(new InterruptedException());
