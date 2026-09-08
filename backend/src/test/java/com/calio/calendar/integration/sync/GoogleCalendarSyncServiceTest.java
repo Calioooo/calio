@@ -83,7 +83,8 @@ class GoogleCalendarSyncServiceTest {
                                 "full-recurrence-event"
                         )
                 ),
-                new FakeOperationLeaseService()
+                new FakeOperationLeaseService(),
+                mock(GoogleCalendarRecurrenceDeleteReconciliationService.class)
         );
 
         // when
@@ -151,7 +152,8 @@ class GoogleCalendarSyncServiceTest {
                 eventRequestService(eventsClient, accessTokenService),
                 new FakePagePersistenceService(),
                 new FakePageNormalizer(),
-                ownershipService
+                ownershipService,
+                mock(GoogleCalendarRecurrenceDeleteReconciliationService.class)
         );
 
         // when, then
@@ -270,7 +272,8 @@ class GoogleCalendarSyncServiceTest {
                                 "recurrence-event-2"
                         )
                 ),
-                ownershipService
+                ownershipService,
+                mock(GoogleCalendarRecurrenceDeleteReconciliationService.class)
         );
 
         // when
@@ -348,7 +351,8 @@ class GoogleCalendarSyncServiceTest {
                 eventRequestService(eventsClient, accessTokenService),
                 pagePersistenceService,
                 new FakePageNormalizer(),
-                new FakeOperationLeaseService()
+                new FakeOperationLeaseService(),
+                mock(GoogleCalendarRecurrenceDeleteReconciliationService.class)
         );
     }
 

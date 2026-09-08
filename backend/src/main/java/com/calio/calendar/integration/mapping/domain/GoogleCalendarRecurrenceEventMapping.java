@@ -56,6 +56,9 @@ public class GoogleCalendarRecurrenceEventMapping extends BaseEntity {
     @Column(name = "local_changed", nullable = false)
     private boolean localChanged;
 
+    @Column(name = "provider_delete_pending", nullable = false)
+    private boolean providerDeletePending;
+
     protected GoogleCalendarRecurrenceEventMapping() {
     }
 
@@ -111,6 +114,14 @@ public class GoogleCalendarRecurrenceEventMapping extends BaseEntity {
 
     public boolean isLocalChanged() {
         return localChanged;
+    }
+
+    public void markProviderDeletePending() {
+        providerDeletePending = true;
+    }
+
+    public boolean isProviderDeletePending() {
+        return providerDeletePending;
     }
 
     public boolean isConflicted() {

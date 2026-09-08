@@ -289,6 +289,7 @@ class GoogleCalendarRecurrenceJobServiceTest {
         service.execute(job(GoogleCalendarRecurrenceJobKind.MASTER_DELETE, null), "worker");
 
         assertThat(master.isLocalChanged()).isTrue();
+        assertThat(master.isProviderDeletePending()).isTrue();
         verifyNoInteractions(tokens, client);
         verify(mappingCommands, never()).deleteRecurrenceAggregateMappings(any());
     }
