@@ -43,13 +43,15 @@ public class GoogleCalendarRecurrenceMappingQueryService {
     public List<GoogleCalendarRecurrenceEventMapping> listRecurrenceEventMappingsForJob(
             Long integrationId, Long recurrenceEventId
     ) {
-        return recurrenceMappingRepository.findAllForJob(integrationId, recurrenceEventId);
+        return recurrenceMappingRepository
+                .findAllWithConnectionAndIntegrationByIntegrationIdAndRecurrenceEventId(
+                        integrationId, recurrenceEventId);
     }
 
     public Optional<GoogleCalendarRecurrenceEventMapping> getRecurrenceEventMappingIfExists(
             Long connectionId, Long recurrenceEventId
     ) {
-        return recurrenceMappingRepository.findByConnection_IdAndRecurrenceEventId(
+        return recurrenceMappingRepository.findByConnectionIdAndRecurrenceEventId(
                 connectionId, recurrenceEventId);
     }
 

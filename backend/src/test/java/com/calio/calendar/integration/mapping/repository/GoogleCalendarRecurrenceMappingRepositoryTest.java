@@ -108,7 +108,7 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
                 );
 
         // when, then
-        assertThat(eventMappingRepository.findByConnection_IdAndRecurrenceEventId(
+        assertThat(eventMappingRepository.findByConnectionIdAndRecurrenceEventId(
                 connection.getId(), recurrenceEvent.getId()))
                 .map(GoogleCalendarRecurrenceEventMapping::getExternalEventId)
                 .contains(externalRecurrenceEventId);
@@ -190,7 +190,7 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
                 new GoogleCalendarRecurrenceEventMapping(second, fixture.recurrenceEvent().getId(),
                         "second-external-id", "etag-2"));
 
-        assertThat(eventMappingRepository.findByConnection_IdAndRecurrenceEventId(
+        assertThat(eventMappingRepository.findByConnectionIdAndRecurrenceEventId(
                 second.getId(), fixture.recurrenceEvent().getId()))
                 .map(GoogleCalendarRecurrenceEventMapping::getId)
                 .contains(secondMapping.getId());
@@ -274,7 +274,7 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
         recurrenceEventRepository.flush();
 
         // then
-        assertThat(eventMappingRepository.findByConnection_IdAndRecurrenceEventId(
+        assertThat(eventMappingRepository.findByConnectionIdAndRecurrenceEventId(
                 fixture.connection().getId(), fixture.recurrenceEvent().getId())).isPresent();
     }
 

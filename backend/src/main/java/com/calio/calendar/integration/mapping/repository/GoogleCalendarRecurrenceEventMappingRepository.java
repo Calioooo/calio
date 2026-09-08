@@ -14,17 +14,25 @@ import org.springframework.data.repository.query.Param;
 public interface GoogleCalendarRecurrenceEventMappingRepository
         extends JpaRepository<GoogleCalendarRecurrenceEventMapping, Long> {
 
-    Optional<GoogleCalendarRecurrenceEventMapping> findByConnection_IdAndRecurrenceEventId(
-            Long connectionId, Long recurrenceEventId);
-
     @Query("""
-            select mapping from GoogleCalendarRecurrenceEventMapping mapping
-            join fetch mapping.connection connection
-            join fetch connection.integration integration
-            where integration.id = :integrationId
+            select mapping
+            from GoogleCalendarRecurrenceEventMapping mapping
+            where mapping.connection.id = :connectionId
               and mapping.recurrenceEventId = :recurrenceEventId
             """)
-    List<GoogleCalendarRecurrenceEventMapping> findAllForJob(
+    Optional<GoogleCalendarRecurrenceEventMapping> findByConnectionIdAndRecurrenceEventId(
+            @Param("connectionId") Long connectionId,
+            @Param("recurrenceEventId") Long recurrenceEventId
+    );
+
+    @EntityGraph(attributePaths = {"connection", "connection.integration"})
+    @Query("""
+            select mapping
+            from GoogleCalendarRecurrenceEventMapping mapping
+            where mapping.connection.integration.id = :integrationId
+              and mapping.recurrenceEventId = :recurrenceEventId
+            """)
+    List<GoogleCalendarRecurrenceEventMapping> findAllWithConnectionAndIntegrationByIntegrationIdAndRecurrenceEventId(
             @Param("integrationId") Long integrationId,
             @Param("recurrenceEventId") Long recurrenceEventId);
 
