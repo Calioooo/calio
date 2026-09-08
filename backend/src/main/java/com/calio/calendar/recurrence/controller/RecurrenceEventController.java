@@ -5,7 +5,7 @@ import com.calio.calendar.recurrence.controller.dto.CreateRecurrenceEventRequest
 import com.calio.calendar.recurrence.controller.dto.RecurrenceEventResponse;
 import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceEventRequest;
 import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceOccurrenceRequest;
-import com.calio.calendar.recurrence.service.RecurrenceEventService;
+import com.calio.calendar.recurrence.service.RecurrenceEventApplicationService;
 import com.calio.calendar.security.AuthenticatedAccount;
 import com.calio.calendar.sharing.recurrence.controller.dto.CreateRecurrenceGroupSharesRequest;
 import com.calio.calendar.sharing.recurrence.controller.dto.CreateRecurrenceGroupSharesResponse;
@@ -33,11 +33,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/recurrence-events")
 public class RecurrenceEventController {
 
-    private final RecurrenceEventService recurrenceEventService;
+    private final RecurrenceEventApplicationService recurrenceEventService;
     private final PersonalRecurrenceGroupShareService recurrenceGroupShareService;
 
     public RecurrenceEventController(
-            RecurrenceEventService recurrenceEventService,
+            RecurrenceEventApplicationService recurrenceEventService,
             PersonalRecurrenceGroupShareService recurrenceGroupShareService
     ) {
         this.recurrenceEventService = recurrenceEventService;
