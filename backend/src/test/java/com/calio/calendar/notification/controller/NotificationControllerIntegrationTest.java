@@ -87,6 +87,35 @@ class NotificationControllerIntegrationTest {
                 .isEqualTo(false);
     }
 
+    @Test
+    @DisplayName("다른 installation이 같은 APNs 토큰을 등록하면 이전 endpoint의 토큰을 해제한다")
+    void givenTokenOwnedByAnotherInstallation_whenRegister_thenTransfersTokenOwnership() throws Exception {
+        mockMvc.perform(put("/api/notification-endpoints/ios")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(endpointRequest("first-installation", "transferred-device-token")))
+                .andExpect(status().isNoContent());
+
+        Long previousEndpointId = endpointRepository.findByApnsToken("transferred-device-token")
+                .orElseThrow()
+                .getId();
+
+        mockMvc.perform(put("/api/notification-endpoints/ios")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(endpointRequest("second-installation", "transferred-device-token")))
+                .andExpect(status().isNoContent());
+
+        assertThat(endpointRepository.findById(previousEndpointId))
+                .get()
+                .satisfies(endpoint -> {
+                    assertThat(endpoint.getApnsToken()).isNull();
+                    assertThat(endpoint.isEligible()).isFalse();
+                });
+        assertThat(endpointRepository.findByApnsToken("transferred-device-token"))
+                .get()
+                .extracting(endpoint -> endpoint.isEligible())
+                .isEqualTo(true);
+    }
+
     private String settingsRequest(int timedReminderMinutes, int importantReminderMinutes) {
         return """
                 {
@@ -98,5 +127,15 @@ class NotificationControllerIntegrationTest {
                   "dailyBriefingTime": "08:00:00"
                 }
                 """.formatted(timedReminderMinutes, importantReminderMinutes);
+    }
+
+    private String endpointRequest(String installationId, String apnsToken) {
+        return """
+                {
+                  "installationId": "%s",
+                  "apnsToken": "%s",
+                  "authorizationStatus": "AUTHORIZED"
+                }
+                """.formatted(installationId, apnsToken);
     }
 }
