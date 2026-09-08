@@ -319,6 +319,10 @@ public class GoogleCalendarRecurrenceChangeService {
         }
         recurrenceMappingCommandService.deleteRecurrenceEventMapping(recurrenceEventMapping);
         Long recurrenceEventId = recurrenceEventMapping.getRecurrenceEventId();
+        if (!recurrenceMappingQueryService.listRecurrenceEventIdsWithMappings(
+                List.of(recurrenceEventId)).isEmpty()) {
+            return;
+        }
         recurrenceEventCommandService.deleteRecurrenceOverridesByRecurrenceEventIds(List.of(recurrenceEventId));
         eventCommandService.deleteEventsByRecurrenceEventIds(List.of(recurrenceEventId));
         recurrenceEventCommandService.deleteRecurrenceEventsByIds(List.of(recurrenceEventId));

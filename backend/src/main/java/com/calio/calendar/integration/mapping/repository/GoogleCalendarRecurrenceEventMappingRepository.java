@@ -28,6 +28,14 @@ public interface GoogleCalendarRecurrenceEventMappingRepository
             @Param("integrationId") Long integrationId,
             @Param("recurrenceEventId") Long recurrenceEventId);
 
+    @Query("""
+            select distinct mapping.recurrenceEventId
+            from GoogleCalendarRecurrenceEventMapping mapping
+            where mapping.recurrenceEventId in :recurrenceEventIds
+            """)
+    List<Long> findRecurrenceEventIdsWithMappings(
+            @Param("recurrenceEventIds") Collection<Long> recurrenceEventIds);
+
     Optional<GoogleCalendarRecurrenceEventMapping>
     findByConnection_IdAndCalendarKeyAndExternalEventId(
             Long connectionId,

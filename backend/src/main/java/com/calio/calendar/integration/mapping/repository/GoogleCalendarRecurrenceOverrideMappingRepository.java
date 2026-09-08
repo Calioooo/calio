@@ -38,6 +38,16 @@ public interface GoogleCalendarRecurrenceOverrideMappingRepository
             select overrideMapping
             from GoogleCalendarRecurrenceOverrideMapping overrideMapping
             join overrideMapping.recurrenceEventMapping recurrenceEventMapping
+            where recurrenceEventMapping.recurrenceEventId in :recurrenceEventIds
+            """)
+    List<GoogleCalendarRecurrenceOverrideMapping> findAllForRecurrenceEventIds(
+            @Param("recurrenceEventIds") Collection<Long> recurrenceEventIds);
+
+    @EntityGraph(attributePaths = "recurrenceEventMapping")
+    @Query("""
+            select overrideMapping
+            from GoogleCalendarRecurrenceOverrideMapping overrideMapping
+            join overrideMapping.recurrenceEventMapping recurrenceEventMapping
             where recurrenceEventMapping.id in :recurrenceEventMappingIds
             """)
     List<GoogleCalendarRecurrenceOverrideMapping>

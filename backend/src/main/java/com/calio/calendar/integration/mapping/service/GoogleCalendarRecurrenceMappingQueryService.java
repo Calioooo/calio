@@ -4,6 +4,7 @@ import com.calio.calendar.integration.mapping.domain.GoogleCalendarRecurrenceEve
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarRecurrenceOverrideMapping;
 import com.calio.calendar.integration.mapping.repository.GoogleCalendarRecurrenceEventMappingRepository;
 import com.calio.calendar.integration.mapping.repository.GoogleCalendarRecurrenceOverrideMappingRepository;
+import com.calio.calendar.recurrence.domain.RecurrenceOverrideIdentity;
 import java.util.Collection;
 import java.util.List;
 import java.time.Instant;
@@ -52,11 +53,31 @@ public class GoogleCalendarRecurrenceMappingQueryService {
                 connectionId, recurrenceEventId);
     }
 
+    public List<Long> listRecurrenceEventIdsWithMappings(Collection<Long> recurrenceEventIds) {
+        if (recurrenceEventIds.isEmpty()) {
+            return List.of();
+        }
+        return recurrenceMappingRepository.findRecurrenceEventIdsWithMappings(recurrenceEventIds);
+    }
+
     public Optional<GoogleCalendarRecurrenceOverrideMapping> getOverrideMappingIfExists(
             Long recurrenceEventMappingId, Instant originStartAt
     ) {
         return overrideMappingRepository.findByRecurrenceEventMapping_IdAndOriginStartAt(
                 recurrenceEventMappingId, originStartAt);
+    }
+
+    public List<RecurrenceOverrideIdentity> listMappedOverrideIdentities(
+            Collection<Long> recurrenceEventIds
+    ) {
+        if (recurrenceEventIds.isEmpty()) {
+            return List.of();
+        }
+        return overrideMappingRepository.findAllForRecurrenceEventIds(recurrenceEventIds).stream()
+                .map(mapping -> new RecurrenceOverrideIdentity(
+                        mapping.getRecurrenceEventMapping().getRecurrenceEventId(),
+                        mapping.getOriginStartAt()))
+                .toList();
     }
 
     public List<GoogleCalendarRecurrenceEventMapping> listRecurrenceEventMappings(
