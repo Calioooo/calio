@@ -210,6 +210,32 @@ class GoogleCalendarRecurrenceJobServiceTest {
     }
 
     @Test
+    @DisplayName("mapping 없는 occurrence upsert가 취소된 provider instance를 만나면 PATCH하지 않고 conflict로 종료한다")
+    void givenCancelledUnmappedProviderInstance_whenUpsertOverride_thenMarksMasterConflict() {
+        // given
+        Instant origin = Instant.parse("2026-09-03T00:00:00Z");
+        GoogleCalendarConnection connection = connection(30L);
+        GoogleCalendarRecurrenceEventMapping master = master(connection);
+        when(mappings.listRecurrenceEventMappingsForJob(20L, 40L)).thenReturn(List.of(master));
+        when(mappings.getOverrideMappingIfExists(60L, origin)).thenReturn(Optional.empty());
+        when(tokens.getAccessToken(30L)).thenReturn("token");
+        when(objectMapper.readValue("payload", GoogleRecurrenceOverrideJobPayload.class))
+                .thenReturn(overridePayload());
+        when(client.getEvent("token", "master-1"))
+                .thenReturn(Optional.of(provider("master-1", "master-etag", null)));
+        when(client.resolveRecurrenceInstance("token", "master-1", origin))
+                .thenReturn(Optional.of(cancelledProviderInstance("instance-1", origin)));
+
+        // when
+        service.execute(job(GoogleCalendarRecurrenceJobKind.OVERRIDE_UPSERT, origin), "worker");
+
+        // then
+        assertThat(master.isConflicted()).isTrue();
+        verify(client, never()).patchRecurrenceInstance(any(), any(), any(), any());
+        verify(jobs).recordSyncConflict(50L, 10L, "worker");
+    }
+
+    @Test
     @DisplayName("새 exception PATCH의 412도 exact origin mapping으로 격리하고 master를 오염시키지 않는다")
     void newOverridePatchConflictCreatesExactConflictedMapping() {
         Instant origin = Instant.parse("2026-09-03T00:00:00Z");
@@ -379,5 +405,11 @@ class GoogleCalendarRecurrenceJobServiceTest {
                 origin == null ? null : "master-1",
                 origin == null ? null : new GoogleCalendarEventTimeResponse(null, origin.toString(), "UTC"),
                 start, new GoogleCalendarEventTimeResponse(null, "2026-09-03T01:00:00Z", "UTC"));
+    }
+
+    private GoogleCalendarEventResponse cancelledProviderInstance(String id, Instant origin) {
+        return new GoogleCalendarEventResponse(id, "cancelled", null,
+                Instant.parse("2026-09-03T00:00:00Z"), null, null, List.of(), "master-1",
+                new GoogleCalendarEventTimeResponse(null, origin.toString(), "UTC"), null, null);
     }
 }
