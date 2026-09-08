@@ -161,6 +161,9 @@ public class GoogleCalendarRecurrenceJobService {
             instance = eventsClient.resolveRecurrenceInstance(
                     token, master.externalId(), job.getOriginStartAt()).orElse(null);
             if (instance == null) return OverrideResult.masterConflict(master.mappingId(), null);
+            if (instance.isCancelled()) {
+                return OverrideResult.masterConflict(master.mappingId(), null);
+            }
         } else {
             instance = eventsClient.getEvent(token, scope.externalId()).orElse(null);
             if (instance == null || !scope.etag().equals(instance.etag())) {
