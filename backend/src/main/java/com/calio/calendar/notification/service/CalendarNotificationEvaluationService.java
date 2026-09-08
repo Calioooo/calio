@@ -64,7 +64,7 @@ public class CalendarNotificationEvaluationService {
                         accountId, settings, member.getGroupSpace().getName(), event, dueFrom, dueTo
                 )));
 
-        evaluateBriefing(accountId, settings, now, dueFrom, dueTo, queryFrom, queryTo);
+        evaluateBriefing(accountId, settings, now, dueFrom, dueTo);
     }
 
     private void evaluatePersonalEvent(
@@ -141,9 +141,7 @@ public class CalendarNotificationEvaluationService {
             AccountNotificationSettings settings,
             Instant now,
             Instant dueFrom,
-            Instant dueTo,
-            Instant queryFrom,
-            Instant queryTo
+            Instant dueTo
     ) {
         if (!settings.isDailyBriefingEnabled()) {
             return;
@@ -157,12 +155,10 @@ public class CalendarNotificationEvaluationService {
             return;
         }
 
-        long remainingScheduleCount = remainingPersonalScheduleCount(
-                accountId,
-                now,
-                queryFrom,
-                queryTo
-        ) + remainingGroupScheduleCount(accountId, now, queryFrom, queryTo);
+        Instant dayStart = targetDate.atStartOfDay(POLICY_ZONE).toInstant();
+        Instant dayEnd = targetDate.plusDays(1).atStartOfDay(POLICY_ZONE).toInstant();
+        long remainingScheduleCount = remainingPersonalScheduleCount(accountId, now, dayStart, dayEnd)
+                + remainingGroupScheduleCount(accountId, now, dayStart, dayEnd);
         if (remainingScheduleCount == 0) {
             return;
         }
@@ -181,29 +177,33 @@ public class CalendarNotificationEvaluationService {
     private long remainingPersonalScheduleCount(
             Long accountId,
             Instant now,
-            Instant queryFrom,
-            Instant queryTo
+            Instant dayStart,
+            Instant dayEnd
     ) {
-        return eventService.listEvents(accountId, queryFrom, queryTo).stream()
+        return eventService.listEvents(accountId, dayStart, dayEnd).stream()
                 .filter(event -> !isGoogleMapped(accountId, event))
-                .filter(event -> event.allDay() || event.endAt().isAfter(now))
+                .filter(event -> isRemainingSchedule(event.allDay(), event.endAt(), now))
                 .count();
     }
 
     private long remainingGroupScheduleCount(
             Long accountId,
             Instant now,
-            Instant queryFrom,
-            Instant queryTo
+            Instant dayStart,
+            Instant dayEnd
     ) {
         return listActiveMemberships(accountId).stream()
                 .mapToLong(member -> groupCalendarService.listItems(
                         accountId,
                         member.getGroupSpace().getId(),
-                        queryFrom,
-                        queryTo
-                ).stream().filter(event -> event.allDay() || event.endAt().isAfter(now)).count())
+                        dayStart,
+                        dayEnd
+                ).stream().filter(event -> isRemainingSchedule(event.allDay(), event.endAt(), now)).count())
                 .sum();
+    }
+
+    private boolean isRemainingSchedule(boolean allDay, Instant endAt, Instant now) {
+        return allDay || endAt.isAfter(now);
     }
 
     private String personalScheduleKey(EventResponse event) {

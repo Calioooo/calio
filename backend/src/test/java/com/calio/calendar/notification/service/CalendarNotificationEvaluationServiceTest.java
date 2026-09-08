@@ -121,6 +121,34 @@ class CalendarNotificationEvaluationServiceTest {
         verify(notificationDispatcher, never()).dispatch(any(), any(), any(), any(), any(), any(), any());
     }
 
+    @Test
+    @DisplayName("브리핑은 Seoul 기준 당일의 남은 일정만 집계한다")
+    void givenSchedulesOutsideBriefingDate_whenEvaluate_thenCountsOnlyTargetDateSchedules() {
+        // given
+        Instant briefingTime = Instant.parse("2026-06-01T23:00:00Z");
+        Instant dayStart = Instant.parse("2026-06-01T15:00:00Z");
+        Instant dayEnd = Instant.parse("2026-06-02T15:00:00Z");
+        EventResponse targetDateEvent = timedEvent(Instant.parse("2026-06-02T01:00:00Z"), "Asia/Seoul");
+        EventResponse nextDateEvent = timedEvent(Instant.parse("2026-06-03T01:00:00Z"), "Asia/Seoul");
+        when(eventService.listEvents(eq(1L), any(), any())).thenReturn(List.of(targetDateEvent, nextDateEvent));
+        when(eventService.listEvents(1L, dayStart, dayEnd)).thenReturn(List.of(targetDateEvent));
+        when(eventMappingQueryService.hasExternalEventMapping(10L, 1L)).thenReturn(false);
+
+        // when
+        evaluationService.evaluate(settings(10, true), briefingTime);
+
+        // then
+        verify(notificationDispatcher).dispatch(
+                eq(1L),
+                eq("BRIEFING"),
+                eq("briefing:2026-06-02"),
+                eq(briefingTime),
+                eq(LocalDate.of(2026, 6, 2)),
+                eq("1"),
+                eq(null)
+        );
+    }
+
     private AccountNotificationSettings settings(int timedReminderMinutes, boolean briefingEnabled) {
         Account account = new Account();
         ReflectionTestUtils.setField(account, "id", 1L);
