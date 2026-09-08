@@ -7,7 +7,6 @@ import com.calio.calendar.notification.apns.ApnsSendResultType;
 import com.calio.calendar.notification.domain.IosNotificationEndpoint;
 import com.calio.calendar.notification.domain.NotificationDelivery;
 import com.calio.calendar.notification.domain.NotificationEndpointDelivery;
-import com.calio.calendar.notification.repository.NotificationDeliveryRepository;
 import com.calio.calendar.notification.repository.NotificationEndpointDeliveryRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -23,7 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class CalendarNotificationDispatcher {
 
-    private final NotificationDeliveryRepository deliveryRepository;
+    private final NotificationDeliveryQueryService deliveryQueryService;
     private final NotificationEndpointDeliveryRepository endpointDeliveryRepository;
     private final IosNotificationEndpointService endpointService;
     private final ApnsGateway apnsGateway;
@@ -31,14 +30,14 @@ public class CalendarNotificationDispatcher {
     private final NotificationDeliveryClaimService deliveryClaimService;
 
     public CalendarNotificationDispatcher(
-            NotificationDeliveryRepository deliveryRepository,
+            NotificationDeliveryQueryService deliveryQueryService,
             NotificationEndpointDeliveryRepository endpointDeliveryRepository,
             IosNotificationEndpointService endpointService,
             ApnsGateway apnsGateway,
             ObjectMapper objectMapper,
             NotificationDeliveryClaimService deliveryClaimService
     ) {
-        this.deliveryRepository = deliveryRepository;
+        this.deliveryQueryService = deliveryQueryService;
         this.endpointDeliveryRepository = endpointDeliveryRepository;
         this.endpointService = endpointService;
         this.apnsGateway = apnsGateway;
@@ -73,9 +72,7 @@ public class CalendarNotificationDispatcher {
     }
 
     private boolean isAlreadyClaimed(Long accountId, String type, String key, Instant scheduledAt) {
-        return deliveryRepository.findByAccount_IdAndNotificationTypeAndScheduleKeyAndScheduledAt(
-                accountId, type, key, scheduledAt
-        ).isPresent();
+        return deliveryQueryService.hasDeliveryClaim(accountId, type, key, scheduledAt);
     }
 
     private NotificationDelivery createClaim(

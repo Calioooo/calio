@@ -5,8 +5,7 @@ import com.calio.calendar.event.service.EventService;
 import com.calio.calendar.groupcalendar.controller.dto.GroupCalendarItemResponse;
 import com.calio.calendar.groupcalendar.service.GroupCalendarService;
 import com.calio.calendar.groupspace.domain.GroupMember;
-import com.calio.calendar.groupspace.domain.GroupMemberStatus;
-import com.calio.calendar.groupspace.repository.GroupMemberRepository;
+import com.calio.calendar.groupspace.service.GroupMembershipQueryService;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingQueryService;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarRecurrenceMappingQueryService;
 import com.calio.calendar.notification.domain.AccountNotificationSettings;
@@ -26,7 +25,7 @@ public class CalendarNotificationEvaluationService {
 
     private final EventService eventService;
     private final GroupCalendarService groupCalendarService;
-    private final GroupMemberRepository groupMemberRepository;
+    private final GroupMembershipQueryService groupMembershipQueryService;
     private final GoogleCalendarEventMappingQueryService eventMappingQueryService;
     private final GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService;
     private final CalendarNotificationDispatcher notificationDispatcher;
@@ -34,14 +33,14 @@ public class CalendarNotificationEvaluationService {
     public CalendarNotificationEvaluationService(
             EventService eventService,
             GroupCalendarService groupCalendarService,
-            GroupMemberRepository groupMemberRepository,
+            GroupMembershipQueryService groupMembershipQueryService,
             GoogleCalendarEventMappingQueryService eventMappingQueryService,
             GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService,
             CalendarNotificationDispatcher notificationDispatcher
     ) {
         this.eventService = eventService;
         this.groupCalendarService = groupCalendarService;
-        this.groupMemberRepository = groupMemberRepository;
+        this.groupMembershipQueryService = groupMembershipQueryService;
         this.eventMappingQueryService = eventMappingQueryService;
         this.recurrenceMappingQueryService = recurrenceMappingQueryService;
         this.notificationDispatcher = notificationDispatcher;
@@ -76,11 +75,11 @@ public class CalendarNotificationEvaluationService {
             Instant dueTo
     ) {
         String scheduleKey = personalScheduleKey(event);
-        dispatchGeneralReminder(accountId, settings, event.startAt(), event.allDay(), scheduleKey, event.title(), null, dueFrom, dueTo);
+        dispatchGeneralReminder(accountId, settings, event.startAt(), event.allDay(), event.timeZone(), scheduleKey, event.title(), null, dueFrom, dueTo);
         if (event.allDay() || event.isRecurrenceOccurrence() || !event.importantEvent()) {
             return;
         }
-        dispatchTimedReminder(accountId, "IMPORTANT", settings.getImportantReminderMinutes(), scheduleKey, event.startAt(), event.title(), null, dueFrom, dueTo);
+        dispatchTimedReminder(accountId, "IMPORTANT", settings.getImportantReminderMinutes(), scheduleKey, event.startAt(), event.timeZone(), event.title(), null, dueFrom, dueTo);
     }
 
     private void evaluateGroupEvent(
@@ -91,7 +90,7 @@ public class CalendarNotificationEvaluationService {
             Instant dueFrom,
             Instant dueTo
     ) {
-        dispatchGeneralReminder(accountId, settings, event.startAt(), event.allDay(), groupScheduleKey(event), event.title(), groupName, dueFrom, dueTo);
+        dispatchGeneralReminder(accountId, settings, event.startAt(), event.allDay(), event.timeZone(), groupScheduleKey(event), event.title(), groupName, dueFrom, dueTo);
     }
 
     private void dispatchGeneralReminder(
@@ -99,6 +98,7 @@ public class CalendarNotificationEvaluationService {
             AccountNotificationSettings settings,
             Instant startAt,
             boolean allDay,
+            String timeZone,
             String scheduleKey,
             String title,
             String groupName,
@@ -108,24 +108,24 @@ public class CalendarNotificationEvaluationService {
         if (allDay) {
             Instant dueAt = startAt.atZone(POLICY_ZONE).toLocalDate()
                     .atTime(settings.getAllDayReminderTime()).atZone(POLICY_ZONE).toInstant();
-            dispatchIfDue(accountId, "ALL_DAY", scheduleKey, dueAt, startAt, title, groupName, dueFrom, dueTo);
+            dispatchIfDue(accountId, "ALL_DAY", scheduleKey, dueAt, startAt, null, title, groupName, dueFrom, dueTo);
             return;
         }
-        dispatchTimedReminder(accountId, "REMINDER", settings.getTimedReminderMinutes(), scheduleKey, startAt, title, groupName, dueFrom, dueTo);
+        dispatchTimedReminder(accountId, "REMINDER", settings.getTimedReminderMinutes(), scheduleKey, startAt, timeZone, title, groupName, dueFrom, dueTo);
     }
 
-    private void dispatchTimedReminder(Long accountId, String type, Integer minutes, String key, Instant startAt, String title, String groupName, Instant dueFrom, Instant dueTo) {
+    private void dispatchTimedReminder(Long accountId, String type, Integer minutes, String key, Instant startAt, String timeZone, String title, String groupName, Instant dueFrom, Instant dueTo) {
         if (minutes == null) {
             return;
         }
-        dispatchIfDue(accountId, type, key, startAt.minus(Duration.ofMinutes(minutes)), startAt, title, groupName, dueFrom, dueTo);
+        dispatchIfDue(accountId, type, key, startAt.minus(Duration.ofMinutes(minutes)), startAt, timeZone, title, groupName, dueFrom, dueTo);
     }
 
-    private void dispatchIfDue(Long accountId, String type, String key, Instant dueAt, Instant startAt, String title, String groupName, Instant dueFrom, Instant dueTo) {
+    private void dispatchIfDue(Long accountId, String type, String key, Instant dueAt, Instant startAt, String timeZone, String title, String groupName, Instant dueFrom, Instant dueTo) {
         if (dueAt.isBefore(dueFrom) || dueAt.isAfter(dueTo)) {
             return;
         }
-        LocalDate targetDate = startAt.atZone(POLICY_ZONE).toLocalDate();
+        LocalDate targetDate = startAt.atZone(timeZone == null ? POLICY_ZONE : ZoneId.of(timeZone)).toLocalDate();
         notificationDispatcher.dispatch(accountId, type, key, dueAt, targetDate, title, groupName);
     }
 
@@ -219,9 +219,6 @@ public class CalendarNotificationEvaluationService {
     }
 
     private List<GroupMember> listActiveMemberships(Long accountId) {
-        return groupMemberRepository.findByAccountIdAndStatusOrderByStatusChangedAtDescGroupSpaceIdDesc(
-                accountId,
-                GroupMemberStatus.ACTIVE
-        );
+        return groupMembershipQueryService.listActiveMemberships(accountId);
     }
 }

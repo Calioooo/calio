@@ -1,9 +1,9 @@
 package com.calio.calendar.notification.scheduler;
 
-import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.notification.domain.AccountNotificationSettings;
 import com.calio.calendar.notification.service.AccountNotificationSettingsService;
 import com.calio.calendar.notification.service.CalendarNotificationEvaluationService;
+import com.calio.calendar.account.service.AccountQueryService;
 import java.time.Instant;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -12,18 +12,18 @@ import org.springframework.stereotype.Component;
 @Component
 public class CalendarNotificationScheduler {
 
-    private final AccountRepository accountRepository;
+    private final AccountQueryService accountQueryService;
     private final AccountNotificationSettingsService settingsService;
     private final CalendarNotificationEvaluationService evaluationService;
     private final boolean schedulerEnabled;
 
     public CalendarNotificationScheduler(
-            AccountRepository accountRepository,
+            AccountQueryService accountQueryService,
             AccountNotificationSettingsService settingsService,
             CalendarNotificationEvaluationService evaluationService,
             @Value("${notifications.scheduler-enabled:false}") boolean schedulerEnabled
     ) {
-        this.accountRepository = accountRepository;
+        this.accountQueryService = accountQueryService;
         this.settingsService = settingsService;
         this.evaluationService = evaluationService;
         this.schedulerEnabled = schedulerEnabled;
@@ -36,7 +36,7 @@ public class CalendarNotificationScheduler {
         }
 
         Instant now = Instant.now();
-        accountRepository.findAll().forEach(account -> evaluateAccount(account.getId(), now));
+        accountQueryService.listAccounts().forEach(account -> evaluateAccount(account.getId(), now));
     }
 
     private void evaluateAccount(Long accountId, Instant now) {
