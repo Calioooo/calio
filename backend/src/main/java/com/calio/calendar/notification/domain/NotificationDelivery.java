@@ -11,11 +11,18 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 import java.time.LocalDate;
 
 @Entity
-@Table(name = "notification_deliveries")
+@Table(
+        name = "notification_deliveries",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_notification_deliveries_claim",
+                columnNames = {"account_id", "notification_type", "schedule_key", "scheduled_at"}
+        )
+)
 public class NotificationDelivery extends BaseEntity {
 
     @Id
