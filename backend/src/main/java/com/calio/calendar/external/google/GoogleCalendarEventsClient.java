@@ -163,6 +163,9 @@ public class GoogleCalendarEventsClient {
             String accessToken, String externalEventId, String expectedProviderEtag,
             GoogleRecurrenceMasterJobPayload payload
     ) {
+        if (payload == null) {
+            throw new CalioException(ErrorCode.GOOGLE_CALENDAR_REQUEST_INVALID);
+        }
         return patchWithEtag(accessToken, externalEventId, expectedProviderEtag,
                 GoogleCalendarEventWriteRequest.forRecurrenceUpdate(payload));
     }
@@ -205,6 +208,9 @@ public class GoogleCalendarEventsClient {
             String accessToken, String externalInstanceId, String expectedProviderEtag,
             GoogleRecurrenceOverrideJobPayload payload
     ) {
+        if (payload == null) {
+            throw new CalioException(ErrorCode.GOOGLE_CALENDAR_REQUEST_INVALID);
+        }
         return patchWithEtag(accessToken, externalInstanceId, expectedProviderEtag,
                 GoogleCalendarEventWriteRequest.forOverrideUpdate(payload));
     }

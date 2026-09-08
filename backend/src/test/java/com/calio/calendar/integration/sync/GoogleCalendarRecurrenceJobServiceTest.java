@@ -1,6 +1,7 @@
 package com.calio.calendar.integration.sync;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
@@ -9,6 +10,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.calio.calendar.common.error.CalioException;
+import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.external.google.GoogleCalendarEventsClient;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventResponse;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventTimeResponse;
@@ -291,6 +294,43 @@ class GoogleCalendarRecurrenceJobServiceTest {
         assertThat(master.isLocalChanged()).isTrue();
         verifyNoInteractions(tokens, client);
         verify(mappingCommands, never()).deleteRecurrenceAggregateMappings(any());
+    }
+
+    @Test
+    @DisplayName("null recurrence payload는 invalid request로 종료하고 provider 작업을 시작하지 않는다")
+    void givenNullRecurrencePayload_whenExecute_thenRejectsInvalidRequest() {
+        // given
+        GoogleCalendarRecurrenceJob job = job(GoogleCalendarRecurrenceJobKind.MASTER_UPDATE, null);
+        ReflectionTestUtils.setField(job, "targetPayload", "null");
+        GoogleCalendarRecurrenceJobService realMapperService = serviceWith(new ObjectMapper());
+
+        // when, then
+        assertThatThrownBy(() -> realMapperService.execute(job, "worker"))
+                .isInstanceOfSatisfying(CalioException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.GOOGLE_CALENDAR_REQUEST_INVALID));
+        verifyNoInteractions(mappings, tokens, client);
+    }
+
+    @Test
+    @DisplayName("recurrence가 누락된 master payload는 invalid request로 종료한다")
+    void givenMissingRecurrenceInMasterPayload_whenExecute_thenRejectsInvalidRequest() {
+        // given
+        GoogleCalendarRecurrenceJob job = job(GoogleCalendarRecurrenceJobKind.MASTER_UPDATE, null);
+        ReflectionTestUtils.setField(job, "targetPayload", "{\"title\":\"daily\"}");
+        GoogleCalendarRecurrenceJobService realMapperService = serviceWith(new ObjectMapper());
+
+        // when, then
+        assertThatThrownBy(() -> realMapperService.execute(job, "worker"))
+                .isInstanceOfSatisfying(CalioException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.GOOGLE_CALENDAR_REQUEST_INVALID));
+        verifyNoInteractions(mappings, tokens, client);
+    }
+
+    private GoogleCalendarRecurrenceJobService serviceWith(ObjectMapper mapper) {
+        return new GoogleCalendarRecurrenceJobService(connections, mappings, mappingCommands,
+                tokens, client, mapper, jobs, transaction);
     }
 
     private GoogleCalendarRecurrenceJob job(GoogleCalendarRecurrenceJobKind kind, Instant origin) {
