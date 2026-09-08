@@ -1,6 +1,5 @@
 package com.calio.calendar.notification.service;
 
-import com.calio.calendar.account.service.AccountQueryService;
 import com.calio.calendar.notification.apns.ApnsGateway;
 import com.calio.calendar.notification.apns.ApnsMessage;
 import com.calio.calendar.notification.apns.ApnsSendResult;
@@ -29,7 +28,7 @@ public class CalendarNotificationDispatcher {
     private final IosNotificationEndpointService endpointService;
     private final ApnsGateway apnsGateway;
     private final ObjectMapper objectMapper;
-    private final AccountQueryService accountQueryService;
+    private final NotificationDeliveryClaimService deliveryClaimService;
 
     public CalendarNotificationDispatcher(
             NotificationDeliveryRepository deliveryRepository,
@@ -37,14 +36,14 @@ public class CalendarNotificationDispatcher {
             IosNotificationEndpointService endpointService,
             ApnsGateway apnsGateway,
             ObjectMapper objectMapper,
-            AccountQueryService accountQueryService
+            NotificationDeliveryClaimService deliveryClaimService
     ) {
         this.deliveryRepository = deliveryRepository;
         this.endpointDeliveryRepository = endpointDeliveryRepository;
         this.endpointService = endpointService;
         this.apnsGateway = apnsGateway;
         this.objectMapper = objectMapper;
-        this.accountQueryService = accountQueryService;
+        this.deliveryClaimService = deliveryClaimService;
     }
 
     @Transactional
@@ -89,15 +88,15 @@ public class CalendarNotificationDispatcher {
             String groupName
     ) {
         try {
-            return deliveryRepository.saveAndFlush(new NotificationDelivery(
-                    accountQueryService.getAccount(accountId),
+            return deliveryClaimService.claim(
+                    accountId,
                     type,
                     key,
                     scheduledAt,
                     targetDate,
                     title,
                     groupName
-            ));
+            );
         } catch (DataIntegrityViolationException ignored) {
             return null;
         }
