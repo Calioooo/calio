@@ -6,7 +6,6 @@ import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceEventRequest;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
-import com.calio.calendar.recurrence.domain.RecurrenceOverrideIdentity;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
 import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
@@ -72,14 +71,15 @@ public class RecurrenceEventCommandService {
         }
     }
 
-    public void deleteRecurrenceOverridesByIdentities(
-            Collection<RecurrenceOverrideIdentity> identities
+    public void deleteRecurrenceOverridesByRecurrenceEventIdAndOriginStartAts(
+            Long recurrenceEventId,
+            Collection<Instant> originStartAts
     ) {
-        List<Long> ids = identities.stream()
-                .map(identity -> recurrenceEventOverrideRepository
-                        .findByRecurrenceEvent_IdAndOriginStartAt(
-                                identity.recurrenceId(), identity.originStartAt()).orElse(null))
-                .filter(java.util.Objects::nonNull)
+        if (originStartAts.isEmpty()) {
+            return;
+        }
+        List<Long> ids = recurrenceEventOverrideRepository
+                .findByRecurrenceEvent_IdAndOriginStartAtIn(recurrenceEventId, originStartAts).stream()
                 .map(RecurrenceEventOverride::getOverrideId)
                 .toList();
         deleteRecurrenceOverridesByIds(ids);

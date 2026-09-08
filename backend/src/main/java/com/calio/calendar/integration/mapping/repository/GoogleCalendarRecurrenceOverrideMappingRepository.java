@@ -40,7 +40,7 @@ public interface GoogleCalendarRecurrenceOverrideMappingRepository
             join overrideMapping.recurrenceEventMapping recurrenceEventMapping
             where recurrenceEventMapping.recurrenceEventId in :recurrenceEventIds
             """)
-    List<GoogleCalendarRecurrenceOverrideMapping> findAllForRecurrenceEventIds(
+    List<GoogleCalendarRecurrenceOverrideMapping> findAllWithRecurrenceEventMappingByRecurrenceEventIds(
             @Param("recurrenceEventIds") Collection<Long> recurrenceEventIds);
 
     @EntityGraph(attributePaths = "recurrenceEventMapping")

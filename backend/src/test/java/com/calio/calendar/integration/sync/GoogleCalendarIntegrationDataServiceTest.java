@@ -24,7 +24,6 @@ import com.calio.calendar.integration.sync.operation.GoogleOperationJobService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobQueryService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationLeaseService;
 import com.calio.calendar.recurrence.service.RecurrenceEventCommandService;
-import com.calio.calendar.recurrence.domain.RecurrenceOverrideIdentity;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
@@ -232,8 +231,12 @@ class GoogleCalendarIntegrationDataServiceTest {
                 .thenReturn(List.of(recurrenceOverrideMapping));
         when(recurrenceMappingQueryService.listOverrideMappingBatch(1L, 10L, 500))
                 .thenReturn(List.of());
-        when(recurrenceMappingQueryService.listMappedOverrideIdentities(List.of(40L)))
-                .thenReturn(List.of(new RecurrenceOverrideIdentity(40L, origin)));
+        GoogleCalendarRecurrenceOverrideMapping remainingOverrideMapping =
+                mock(GoogleCalendarRecurrenceOverrideMapping.class);
+        when(remainingOverrideMapping.getRecurrenceEventMapping()).thenReturn(recurrenceMapping);
+        when(remainingOverrideMapping.getOriginStartAt()).thenReturn(origin);
+        when(recurrenceMappingQueryService.listOverrideMappingsByRecurrenceEventIds(List.of(40L)))
+                .thenReturn(List.of(remainingOverrideMapping));
         when(eventMappingQueryService.listEventMappingBatch(1L, 0L, 500)).thenReturn(List.of());
         when(recurrenceMappingQueryService.listRecurrenceEventMappingBatch(1L, 0L, 500))
                 .thenReturn(List.of());
@@ -248,6 +251,7 @@ class GoogleCalendarIntegrationDataServiceTest {
                 Set.of(), Set.of(), Set.of(), "next-token");
 
         verify(recurrenceMappingCommandService).deleteOverrideMappingsWithIds(List.of(10L));
-        verify(recurrenceEventCommandService, never()).deleteRecurrenceOverridesByIdentities(any());
+        verify(recurrenceEventCommandService, never())
+                .deleteRecurrenceOverridesByRecurrenceEventIdAndOriginStartAts(any(), any());
     }
 }

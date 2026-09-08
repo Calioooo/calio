@@ -16,12 +16,14 @@ import com.calio.calendar.integration.sync.operation.GoogleOperationJobQueryServ
 import com.calio.calendar.integration.sync.operation.GoogleOperationLeaseService;
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEffectiveScope;
 import com.calio.calendar.integration.sync.page.GoogleCalendarRecurrenceChangeService;
-import com.calio.calendar.recurrence.service.RecurrenceEventCommandService;
-import com.calio.calendar.recurrence.domain.RecurrenceOverrideIdentity;
 import com.calio.calendar.integration.sync.page.dto.GoogleCalendarRecurrenceOverrideExternalKey;
+import com.calio.calendar.recurrence.service.RecurrenceEventCommandService;
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -179,28 +181,12 @@ public class GoogleCalendarIntegrationDataService {
                         ))).filter(mapping -> canDeleteUnseen(mapping, ownership))
                 .toList();
         if (!unseenMappings.isEmpty()) {
-            List<RecurrenceOverrideIdentity> unseenOverrideIdentities = unseenMappings.stream()
-                    .map(mapping -> new RecurrenceOverrideIdentity(
-                            mapping.getRecurrenceEventMapping().getRecurrenceEventId(),
-                            mapping.getOriginStartAt()))
-                    .distinct()
-                    .toList();
+            Map<Long, Set<Instant>> originStartAtsByRecurrenceEventId =
+                    originStartAtsByRecurrenceEventId(unseenMappings);
             recurrenceMappingCommandService.deleteOverrideMappingsWithIds(unseenMappings.stream()
                     .map(GoogleCalendarRecurrenceOverrideMapping::getId)
                     .toList());
-            Set<RecurrenceOverrideIdentity> remainingOverrideIdentities = new HashSet<>(
-                    recurrenceMappingQueryService.listMappedOverrideIdentities(
-                            unseenOverrideIdentities.stream()
-                                    .map(RecurrenceOverrideIdentity::recurrenceId)
-                                    .distinct()
-                                    .toList()));
-            List<RecurrenceOverrideIdentity> unmappedOverrideIdentities = unseenOverrideIdentities.stream()
-                    .filter(identity -> !remainingOverrideIdentities.contains(identity))
-                    .toList();
-            if (!unmappedOverrideIdentities.isEmpty()) {
-                recurrenceEventCommandService.deleteRecurrenceOverridesByIdentities(
-                        unmappedOverrideIdentities);
-            }
+            deleteUnmappedRecurrenceOverrides(originStartAtsByRecurrenceEventId);
         }
         return mappings.getLast().getId();
     }
@@ -409,12 +395,40 @@ public class GoogleCalendarIntegrationDataService {
         if (mappings.isEmpty()) {
             return;
         }
-        recurrenceEventCommandService.deleteRecurrenceOverridesByIdentities(mappings.stream()
-                .map(mapping -> new RecurrenceOverrideIdentity(
-                        mapping.getRecurrenceEventMapping().getRecurrenceEventId(),
-                        mapping.getOriginStartAt()))
-                .toList());
+        Map<Long, Set<Instant>> originStartAtsByRecurrenceEventId =
+                originStartAtsByRecurrenceEventId(mappings);
         recurrenceMappingCommandService.deleteOverrideMappings(mappings);
+        deleteUnmappedRecurrenceOverrides(originStartAtsByRecurrenceEventId);
+    }
+
+    private Map<Long, Set<Instant>> originStartAtsByRecurrenceEventId(
+            List<GoogleCalendarRecurrenceOverrideMapping> mappings
+    ) {
+        return mappings.stream().collect(Collectors.groupingBy(
+                mapping -> mapping.getRecurrenceEventMapping().getRecurrenceEventId(),
+                Collectors.mapping(GoogleCalendarRecurrenceOverrideMapping::getOriginStartAt, Collectors.toSet())
+        ));
+    }
+
+    private void deleteUnmappedRecurrenceOverrides(
+            Map<Long, Set<Instant>> originStartAtsByRecurrenceEventId
+    ) {
+        Map<Long, Set<Instant>> remainingOriginStartAtsByRecurrenceEventId =
+                originStartAtsByRecurrenceEventId(
+                        recurrenceMappingQueryService.listOverrideMappingsByRecurrenceEventIds(
+                                List.copyOf(originStartAtsByRecurrenceEventId.keySet())));
+        originStartAtsByRecurrenceEventId.forEach((recurrenceEventId, originStartAts) -> {
+            Set<Instant> remainingOriginStartAts = remainingOriginStartAtsByRecurrenceEventId
+                    .getOrDefault(recurrenceEventId, Set.of());
+            List<Instant> unmappedOriginStartAts = originStartAts.stream()
+                    .filter(originStartAt -> !remainingOriginStartAts.contains(originStartAt))
+                    .toList();
+            if (!unmappedOriginStartAts.isEmpty()) {
+                recurrenceEventCommandService
+                        .deleteRecurrenceOverridesByRecurrenceEventIdAndOriginStartAts(
+                                recurrenceEventId, unmappedOriginStartAts);
+            }
+        });
     }
 
     private void deleteEventMappings(List<GoogleCalendarEventMapping> mappings) {

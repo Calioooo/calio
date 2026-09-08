@@ -3,6 +3,7 @@ package com.calio.calendar.recurrence.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 import com.calio.calendar.common.domain.CanonicalSchedule;
@@ -147,6 +148,26 @@ class RecurrenceEventCommandServiceTest {
         // then
         verify(recurrenceEventOverrideRepository).saveAndFlush(override);
         assertThat(override.isDeleted()).isTrue();
+    }
+
+    @Test
+    @DisplayName("반복 일정과 original start 시각으로 override를 조회해 삭제한다")
+    void givenRecurrenceEventAndOriginStartAts_whenDeleteOverrides_thenDeletesMatchedOverrides() {
+        // given
+        Instant originStartAt = Instant.parse("2027-01-01T00:00:00Z");
+        RecurrenceEventOverride override = mock(RecurrenceEventOverride.class);
+        when(recurrenceEventOverrideRepository.findByRecurrenceEvent_IdAndOriginStartAtIn(
+                10L, List.of(originStartAt))).thenReturn(List.of(override));
+        when(override.getOverrideId()).thenReturn(20L);
+
+        // when
+        recurrenceEventCommandService.deleteRecurrenceOverridesByRecurrenceEventIdAndOriginStartAts(
+                10L, List.of(originStartAt));
+
+        // then
+        verify(recurrenceEventOverrideRepository)
+                .findByRecurrenceEvent_IdAndOriginStartAtIn(10L, List.of(originStartAt));
+        verify(recurrenceEventOverrideRepository).deleteAllByIds(List.of(20L));
     }
 
     private RecurrenceEvent recurrenceEvent() {
