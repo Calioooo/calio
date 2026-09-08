@@ -2,7 +2,7 @@ CREATE TABLE ios_notification_endpoints (
     id BIGINT NOT NULL AUTO_INCREMENT,
     account_id BIGINT NOT NULL,
     installation_id VARCHAR(128) NOT NULL,
-    apns_token VARCHAR(512) NOT NULL,
+    apns_token VARCHAR(512),
     authorization_status VARCHAR(32) NOT NULL,
     active BOOLEAN NOT NULL,
     environment VARCHAR(32) NOT NULL,
