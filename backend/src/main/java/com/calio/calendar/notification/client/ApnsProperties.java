@@ -1,4 +1,4 @@
-package com.calio.calendar.notification.apns;
+package com.calio.calendar.notification.client;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 

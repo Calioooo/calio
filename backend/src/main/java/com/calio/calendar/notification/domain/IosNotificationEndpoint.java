@@ -30,7 +30,7 @@ public class IosNotificationEndpoint extends BaseEntity {
     @Column(name = "installation_id", nullable = false)
     private String installationId;
 
-    @Column(name = "apns_token", nullable = false)
+    @Column(name = "apns_token")
     private String apnsToken;
 
     @Enumerated(EnumType.STRING)

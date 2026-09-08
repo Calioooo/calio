@@ -1,10 +1,9 @@
 package com.calio.calendar.notification.service;
 
 import com.calio.calendar.account.service.AccountQueryService;
-import com.calio.calendar.notification.apns.ApnsProperties;
+import com.calio.calendar.notification.client.ApnsProperties;
 import com.calio.calendar.notification.domain.IosNotificationAuthorizationStatus;
 import com.calio.calendar.notification.domain.IosNotificationEndpoint;
-import com.calio.calendar.notification.repository.IosNotificationEndpointRepository;
 import java.time.Instant;
 import java.util.List;
 import org.springframework.stereotype.Service;
@@ -14,18 +13,21 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class IosNotificationEndpointService {
 
-    private final IosNotificationEndpointRepository endpointRepository;
     private final AccountQueryService accountQueryService;
     private final ApnsProperties apnsProperties;
+    private final IosNotificationEndpointQueryService endpointQueryService;
+    private final IosNotificationEndpointCommandService endpointCommandService;
 
     public IosNotificationEndpointService(
-            IosNotificationEndpointRepository endpointRepository,
             AccountQueryService accountQueryService,
-            ApnsProperties apnsProperties
+            ApnsProperties apnsProperties,
+            IosNotificationEndpointQueryService endpointQueryService,
+            IosNotificationEndpointCommandService endpointCommandService
     ) {
-        this.endpointRepository = endpointRepository;
         this.accountQueryService = accountQueryService;
         this.apnsProperties = apnsProperties;
+        this.endpointQueryService = endpointQueryService;
+        this.endpointCommandService = endpointCommandService;
     }
 
     public void register(
@@ -36,8 +38,8 @@ public class IosNotificationEndpointService {
     ) {
         deactivateEndpointOwnedByAnotherInstallation(accountId, installationId, apnsToken);
 
-        IosNotificationEndpoint endpoint = endpointRepository
-                .findByAccount_IdAndInstallationId(accountId, installationId)
+        IosNotificationEndpoint endpoint = endpointQueryService
+                .getEndpointIfExists(accountId, installationId)
                 .orElseGet(() -> new IosNotificationEndpoint(
                         accountQueryService.getAccount(accountId),
                         installationId,
@@ -46,20 +48,19 @@ public class IosNotificationEndpointService {
                         apnsProperties.environment()
                 ));
         endpoint.refresh(apnsToken, authorizationStatus, apnsProperties.environment());
-        endpointRepository.save(endpoint);
+        if (endpoint.getId() == null) {
+            endpointCommandService.create(endpoint);
+        }
     }
 
     public void deactivate(Long accountId, String installationId) {
-        endpointRepository.findByAccount_IdAndInstallationId(accountId, installationId)
+        endpointQueryService.getEndpointIfExists(accountId, installationId)
                 .ifPresent(endpoint -> endpoint.deactivate(Instant.now()));
     }
 
     @Transactional(readOnly = true)
     public List<IosNotificationEndpoint> listEligibleEndpoints(Long accountId) {
-        return endpointRepository.findByAccount_IdAndActiveTrueAndAuthorizationStatus(
-                accountId,
-                IosNotificationAuthorizationStatus.AUTHORIZED
-        );
+        return endpointQueryService.listEligibleEndpoints(accountId);
     }
 
     public void deactivateInvalidEndpoint(IosNotificationEndpoint endpoint) {
@@ -71,14 +72,13 @@ public class IosNotificationEndpointService {
             String installationId,
             String apnsToken
     ) {
-        endpointRepository.findByApnsToken(apnsToken)
+        endpointQueryService.getEndpointWithTokenIfExists(apnsToken)
                 .filter(endpoint -> !isSameInstallation(endpoint, accountId, installationId))
                 .ifPresent(endpoint -> deactivateAndClearToken(endpoint, Instant.now()));
     }
 
     private void deactivateAndClearToken(IosNotificationEndpoint endpoint, Instant now) {
-        endpoint.deactivate(now);
-        endpoint.clearApnsToken();
+        endpointCommandService.deactivateAndReleaseToken(endpoint, now);
     }
 
     private boolean isSameInstallation(
@@ -86,7 +86,7 @@ public class IosNotificationEndpointService {
             Long accountId,
             String installationId
     ) {
-        return endpointRepository.findByAccount_IdAndInstallationId(accountId, installationId)
+        return endpointQueryService.getEndpointIfExists(accountId, installationId)
                 .map(currentEndpoint -> currentEndpoint.getId().equals(endpoint.getId()))
                 .orElse(false);
     }
