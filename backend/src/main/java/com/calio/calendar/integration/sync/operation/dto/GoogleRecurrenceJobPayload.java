@@ -1,6 +1,6 @@
 package com.calio.calendar.integration.sync.operation.dto;
 
-import com.calio.calendar.recurrence.controller.dto.RecurrenceEventResponse;
+import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import java.time.Instant;
 import java.util.List;
 
@@ -17,10 +17,11 @@ public record GoogleRecurrenceJobPayload(
         recurrence = List.copyOf(recurrence);
     }
 
-    public static GoogleRecurrenceJobPayload from(RecurrenceEventResponse response) {
+    public static GoogleRecurrenceJobPayload from(RecurrenceEvent recurrenceEvent) {
         return new GoogleRecurrenceJobPayload(
-                response.title(), response.description(), response.firstOccurrenceStartAt(),
-                response.firstOccurrenceEndAt(), response.allDay(), response.timeZone(),
-                response.recurrence());
+                recurrenceEvent.getTitle(), recurrenceEvent.getDescription(),
+                recurrenceEvent.getFirstOccurrenceStartAt(), recurrenceEvent.getFirstOccurrenceEndAt(),
+                recurrenceEvent.isAllDay(), recurrenceEvent.getTimeZone(),
+                recurrenceEvent.getRecurrenceRules());
     }
 }

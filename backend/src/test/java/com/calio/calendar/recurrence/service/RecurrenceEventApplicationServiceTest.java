@@ -13,6 +13,8 @@ import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarRecurr
 import com.calio.calendar.recurrence.controller.dto.CreateRecurrenceEventRequest;
 import com.calio.calendar.recurrence.controller.dto.RecurrenceEventResponse;
 import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceOccurrenceRequest;
+import com.calio.calendar.recurrence.domain.RecurrenceEvent;
+import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -21,9 +23,11 @@ import org.mockito.InOrder;
 
 class RecurrenceEventApplicationServiceTest {
     private final RecurrenceEventService recurrenceService = mock();
+    private final RecurrenceEventQueryService recurrenceEventQueryService = mock();
     private final GoogleOperationJobEnqueueService enqueueService = mock();
     private final RecurrenceEventApplicationService service =
-            new RecurrenceEventApplicationService(recurrenceService, enqueueService);
+            new RecurrenceEventApplicationService(
+                    recurrenceService, recurrenceEventQueryService, enqueueService);
 
     @Test
     @DisplayName("master canonical create 뒤 같은 application transaction 경계에서 narrow Job을 enqueue한다")
@@ -33,13 +37,15 @@ class RecurrenceEventApplicationServiceTest {
                 Instant.parse("2026-09-04T01:00:00Z"), "UTC",
                 List.of("RRULE:FREQ=DAILY"), null);
         RecurrenceEventResponse response = mock();
+        RecurrenceEvent recurrenceEvent = mock();
         when(response.recurrenceId()).thenReturn(40L);
-        when(response.title()).thenReturn("daily");
-        when(response.firstOccurrenceStartAt()).thenReturn(request.firstOccurrenceStartAt());
-        when(response.firstOccurrenceEndAt()).thenReturn(request.firstOccurrenceEndAt());
-        when(response.timeZone()).thenReturn("UTC");
-        when(response.recurrence()).thenReturn(request.recurrence());
+        when(recurrenceEvent.getTitle()).thenReturn("daily");
+        when(recurrenceEvent.getFirstOccurrenceStartAt()).thenReturn(request.firstOccurrenceStartAt());
+        when(recurrenceEvent.getFirstOccurrenceEndAt()).thenReturn(request.firstOccurrenceEndAt());
+        when(recurrenceEvent.getTimeZone()).thenReturn("UTC");
+        when(recurrenceEvent.getRecurrenceRules()).thenReturn(request.recurrence());
         when(recurrenceService.createRecurrenceEvent(10L, request)).thenReturn(response);
+        when(recurrenceEventQueryService.getRecurrenceEvent(10L, 40L)).thenReturn(recurrenceEvent);
 
         service.createRecurrenceEvent(10L, request);
 
@@ -58,11 +64,18 @@ class RecurrenceEventApplicationServiceTest {
                 origin, "moved", null, Instant.parse("2026-09-04T02:00:00Z"),
                 Instant.parse("2026-09-04T03:00:00Z"), false, "UTC");
         EventResponse response = mock();
+        RecurrenceEventOverride recurrenceOverride = mock();
         when(response.title()).thenReturn("moved");
         when(response.startAt()).thenReturn(request.startAt());
         when(response.endAt()).thenReturn(request.endAt());
         when(response.timeZone()).thenReturn("UTC");
         when(recurrenceService.updateRecurrenceOccurrence(10L, 40L, request)).thenReturn(response);
+        when(recurrenceOverride.getOverrideTitle()).thenReturn("moved");
+        when(recurrenceOverride.getOverrideStartAt()).thenReturn(request.startAt());
+        when(recurrenceOverride.getOverrideEndAt()).thenReturn(request.endAt());
+        when(recurrenceOverride.getOverrideTimeZone()).thenReturn("UTC");
+        when(recurrenceEventQueryService.getOverrideIfExists(40L, origin))
+                .thenReturn(java.util.Optional.of(recurrenceOverride));
 
         service.updateRecurrenceOccurrence(10L, 40L, request);
 

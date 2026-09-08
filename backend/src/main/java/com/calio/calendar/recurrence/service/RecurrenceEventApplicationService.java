@@ -18,13 +18,16 @@ import org.springframework.transaction.annotation.Transactional;
 public class RecurrenceEventApplicationService {
 
     private final RecurrenceEventService recurrenceService;
+    private final RecurrenceEventQueryService recurrenceEventQueryService;
     private final GoogleOperationJobEnqueueService jobEnqueueService;
 
     public RecurrenceEventApplicationService(
             RecurrenceEventService recurrenceService,
+            RecurrenceEventQueryService recurrenceEventQueryService,
             GoogleOperationJobEnqueueService jobEnqueueService
     ) {
         this.recurrenceService = recurrenceService;
+        this.recurrenceEventQueryService = recurrenceEventQueryService;
         this.jobEnqueueService = jobEnqueueService;
     }
 
@@ -33,7 +36,8 @@ public class RecurrenceEventApplicationService {
         RecurrenceEventResponse response = recurrenceService.createRecurrenceEvent(accountId, request);
         jobEnqueueService.enqueueRecurrenceMaster(accountId, response.recurrenceId(),
                 GoogleCalendarRecurrenceJobKind.MASTER_CREATE,
-                GoogleRecurrenceMasterJobPayload.from(response));
+                GoogleRecurrenceMasterJobPayload.from(recurrenceEventQueryService.getRecurrenceEvent(
+                        accountId, response.recurrenceId())));
         return response;
     }
 
@@ -48,7 +52,8 @@ public class RecurrenceEventApplicationService {
         RecurrenceEventResponse response = recurrenceService.updateRecurrenceEvent(accountId, recurrenceId, request);
         jobEnqueueService.enqueueRecurrenceMaster(accountId, recurrenceId,
                 GoogleCalendarRecurrenceJobKind.MASTER_UPDATE,
-                GoogleRecurrenceMasterJobPayload.from(response));
+                GoogleRecurrenceMasterJobPayload.from(recurrenceEventQueryService.getRecurrenceEvent(
+                        accountId, recurrenceId)));
         return response;
     }
 
@@ -58,7 +63,9 @@ public class RecurrenceEventApplicationService {
     ) {
         EventResponse response = recurrenceService.updateRecurrenceOccurrence(accountId, recurrenceId, request);
         jobEnqueueService.enqueueRecurrenceOverride(accountId, recurrenceId, request.originStartAt(),
-                GoogleRecurrenceOverrideJobPayload.from(response));
+                GoogleRecurrenceOverrideJobPayload.from(recurrenceEventQueryService
+                        .getOverrideIfExists(recurrenceId, request.originStartAt())
+                        .orElseThrow()));
         return response;
     }
 
