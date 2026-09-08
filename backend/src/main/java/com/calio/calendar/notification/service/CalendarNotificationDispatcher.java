@@ -7,8 +7,6 @@ import com.calio.calendar.notification.client.ApnsSendResult;
 import com.calio.calendar.notification.client.ApnsSendResultType;
 import com.calio.calendar.notification.domain.IosNotificationEndpoint;
 import com.calio.calendar.notification.domain.NotificationDelivery;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -17,6 +15,8 @@ import java.util.Map;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 
 @Service
 public class CalendarNotificationDispatcher {
@@ -119,7 +119,7 @@ public class CalendarNotificationDispatcher {
                     "aps", Map.of("alert", alert(delivery), "sound", "default"),
                     "calio", metadata(delivery)
             ));
-        } catch (JsonProcessingException exception) {
+        } catch (JacksonException exception) {
             throw new IllegalStateException("Cannot serialize APNs payload.", exception);
         }
     }
