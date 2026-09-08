@@ -73,6 +73,7 @@ class GoogleOperationJobServiceIntegrationTest {
             assertThat(recurrence.getKind()).isEqualTo(GoogleCalendarRecurrenceJobKind.OVERRIDE_UPSERT);
             assertThat(recurrence.getRecurrenceEventId()).isEqualTo(40L);
             assertThat(recurrence.getOriginStartAt()).isEqualTo(origin);
+            assertThat(recurrence.getTargetPayload()).isEqualTo("{\"title\":\"moved\"}");
         });
     }
 

@@ -1,11 +1,14 @@
 package com.calio.calendar.integration.sync.operation.domain;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.DiscriminatorValue;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import java.time.Instant;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @DiscriminatorValue("EVENT")
@@ -21,6 +24,8 @@ public class GoogleCalendarEventJob extends GoogleOperationJob {
     @Column(name = "provider_identity", updatable = false, length = 1024)
     private String providerIdentity;
 
+    @Convert(converter = JsonPayloadConverter.class)
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "target_payload", updatable = false, columnDefinition = "JSON")
     private String targetPayload;
 
