@@ -173,8 +173,8 @@ class GoogleCalendarIntegrationDataServiceTest {
     }
 
     @Test
-    @DisplayName("다른 connection mapping이 남아 있으면 FULL SYNC cleanup은 recurrence aggregate를 삭제하지 않는다")
-    void givenUnseenRecurrenceMappingWithAnotherConnectionMapping_whenFinalizeFullSync_thenKeepsAggregate() {
+    @DisplayName("같은 recurrence event를 참조하는 mapping이 남아 있으면 FULL SYNC cleanup은 recurrence aggregate를 삭제하지 않는다")
+    void givenUnseenRecurrenceMappingWithRemainingRecurrenceReference_whenFinalizeFullSync_thenKeepsAggregate() {
         GoogleCalendarConnection connection = mock(GoogleCalendarConnection.class);
         GoogleCalendarIntegration integration = mock(GoogleCalendarIntegration.class);
         when(recurrenceMapping.getId()).thenReturn(10L);
