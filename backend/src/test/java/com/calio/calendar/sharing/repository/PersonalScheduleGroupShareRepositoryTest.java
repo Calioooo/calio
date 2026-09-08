@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.calio.calendar.account.domain.Account;
+import com.calio.calendar.common.testsupport.SharedIntegrationDatabase;
 import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.event.repository.EventRepository;
@@ -36,12 +37,13 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @SpringBootTest(properties = {
-        "spring.datasource.url=jdbc:h2:mem:personal-schedule-group-share-repository-test;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE",
+        "spring.datasource.url=jdbc:h2:mem:calendar-shared-integration-test;MODE=MySQL;DB_CLOSE_ON_EXIT=FALSE",
         "spring.datasource.driver-class-name=org.h2.Driver",
         "spring.datasource.username=sa",
         "spring.datasource.password=",
         "spring.jpa.hibernate.ddl-auto=create-drop"
 })
+@SharedIntegrationDatabase
 class PersonalScheduleGroupShareRepositoryTest {
 
     private static final Instant START_AT = Instant.parse("2026-08-01T09:00:00Z");

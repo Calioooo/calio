@@ -6,6 +6,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.calio.calendar.common.testsupport.SharedIntegrationDatabase;
+import com.calio.calendar.event.repository.EventRepository;
+import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.tag.repository.TagRepository;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.domain.TagType;
@@ -21,7 +24,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest(properties = {
-        "spring.datasource.url=jdbc:h2:mem:calendar-tag-test;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE",
+        "spring.datasource.url=jdbc:h2:mem:calendar-shared-auth-controller-test;MODE=MySQL;DB_CLOSE_ON_EXIT=FALSE",
         "spring.datasource.driver-class-name=org.h2.Driver",
         "spring.datasource.username=sa",
         "spring.datasource.password=",
@@ -30,6 +33,7 @@ import org.springframework.test.web.servlet.MockMvc;
 @AutoConfigureMockMvc
 @WithAuthenticatedAccount
 @Import(AuthenticatedAccountMockMvcTestConfig.class)
+@SharedIntegrationDatabase
 class TagControllerTest {
 
     @Autowired
@@ -38,8 +42,16 @@ class TagControllerTest {
     @Autowired
     private TagRepository tagRepository;
 
+    @Autowired
+    private EventRepository eventRepository;
+
+    @Autowired
+    private RecurrenceEventRepository recurrenceEventRepository;
+
     @BeforeEach
     void setUp() {
+        eventRepository.deleteAll();
+        recurrenceEventRepository.deleteAll();
         tagRepository.deleteAll();
     }
 
