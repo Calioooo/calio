@@ -206,7 +206,6 @@ public class GoogleCalendarRecurrenceJobService {
     ) {
         Map<Long, GoogleCalendarRecurrenceEventMapping> current = currentMasters(job);
         Outcome outcome = applyMasterResults(results, current);
-        if (finishConflict(job, workerToken, outcome)) return;
         if (created != null && creationTarget != null && current.values().stream().noneMatch(mapping ->
                 mapping.getConnection().getId().equals(creationTarget))) {
             connectionQueryService.listConnections(job.getIntegrationId()).stream()
@@ -215,6 +214,7 @@ public class GoogleCalendarRecurrenceJobService {
                             new GoogleCalendarRecurrenceEventMapping(connection,
                                     job.getRecurrenceEventId(), created.id(), created.etag())));
         }
+        if (finishConflict(job, workerToken, outcome)) return;
         jobService.succeed(job.getId(), job.getAccountId(), workerToken);
     }
 

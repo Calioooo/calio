@@ -127,6 +127,45 @@ class GoogleCalendarRecurrenceJobServiceTest {
     }
 
     @Test
+    @DisplayName("master CREATE 후 기존 mapping이 충돌해도 생성한 provider master mapping을 보존한다")
+    void givenConflictAfterMasterCreate_whenComplete_thenPreservesCreatedProviderMapping() {
+        // given
+        GoogleCalendarConnection existingConnection = connection(30L);
+        GoogleCalendarConnection creationConnection = connection(31L);
+        GoogleCalendarRecurrenceEventMapping loadedMaster = master(existingConnection);
+        GoogleCalendarRecurrenceEventMapping currentMaster =
+                new GoogleCalendarRecurrenceEventMapping(
+                        existingConnection, 40L, "master-1", "concurrently-changed-etag");
+        ReflectionTestUtils.setField(currentMaster, "id", 60L);
+        when(mappings.listRecurrenceEventMappingsForJob(20L, 40L))
+                .thenReturn(List.of(loadedMaster), List.of(currentMaster));
+        when(connections.listConnections(20L))
+                .thenReturn(List.of(existingConnection, creationConnection));
+        when(tokens.getAccessToken(30L)).thenReturn("existing-token");
+        when(tokens.getAccessToken(31L)).thenReturn("creation-token");
+        when(objectMapper.readValue("payload", GoogleRecurrenceMasterJobPayload.class))
+                .thenReturn(masterPayload());
+        when(client.getEvent("existing-token", "master-1"))
+                .thenReturn(Optional.of(provider("master-1", "master-etag", null)));
+        when(client.patchRecurrenceEvent(
+                "existing-token", "master-1", "master-etag", masterPayload()))
+                .thenReturn(provider("master-1", "updated-etag", null));
+        when(client.insertRecurrenceEvent("creation-token", "provider-id", masterPayload()))
+                .thenReturn(provider("created-master", "created-etag", null));
+
+        // when
+        service.execute(job(GoogleCalendarRecurrenceJobKind.MASTER_CREATE, null), "worker");
+
+        // then
+        ArgumentCaptor<GoogleCalendarRecurrenceEventMapping> captor =
+                ArgumentCaptor.forClass(GoogleCalendarRecurrenceEventMapping.class);
+        verify(mappingCommands).createRecurrenceEventMapping(captor.capture());
+        assertThat(captor.getValue().getConnection()).isSameAs(creationConnection);
+        assertThat(captor.getValue().getExternalEventId()).isEqualTo("created-master");
+        verify(jobs).recordSyncConflict(50L, 10L, "worker");
+    }
+
+    @Test
     @DisplayName("master etag가 바뀌면 aggregate conflict로 격리하고 patch하지 않는다")
     void changedMasterEtagConflictsAggregate() {
         GoogleCalendarConnection connection = connection(30L);
