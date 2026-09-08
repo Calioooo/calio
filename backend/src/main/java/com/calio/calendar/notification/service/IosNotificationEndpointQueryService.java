@@ -23,7 +23,7 @@ public class IosNotificationEndpointQueryService {
     }
 
     public Optional<IosNotificationEndpoint> getEndpointWithTokenIfExists(String apnsToken) {
-        return endpointRepository.findByApnsToken(apnsToken);
+        return endpointRepository.lockEndpointWithToken(apnsToken);
     }
 
     public List<IosNotificationEndpoint> listEligibleEndpoints(Long accountId) {
