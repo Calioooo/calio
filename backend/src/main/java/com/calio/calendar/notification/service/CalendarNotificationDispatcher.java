@@ -1,13 +1,12 @@
 package com.calio.calendar.notification.service;
 
-import com.calio.calendar.notification.apns.ApnsGateway;
-import com.calio.calendar.notification.apns.ApnsMessage;
-import com.calio.calendar.notification.apns.ApnsSendResult;
-import com.calio.calendar.notification.apns.ApnsSendResultType;
+import com.calio.calendar.account.service.AccountQueryService;
+import com.calio.calendar.notification.client.ApnsGateway;
+import com.calio.calendar.notification.client.ApnsMessage;
+import com.calio.calendar.notification.client.ApnsSendResult;
+import com.calio.calendar.notification.client.ApnsSendResultType;
 import com.calio.calendar.notification.domain.IosNotificationEndpoint;
 import com.calio.calendar.notification.domain.NotificationDelivery;
-import com.calio.calendar.notification.domain.NotificationEndpointDelivery;
-import com.calio.calendar.notification.repository.NotificationEndpointDeliveryRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Duration;
@@ -23,26 +22,29 @@ import org.springframework.transaction.annotation.Transactional;
 public class CalendarNotificationDispatcher {
 
     private final NotificationDeliveryQueryService deliveryQueryService;
-    private final NotificationEndpointDeliveryRepository endpointDeliveryRepository;
+    private final NotificationDeliveryCommandService deliveryCommandService;
+    private final NotificationEndpointDeliveryCommandService endpointDeliveryCommandService;
+    private final AccountQueryService accountQueryService;
     private final IosNotificationEndpointService endpointService;
     private final ApnsGateway apnsGateway;
     private final ObjectMapper objectMapper;
-    private final NotificationDeliveryClaimService deliveryClaimService;
 
     public CalendarNotificationDispatcher(
             NotificationDeliveryQueryService deliveryQueryService,
-            NotificationEndpointDeliveryRepository endpointDeliveryRepository,
+            NotificationDeliveryCommandService deliveryCommandService,
+            NotificationEndpointDeliveryCommandService endpointDeliveryCommandService,
+            AccountQueryService accountQueryService,
             IosNotificationEndpointService endpointService,
             ApnsGateway apnsGateway,
-            ObjectMapper objectMapper,
-            NotificationDeliveryClaimService deliveryClaimService
+            ObjectMapper objectMapper
     ) {
         this.deliveryQueryService = deliveryQueryService;
-        this.endpointDeliveryRepository = endpointDeliveryRepository;
+        this.deliveryCommandService = deliveryCommandService;
+        this.endpointDeliveryCommandService = endpointDeliveryCommandService;
+        this.accountQueryService = accountQueryService;
         this.endpointService = endpointService;
         this.apnsGateway = apnsGateway;
         this.objectMapper = objectMapper;
-        this.deliveryClaimService = deliveryClaimService;
     }
 
     @Transactional
@@ -85,8 +87,8 @@ public class CalendarNotificationDispatcher {
             String groupName
     ) {
         try {
-            return deliveryClaimService.claim(
-                    accountId,
+            return deliveryCommandService.create(
+                    accountQueryService.getAccount(accountId),
                     type,
                     key,
                     scheduledAt,
@@ -105,9 +107,7 @@ public class CalendarNotificationDispatcher {
                 payload(delivery),
                 delivery.getScheduledAt().plus(Duration.ofMinutes(5))
         ));
-        endpointDeliveryRepository.save(new NotificationEndpointDelivery(
-                delivery, endpoint, result.type().name(), result.requestId(), result.reason()
-        ));
+        endpointDeliveryCommandService.create(delivery, endpoint, result);
         if (result.type() == ApnsSendResultType.INVALID_ENDPOINT) {
             endpointService.deactivateInvalidEndpoint(endpoint);
         }
