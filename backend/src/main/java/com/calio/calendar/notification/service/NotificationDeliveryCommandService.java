@@ -1,6 +1,6 @@
 package com.calio.calendar.notification.service;
 
-import com.calio.calendar.account.service.AccountQueryService;
+import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.notification.domain.NotificationDelivery;
 import com.calio.calendar.notification.repository.NotificationDeliveryRepository;
 import java.time.Instant;
@@ -10,22 +10,17 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-public class NotificationDeliveryClaimService {
+public class NotificationDeliveryCommandService {
 
     private final NotificationDeliveryRepository deliveryRepository;
-    private final AccountQueryService accountQueryService;
 
-    public NotificationDeliveryClaimService(
-            NotificationDeliveryRepository deliveryRepository,
-            AccountQueryService accountQueryService
-    ) {
+    public NotificationDeliveryCommandService(NotificationDeliveryRepository deliveryRepository) {
         this.deliveryRepository = deliveryRepository;
-        this.accountQueryService = accountQueryService;
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public NotificationDelivery claim(
-            Long accountId,
+    public NotificationDelivery create(
+            Account account,
             String type,
             String key,
             Instant scheduledAt,
@@ -34,7 +29,7 @@ public class NotificationDeliveryClaimService {
             String groupName
     ) {
         return deliveryRepository.saveAndFlush(new NotificationDelivery(
-                accountQueryService.getAccount(accountId),
+                account,
                 type,
                 key,
                 scheduledAt,

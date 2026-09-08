@@ -8,12 +8,12 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.calio.calendar.account.domain.Account;
-import com.calio.calendar.notification.apns.ApnsGateway;
-import com.calio.calendar.notification.apns.ApnsSendResult;
-import com.calio.calendar.notification.apns.ApnsSendResultType;
+import com.calio.calendar.account.service.AccountQueryService;
+import com.calio.calendar.notification.client.ApnsGateway;
+import com.calio.calendar.notification.client.ApnsSendResult;
+import com.calio.calendar.notification.client.ApnsSendResultType;
 import com.calio.calendar.notification.domain.IosNotificationEndpoint;
 import com.calio.calendar.notification.domain.NotificationDelivery;
-import com.calio.calendar.notification.repository.NotificationEndpointDeliveryRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -32,16 +32,19 @@ class CalendarNotificationDispatcherTest {
     private NotificationDeliveryQueryService deliveryQueryService;
 
     @Mock
-    private NotificationEndpointDeliveryRepository endpointDeliveryRepository;
+    private NotificationDeliveryCommandService deliveryCommandService;
+
+    @Mock
+    private NotificationEndpointDeliveryCommandService endpointDeliveryCommandService;
+
+    @Mock
+    private AccountQueryService accountQueryService;
 
     @Mock
     private IosNotificationEndpointService endpointService;
 
     @Mock
     private ApnsGateway apnsGateway;
-
-    @Mock
-    private NotificationDeliveryClaimService deliveryClaimService;
 
     @Mock
     private IosNotificationEndpoint iphoneEndpoint;
@@ -55,11 +58,12 @@ class CalendarNotificationDispatcherTest {
     void setUp() {
         dispatcher = new CalendarNotificationDispatcher(
                 deliveryQueryService,
-                endpointDeliveryRepository,
+                deliveryCommandService,
+                endpointDeliveryCommandService,
+                accountQueryService,
                 endpointService,
                 apnsGateway,
-                new ObjectMapper(),
-                deliveryClaimService
+                new ObjectMapper()
         );
     }
 
@@ -71,8 +75,9 @@ class CalendarNotificationDispatcherTest {
         NotificationDelivery delivery = delivery(scheduledAt);
         when(deliveryQueryService.hasDeliveryClaim(1L, "REMINDER", "personal:1", scheduledAt))
                 .thenReturn(false);
-        when(deliveryClaimService.claim(
-                eq(1L),
+        when(accountQueryService.getAccount(1L)).thenReturn(new Account());
+        when(deliveryCommandService.create(
+                any(Account.class),
                 eq("REMINDER"),
                 eq("personal:1"),
                 eq(scheduledAt),
@@ -102,7 +107,7 @@ class CalendarNotificationDispatcherTest {
 
         // then
         verify(apnsGateway, times(2)).send(any());
-        verify(endpointDeliveryRepository, times(2)).save(any());
+        verify(endpointDeliveryCommandService, times(2)).create(any(), any(), any());
     }
 
     @Test
@@ -125,7 +130,7 @@ class CalendarNotificationDispatcherTest {
         );
 
         // then
-        verify(deliveryClaimService, never()).claim(any(), any(), any(), any(), any(), any(), any());
+        verify(deliveryCommandService, never()).create(any(), any(), any(), any(), any(), any(), any());
         verify(apnsGateway, never()).send(any());
     }
 
