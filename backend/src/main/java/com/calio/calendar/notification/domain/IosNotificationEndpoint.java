@@ -88,4 +88,8 @@ public class IosNotificationEndpoint extends BaseEntity {
     public String getApnsToken() {
         return apnsToken;
     }
+
+    public boolean isEligible() {
+        return active && authorizationStatus == IosNotificationAuthorizationStatus.AUTHORIZED;
+    }
 }
