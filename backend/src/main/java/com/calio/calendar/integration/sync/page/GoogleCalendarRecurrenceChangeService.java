@@ -115,7 +115,7 @@ public class GoogleCalendarRecurrenceChangeService {
             recordSyncConflict(mapping, ownership);
             return;
         }
-        recurrenceEvent(mapping).updateProviderContent(
+        recurrenceEventQueryService.getRecurrenceEvent(mapping.getRecurrenceEventId()).updateProviderContent(
                 item.title(), item.description(), schedule, item.recurrenceRules());
         mapping.updateProviderEtag(item.providerEtag());
     }
@@ -249,7 +249,7 @@ public class GoogleCalendarRecurrenceChangeService {
             return existingOverride.recurrenceEventOverride();
         }
         RecurrenceEventOverride recurrenceEventOverride = createRecurrenceEventOverride(
-                recurrenceEvent(recurrenceEventMapping),
+                recurrenceEventQueryService.getRecurrenceEvent(recurrenceEventMapping.getRecurrenceEventId()),
                 item
         );
         recurrenceEventCommandService.createOrUpdateRecurrenceOverride(recurrenceEventOverride);
@@ -411,10 +411,6 @@ public class GoogleCalendarRecurrenceChangeService {
                 mapping.getConnection().getAccountId(),
                 ownership.workerToken()
         );
-    }
-
-    private RecurrenceEvent recurrenceEvent(GoogleCalendarRecurrenceEventMapping mapping) {
-        return recurrenceEventQueryService.getRecurrenceEvent(mapping.getRecurrenceEventId());
     }
 
     private RecurrenceEventOverride recurrenceOverride(
