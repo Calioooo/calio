@@ -11,6 +11,10 @@ import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEventJ
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobTrigger;
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEffectiveScope;
 import com.calio.calendar.integration.sync.operation.dto.GoogleEventJobPayload;
+import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarRecurrenceJob;
+import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarRecurrenceJobKind;
+import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceMasterJobPayload;
+import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceOverrideJobPayload;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
@@ -121,6 +125,60 @@ public class GoogleOperationJobEnqueueService {
         return true;
     }
 
+    @Transactional
+    public boolean enqueueRecurrenceMaster(
+            Long accountId, Long recurrenceEventId, GoogleCalendarRecurrenceJobKind kind,
+            GoogleRecurrenceMasterJobPayload payload
+    ) {
+        return enqueueRecurrenceJob(accountId, recurrenceEventId, kind, null,
+                serializePayload(payload));
+    }
+
+    @Transactional
+    public boolean enqueueRecurrenceMasterDeleted(Long accountId, Long recurrenceEventId) {
+        return enqueueRecurrenceJob(accountId, recurrenceEventId,
+                GoogleCalendarRecurrenceJobKind.MASTER_DELETE, null, "{}");
+    }
+
+    @Transactional
+    public boolean enqueueRecurrenceOverride(
+            Long accountId, Long recurrenceEventId, Instant originStartAt,
+            GoogleRecurrenceOverrideJobPayload payload
+    ) {
+        return enqueueRecurrenceJob(accountId, recurrenceEventId,
+                GoogleCalendarRecurrenceJobKind.OVERRIDE_UPSERT, originStartAt,
+                serializePayload(payload));
+    }
+
+    @Transactional
+    public boolean enqueueRecurrenceOverrideDeleted(
+            Long accountId, Long recurrenceEventId, Instant originStartAt
+    ) {
+        return enqueueRecurrenceJob(accountId, recurrenceEventId,
+                GoogleCalendarRecurrenceJobKind.OVERRIDE_DELETE, originStartAt, "{}");
+    }
+
+    private boolean enqueueRecurrenceJob(
+            Long accountId, Long recurrenceEventId, GoogleCalendarRecurrenceJobKind kind,
+            Instant originStartAt, String targetPayload
+    ) {
+        var integration = integrationCommandService.tryLockIntegration(accountId).orElse(null);
+        if (integration == null) {
+            return false;
+        }
+        String operationId = UUID.randomUUID().toString();
+        GoogleCalendarRecurrenceJob job = GoogleCalendarRecurrenceJob.create(
+                operationId, integration.getId(), accountId,
+                integration.allocateGoogleOperationSequence(), kind, recurrenceEventId,
+                originStartAt, targetPayload,
+                kind == GoogleCalendarRecurrenceJobKind.MASTER_CREATE
+                        ? "c1" + operationId.replace("-", "") : null,
+                Instant.now(clock));
+        jobCommandService.enqueueOperationJob(job);
+        wakeAfterCommit(accountId);
+        return true;
+    }
+
     private String providerIdentity(GoogleCalendarEventJobKind kind, String operationId) {
         if (kind != GoogleCalendarEventJobKind.CREATE) {
             return null;
@@ -133,6 +191,14 @@ public class GoogleOperationJobEnqueueService {
             return objectMapper.writeValueAsString(payload);
         } catch (JacksonException exception) {
             throw new IllegalArgumentException("Google Event job payload cannot be encoded", exception);
+        }
+    }
+
+    private String serializePayload(Object payload) {
+        try {
+            return objectMapper.writeValueAsString(payload);
+        } catch (JacksonException exception) {
+            throw new IllegalArgumentException("Google recurrence job payload cannot be encoded", exception);
         }
     }
 

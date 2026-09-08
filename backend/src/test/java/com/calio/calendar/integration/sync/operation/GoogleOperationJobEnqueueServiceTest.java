@@ -13,6 +13,10 @@ import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrati
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJob;
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEventJob;
 import com.calio.calendar.integration.sync.operation.dto.GoogleEventJobPayload;
+import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarRecurrenceJob;
+import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarRecurrenceJobKind;
+import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceMasterJobPayload;
+import java.util.List;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -70,5 +74,71 @@ class GoogleOperationJobEnqueueServiceTest {
         GoogleCalendarEventJob job = (GoogleCalendarEventJob) jobCaptor.getValue();
         assertThat(job.getProviderIdentity())
                 .isEqualTo("c1" + job.getOperationId().replace("-", ""));
+    }
+
+    @Test
+    @DisplayName("recurrence master CREATE Job은 Connection 없이 narrow snapshot과 재시도 identity를 저장한다")
+    void recurrenceMasterCreateStoresConnectionIndependentNarrowPayload() {
+        GoogleCalendarIntegration integration = mock();
+        GoogleRecurrenceMasterJobPayload payload = new GoogleRecurrenceMasterJobPayload(
+                "daily", null, Instant.parse("2026-09-04T00:00:00Z"),
+                Instant.parse("2026-09-04T01:00:00Z"), false, "UTC",
+                List.of("RRULE:FREQ=DAILY"));
+        when(integration.getId()).thenReturn(20L);
+        when(integration.allocateGoogleOperationSequence()).thenReturn(1L);
+        when(integrationCommandService.tryLockIntegration(10L)).thenReturn(Optional.of(integration));
+        when(objectMapper.writeValueAsString(payload)).thenReturn("master-payload");
+        TransactionSynchronizationManager.initSynchronization();
+
+        boolean enqueued = service.enqueueRecurrenceMaster(10L, 40L,
+                GoogleCalendarRecurrenceJobKind.MASTER_CREATE, payload);
+
+        ArgumentCaptor<GoogleOperationJob> captor = ArgumentCaptor.forClass(GoogleOperationJob.class);
+        verify(jobCommandService).enqueueOperationJob(captor.capture());
+        GoogleCalendarRecurrenceJob job = (GoogleCalendarRecurrenceJob) captor.getValue();
+        assertThat(enqueued).isTrue();
+        assertThat(job.getRecurrenceEventId()).isEqualTo(40L);
+        assertThat(job.getOriginStartAt()).isNull();
+        assertThat(job.getTargetPayload()).isEqualTo("master-payload");
+        assertThat(job.getProviderIdentity()).isEqualTo("c1" + job.getOperationId().replace("-", ""));
+        org.mockito.Mockito.verifyNoInteractions(connectionCommandService);
+    }
+
+    @Test
+    @DisplayName("Google Integration이 없으면 recurrence mutation Job을 만들지 않는다")
+    void absentIntegrationLeavesRecurrenceMutationLocalOnly() {
+        when(integrationCommandService.tryLockIntegration(10L)).thenReturn(Optional.empty());
+        TransactionSynchronizationManager.initSynchronization();
+
+        boolean enqueued = service.enqueueRecurrenceOverrideDeleted(
+                10L, 40L, Instant.parse("2026-09-04T00:00:00Z"));
+
+        assertThat(enqueued).isFalse();
+        org.mockito.Mockito.verifyNoInteractions(jobCommandService, worker);
+    }
+
+    @Test
+    @DisplayName("override Job은 parent recurrence ID와 exact origin만 identity로 저장한다")
+    void overrideJobStoresExactOriginWithoutConnectionOrProviderIdentity() {
+        GoogleCalendarIntegration integration = mock();
+        Instant origin = Instant.parse("2026-09-04T00:00:00Z");
+        var payload = new com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceOverrideJobPayload(
+                "moved", null, Instant.parse("2026-09-04T02:00:00Z"),
+                Instant.parse("2026-09-04T03:00:00Z"), false, "UTC");
+        when(integration.getId()).thenReturn(20L);
+        when(integration.allocateGoogleOperationSequence()).thenReturn(1L);
+        when(integrationCommandService.tryLockIntegration(10L)).thenReturn(Optional.of(integration));
+        when(objectMapper.writeValueAsString(payload)).thenReturn("override-payload");
+        TransactionSynchronizationManager.initSynchronization();
+
+        service.enqueueRecurrenceOverride(10L, 40L, origin, payload);
+
+        ArgumentCaptor<GoogleOperationJob> captor = ArgumentCaptor.forClass(GoogleOperationJob.class);
+        verify(jobCommandService).enqueueOperationJob(captor.capture());
+        GoogleCalendarRecurrenceJob job = (GoogleCalendarRecurrenceJob) captor.getValue();
+        assertThat(job.getRecurrenceEventId()).isEqualTo(40L);
+        assertThat(job.getOriginStartAt()).isEqualTo(origin);
+        assertThat(job.getTargetPayload()).isEqualTo("override-payload");
+        assertThat(job.getProviderIdentity()).isNull();
     }
 }
