@@ -33,6 +33,11 @@ public class RecurrenceEventQueryService {
                 .orElseThrow(() -> new CalioException(ErrorCode.RECURRENCE_EVENT_NOT_FOUND));
     }
 
+    public RecurrenceEvent getRecurrenceEvent(Long recurrenceId) {
+        return recurrenceEventRepository.findById(recurrenceId)
+                .orElseThrow(() -> new CalioException(ErrorCode.RECURRENCE_EVENT_NOT_FOUND));
+    }
+
     public Optional<RecurrenceEventOverride> getOverrideIfExists(Long recurrenceId, Instant originStartAt) {
         return recurrenceEventOverrideRepository
                 .findByRecurrenceEvent_IdAndOriginStartAt(recurrenceId, originStartAt);

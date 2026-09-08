@@ -6,6 +6,8 @@ import com.calio.calendar.integration.mapping.repository.GoogleCalendarRecurrenc
 import com.calio.calendar.integration.mapping.repository.GoogleCalendarRecurrenceOverrideMappingRepository;
 import java.util.Collection;
 import java.util.List;
+import java.time.Instant;
+import java.util.Optional;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,6 +37,26 @@ public class GoogleCalendarRecurrenceMappingQueryService {
                 calendarKey,
                 externalEventIds
         );
+    }
+
+    public List<GoogleCalendarRecurrenceEventMapping> listRecurrenceEventMappingsForJob(
+            Long integrationId, Long recurrenceEventId
+    ) {
+        return recurrenceMappingRepository.findAllForJob(integrationId, recurrenceEventId);
+    }
+
+    public Optional<GoogleCalendarRecurrenceEventMapping> getRecurrenceEventMappingIfExists(
+            Long connectionId, Long recurrenceEventId
+    ) {
+        return recurrenceMappingRepository.findByConnection_IdAndRecurrenceEventId(
+                connectionId, recurrenceEventId);
+    }
+
+    public Optional<GoogleCalendarRecurrenceOverrideMapping> getOverrideMappingIfExists(
+            Long recurrenceEventMappingId, Instant originStartAt
+    ) {
+        return overrideMappingRepository.findByRecurrenceEventMapping_IdAndOriginStartAt(
+                recurrenceEventMappingId, originStartAt);
     }
 
     public List<GoogleCalendarRecurrenceEventMapping> listRecurrenceEventMappings(

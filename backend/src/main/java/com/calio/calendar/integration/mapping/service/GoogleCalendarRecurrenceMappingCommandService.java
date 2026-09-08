@@ -57,4 +57,10 @@ public class GoogleCalendarRecurrenceMappingCommandService {
     public void deleteOverrideMappingsForRecurrenceMappings(Collection<Long> mappingIds) {
         overrideMappingRepository.deleteAllByRecurrenceEventMappingIds(mappingIds);
     }
+
+    public void deleteRecurrenceAggregateMappings(GoogleCalendarRecurrenceEventMapping mapping) {
+        overrideMappingRepository.deleteAllByRecurrenceEventMappingIds(List.of(mapping.getId()));
+        recurrenceMappingRepository.delete(mapping);
+        recurrenceMappingRepository.flush();
+    }
 }

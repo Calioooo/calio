@@ -30,7 +30,10 @@ public interface GoogleCalendarRecurrenceOverrideMappingRepository
             @Param("externalEventIds") Collection<String> externalEventIds
     );
 
-    @EntityGraph(attributePaths = {"recurrenceEventMapping", "recurrenceEventOverride"})
+    Optional<GoogleCalendarRecurrenceOverrideMapping>
+    findByRecurrenceEventMapping_IdAndOriginStartAt(Long recurrenceEventMappingId, java.time.Instant originStartAt);
+
+    @EntityGraph(attributePaths = "recurrenceEventMapping")
     @Query("""
             select overrideMapping
             from GoogleCalendarRecurrenceOverrideMapping overrideMapping
@@ -42,7 +45,7 @@ public interface GoogleCalendarRecurrenceOverrideMappingRepository
             @Param("recurrenceEventMappingIds") Collection<Long> recurrenceEventMappingIds
     );
 
-    @EntityGraph(attributePaths = {"recurrenceEventMapping", "recurrenceEventOverride"})
+    @EntityGraph(attributePaths = "recurrenceEventMapping")
     @Query("""
             select overrideMapping
             from GoogleCalendarRecurrenceOverrideMapping overrideMapping
@@ -54,7 +57,7 @@ public interface GoogleCalendarRecurrenceOverrideMappingRepository
             @Param("connectionId") Long connectionId
     );
 
-    @EntityGraph(attributePaths = {"recurrenceEventMapping", "recurrenceEventOverride"})
+    @EntityGraph(attributePaths = "recurrenceEventMapping")
     @Query("""
             select mapping
             from GoogleCalendarRecurrenceOverrideMapping mapping

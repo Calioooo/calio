@@ -14,7 +14,19 @@ import org.springframework.data.repository.query.Param;
 public interface GoogleCalendarRecurrenceEventMappingRepository
         extends JpaRepository<GoogleCalendarRecurrenceEventMapping, Long> {
 
-    Optional<GoogleCalendarRecurrenceEventMapping> findByRecurrenceEvent_Id(Long recurrenceEventId);
+    Optional<GoogleCalendarRecurrenceEventMapping> findByConnection_IdAndRecurrenceEventId(
+            Long connectionId, Long recurrenceEventId);
+
+    @Query("""
+            select mapping from GoogleCalendarRecurrenceEventMapping mapping
+            join fetch mapping.connection connection
+            join fetch connection.integration integration
+            where integration.id = :integrationId
+              and mapping.recurrenceEventId = :recurrenceEventId
+            """)
+    List<GoogleCalendarRecurrenceEventMapping> findAllForJob(
+            @Param("integrationId") Long integrationId,
+            @Param("recurrenceEventId") Long recurrenceEventId);
 
     Optional<GoogleCalendarRecurrenceEventMapping>
     findByConnection_IdAndCalendarKeyAndExternalEventId(
@@ -23,7 +35,7 @@ public interface GoogleCalendarRecurrenceEventMappingRepository
             String externalEventId
     );
 
-    @EntityGraph(attributePaths = {"recurrenceEvent", "recurrenceEvent.tag"})
+    @EntityGraph(attributePaths = "connection")
     @Query("""
             select mapping
             from GoogleCalendarRecurrenceEventMapping mapping
@@ -37,7 +49,7 @@ public interface GoogleCalendarRecurrenceEventMappingRepository
             @Param("externalEventIds") Collection<String> externalEventIds
     );
 
-    @EntityGraph(attributePaths = "recurrenceEvent")
+    @EntityGraph(attributePaths = "connection")
     @Query("""
             select mapping
             from GoogleCalendarRecurrenceEventMapping mapping
@@ -47,7 +59,7 @@ public interface GoogleCalendarRecurrenceEventMappingRepository
             @Param("connectionId") Long connectionId
     );
 
-    @EntityGraph(attributePaths = "recurrenceEvent")
+    @EntityGraph(attributePaths = "connection")
     @Query("""
             select mapping
             from GoogleCalendarRecurrenceEventMapping mapping

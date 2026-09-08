@@ -249,7 +249,7 @@ class GoogleCalendarPageChangeServiceTest {
         GoogleCalendarRecurrenceEventMapping existingMapping = recurrenceEventMappingRepository.findAll()
                 .getFirst();
         Long existingMappingId = existingMapping.getId();
-        Long existingRecurrenceEventId = existingMapping.getRecurrenceEvent().getId();
+        Long existingRecurrenceEventId = existingMapping.getRecurrenceEventId();
         when(operationJobQueryService.hasPendingOutboundJob(any(), any(), any())).thenReturn(true);
 
         // when
@@ -282,8 +282,9 @@ class GoogleCalendarPageChangeServiceTest {
                     assertThat(mapping.isConflicted()).isTrue();
                     assertThat(mapping.getId()).isEqualTo(existingMappingId);
                     assertThat(mapping.getExternalEventId()).isEqualTo(externalEventId);
-                    assertThat(mapping.getRecurrenceEvent().getId()).isEqualTo(existingRecurrenceEventId);
-                    assertThat(mapping.getRecurrenceEvent().getTitle()).isEqualTo("Recurring event");
+                    assertThat(mapping.getRecurrenceEventId()).isEqualTo(existingRecurrenceEventId);
+                    assertThat(recurrenceEventRepository.findById(mapping.getRecurrenceEventId()))
+                            .get().extracting(event -> event.getTitle()).isEqualTo("Recurring event");
                     assertThat(mapping.getProviderEtag()).isEqualTo("etag-recurrence");
                 });
         assertThat(eventRepository.count()).isZero();

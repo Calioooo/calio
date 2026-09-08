@@ -71,6 +71,19 @@ public class RecurrenceEventCommandService {
         }
     }
 
+    public void deleteRecurrenceOverridesByIdentities(
+            Collection<com.calio.calendar.recurrence.domain.RecurrenceOverrideIdentity> identities
+    ) {
+        List<Long> ids = identities.stream()
+                .map(identity -> recurrenceEventOverrideRepository
+                        .findByRecurrenceEvent_IdAndOriginStartAt(
+                                identity.recurrenceId(), identity.originStartAt()).orElse(null))
+                .filter(java.util.Objects::nonNull)
+                .map(RecurrenceEventOverride::getOverrideId)
+                .toList();
+        deleteRecurrenceOverridesByIds(ids);
+    }
+
     public RecurrenceEventOverride createOrUpdateRecurrenceOverride(RecurrenceEventOverride override) {
         return recurrenceEventOverrideRepository.saveAndFlush(override);
     }
