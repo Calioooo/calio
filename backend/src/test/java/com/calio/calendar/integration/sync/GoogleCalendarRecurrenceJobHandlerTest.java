@@ -323,15 +323,15 @@ class GoogleCalendarRecurrenceJobHandlerTest {
         handler.execute(job(GoogleCalendarRecurrenceJobKind.RECURRENCE_DELETE, null), "worker");
 
         verify(mappingCommands).deleteRecurrenceAggregateMappings(recurrenceEventMapping);
-        verify(mappingCommands).markInactiveRecurrenceEventMappingsLocalChanged(20L, 40L);
+        verify(mappingCommands).markInactiveRecurrenceEventMappingsDeletePending(20L, 40L);
     }
 
     @Test
-    @DisplayName("CONNECTED recurrence-event가 없는 DELETE는 inactive identity만 localChanged로 남긴다")
+    @DisplayName("CONNECTED recurrence-event가 없는 DELETE는 inactive identity를 삭제 대기로 남긴다")
     void deleteWithoutConnectedRecurrenceEventRetainsInactiveIdentity() {
         handler.execute(job(GoogleCalendarRecurrenceJobKind.RECURRENCE_DELETE, null), "worker");
 
-        verify(mappingCommands).markInactiveRecurrenceEventMappingsLocalChanged(20L, 40L);
+        verify(mappingCommands).markInactiveRecurrenceEventMappingsDeletePending(20L, 40L);
         verify(mappingCommands, never()).deleteRecurrenceAggregateMappings(any());
         verifyNoInteractions(tokens, client);
     }

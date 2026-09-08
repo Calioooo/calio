@@ -77,6 +77,21 @@ public class GoogleCalendarRecurrenceMappingCommandService {
                 .forEach(GoogleCalendarRecurrenceEventMapping::markLocalChanged);
     }
 
+    public void markInactiveRecurrenceEventMappingsDeletePending(
+            Long integrationId,
+            Long recurrenceEventId
+    ) {
+        recurrenceMappingRepository
+                .findAllInactiveAndUnchangedByIntegrationIdAndRecurrenceEventId(
+                        integrationId,
+                        recurrenceEventId
+                )
+                .forEach(mapping -> {
+                    mapping.markLocalChanged();
+                    mapping.markProviderDeletePending();
+                });
+    }
+
     public void markInactiveOverrideMappingsLocalChanged(
             Long integrationId,
             Long recurrenceEventId,
