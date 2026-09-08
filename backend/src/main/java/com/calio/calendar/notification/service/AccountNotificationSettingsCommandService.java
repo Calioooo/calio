@@ -1,12 +1,13 @@
 package com.calio.calendar.notification.service;
 
+import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.notification.domain.AccountNotificationSettings;
 import com.calio.calendar.notification.repository.AccountNotificationSettingsRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@Transactional
 public class AccountNotificationSettingsCommandService {
 
     private final AccountNotificationSettingsRepository settingsRepository;
@@ -15,7 +16,8 @@ public class AccountNotificationSettingsCommandService {
         this.settingsRepository = settingsRepository;
     }
 
-    public AccountNotificationSettings create(AccountNotificationSettings settings) {
-        return settingsRepository.save(settings);
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public AccountNotificationSettings createDefaultSettings(Account account) {
+        return settingsRepository.saveAndFlush(new AccountNotificationSettings(account));
     }
 }

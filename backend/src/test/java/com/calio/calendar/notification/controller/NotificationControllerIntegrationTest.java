@@ -60,6 +60,26 @@ class NotificationControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("지원되는 알림 정책을 수정하면 후속 조회에서 canonical 설정을 반환한다")
+    void givenSupportedSettingsUpdate_whenGetSettings_thenReturnsUpdatedPolicy() throws Exception {
+        mockMvc.perform(put("/api/notification-settings")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(settingsRequest(30, 60)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.timedReminderMinutes").value(30))
+                .andExpect(jsonPath("$.importantReminderMinutes").value(60));
+
+        mockMvc.perform(get("/api/notification-settings"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.calendarNotificationsEnabled").value(true))
+                .andExpect(jsonPath("$.timedReminderMinutes").value(30))
+                .andExpect(jsonPath("$.importantReminderMinutes").value(60))
+                .andExpect(jsonPath("$.allDayReminderTime").value("09:00:00"))
+                .andExpect(jsonPath("$.dailyBriefingEnabled").value(false))
+                .andExpect(jsonPath("$.dailyBriefingTime").value("08:00:00"));
+    }
+
+    @Test
     @DisplayName("iOS endpoint 등록 후 로그아웃 비활성화하면 이후 발송 대상에서 제외된다")
     void givenRegisteredEndpoint_whenDeactivate_thenRemovesEligibleEndpoint() throws Exception {
         mockMvc.perform(put("/api/notification-endpoints/ios")
