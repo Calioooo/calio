@@ -1,6 +1,7 @@
 package com.calio.calendar.integration.mapping.repository;
 
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarRecurrenceOverrideMapping;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -31,7 +32,7 @@ public interface GoogleCalendarRecurrenceOverrideMappingRepository
     );
 
     Optional<GoogleCalendarRecurrenceOverrideMapping>
-    findByRecurrenceEventMapping_IdAndOriginStartAt(Long recurrenceEventMappingId, java.time.Instant originStartAt);
+    findByRecurrenceEventMapping_IdAndOriginStartAt(Long recurrenceEventMappingId, Instant originStartAt);
 
     @EntityGraph(attributePaths = "recurrenceEventMapping")
     @Query("""
