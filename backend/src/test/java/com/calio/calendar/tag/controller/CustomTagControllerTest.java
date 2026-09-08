@@ -11,6 +11,7 @@ import static com.calio.calendar.security.TestAccountSupport.currentAccountRefer
 
 import com.calio.calendar.event.repository.EventRepository;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
+import com.calio.calendar.common.testsupport.SharedIntegrationDatabase;
 import com.calio.calendar.tag.repository.TagRepository;
 import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
@@ -35,7 +36,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 @SpringBootTest(properties = {
-        "spring.datasource.url=jdbc:h2:mem:calendar-custom-tag-test;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE",
+        "spring.datasource.url=jdbc:h2:mem:calendar-shared-auth-controller-test;MODE=MySQL;DB_CLOSE_ON_EXIT=FALSE",
         "spring.datasource.driver-class-name=org.h2.Driver",
         "spring.datasource.username=sa",
         "spring.datasource.password=",
@@ -44,6 +45,7 @@ import org.springframework.test.web.servlet.MvcResult;
 @AutoConfigureMockMvc
 @WithAuthenticatedAccount
 @Import(AuthenticatedAccountMockMvcTestConfig.class)
+@SharedIntegrationDatabase
 class CustomTagControllerTest {
 
     @Autowired

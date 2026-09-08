@@ -3,6 +3,7 @@ package com.calio.calendar.recurrence.repository;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.calio.calendar.account.domain.Account;
+import com.calio.calendar.common.testsupport.SharedIntegrationDatabase;
 import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
@@ -18,12 +19,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest(properties = {
-        "spring.datasource.url=jdbc:h2:mem:calendar-recurrence-repository-test;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE",
+        "spring.datasource.url=jdbc:h2:mem:calendar-shared-integration-test;MODE=MySQL;DB_CLOSE_ON_EXIT=FALSE",
         "spring.datasource.driver-class-name=org.h2.Driver",
         "spring.datasource.username=sa",
         "spring.datasource.password=",
         "spring.jpa.hibernate.ddl-auto=create-drop"
 })
+@SharedIntegrationDatabase
 class RecurrenceEventRepositoryTest {
 
     @Autowired
