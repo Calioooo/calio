@@ -27,12 +27,12 @@ public record GoogleCalendarNormalizedPage(
 
     public record EventUpsert(
             String externalEventId,
-            String googleEtag,
-            Instant googleUpdatedAt,
+            String providerEtag,
             String title,
             String description,
             NormalizedEventSchedule schedule
     ) implements NormalizedItem {
+
     }
 
     public record EventCancellation(String externalEventId) implements NormalizedItem {
@@ -40,8 +40,7 @@ public record GoogleCalendarNormalizedPage(
 
     public record RecurrenceEventUpsert(
             String externalEventId,
-            String googleEtag,
-            Instant googleUpdatedAt,
+            String providerEtag,
             String title,
             String description,
             NormalizedEventSchedule schedule,
@@ -51,6 +50,7 @@ public record GoogleCalendarNormalizedPage(
         public RecurrenceEventUpsert {
             recurrenceRules = List.copyOf(recurrenceRules);
         }
+
     }
 
     public record RecurrenceEventCancellation(String externalEventId)
@@ -65,29 +65,29 @@ public record GoogleCalendarNormalizedPage(
 
         Instant originStartAt();
 
-        String googleEtag();
+        String providerEtag();
 
-        Instant googleUpdatedAt();
     }
 
     public record ActiveRecurrenceEventOverrideUpsert(
             String externalEventId,
             String recurrenceEventExternalId,
             Instant originStartAt,
-            String googleEtag,
-            Instant googleUpdatedAt,
+            String providerEtag,
             String title,
             String description,
             NormalizedEventSchedule schedule
     ) implements RecurrenceEventOverrideUpsert {
+
     }
 
     public record CancelledRecurrenceEventOverrideUpsert(
             String externalEventId,
             String recurrenceEventExternalId,
             Instant originStartAt,
-            String googleEtag,
-            Instant googleUpdatedAt
+            String providerEtag,
+            Instant deletedAt
     ) implements RecurrenceEventOverrideUpsert {
+
     }
 }

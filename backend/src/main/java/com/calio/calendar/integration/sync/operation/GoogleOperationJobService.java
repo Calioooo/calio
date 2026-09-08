@@ -99,6 +99,30 @@ public class GoogleOperationJobService {
                 accountId, jobId);
     }
 
+    @Transactional
+    public void completeSyncRun(Long jobId, Long accountId, String workerToken) {
+        try {
+            jobCommandService.completeSyncOperationJob(jobId, workerToken);
+        } catch (GoogleOperationOwnershipLostException exception) {
+            log.warn("Google sync final transition rejected. accountId={} jobId={}", accountId, jobId);
+            throw exception;
+        }
+        log.info("Google sync run completed. accountId={} jobId={}", accountId, jobId);
+    }
+
+    @Transactional
+    public void recordSyncConflict(Long jobId, Long accountId, String workerToken) {
+        jobCommandService.markConflictDetected(jobId, workerToken);
+        log.info("Google sync conflict detected. accountId={} jobId={}", accountId, jobId);
+    }
+
+    @Transactional
+    public void skipConflictedScope(Long jobId, Long accountId, String workerToken) {
+        jobCommandService.skipConflictedScope(jobId, workerToken);
+        log.info("Google operation skipped because mapping scope is conflicted. accountId={} jobId={}",
+                accountId, jobId);
+    }
+
     @Transactional(readOnly = true)
     public List<Long> findRecoverableAccountIds() {
         return jobQueryService.listRecoverableAccountIds(

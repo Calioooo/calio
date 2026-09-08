@@ -150,7 +150,7 @@ class GoogleCalendarConnectionTest {
         );
         GoogleCalendarRecurrenceEventMapping parentMapping =
                 recurrenceMappingRepository.saveAndFlush(new GoogleCalendarRecurrenceEventMapping(
-                        integration, providerRecurrence, "master-1", null, null
+                        integration, providerRecurrence, "master-1", "a".repeat(64)
                 ));
         RecurrenceEventOverride providerOverride = overrideRepository.saveAndFlush(
                 RecurrenceEventOverride.deleted(
@@ -160,7 +160,7 @@ class GoogleCalendarConnectionTest {
                 )
         );
         overrideMappingRepository.saveAndFlush(new GoogleCalendarRecurrenceOverrideMapping(
-                parentMapping, providerOverride, "exception-1", null, null
+                parentMapping, providerOverride, "exception-1", "a".repeat(64)
         ));
         RecurrenceEvent localRecurrence = recurrenceEventRepository.saveAndFlush(
                 recurrenceEvent(account, defaultTag, "Local")
@@ -233,8 +233,7 @@ class GoogleCalendarConnectionTest {
                 integration,
                 event,
                 externalEventId,
-                null,
-                null
+                "a".repeat(64)
         ));
         return event;
     }

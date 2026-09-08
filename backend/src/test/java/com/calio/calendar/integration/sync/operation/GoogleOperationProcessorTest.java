@@ -1,6 +1,7 @@
 package com.calio.calendar.integration.sync.operation;
 
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
@@ -12,6 +13,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.calio.calendar.integration.sync.GoogleCalendarSyncService;
+import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEffectiveScopeType;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJob;
 import com.calio.calendar.integration.sync.operation.dto.GoogleOperationFailureDecision;
 import org.junit.jupiter.api.BeforeEach;
@@ -174,6 +176,10 @@ class GoogleOperationProcessorTest {
         when(job.getId()).thenReturn(jobId);
         when(job.getAccountId()).thenReturn(accountId);
         when(job.getKind()).thenReturn(kind);
+        when(job.getIntegrationId()).thenReturn(20L);
+        when(job.getEffectiveResourceScope()).thenReturn(
+                GoogleCalendarEffectiveScopeType.EVENT.getStoredValue());
+        when(job.getEffectiveResourceKey()).thenReturn("1");
         return job;
     }
 }
