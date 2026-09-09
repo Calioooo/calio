@@ -35,9 +35,6 @@ class CalendarNotificationDispatcherTest {
     private NotificationDeliveryCommandService deliveryCommandService;
 
     @Mock
-    private NotificationEndpointDeliveryCommandService endpointDeliveryCommandService;
-
-    @Mock
     private AccountQueryService accountQueryService;
 
     @Mock
@@ -59,7 +56,6 @@ class CalendarNotificationDispatcherTest {
         dispatcher = new CalendarNotificationDispatcher(
                 deliveryQueryService,
                 deliveryCommandService,
-                endpointDeliveryCommandService,
                 accountQueryService,
                 pushDeviceService,
                 apnsClient,
@@ -107,7 +103,6 @@ class CalendarNotificationDispatcherTest {
 
         // then
         verify(apnsClient, times(2)).send(any());
-        verify(endpointDeliveryCommandService, times(2)).create(any(), any(), any());
     }
 
     @Test
