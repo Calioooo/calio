@@ -52,7 +52,7 @@ public class IosPushDeviceService {
 
     public void deactivate(Long accountId, String installationId) {
         pushDeviceQueryService.getPushDeviceIfExists(accountId, installationId)
-                .ifPresent(pushDevice -> pushDevice.deactivate(Instant.now()));
+                .ifPresent(pushDevice -> pushDeviceCommandService.deactivate(pushDevice, Instant.now()));
     }
 
     @Transactional(readOnly = true)
@@ -61,7 +61,7 @@ public class IosPushDeviceService {
     }
 
     public void deactivateInvalidPushDevice(IosPushDevice pushDevice) {
-        pushDevice.deactivate(Instant.now());
+        pushDeviceCommandService.deactivate(pushDevice, Instant.now());
     }
 
     private void deactivatePushDeviceOwnedByAnotherInstallation(
@@ -71,11 +71,7 @@ public class IosPushDeviceService {
     ) {
         pushDeviceQueryService.getPushDeviceWithTokenIfExists(apnsToken)
                 .filter(pushDevice -> !isSameInstallation(pushDevice, accountId, installationId))
-                .ifPresent(pushDevice -> deactivateAndClearToken(pushDevice, Instant.now()));
-    }
-
-    private void deactivateAndClearToken(IosPushDevice pushDevice, Instant now) {
-        pushDeviceCommandService.deactivateAndReleaseToken(pushDevice, now);
+                .ifPresent(pushDevice -> pushDeviceCommandService.deactivateAndReleaseToken(pushDevice, Instant.now()));
     }
 
     private void refreshPushDevice(

@@ -71,6 +71,30 @@ class IosPushDeviceServiceTest {
     }
 
     @Test
+    @DisplayName("설치본의 푸시 기기를 비활성화하면 command service에 상태 전이를 위임한다")
+    void givenRegisteredPushDevice_whenDeactivate_thenDelegatesStateTransitionToCommandService() {
+        // given
+        when(pushDeviceQueryService.getPushDeviceIfExists(1L, "installation"))
+                .thenReturn(Optional.of(previousPushDevice));
+
+        // when
+        pushDeviceService.deactivate(1L, "installation");
+
+        // then
+        verify(pushDeviceCommandService).deactivate(eq(previousPushDevice), any());
+    }
+
+    @Test
+    @DisplayName("유효하지 않은 APNs 기기를 비활성화하면 command service에 상태 전이를 위임한다")
+    void givenInvalidPushDevice_whenDeactivate_thenDelegatesStateTransitionToCommandService() {
+        // when
+        pushDeviceService.deactivateInvalidPushDevice(previousPushDevice);
+
+        // then
+        verify(pushDeviceCommandService).deactivate(eq(previousPushDevice), any());
+    }
+
+    @Test
     @DisplayName("동시에 등록된 APNs token이 충돌하면 명시적인 conflict 오류를 반환한다")
     void givenConcurrentTokenRegistration_whenRegister_thenThrowsTokenConflict() {
         // given
