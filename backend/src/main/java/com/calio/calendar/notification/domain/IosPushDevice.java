@@ -16,7 +16,7 @@ import jakarta.persistence.Table;
 import java.time.Instant;
 
 @Entity
-@Table(name = "ios_notification_endpoints")
+@Table(name = "ios_push_devices")
 public class IosPushDevice extends BaseEntity {
 
     @Id
