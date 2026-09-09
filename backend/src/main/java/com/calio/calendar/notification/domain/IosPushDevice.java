@@ -4,8 +4,6 @@ import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.common.domain.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -33,10 +31,6 @@ public class IosPushDevice extends BaseEntity {
     @Column(name = "apns_token")
     private String apnsToken;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "authorization_status", nullable = false)
-    private IosNotificationAuthorizationStatus authorizationStatus;
-
     @Column(nullable = false)
     private boolean active;
 
@@ -52,21 +46,18 @@ public class IosPushDevice extends BaseEntity {
             Account account,
             String installationId,
             String apnsToken,
-            IosNotificationAuthorizationStatus authorizationStatus,
             String environment
     ) {
         this.account = account;
         this.installationId = installationId;
-        refresh(apnsToken, authorizationStatus, environment);
+        refresh(apnsToken, environment);
     }
 
     public void refresh(
             String apnsToken,
-            IosNotificationAuthorizationStatus authorizationStatus,
             String environment
     ) {
         this.apnsToken = apnsToken;
-        this.authorizationStatus = authorizationStatus;
         this.environment = environment;
         active = true;
         deactivatedAt = null;
@@ -90,6 +81,6 @@ public class IosPushDevice extends BaseEntity {
     }
 
     public boolean isEligible() {
-        return active && authorizationStatus == IosNotificationAuthorizationStatus.AUTHORIZED;
+        return active && apnsToken != null;
     }
 }

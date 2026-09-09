@@ -1,6 +1,5 @@
 package com.calio.calendar.notification.repository;
 
-import com.calio.calendar.notification.domain.IosNotificationAuthorizationStatus;
 import com.calio.calendar.notification.domain.IosPushDevice;
 import jakarta.persistence.LockModeType;
 import java.util.List;
@@ -19,8 +18,5 @@ public interface IosPushDeviceRepository extends JpaRepository<IosPushDevice, Lo
     @Query("select device from IosPushDevice device where device.apnsToken = :apnsToken")
     Optional<IosPushDevice> lockDeviceWithToken(@Param("apnsToken") String apnsToken);
 
-    List<IosPushDevice> findByAccount_IdAndActiveTrueAndAuthorizationStatus(
-            Long accountId,
-            IosNotificationAuthorizationStatus status
-    );
+    List<IosPushDevice> findByAccount_IdAndActiveTrueAndApnsTokenIsNotNull(Long accountId);
 }

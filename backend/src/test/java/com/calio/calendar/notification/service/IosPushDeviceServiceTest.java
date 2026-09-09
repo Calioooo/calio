@@ -12,7 +12,6 @@ import com.calio.calendar.account.service.AccountQueryService;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.notification.client.ApnsProperties;
-import com.calio.calendar.notification.domain.IosNotificationAuthorizationStatus;
 import com.calio.calendar.notification.domain.IosPushDevice;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -63,8 +62,7 @@ class IosPushDeviceServiceTest {
         pushDeviceService.register(
                 1L,
                 "installation",
-                "token",
-                IosNotificationAuthorizationStatus.AUTHORIZED
+                "token"
         );
 
         // then
@@ -86,8 +84,7 @@ class IosPushDeviceServiceTest {
         assertThatThrownBy(() -> pushDeviceService.register(
                 1L,
                 "installation",
-                "token",
-                IosNotificationAuthorizationStatus.AUTHORIZED
+                "token"
         )).isInstanceOfSatisfying(CalioException.class, exception ->
                 assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.NOTIFICATION_ENDPOINT_TOKEN_CONFLICT)
         );

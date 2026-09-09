@@ -1,6 +1,5 @@
 package com.calio.calendar.notification.service;
 
-import com.calio.calendar.notification.domain.IosNotificationAuthorizationStatus;
 import com.calio.calendar.notification.domain.IosPushDevice;
 import com.calio.calendar.notification.repository.IosPushDeviceRepository;
 import java.util.List;
@@ -27,9 +26,6 @@ public class IosPushDeviceQueryService {
     }
 
     public List<IosPushDevice> listEligiblePushDevices(Long accountId) {
-        return pushDeviceRepository.findByAccount_IdAndActiveTrueAndAuthorizationStatus(
-                accountId,
-                IosNotificationAuthorizationStatus.AUTHORIZED
-        );
+        return pushDeviceRepository.findByAccount_IdAndActiveTrueAndApnsTokenIsNotNull(accountId);
     }
 }

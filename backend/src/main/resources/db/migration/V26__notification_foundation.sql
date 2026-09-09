@@ -3,7 +3,6 @@ CREATE TABLE ios_push_devices (
     account_id BIGINT NOT NULL,
     installation_id VARCHAR(128) NOT NULL,
     apns_token VARCHAR(512),
-    authorization_status VARCHAR(32) NOT NULL,
     active BOOLEAN NOT NULL,
     environment VARCHAR(32) NOT NULL,
     deactivated_at DATETIME(6),
@@ -13,5 +12,5 @@ CREATE TABLE ios_push_devices (
     CONSTRAINT uk_ios_push_devices_account_installation UNIQUE (account_id, installation_id),
     CONSTRAINT uk_ios_push_devices_apns_token UNIQUE (apns_token),
     CONSTRAINT fk_ios_push_devices_account FOREIGN KEY (account_id) REFERENCES accounts (id),
-    INDEX idx_ios_push_devices_eligible (account_id, active, authorization_status)
+    INDEX idx_ios_push_devices_eligible (account_id, active)
 );
