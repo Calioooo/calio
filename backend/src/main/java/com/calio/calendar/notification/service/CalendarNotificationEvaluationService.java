@@ -75,11 +75,33 @@ public class CalendarNotificationEvaluationService {
             Instant dueTo
     ) {
         String scheduleKey = personalScheduleKey(event);
-        dispatchGeneralReminder(accountId, settings, event.startAt(), event.allDay(), event.timeZone(), scheduleKey, event.title(), null, dueFrom, dueTo);
+        dispatchGeneralReminder(
+                accountId,
+                settings,
+                event.startAt(),
+                event.allDay(),
+                event.timeZone(),
+                scheduleKey,
+                event.title(),
+                null,
+                dueFrom,
+                dueTo
+        );
         if (event.allDay() || event.isRecurrenceOccurrence() || !event.importantEvent()) {
             return;
         }
-        dispatchTimedReminder(accountId, "IMPORTANT", settings.getImportantReminderMinutes(), scheduleKey, event.startAt(), event.timeZone(), event.title(), null, dueFrom, dueTo);
+        dispatchTimedReminder(
+                accountId,
+                "IMPORTANT",
+                settings.getImportantReminderMinutes(),
+                scheduleKey,
+                event.startAt(),
+                event.timeZone(),
+                event.title(),
+                null,
+                dueFrom,
+                dueTo
+        );
     }
 
     private void evaluateGroupEvent(
@@ -90,7 +112,18 @@ public class CalendarNotificationEvaluationService {
             Instant dueFrom,
             Instant dueTo
     ) {
-        dispatchGeneralReminder(accountId, settings, event.startAt(), event.allDay(), event.timeZone(), groupScheduleKey(event), event.title(), groupName, dueFrom, dueTo);
+        dispatchGeneralReminder(
+                accountId,
+                settings,
+                event.startAt(),
+                event.allDay(),
+                event.timeZone(),
+                groupScheduleKey(event),
+                event.title(),
+                groupName,
+                dueFrom,
+                dueTo
+        );
     }
 
     private void dispatchGeneralReminder(
@@ -111,17 +144,61 @@ public class CalendarNotificationEvaluationService {
             dispatchIfDue(accountId, "ALL_DAY", scheduleKey, dueAt, startAt, null, title, groupName, dueFrom, dueTo);
             return;
         }
-        dispatchTimedReminder(accountId, "REMINDER", settings.getTimedReminderMinutes(), scheduleKey, startAt, timeZone, title, groupName, dueFrom, dueTo);
+        dispatchTimedReminder(
+                accountId,
+                "REMINDER",
+                settings.getTimedReminderMinutes(),
+                scheduleKey,
+                startAt,
+                timeZone,
+                title,
+                groupName,
+                dueFrom,
+                dueTo
+        );
     }
 
-    private void dispatchTimedReminder(Long accountId, String type, Integer minutes, String key, Instant startAt, String timeZone, String title, String groupName, Instant dueFrom, Instant dueTo) {
+    private void dispatchTimedReminder(
+            Long accountId,
+            String type,
+            Integer minutes,
+            String key,
+            Instant startAt,
+            String timeZone,
+            String title,
+            String groupName,
+            Instant dueFrom,
+            Instant dueTo
+    ) {
         if (minutes == null) {
             return;
         }
-        dispatchIfDue(accountId, type, key, startAt.minus(Duration.ofMinutes(minutes)), startAt, timeZone, title, groupName, dueFrom, dueTo);
+        dispatchIfDue(
+                accountId,
+                type,
+                key,
+                startAt.minus(Duration.ofMinutes(minutes)),
+                startAt,
+                timeZone,
+                title,
+                groupName,
+                dueFrom,
+                dueTo
+        );
     }
 
-    private void dispatchIfDue(Long accountId, String type, String key, Instant dueAt, Instant startAt, String timeZone, String title, String groupName, Instant dueFrom, Instant dueTo) {
+    private void dispatchIfDue(
+            Long accountId,
+            String type,
+            String key,
+            Instant dueAt,
+            Instant startAt,
+            String timeZone,
+            String title,
+            String groupName,
+            Instant dueFrom,
+            Instant dueTo
+    ) {
         if (dueAt.isBefore(dueFrom) || dueAt.isAfter(dueTo)) {
             return;
         }

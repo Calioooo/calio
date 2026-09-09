@@ -1,9 +1,9 @@
 package com.calio.calendar.notification.scheduler;
 
+import com.calio.calendar.account.service.AccountQueryService;
 import com.calio.calendar.notification.domain.AccountNotificationSettings;
 import com.calio.calendar.notification.service.AccountNotificationSettingsService;
 import com.calio.calendar.notification.service.CalendarNotificationEvaluationService;
-import com.calio.calendar.account.service.AccountQueryService;
 import java.time.Instant;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -36,7 +36,8 @@ public class CalendarNotificationScheduler {
         }
 
         Instant now = Instant.now();
-        accountQueryService.listAccounts().forEach(account -> evaluateAccount(account.getId(), now));
+        accountQueryService.listAccounts()
+                .forEach(account -> evaluateAccount(account.getId(), now));
     }
 
     private void evaluateAccount(Long accountId, Instant now) {
