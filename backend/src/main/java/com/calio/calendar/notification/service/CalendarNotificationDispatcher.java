@@ -6,7 +6,7 @@ import com.calio.calendar.notification.client.ApnsSendResult;
 import com.calio.calendar.notification.client.ApnsSendResultType;
 import com.calio.calendar.notification.client.ApnsClient;
 import com.calio.calendar.notification.domain.IosPushDevice;
-import com.calio.calendar.notification.domain.NotificationDelivery;
+import com.calio.calendar.notification.domain.NotificationDispatch;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -25,23 +25,23 @@ public class CalendarNotificationDispatcher {
 
     private static final Logger log = LoggerFactory.getLogger(CalendarNotificationDispatcher.class);
 
-    private final NotificationDeliveryQueryService deliveryQueryService;
-    private final NotificationDeliveryCommandService deliveryCommandService;
+    private final NotificationDispatchQueryService dispatchQueryService;
+    private final NotificationDispatchCommandService dispatchCommandService;
     private final AccountQueryService accountQueryService;
     private final IosPushDeviceService pushDeviceService;
     private final ApnsClient apnsClient;
     private final ObjectMapper objectMapper;
 
     public CalendarNotificationDispatcher(
-            NotificationDeliveryQueryService deliveryQueryService,
-            NotificationDeliveryCommandService deliveryCommandService,
+            NotificationDispatchQueryService dispatchQueryService,
+            NotificationDispatchCommandService dispatchCommandService,
             AccountQueryService accountQueryService,
             IosPushDeviceService pushDeviceService,
             ApnsClient apnsClient,
             ObjectMapper objectMapper
     ) {
-        this.deliveryQueryService = deliveryQueryService;
-        this.deliveryCommandService = deliveryCommandService;
+        this.dispatchQueryService = dispatchQueryService;
+        this.dispatchCommandService = dispatchCommandService;
         this.accountQueryService = accountQueryService;
         this.pushDeviceService = pushDeviceService;
         this.apnsClient = apnsClient;
@@ -62,23 +62,23 @@ public class CalendarNotificationDispatcher {
             return;
         }
 
-        NotificationDelivery delivery = createClaim(
+        NotificationDispatch dispatch = createClaim(
                 accountId, notificationType, scheduleKey, scheduledAt, targetDate, title, groupName
         );
-        if (delivery == null) {
+        if (dispatch == null) {
             return;
         }
 
         pushDeviceService.listEligiblePushDevices(accountId)
-                .forEach(pushDevice -> sendToPushDevice(delivery, pushDevice));
-        delivery.complete("DISPATCHED");
+                .forEach(pushDevice -> sendToPushDevice(dispatch, pushDevice));
+        dispatch.complete("DISPATCHED");
     }
 
     private boolean isAlreadyClaimed(Long accountId, String type, String key, Instant scheduledAt) {
-        return deliveryQueryService.hasDeliveryClaim(accountId, type, key, scheduledAt);
+        return dispatchQueryService.hasDispatchClaim(accountId, type, key, scheduledAt);
     }
 
-    private NotificationDelivery createClaim(
+    private NotificationDispatch createClaim(
             Long accountId,
             String type,
             String key,
@@ -88,7 +88,7 @@ public class CalendarNotificationDispatcher {
             String groupName
     ) {
         try {
-            return deliveryCommandService.create(
+            return dispatchCommandService.create(
                     accountQueryService.getAccount(accountId),
                     type,
                     key,
@@ -102,20 +102,20 @@ public class CalendarNotificationDispatcher {
         }
     }
 
-    private void sendToPushDevice(NotificationDelivery delivery, IosPushDevice pushDevice) {
+    private void sendToPushDevice(NotificationDispatch dispatch, IosPushDevice pushDevice) {
         ApnsSendResult result = apnsClient.send(new ApnsMessage(
                 pushDevice.getApnsToken(),
-                payload(delivery),
-                delivery.getScheduledAt().plus(Duration.ofMinutes(5))
+                payload(dispatch),
+                dispatch.getScheduledAt().plus(Duration.ofMinutes(5))
         ));
-        logFailedDelivery(delivery, pushDevice, result);
+        logFailedDispatch(dispatch, pushDevice, result);
         if (result.type() == ApnsSendResultType.INVALID_ENDPOINT) {
             pushDeviceService.deactivateInvalidPushDevice(pushDevice);
         }
     }
 
-    private void logFailedDelivery(
-            NotificationDelivery delivery,
+    private void logFailedDispatch(
+            NotificationDispatch dispatch,
             IosPushDevice pushDevice,
             ApnsSendResult result
     ) {
@@ -124,8 +124,8 @@ public class CalendarNotificationDispatcher {
         }
 
         log.warn(
-                "APNs notification delivery failed. notificationDeliveryId={} iosPushDeviceId={} resultType={} providerRequestId={} reason={}",
-                delivery.getId(),
+                "APNs notification dispatch failed. notificationDispatchId={} iosPushDeviceId={} resultType={} providerRequestId={} reason={}",
+                dispatch.getId(),
                 pushDevice.getId(),
                 result.type(),
                 result.requestId(),
@@ -133,38 +133,38 @@ public class CalendarNotificationDispatcher {
         );
     }
 
-    private String payload(NotificationDelivery delivery) {
+    private String payload(NotificationDispatch dispatch) {
         try {
             return objectMapper.writeValueAsString(Map.of(
-                    "aps", Map.of("alert", alert(delivery), "sound", "default"),
-                    "calio", metadata(delivery)
+                    "aps", Map.of("alert", alert(dispatch), "sound", "default"),
+                    "calio", metadata(dispatch)
             ));
         } catch (JacksonException exception) {
             throw new IllegalStateException("Cannot serialize APNs payload.", exception);
         }
     }
 
-    private Map<String, String> alert(NotificationDelivery delivery) {
+    private Map<String, String> alert(NotificationDispatch dispatch) {
         Map<String, String> alert = new LinkedHashMap<>();
         alert.put("title", "Calio");
-        alert.put("body", visibleBody(delivery));
+        alert.put("body", visibleBody(dispatch));
         return alert;
     }
 
-    private Map<String, String> metadata(NotificationDelivery delivery) {
+    private Map<String, String> metadata(NotificationDispatch dispatch) {
         Map<String, String> metadata = new LinkedHashMap<>();
-        metadata.put("notificationType", delivery.getNotificationType());
-        metadata.put("targetDate", delivery.getTargetDate().toString());
+        metadata.put("notificationType", dispatch.getNotificationType());
+        metadata.put("targetDate", dispatch.getTargetDate().toString());
         return metadata;
     }
 
-    private String visibleBody(NotificationDelivery delivery) {
-        if ("BRIEFING".equals(delivery.getNotificationType())) {
-            return "오늘 일정이 " + delivery.getTitle() + "개 있어요";
+    private String visibleBody(NotificationDispatch dispatch) {
+        if ("BRIEFING".equals(dispatch.getNotificationType())) {
+            return "오늘 일정이 " + dispatch.getTitle() + "개 있어요";
         }
-        if (delivery.getGroupName() == null) {
-            return delivery.getTitle();
+        if (dispatch.getGroupName() == null) {
+            return dispatch.getTitle();
         }
-        return delivery.getTitle() + " · " + delivery.getGroupName();
+        return dispatch.getTitle() + " · " + dispatch.getGroupName();
     }
 }

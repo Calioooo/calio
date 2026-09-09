@@ -13,7 +13,7 @@ import com.calio.calendar.notification.client.ApnsSendResult;
 import com.calio.calendar.notification.client.ApnsSendResultType;
 import com.calio.calendar.notification.client.ApnsClient;
 import com.calio.calendar.notification.domain.IosPushDevice;
-import com.calio.calendar.notification.domain.NotificationDelivery;
+import com.calio.calendar.notification.domain.NotificationDispatch;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -29,10 +29,10 @@ import tools.jackson.databind.ObjectMapper;
 class CalendarNotificationDispatcherTest {
 
     @Mock
-    private NotificationDeliveryQueryService deliveryQueryService;
+    private NotificationDispatchQueryService dispatchQueryService;
 
     @Mock
-    private NotificationDeliveryCommandService deliveryCommandService;
+    private NotificationDispatchCommandService dispatchCommandService;
 
     @Mock
     private AccountQueryService accountQueryService;
@@ -54,8 +54,8 @@ class CalendarNotificationDispatcherTest {
     @BeforeEach
     void setUp() {
         dispatcher = new CalendarNotificationDispatcher(
-                deliveryQueryService,
-                deliveryCommandService,
+                dispatchQueryService,
+                dispatchCommandService,
                 accountQueryService,
                 pushDeviceService,
                 apnsClient,
@@ -68,11 +68,11 @@ class CalendarNotificationDispatcherTest {
     void givenTwoEligibleEndpoints_whenDispatch_thenSendsToEachEndpoint() {
         // given
         Instant scheduledAt = Instant.parse("2026-09-08T00:00:00Z");
-        NotificationDelivery delivery = delivery(scheduledAt);
-        when(deliveryQueryService.hasDeliveryClaim(1L, "REMINDER", "personal:1", scheduledAt))
+        NotificationDispatch dispatch = dispatch(scheduledAt);
+        when(dispatchQueryService.hasDispatchClaim(1L, "REMINDER", "personal:1", scheduledAt))
                 .thenReturn(false);
         when(accountQueryService.getAccount(1L)).thenReturn(new Account());
-        when(deliveryCommandService.create(
+        when(dispatchCommandService.create(
                 any(Account.class),
                 eq("REMINDER"),
                 eq("personal:1"),
@@ -80,7 +80,7 @@ class CalendarNotificationDispatcherTest {
                 eq(LocalDate.of(2026, 9, 8)),
                 eq("회의"),
                 eq(null)
-        )).thenReturn(delivery);
+        )).thenReturn(dispatch);
         when(pushDeviceService.listEligiblePushDevices(1L)).thenReturn(List.of(iphonePushDevice, ipadPushDevice));
         when(iphonePushDevice.getApnsToken()).thenReturn("iphone-token");
         when(ipadPushDevice.getApnsToken()).thenReturn("ipad-token");
@@ -110,7 +110,7 @@ class CalendarNotificationDispatcherTest {
     void givenExistingDeliveryClaim_whenDispatch_thenSkipsApnsSend() {
         // given
         Instant scheduledAt = Instant.parse("2026-09-08T00:00:00Z");
-        when(deliveryQueryService.hasDeliveryClaim(1L, "REMINDER", "personal:1", scheduledAt))
+        when(dispatchQueryService.hasDispatchClaim(1L, "REMINDER", "personal:1", scheduledAt))
                 .thenReturn(true);
 
         // when
@@ -125,12 +125,12 @@ class CalendarNotificationDispatcherTest {
         );
 
         // then
-        verify(deliveryCommandService, never()).create(any(), any(), any(), any(), any(), any(), any());
+        verify(dispatchCommandService, never()).create(any(), any(), any(), any(), any(), any(), any());
         verify(apnsClient, never()).send(any());
     }
 
-    private NotificationDelivery delivery(Instant scheduledAt) {
-        return new NotificationDelivery(
+    private NotificationDispatch dispatch(Instant scheduledAt) {
+        return new NotificationDispatch(
                 new Account(),
                 "REMINDER",
                 "personal:1",
