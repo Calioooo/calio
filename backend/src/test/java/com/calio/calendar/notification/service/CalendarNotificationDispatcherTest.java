@@ -11,7 +11,7 @@ import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.service.AccountQueryService;
 import com.calio.calendar.notification.client.ApnsSendResult;
 import com.calio.calendar.notification.client.ApnsSendResultType;
-import com.calio.calendar.notification.client.HttpApnsGateway;
+import com.calio.calendar.notification.client.ApnsClient;
 import com.calio.calendar.notification.domain.IosNotificationEndpoint;
 import com.calio.calendar.notification.domain.NotificationDelivery;
 import java.time.Instant;
@@ -44,7 +44,7 @@ class CalendarNotificationDispatcherTest {
     private IosNotificationEndpointService endpointService;
 
     @Mock
-    private HttpApnsGateway apnsGateway;
+    private ApnsClient apnsClient;
 
     @Mock
     private IosNotificationEndpoint iphoneEndpoint;
@@ -62,7 +62,7 @@ class CalendarNotificationDispatcherTest {
                 endpointDeliveryCommandService,
                 accountQueryService,
                 endpointService,
-                apnsGateway,
+                apnsClient,
                 new ObjectMapper()
         );
     }
@@ -88,7 +88,7 @@ class CalendarNotificationDispatcherTest {
         when(endpointService.listEligibleEndpoints(1L)).thenReturn(List.of(iphoneEndpoint, ipadEndpoint));
         when(iphoneEndpoint.getApnsToken()).thenReturn("iphone-token");
         when(ipadEndpoint.getApnsToken()).thenReturn("ipad-token");
-        when(apnsGateway.send(any())).thenReturn(new ApnsSendResult(
+        when(apnsClient.send(any())).thenReturn(new ApnsSendResult(
                 ApnsSendResultType.ACCEPTED,
                 "apns-id",
                 null
@@ -106,7 +106,7 @@ class CalendarNotificationDispatcherTest {
         );
 
         // then
-        verify(apnsGateway, times(2)).send(any());
+        verify(apnsClient, times(2)).send(any());
         verify(endpointDeliveryCommandService, times(2)).create(any(), any(), any());
     }
 
@@ -131,7 +131,7 @@ class CalendarNotificationDispatcherTest {
 
         // then
         verify(deliveryCommandService, never()).create(any(), any(), any(), any(), any(), any(), any());
-        verify(apnsGateway, never()).send(any());
+        verify(apnsClient, never()).send(any());
     }
 
     private NotificationDelivery delivery(Instant scheduledAt) {

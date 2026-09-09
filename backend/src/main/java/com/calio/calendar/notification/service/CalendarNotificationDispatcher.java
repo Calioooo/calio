@@ -4,7 +4,7 @@ import com.calio.calendar.account.service.AccountQueryService;
 import com.calio.calendar.notification.client.ApnsMessage;
 import com.calio.calendar.notification.client.ApnsSendResult;
 import com.calio.calendar.notification.client.ApnsSendResultType;
-import com.calio.calendar.notification.client.HttpApnsGateway;
+import com.calio.calendar.notification.client.ApnsClient;
 import com.calio.calendar.notification.domain.IosNotificationEndpoint;
 import com.calio.calendar.notification.domain.NotificationDelivery;
 import java.time.Duration;
@@ -26,7 +26,7 @@ public class CalendarNotificationDispatcher {
     private final NotificationEndpointDeliveryCommandService endpointDeliveryCommandService;
     private final AccountQueryService accountQueryService;
     private final IosNotificationEndpointService endpointService;
-    private final HttpApnsGateway apnsGateway;
+    private final ApnsClient apnsClient;
     private final ObjectMapper objectMapper;
 
     public CalendarNotificationDispatcher(
@@ -35,7 +35,7 @@ public class CalendarNotificationDispatcher {
             NotificationEndpointDeliveryCommandService endpointDeliveryCommandService,
             AccountQueryService accountQueryService,
             IosNotificationEndpointService endpointService,
-            HttpApnsGateway apnsGateway,
+            ApnsClient apnsClient,
             ObjectMapper objectMapper
     ) {
         this.deliveryQueryService = deliveryQueryService;
@@ -43,7 +43,7 @@ public class CalendarNotificationDispatcher {
         this.endpointDeliveryCommandService = endpointDeliveryCommandService;
         this.accountQueryService = accountQueryService;
         this.endpointService = endpointService;
-        this.apnsGateway = apnsGateway;
+        this.apnsClient = apnsClient;
         this.objectMapper = objectMapper;
     }
 
@@ -102,7 +102,7 @@ public class CalendarNotificationDispatcher {
     }
 
     private void sendToEndpoint(NotificationDelivery delivery, IosNotificationEndpoint endpoint) {
-        ApnsSendResult result = apnsGateway.send(new ApnsMessage(
+        ApnsSendResult result = apnsClient.send(new ApnsMessage(
                 endpoint.getApnsToken(),
                 payload(delivery),
                 delivery.getScheduledAt().plus(Duration.ofMinutes(5))

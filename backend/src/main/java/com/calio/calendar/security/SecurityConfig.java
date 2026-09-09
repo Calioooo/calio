@@ -71,7 +71,11 @@ public class SecurityConfig {
                 )
                 .exceptionHandling(exception -> exception.authenticationEntryPoint(
                         (request, response, authException) ->
-                                authenticationErrorResponseWriter.write(request, response, ErrorCode.AUTH_TOKEN_REQUIRED)
+                                authenticationErrorResponseWriter.write(
+                                        request,
+                                        response,
+                                        ErrorCode.AUTH_TOKEN_REQUIRED
+                                )
                 ))
                 .addFilterBefore(bearerTokenAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
