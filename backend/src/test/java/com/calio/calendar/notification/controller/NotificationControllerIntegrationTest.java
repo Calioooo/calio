@@ -7,7 +7,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.calio.calendar.notification.repository.IosNotificationEndpointRepository;
+import com.calio.calendar.notification.repository.IosPushDeviceRepository;
 import com.calio.calendar.security.AuthenticatedAccountMockMvcTestConfig;
 import com.calio.calendar.security.WithAuthenticatedAccount;
 import org.junit.jupiter.api.DisplayName;
@@ -36,7 +36,7 @@ class NotificationControllerIntegrationTest {
     private MockMvc mockMvc;
 
     @Autowired
-    private IosNotificationEndpointRepository endpointRepository;
+    private IosPushDeviceRepository endpointRepository;
 
     @Test
     @DisplayName("알림 설정 조회는 서버 기본값과 시간 타입을 직렬화해 반환한다")
