@@ -37,8 +37,8 @@ public class AccountNotificationSettingsService {
         AccountNotificationSettings settings = get(accountId);
         settings.update(
                 request.calendarNotificationsEnabled(),
-                request.timedReminderMinutes(),
-                request.importantReminderMinutes(),
+                request.timedReminderOffset(),
+                request.importantReminderOffset(),
                 request.allDayReminderTime(),
                 request.dailyBriefingEnabled(),
                 request.dailyBriefingTime()
