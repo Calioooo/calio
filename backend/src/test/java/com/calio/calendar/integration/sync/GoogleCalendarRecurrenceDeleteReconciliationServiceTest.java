@@ -1,6 +1,8 @@
 package com.calio.calendar.integration.sync;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -43,6 +45,35 @@ class GoogleCalendarRecurrenceDeleteReconciliationServiceTest {
         service.reconcilePendingDeletes(connection);
 
         verify(client).deleteEvent("token", "master-1", "new-etag");
+        verify(mappingCommands).deleteRecurrenceAggregateMappings(mapping);
+    }
+
+    @Test
+    @DisplayName("원격 master가 이미 없으면 provider delete 없이 retained mapping을 제거한다")
+    void givenMissingProviderAggregate_whenReconcilingPendingDelete_thenRemovesRetainedMapping() {
+        // given
+        GoogleCalendarRecurrenceMappingQueryService mappings = mock();
+        GoogleCalendarRecurrenceMappingCommandService mappingCommands = mock();
+        GoogleCalendarAccessTokenService tokens = mock();
+        GoogleCalendarEventsClient client = mock();
+        GoogleCalendarConnection connection = mock();
+        GoogleCalendarRecurrenceEventMapping mapping = mock();
+        when(connection.getId()).thenReturn(30L);
+        when(mapping.isProviderDeletePending()).thenReturn(true);
+        when(mapping.getExternalEventId()).thenReturn("master-1");
+        when(mappings.listRecurrenceEventMappings(30L)).thenReturn(List.of(mapping));
+        when(tokens.getAccessToken(30L)).thenReturn("token");
+        when(client.getEvent("token", "master-1")).thenReturn(Optional.empty());
+
+        GoogleCalendarRecurrenceDeleteReconciliationService service =
+                new GoogleCalendarRecurrenceDeleteReconciliationService(
+                        mappings, mappingCommands, tokens, client);
+
+        // when
+        service.reconcilePendingDeletes(connection);
+
+        // then
+        verify(client, never()).deleteEvent(any(), any(), any());
         verify(mappingCommands).deleteRecurrenceAggregateMappings(mapping);
     }
 
