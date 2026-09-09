@@ -44,7 +44,7 @@ class AccountNotificationSettingsServiceTest {
     }
 
     @Test
-    @DisplayName("동시 최초 생성 충돌 후 저장된 알림 설정을 다시 조회한다")
+    @DisplayName("동시에 처음 조회해도 계정별 기본 알림 설정 하나를 반환한다")
     void givenConcurrentDefaultCreation_whenGet_thenReturnsPersistedSettings() {
         // given
         Account account = new Account();
