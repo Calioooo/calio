@@ -9,4 +9,5 @@ public record RegisterIosNotificationEndpointRequest(
         @NotBlank @Size(max = 128) String installationId,
         @NotBlank @Size(max = 512) String apnsToken,
         @NotNull IosNotificationAuthorizationStatus authorizationStatus
-) { }
+) {
+}

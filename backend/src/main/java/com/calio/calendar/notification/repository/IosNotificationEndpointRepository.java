@@ -19,5 +19,8 @@ public interface IosNotificationEndpointRepository extends JpaRepository<IosNoti
     @Query("select endpoint from IosNotificationEndpoint endpoint where endpoint.apnsToken = :apnsToken")
     Optional<IosNotificationEndpoint> lockEndpointWithToken(@Param("apnsToken") String apnsToken);
 
-    List<IosNotificationEndpoint> findByAccount_IdAndActiveTrueAndAuthorizationStatus(Long accountId, IosNotificationAuthorizationStatus status);
+    List<IosNotificationEndpoint> findByAccount_IdAndActiveTrueAndAuthorizationStatus(
+            Long accountId,
+            IosNotificationAuthorizationStatus status
+    );
 }
