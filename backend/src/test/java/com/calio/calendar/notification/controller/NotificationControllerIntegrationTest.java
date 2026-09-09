@@ -44,18 +44,18 @@ class NotificationControllerIntegrationTest {
         mockMvc.perform(get("/api/notification-settings"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.calendarNotificationsEnabled").value(true))
-                .andExpect(jsonPath("$.timedReminderMinutes").value(10))
-                .andExpect(jsonPath("$.importantReminderMinutes").value(120))
+                .andExpect(jsonPath("$.timedReminderOffset").value("MINUTES_10"))
+                .andExpect(jsonPath("$.importantReminderOffset").value("MINUTES_120"))
                 .andExpect(jsonPath("$.allDayReminderTime").isString())
                 .andExpect(jsonPath("$.dailyBriefingTime").isString());
     }
 
     @Test
-    @DisplayName("지원하지 않는 일정 알림 lead time은 validation failure로 거절한다")
-    void givenUnsupportedReminderMinutes_whenUpdateSettings_thenRejectsRequest() throws Exception {
+    @DisplayName("지원하지 않는 일정 알림 offset은 validation failure로 거절한다")
+    void givenUnsupportedReminderOffset_whenUpdateSettings_thenRejectsRequest() throws Exception {
         mockMvc.perform(put("/api/notification-settings")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(settingsRequest(7, 120)))
+                        .content(settingsRequest("MINUTES_7", "MINUTES_120")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"));
     }
@@ -65,16 +65,16 @@ class NotificationControllerIntegrationTest {
     void givenSupportedSettingsUpdate_whenGetSettings_thenReturnsUpdatedPolicy() throws Exception {
         mockMvc.perform(put("/api/notification-settings")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(settingsRequest(30, 60)))
+                        .content(settingsRequest("NONE", "MINUTES_60")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.timedReminderMinutes").value(30))
-                .andExpect(jsonPath("$.importantReminderMinutes").value(60));
+                .andExpect(jsonPath("$.timedReminderOffset").value("NONE"))
+                .andExpect(jsonPath("$.importantReminderOffset").value("MINUTES_60"));
 
         mockMvc.perform(get("/api/notification-settings"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.calendarNotificationsEnabled").value(true))
-                .andExpect(jsonPath("$.timedReminderMinutes").value(30))
-                .andExpect(jsonPath("$.importantReminderMinutes").value(60))
+                .andExpect(jsonPath("$.timedReminderOffset").value("NONE"))
+                .andExpect(jsonPath("$.importantReminderOffset").value("MINUTES_60"))
                 .andExpect(jsonPath("$.allDayReminderTime").value("09:00:00"))
                 .andExpect(jsonPath("$.dailyBriefingEnabled").value(false))
                 .andExpect(jsonPath("$.dailyBriefingTime").value("08:00:00"));
@@ -137,17 +137,17 @@ class NotificationControllerIntegrationTest {
                 .isEqualTo(true);
     }
 
-    private String settingsRequest(int timedReminderMinutes, int importantReminderMinutes) {
+    private String settingsRequest(String timedReminderOffset, String importantReminderOffset) {
         return """
                 {
                   "calendarNotificationsEnabled": true,
-                  "timedReminderMinutes": %d,
-                  "importantReminderMinutes": %d,
+                  "timedReminderOffset": "%s",
+                  "importantReminderOffset": "%s",
                   "allDayReminderTime": "09:00:00",
                   "dailyBriefingEnabled": false,
                   "dailyBriefingTime": "08:00:00"
                 }
-                """.formatted(timedReminderMinutes, importantReminderMinutes);
+                """.formatted(timedReminderOffset, importantReminderOffset);
     }
 
     private String endpointRequest(String installationId, String apnsToken) {

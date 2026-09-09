@@ -4,6 +4,8 @@ import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.common.domain.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -28,8 +30,13 @@ public class AccountNotificationSettings extends BaseEntity {
     @Column(nullable = false)
     private boolean calendarNotificationsEnabled = true;
 
-    private Integer timedReminderMinutes = 10;
-    private Integer importantReminderMinutes = 120;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private TimedReminderOffset timedReminderOffset = TimedReminderOffset.MINUTES_10;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private ImportantReminderOffset importantReminderOffset = ImportantReminderOffset.MINUTES_120;
 
     @Column(nullable = false)
     private LocalTime allDayReminderTime = LocalTime.of(9, 0);
@@ -49,15 +56,15 @@ public class AccountNotificationSettings extends BaseEntity {
 
     public void update(
             boolean calendarNotificationsEnabled,
-            Integer timedReminderMinutes,
-            Integer importantReminderMinutes,
+            TimedReminderOffset timedReminderOffset,
+            ImportantReminderOffset importantReminderOffset,
             LocalTime allDayReminderTime,
             boolean dailyBriefingEnabled,
             LocalTime dailyBriefingTime
     ) {
         this.calendarNotificationsEnabled = calendarNotificationsEnabled;
-        this.timedReminderMinutes = timedReminderMinutes;
-        this.importantReminderMinutes = importantReminderMinutes;
+        this.timedReminderOffset = timedReminderOffset;
+        this.importantReminderOffset = importantReminderOffset;
         this.allDayReminderTime = allDayReminderTime;
         this.dailyBriefingEnabled = dailyBriefingEnabled;
         this.dailyBriefingTime = dailyBriefingTime;
@@ -71,12 +78,12 @@ public class AccountNotificationSettings extends BaseEntity {
         return calendarNotificationsEnabled;
     }
 
-    public Integer getTimedReminderMinutes() {
-        return timedReminderMinutes;
+    public TimedReminderOffset getTimedReminderOffset() {
+        return timedReminderOffset;
     }
 
-    public Integer getImportantReminderMinutes() {
-        return importantReminderMinutes;
+    public ImportantReminderOffset getImportantReminderOffset() {
+        return importantReminderOffset;
     }
 
     public LocalTime getAllDayReminderTime() {
