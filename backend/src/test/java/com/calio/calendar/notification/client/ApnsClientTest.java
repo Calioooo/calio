@@ -11,10 +11,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import java.security.KeyPairGenerator;
 import java.security.interfaces.ECPrivateKey;
 import java.time.Clock;
-import java.time.Duration;
 import java.time.Instant;
-import java.time.ZoneId;
-import java.util.ArrayList;
 import java.util.Base64;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -22,41 +19,12 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
-import org.springframework.test.web.client.ExpectedCount;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
 class ApnsClientTest {
 
     private static final String APNS_HOST = "https://api.sandbox.push.apple.com";
-
-    @Test
-    @DisplayName("50분 안의 APNs 전송은 같은 provider JWT를 재사용한다")
-    void givenRepeatedSendWithinProviderTokenReuseDuration_whenSend_thenReusesProviderToken() {
-        // given
-        MutableClock clock = new MutableClock(Instant.parse("2026-09-09T00:00:00Z"));
-        ArrayList<String> authorizationHeaders = new ArrayList<>();
-        RestClient.Builder restClientBuilder = RestClient.builder();
-        MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
-        server.expect(ExpectedCount.times(2), request ->
-                        authorizationHeaders.add(request.getHeaders().getFirst(HttpHeaders.AUTHORIZATION))
-                )
-                .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
-        ApnsClient client = new ApnsClient(
-                properties(),
-                restClientBuilder.baseUrl(APNS_HOST).build(),
-                clock
-        );
-
-        // when
-        client.send(message());
-        clock.advance(Duration.ofMinutes(1));
-        client.send(message());
-
-        // then
-        assertThat(authorizationHeaders).containsOnly(authorizationHeaders.getFirst());
-        server.verify();
-    }
 
     @Test
     @DisplayName("APNs 성공 응답은 provider request ID와 함께 accepted로 분류한다")
@@ -170,7 +138,7 @@ class ApnsClientTest {
     @DisplayName("APNs credential이 없으면 configuration failure를 반환한다")
     void givenMissingConfiguration_whenSend_thenReturnsConfigurationFailure() {
         // given
-        ApnsClient client = new ApnsClient(
+        ApnsClient client = apnsClient(
                 new ApnsProperties("development", "", "", "", ""),
                 RestClient.builder().build(),
                 Clock.systemUTC()
@@ -189,7 +157,7 @@ class ApnsClientTest {
         // given
         RestClient.Builder restClientBuilder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
-        ApnsClient client = new ApnsClient(
+        ApnsClient client = apnsClient(
                 new ApnsProperties(
                         "development",
                         "team",
@@ -213,7 +181,15 @@ class ApnsClientTest {
         RestClient.Builder restClientBuilder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
         RestClient restClient = restClientBuilder.baseUrl(APNS_HOST).build();
-        return new TestClient(new ApnsClient(properties(), restClient, Clock.systemUTC()), server);
+        return new TestClient(apnsClient(properties(), restClient, Clock.systemUTC()), server);
+    }
+
+    private ApnsClient apnsClient(ApnsProperties properties, RestClient restClient, Clock clock) {
+        return new ApnsClient(
+                properties,
+                new ApnsProviderTokenProvider(properties, clock),
+                restClient
+        );
     }
 
     private ApnsProperties properties() {
@@ -240,31 +216,4 @@ class ApnsClientTest {
     private record TestClient(ApnsClient client, MockRestServiceServer server) {
     }
 
-    private static class MutableClock extends Clock {
-
-        private Instant instant;
-
-        private MutableClock(Instant instant) {
-            this.instant = instant;
-        }
-
-        @Override
-        public ZoneId getZone() {
-            return ZoneId.of("UTC");
-        }
-
-        @Override
-        public Clock withZone(ZoneId zone) {
-            return this;
-        }
-
-        @Override
-        public Instant instant() {
-            return instant;
-        }
-
-        private void advance(Duration duration) {
-            instant = instant.plus(duration);
-        }
-    }
 }

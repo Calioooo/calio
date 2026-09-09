@@ -1,18 +1,6 @@
 package com.calio.calendar.notification.client;
 
-import com.nimbusds.jose.JWSAlgorithm;
-import com.nimbusds.jose.JWSHeader;
-import com.nimbusds.jose.crypto.ECDSASigner;
-import com.nimbusds.jwt.JWTClaimsSet;
-import com.nimbusds.jwt.SignedJWT;
-import java.security.KeyFactory;
-import java.security.interfaces.ECPrivateKey;
-import java.security.spec.PKCS8EncodedKeySpec;
-import java.time.Clock;
-import java.time.Duration;
 import java.time.Instant;
-import java.util.Base64;
-import java.util.Date;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -26,34 +14,26 @@ import org.springframework.web.client.RestClientResponseException;
 public class ApnsClient {
 
     private static final String DEVICE_URI_TEMPLATE = "/3/device/{token}";
-    private static final Duration PROVIDER_TOKEN_REUSE_DURATION = Duration.ofMinutes(50);
-
     private final ApnsProperties properties;
+    private final ApnsProviderTokenProvider providerTokenProvider;
     private final RestClient restClient;
-    private final Clock clock;
-    private String cachedProviderToken;
-    private Instant cachedProviderTokenIssuedAt;
 
     public ApnsClient(
             ApnsProperties properties,
-            @Qualifier("apnsRestClient") RestClient restClient,
-            Clock clock
+            ApnsProviderTokenProvider providerTokenProvider,
+            @Qualifier("apnsRestClient") RestClient restClient
     ) {
         this.properties = properties;
+        this.providerTokenProvider = providerTokenProvider;
         this.restClient = restClient;
-        this.clock = clock;
     }
 
     public ApnsSendResult send(ApnsMessage message) {
-        if (!properties.configured()) {
-            return ApnsSendResult.configurationFailure("APNs credentials are not configured");
-        }
-
         String providerToken;
         try {
-            providerToken = providerToken();
-        } catch (Exception exception) {
-            return ApnsSendResult.configurationFailure("APNs provider token could not be created");
+            providerToken = providerTokenProvider.getProviderToken();
+        } catch (ApnsProviderTokenException exception) {
+            return ApnsSendResult.configurationFailure(exception.getMessage());
         }
 
         try {
@@ -125,31 +105,4 @@ public class ApnsClient {
         );
     }
 
-    private synchronized String providerToken() throws Exception {
-        Instant now = clock.instant();
-        if (cachedProviderToken != null
-                && cachedProviderTokenIssuedAt.plus(PROVIDER_TOKEN_REUSE_DURATION).isAfter(now)) {
-            return cachedProviderToken;
-        }
-
-        String pem = properties.privateKey()
-                .replace("-----BEGIN PRIVATE KEY-----", "")
-                .replace("-----END PRIVATE KEY-----", "")
-                .replaceAll("\\s", "");
-        ECPrivateKey key = (ECPrivateKey) KeyFactory.getInstance("EC")
-                .generatePrivate(
-                        new PKCS8EncodedKeySpec(Base64.getDecoder().decode(pem))
-                );
-        SignedJWT jwt = new SignedJWT(
-                new JWSHeader.Builder(JWSAlgorithm.ES256).keyID(properties.keyId()).build(),
-                new JWTClaimsSet.Builder()
-                        .issuer(properties.teamId())
-                        .issueTime(Date.from(now))
-                        .build()
-        );
-        jwt.sign(new ECDSASigner(key));
-        cachedProviderToken = jwt.serialize();
-        cachedProviderTokenIssuedAt = now;
-        return cachedProviderToken;
-    }
 }
