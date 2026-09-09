@@ -4,7 +4,6 @@ import com.calio.calendar.account.service.AccountQueryService;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.notification.client.ApnsProperties;
-import com.calio.calendar.notification.domain.IosNotificationAuthorizationStatus;
 import com.calio.calendar.notification.domain.IosPushDevice;
 import java.time.Instant;
 import java.util.List;
@@ -36,8 +35,7 @@ public class IosPushDeviceService {
     public void register(
             Long accountId,
             String installationId,
-            String apnsToken,
-            IosNotificationAuthorizationStatus authorizationStatus
+            String apnsToken
     ) {
         deactivatePushDeviceOwnedByAnotherInstallation(accountId, installationId, apnsToken);
 
@@ -47,10 +45,9 @@ public class IosPushDeviceService {
                         accountQueryService.getAccount(accountId),
                         installationId,
                         apnsToken,
-                        authorizationStatus,
                         apnsProperties.environment()
                 ));
-        refreshPushDevice(pushDevice, apnsToken, authorizationStatus);
+        refreshPushDevice(pushDevice, apnsToken);
     }
 
     public void deactivate(Long accountId, String installationId) {
@@ -83,10 +80,9 @@ public class IosPushDeviceService {
 
     private void refreshPushDevice(
             IosPushDevice pushDevice,
-            String apnsToken,
-            IosNotificationAuthorizationStatus authorizationStatus
+            String apnsToken
     ) {
-        pushDevice.refresh(apnsToken, authorizationStatus, apnsProperties.environment());
+        pushDevice.refresh(apnsToken, apnsProperties.environment());
         try {
             if (pushDevice.getId() == null) {
                 pushDeviceCommandService.create(pushDevice);

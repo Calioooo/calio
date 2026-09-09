@@ -88,8 +88,7 @@ class NotificationControllerIntegrationTest {
                         .content("""
                                 {
                                   "installationId": "iphone-installation",
-                                  "apnsToken": "device-token",
-                                  "authorizationStatus": "AUTHORIZED"
+                                  "apnsToken": "device-token"
                                 }
                                 """))
                 .andExpect(status().isNoContent());
@@ -154,8 +153,7 @@ class NotificationControllerIntegrationTest {
         return """
                 {
                   "installationId": "%s",
-                  "apnsToken": "%s",
-                  "authorizationStatus": "AUTHORIZED"
+                  "apnsToken": "%s"
                 }
                 """.formatted(installationId, apnsToken);
     }

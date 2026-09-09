@@ -36,16 +36,15 @@ class NotificationRequestValidationTest {
     }
 
     @Test
-    @DisplayName("iOS 푸시 기기 등록 요청의 필수 필드는 명시적인 validation 메시지를 반환한다")
+    @DisplayName("iOS 푸시 기기 등록 요청의 공백 및 필수 필드는 명시적인 validation 메시지를 반환한다")
     void registerIosPushDeviceRequestUsesExplicitRequiredFieldMessages() {
-        RegisterIosPushDeviceRequest request = new RegisterIosPushDeviceRequest(null, " ", null);
+        RegisterIosPushDeviceRequest request = new RegisterIosPushDeviceRequest(null, " ");
 
         assertThat(validator.validate(request))
                 .extracting(violation -> violation.getMessage())
                 .containsExactlyInAnyOrder(
                         "iOS 설치 식별자는 공백일 수 없습니다.",
-                        "APNs 토큰은 공백일 수 없습니다.",
-                        "iOS 알림 권한 상태는 필수입니다."
+                        "APNs 토큰은 공백일 수 없습니다."
                 );
     }
 }
