@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class NotificationRequestValidationTest {
@@ -11,6 +12,7 @@ class NotificationRequestValidationTest {
     private final Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
 
     @Test
+    @DisplayName("알림 설정 요청의 필수 필드는 명시적인 validation 메시지를 반환한다")
     void updateNotificationSettingsRequestUsesExplicitRequiredFieldMessages() {
         UpdateNotificationSettingsRequest request = new UpdateNotificationSettingsRequest(
                 null,
@@ -34,6 +36,7 @@ class NotificationRequestValidationTest {
     }
 
     @Test
+    @DisplayName("iOS 푸시 기기 등록 요청의 필수 필드는 명시적인 validation 메시지를 반환한다")
     void registerIosPushDeviceRequestUsesExplicitRequiredFieldMessages() {
         RegisterIosPushDeviceRequest request = new RegisterIosPushDeviceRequest(null, " ", null);
 
