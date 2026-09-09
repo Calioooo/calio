@@ -77,7 +77,6 @@ ai-calendar:
     maximum-query-days: 14
 
 notifications:
-  scheduler-enabled: false
   apns:
     environment: development
     team-id: ${APNS_TEAM_ID:}
