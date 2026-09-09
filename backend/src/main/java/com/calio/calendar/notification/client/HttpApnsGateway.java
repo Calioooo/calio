@@ -20,7 +20,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 @Component
-public class HttpApnsGateway implements ApnsGateway {
+public class HttpApnsGateway {
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(5);
 
     private final ApnsProperties properties;
@@ -38,7 +38,6 @@ public class HttpApnsGateway implements ApnsGateway {
         this.client = client;
     }
 
-    @Override
     public ApnsSendResult send(ApnsMessage message) {
         if (!properties.configured()) {
             return ApnsSendResult.configurationFailure("APNs credentials are not configured");
