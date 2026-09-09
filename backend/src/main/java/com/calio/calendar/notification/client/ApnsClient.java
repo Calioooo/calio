@@ -41,8 +41,14 @@ public class ApnsClient {
             return ApnsSendResult.configurationFailure("APNs credentials are not configured");
         }
 
+        String providerToken;
         try {
-            String providerToken = providerToken();
+            providerToken = providerToken();
+        } catch (Exception exception) {
+            return ApnsSendResult.configurationFailure("APNs provider token could not be created");
+        }
+
+        try {
             ResponseEntity<String> response = restClient.post()
                     .uri(DEVICE_URI_TEMPLATE, message.token())
                     .headers(headers -> applyHeaders(headers, message, providerToken))
