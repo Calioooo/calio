@@ -343,7 +343,7 @@ public class GoogleCalendarRecurrenceJobHandler {
             String expectedEtag,
             String updatedEtag
     ) {
-        markInactiveRecurrenceEventMappingsDeletePending(job);
+        markInactiveRecurrenceEventMappingsLocalChanged(job);
         GoogleCalendarRecurrenceEventMapping mapping = mappingQueryService
                 .getRecurrenceEventMappingIfExists(mappingId)
                 .orElse(null);
@@ -369,7 +369,7 @@ public class GoogleCalendarRecurrenceJobHandler {
             String workerToken,
             Long mappingId
     ) {
-        markInactiveRecurrenceEventMappingsLocalChanged(job);
+        markInactiveRecurrenceEventMappingsDeletePending(job);
         mappingQueryService.getRecurrenceEventMappingIfExists(mappingId)
                 .ifPresent(mappingCommandService::deleteRecurrenceAggregateMappings);
         jobService.succeed(job.getId(), job.getAccountId(), workerToken);

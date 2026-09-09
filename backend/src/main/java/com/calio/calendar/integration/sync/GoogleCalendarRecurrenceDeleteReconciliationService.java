@@ -50,7 +50,7 @@ public class GoogleCalendarRecurrenceDeleteReconciliationService {
                 .getEvent(accessToken, mapping.getExternalEventId())
                 .orElse(null);
         if (providerEvent != null) {
-            eventsClient.deleteEvent(accessToken, mapping.getExternalEventId(), providerEvent.etag());
+            eventsClient.delete(accessToken, mapping.getExternalEventId(), providerEvent.etag());
         }
         mappingCommandService.deleteRecurrenceAggregateMappings(mapping);
     }

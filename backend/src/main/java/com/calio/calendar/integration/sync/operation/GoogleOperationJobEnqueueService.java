@@ -13,7 +13,7 @@ import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEffect
 import com.calio.calendar.integration.sync.operation.dto.GoogleEventJobPayload;
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarRecurrenceJob;
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarRecurrenceJobKind;
-import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceMasterJobPayload;
+import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceJobPayload;
 import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceOverrideJobPayload;
 import java.time.Clock;
 import java.time.Instant;
@@ -126,18 +126,18 @@ public class GoogleOperationJobEnqueueService {
     }
 
     @Transactional
-    public boolean enqueueRecurrenceMaster(
+    public boolean enqueueRecurrence(
             Long accountId, Long recurrenceEventId, GoogleCalendarRecurrenceJobKind kind,
-            GoogleRecurrenceMasterJobPayload payload
+            GoogleRecurrenceJobPayload payload
     ) {
         return enqueueRecurrenceJob(accountId, recurrenceEventId, kind, null,
                 serializePayload(payload));
     }
 
     @Transactional
-    public boolean enqueueRecurrenceMasterDeleted(Long accountId, Long recurrenceEventId) {
+    public boolean enqueueRecurrenceDeleted(Long accountId, Long recurrenceEventId) {
         return enqueueRecurrenceJob(accountId, recurrenceEventId,
-                GoogleCalendarRecurrenceJobKind.MASTER_DELETE, null, "{}");
+                GoogleCalendarRecurrenceJobKind.RECURRENCE_DELETE, null, "{}");
     }
 
     @Transactional
@@ -171,7 +171,7 @@ public class GoogleOperationJobEnqueueService {
                 operationId, integration.getId(), accountId,
                 integration.allocateGoogleOperationSequence(), kind, recurrenceEventId,
                 originStartAt, targetPayload,
-                kind == GoogleCalendarRecurrenceJobKind.MASTER_CREATE
+                kind == GoogleCalendarRecurrenceJobKind.RECURRENCE_CREATE
                         ? "c1" + operationId.replace("-", "") : null,
                 Instant.now(clock));
         jobCommandService.enqueueOperationJob(job);

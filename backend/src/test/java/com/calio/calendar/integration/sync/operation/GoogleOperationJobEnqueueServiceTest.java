@@ -15,7 +15,7 @@ import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEventJ
 import com.calio.calendar.integration.sync.operation.dto.GoogleEventJobPayload;
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarRecurrenceJob;
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarRecurrenceJobKind;
-import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceMasterJobPayload;
+import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceJobPayload;
 import java.util.List;
 import java.time.Clock;
 import java.time.Instant;
@@ -80,7 +80,7 @@ class GoogleOperationJobEnqueueServiceTest {
     @DisplayName("recurrence master CREATE Job은 Connection 없이 narrow snapshot과 재시도 identity를 저장한다")
     void recurrenceMasterCreateStoresConnectionIndependentNarrowPayload() {
         GoogleCalendarIntegration integration = mock();
-        GoogleRecurrenceMasterJobPayload payload = new GoogleRecurrenceMasterJobPayload(
+        GoogleRecurrenceJobPayload payload = new GoogleRecurrenceJobPayload(
                 "daily", null, Instant.parse("2026-09-04T00:00:00Z"),
                 Instant.parse("2026-09-04T01:00:00Z"), false, "UTC",
                 List.of("RRULE:FREQ=DAILY"));
@@ -90,8 +90,8 @@ class GoogleOperationJobEnqueueServiceTest {
         when(objectMapper.writeValueAsString(payload)).thenReturn("master-payload");
         TransactionSynchronizationManager.initSynchronization();
 
-        boolean enqueued = service.enqueueRecurrenceMaster(10L, 40L,
-                GoogleCalendarRecurrenceJobKind.MASTER_CREATE, payload);
+        boolean enqueued = service.enqueueRecurrence(10L, 40L,
+                GoogleCalendarRecurrenceJobKind.RECURRENCE_CREATE, payload);
 
         ArgumentCaptor<GoogleOperationJob> captor = ArgumentCaptor.forClass(GoogleOperationJob.class);
         verify(jobCommandService).enqueueOperationJob(captor.capture());

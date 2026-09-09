@@ -44,7 +44,7 @@ class GoogleCalendarRecurrenceDeleteReconciliationServiceTest {
 
         service.reconcilePendingDeletes(connection);
 
-        verify(client).deleteEvent("token", "master-1", "new-etag");
+        verify(client).delete("token", "master-1", "new-etag");
         verify(mappingCommands).deleteRecurrenceAggregateMappings(mapping);
     }
 
@@ -73,7 +73,7 @@ class GoogleCalendarRecurrenceDeleteReconciliationServiceTest {
         service.reconcilePendingDeletes(connection);
 
         // then
-        verify(client, never()).deleteEvent(any(), any(), any());
+        verify(client, never()).delete(any(), any(), any());
         verify(mappingCommands).deleteRecurrenceAggregateMappings(mapping);
     }
 

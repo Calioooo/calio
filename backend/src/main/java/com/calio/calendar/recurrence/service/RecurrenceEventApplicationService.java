@@ -3,7 +3,7 @@ package com.calio.calendar.recurrence.service;
 import com.calio.calendar.event.controller.dto.EventResponse;
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobEnqueueService;
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarRecurrenceJobKind;
-import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceMasterJobPayload;
+import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceJobPayload;
 import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceOverrideJobPayload;
 import com.calio.calendar.recurrence.controller.dto.CreateRecurrenceEventRequest;
 import com.calio.calendar.recurrence.controller.dto.RecurrenceEventResponse;
@@ -34,9 +34,9 @@ public class RecurrenceEventApplicationService {
     @Transactional
     public RecurrenceEventResponse createRecurrenceEvent(Long accountId, CreateRecurrenceEventRequest request) {
         RecurrenceEventResponse response = recurrenceService.createRecurrenceEvent(accountId, request);
-        jobEnqueueService.enqueueRecurrenceMaster(accountId, response.recurrenceId(),
-                GoogleCalendarRecurrenceJobKind.MASTER_CREATE,
-                GoogleRecurrenceMasterJobPayload.from(recurrenceEventQueryService.getRecurrenceEvent(
+        jobEnqueueService.enqueueRecurrence(accountId, response.recurrenceId(),
+                GoogleCalendarRecurrenceJobKind.RECURRENCE_CREATE,
+                GoogleRecurrenceJobPayload.from(recurrenceEventQueryService.getRecurrenceEvent(
                         accountId, response.recurrenceId())));
         return response;
     }
@@ -50,9 +50,9 @@ public class RecurrenceEventApplicationService {
             Long accountId, Long recurrenceId, UpdateRecurrenceEventRequest request
     ) {
         RecurrenceEventResponse response = recurrenceService.updateRecurrenceEvent(accountId, recurrenceId, request);
-        jobEnqueueService.enqueueRecurrenceMaster(accountId, recurrenceId,
-                GoogleCalendarRecurrenceJobKind.MASTER_UPDATE,
-                GoogleRecurrenceMasterJobPayload.from(recurrenceEventQueryService.getRecurrenceEvent(
+        jobEnqueueService.enqueueRecurrence(accountId, recurrenceId,
+                GoogleCalendarRecurrenceJobKind.RECURRENCE_UPDATE,
+                GoogleRecurrenceJobPayload.from(recurrenceEventQueryService.getRecurrenceEvent(
                         accountId, recurrenceId)));
         return response;
     }
@@ -72,7 +72,7 @@ public class RecurrenceEventApplicationService {
     @Transactional
     public void deleteRecurrenceEvent(Long accountId, Long recurrenceId) {
         recurrenceService.deleteRecurrenceEvent(accountId, recurrenceId);
-        jobEnqueueService.enqueueRecurrenceMasterDeleted(accountId, recurrenceId);
+        jobEnqueueService.enqueueRecurrenceDeleted(accountId, recurrenceId);
     }
 
     @Transactional
