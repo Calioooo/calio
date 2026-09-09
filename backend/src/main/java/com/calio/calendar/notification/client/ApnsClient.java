@@ -8,9 +8,12 @@ import com.nimbusds.jwt.SignedJWT;
 import java.security.KeyFactory;
 import java.security.interfaces.ECPrivateKey;
 import java.security.spec.PKCS8EncodedKeySpec;
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.Date;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -24,16 +27,30 @@ import org.springframework.web.client.RestClientResponseException;
 public class ApnsClient {
 
     private static final String DEVICE_URI_TEMPLATE = "/3/device/{token}";
+    private static final Duration PROVIDER_TOKEN_REUSE_DURATION = Duration.ofMinutes(50);
 
     private final ApnsProperties properties;
     private final RestClient restClient;
+    private final Clock clock;
+    private String cachedProviderToken;
+    private Instant cachedProviderTokenIssuedAt;
 
+    @Autowired
     public ApnsClient(
             ApnsProperties properties,
             @Qualifier("apnsRestClient") RestClient restClient
     ) {
+        this(properties, restClient, Clock.systemUTC());
+    }
+
+    ApnsClient(
+            ApnsProperties properties,
+            RestClient restClient,
+            Clock clock
+    ) {
         this.properties = properties;
         this.restClient = restClient;
+        this.clock = clock;
     }
 
     public ApnsSendResult send(ApnsMessage message) {
@@ -117,7 +134,13 @@ public class ApnsClient {
         );
     }
 
-    private String providerToken() throws Exception {
+    private synchronized String providerToken() throws Exception {
+        Instant now = clock.instant();
+        if (cachedProviderToken != null
+                && cachedProviderTokenIssuedAt.plus(PROVIDER_TOKEN_REUSE_DURATION).isAfter(now)) {
+            return cachedProviderToken;
+        }
+
         String pem = properties.privateKey()
                 .replace("-----BEGIN PRIVATE KEY-----", "")
                 .replace("-----END PRIVATE KEY-----", "")
@@ -130,10 +153,12 @@ public class ApnsClient {
                 new JWSHeader.Builder(JWSAlgorithm.ES256).keyID(properties.keyId()).build(),
                 new JWTClaimsSet.Builder()
                         .issuer(properties.teamId())
-                        .issueTime(Date.from(Instant.now()))
+                        .issueTime(Date.from(now))
                         .build()
         );
         jwt.sign(new ECDSASigner(key));
-        return jwt.serialize();
+        cachedProviderToken = jwt.serialize();
+        cachedProviderTokenIssuedAt = now;
+        return cachedProviderToken;
     }
 }
