@@ -12,6 +12,8 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,9 +23,10 @@ import tools.jackson.databind.ObjectMapper;
 @Service
 public class CalendarNotificationDispatcher {
 
+    private static final Logger log = LoggerFactory.getLogger(CalendarNotificationDispatcher.class);
+
     private final NotificationDeliveryQueryService deliveryQueryService;
     private final NotificationDeliveryCommandService deliveryCommandService;
-    private final NotificationEndpointDeliveryCommandService endpointDeliveryCommandService;
     private final AccountQueryService accountQueryService;
     private final IosPushDeviceService pushDeviceService;
     private final ApnsClient apnsClient;
@@ -32,7 +35,6 @@ public class CalendarNotificationDispatcher {
     public CalendarNotificationDispatcher(
             NotificationDeliveryQueryService deliveryQueryService,
             NotificationDeliveryCommandService deliveryCommandService,
-            NotificationEndpointDeliveryCommandService endpointDeliveryCommandService,
             AccountQueryService accountQueryService,
             IosPushDeviceService pushDeviceService,
             ApnsClient apnsClient,
@@ -40,7 +42,6 @@ public class CalendarNotificationDispatcher {
     ) {
         this.deliveryQueryService = deliveryQueryService;
         this.deliveryCommandService = deliveryCommandService;
-        this.endpointDeliveryCommandService = endpointDeliveryCommandService;
         this.accountQueryService = accountQueryService;
         this.pushDeviceService = pushDeviceService;
         this.apnsClient = apnsClient;
@@ -107,10 +108,29 @@ public class CalendarNotificationDispatcher {
                 payload(delivery),
                 delivery.getScheduledAt().plus(Duration.ofMinutes(5))
         ));
-        endpointDeliveryCommandService.create(delivery, pushDevice, result);
+        logFailedDelivery(delivery, pushDevice, result);
         if (result.type() == ApnsSendResultType.INVALID_ENDPOINT) {
             pushDeviceService.deactivateInvalidPushDevice(pushDevice);
         }
+    }
+
+    private void logFailedDelivery(
+            NotificationDelivery delivery,
+            IosPushDevice pushDevice,
+            ApnsSendResult result
+    ) {
+        if (result.type() == ApnsSendResultType.ACCEPTED) {
+            return;
+        }
+
+        log.warn(
+                "APNs notification delivery failed. notificationDeliveryId={} iosPushDeviceId={} resultType={} providerRequestId={} reason={}",
+                delivery.getId(),
+                pushDevice.getId(),
+                result.type(),
+                result.requestId(),
+                result.reason()
+        );
     }
 
     private String payload(NotificationDelivery delivery) {
