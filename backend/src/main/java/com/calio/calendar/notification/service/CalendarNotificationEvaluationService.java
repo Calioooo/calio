@@ -9,6 +9,8 @@ import com.calio.calendar.groupspace.service.GroupMembershipQueryService;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingQueryService;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarRecurrenceMappingQueryService;
 import com.calio.calendar.notification.domain.AccountNotificationSettings;
+import com.calio.calendar.notification.domain.ImportantReminderOffset;
+import com.calio.calendar.notification.domain.TimedReminderOffset;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -90,10 +92,14 @@ public class CalendarNotificationEvaluationService {
         if (event.allDay() || event.isRecurrenceOccurrence() || !event.importantEvent()) {
             return;
         }
+        ImportantReminderOffset reminderOffset = settings.getImportantReminderOffset();
+        if (reminderOffset.isDisabled()) {
+            return;
+        }
         dispatchTimedReminder(
                 accountId,
                 "IMPORTANT",
-                settings.getImportantReminderMinutes(),
+                reminderOffset.minutes(),
                 scheduleKey,
                 event.startAt(),
                 event.timeZone(),
@@ -144,10 +150,14 @@ public class CalendarNotificationEvaluationService {
             dispatchIfDue(accountId, "ALL_DAY", scheduleKey, dueAt, startAt, null, title, groupName, dueFrom, dueTo);
             return;
         }
+        TimedReminderOffset reminderOffset = settings.getTimedReminderOffset();
+        if (reminderOffset.isDisabled()) {
+            return;
+        }
         dispatchTimedReminder(
                 accountId,
                 "REMINDER",
-                settings.getTimedReminderMinutes(),
+                reminderOffset.minutes(),
                 scheduleKey,
                 startAt,
                 timeZone,
@@ -161,7 +171,7 @@ public class CalendarNotificationEvaluationService {
     private void dispatchTimedReminder(
             Long accountId,
             String type,
-            Integer minutes,
+            int minutes,
             String key,
             Instant startAt,
             String timeZone,
@@ -170,9 +180,6 @@ public class CalendarNotificationEvaluationService {
             Instant dueFrom,
             Instant dueTo
     ) {
-        if (minutes == null) {
-            return;
-        }
         dispatchIfDue(
                 accountId,
                 type,
