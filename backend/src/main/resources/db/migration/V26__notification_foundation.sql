@@ -1,4 +1,4 @@
-CREATE TABLE ios_notification_endpoints (
+CREATE TABLE ios_push_devices (
     id BIGINT NOT NULL AUTO_INCREMENT,
     account_id BIGINT NOT NULL,
     installation_id VARCHAR(128) NOT NULL,
@@ -10,10 +10,10 @@ CREATE TABLE ios_notification_endpoints (
     created_at DATETIME(6) NOT NULL,
     updated_at DATETIME(6) NOT NULL,
     PRIMARY KEY (id),
-    CONSTRAINT uk_ios_notification_endpoints_account_installation UNIQUE (account_id, installation_id),
-    CONSTRAINT uk_ios_notification_endpoints_apns_token UNIQUE (apns_token),
-    CONSTRAINT fk_ios_notification_endpoints_account FOREIGN KEY (account_id) REFERENCES accounts (id),
-    INDEX idx_ios_notification_endpoints_eligible (account_id, active, authorization_status)
+    CONSTRAINT uk_ios_push_devices_account_installation UNIQUE (account_id, installation_id),
+    CONSTRAINT uk_ios_push_devices_apns_token UNIQUE (apns_token),
+    CONSTRAINT fk_ios_push_devices_account FOREIGN KEY (account_id) REFERENCES accounts (id),
+    INDEX idx_ios_push_devices_eligible (account_id, active, authorization_status)
 );
 
 CREATE TABLE account_notification_settings (
@@ -62,5 +62,5 @@ CREATE TABLE notification_endpoint_deliveries (
     PRIMARY KEY (id),
     CONSTRAINT uk_notification_endpoint_deliveries UNIQUE (notification_delivery_id, endpoint_id),
     CONSTRAINT fk_notification_endpoint_deliveries_delivery FOREIGN KEY (notification_delivery_id) REFERENCES notification_deliveries (id),
-    CONSTRAINT fk_notification_endpoint_deliveries_endpoint FOREIGN KEY (endpoint_id) REFERENCES ios_notification_endpoints (id)
+    CONSTRAINT fk_notification_endpoint_deliveries_endpoint FOREIGN KEY (endpoint_id) REFERENCES ios_push_devices (id)
 );
