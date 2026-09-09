@@ -9,10 +9,10 @@ import static org.mockito.Mockito.when;
 
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.service.AccountQueryService;
-import com.calio.calendar.notification.client.ApnsGateway;
 import com.calio.calendar.notification.client.ApnsSendResult;
 import com.calio.calendar.notification.client.ApnsSendResultType;
-import com.calio.calendar.notification.domain.IosNotificationEndpoint;
+import com.calio.calendar.notification.client.ApnsClient;
+import com.calio.calendar.notification.domain.IosPushDevice;
 import com.calio.calendar.notification.domain.NotificationDelivery;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -41,16 +41,16 @@ class CalendarNotificationDispatcherTest {
     private AccountQueryService accountQueryService;
 
     @Mock
-    private IosNotificationEndpointService endpointService;
+    private IosPushDeviceService pushDeviceService;
 
     @Mock
-    private ApnsGateway apnsGateway;
+    private ApnsClient apnsClient;
 
     @Mock
-    private IosNotificationEndpoint iphoneEndpoint;
+    private IosPushDevice iphonePushDevice;
 
     @Mock
-    private IosNotificationEndpoint ipadEndpoint;
+    private IosPushDevice ipadPushDevice;
 
     private CalendarNotificationDispatcher dispatcher;
 
@@ -61,8 +61,8 @@ class CalendarNotificationDispatcherTest {
                 deliveryCommandService,
                 endpointDeliveryCommandService,
                 accountQueryService,
-                endpointService,
-                apnsGateway,
+                pushDeviceService,
+                apnsClient,
                 new ObjectMapper()
         );
     }
@@ -85,10 +85,10 @@ class CalendarNotificationDispatcherTest {
                 eq("회의"),
                 eq(null)
         )).thenReturn(delivery);
-        when(endpointService.listEligibleEndpoints(1L)).thenReturn(List.of(iphoneEndpoint, ipadEndpoint));
-        when(iphoneEndpoint.getApnsToken()).thenReturn("iphone-token");
-        when(ipadEndpoint.getApnsToken()).thenReturn("ipad-token");
-        when(apnsGateway.send(any())).thenReturn(new ApnsSendResult(
+        when(pushDeviceService.listEligiblePushDevices(1L)).thenReturn(List.of(iphonePushDevice, ipadPushDevice));
+        when(iphonePushDevice.getApnsToken()).thenReturn("iphone-token");
+        when(ipadPushDevice.getApnsToken()).thenReturn("ipad-token");
+        when(apnsClient.send(any())).thenReturn(new ApnsSendResult(
                 ApnsSendResultType.ACCEPTED,
                 "apns-id",
                 null
@@ -106,7 +106,7 @@ class CalendarNotificationDispatcherTest {
         );
 
         // then
-        verify(apnsGateway, times(2)).send(any());
+        verify(apnsClient, times(2)).send(any());
         verify(endpointDeliveryCommandService, times(2)).create(any(), any(), any());
     }
 
@@ -131,7 +131,7 @@ class CalendarNotificationDispatcherTest {
 
         // then
         verify(deliveryCommandService, never()).create(any(), any(), any(), any(), any(), any(), any());
-        verify(apnsGateway, never()).send(any());
+        verify(apnsClient, never()).send(any());
     }
 
     private NotificationDelivery delivery(Instant scheduledAt) {
