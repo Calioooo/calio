@@ -63,7 +63,6 @@ public class SecurityConfig {
                         .requestMatchers("/api/integrations/**").authenticated()
                         .requestMatchers("/api/ai/calendar/**").authenticated()
                         .requestMatchers("/api/notification-endpoints/**").authenticated()
-                        .requestMatchers("/api/notification-settings/**").authenticated()
                         .requestMatchers("/api/group-spaces").authenticated()
                         .requestMatchers("/api/group-spaces/**").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/group-invitations/accept").authenticated()
