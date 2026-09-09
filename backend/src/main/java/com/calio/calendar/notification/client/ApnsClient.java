@@ -23,6 +23,8 @@ import org.springframework.web.client.RestClientResponseException;
 @Component
 public class ApnsClient {
 
+    private static final String DEVICE_URI_TEMPLATE = "/3/device/{token}";
+
     private final ApnsProperties properties;
     private final RestClient restClient;
 
@@ -42,7 +44,7 @@ public class ApnsClient {
         try {
             String providerToken = providerToken();
             ResponseEntity<String> response = restClient.post()
-                    .uri("/3/device/{token}", message.token())
+                    .uri(DEVICE_URI_TEMPLATE, message.token())
                     .headers(headers -> applyHeaders(headers, message, providerToken))
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(message.payload())
