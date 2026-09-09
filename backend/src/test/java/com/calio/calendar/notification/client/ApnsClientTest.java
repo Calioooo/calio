@@ -149,6 +149,31 @@ class ApnsClientTest {
         assertThat(result.type()).isEqualTo(ApnsSendResultType.CONFIGURATION_FAILURE);
     }
 
+    @Test
+    @DisplayName("잘못된 APNs private key는 네트워크 요청 없이 configuration failure를 반환한다")
+    void givenInvalidPrivateKey_whenSend_thenReturnsConfigurationFailureWithoutSendingRequest() {
+        // given
+        RestClient.Builder restClientBuilder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
+        ApnsClient client = new ApnsClient(
+                new ApnsProperties(
+                        "development",
+                        "team",
+                        "key",
+                        "bundle",
+                        "-----BEGIN PRIVATE KEY-----\\ninvalid\\n-----END PRIVATE KEY-----"
+                ),
+                restClientBuilder.baseUrl(APNS_HOST).build()
+        );
+
+        // when
+        ApnsSendResult result = client.send(message());
+
+        // then
+        assertThat(result.type()).isEqualTo(ApnsSendResultType.CONFIGURATION_FAILURE);
+        server.verify();
+    }
+
     private TestClient testClient() {
         RestClient.Builder restClientBuilder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
