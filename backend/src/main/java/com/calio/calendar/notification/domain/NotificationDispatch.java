@@ -17,13 +17,13 @@ import java.time.LocalDate;
 
 @Entity
 @Table(
-        name = "notification_deliveries",
+        name = "notification_dispatches",
         uniqueConstraints = @UniqueConstraint(
-                name = "uk_notification_deliveries_claim",
+                name = "uk_notification_dispatches_claim",
                 columnNames = {"account_id", "notification_type", "schedule_key", "scheduled_at"}
         )
 )
-public class NotificationDelivery extends BaseEntity {
+public class NotificationDispatch extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -51,10 +51,10 @@ public class NotificationDelivery extends BaseEntity {
     @Column(nullable = false)
     private String status;
 
-    protected NotificationDelivery() {
+    protected NotificationDispatch() {
     }
 
-    public NotificationDelivery(
+    public NotificationDispatch(
             Account account,
             String notificationType,
             String scheduleKey,

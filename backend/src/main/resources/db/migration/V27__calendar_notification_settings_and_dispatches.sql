@@ -15,7 +15,7 @@ CREATE TABLE account_notification_settings (
     INDEX idx_account_notification_settings_enabled (calendar_notifications_enabled, account_id)
 );
 
-CREATE TABLE notification_deliveries (
+CREATE TABLE notification_dispatches (
     id BIGINT NOT NULL AUTO_INCREMENT,
     account_id BIGINT NOT NULL,
     notification_type VARCHAR(64) NOT NULL,
@@ -28,6 +28,6 @@ CREATE TABLE notification_deliveries (
     created_at DATETIME(6) NOT NULL,
     updated_at DATETIME(6) NOT NULL,
     PRIMARY KEY (id),
-    CONSTRAINT uk_notification_deliveries_claim UNIQUE (account_id, notification_type, schedule_key, scheduled_at),
-    CONSTRAINT fk_notification_deliveries_account FOREIGN KEY (account_id) REFERENCES accounts (id)
+    CONSTRAINT uk_notification_dispatches_claim UNIQUE (account_id, notification_type, schedule_key, scheduled_at),
+    CONSTRAINT fk_notification_dispatches_account FOREIGN KEY (account_id) REFERENCES accounts (id)
 );
