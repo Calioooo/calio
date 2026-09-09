@@ -1,0 +1,161 @@
+package com.calio.calendar.recurrence.service;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import com.calio.calendar.event.controller.dto.EventResponse;
+import com.calio.calendar.integration.sync.operation.GoogleOperationJobEnqueueService;
+import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarRecurrenceJobKind;
+import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceMasterJobPayload;
+import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceOverrideJobPayload;
+import com.calio.calendar.recurrence.controller.dto.CreateRecurrenceEventRequest;
+import com.calio.calendar.recurrence.controller.dto.RecurrenceEventResponse;
+import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceEventRequest;
+import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceOccurrenceRequest;
+import com.calio.calendar.recurrence.domain.RecurrenceEvent;
+import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
+import java.time.Instant;
+import java.util.List;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
+import org.mockito.ArgumentCaptor;
+
+class RecurrenceEventApplicationServiceTest {
+    private final RecurrenceEventService recurrenceService = mock();
+    private final RecurrenceEventQueryService recurrenceEventQueryService = mock();
+    private final GoogleOperationJobEnqueueService enqueueService = mock();
+    private final RecurrenceEventApplicationService service =
+            new RecurrenceEventApplicationService(
+                    recurrenceService, recurrenceEventQueryService, enqueueService);
+
+    @Test
+    @DisplayName("master canonical create 뒤 같은 application transaction 경계에서 narrow Job을 enqueue한다")
+    void masterCreateMutatesBeforeEnqueueingSnapshot() {
+        CreateRecurrenceEventRequest request = new CreateRecurrenceEventRequest(
+                "daily", null, false, Instant.parse("2026-09-04T00:00:00Z"),
+                Instant.parse("2026-09-04T01:00:00Z"), "UTC",
+                List.of("RRULE:FREQ=DAILY"), null);
+        RecurrenceEventResponse response = mock();
+        RecurrenceEvent recurrenceEvent = mock();
+        when(response.recurrenceId()).thenReturn(40L);
+        when(recurrenceEvent.getTitle()).thenReturn("daily");
+        when(recurrenceEvent.getDescription()).thenReturn("daily description");
+        when(recurrenceEvent.isAllDay()).thenReturn(false);
+        when(recurrenceEvent.getFirstOccurrenceStartAt()).thenReturn(request.firstOccurrenceStartAt());
+        when(recurrenceEvent.getFirstOccurrenceEndAt()).thenReturn(request.firstOccurrenceEndAt());
+        when(recurrenceEvent.getTimeZone()).thenReturn("UTC");
+        when(recurrenceEvent.getRecurrenceRules()).thenReturn(request.recurrence());
+        when(recurrenceService.createRecurrenceEvent(10L, request)).thenReturn(response);
+        when(recurrenceEventQueryService.getRecurrenceEvent(10L, 40L)).thenReturn(recurrenceEvent);
+
+        service.createRecurrenceEvent(10L, request);
+
+        InOrder order = inOrder(recurrenceService, enqueueService);
+        order.verify(recurrenceService).createRecurrenceEvent(10L, request);
+        order.verify(enqueueService).enqueueRecurrenceMaster(
+                org.mockito.ArgumentMatchers.eq(10L), org.mockito.ArgumentMatchers.eq(40L),
+                org.mockito.ArgumentMatchers.eq(GoogleCalendarRecurrenceJobKind.MASTER_CREATE), any());
+        ArgumentCaptor<GoogleRecurrenceMasterJobPayload> payload = ArgumentCaptor.forClass(
+                GoogleRecurrenceMasterJobPayload.class);
+        verify(enqueueService).enqueueRecurrenceMaster(
+                eq(10L), eq(40L), eq(GoogleCalendarRecurrenceJobKind.MASTER_CREATE), payload.capture());
+        assertThat(payload.getValue()).isEqualTo(new GoogleRecurrenceMasterJobPayload(
+                "daily", "daily description", request.firstOccurrenceStartAt(),
+                request.firstOccurrenceEndAt(), false, "UTC", List.of("RRULE:FREQ=DAILY")));
+    }
+
+    @Test
+    @DisplayName("override mutation은 exact origin과 해당 full final snapshot만 enqueue한다")
+    void overrideMutationEnqueuesExactOriginSnapshot() {
+        Instant origin = Instant.parse("2026-09-04T00:00:00Z");
+        UpdateRecurrenceOccurrenceRequest request = new UpdateRecurrenceOccurrenceRequest(
+                origin, "moved", null, Instant.parse("2026-09-04T02:00:00Z"),
+                Instant.parse("2026-09-04T03:00:00Z"), false, "UTC");
+        EventResponse response = mock();
+        RecurrenceEventOverride recurrenceOverride = mock();
+        when(response.title()).thenReturn("moved");
+        when(response.startAt()).thenReturn(request.startAt());
+        when(response.endAt()).thenReturn(request.endAt());
+        when(response.timeZone()).thenReturn("UTC");
+        when(recurrenceService.updateRecurrenceOccurrence(10L, 40L, request)).thenReturn(response);
+        when(recurrenceOverride.getOverrideTitle()).thenReturn("moved");
+        when(recurrenceOverride.getOverrideDescription()).thenReturn("moved description");
+        when(recurrenceOverride.getOverrideStartAt()).thenReturn(request.startAt());
+        when(recurrenceOverride.getOverrideEndAt()).thenReturn(request.endAt());
+        when(recurrenceOverride.getOverrideTimeZone()).thenReturn("UTC");
+        when(recurrenceEventQueryService.getOverrideIfExists(40L, origin))
+                .thenReturn(java.util.Optional.of(recurrenceOverride));
+
+        service.updateRecurrenceOccurrence(10L, 40L, request);
+
+        verify(enqueueService).enqueueRecurrenceOverride(
+                org.mockito.ArgumentMatchers.eq(10L), org.mockito.ArgumentMatchers.eq(40L),
+                org.mockito.ArgumentMatchers.eq(origin), any());
+        ArgumentCaptor<GoogleRecurrenceOverrideJobPayload> payload = ArgumentCaptor.forClass(
+                GoogleRecurrenceOverrideJobPayload.class);
+        verify(enqueueService).enqueueRecurrenceOverride(eq(10L), eq(40L), eq(origin), payload.capture());
+        assertThat(payload.getValue()).isEqualTo(new GoogleRecurrenceOverrideJobPayload(
+                "moved", "moved description", request.startAt(), request.endAt(), false, "UTC"));
+        verify(enqueueService, never()).enqueueRecurrenceMaster(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("master update는 수정된 recurrence snapshot으로 MASTER_UPDATE Job을 enqueue한다")
+    void updateRecurrenceEventEnqueuesMasterUpdate() {
+        // given
+        UpdateRecurrenceEventRequest request = new UpdateRecurrenceEventRequest(
+                "weekly", "weekly description", false,
+                Instant.parse("2026-09-11T00:00:00Z"), Instant.parse("2026-09-11T01:00:00Z"),
+                "UTC", List.of("RRULE:FREQ=WEEKLY"), null);
+        RecurrenceEventResponse response = mock();
+        RecurrenceEvent recurrenceEvent = mock();
+        when(recurrenceService.updateRecurrenceEvent(10L, 40L, request)).thenReturn(response);
+        when(recurrenceEvent.getTitle()).thenReturn("weekly");
+        when(recurrenceEvent.getDescription()).thenReturn("weekly description");
+        when(recurrenceEvent.getFirstOccurrenceStartAt()).thenReturn(request.firstOccurrenceStartAt());
+        when(recurrenceEvent.getFirstOccurrenceEndAt()).thenReturn(request.firstOccurrenceEndAt());
+        when(recurrenceEvent.isAllDay()).thenReturn(false);
+        when(recurrenceEvent.getTimeZone()).thenReturn("UTC");
+        when(recurrenceEvent.getRecurrenceRules()).thenReturn(request.recurrence());
+        when(recurrenceEventQueryService.getRecurrenceEvent(10L, 40L)).thenReturn(recurrenceEvent);
+
+        // when
+        service.updateRecurrenceEvent(10L, 40L, request);
+
+        // then
+        verify(enqueueService).enqueueRecurrenceMaster(
+                eq(10L), eq(40L), eq(GoogleCalendarRecurrenceJobKind.MASTER_UPDATE), any());
+    }
+
+    @Test
+    @DisplayName("master delete는 recurrence identity로 delete Job을 enqueue한다")
+    void deleteRecurrenceEventEnqueuesMasterDelete() {
+        // when
+        service.deleteRecurrenceEvent(10L, 40L);
+
+        // then
+        verify(recurrenceService).deleteRecurrenceEvent(10L, 40L);
+        verify(enqueueService).enqueueRecurrenceMasterDeleted(10L, 40L);
+    }
+
+    @Test
+    @DisplayName("occurrence delete는 exact origin으로 override delete Job을 enqueue한다")
+    void deleteRecurrenceOccurrenceEnqueuesOverrideDelete() {
+        // given
+        Instant origin = Instant.parse("2026-09-04T00:00:00Z");
+
+        // when
+        service.deleteRecurrenceOccurrence(10L, 40L, origin);
+
+        // then
+        verify(recurrenceService).deleteRecurrenceOccurrence(10L, 40L, origin);
+        verify(enqueueService).enqueueRecurrenceOverrideDeleted(10L, 40L, origin);
+    }
+}

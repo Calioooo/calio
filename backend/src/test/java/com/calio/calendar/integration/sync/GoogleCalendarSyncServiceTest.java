@@ -2,7 +2,12 @@ package com.calio.calendar.integration.sync;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.calio.calendar.account.service.AccountQueryService;
@@ -39,6 +44,7 @@ import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
 import org.springframework.web.client.RestClient;
 import tools.jackson.databind.ObjectMapper;
 
@@ -47,6 +53,59 @@ class GoogleCalendarSyncServiceTest {
     private static final long JOB_ID = 30L;
     private static final long ACCOUNT_ID = 10L;
     private static final String WORKER_TOKEN = "worker-token";
+
+    @Test
+    @DisplayName("pending recurrence delete를 reconciliation한 뒤 inbound page를 요청한다")
+    void givenPendingRecurrenceDelete_whenSync_thenReconcilesBeforeRequestingInboundPage() {
+        // given
+        GoogleCalendarConnectionQueryService connections = mock();
+        GoogleCalendarConnection connection = connectedConnection(null);
+        GoogleCalendarIntegrationDataService dataService = mock();
+        GoogleCalendarAccessTokenService tokens = mock();
+        GoogleCalendarEventRequestService eventRequests = mock();
+        GoogleCalendarPageChangeService pageChanges = mock();
+        GoogleCalendarPageNormalizer pageNormalizer = mock();
+        GoogleOperationLeaseService leases = mock();
+        GoogleCalendarRecurrenceDeleteReconciliationService reconciliation = mock();
+        when(connections.getConnectedConnection(ACCOUNT_ID)).thenReturn(connection);
+        when(tokens.getAccessToken(20L)).thenReturn("token");
+        when(eventRequests.listEvents(eq(20L), eq(GoogleCalendarSyncMode.FULL), eq(null), eq(null), any()))
+                .thenReturn(terminalPage("next-cursor"));
+        when(pageNormalizer.normalize(eq(20L), any(), any()))
+                .thenReturn(new GoogleCalendarNormalizedPage(List.of(), null, "next-cursor"));
+
+        GoogleCalendarSyncService service = new GoogleCalendarSyncService(
+                connections, dataService, tokens, eventRequests, pageChanges, pageNormalizer,
+                leases, reconciliation);
+
+        // when
+        synchronize(service);
+
+        // then
+        InOrder order = inOrder(reconciliation, eventRequests);
+        order.verify(reconciliation).reconcilePendingDeletes(connection);
+        order.verify(eventRequests).listEvents(
+                eq(20L), eq(GoogleCalendarSyncMode.FULL), eq(null), eq(null), any());
+    }
+
+    @Test
+    @DisplayName("pending recurrence delete reconciliation이 실패하면 inbound page를 요청하지 않는다")
+    void givenReconciliationFailure_whenSync_thenDoesNotRequestInboundPage() {
+        // given
+        GoogleCalendarConnectionQueryService connections = mock();
+        GoogleCalendarConnection connection = connectedConnection(null);
+        GoogleCalendarEventRequestService eventRequests = mock();
+        GoogleCalendarRecurrenceDeleteReconciliationService reconciliation = mock();
+        CalioException failure = new CalioException(ErrorCode.GOOGLE_CALENDAR_SYNC_FAILED);
+        when(connections.getConnectedConnection(ACCOUNT_ID)).thenReturn(connection);
+        org.mockito.Mockito.doThrow(failure).when(reconciliation).reconcilePendingDeletes(connection);
+        GoogleCalendarSyncService service = new GoogleCalendarSyncService(
+                connections, mock(), mock(), eventRequests, mock(), mock(), mock(), reconciliation);
+
+        // when, then
+        assertThatThrownBy(() -> synchronize(service)).isSameAs(failure);
+        verify(eventRequests, never()).listEvents(any(), any(), any(), any(), any());
+    }
 
     @Test
     @DisplayName("INCREMENTAL 두 번째 page 요청이 410이면 FULL sync를 처음부터 다시 실행하고 이전 처리 결과를 사용하지 않는다")
@@ -83,7 +142,8 @@ class GoogleCalendarSyncServiceTest {
                                 "full-recurrence-event"
                         )
                 ),
-                new FakeOperationLeaseService()
+                new FakeOperationLeaseService(),
+                mock(GoogleCalendarRecurrenceDeleteReconciliationService.class)
         );
 
         // when
@@ -151,7 +211,8 @@ class GoogleCalendarSyncServiceTest {
                 eventRequestService(eventsClient, accessTokenService),
                 new FakePagePersistenceService(),
                 new FakePageNormalizer(),
-                ownershipService
+                ownershipService,
+                mock(GoogleCalendarRecurrenceDeleteReconciliationService.class)
         );
 
         // when, then
@@ -270,7 +331,8 @@ class GoogleCalendarSyncServiceTest {
                                 "recurrence-event-2"
                         )
                 ),
-                ownershipService
+                ownershipService,
+                mock(GoogleCalendarRecurrenceDeleteReconciliationService.class)
         );
 
         // when
@@ -319,6 +381,14 @@ class GoogleCalendarSyncServiceTest {
         service.synchronize(JOB_ID, ACCOUNT_ID, WORKER_TOKEN);
     }
 
+    private GoogleCalendarConnection connectedConnection(String nextSyncToken) {
+        GoogleCalendarConnection connection = mock();
+        when(connection.getId()).thenReturn(20L);
+        when(connection.getAccountId()).thenReturn(ACCOUNT_ID);
+        when(connection.getNextSyncToken()).thenReturn(nextSyncToken);
+        return connection;
+    }
+
     private GoogleCalendarSyncService service(
             FakeIntegrationQueryService integrationQueryService,
             FakeProviderDataService providerDataService,
@@ -348,7 +418,8 @@ class GoogleCalendarSyncServiceTest {
                 eventRequestService(eventsClient, accessTokenService),
                 pagePersistenceService,
                 new FakePageNormalizer(),
-                new FakeOperationLeaseService()
+                new FakeOperationLeaseService(),
+                mock(GoogleCalendarRecurrenceDeleteReconciliationService.class)
         );
     }
 

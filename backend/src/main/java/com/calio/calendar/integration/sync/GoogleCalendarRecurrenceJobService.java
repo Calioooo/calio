@@ -223,6 +223,9 @@ public class GoogleCalendarRecurrenceJobService {
     ) {
         Map<Long, GoogleCalendarRecurrenceEventMapping> current = currentMasters(job);
         Outcome outcome = applyMasterResults(results, current);
+        results.stream().filter(Result::localChanged).map(result -> current.get(result.mappingId()))
+                .filter(Objects::nonNull)
+                .forEach(GoogleCalendarRecurrenceEventMapping::markProviderDeletePending);
         if (finishConflict(job, workerToken, outcome)) return;
         results.stream().filter(Result::providerDeleted).map(result -> current.get(result.mappingId()))
                 .filter(Objects::nonNull).forEach(mappingCommandService::deleteRecurrenceAggregateMappings);

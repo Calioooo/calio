@@ -5,7 +5,7 @@ import com.calio.calendar.recurrence.controller.dto.CreateRecurrenceEventRequest
 import com.calio.calendar.recurrence.controller.dto.RecurrenceEventResponse;
 import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceEventRequest;
 import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceOccurrenceRequest;
-import com.calio.calendar.recurrence.service.RecurrenceEventService;
+import com.calio.calendar.recurrence.service.RecurrenceEventApplicationService;
 import com.calio.calendar.security.AuthenticatedAccount;
 import jakarta.validation.Valid;
 import java.time.Instant;
@@ -30,9 +30,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/recurrence-events")
 public class RecurrenceEventController {
 
-    private final RecurrenceEventService recurrenceEventService;
+    private final RecurrenceEventApplicationService recurrenceEventService;
 
-    public RecurrenceEventController(RecurrenceEventService recurrenceEventService) {
+    public RecurrenceEventController(RecurrenceEventApplicationService recurrenceEventService) {
         this.recurrenceEventService = recurrenceEventService;
     }
 
