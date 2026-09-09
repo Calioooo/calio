@@ -9,9 +9,9 @@ import static org.mockito.Mockito.when;
 
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.service.AccountQueryService;
-import com.calio.calendar.notification.client.ApnsGateway;
 import com.calio.calendar.notification.client.ApnsSendResult;
 import com.calio.calendar.notification.client.ApnsSendResultType;
+import com.calio.calendar.notification.client.HttpApnsGateway;
 import com.calio.calendar.notification.domain.IosNotificationEndpoint;
 import com.calio.calendar.notification.domain.NotificationDelivery;
 import java.time.Instant;
@@ -44,7 +44,7 @@ class CalendarNotificationDispatcherTest {
     private IosNotificationEndpointService endpointService;
 
     @Mock
-    private ApnsGateway apnsGateway;
+    private HttpApnsGateway apnsGateway;
 
     @Mock
     private IosNotificationEndpoint iphoneEndpoint;

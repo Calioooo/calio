@@ -1,10 +1,10 @@
 package com.calio.calendar.notification.service;
 
 import com.calio.calendar.account.service.AccountQueryService;
-import com.calio.calendar.notification.client.ApnsGateway;
 import com.calio.calendar.notification.client.ApnsMessage;
 import com.calio.calendar.notification.client.ApnsSendResult;
 import com.calio.calendar.notification.client.ApnsSendResultType;
+import com.calio.calendar.notification.client.HttpApnsGateway;
 import com.calio.calendar.notification.domain.IosNotificationEndpoint;
 import com.calio.calendar.notification.domain.NotificationDelivery;
 import java.time.Duration;
@@ -26,7 +26,7 @@ public class CalendarNotificationDispatcher {
     private final NotificationEndpointDeliveryCommandService endpointDeliveryCommandService;
     private final AccountQueryService accountQueryService;
     private final IosNotificationEndpointService endpointService;
-    private final ApnsGateway apnsGateway;
+    private final HttpApnsGateway apnsGateway;
     private final ObjectMapper objectMapper;
 
     public CalendarNotificationDispatcher(
@@ -35,7 +35,7 @@ public class CalendarNotificationDispatcher {
             NotificationEndpointDeliveryCommandService endpointDeliveryCommandService,
             AccountQueryService accountQueryService,
             IosNotificationEndpointService endpointService,
-            ApnsGateway apnsGateway,
+            HttpApnsGateway apnsGateway,
             ObjectMapper objectMapper
     ) {
         this.deliveryQueryService = deliveryQueryService;
