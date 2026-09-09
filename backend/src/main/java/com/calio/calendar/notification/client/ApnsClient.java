@@ -13,7 +13,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.Date;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -35,17 +34,9 @@ public class ApnsClient {
     private String cachedProviderToken;
     private Instant cachedProviderTokenIssuedAt;
 
-    @Autowired
     public ApnsClient(
             ApnsProperties properties,
-            @Qualifier("apnsRestClient") RestClient restClient
-    ) {
-        this(properties, restClient, Clock.systemUTC());
-    }
-
-    ApnsClient(
-            ApnsProperties properties,
-            RestClient restClient,
+            @Qualifier("apnsRestClient") RestClient restClient,
             Clock clock
     ) {
         this.properties = properties;
