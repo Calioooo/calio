@@ -172,7 +172,8 @@ class ApnsClientTest {
         // given
         ApnsClient client = new ApnsClient(
                 new ApnsProperties("development", "", "", "", ""),
-                RestClient.builder().build()
+                RestClient.builder().build(),
+                Clock.systemUTC()
         );
 
         // when
@@ -196,7 +197,8 @@ class ApnsClientTest {
                         "bundle",
                         "-----BEGIN PRIVATE KEY-----\\ninvalid\\n-----END PRIVATE KEY-----"
                 ),
-                restClientBuilder.baseUrl(APNS_HOST).build()
+                restClientBuilder.baseUrl(APNS_HOST).build(),
+                Clock.systemUTC()
         );
 
         // when
@@ -211,7 +213,7 @@ class ApnsClientTest {
         RestClient.Builder restClientBuilder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
         RestClient restClient = restClientBuilder.baseUrl(APNS_HOST).build();
-        return new TestClient(new ApnsClient(properties(), restClient), server);
+        return new TestClient(new ApnsClient(properties(), restClient, Clock.systemUTC()), server);
     }
 
     private ApnsProperties properties() {
