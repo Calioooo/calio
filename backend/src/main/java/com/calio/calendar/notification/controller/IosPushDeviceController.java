@@ -1,7 +1,7 @@
 package com.calio.calendar.notification.controller;
 
-import com.calio.calendar.notification.controller.dto.RegisterIosNotificationEndpointRequest;
-import com.calio.calendar.notification.service.IosNotificationEndpointService;
+import com.calio.calendar.notification.controller.dto.RegisterIosPushDeviceRequest;
+import com.calio.calendar.notification.service.IosPushDeviceService;
 import com.calio.calendar.security.AuthenticatedAccount;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -15,20 +15,20 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/notification-endpoints/ios")
-public class IosNotificationEndpointController {
+public class IosPushDeviceController {
 
-    private final IosNotificationEndpointService endpointService;
+    private final IosPushDeviceService pushDeviceService;
 
-    public IosNotificationEndpointController(IosNotificationEndpointService endpointService) {
-        this.endpointService = endpointService;
+    public IosPushDeviceController(IosPushDeviceService pushDeviceService) {
+        this.pushDeviceService = pushDeviceService;
     }
 
     @PutMapping
     public ResponseEntity<Void> register(
             @AuthenticationPrincipal AuthenticatedAccount account,
-            @Valid @RequestBody RegisterIosNotificationEndpointRequest request
+            @Valid @RequestBody RegisterIosPushDeviceRequest request
     ) {
-        endpointService.register(
+        pushDeviceService.register(
                 account.accountId(),
                 request.installationId(),
                 request.apnsToken(),
@@ -42,7 +42,7 @@ public class IosNotificationEndpointController {
             @AuthenticationPrincipal AuthenticatedAccount account,
             @PathVariable String installationId
     ) {
-        endpointService.deactivate(account.accountId(), installationId);
+        pushDeviceService.deactivate(account.accountId(), installationId);
         return ResponseEntity.noContent().build();
     }
 }

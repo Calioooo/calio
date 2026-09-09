@@ -17,7 +17,7 @@ import java.time.Instant;
 
 @Entity
 @Table(name = "ios_notification_endpoints")
-public class IosNotificationEndpoint extends BaseEntity {
+public class IosPushDevice extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -45,10 +45,10 @@ public class IosNotificationEndpoint extends BaseEntity {
 
     private Instant deactivatedAt;
 
-    protected IosNotificationEndpoint() {
+    protected IosPushDevice() {
     }
 
-    public IosNotificationEndpoint(
+    public IosPushDevice(
             Account account,
             String installationId,
             String apnsToken,
