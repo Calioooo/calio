@@ -24,6 +24,11 @@ public class IosPushDeviceCommandService {
         pushDeviceRepository.saveAndFlush(pushDevice);
     }
 
+    public void deactivate(IosPushDevice pushDevice, Instant now) {
+        pushDevice.deactivate(now);
+        pushDeviceRepository.saveAndFlush(pushDevice);
+    }
+
     public void deactivateAndReleaseToken(IosPushDevice pushDevice, Instant now) {
         pushDevice.deactivate(now);
         pushDevice.clearApnsToken();
