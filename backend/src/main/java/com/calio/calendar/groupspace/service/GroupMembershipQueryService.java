@@ -42,6 +42,13 @@ public class GroupMembershipQueryService {
         return groupMemberRepository.findAllActiveByAccountIdAndGroupSpaceIds(accountId, groupSpaceIds);
     }
 
+    public List<GroupMember> listActiveMemberships(Long accountId) {
+        return groupMemberRepository.findByAccountIdAndStatusOrderByStatusChangedAtDescGroupSpaceIdDesc(
+                accountId,
+                GroupMemberStatus.ACTIVE
+        );
+    }
+
     public boolean hasActiveNicknameConflict(
             Long groupSpaceId,
             String nickname,
