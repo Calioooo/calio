@@ -3,7 +3,13 @@ package com.calio.calendar.notification.client;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "notifications.apns")
-public record ApnsProperties(String environment, String teamId, String keyId, String bundleId, String privateKey) {
+public record ApnsProperties(
+        String environment,
+        String teamId,
+        String keyId,
+        String bundleId,
+        String privateKey
+) {
 
     public ApnsProperties {
         environment = isBlank(environment) ? "development" : environment;

@@ -25,6 +25,7 @@ public class HttpApnsGateway {
 
     private final ApnsProperties properties;
     private final HttpClient client;
+
     @Autowired
     public HttpApnsGateway(ApnsProperties properties) {
         this(properties, HttpClient.newBuilder()
@@ -43,7 +44,9 @@ public class HttpApnsGateway {
             return ApnsSendResult.configurationFailure("APNs credentials are not configured");
         }
         try {
-            HttpRequest request = HttpRequest.newBuilder(URI.create(properties.host() + "/3/device/" + message.token()))
+            HttpRequest request = HttpRequest.newBuilder(
+                            URI.create(properties.host() + "/3/device/" + message.token())
+                    )
                     .timeout(REQUEST_TIMEOUT)
                     .header("authorization", "bearer " + providerToken())
                     .header("apns-topic", properties.bundleId())
@@ -58,7 +61,9 @@ public class HttpApnsGateway {
                 return new ApnsSendResult(ApnsSendResultType.ACCEPTED, requestId, null);
             }
             String reason = response.body();
-            if (response.statusCode() == 410 || reason.contains("BadDeviceToken") || reason.contains("Unregistered")) {
+            if (response.statusCode() == 410
+                    || reason.contains("BadDeviceToken")
+                    || reason.contains("Unregistered")) {
                 return new ApnsSendResult(ApnsSendResultType.INVALID_ENDPOINT, requestId, reason);
             }
             if (response.statusCode() >= 500 || response.statusCode() == 429) {
@@ -76,16 +81,22 @@ public class HttpApnsGateway {
             );
         }
     }
+
     private String providerToken() throws Exception {
         String pem = properties.privateKey()
                 .replace("-----BEGIN PRIVATE KEY-----", "")
                 .replace("-----END PRIVATE KEY-----", "")
                 .replaceAll("\\s", "");
         ECPrivateKey key = (ECPrivateKey) KeyFactory.getInstance("EC")
-                .generatePrivate(new PKCS8EncodedKeySpec(Base64.getDecoder().decode(pem)));
+                .generatePrivate(
+                        new PKCS8EncodedKeySpec(Base64.getDecoder().decode(pem))
+                );
         SignedJWT jwt = new SignedJWT(
                 new JWSHeader.Builder(JWSAlgorithm.ES256).keyID(properties.keyId()).build(),
-                new JWTClaimsSet.Builder().issuer(properties.teamId()).issueTime(Date.from(Instant.now())).build()
+                new JWTClaimsSet.Builder()
+                        .issuer(properties.teamId())
+                        .issueTime(Date.from(Instant.now()))
+                        .build()
         );
         jwt.sign(new ECDSASigner(key));
         return jwt.serialize();
