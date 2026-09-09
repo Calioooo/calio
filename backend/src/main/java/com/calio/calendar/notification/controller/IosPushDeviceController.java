@@ -31,8 +31,7 @@ public class IosPushDeviceController {
         pushDeviceService.register(
                 account.accountId(),
                 request.installationId(),
-                request.apnsToken(),
-                request.authorizationStatus()
+                request.apnsToken()
         );
         return ResponseEntity.noContent().build();
     }
