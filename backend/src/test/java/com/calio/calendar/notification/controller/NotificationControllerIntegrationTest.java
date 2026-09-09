@@ -109,7 +109,7 @@ class NotificationControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("다른 installation이 같은 APNs 토큰을 등록하면 이전 endpoint의 토큰을 해제한다")
+    @DisplayName("새 설치본이 이미 다른 설치본에 연결된 APNs 토큰을 등록하면 기존 endpoint를 비활성화하고 토큰을 해제한다")
     void givenTokenOwnedByAnotherInstallation_whenRegister_thenTransfersTokenOwnership() throws Exception {
         mockMvc.perform(put("/api/notification-endpoints/ios")
                         .contentType(MediaType.APPLICATION_JSON)
