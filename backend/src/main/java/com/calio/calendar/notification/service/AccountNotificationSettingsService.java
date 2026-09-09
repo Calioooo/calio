@@ -1,8 +1,8 @@
 package com.calio.calendar.notification.service;
 
 import com.calio.calendar.account.service.AccountQueryService;
+import com.calio.calendar.notification.controller.dto.UpdateNotificationSettingsRequest;
 import com.calio.calendar.notification.domain.AccountNotificationSettings;
-import java.time.LocalTime;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,21 +32,16 @@ public class AccountNotificationSettingsService {
 
     public AccountNotificationSettings update(
             Long accountId,
-            boolean calendarNotificationsEnabled,
-            Integer timedReminderMinutes,
-            Integer importantReminderMinutes,
-            LocalTime allDayReminderTime,
-            boolean dailyBriefingEnabled,
-            LocalTime dailyBriefingTime
+            UpdateNotificationSettingsRequest request
     ) {
         AccountNotificationSettings settings = get(accountId);
         settings.update(
-                calendarNotificationsEnabled,
-                timedReminderMinutes,
-                importantReminderMinutes,
-                allDayReminderTime,
-                dailyBriefingEnabled,
-                dailyBriefingTime
+                request.calendarNotificationsEnabled(),
+                request.timedReminderMinutes(),
+                request.importantReminderMinutes(),
+                request.allDayReminderTime(),
+                request.dailyBriefingEnabled(),
+                request.dailyBriefingTime()
         );
         return settings;
     }

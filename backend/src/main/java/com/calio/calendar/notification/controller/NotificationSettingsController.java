@@ -34,14 +34,6 @@ public class NotificationSettingsController {
             @AuthenticationPrincipal AuthenticatedAccount account,
             @Valid @RequestBody UpdateNotificationSettingsRequest request
     ) {
-        return NotificationSettingsResponse.from(settingsService.update(
-                account.accountId(),
-                request.calendarNotificationsEnabled(),
-                request.timedReminderMinutes(),
-                request.importantReminderMinutes(),
-                request.allDayReminderTime(),
-                request.dailyBriefingEnabled(),
-                request.dailyBriefingTime()
-        ));
+        return NotificationSettingsResponse.from(settingsService.update(account.accountId(), request));
     }
 }
