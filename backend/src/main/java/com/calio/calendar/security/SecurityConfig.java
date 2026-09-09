@@ -62,6 +62,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/vote-rooms/**").authenticated()
                         .requestMatchers("/api/integrations/**").authenticated()
                         .requestMatchers("/api/ai/calendar/**").authenticated()
+                        .requestMatchers("/api/notification-endpoints/**").authenticated()
                         .requestMatchers("/api/group-spaces").authenticated()
                         .requestMatchers("/api/group-spaces/**").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/group-invitations/accept").authenticated()
@@ -69,7 +70,11 @@ public class SecurityConfig {
                 )
                 .exceptionHandling(exception -> exception.authenticationEntryPoint(
                         (request, response, authException) ->
-                                authenticationErrorResponseWriter.write(request, response, ErrorCode.AUTH_TOKEN_REQUIRED)
+                                authenticationErrorResponseWriter.write(
+                                        request,
+                                        response,
+                                        ErrorCode.AUTH_TOKEN_REQUIRED
+                                )
                 ))
                 .addFilterBefore(bearerTokenAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();

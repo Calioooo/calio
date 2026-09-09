@@ -75,3 +75,11 @@ ai-calendar:
     connection-timeout: PT5S
     max-tool-calls: 2
     maximum-query-days: 14
+
+notifications:
+  apns:
+    environment: development
+    team-id: ${APNS_TEAM_ID:}
+    key-id: ${APNS_KEY_ID:}
+    bundle-id: ${APNS_BUNDLE_ID:}
+    private-key: ${APNS_PRIVATE_KEY:}
