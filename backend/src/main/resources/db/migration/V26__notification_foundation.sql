@@ -15,7 +15,6 @@ CREATE TABLE ios_push_devices (
     CONSTRAINT fk_ios_push_devices_account FOREIGN KEY (account_id) REFERENCES accounts (id),
     INDEX idx_ios_push_devices_eligible (account_id, active, authorization_status)
 );
-
 CREATE TABLE account_notification_settings (
     id BIGINT NOT NULL AUTO_INCREMENT,
     account_id BIGINT NOT NULL,
@@ -48,19 +47,4 @@ CREATE TABLE notification_deliveries (
     PRIMARY KEY (id),
     CONSTRAINT uk_notification_deliveries_claim UNIQUE (account_id, notification_type, schedule_key, scheduled_at),
     CONSTRAINT fk_notification_deliveries_account FOREIGN KEY (account_id) REFERENCES accounts (id)
-);
-
-CREATE TABLE notification_endpoint_deliveries (
-    id BIGINT NOT NULL AUTO_INCREMENT,
-    notification_delivery_id BIGINT NOT NULL,
-    endpoint_id BIGINT NOT NULL,
-    result VARCHAR(32) NOT NULL,
-    provider_request_id VARCHAR(255),
-    failure_reason VARCHAR(255),
-    created_at DATETIME(6) NOT NULL,
-    updated_at DATETIME(6) NOT NULL,
-    PRIMARY KEY (id),
-    CONSTRAINT uk_notification_endpoint_deliveries UNIQUE (notification_delivery_id, endpoint_id),
-    CONSTRAINT fk_notification_endpoint_deliveries_delivery FOREIGN KEY (notification_delivery_id) REFERENCES notification_deliveries (id),
-    CONSTRAINT fk_notification_endpoint_deliveries_endpoint FOREIGN KEY (endpoint_id) REFERENCES ios_push_devices (id)
 );
