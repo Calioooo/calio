@@ -1,7 +1,7 @@
 package com.calio.calendar.notification.service;
 
 import com.calio.calendar.notification.client.ApnsSendResult;
-import com.calio.calendar.notification.domain.IosNotificationEndpoint;
+import com.calio.calendar.notification.domain.IosPushDevice;
 import com.calio.calendar.notification.domain.NotificationDelivery;
 import com.calio.calendar.notification.domain.NotificationEndpointDelivery;
 import com.calio.calendar.notification.repository.NotificationEndpointDeliveryRepository;
@@ -22,7 +22,7 @@ public class NotificationEndpointDeliveryCommandService {
 
     public void create(
             NotificationDelivery delivery,
-            IosNotificationEndpoint endpoint,
+            IosPushDevice endpoint,
             ApnsSendResult result
     ) {
         endpointDeliveryRepository.save(new NotificationEndpointDelivery(

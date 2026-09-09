@@ -32,7 +32,7 @@ public class NotificationEndpointDelivery extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "endpoint_id", nullable = false)
-    private IosNotificationEndpoint endpoint;
+    private IosPushDevice endpoint;
 
     @Column(nullable = false)
     private String result;
@@ -45,7 +45,7 @@ public class NotificationEndpointDelivery extends BaseEntity {
 
     public NotificationEndpointDelivery(
             NotificationDelivery delivery,
-            IosNotificationEndpoint endpoint,
+            IosPushDevice endpoint,
             String result,
             String providerRequestId,
             String failureReason

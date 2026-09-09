@@ -5,7 +5,7 @@ import com.calio.calendar.notification.client.ApnsMessage;
 import com.calio.calendar.notification.client.ApnsSendResult;
 import com.calio.calendar.notification.client.ApnsSendResultType;
 import com.calio.calendar.notification.client.ApnsClient;
-import com.calio.calendar.notification.domain.IosNotificationEndpoint;
+import com.calio.calendar.notification.domain.IosPushDevice;
 import com.calio.calendar.notification.domain.NotificationDelivery;
 import java.time.Duration;
 import java.time.Instant;
@@ -25,7 +25,7 @@ public class CalendarNotificationDispatcher {
     private final NotificationDeliveryCommandService deliveryCommandService;
     private final NotificationEndpointDeliveryCommandService endpointDeliveryCommandService;
     private final AccountQueryService accountQueryService;
-    private final IosNotificationEndpointService endpointService;
+    private final IosPushDeviceService pushDeviceService;
     private final ApnsClient apnsClient;
     private final ObjectMapper objectMapper;
 
@@ -34,7 +34,7 @@ public class CalendarNotificationDispatcher {
             NotificationDeliveryCommandService deliveryCommandService,
             NotificationEndpointDeliveryCommandService endpointDeliveryCommandService,
             AccountQueryService accountQueryService,
-            IosNotificationEndpointService endpointService,
+            IosPushDeviceService pushDeviceService,
             ApnsClient apnsClient,
             ObjectMapper objectMapper
     ) {
@@ -42,7 +42,7 @@ public class CalendarNotificationDispatcher {
         this.deliveryCommandService = deliveryCommandService;
         this.endpointDeliveryCommandService = endpointDeliveryCommandService;
         this.accountQueryService = accountQueryService;
-        this.endpointService = endpointService;
+        this.pushDeviceService = pushDeviceService;
         this.apnsClient = apnsClient;
         this.objectMapper = objectMapper;
     }
@@ -68,8 +68,8 @@ public class CalendarNotificationDispatcher {
             return;
         }
 
-        endpointService.listEligibleEndpoints(accountId)
-                .forEach(endpoint -> sendToEndpoint(delivery, endpoint));
+        pushDeviceService.listEligiblePushDevices(accountId)
+                .forEach(pushDevice -> sendToPushDevice(delivery, pushDevice));
         delivery.complete("DISPATCHED");
     }
 
@@ -101,15 +101,15 @@ public class CalendarNotificationDispatcher {
         }
     }
 
-    private void sendToEndpoint(NotificationDelivery delivery, IosNotificationEndpoint endpoint) {
+    private void sendToPushDevice(NotificationDelivery delivery, IosPushDevice pushDevice) {
         ApnsSendResult result = apnsClient.send(new ApnsMessage(
-                endpoint.getApnsToken(),
+                pushDevice.getApnsToken(),
                 payload(delivery),
                 delivery.getScheduledAt().plus(Duration.ofMinutes(5))
         ));
-        endpointDeliveryCommandService.create(delivery, endpoint, result);
+        endpointDeliveryCommandService.create(delivery, pushDevice, result);
         if (result.type() == ApnsSendResultType.INVALID_ENDPOINT) {
-            endpointService.deactivateInvalidEndpoint(endpoint);
+            pushDeviceService.deactivateInvalidPushDevice(pushDevice);
         }
     }
 
