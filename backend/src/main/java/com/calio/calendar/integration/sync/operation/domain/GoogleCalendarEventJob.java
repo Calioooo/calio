@@ -32,10 +32,12 @@ public class GoogleCalendarEventJob extends GoogleOperationJob {
     protected GoogleCalendarEventJob() {
     }
 
-    public static GoogleCalendarEventJob create(String operationId, Long integrationId, Long accountId,
-                                                 long integrationSequence, GoogleCalendarEventJobKind kind,
-                                                 Long eventId, String providerIdentity, String targetPayload,
-                                                 Instant runnableAt) {
+    public static GoogleCalendarEventJob create(
+            String operationId, Long integrationId, Long accountId,
+            long integrationSequence, GoogleCalendarEventJobKind kind,
+            Long eventId, String providerIdentity, String targetPayload,
+            Instant runnableAt
+    ) {
         if (kind == null || eventId == null || !hasText(targetPayload)) {
             throw new IllegalArgumentException("Google Event job fields are required");
         }
@@ -55,8 +57,19 @@ public class GoogleCalendarEventJob extends GoogleOperationJob {
         return value != null && !value.isBlank();
     }
 
-    public GoogleCalendarEventJobKind getKind() { return kind; }
-    public Long getEventId() { return eventId; }
-    public String getProviderIdentity() { return providerIdentity; }
-    public String getTargetPayload() { return targetPayload; }
+    public GoogleCalendarEventJobKind getKind() {
+        return kind;
+    }
+
+    public Long getEventId() {
+        return eventId;
+    }
+
+    public String getProviderIdentity() {
+        return providerIdentity;
+    }
+
+    public String getTargetPayload() {
+        return targetPayload;
+    }
 }
