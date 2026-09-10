@@ -4,6 +4,7 @@ import com.calio.calendar.integration.sync.operation.dto.GoogleEventJobPayload;
 import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceJobPayload;
 import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceOverrideJobPayload;
 import com.fasterxml.jackson.annotation.JsonInclude;
+import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 
@@ -59,7 +60,7 @@ public record GoogleCalendarEventWriteRequest(
     }
 
     private static GoogleCalendarEventWriteRequest from(
-            String title, String description, java.time.Instant startAt, java.time.Instant endAt,
+            String title, String description, Instant startAt, Instant endAt,
             boolean allDay, String timeZone, String providerIdentity, List<String> recurrence
     ) {
         if (allDay) {

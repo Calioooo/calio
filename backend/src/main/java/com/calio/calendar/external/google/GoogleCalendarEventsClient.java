@@ -4,12 +4,16 @@ import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventResponse;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventPage;
+import com.calio.calendar.external.google.dto.GoogleCalendarEventTimeResponse;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventWriteRequest;
 import com.calio.calendar.integration.sync.GoogleCalendarSyncMode;
 import com.calio.calendar.integration.sync.operation.dto.GoogleEventJobPayload;
 import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceJobPayload;
 import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceOverrideJobPayload;
 import java.net.URI;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -171,7 +175,7 @@ public class GoogleCalendarEventsClient {
     }
 
     public Optional<GoogleCalendarEventResponse> getRecurrenceOccurrenceByOriginStartAt(
-            String accessToken, String externalMasterId, java.time.Instant originStartAt
+            String accessToken, String externalMasterId, Instant originStartAt
     ) {
         validateExternalEventId(externalMasterId);
         if (originStartAt == null) {
@@ -382,7 +386,7 @@ public class GoogleCalendarEventsClient {
                 .toUri();
     }
 
-    private URI instanceUri(String externalMasterId, java.time.Instant originStartAt) {
+    private URI instanceUri(String externalMasterId, Instant originStartAt) {
         return UriComponentsBuilder.fromUriString(properties.getCalendarEventsUrl())
                 .pathSegment(externalMasterId, "instances")
                 .queryParam("originalStart", originStartAt.toString())
@@ -490,14 +494,14 @@ public class GoogleCalendarEventsClient {
     }
 
     private boolean matchesOrigin(
-            com.calio.calendar.external.google.dto.GoogleCalendarEventTimeResponse value,
-            java.time.Instant originStartAt
+            GoogleCalendarEventTimeResponse value,
+            Instant originStartAt
     ) {
         if (hasText(value.dateTime())) {
-            return originStartAt.equals(java.time.OffsetDateTime.parse(value.dateTime()).toInstant());
+            return originStartAt.equals(OffsetDateTime.parse(value.dateTime()).toInstant());
         }
         return hasText(value.date())
-                && originStartAt.atOffset(java.time.ZoneOffset.UTC).toLocalDate().toString().equals(value.date());
+                && originStartAt.atOffset(ZoneOffset.UTC).toLocalDate().toString().equals(value.date());
     }
 
     private boolean isDeserializationFailure(RestClientException exception) {
