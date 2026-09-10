@@ -15,6 +15,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 
 import com.calio.calendar.external.google.dto.GoogleCalendarEventPage;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventResponse;
+import com.calio.calendar.external.google.dto.GoogleCalendarEventWriteRequest;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.integration.sync.GoogleCalendarSyncMode;
@@ -59,17 +60,13 @@ class GoogleCalendarEventsClientTest {
     }
 
     @Test
-    @DisplayName("recurrence PATCH는 null payload를 invalid request로 거부한다")
-    void givenNullRecurrencePayload_whenPatch_thenRejectsInvalidRequest() {
+    @DisplayName("PATCH는 null write request를 invalid request로 거부한다")
+    void givenNullWriteRequest_whenPatch_thenRejectsInvalidRequest() {
         // given
         GoogleCalendarEventsClient client = client(RestClient.builder());
 
         // when, then
-        assertThatThrownBy(() -> client.patchRecurrenceEvent("token", "master-1", "etag-1", null))
-                .isInstanceOfSatisfying(CalioException.class, exception ->
-                        assertThat(exception.getErrorCode())
-                                .isEqualTo(ErrorCode.GOOGLE_CALENDAR_REQUEST_INVALID));
-        assertThatThrownBy(() -> client.patchRecurrenceOccurrence("token", "instance-1", "etag-1", null))
+        assertThatThrownBy(() -> client.patchEvent("token", "event-1", "etag-1", null))
                 .isInstanceOfSatisfying(CalioException.class, exception ->
                         assertThat(exception.getErrorCode())
                                 .isEqualTo(ErrorCode.GOOGLE_CALENDAR_REQUEST_INVALID));
@@ -110,10 +107,10 @@ class GoogleCalendarEventsClientTest {
                 .andExpect(jsonPath("$.recurrence").doesNotExist())
                 .andRespond(withSuccess(eventResponse("instance-1"), MediaType.APPLICATION_JSON));
 
-        client.patchRecurrenceOccurrence("token", "instance-1", "etag-i",
-                new GoogleRecurrenceOverrideJobPayload("moved", null,
+        client.patchEvent("token", "instance-1", "etag-i",
+                GoogleCalendarEventWriteRequest.forOverrideUpdate(new GoogleRecurrenceOverrideJobPayload("moved", null,
                         Instant.parse("2026-09-04T02:00:00Z"),
-                        Instant.parse("2026-09-04T03:00:00Z"), false, "UTC"));
+                        Instant.parse("2026-09-04T03:00:00Z"), false, "UTC")));
         server.verify();
     }
 
@@ -129,10 +126,10 @@ class GoogleCalendarEventsClientTest {
                 .andExpect(jsonPath("$.start.dateTime").doesNotExist())
                 .andRespond(withSuccess(eventResponse("instance-1"), MediaType.APPLICATION_JSON));
 
-        client.patchRecurrenceOccurrence("token", "instance-1", "etag-i",
-                new GoogleRecurrenceOverrideJobPayload("offsite", null,
+        client.patchEvent("token", "instance-1", "etag-i",
+                GoogleCalendarEventWriteRequest.forOverrideUpdate(new GoogleRecurrenceOverrideJobPayload("offsite", null,
                         Instant.parse("2026-09-04T00:00:00Z"),
-                        Instant.parse("2026-09-06T00:00:00Z"), true, null));
+                        Instant.parse("2026-09-06T00:00:00Z"), true, null)));
 
         server.verify();
     }
@@ -180,7 +177,7 @@ class GoogleCalendarEventsClientTest {
                 "current-token",
                 "event-1",
                 "etag-1",
-                payload()
+                GoogleCalendarEventWriteRequest.forUpdate(payload())
         );
 
         // then
@@ -202,7 +199,7 @@ class GoogleCalendarEventsClientTest {
                 "current-token",
                 "event-1",
                 "etag-1",
-                payload()
+                GoogleCalendarEventWriteRequest.forUpdate(payload())
         )).isInstanceOf(GoogleCalendarEventVersionConflictException.class);
         server.verify();
     }

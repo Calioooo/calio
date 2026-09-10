@@ -17,6 +17,7 @@ import com.calio.calendar.external.google.GoogleCalendarEventVersionConflictExce
 import com.calio.calendar.external.google.GoogleCalendarEventsClient;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventResponse;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventTimeResponse;
+import com.calio.calendar.external.google.dto.GoogleCalendarEventWriteRequest;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarConnection;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.connection.service.GoogleCalendarAccessTokenService;
@@ -98,7 +99,8 @@ class GoogleCalendarRecurrenceJobServiceTest {
         when(objectMapper.readValue("payload", GoogleRecurrenceJobPayload.class)).thenReturn(masterPayload());
         when(client.getEvent("token", "master-1"))
                 .thenReturn(Optional.of(provider("master-1", "master-etag", null)));
-        when(client.patchRecurrenceEvent("token", "master-1", "master-etag", masterPayload()))
+        when(client.patchEvent("token", "master-1", "master-etag",
+                GoogleCalendarEventWriteRequest.forRecurrenceUpdate(masterPayload())))
                 .thenReturn(provider("master-1", "master-etag-2", null));
 
         service.execute(job(GoogleCalendarRecurrenceJobKind.MASTER_UPDATE, null), "worker");
@@ -145,8 +147,8 @@ class GoogleCalendarRecurrenceJobServiceTest {
                 .thenReturn(masterPayload());
         when(client.getEvent("existing-token", "master-1"))
                 .thenReturn(Optional.of(provider("master-1", "master-etag", null)));
-        when(client.patchRecurrenceEvent(
-                "existing-token", "master-1", "master-etag", masterPayload()))
+        when(client.patchEvent("existing-token", "master-1", "master-etag",
+                GoogleCalendarEventWriteRequest.forRecurrenceUpdate(masterPayload())))
                 .thenReturn(provider("master-1", "updated-etag", null));
         when(client.insertRecurrenceEvent("creation-token", "provider-id", masterPayload()))
                 .thenReturn(provider("created-master", "created-etag", null));
@@ -184,8 +186,8 @@ class GoogleCalendarRecurrenceJobServiceTest {
                 .thenReturn(masterPayload());
         when(client.getEvent("existing-token", "master-1"))
                 .thenReturn(Optional.of(provider("master-1", "master-etag", null)));
-        when(client.patchRecurrenceEvent(
-                "existing-token", "master-1", "master-etag", masterPayload()))
+        when(client.patchEvent("existing-token", "master-1", "master-etag",
+                GoogleCalendarEventWriteRequest.forRecurrenceUpdate(masterPayload())))
                 .thenReturn(provider("master-1", "updated-etag", null));
         when(client.insertRecurrenceEvent("creation-token", "provider-id", masterPayload()))
                 .thenReturn(provider("created-master", "created-etag", null));
@@ -215,7 +217,7 @@ class GoogleCalendarRecurrenceJobServiceTest {
         service.execute(job(GoogleCalendarRecurrenceJobKind.MASTER_UPDATE, null), "worker");
 
         assertThat(mapping.isConflicted()).isTrue();
-        verify(client, never()).patchRecurrenceEvent(any(), any(), any(), any());
+        verify(client, never()).patchEvent(any(), any(), any(), any());
         verify(jobs).recordSyncConflict(50L, 10L, "worker");
     }
 
@@ -254,7 +256,7 @@ class GoogleCalendarRecurrenceJobServiceTest {
 
         assertThat(override.isConflicted()).isTrue();
         assertThat(master.isConflicted()).isFalse();
-        verify(client, never()).patchRecurrenceOccurrence(any(), any(), any(), any());
+        verify(client, never()).patchEvent(any(), any(), any(), any());
     }
 
     @Test
@@ -273,7 +275,8 @@ class GoogleCalendarRecurrenceJobServiceTest {
         GoogleCalendarEventResponse instance = provider("instance-1", "etag-i", origin);
         when(client.getRecurrenceOccurrenceByOriginStartAt("token", "master-1", origin))
                 .thenReturn(Optional.of(instance));
-        when(client.patchRecurrenceOccurrence("token", "instance-1", "etag-i", overridePayload()))
+        when(client.patchEvent("token", "instance-1", "etag-i",
+                GoogleCalendarEventWriteRequest.forOverrideUpdate(overridePayload())))
                 .thenReturn(provider("instance-1", "etag-i-2", origin));
 
         service.execute(job(GoogleCalendarRecurrenceJobKind.OVERRIDE_UPSERT, origin), "worker");
@@ -307,7 +310,7 @@ class GoogleCalendarRecurrenceJobServiceTest {
 
         // then
         assertThat(master.isConflicted()).isTrue();
-        verify(client, never()).patchRecurrenceOccurrence(any(), any(), any(), any());
+        verify(client, never()).patchEvent(any(), any(), any(), any());
         verify(jobs).recordSyncConflict(50L, 10L, "worker");
     }
 
@@ -345,7 +348,8 @@ class GoogleCalendarRecurrenceJobServiceTest {
         GoogleCalendarEventResponse instance = provider("instance-1", "etag-i", origin);
         when(client.getRecurrenceOccurrenceByOriginStartAt("token", "master-1", origin))
                 .thenReturn(Optional.of(instance));
-        when(client.patchRecurrenceOccurrence("token", "instance-1", "etag-i", overridePayload()))
+        when(client.patchEvent("token", "instance-1", "etag-i",
+                GoogleCalendarEventWriteRequest.forOverrideUpdate(overridePayload())))
                 .thenThrow(new GoogleCalendarEventVersionConflictException(
                         new RuntimeException()));
         when(mappingCommands.createOverrideMapping(any())).thenAnswer(invocation -> invocation.getArgument(0));

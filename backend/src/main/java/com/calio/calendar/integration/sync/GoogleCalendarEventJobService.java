@@ -3,6 +3,7 @@ package com.calio.calendar.integration.sync;
 import com.calio.calendar.external.google.GoogleCalendarEventVersionConflictException;
 import com.calio.calendar.external.google.GoogleCalendarEventsClient;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventResponse;
+import com.calio.calendar.external.google.dto.GoogleCalendarEventWriteRequest;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarConnection;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarConnectionState;
 import com.calio.calendar.integration.connection.service.GoogleCalendarAccessTokenService;
@@ -154,7 +155,7 @@ public class GoogleCalendarEventJobService {
                     accessToken,
                     mapping.externalEventId(),
                     mapping.providerEtag(),
-                    eventSnapshot
+                    GoogleCalendarEventWriteRequest.forUpdate(eventSnapshot)
             );
         } catch (GoogleCalendarEventVersionConflictException exception) {
             return MappingExecutionResult.conflictDetected(mapping.mappingId());

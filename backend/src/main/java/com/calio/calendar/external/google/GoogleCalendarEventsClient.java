@@ -9,7 +9,6 @@ import com.calio.calendar.external.google.dto.GoogleCalendarEventWriteRequest;
 import com.calio.calendar.integration.sync.GoogleCalendarSyncMode;
 import com.calio.calendar.integration.sync.operation.dto.GoogleEventJobPayload;
 import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceJobPayload;
-import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceOverrideJobPayload;
 import java.net.URI;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -124,18 +123,13 @@ public class GoogleCalendarEventsClient {
             String accessToken,
             String externalEventId,
             String expectedProviderEtag,
-            GoogleEventJobPayload payload
+            GoogleCalendarEventWriteRequest request
     ) {
-        if (!hasText(externalEventId) || !hasText(expectedProviderEtag) || payload == null) {
+        if (!hasText(externalEventId) || !hasText(expectedProviderEtag) || request == null) {
             throw new CalioException(ErrorCode.GOOGLE_CALENDAR_REQUEST_INVALID);
         }
         try {
-            return patchExistingEvent(
-                    accessToken,
-                    externalEventId,
-                    GoogleCalendarEventWriteRequest.forUpdate(payload),
-                    expectedProviderEtag
-            );
+            return patchExistingEvent(accessToken, externalEventId, request, expectedProviderEtag);
         } catch (RestClientResponseException exception) {
             if (exception.getStatusCode().value() == HttpStatus.PRECONDITION_FAILED.value()) {
                 throw new GoogleCalendarEventVersionConflictException(exception);
@@ -161,17 +155,6 @@ public class GoogleCalendarEventsClient {
             return requireRequestedEventId(getEvent(accessToken, providerIdentity)
                     .orElseThrow(() -> syncFailed(exception)), providerIdentity);
         }
-    }
-
-    public GoogleCalendarEventResponse patchRecurrenceEvent(
-            String accessToken, String externalEventId, String expectedProviderEtag,
-            GoogleRecurrenceJobPayload payload
-    ) {
-        if (payload == null) {
-            throw new CalioException(ErrorCode.GOOGLE_CALENDAR_REQUEST_INVALID);
-        }
-        return patchWithEtag(accessToken, externalEventId, expectedProviderEtag,
-                GoogleCalendarEventWriteRequest.forRecurrenceUpdate(payload));
     }
 
     public Optional<GoogleCalendarEventResponse> getRecurrenceOccurrenceByOriginStartAt(
@@ -205,34 +188,6 @@ public class GoogleCalendarEventsClient {
                 throw invalidResponse(exception);
             }
             throw syncFailed(exception);
-        }
-    }
-
-    public GoogleCalendarEventResponse patchRecurrenceOccurrence(
-            String accessToken, String externalInstanceId, String expectedProviderEtag,
-            GoogleRecurrenceOverrideJobPayload payload
-    ) {
-        if (payload == null) {
-            throw new CalioException(ErrorCode.GOOGLE_CALENDAR_REQUEST_INVALID);
-        }
-        return patchWithEtag(accessToken, externalInstanceId, expectedProviderEtag,
-                GoogleCalendarEventWriteRequest.forOverrideUpdate(payload));
-    }
-
-    private GoogleCalendarEventResponse patchWithEtag(
-            String accessToken, String externalEventId, String expectedProviderEtag,
-            GoogleCalendarEventWriteRequest request
-    ) {
-        if (!hasText(externalEventId) || !hasText(expectedProviderEtag) || request == null) {
-            throw new CalioException(ErrorCode.GOOGLE_CALENDAR_REQUEST_INVALID);
-        }
-        try {
-            return patchExistingEvent(accessToken, externalEventId, request, expectedProviderEtag);
-        } catch (RestClientResponseException exception) {
-            if (exception.getStatusCode().value() == HttpStatus.PRECONDITION_FAILED.value()) {
-                throw new GoogleCalendarEventVersionConflictException(exception);
-            }
-            throw translateEventResponseFailure(exception);
         }
     }
 

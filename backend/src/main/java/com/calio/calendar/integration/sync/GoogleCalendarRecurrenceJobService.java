@@ -5,6 +5,7 @@ import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.external.google.GoogleCalendarEventVersionConflictException;
 import com.calio.calendar.external.google.GoogleCalendarEventsClient;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventResponse;
+import com.calio.calendar.external.google.dto.GoogleCalendarEventWriteRequest;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarConnection;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarConnectionState;
 import com.calio.calendar.integration.connection.service.GoogleCalendarAccessTokenService;
@@ -103,8 +104,9 @@ public class GoogleCalendarRecurrenceJobService {
             return Result.conflicted(mapping.mappingId());
         }
         try {
-            GoogleCalendarEventResponse updated = eventsClient.patchRecurrenceEvent(
-                    token, mapping.externalId(), mapping.etag(), payload);
+            GoogleCalendarEventResponse updated = eventsClient.patchEvent(
+                    token, mapping.externalId(), mapping.etag(),
+                    GoogleCalendarEventWriteRequest.forRecurrenceUpdate(payload));
             return Result.updated(mapping.mappingId(), mapping.etag(), updated.etag());
         } catch (GoogleCalendarEventVersionConflictException exception) {
             return Result.conflicted(mapping.mappingId());
@@ -176,8 +178,9 @@ public class GoogleCalendarRecurrenceJobService {
                 eventsClient.deleteEvent(token, instance.id(), expected);
                 return OverrideResult.deleted(master.mappingId(), scope.overrideId());
             }
-            GoogleCalendarEventResponse updated = eventsClient.patchRecurrenceOccurrence(
-                    token, instance.id(), expected, payload);
+            GoogleCalendarEventResponse updated = eventsClient.patchEvent(
+                    token, instance.id(), expected,
+                    GoogleCalendarEventWriteRequest.forOverrideUpdate(payload));
             return OverrideResult.updated(master.mappingId(), scope.overrideId(),
                     instance.id(), expected, updated.etag());
         } catch (GoogleCalendarEventVersionConflictException exception) {
