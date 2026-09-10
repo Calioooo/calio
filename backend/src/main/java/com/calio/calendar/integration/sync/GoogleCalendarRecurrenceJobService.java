@@ -158,34 +158,34 @@ public class GoogleCalendarRecurrenceJobService {
         if (providerMaster == null || !master.etag().equals(providerMaster.etag())) {
             return OverrideResult.masterConflict(master.mappingId(), scope.overrideId());
         }
-        GoogleCalendarEventResponse instance;
+        GoogleCalendarEventResponse occurrence;
         if (scope.overrideId() == null) {
-            instance = eventsClient.getRecurrenceOccurrenceByOriginStartAt(
+            occurrence = eventsClient.getRecurrenceOccurrenceByOriginStartAt(
                     token, master.externalId(), job.getOriginStartAt()).orElse(null);
-            if (instance == null) return OverrideResult.masterConflict(master.mappingId(), null);
-            if (instance.isCancelled()) {
+            if (occurrence == null) return OverrideResult.masterConflict(master.mappingId(), null);
+            if (occurrence.isCancelled()) {
                 return OverrideResult.masterConflict(master.mappingId(), null);
             }
         } else {
-            instance = eventsClient.getEvent(token, scope.externalId()).orElse(null);
-            if (instance == null || !scope.etag().equals(instance.etag())) {
+            occurrence = eventsClient.getEvent(token, scope.externalId()).orElse(null);
+            if (occurrence == null || !scope.etag().equals(occurrence.etag())) {
                 return OverrideResult.overrideConflict(master.mappingId(), scope.overrideId());
             }
         }
-        String expected = scope.overrideId() == null ? instance.etag() : scope.etag();
+        String expected = scope.overrideId() == null ? occurrence.etag() : scope.etag();
         try {
             if (delete) {
-                eventsClient.deleteEvent(token, instance.id(), expected);
+                eventsClient.deleteEvent(token, occurrence.id(), expected);
                 return OverrideResult.deleted(master.mappingId(), scope.overrideId());
             }
             GoogleCalendarEventResponse updated = eventsClient.patchEvent(
-                    token, instance.id(), expected,
+                    token, occurrence.id(), expected,
                     GoogleCalendarEventWriteRequest.forOverrideUpdate(payload));
             return OverrideResult.updated(master.mappingId(), scope.overrideId(),
-                    instance.id(), expected, updated.etag());
+                    occurrence.id(), expected, updated.etag());
         } catch (GoogleCalendarEventVersionConflictException exception) {
             return OverrideResult.overrideConflict(
-                    master.mappingId(), scope.overrideId(), instance.id(), expected);
+                    master.mappingId(), scope.overrideId(), occurrence.id(), expected);
         }
     }
 

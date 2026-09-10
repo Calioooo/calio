@@ -166,7 +166,7 @@ public class GoogleCalendarEventsClient {
         }
         try {
             GoogleCalendarEventPage page = restClient.get()
-                    .uri(instanceUri(externalMasterId, originStartAt))
+                    .uri(occurrenceUri(externalMasterId, originStartAt))
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                     .retrieve().body(GoogleCalendarEventPage.class);
             if (page == null || page.items() == null) {
@@ -335,7 +335,7 @@ public class GoogleCalendarEventsClient {
                 .toUri();
     }
 
-    private URI instanceUri(String externalMasterId, Instant originStartAt) {
+    private URI occurrenceUri(String externalMasterId, Instant originStartAt) {
         return UriComponentsBuilder.fromUriString(properties.getCalendarEventsUrl())
                 .pathSegment(externalMasterId, "instances")
                 .queryParam("originalStart", originStartAt.toString())
