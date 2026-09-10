@@ -1,9 +1,9 @@
 package com.calio.calendar.integration.sync.operation.domain;
 
 public enum GoogleCalendarRecurrenceJobKind {
-    MASTER_CREATE,
-    MASTER_UPDATE,
-    MASTER_DELETE,
+    RECURRENCE_CREATE,
+    RECURRENCE_UPDATE,
+    RECURRENCE_DELETE,
     OVERRIDE_UPSERT,
     OVERRIDE_DELETE
 }
