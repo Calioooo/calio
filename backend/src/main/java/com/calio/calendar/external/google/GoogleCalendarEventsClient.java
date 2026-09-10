@@ -219,12 +219,6 @@ public class GoogleCalendarEventsClient {
                 GoogleCalendarEventWriteRequest.forOverrideUpdate(payload));
     }
 
-    public boolean cancelRecurrenceOccurrence(
-            String accessToken, String externalInstanceId, String expectedProviderEtag
-    ) {
-        return deleteEvent(accessToken, externalInstanceId, expectedProviderEtag);
-    }
-
     private GoogleCalendarEventResponse patchWithEtag(
             String accessToken, String externalEventId, String expectedProviderEtag,
             GoogleCalendarEventWriteRequest request

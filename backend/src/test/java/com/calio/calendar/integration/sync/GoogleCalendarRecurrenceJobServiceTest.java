@@ -3,6 +3,7 @@ package com.calio.calendar.integration.sync;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -378,7 +379,7 @@ class GoogleCalendarRecurrenceJobServiceTest {
 
         service.execute(job(GoogleCalendarRecurrenceJobKind.OVERRIDE_DELETE, origin), "worker");
 
-        verify(client).cancelRecurrenceOccurrence("token", "instance-1", "etag-i");
+        verify(client).deleteEvent("token", "instance-1", "etag-i");
         verify(mappingCommands).deleteOverrideMappings(List.of(override));
         assertThat(master.isConflicted()).isFalse();
     }
@@ -397,7 +398,7 @@ class GoogleCalendarRecurrenceJobServiceTest {
 
         verify(client).deleteEvent("token", "master-1", "master-etag");
         verify(mappingCommands).deleteRecurrenceAggregateMappings(master);
-        verify(client, never()).cancelRecurrenceOccurrence(any(), any(), any());
+        verify(client, never()).deleteEvent(eq("token"), eq("instance-1"), any());
     }
 
     @Test
