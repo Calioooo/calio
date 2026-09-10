@@ -42,17 +42,10 @@ public class GoogleCalendarRecurrenceJob extends GoogleOperationJob {
         if (kind == null || recurrenceEventId == null || targetPayload == null || targetPayload.isBlank()) {
             throw new IllegalArgumentException("Google recurrence job fields are required");
         }
-        if ((kind == GoogleCalendarRecurrenceJobKind.OVERRIDE_UPSERT
-                || kind == GoogleCalendarRecurrenceJobKind.OVERRIDE_DELETE) && originStartAt == null) {
+        if (kind.isOverrideJob() && originStartAt == null) {
             throw new IllegalArgumentException("Google recurrence override job requires originStartAt");
         }
-        boolean masterKind = kind == GoogleCalendarRecurrenceJobKind.RECURRENCE_CREATE
-                || kind == GoogleCalendarRecurrenceJobKind.RECURRENCE_UPDATE
-                || kind == GoogleCalendarRecurrenceJobKind.RECURRENCE_DELETE;
-        if (masterKind && originStartAt != null) {
-            throw new IllegalArgumentException("Google recurrence master job cannot have originStartAt");
-        }
-        if ((kind == GoogleCalendarRecurrenceJobKind.RECURRENCE_CREATE) != hasText(providerIdentity)) {
+        if ((kind == GoogleCalendarRecurrenceJobKind.RECURRENCE_CREATE) && !hasText(providerIdentity)) {
             throw new IllegalArgumentException("Only Google recurrence master create requires provider identity");
         }
         GoogleCalendarRecurrenceJob job = new GoogleCalendarRecurrenceJob();

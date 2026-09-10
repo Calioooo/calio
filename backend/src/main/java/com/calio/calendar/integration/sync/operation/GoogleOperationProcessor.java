@@ -21,8 +21,6 @@ import org.springframework.stereotype.Service;
 @Service
 public class GoogleOperationProcessor {
 
-    private static final String UNSUPPORTED_JOB_SCOPE = "UNSUPPORTED_JOB_SCOPE";
-
     private final GoogleOperationJobService jobService;
     private final GoogleOperationLeaseService operationLeaseService;
     private final GoogleCalendarSyncService syncService;
@@ -83,24 +81,19 @@ public class GoogleOperationProcessor {
 
     private JobExecutionResult terminateUnsupported(
             GoogleOperationJob job,
-            String workerToken,
-            String reason
+            String workerToken
     ) {
-        jobService.terminate(job.getId(), job.getAccountId(), workerToken, reason);
+        jobService.terminate(job.getId(), job.getAccountId(), workerToken, "UNSUPPORTED_JOB_SCOPE");
         return JobExecutionResult.CONTINUE_WITH_NEXT_JOB;
     }
 
     private JobExecutionResult execute(GoogleOperationJob job, String workerToken) {
-        if (job instanceof GoogleCalendarSyncJob syncJob) {
-            return executeSyncJob(syncJob, workerToken);
-        }
-        if (job instanceof GoogleCalendarEventJob eventJob) {
-            return executeEventJob(eventJob, workerToken);
-        }
-        if (job instanceof GoogleCalendarRecurrenceJob recurrenceJob) {
-            return executeRecurrenceJob(recurrenceJob, workerToken);
-        }
-        return terminateUnsupported(job, workerToken, UNSUPPORTED_JOB_SCOPE);
+        return switch (job) {
+            case GoogleCalendarSyncJob syncJob -> executeSyncJob(syncJob, workerToken);
+            case GoogleCalendarEventJob eventJob -> executeEventJob(eventJob, workerToken);
+            case GoogleCalendarRecurrenceJob recurrenceJob -> executeRecurrenceJob(recurrenceJob, workerToken);
+            default -> terminateUnsupported(job, workerToken);
+        };
     }
 
     private JobExecutionResult executeSyncJob(GoogleCalendarSyncJob job, String workerToken) {
