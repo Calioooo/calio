@@ -3,6 +3,7 @@ package com.calio.calendar.integration.sync;
 import com.calio.calendar.external.google.GoogleCalendarEventVersionConflictException;
 import com.calio.calendar.external.google.GoogleCalendarEventsClient;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventResponse;
+import com.calio.calendar.external.google.dto.GoogleCalendarEventWriteRequest;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarConnection;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarConnectionState;
 import com.calio.calendar.integration.connection.service.GoogleCalendarAccessTokenService;
@@ -150,11 +151,11 @@ public class GoogleCalendarEventJobService {
         }
         GoogleCalendarEventResponse updatedEvent;
         try {
-            updatedEvent = eventsClient.patchEvent(
+            updatedEvent = eventsClient.patch(
                     accessToken,
                     mapping.externalEventId(),
                     mapping.providerEtag(),
-                    eventSnapshot
+                    GoogleCalendarEventWriteRequest.forEventUpdate(eventSnapshot)
             );
         } catch (GoogleCalendarEventVersionConflictException exception) {
             return MappingExecutionResult.conflictDetected(mapping.mappingId());
@@ -178,7 +179,7 @@ public class GoogleCalendarEventJobService {
         }
         String accessToken = accessTokenService.getAccessToken(mapping.connectionId());
         try {
-            eventsClient.deleteEvent(
+            eventsClient.delete(
                     accessToken,
                     mapping.externalEventId(),
                     mapping.providerEtag()
@@ -195,11 +196,10 @@ public class GoogleCalendarEventJobService {
             Long targetConnectionId
     ) {
         String accessToken = accessTokenService.getAccessToken(targetConnectionId);
-        return eventsClient.insertEvent(
-                accessToken,
-                job.getProviderIdentity(),
-                eventSnapshot
-        );
+
+        GoogleCalendarEventWriteRequest request = GoogleCalendarEventWriteRequest.forEventCreate(
+                eventSnapshot, job.getProviderIdentity());
+        return eventsClient.post(accessToken, request);
     }
 
     private void completeCreate(

@@ -12,17 +12,24 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.calio.calendar.common.error.CalioException;
+import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.connection.service.GoogleCalendarConnectionCommandService;
 import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrationQueryService;
 import com.calio.calendar.external.google.GoogleCalendarInvalidGrantException;
 import com.calio.calendar.integration.sync.GoogleCalendarEventJobService;
+import com.calio.calendar.integration.sync.GoogleCalendarRecurrenceJobService;
 import com.calio.calendar.integration.sync.GoogleCalendarSyncService;
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEventJob;
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarSyncJob;
+import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarRecurrenceJob;
+import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarRecurrenceJobKind;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJob;
 import com.calio.calendar.integration.sync.operation.dto.GoogleOperationFailureDecision;
 import java.time.Clock;
+import java.time.Instant;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -34,6 +41,7 @@ class GoogleOperationProcessorTest {
     private GoogleOperationLeaseService operationLeaseService;
     private GoogleCalendarSyncService syncService;
     private GoogleCalendarEventJobService eventJobService;
+    private GoogleCalendarRecurrenceJobService recurrenceJobService;
     private GoogleOperationFailureClassifier failureClassifier;
     private GoogleCalendarConnectionCommandService connectionCommandService;
     private GoogleCalendarIntegrationQueryService integrationQueryService;
@@ -45,17 +53,19 @@ class GoogleOperationProcessorTest {
         operationLeaseService = mock(GoogleOperationLeaseService.class);
         syncService = mock(GoogleCalendarSyncService.class);
         eventJobService = mock(GoogleCalendarEventJobService.class);
+        recurrenceJobService = mock(GoogleCalendarRecurrenceJobService.class);
         failureClassifier = mock(GoogleOperationFailureClassifier.class);
         connectionCommandService = mock(GoogleCalendarConnectionCommandService.class);
         integrationQueryService = mock(GoogleCalendarIntegrationQueryService.class);
         GoogleCalendarIntegration integration = mock(GoogleCalendarIntegration.class);
         when(integration.getId()).thenReturn(20L);
-        when(integrationQueryService.getIntegrationIfExists(10L)).thenReturn(java.util.Optional.of(integration));
+        when(integrationQueryService.getIntegrationIfExists(10L)).thenReturn(Optional.of(integration));
         processor = new GoogleOperationProcessor(
                 jobPersistenceService,
                 operationLeaseService,
                 syncService,
                 eventJobService,
+                recurrenceJobService,
                 failureClassifier,
                 connectionCommandService,
                 integrationQueryService,
@@ -81,6 +91,24 @@ class GoogleOperationProcessorTest {
         executionOrder.verify(syncService).synchronize(eq(1L), eq(10L), anyString());
         executionOrder.verify(syncService).synchronize(eq(2L), eq(10L), anyString());
         verify(operationLeaseService).release(eq(10L), anyString());
+    }
+
+    @Test
+    @DisplayName("concrete recurrence Job은 generic scope 해석 없이 recurrence handler로 직접 dispatch한다")
+    void recurrenceJobDispatchesDirectlyToRecurrenceHandler() {
+        GoogleCalendarRecurrenceJob job = GoogleCalendarRecurrenceJob.create(
+                "operation", 20L, 10L, 1L, GoogleCalendarRecurrenceJobKind.RECURRENCE_UPDATE,
+                40L, null, "payload", null, Instant.parse("2026-09-01T00:00:00Z"));
+        org.springframework.test.util.ReflectionTestUtils.setField(job, "id", 50L);
+        when(operationLeaseService.acquire(eq(10L), anyString())).thenReturn(true);
+        when(jobPersistenceService.claimNextJob(eq(10L), eq(20L), anyString()))
+                .thenReturn(job)
+                .thenReturn((GoogleOperationJob) null);
+
+        processor.processAccount(10L);
+
+        verify(recurrenceJobService).execute(eq(job), anyString());
+        verifyNoInteractions(eventJobService);
     }
 
     @Test
@@ -134,9 +162,7 @@ class GoogleOperationProcessorTest {
     @DisplayName("재연결이 필요한 provider 오류는 Job을 종료한 뒤 Integration을 SYNC_ERROR로 pause한다")
     void givenReconnectRequiredFailure_whenProcess_thenPausesIntegrationAndStopsAccount() {
         GoogleOperationJob job = syncJob(1L, 10L);
-        com.calio.calendar.common.error.CalioException failure =
-                new com.calio.calendar.common.error.CalioException(
-                        com.calio.calendar.common.error.ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED);
+        CalioException failure = new CalioException(ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED);
         when(operationLeaseService.acquire(eq(10L), anyString())).thenReturn(true);
         when(jobPersistenceService.claimNextJob(eq(10L), eq(20L), anyString())).thenReturn(job);
         doThrow(failure).when(syncService).synchronize(eq(1L), eq(10L), anyString());
@@ -156,9 +182,7 @@ class GoogleOperationProcessorTest {
     @DisplayName("invalid_grant로 retained disconnect가 완료된 Sync 실패는 삭제된 Job을 다시 종료 처리하지 않는다")
     void givenInvalidGrantAfterRetainedDisconnect_whenProcess_thenStopsWithoutJobTransition() {
         GoogleOperationJob job = syncJob(1L, 10L);
-        com.calio.calendar.common.error.CalioException failure =
-                new com.calio.calendar.common.error.CalioException(
-                        com.calio.calendar.common.error.ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED,
+        CalioException failure = new CalioException(ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED,
                         new GoogleCalendarInvalidGrantException(new RuntimeException())
                 );
         when(operationLeaseService.acquire(eq(10L), anyString())).thenReturn(true);
