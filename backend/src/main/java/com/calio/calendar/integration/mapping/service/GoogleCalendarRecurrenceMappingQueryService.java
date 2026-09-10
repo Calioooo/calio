@@ -42,14 +42,10 @@ public class GoogleCalendarRecurrenceMappingQueryService {
     public List<GoogleCalendarRecurrenceEventMapping> listRecurrenceEventMappingsForJob(
             Long integrationId, Long recurrenceEventId
     ) {
-        return recurrenceMappingRepository.findAllForJob(integrationId, recurrenceEventId);
-    }
-
-    public Optional<GoogleCalendarRecurrenceEventMapping> getRecurrenceEventMappingIfExists(
-            Long connectionId, Long recurrenceEventId
-    ) {
-        return recurrenceMappingRepository.findByConnection_IdAndRecurrenceEventId(
-                connectionId, recurrenceEventId);
+        return recurrenceMappingRepository.findAllWithConnectionByIntegrationIdAndRecurrenceEventId(
+                integrationId,
+                recurrenceEventId
+        );
     }
 
     public Optional<GoogleCalendarRecurrenceOverrideMapping> getOverrideMappingIfExists(

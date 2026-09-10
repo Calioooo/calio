@@ -17,23 +17,18 @@ public interface GoogleCalendarRecurrenceEventMappingRepository
     Optional<GoogleCalendarRecurrenceEventMapping> findByConnection_IdAndRecurrenceEventId(
             Long connectionId, Long recurrenceEventId);
 
+    @EntityGraph(attributePaths = "connection")
     @Query("""
             select mapping from GoogleCalendarRecurrenceEventMapping mapping
-            join fetch mapping.connection connection
-            join fetch connection.integration integration
+            join mapping.connection connection
+            join connection.integration integration
             where integration.id = :integrationId
               and mapping.recurrenceEventId = :recurrenceEventId
             """)
-    List<GoogleCalendarRecurrenceEventMapping> findAllForJob(
+    List<GoogleCalendarRecurrenceEventMapping>
+    findAllWithConnectionByIntegrationIdAndRecurrenceEventId(
             @Param("integrationId") Long integrationId,
             @Param("recurrenceEventId") Long recurrenceEventId);
-
-    Optional<GoogleCalendarRecurrenceEventMapping>
-    findByConnection_IdAndCalendarKeyAndExternalEventId(
-            Long connectionId,
-            String calendarKey,
-            String externalEventId
-    );
 
     @EntityGraph(attributePaths = "connection")
     @Query("""
