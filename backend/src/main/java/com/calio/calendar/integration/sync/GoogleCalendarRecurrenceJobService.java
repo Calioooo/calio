@@ -15,7 +15,7 @@ import com.calio.calendar.integration.mapping.service.GoogleCalendarRecurrenceMa
 import com.calio.calendar.integration.mapping.service.GoogleCalendarRecurrenceMappingQueryService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobService;
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarRecurrenceJob;
-import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceMasterJobPayload;
+import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceJobPayload;
 import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceOverrideJobPayload;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -69,7 +69,7 @@ public class GoogleCalendarRecurrenceJobService {
     }
 
     private void executeMasterUpsert(GoogleCalendarRecurrenceJob job, String workerToken, boolean create) {
-        GoogleRecurrenceMasterJobPayload payload = read(job, GoogleRecurrenceMasterJobPayload.class);
+        GoogleRecurrenceJobPayload payload = read(job, GoogleRecurrenceJobPayload.class);
         List<MasterSnapshot> mappings = loadMasters(job);
         List<Result> results = new ArrayList<>();
         mappings.forEach(mapping -> results.add(upsertMaster(mapping, payload)));
@@ -92,7 +92,7 @@ public class GoogleCalendarRecurrenceJobService {
                 job, workerToken, results, creationTarget, providerCreated));
     }
 
-    private Result upsertMaster(MasterSnapshot mapping, GoogleRecurrenceMasterJobPayload payload) {
+    private Result upsertMaster(MasterSnapshot mapping, GoogleRecurrenceJobPayload payload) {
         if (mapping.conflicted()) return Result.alreadyConflicted(mapping.mappingId());
         if (mapping.state() != GoogleCalendarConnectionState.CONNECTED) {
             return Result.localChanged(mapping.mappingId());
