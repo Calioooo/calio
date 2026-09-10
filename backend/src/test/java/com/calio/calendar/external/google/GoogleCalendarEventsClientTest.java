@@ -92,7 +92,7 @@ class GoogleCalendarEventsClientTest {
                         "end":{"dateTime":"2026-09-04T03:00:00Z","timeZone":"UTC"}}]}
                         """, MediaType.APPLICATION_JSON));
 
-        assertThat(client.resolveRecurrenceInstance("token", "master-1",
+        assertThat(client.getRecurrenceOccurrenceByOriginStartAt("token", "master-1",
                 Instant.parse("2026-09-04T00:00:00Z"))).isPresent();
         server.verify();
     }

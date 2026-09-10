@@ -269,7 +269,7 @@ class GoogleCalendarRecurrenceJobServiceTest {
         when(client.getEvent("token", "master-1"))
                 .thenReturn(Optional.of(provider("master-1", "master-etag", null)));
         GoogleCalendarEventResponse instance = provider("instance-1", "etag-i", origin);
-        when(client.resolveRecurrenceInstance("token", "master-1", origin))
+        when(client.getRecurrenceOccurrenceByOriginStartAt("token", "master-1", origin))
                 .thenReturn(Optional.of(instance));
         when(client.patchRecurrenceInstance("token", "instance-1", "etag-i", overridePayload()))
                 .thenReturn(provider("instance-1", "etag-i-2", origin));
@@ -297,7 +297,7 @@ class GoogleCalendarRecurrenceJobServiceTest {
                 .thenReturn(overridePayload());
         when(client.getEvent("token", "master-1"))
                 .thenReturn(Optional.of(provider("master-1", "master-etag", null)));
-        when(client.resolveRecurrenceInstance("token", "master-1", origin))
+        when(client.getRecurrenceOccurrenceByOriginStartAt("token", "master-1", origin))
                 .thenReturn(Optional.of(cancelledProviderInstance("instance-1", origin)));
 
         // when
@@ -341,7 +341,7 @@ class GoogleCalendarRecurrenceJobServiceTest {
         when(client.getEvent("token", "master-1"))
                 .thenReturn(Optional.of(provider("master-1", "master-etag", null)));
         GoogleCalendarEventResponse instance = provider("instance-1", "etag-i", origin);
-        when(client.resolveRecurrenceInstance("token", "master-1", origin))
+        when(client.getRecurrenceOccurrenceByOriginStartAt("token", "master-1", origin))
                 .thenReturn(Optional.of(instance));
         when(client.patchRecurrenceInstance("token", "instance-1", "etag-i", overridePayload()))
                 .thenThrow(new com.calio.calendar.external.google.GoogleCalendarEventVersionConflictException(
