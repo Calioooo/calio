@@ -170,7 +170,7 @@ public class GoogleCalendarEventsClient {
                 GoogleCalendarEventWriteRequest.forRecurrenceUpdate(payload));
     }
 
-    public Optional<GoogleCalendarEventResponse> resolveRecurrenceInstance(
+    public Optional<GoogleCalendarEventResponse> getRecurrenceOccurrenceByOriginStartAt(
             String accessToken, String externalMasterId, java.time.Instant originStartAt
     ) {
         validateExternalEventId(externalMasterId);

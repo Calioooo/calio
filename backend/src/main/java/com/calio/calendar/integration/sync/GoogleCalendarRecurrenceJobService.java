@@ -158,7 +158,7 @@ public class GoogleCalendarRecurrenceJobService {
         }
         GoogleCalendarEventResponse instance;
         if (scope.overrideId() == null) {
-            instance = eventsClient.resolveRecurrenceInstance(
+            instance = eventsClient.getRecurrenceOccurrenceByOriginStartAt(
                     token, master.externalId(), job.getOriginStartAt()).orElse(null);
             if (instance == null) return OverrideResult.masterConflict(master.mappingId(), null);
             if (instance.isCancelled()) {
