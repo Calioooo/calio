@@ -8,6 +8,7 @@ import com.calio.calendar.integration.sync.operation.dto.GoogleEventJobPayload;
 import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceJobPayload;
 import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceOverrideJobPayload;
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -19,8 +20,9 @@ public record GoogleCalendarEventWriteRequest(
         String description,
         GoogleCalendarEventTimeResponse start,
         GoogleCalendarEventTimeResponse end,
+        @JsonProperty("recurrence")
         @JsonInclude(NON_NULL)
-        List<String> recurrence
+        List<String> recurrenceRules
 ) {
     public static GoogleCalendarEventWriteRequest forEventUpdate(GoogleEventJobPayload payload) {
         if (payload == null) {
@@ -114,7 +116,7 @@ public record GoogleCalendarEventWriteRequest(
 
     private static GoogleCalendarEventWriteRequest from(
             String title, String description, Instant startAt, Instant endAt,
-            boolean allDay, String timeZone, String providerIdentity, List<String> recurrence
+            boolean allDay, String timeZone, String providerIdentity, List<String> recurrenceRules
     ) {
         if (allDay) {
             return new GoogleCalendarEventWriteRequest(
@@ -123,14 +125,14 @@ public record GoogleCalendarEventWriteRequest(
                             startAt.atOffset(ZoneOffset.UTC).toLocalDate().toString(), null, null),
                     new GoogleCalendarEventTimeResponse(
                             endAt.atOffset(ZoneOffset.UTC).toLocalDate().toString(), null, null),
-                    recurrence
+                    recurrenceRules
             );
         }
         return new GoogleCalendarEventWriteRequest(
                 providerIdentity, title, description,
                 new GoogleCalendarEventTimeResponse(null, startAt.toString(), timeZone),
                 new GoogleCalendarEventTimeResponse(null, endAt.toString(), timeZone),
-                recurrence
+                recurrenceRules
         );
     }
 
