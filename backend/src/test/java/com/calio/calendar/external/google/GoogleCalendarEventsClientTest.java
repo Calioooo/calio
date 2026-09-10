@@ -19,7 +19,7 @@ import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.integration.sync.GoogleCalendarSyncMode;
 import com.calio.calendar.integration.sync.operation.dto.GoogleEventJobPayload;
-import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceMasterJobPayload;
+import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceJobPayload;
 import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceOverrideJobPayload;
 import java.io.IOException;
 import java.time.Instant;
@@ -50,7 +50,7 @@ class GoogleCalendarEventsClientTest {
                 .andExpect(jsonPath("$.originalStartTime").doesNotExist())
                 .andRespond(withSuccess(eventResponse("provider-id"), MediaType.APPLICATION_JSON));
 
-        client.insertRecurrenceEvent("token", "provider-id", new GoogleRecurrenceMasterJobPayload(
+        client.insertRecurrenceEvent("token", "provider-id", new GoogleRecurrenceJobPayload(
                 "daily", null, Instant.parse("2026-09-04T00:00:00Z"),
                 Instant.parse("2026-09-04T01:00:00Z"), false, "UTC",
                 List.of("RRULE:FREQ=DAILY")));

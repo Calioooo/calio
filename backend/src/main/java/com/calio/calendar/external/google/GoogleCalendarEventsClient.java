@@ -7,7 +7,7 @@ import com.calio.calendar.external.google.dto.GoogleCalendarEventPage;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventWriteRequest;
 import com.calio.calendar.integration.sync.GoogleCalendarSyncMode;
 import com.calio.calendar.integration.sync.operation.dto.GoogleEventJobPayload;
-import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceMasterJobPayload;
+import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceJobPayload;
 import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceOverrideJobPayload;
 import java.net.URI;
 import java.util.Optional;
@@ -141,7 +141,7 @@ public class GoogleCalendarEventsClient {
     }
 
     public GoogleCalendarEventResponse insertRecurrenceEvent(
-            String accessToken, String providerIdentity, GoogleRecurrenceMasterJobPayload payload
+            String accessToken, String providerIdentity, GoogleRecurrenceJobPayload payload
     ) {
         if (!hasText(providerIdentity) || payload == null) {
             throw new CalioException(ErrorCode.GOOGLE_CALENDAR_REQUEST_INVALID);
@@ -161,7 +161,7 @@ public class GoogleCalendarEventsClient {
 
     public GoogleCalendarEventResponse patchRecurrenceEvent(
             String accessToken, String externalEventId, String expectedProviderEtag,
-            GoogleRecurrenceMasterJobPayload payload
+            GoogleRecurrenceJobPayload payload
     ) {
         if (payload == null) {
             throw new CalioException(ErrorCode.GOOGLE_CALENDAR_REQUEST_INVALID);

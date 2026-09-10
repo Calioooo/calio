@@ -1,7 +1,7 @@
 package com.calio.calendar.external.google.dto;
 
 import com.calio.calendar.integration.sync.operation.dto.GoogleEventJobPayload;
-import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceMasterJobPayload;
+import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceJobPayload;
 import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceOverrideJobPayload;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import java.time.ZoneOffset;
@@ -29,7 +29,7 @@ public record GoogleCalendarEventWriteRequest(
     }
 
     public static GoogleCalendarEventWriteRequest forRecurrenceCreate(
-            GoogleRecurrenceMasterJobPayload payload,
+            GoogleRecurrenceJobPayload payload,
             String providerIdentity
     ) {
         return from(payload.title(), payload.description(), payload.startAt(), payload.endAt(),
@@ -37,7 +37,7 @@ public record GoogleCalendarEventWriteRequest(
     }
 
     public static GoogleCalendarEventWriteRequest forRecurrenceUpdate(
-            GoogleRecurrenceMasterJobPayload payload
+            GoogleRecurrenceJobPayload payload
     ) {
         return from(payload.title(), payload.description(), payload.startAt(), payload.endAt(),
                 payload.allDay(), payload.timeZone(), null, payload.recurrence());

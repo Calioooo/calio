@@ -26,7 +26,7 @@ import com.calio.calendar.integration.mapping.service.GoogleCalendarRecurrenceMa
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobService;
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarRecurrenceJob;
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarRecurrenceJobKind;
-import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceMasterJobPayload;
+import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceJobPayload;
 import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceOverrideJobPayload;
 import java.time.Instant;
 import java.util.List;
@@ -71,7 +71,7 @@ class GoogleCalendarRecurrenceJobServiceTest {
         connection.disconnect(Instant.parse("2026-09-01T00:00:00Z"));
         GoogleCalendarRecurrenceEventMapping mapping = master(connection);
         when(mappings.listRecurrenceEventMappingsForJob(20L, 40L)).thenReturn(List.of(mapping));
-        when(objectMapper.readValue("payload", GoogleRecurrenceMasterJobPayload.class)).thenReturn(masterPayload());
+        when(objectMapper.readValue("payload", GoogleRecurrenceJobPayload.class)).thenReturn(masterPayload());
 
         service.execute(job(GoogleCalendarRecurrenceJobKind.MASTER_UPDATE, null), "worker");
 
@@ -93,7 +93,7 @@ class GoogleCalendarRecurrenceJobServiceTest {
         when(mappings.listRecurrenceEventMappingsForJob(20L, 40L))
                 .thenReturn(List.of(connectedMapping, errorMapping));
         when(tokens.getAccessToken(30L)).thenReturn("token");
-        when(objectMapper.readValue("payload", GoogleRecurrenceMasterJobPayload.class)).thenReturn(masterPayload());
+        when(objectMapper.readValue("payload", GoogleRecurrenceJobPayload.class)).thenReturn(masterPayload());
         when(client.getEvent("token", "master-1"))
                 .thenReturn(Optional.of(provider("master-1", "master-etag", null)));
         when(client.patchRecurrenceEvent("token", "master-1", "master-etag", masterPayload()))
@@ -113,7 +113,7 @@ class GoogleCalendarRecurrenceJobServiceTest {
         when(mappings.listRecurrenceEventMappingsForJob(20L, 40L)).thenReturn(List.of());
         when(connections.listConnections(20L)).thenReturn(List.of(connection));
         when(tokens.getAccessToken(30L)).thenReturn("token");
-        when(objectMapper.readValue("payload", GoogleRecurrenceMasterJobPayload.class)).thenReturn(masterPayload());
+        when(objectMapper.readValue("payload", GoogleRecurrenceJobPayload.class)).thenReturn(masterPayload());
         when(client.insertRecurrenceEvent("token", "provider-id", masterPayload()))
                 .thenReturn(provider("master-1", "etag-1", null));
 
@@ -139,7 +139,7 @@ class GoogleCalendarRecurrenceJobServiceTest {
                 .thenReturn(List.of(existingConnection, creationConnection));
         when(tokens.getAccessToken(30L)).thenReturn("existing-token");
         when(tokens.getAccessToken(31L)).thenReturn("creation-token");
-        when(objectMapper.readValue("payload", GoogleRecurrenceMasterJobPayload.class))
+        when(objectMapper.readValue("payload", GoogleRecurrenceJobPayload.class))
                 .thenReturn(masterPayload());
         when(client.getEvent("existing-token", "master-1"))
                 .thenReturn(Optional.of(provider("master-1", "master-etag", null)));
@@ -178,7 +178,7 @@ class GoogleCalendarRecurrenceJobServiceTest {
                 .thenReturn(List.of(existingConnection, creationConnection));
         when(tokens.getAccessToken(30L)).thenReturn("existing-token");
         when(tokens.getAccessToken(31L)).thenReturn("creation-token");
-        when(objectMapper.readValue("payload", GoogleRecurrenceMasterJobPayload.class))
+        when(objectMapper.readValue("payload", GoogleRecurrenceJobPayload.class))
                 .thenReturn(masterPayload());
         when(client.getEvent("existing-token", "master-1"))
                 .thenReturn(Optional.of(provider("master-1", "master-etag", null)));
@@ -207,7 +207,7 @@ class GoogleCalendarRecurrenceJobServiceTest {
         GoogleCalendarRecurrenceEventMapping mapping = master(connection);
         when(mappings.listRecurrenceEventMappingsForJob(20L, 40L)).thenReturn(List.of(mapping));
         when(tokens.getAccessToken(30L)).thenReturn("token");
-        when(objectMapper.readValue("payload", GoogleRecurrenceMasterJobPayload.class)).thenReturn(masterPayload());
+        when(objectMapper.readValue("payload", GoogleRecurrenceJobPayload.class)).thenReturn(masterPayload());
         when(client.getEvent("token", "master-1")).thenReturn(Optional.of(provider("master-1", "etag-2", null)));
 
         service.execute(job(GoogleCalendarRecurrenceJobKind.MASTER_UPDATE, null), "worker");
@@ -316,7 +316,7 @@ class GoogleCalendarRecurrenceJobServiceTest {
         GoogleCalendarRecurrenceEventMapping master = master(connection(30L));
         master.markConflicted();
         when(mappings.listRecurrenceEventMappingsForJob(20L, 40L)).thenReturn(List.of(master));
-        when(objectMapper.readValue("payload", GoogleRecurrenceMasterJobPayload.class))
+        when(objectMapper.readValue("payload", GoogleRecurrenceJobPayload.class))
                 .thenReturn(masterPayload());
 
         // when
@@ -494,8 +494,8 @@ class GoogleCalendarRecurrenceJobServiceTest {
         return mapping;
     }
 
-    private GoogleRecurrenceMasterJobPayload masterPayload() {
-        return new GoogleRecurrenceMasterJobPayload("title", null,
+    private GoogleRecurrenceJobPayload masterPayload() {
+        return new GoogleRecurrenceJobPayload("title", null,
                 Instant.parse("2026-09-03T00:00:00Z"), Instant.parse("2026-09-03T01:00:00Z"),
                 false, "UTC", List.of("RRULE:FREQ=DAILY"));
     }
