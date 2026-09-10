@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
+import com.calio.calendar.external.google.GoogleCalendarEventVersionConflictException;
 import com.calio.calendar.external.google.GoogleCalendarEventsClient;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventResponse;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventTimeResponse;
@@ -344,7 +345,7 @@ class GoogleCalendarRecurrenceJobServiceTest {
         when(client.getRecurrenceOccurrenceByOriginStartAt("token", "master-1", origin))
                 .thenReturn(Optional.of(instance));
         when(client.patchRecurrenceOccurrence("token", "instance-1", "etag-i", overridePayload()))
-                .thenThrow(new com.calio.calendar.external.google.GoogleCalendarEventVersionConflictException(
+                .thenThrow(new GoogleCalendarEventVersionConflictException(
                         new RuntimeException()));
         when(mappingCommands.createOverrideMapping(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
