@@ -226,8 +226,8 @@ class GoogleCalendarEventsClientTest {
     }
 
     @Test
-    @DisplayName("CREATE 재시도의 기존 Google Event ID가 요청 ID와 다르면 invalid response를 반환한다")
-    void givenMismatchedEventAfterCreateConflict_whenInsertEvent_thenReturnsInvalidResponse() {
+    @DisplayName("CREATE 재시도는 conflict 뒤 조회한 기존 Google Event를 반환한다")
+    void givenExistingEventAfterCreateConflict_whenInsertEvent_thenReturnsExistingEvent() {
         // given
         String providerIdentity = "c10000000000000014000000000000028";
         RestClient.Builder restClientBuilder = RestClient.builder();
@@ -238,11 +238,12 @@ class GoogleCalendarEventsClientTest {
         server.expect(method(HttpMethod.GET))
                 .andRespond(withSuccess(eventResponse("different-event-id"), MediaType.APPLICATION_JSON));
 
-        // when, then
-        assertThatThrownBy(() -> client.insertEvent("current-token", providerIdentity, payload()))
-                .isInstanceOfSatisfying(CalioException.class, exception ->
-                        assertThat(exception.getErrorCode())
-                                .isEqualTo(ErrorCode.GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID));
+        // when
+        GoogleCalendarEventResponse response = client.insertEvent(
+                "current-token", providerIdentity, payload());
+
+        // then
+        assertThat(response.id()).isEqualTo("different-event-id");
         server.verify();
     }
 
