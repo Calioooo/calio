@@ -1,5 +1,7 @@
 package com.calio.calendar.external.google.dto;
 
+import static com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL;
+
 import com.calio.calendar.integration.sync.operation.dto.GoogleEventJobPayload;
 import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceJobPayload;
 import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceOverrideJobPayload;
@@ -9,13 +11,13 @@ import java.time.ZoneOffset;
 import java.util.List;
 
 public record GoogleCalendarEventWriteRequest(
-        @JsonInclude(JsonInclude.Include.NON_NULL)
+        @JsonInclude(NON_NULL)
         String id,
         String summary,
         String description,
         GoogleCalendarEventTimeResponse start,
         GoogleCalendarEventTimeResponse end,
-        @JsonInclude(JsonInclude.Include.NON_NULL)
+        @JsonInclude(NON_NULL)
         List<String> recurrence
 ) {
     public static GoogleCalendarEventWriteRequest forUpdate(GoogleEventJobPayload payload) {
