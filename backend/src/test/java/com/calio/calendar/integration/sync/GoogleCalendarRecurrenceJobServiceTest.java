@@ -252,7 +252,7 @@ class GoogleCalendarRecurrenceJobServiceTest {
 
         assertThat(override.isConflicted()).isTrue();
         assertThat(master.isConflicted()).isFalse();
-        verify(client, never()).patchRecurrenceInstance(any(), any(), any(), any());
+        verify(client, never()).patchRecurrenceOccurrence(any(), any(), any(), any());
     }
 
     @Test
@@ -271,7 +271,7 @@ class GoogleCalendarRecurrenceJobServiceTest {
         GoogleCalendarEventResponse instance = provider("instance-1", "etag-i", origin);
         when(client.getRecurrenceOccurrenceByOriginStartAt("token", "master-1", origin))
                 .thenReturn(Optional.of(instance));
-        when(client.patchRecurrenceInstance("token", "instance-1", "etag-i", overridePayload()))
+        when(client.patchRecurrenceOccurrence("token", "instance-1", "etag-i", overridePayload()))
                 .thenReturn(provider("instance-1", "etag-i-2", origin));
 
         service.execute(job(GoogleCalendarRecurrenceJobKind.OVERRIDE_UPSERT, origin), "worker");
@@ -305,7 +305,7 @@ class GoogleCalendarRecurrenceJobServiceTest {
 
         // then
         assertThat(master.isConflicted()).isTrue();
-        verify(client, never()).patchRecurrenceInstance(any(), any(), any(), any());
+        verify(client, never()).patchRecurrenceOccurrence(any(), any(), any(), any());
         verify(jobs).recordSyncConflict(50L, 10L, "worker");
     }
 
@@ -343,7 +343,7 @@ class GoogleCalendarRecurrenceJobServiceTest {
         GoogleCalendarEventResponse instance = provider("instance-1", "etag-i", origin);
         when(client.getRecurrenceOccurrenceByOriginStartAt("token", "master-1", origin))
                 .thenReturn(Optional.of(instance));
-        when(client.patchRecurrenceInstance("token", "instance-1", "etag-i", overridePayload()))
+        when(client.patchRecurrenceOccurrence("token", "instance-1", "etag-i", overridePayload()))
                 .thenThrow(new com.calio.calendar.external.google.GoogleCalendarEventVersionConflictException(
                         new RuntimeException()));
         when(mappingCommands.createOverrideMapping(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -377,7 +377,7 @@ class GoogleCalendarRecurrenceJobServiceTest {
 
         service.execute(job(GoogleCalendarRecurrenceJobKind.OVERRIDE_DELETE, origin), "worker");
 
-        verify(client).cancelRecurrenceInstance("token", "instance-1", "etag-i");
+        verify(client).cancelRecurrenceOccurrence("token", "instance-1", "etag-i");
         verify(mappingCommands).deleteOverrideMappings(List.of(override));
         assertThat(master.isConflicted()).isFalse();
     }
@@ -396,7 +396,7 @@ class GoogleCalendarRecurrenceJobServiceTest {
 
         verify(client).deleteEvent("token", "master-1", "master-etag");
         verify(mappingCommands).deleteRecurrenceAggregateMappings(master);
-        verify(client, never()).cancelRecurrenceInstance(any(), any(), any());
+        verify(client, never()).cancelRecurrenceOccurrence(any(), any(), any());
     }
 
     @Test
