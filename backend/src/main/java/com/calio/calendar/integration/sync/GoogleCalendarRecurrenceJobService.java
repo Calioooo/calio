@@ -173,10 +173,10 @@ public class GoogleCalendarRecurrenceJobService {
         String expected = scope.overrideId() == null ? instance.etag() : scope.etag();
         try {
             if (delete) {
-                eventsClient.cancelRecurrenceInstance(token, instance.id(), expected);
+                eventsClient.cancelRecurrenceOccurrence(token, instance.id(), expected);
                 return OverrideResult.deleted(master.mappingId(), scope.overrideId());
             }
-            GoogleCalendarEventResponse updated = eventsClient.patchRecurrenceInstance(
+            GoogleCalendarEventResponse updated = eventsClient.patchRecurrenceOccurrence(
                     token, instance.id(), expected, payload);
             return OverrideResult.updated(master.mappingId(), scope.overrideId(),
                     instance.id(), expected, updated.etag());
