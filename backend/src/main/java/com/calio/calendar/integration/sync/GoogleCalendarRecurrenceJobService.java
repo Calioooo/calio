@@ -61,17 +61,17 @@ public class GoogleCalendarRecurrenceJobService {
 
     public void execute(GoogleCalendarRecurrenceJob job, String workerToken) {
         switch (job.getKind()) {
-            case MASTER_CREATE -> executeMasterUpsert(job, workerToken, true);
-            case MASTER_UPDATE -> executeMasterUpsert(job, workerToken, false);
-            case MASTER_DELETE -> executeMasterDelete(job, workerToken);
+            case RECURRENCE_CREATE -> executeRecurrenceUpsert(job, workerToken, true);
+            case RECURRENCE_UPDATE -> executeRecurrenceUpsert(job, workerToken, false);
+            case RECURRENCE_DELETE -> executeRecurrenceDelete(job, workerToken);
             case OVERRIDE_UPSERT -> executeOverride(job, workerToken, false);
             case OVERRIDE_DELETE -> executeOverride(job, workerToken, true);
         }
     }
 
-    private void executeMasterUpsert(GoogleCalendarRecurrenceJob job, String workerToken, boolean create) {
-        GoogleRecurrenceJobPayload payload = read(job, GoogleRecurrenceJobPayload.class);
-        List<MasterSnapshot> mappings = loadMasters(job);
+    private void executeRecurrenceUpsert(GoogleCalendarRecurrenceJob job, String workerToken, boolean create) {
+        GoogleRecurrenceJobPayload payload = readRecurrenceSnapshot(job);
+        List<RecurrenceSnapshot> mappings = loadMasters(job);
         List<Result> results = new ArrayList<>();
         mappings.forEach(mapping -> results.add(upsertMaster(mapping, payload)));
         Long target = null;
@@ -83,8 +83,13 @@ public class GoogleCalendarRecurrenceJobService {
                             mapping.connectionId().equals(connection.getId())))
                     .map(GoogleCalendarConnection::getId).findFirst().orElse(null);
             if (target != null) {
-                created = eventsClient.insertRecurrenceEvent(
-                        accessTokenService.getAccessToken(target), job.getProviderIdentity(), payload);
+                created = eventsClient.post(
+                        accessTokenService.getAccessToken(target),
+                        GoogleCalendarEventWriteRequest.forRecurrenceCreate(
+                                payload,
+                                job.getProviderIdentity()
+                        )
+                );
             }
         }
         Long creationTarget = target;
@@ -93,7 +98,7 @@ public class GoogleCalendarRecurrenceJobService {
                 job, workerToken, results, creationTarget, providerCreated));
     }
 
-    private Result upsertMaster(MasterSnapshot mapping, GoogleRecurrenceJobPayload payload) {
+    private Result upsertMaster(RecurrenceSnapshot mapping, GoogleRecurrenceJobPayload payload) {
         if (mapping.conflicted()) return Result.alreadyConflicted(mapping.mappingId());
         if (mapping.state() != GoogleCalendarConnectionState.CONNECTED) {
             return Result.localChanged(mapping.mappingId());
@@ -104,7 +109,7 @@ public class GoogleCalendarRecurrenceJobService {
             return Result.conflicted(mapping.mappingId());
         }
         try {
-            GoogleCalendarEventResponse updated = eventsClient.patchEvent(
+            GoogleCalendarEventResponse updated = eventsClient.patch(
                     token, mapping.externalId(), mapping.etag(),
                     GoogleCalendarEventWriteRequest.forRecurrenceUpdate(payload));
             return Result.updated(mapping.mappingId(), mapping.etag(), updated.etag());
@@ -113,18 +118,18 @@ public class GoogleCalendarRecurrenceJobService {
         }
     }
 
-    private void executeMasterDelete(GoogleCalendarRecurrenceJob job, String workerToken) {
+    private void executeRecurrenceDelete(GoogleCalendarRecurrenceJob job, String workerToken) {
         List<Result> results = loadMasters(job).stream().map(this::deleteMaster).toList();
         transactionTemplate.executeWithoutResult(status -> completeMasterDelete(job, workerToken, results));
     }
 
-    private Result deleteMaster(MasterSnapshot mapping) {
+    private Result deleteMaster(RecurrenceSnapshot mapping) {
         if (mapping.conflicted()) return Result.alreadyConflicted(mapping.mappingId());
         if (mapping.state() != GoogleCalendarConnectionState.CONNECTED) {
             return Result.localChanged(mapping.mappingId());
         }
         try {
-            eventsClient.deleteEvent(accessTokenService.getAccessToken(mapping.connectionId()),
+            eventsClient.delete(accessTokenService.getAccessToken(mapping.connectionId()),
                     mapping.externalId(), mapping.etag());
             return Result.deleted(mapping.mappingId());
         } catch (GoogleCalendarEventVersionConflictException exception) {
@@ -134,7 +139,7 @@ public class GoogleCalendarRecurrenceJobService {
 
     private void executeOverride(GoogleCalendarRecurrenceJob job, String workerToken, boolean delete) {
         GoogleRecurrenceOverrideJobPayload payload = delete ? null
-                : read(job, GoogleRecurrenceOverrideJobPayload.class);
+                : readRecurrenceOverrideSnapshot(job);
         List<OverrideResult> results = loadOverrideScopes(job).stream()
                 .map(scope -> applyOverride(job, scope, payload, delete)).toList();
         transactionTemplate.executeWithoutResult(status -> completeOverride(job, workerToken, results));
@@ -144,7 +149,7 @@ public class GoogleCalendarRecurrenceJobService {
             GoogleCalendarRecurrenceJob job, OverrideScope scope,
             GoogleRecurrenceOverrideJobPayload payload, boolean delete
     ) {
-        MasterSnapshot master = scope.master();
+        RecurrenceSnapshot master = scope.master();
         if (master.conflicted() || scope.overrideConflicted()) {
             return OverrideResult.alreadyConflicted(master.mappingId(), scope.overrideId());
         }
@@ -160,7 +165,7 @@ public class GoogleCalendarRecurrenceJobService {
         }
         GoogleCalendarEventResponse occurrence;
         if (scope.overrideId() == null) {
-            occurrence = eventsClient.getRecurrenceOccurrenceByOriginStartAt(
+            occurrence = eventsClient.getRecurrenceOccurrence(
                     token, master.externalId(), job.getOriginStartAt()).orElse(null);
             if (occurrence == null) return OverrideResult.masterConflict(master.mappingId(), null);
             if (occurrence.isCancelled()) {
@@ -175,10 +180,10 @@ public class GoogleCalendarRecurrenceJobService {
         String expected = scope.overrideId() == null ? occurrence.etag() : scope.etag();
         try {
             if (delete) {
-                eventsClient.deleteEvent(token, occurrence.id(), expected);
+                eventsClient.delete(token, occurrence.id(), expected);
                 return OverrideResult.deleted(master.mappingId(), scope.overrideId());
             }
-            GoogleCalendarEventResponse updated = eventsClient.patchEvent(
+            GoogleCalendarEventResponse updated = eventsClient.patch(
                     token, occurrence.id(), expected,
                     GoogleCalendarEventWriteRequest.forOverrideUpdate(payload));
             return OverrideResult.updated(master.mappingId(), scope.overrideId(),
@@ -189,10 +194,10 @@ public class GoogleCalendarRecurrenceJobService {
         }
     }
 
-    private List<MasterSnapshot> loadMasters(GoogleCalendarRecurrenceJob job) {
+    private List<RecurrenceSnapshot> loadMasters(GoogleCalendarRecurrenceJob job) {
         return Objects.requireNonNull(transactionTemplate.execute(status -> mappingQueryService
                 .listRecurrenceEventMappingsForJob(job.getIntegrationId(), job.getRecurrenceEventId())
-                .stream().map(MasterSnapshot::from).toList()));
+                .stream().map(RecurrenceSnapshot::from).toList()));
     }
 
     private List<OverrideScope> loadOverrideScopes(GoogleCalendarRecurrenceJob job) {
@@ -315,34 +320,52 @@ public class GoogleCalendarRecurrenceJobService {
         return false;
     }
 
-    private <T> T read(GoogleCalendarRecurrenceJob job, Class<T> type) {
+    private GoogleRecurrenceJobPayload readRecurrenceSnapshot(GoogleCalendarRecurrenceJob job) {
         try {
-            T payload = objectMapper.readValue(job.getTargetPayload(), type);
+            GoogleRecurrenceJobPayload payload = objectMapper.readValue(
+                    job.getTargetPayload(),
+                    GoogleRecurrenceJobPayload.class
+            );
             if (payload == null) {
                 throw new CalioException(ErrorCode.GOOGLE_CALENDAR_REQUEST_INVALID);
             }
             return payload;
-        }
-        catch (JacksonException exception) {
+        } catch (JacksonException exception) {
             throw new CalioException(ErrorCode.GOOGLE_CALENDAR_REQUEST_INVALID, exception);
         }
     }
 
-    private record MasterSnapshot(Long mappingId, Long connectionId,
-                                  GoogleCalendarConnectionState state, String externalId,
-                                  String etag, boolean conflicted) {
-        static MasterSnapshot from(GoogleCalendarRecurrenceEventMapping mapping) {
-            return new MasterSnapshot(mapping.getId(), mapping.getConnection().getId(),
+    private GoogleRecurrenceOverrideJobPayload readRecurrenceOverrideSnapshot(GoogleCalendarRecurrenceJob job) {
+        try {
+            GoogleRecurrenceOverrideJobPayload payload = objectMapper.readValue(
+                    job.getTargetPayload(),
+                    GoogleRecurrenceOverrideJobPayload.class
+            );
+            if (payload == null) {
+                throw new CalioException(ErrorCode.GOOGLE_CALENDAR_REQUEST_INVALID);
+            }
+            return payload;
+        } catch (JacksonException exception) {
+            throw new CalioException(ErrorCode.GOOGLE_CALENDAR_REQUEST_INVALID, exception);
+        }
+    }
+
+    private record RecurrenceSnapshot(Long mappingId, Long connectionId,
+                                      GoogleCalendarConnectionState state, String externalId,
+                                      String etag, boolean conflicted) {
+        static RecurrenceSnapshot from(GoogleCalendarRecurrenceEventMapping mapping) {
+            return new RecurrenceSnapshot(mapping.getId(), mapping.getConnection().getId(),
                     mapping.getConnection().getState(), mapping.getExternalEventId(),
                     mapping.getProviderEtag(), mapping.isConflicted());
         }
     }
 
-    private record OverrideScope(MasterSnapshot master, Long overrideId, String externalId,
+    private record OverrideScope(RecurrenceSnapshot master, Long overrideId, String externalId,
                                  String etag, boolean overrideConflicted) {
         static OverrideScope from(GoogleCalendarRecurrenceEventMapping master,
                                   GoogleCalendarRecurrenceOverrideMapping override) {
-            return new OverrideScope(MasterSnapshot.from(master), override == null ? null : override.getId(),
+            return new OverrideScope(
+                    RecurrenceSnapshot.from(master), override == null ? null : override.getId(),
                     override == null ? null : override.getExternalEventId(),
                     override == null ? null : override.getProviderEtag(),
                     override != null && override.isConflicted());

@@ -51,10 +51,13 @@ class GoogleCalendarEventsClientTest {
                 .andExpect(jsonPath("$.originalStartTime").doesNotExist())
                 .andRespond(withSuccess(eventResponse("provider-id"), MediaType.APPLICATION_JSON));
 
-        client.insertRecurrenceEvent("token", "provider-id", new GoogleRecurrenceJobPayload(
-                "daily", null, Instant.parse("2026-09-04T00:00:00Z"),
-                Instant.parse("2026-09-04T01:00:00Z"), false, "UTC",
-                List.of("RRULE:FREQ=DAILY")));
+        client.post("token", GoogleCalendarEventWriteRequest.forRecurrenceCreate(
+                new GoogleRecurrenceJobPayload(
+                        "daily", null, Instant.parse("2026-09-04T00:00:00Z"),
+                        Instant.parse("2026-09-04T01:00:00Z"), false, "UTC",
+                        List.of("RRULE:FREQ=DAILY")),
+                "provider-id"
+        ));
 
         server.verify();
     }
@@ -66,7 +69,7 @@ class GoogleCalendarEventsClientTest {
         GoogleCalendarEventsClient client = client(RestClient.builder());
 
         // when, then
-        assertThatThrownBy(() -> client.patchEvent("token", "event-1", "etag-1", null))
+        assertThatThrownBy(() -> client.patch("token", "event-1", "etag-1", null))
                 .isInstanceOfSatisfying(CalioException.class, exception ->
                         assertThat(exception.getErrorCode())
                                 .isEqualTo(ErrorCode.GOOGLE_CALENDAR_REQUEST_INVALID));
@@ -89,7 +92,7 @@ class GoogleCalendarEventsClientTest {
                         "end":{"dateTime":"2026-09-04T03:00:00Z","timeZone":"UTC"}}]}
                         """, MediaType.APPLICATION_JSON));
 
-        assertThat(client.getRecurrenceOccurrenceByOriginStartAt("token", "master-1",
+        assertThat(client.getRecurrenceOccurrence("token", "master-1",
                 Instant.parse("2026-09-04T00:00:00Z"))).isPresent();
         server.verify();
     }
@@ -107,7 +110,7 @@ class GoogleCalendarEventsClientTest {
                 .andExpect(jsonPath("$.recurrence").doesNotExist())
                 .andRespond(withSuccess(eventResponse("occurrence-1"), MediaType.APPLICATION_JSON));
 
-        client.patchEvent("token", "occurrence-1", "etag-i",
+        client.patch("token", "occurrence-1", "etag-i",
                 GoogleCalendarEventWriteRequest.forOverrideUpdate(new GoogleRecurrenceOverrideJobPayload("moved", null,
                         Instant.parse("2026-09-04T02:00:00Z"),
                         Instant.parse("2026-09-04T03:00:00Z"), false, "UTC")));
@@ -126,7 +129,7 @@ class GoogleCalendarEventsClientTest {
                 .andExpect(jsonPath("$.start.dateTime").doesNotExist())
                 .andRespond(withSuccess(eventResponse("occurrence-1"), MediaType.APPLICATION_JSON));
 
-        client.patchEvent("token", "occurrence-1", "etag-i",
+        client.patch("token", "occurrence-1", "etag-i",
                 GoogleCalendarEventWriteRequest.forOverrideUpdate(new GoogleRecurrenceOverrideJobPayload("offsite", null,
                         Instant.parse("2026-09-04T00:00:00Z"),
                         Instant.parse("2026-09-06T00:00:00Z"), true, null)));
@@ -136,7 +139,7 @@ class GoogleCalendarEventsClientTest {
 
     @Test
     @DisplayName("CREATE 재시도에서 동일한 Google Event ID가 이미 존재하면 기존 이벤트를 조회해 성공 처리한다")
-    void givenExistingDeterministicEventId_whenInsertEvent_thenRecoversExistingEvent() {
+    void givenExistingDeterministicEventId_whenPost() {
         // given
         String providerIdentity = "c10000000000000014000000000000028";
         RestClient.Builder restClientBuilder = RestClient.builder();
@@ -150,10 +153,9 @@ class GoogleCalendarEventsClientTest {
                 .andRespond(withSuccess(eventResponse(providerIdentity), MediaType.APPLICATION_JSON));
 
         // when
-        GoogleCalendarEventResponse response = client.insertEvent(
+        GoogleCalendarEventResponse response = client.post(
                 "current-token",
-                providerIdentity,
-                payload()
+                GoogleCalendarEventWriteRequest.forEventCreate(payload(), providerIdentity)
         );
 
         // then
@@ -163,7 +165,7 @@ class GoogleCalendarEventsClientTest {
 
     @Test
     @DisplayName("PATCH는 읽은 provider ETag를 If-Match precondition으로 보낸다")
-    void givenExpectedProviderEtag_whenPatchEvent_thenSendsConditionalRequest() {
+    void givenExpectedProviderEtag_whenPatch_thenSendsConditionalRequest() {
         // given
         RestClient.Builder restClientBuilder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
@@ -173,11 +175,11 @@ class GoogleCalendarEventsClientTest {
                 .andRespond(withSuccess(eventResponse("event-1"), MediaType.APPLICATION_JSON));
 
         // when
-        client.patchEvent(
+        client.patch(
                 "current-token",
                 "event-1",
                 "etag-1",
-                GoogleCalendarEventWriteRequest.forUpdate(payload())
+                GoogleCalendarEventWriteRequest.forEventUpdate(payload())
         );
 
         // then
@@ -186,7 +188,7 @@ class GoogleCalendarEventsClientTest {
 
     @Test
     @DisplayName("PATCH의 412 precondition 실패는 provider conflict 예외로 구분한다")
-    void givenPreconditionFailed_whenPatchEvent_thenReturnsProviderConflict() {
+    void givenPreconditionFailed_whenPatch_thenReturnsProviderConflict() {
         // given
         RestClient.Builder restClientBuilder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
@@ -195,18 +197,18 @@ class GoogleCalendarEventsClientTest {
                 .andRespond(withStatus(HttpStatus.PRECONDITION_FAILED));
 
         // when, then
-        assertThatThrownBy(() -> client.patchEvent(
+        assertThatThrownBy(() -> client.patch(
                 "current-token",
                 "event-1",
                 "etag-1",
-                GoogleCalendarEventWriteRequest.forUpdate(payload())
+                GoogleCalendarEventWriteRequest.forEventUpdate(payload())
         )).isInstanceOf(GoogleCalendarEventVersionConflictException.class);
         server.verify();
     }
 
     @Test
     @DisplayName("CREATE 재시도의 409 뒤 기존 Google Event를 찾지 못하면 sync failed를 반환한다")
-    void givenMissingEventAfterCreateConflict_whenInsertEvent_thenReturnsSyncFailed() {
+    void givenMissingEventAfterCreateConflict_whenPost_thenReturnsSyncFailed() {
         // given
         String providerIdentity = "c10000000000000014000000000000028";
         RestClient.Builder restClientBuilder = RestClient.builder();
@@ -218,7 +220,8 @@ class GoogleCalendarEventsClientTest {
                 .andRespond(withStatus(HttpStatus.NOT_FOUND));
 
         // when, then
-        assertThatThrownBy(() -> client.insertEvent("current-token", providerIdentity, payload()))
+        assertThatThrownBy(() -> client.post(
+                "current-token", GoogleCalendarEventWriteRequest.forEventCreate(payload(), providerIdentity)))
                 .isInstanceOfSatisfying(CalioException.class, exception ->
                         assertThat(exception.getErrorCode())
                                 .isEqualTo(ErrorCode.GOOGLE_CALENDAR_SYNC_FAILED));
@@ -227,7 +230,7 @@ class GoogleCalendarEventsClientTest {
 
     @Test
     @DisplayName("CREATE 재시도는 conflict 뒤 조회한 기존 Google Event를 반환한다")
-    void givenExistingEventAfterCreateConflict_whenInsertEvent_thenReturnsExistingEvent() {
+    void givenExistingEventAfterCreateConflict_whenPost() {
         // given
         String providerIdentity = "c10000000000000014000000000000028";
         RestClient.Builder restClientBuilder = RestClient.builder();
@@ -239,8 +242,8 @@ class GoogleCalendarEventsClientTest {
                 .andRespond(withSuccess(eventResponse("different-event-id"), MediaType.APPLICATION_JSON));
 
         // when
-        GoogleCalendarEventResponse response = client.insertEvent(
-                "current-token", providerIdentity, payload());
+        GoogleCalendarEventResponse response = client.post(
+                "current-token", GoogleCalendarEventWriteRequest.forEventCreate(payload(), providerIdentity));
 
         // then
         assertThat(response.id()).isEqualTo("different-event-id");
@@ -249,7 +252,7 @@ class GoogleCalendarEventsClientTest {
 
     @Test
     @DisplayName("DELETE는 읽은 provider ETag를 If-Match precondition으로 보낸다")
-    void givenExpectedProviderEtag_whenDeleteEvent_thenSendsConditionalRequest() {
+    void givenExpectedProviderEtag_whenDelete_thenSendsConditionalRequest() {
         // given
         RestClient.Builder restClientBuilder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
@@ -259,7 +262,7 @@ class GoogleCalendarEventsClientTest {
                 .andRespond(withSuccess());
 
         // when
-        client.deleteEvent("current-token", "event-1", "etag-1");
+        client.delete("current-token", "event-1", "etag-1");
 
         // then
         server.verify();
@@ -267,7 +270,7 @@ class GoogleCalendarEventsClientTest {
 
     @Test
     @DisplayName("DELETE의 412 precondition 실패는 provider conflict 예외로 구분한다")
-    void givenPreconditionFailed_whenDeleteEvent_thenReturnsProviderConflict() {
+    void givenPreconditionFailed_whenDelete_thenReturnsProviderConflict() {
         // given
         RestClient.Builder restClientBuilder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
@@ -276,14 +279,14 @@ class GoogleCalendarEventsClientTest {
                 .andRespond(withStatus(HttpStatus.PRECONDITION_FAILED));
 
         // when, then
-        assertThatThrownBy(() -> client.deleteEvent("current-token", "event-1", "etag-1"))
+        assertThatThrownBy(() -> client.delete("current-token", "event-1", "etag-1"))
                 .isInstanceOf(GoogleCalendarEventVersionConflictException.class);
         server.verify();
     }
 
     @Test
     @DisplayName("DELETE의 410 응답은 이미 삭제된 일정으로 처리한다")
-    void givenGoneResponse_whenDeleteEvent_thenTreatsDeletionAsComplete() {
+    void givenGoneResponse_whenDelete_thenTreatsDeletionAsComplete() {
         // given
         RestClient.Builder restClientBuilder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
@@ -292,7 +295,7 @@ class GoogleCalendarEventsClientTest {
                 .andRespond(withStatus(HttpStatus.GONE));
 
         // when
-        boolean deleted = client.deleteEvent("current-token", "event-1", "etag-1");
+        boolean deleted = client.delete("current-token", "event-1", "etag-1");
 
         // then
         assertThat(deleted).isFalse();

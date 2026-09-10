@@ -2,6 +2,8 @@ package com.calio.calendar.external.google.dto;
 
 import static com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL;
 
+import com.calio.calendar.common.error.CalioException;
+import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.integration.sync.operation.dto.GoogleEventJobPayload;
 import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceJobPayload;
 import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceOverrideJobPayload;
@@ -20,45 +22,94 @@ public record GoogleCalendarEventWriteRequest(
         @JsonInclude(NON_NULL)
         List<String> recurrence
 ) {
-    public static GoogleCalendarEventWriteRequest forUpdate(GoogleEventJobPayload payload) {
-        return from(payload, null);
+    public static GoogleCalendarEventWriteRequest forEventUpdate(GoogleEventJobPayload payload) {
+        if (payload == null) {
+            throw new CalioException(ErrorCode.GOOGLE_CALENDAR_REQUEST_INVALID);
+        }
+        return from(
+                payload.title(),
+                payload.description(),
+                payload.startAt(),
+                payload.endAt(),
+                payload.allDay(),
+                payload.timeZone(),
+                null,
+                null
+        );
     }
 
-    public static GoogleCalendarEventWriteRequest forCreate(
+    public static GoogleCalendarEventWriteRequest forEventCreate(
             GoogleEventJobPayload payload,
             String providerIdentity
     ) {
-        return from(payload, providerIdentity);
+        if (!hasText(providerIdentity) || payload == null) {
+            throw new CalioException(ErrorCode.GOOGLE_CALENDAR_REQUEST_INVALID);
+        }
+        return from(
+                payload.title(),
+                payload.description(),
+                payload.startAt(),
+                payload.endAt(),
+                payload.allDay(),
+                payload.timeZone(),
+                providerIdentity,
+                null
+        );
     }
 
     public static GoogleCalendarEventWriteRequest forRecurrenceCreate(
             GoogleRecurrenceJobPayload payload,
             String providerIdentity
     ) {
-        return from(payload.title(), payload.description(), payload.startAt(), payload.endAt(),
-                payload.allDay(), payload.timeZone(), providerIdentity, payload.recurrence());
+        if (!hasText(providerIdentity) || payload == null) {
+            throw new CalioException(ErrorCode.GOOGLE_CALENDAR_REQUEST_INVALID);
+        }
+        return from(
+                payload.title(),
+                payload.description(),
+                payload.startAt(),
+                payload.endAt(),
+                payload.allDay(),
+                payload.timeZone(),
+                providerIdentity,
+                payload.recurrence()
+        );
     }
 
     public static GoogleCalendarEventWriteRequest forRecurrenceUpdate(
             GoogleRecurrenceJobPayload payload
     ) {
-        return from(payload.title(), payload.description(), payload.startAt(), payload.endAt(),
-                payload.allDay(), payload.timeZone(), null, payload.recurrence());
+        if (payload == null) {
+            throw new CalioException(ErrorCode.GOOGLE_CALENDAR_REQUEST_INVALID);
+        }
+        return from(
+                payload.title(),
+                payload.description(),
+                payload.startAt(),
+                payload.endAt(),
+                payload.allDay(),
+                payload.timeZone(),
+                null,
+                payload.recurrence()
+        );
     }
 
     public static GoogleCalendarEventWriteRequest forOverrideUpdate(
             GoogleRecurrenceOverrideJobPayload payload
     ) {
-        return from(payload.title(), payload.description(), payload.startAt(), payload.endAt(),
-                payload.allDay(), payload.timeZone(), null, null);
-    }
-
-    private static GoogleCalendarEventWriteRequest from(
-            GoogleEventJobPayload payload,
-            String providerIdentity
-    ) {
-        return from(payload.title(), payload.description(), payload.startAt(), payload.endAt(),
-                payload.allDay(), payload.timeZone(), providerIdentity, null);
+        if (payload == null) {
+            throw new CalioException(ErrorCode.GOOGLE_CALENDAR_REQUEST_INVALID);
+        }
+        return from(
+                payload.title(),
+                payload.description(),
+                payload.startAt(),
+                payload.endAt(),
+                payload.allDay(),
+                payload.timeZone(),
+                null,
+                null
+        );
     }
 
     private static GoogleCalendarEventWriteRequest from(
@@ -81,5 +132,9 @@ public record GoogleCalendarEventWriteRequest(
                 new GoogleCalendarEventTimeResponse(null, endAt.toString(), timeZone),
                 recurrence
         );
+    }
+
+    private static boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 }

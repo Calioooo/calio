@@ -97,7 +97,7 @@ class GoogleOperationProcessorTest {
     @DisplayName("concrete recurrence Job은 generic scope 해석 없이 recurrence handler로 직접 dispatch한다")
     void recurrenceJobDispatchesDirectlyToRecurrenceHandler() {
         GoogleCalendarRecurrenceJob job = GoogleCalendarRecurrenceJob.create(
-                "operation", 20L, 10L, 1L, GoogleCalendarRecurrenceJobKind.MASTER_UPDATE,
+                "operation", 20L, 10L, 1L, GoogleCalendarRecurrenceJobKind.RECURRENCE_UPDATE,
                 40L, null, "payload", null, Instant.parse("2026-09-01T00:00:00Z"));
         org.springframework.test.util.ReflectionTestUtils.setField(job, "id", 50L);
         when(operationLeaseService.acquire(eq(10L), anyString())).thenReturn(true);
