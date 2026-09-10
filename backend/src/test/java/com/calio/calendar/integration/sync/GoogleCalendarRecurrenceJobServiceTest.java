@@ -242,7 +242,7 @@ class GoogleCalendarRecurrenceJobServiceTest {
         GoogleCalendarConnection connection = connection(30L);
         GoogleCalendarRecurrenceEventMapping master = master(connection);
         GoogleCalendarRecurrenceOverrideMapping override = new GoogleCalendarRecurrenceOverrideMapping(
-                master, origin, "instance-1", "override-etag-1");
+                master, origin, "occurrence-1", "override-etag-1");
         ReflectionTestUtils.setField(override, "id", 70L);
         when(mappings.listRecurrenceEventMappingsForJob(20L, 40L)).thenReturn(List.of(master));
         when(mappings.getOverrideMappingIfExists(60L, origin)).thenReturn(Optional.of(override));
@@ -250,7 +250,7 @@ class GoogleCalendarRecurrenceJobServiceTest {
         when(objectMapper.readValue("payload", GoogleRecurrenceOverrideJobPayload.class))
                 .thenReturn(overridePayload());
         when(client.getEvent("token", "master-1")).thenReturn(Optional.of(provider("master-1", "master-etag", null)));
-        when(client.getEvent("token", "instance-1")).thenReturn(Optional.of(provider("instance-1", "override-etag-2", origin)));
+        when(client.getEvent("token", "occurrence-1")).thenReturn(Optional.of(provider("occurrence-1", "override-etag-2", origin)));
 
         service.execute(job(GoogleCalendarRecurrenceJobKind.OVERRIDE_UPSERT, origin), "worker");
 
@@ -260,8 +260,8 @@ class GoogleCalendarRecurrenceJobServiceTest {
     }
 
     @Test
-    @DisplayName("active override는 exact origin으로 instance를 resolve해 full snapshot을 적용하고 mapping을 만든다")
-    void activeOverrideResolvesExactInstanceAndCreatesMapping() {
+    @DisplayName("active override는 exact origin으로 occurrence를 resolve해 full snapshot을 적용하고 mapping을 만든다")
+    void activeOverrideResolvesExactOccurrenceAndCreatesMapping() {
         Instant origin = Instant.parse("2026-09-03T00:00:00Z");
         GoogleCalendarConnection connection = connection(30L);
         GoogleCalendarRecurrenceEventMapping master = master(connection);
@@ -272,12 +272,12 @@ class GoogleCalendarRecurrenceJobServiceTest {
                 .thenReturn(overridePayload());
         when(client.getEvent("token", "master-1"))
                 .thenReturn(Optional.of(provider("master-1", "master-etag", null)));
-        GoogleCalendarEventResponse instance = provider("instance-1", "etag-i", origin);
+        GoogleCalendarEventResponse occurrence = provider("occurrence-1", "etag-i", origin);
         when(client.getRecurrenceOccurrenceByOriginStartAt("token", "master-1", origin))
-                .thenReturn(Optional.of(instance));
-        when(client.patchEvent("token", "instance-1", "etag-i",
+                .thenReturn(Optional.of(occurrence));
+        when(client.patchEvent("token", "occurrence-1", "etag-i",
                 GoogleCalendarEventWriteRequest.forOverrideUpdate(overridePayload())))
-                .thenReturn(provider("instance-1", "etag-i-2", origin));
+                .thenReturn(provider("occurrence-1", "etag-i-2", origin));
 
         service.execute(job(GoogleCalendarRecurrenceJobKind.OVERRIDE_UPSERT, origin), "worker");
 
@@ -285,12 +285,12 @@ class GoogleCalendarRecurrenceJobServiceTest {
                 ArgumentCaptor.forClass(GoogleCalendarRecurrenceOverrideMapping.class);
         verify(mappingCommands).createOverrideMapping(captor.capture());
         assertThat(captor.getValue().getOriginStartAt()).isEqualTo(origin);
-        assertThat(captor.getValue().getExternalEventId()).isEqualTo("instance-1");
+        assertThat(captor.getValue().getExternalEventId()).isEqualTo("occurrence-1");
     }
 
     @Test
-    @DisplayName("mapping 없는 occurrence upsert가 취소된 provider instance를 만나면 PATCH하지 않고 conflict로 종료한다")
-    void givenCancelledUnmappedProviderInstance_whenUpsertOverride_thenMarksMasterConflict() {
+    @DisplayName("mapping 없는 occurrence upsert가 취소된 provider occurrence를 만나면 PATCH하지 않고 conflict로 종료한다")
+    void givenCancelledUnmappedProviderOccurrence_whenUpsertOverride_thenMarksMasterConflict() {
         // given
         Instant origin = Instant.parse("2026-09-03T00:00:00Z");
         GoogleCalendarConnection connection = connection(30L);
@@ -303,7 +303,7 @@ class GoogleCalendarRecurrenceJobServiceTest {
         when(client.getEvent("token", "master-1"))
                 .thenReturn(Optional.of(provider("master-1", "master-etag", null)));
         when(client.getRecurrenceOccurrenceByOriginStartAt("token", "master-1", origin))
-                .thenReturn(Optional.of(cancelledProviderInstance("instance-1", origin)));
+                .thenReturn(Optional.of(cancelledProviderOccurrence("occurrence-1", origin)));
 
         // when
         service.execute(job(GoogleCalendarRecurrenceJobKind.OVERRIDE_UPSERT, origin), "worker");
@@ -345,10 +345,10 @@ class GoogleCalendarRecurrenceJobServiceTest {
                 .thenReturn(overridePayload());
         when(client.getEvent("token", "master-1"))
                 .thenReturn(Optional.of(provider("master-1", "master-etag", null)));
-        GoogleCalendarEventResponse instance = provider("instance-1", "etag-i", origin);
+        GoogleCalendarEventResponse occurrence = provider("occurrence-1", "etag-i", origin);
         when(client.getRecurrenceOccurrenceByOriginStartAt("token", "master-1", origin))
-                .thenReturn(Optional.of(instance));
-        when(client.patchEvent("token", "instance-1", "etag-i",
+                .thenReturn(Optional.of(occurrence));
+        when(client.patchEvent("token", "occurrence-1", "etag-i",
                 GoogleCalendarEventWriteRequest.forOverrideUpdate(overridePayload())))
                 .thenThrow(new GoogleCalendarEventVersionConflictException(
                         new RuntimeException()));
@@ -365,25 +365,25 @@ class GoogleCalendarRecurrenceJobServiceTest {
     }
 
     @Test
-    @DisplayName("deleted override는 exact mapped instance를 cancel하고 해당 child mapping만 제거한다")
-    void deletedOverrideCancelsExactInstanceAndRemovesChildMapping() {
+    @DisplayName("deleted override는 exact mapped occurrence를 cancel하고 해당 child mapping만 제거한다")
+    void deletedOverrideCancelsExactOccurrenceAndRemovesChildMapping() {
         Instant origin = Instant.parse("2026-09-03T00:00:00Z");
         GoogleCalendarConnection connection = connection(30L);
         GoogleCalendarRecurrenceEventMapping master = master(connection);
         GoogleCalendarRecurrenceOverrideMapping override = new GoogleCalendarRecurrenceOverrideMapping(
-                master, origin, "instance-1", "etag-i");
+                master, origin, "occurrence-1", "etag-i");
         ReflectionTestUtils.setField(override, "id", 70L);
         when(mappings.listRecurrenceEventMappingsForJob(20L, 40L)).thenReturn(List.of(master));
         when(mappings.getOverrideMappingIfExists(60L, origin)).thenReturn(Optional.of(override));
         when(tokens.getAccessToken(30L)).thenReturn("token");
         when(client.getEvent("token", "master-1"))
                 .thenReturn(Optional.of(provider("master-1", "master-etag", null)));
-        when(client.getEvent("token", "instance-1"))
-                .thenReturn(Optional.of(provider("instance-1", "etag-i", origin)));
+        when(client.getEvent("token", "occurrence-1"))
+                .thenReturn(Optional.of(provider("occurrence-1", "etag-i", origin)));
 
         service.execute(job(GoogleCalendarRecurrenceJobKind.OVERRIDE_DELETE, origin), "worker");
 
-        verify(client).deleteEvent("token", "instance-1", "etag-i");
+        verify(client).deleteEvent("token", "occurrence-1", "etag-i");
         verify(mappingCommands).deleteOverrideMappings(List.of(override));
         assertThat(master.isConflicted()).isFalse();
     }
@@ -402,7 +402,7 @@ class GoogleCalendarRecurrenceJobServiceTest {
 
         verify(client).deleteEvent("token", "master-1", "master-etag");
         verify(mappingCommands).deleteRecurrenceAggregateMappings(master);
-        verify(client, never()).deleteEvent(eq("token"), eq("instance-1"), any());
+        verify(client, never()).deleteEvent(eq("token"), eq("occurrence-1"), any());
     }
 
     @Test
@@ -522,7 +522,7 @@ class GoogleCalendarRecurrenceJobServiceTest {
                 start, new GoogleCalendarEventTimeResponse(null, "2026-09-03T01:00:00Z", "UTC"));
     }
 
-    private GoogleCalendarEventResponse cancelledProviderInstance(String id, Instant origin) {
+    private GoogleCalendarEventResponse cancelledProviderOccurrence(String id, Instant origin) {
         return new GoogleCalendarEventResponse(id, "cancelled", null,
                 Instant.parse("2026-09-03T00:00:00Z"), null, null, List.of(), "master-1",
                 new GoogleCalendarEventTimeResponse(null, origin.toString(), "UTC"), null, null);

@@ -73,8 +73,8 @@ class GoogleCalendarEventsClientTest {
     }
 
     @Test
-    @DisplayName("exact instance resolve는 master instances endpoint와 immutable originalStart를 사용한다")
-    void resolvesExactRecurrenceInstanceByOriginalStart() {
+    @DisplayName("exact occurrence resolve는 Google instances endpoint와 immutable originalStart를 사용한다")
+    void resolvesExactRecurrenceOccurrenceByOriginalStart() {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         GoogleCalendarEventsClient client = client(builder);
@@ -82,7 +82,7 @@ class GoogleCalendarEventsClientTest {
                         containsString("originalStart=2026-09-04T00:00:00Z"))))
                 .andExpect(method(HttpMethod.GET))
                 .andRespond(withSuccess("""
-                        {"items":[{"id":"instance-1","status":"confirmed","etag":"etag-i",
+                        {"items":[{"id":"occurrence-1","status":"confirmed","etag":"etag-i",
                         "recurringEventId":"master-1",
                         "originalStartTime":{"dateTime":"2026-09-04T00:00:00Z","timeZone":"UTC"},
                         "start":{"dateTime":"2026-09-04T02:00:00Z","timeZone":"UTC"},
@@ -105,9 +105,9 @@ class GoogleCalendarEventsClientTest {
                 .andExpect(header(HttpHeaders.IF_MATCH, "etag-i"))
                 .andExpect(jsonPath("$.start.dateTime", is("2026-09-04T02:00:00Z")))
                 .andExpect(jsonPath("$.recurrence").doesNotExist())
-                .andRespond(withSuccess(eventResponse("instance-1"), MediaType.APPLICATION_JSON));
+                .andRespond(withSuccess(eventResponse("occurrence-1"), MediaType.APPLICATION_JSON));
 
-        client.patchEvent("token", "instance-1", "etag-i",
+        client.patchEvent("token", "occurrence-1", "etag-i",
                 GoogleCalendarEventWriteRequest.forOverrideUpdate(new GoogleRecurrenceOverrideJobPayload("moved", null,
                         Instant.parse("2026-09-04T02:00:00Z"),
                         Instant.parse("2026-09-04T03:00:00Z"), false, "UTC")));
@@ -124,9 +124,9 @@ class GoogleCalendarEventsClientTest {
                 .andExpect(jsonPath("$.start.date", is("2026-09-04")))
                 .andExpect(jsonPath("$.end.date", is("2026-09-06")))
                 .andExpect(jsonPath("$.start.dateTime").doesNotExist())
-                .andRespond(withSuccess(eventResponse("instance-1"), MediaType.APPLICATION_JSON));
+                .andRespond(withSuccess(eventResponse("occurrence-1"), MediaType.APPLICATION_JSON));
 
-        client.patchEvent("token", "instance-1", "etag-i",
+        client.patchEvent("token", "occurrence-1", "etag-i",
                 GoogleCalendarEventWriteRequest.forOverrideUpdate(new GoogleRecurrenceOverrideJobPayload("offsite", null,
                         Instant.parse("2026-09-04T00:00:00Z"),
                         Instant.parse("2026-09-06T00:00:00Z"), true, null)));
