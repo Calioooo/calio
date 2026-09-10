@@ -70,7 +70,7 @@ public class GoogleCalendarEventsClient {
             if (isDeserializationFailure(exception)) {
                 throw invalidResponse(exception);
             }
-            throw syncFailed(exception);
+            throw providerRequestFailed(exception);
         }
     }
 
@@ -93,7 +93,7 @@ public class GoogleCalendarEventsClient {
             if (isDeserializationFailure(exception)) {
                 throw invalidResponse(exception);
             }
-            throw syncFailed(exception);
+            throw providerRequestFailed(exception);
         }
     }
 
@@ -114,7 +114,7 @@ public class GoogleCalendarEventsClient {
                 throw translateEventResponseFailure(exception);
             }
             GoogleCalendarEventResponse existing = getEvent(accessToken, providerIdentity)
-                    .orElseThrow(() -> syncFailed(exception));
+                    .orElseThrow(() -> providerRequestFailed(exception));
             return requireRequestedEventId(existing, providerIdentity);
         }
     }
@@ -153,7 +153,7 @@ public class GoogleCalendarEventsClient {
                 throw translateEventResponseFailure(exception);
             }
             return requireRequestedEventId(getEvent(accessToken, providerIdentity)
-                    .orElseThrow(() -> syncFailed(exception)), providerIdentity);
+                    .orElseThrow(() -> providerRequestFailed(exception)), providerIdentity);
         }
     }
 
@@ -187,7 +187,7 @@ public class GoogleCalendarEventsClient {
             if (isDeserializationFailure(exception)) {
                 throw invalidResponse(exception);
             }
-            throw syncFailed(exception);
+            throw providerRequestFailed(exception);
         }
     }
 
@@ -215,7 +215,7 @@ public class GoogleCalendarEventsClient {
             }
             throw translateEventResponseFailure(exception);
         } catch (RestClientException exception) {
-            throw syncFailed(exception);
+            throw providerRequestFailed(exception);
         }
     }
 
@@ -234,7 +234,7 @@ public class GoogleCalendarEventsClient {
         } catch (CalioException exception) {
             throw exception;
         } catch (RestClientException exception) {
-            throw syncFailed(exception);
+            throw providerRequestFailed(exception);
         }
     }
 
@@ -256,7 +256,7 @@ public class GoogleCalendarEventsClient {
         } catch (CalioException exception) {
             throw exception;
         } catch (RestClientException exception) {
-            throw syncFailed(exception);
+            throw providerRequestFailed(exception);
         }
     }
 
@@ -377,7 +377,7 @@ public class GoogleCalendarEventsClient {
             logFailure(ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED, status, exception);
             return new CalioException(ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED, exception);
         }
-        return syncFailed(exception);
+        return providerRequestFailed(exception);
     }
 
     private RuntimeException translateEventResponseFailure(RestClientResponseException exception) {
@@ -389,7 +389,7 @@ public class GoogleCalendarEventsClient {
             logFailure(ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED, status, exception);
             return new CalioException(ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED, exception);
         }
-        return syncFailed(exception);
+        return providerRequestFailed(exception);
     }
 
     private boolean isScopeFailure(RestClientResponseException exception) {
@@ -420,7 +420,7 @@ public class GoogleCalendarEventsClient {
         return new CalioException(ErrorCode.GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID, exception);
     }
 
-    private CalioException syncFailed(Exception exception) {
+    private CalioException providerRequestFailed(Exception exception) {
         logFailure(ErrorCode.GOOGLE_CALENDAR_SYNC_FAILED, httpStatus(exception), exception);
         return new CalioException(ErrorCode.GOOGLE_CALENDAR_SYNC_FAILED, exception);
     }
