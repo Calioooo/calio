@@ -39,20 +39,19 @@ public class GoogleCalendarRecurrenceMappingQueryService {
         );
     }
 
-    public List<GoogleCalendarRecurrenceEventMapping> listRecurrenceEventMappingsForJob(
-            Long integrationId, Long recurrenceEventId
+    public Optional<GoogleCalendarRecurrenceEventMapping> getRecurrenceEventMappingIfExists(
+            Long connectionId, Long recurrenceEventId
     ) {
-        return recurrenceMappingRepository.findAllWithConnectionByIntegrationIdAndRecurrenceEventId(
-                integrationId,
+        return recurrenceMappingRepository.findByConnectionIdAndRecurrenceEventId(
+                connectionId,
                 recurrenceEventId
         );
     }
 
     public Optional<GoogleCalendarRecurrenceEventMapping> getRecurrenceEventMappingIfExists(
-            Long connectionId, Long recurrenceEventId
+            Long mappingId
     ) {
-        return recurrenceMappingRepository.findByConnectionIdAndRecurrenceEventId(
-                connectionId, recurrenceEventId);
+        return recurrenceMappingRepository.findById(mappingId);
     }
 
     public List<Long> listRecurrenceEventIdsWithMappings(Collection<Long> recurrenceEventIds) {
@@ -65,7 +64,7 @@ public class GoogleCalendarRecurrenceMappingQueryService {
     public Optional<GoogleCalendarRecurrenceOverrideMapping> getOverrideMappingIfExists(
             Long recurrenceEventMappingId, Instant originStartAt
     ) {
-        return overrideMappingRepository.findByRecurrenceEventMapping_IdAndOriginStartAt(
+        return overrideMappingRepository.findByRecurrenceEventMappingIdAndOriginStartAt(
                 recurrenceEventMappingId, originStartAt);
     }
 

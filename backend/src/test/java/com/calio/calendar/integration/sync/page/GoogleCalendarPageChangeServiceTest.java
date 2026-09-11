@@ -750,7 +750,7 @@ class GoogleCalendarPageChangeServiceTest {
     @Transactional
     @DisplayName("pending override Job은 connection ID가 아닌 integration ID로 inbound 변경을 conflict 처리한다")
     void pendingOverrideJobUsesIntegrationIdentityForConflictDetection() {
-        tagRepository.saveAndFlush(new Tag(TagType.DEFAULT, "기타", "#64748B"));
+        tagRepository.saveAndFlush(Tag.personalDefault("기타", "#64748B"));
         GoogleCalendarConnection secondConnection = connectionRepository.saveAndFlush(
                 connection(integration.getIntegration()));
         Instant origin = Instant.parse("2026-07-02T09:00:00Z");

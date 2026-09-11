@@ -46,7 +46,8 @@ public class GoogleCalendarRecurrenceJob extends GoogleOperationJob {
             throw new IllegalArgumentException("Google recurrence override job requires originStartAt");
         }
         if ((kind == GoogleCalendarRecurrenceJobKind.RECURRENCE_CREATE) && !hasText(providerIdentity)) {
-            throw new IllegalArgumentException("Only Google recurrence master create requires provider identity");
+            throw new IllegalArgumentException(
+                    "Only Google recurrence-event create requires provider identity");
         }
         GoogleCalendarRecurrenceJob job = new GoogleCalendarRecurrenceJob();
         job.initialize(operationId, integrationId, accountId, integrationSequence, runnableAt);

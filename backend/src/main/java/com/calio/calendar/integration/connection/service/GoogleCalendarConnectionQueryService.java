@@ -33,10 +33,23 @@ public class GoogleCalendarConnectionQueryService {
         );
     }
 
+    public Optional<GoogleCalendarConnection> getConnectedConnectionByIntegrationIdIfExists(
+            Long integrationId
+    ) {
+        return connectionRepository.findWithIntegrationByIntegrationIdAndState(
+                integrationId,
+                GoogleCalendarConnectionState.CONNECTED
+        );
+    }
+
     public GoogleCalendarConnection getConnectedConnectionById(Long connectionId) {
         return connectionRepository.findWithIntegrationById(connectionId)
                 .filter(GoogleCalendarConnection::isConnected)
                 .orElseThrow(() -> new CalioException(ErrorCode.GOOGLE_CALENDAR_NOT_CONNECTED));
+    }
+
+    public Optional<GoogleCalendarConnection> getConnectionIfExists(Long connectionId) {
+        return connectionRepository.findWithIntegrationById(connectionId);
     }
 
     public List<Long> listConnectedAccountIds(Long afterAccountId, int limit) {

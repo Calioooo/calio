@@ -19,7 +19,7 @@ import com.calio.calendar.integration.connection.service.GoogleCalendarConnectio
 import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrationQueryService;
 import com.calio.calendar.external.google.GoogleCalendarInvalidGrantException;
 import com.calio.calendar.integration.sync.GoogleCalendarEventJobService;
-import com.calio.calendar.integration.sync.GoogleCalendarRecurrenceJobService;
+import com.calio.calendar.integration.sync.GoogleCalendarRecurrenceJobHandler;
 import com.calio.calendar.integration.sync.GoogleCalendarSyncService;
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEventJob;
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarSyncJob;
@@ -41,7 +41,7 @@ class GoogleOperationProcessorTest {
     private GoogleOperationLeaseService operationLeaseService;
     private GoogleCalendarSyncService syncService;
     private GoogleCalendarEventJobService eventJobService;
-    private GoogleCalendarRecurrenceJobService recurrenceJobService;
+    private GoogleCalendarRecurrenceJobHandler recurrenceJobHandler;
     private GoogleOperationFailureClassifier failureClassifier;
     private GoogleCalendarConnectionCommandService connectionCommandService;
     private GoogleCalendarIntegrationQueryService integrationQueryService;
@@ -53,7 +53,7 @@ class GoogleOperationProcessorTest {
         operationLeaseService = mock(GoogleOperationLeaseService.class);
         syncService = mock(GoogleCalendarSyncService.class);
         eventJobService = mock(GoogleCalendarEventJobService.class);
-        recurrenceJobService = mock(GoogleCalendarRecurrenceJobService.class);
+        recurrenceJobHandler = mock(GoogleCalendarRecurrenceJobHandler.class);
         failureClassifier = mock(GoogleOperationFailureClassifier.class);
         connectionCommandService = mock(GoogleCalendarConnectionCommandService.class);
         integrationQueryService = mock(GoogleCalendarIntegrationQueryService.class);
@@ -65,7 +65,7 @@ class GoogleOperationProcessorTest {
                 operationLeaseService,
                 syncService,
                 eventJobService,
-                recurrenceJobService,
+                recurrenceJobHandler,
                 failureClassifier,
                 connectionCommandService,
                 integrationQueryService,
@@ -107,7 +107,7 @@ class GoogleOperationProcessorTest {
 
         processor.processAccount(10L);
 
-        verify(recurrenceJobService).execute(eq(job), anyString());
+        verify(recurrenceJobHandler).execute(eq(job), anyString());
         verifyNoInteractions(eventJobService);
     }
 

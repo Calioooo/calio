@@ -16,8 +16,8 @@ class GoogleOperationJobQueryServiceTest {
     private final GoogleOperationJobQueryService service = new GoogleOperationJobQueryService(repository);
 
     @Test
-    @DisplayName("master inbound cleanup은 같은 recurrence aggregate의 pending outbound Job을 보호한다")
-    void recurrenceMasterScopeQueriesAggregateJobs() {
+    @DisplayName("recurrence-event inbound cleanup은 같은 recurrence aggregate의 pending outbound Job을 보호한다")
+    void recurrenceEventScopeQueriesAggregateJobs() {
         when(repository.existsPendingRecurrenceAggregateJob(10L, 20L, 40L)).thenReturn(true);
 
         assertThat(service.hasPendingOutboundJob(

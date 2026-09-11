@@ -39,7 +39,7 @@ import tools.jackson.databind.ObjectMapper;
 class GoogleCalendarEventsClientTest {
 
     @Test
-    @DisplayName("recurring master CREATE는 RRULE과 sendUpdates=none을 보낸다")
+    @DisplayName("recurring recurrence-event CREATE는 RRULE과 sendUpdates=none을 보낸다")
     void recurrenceCreateSendsRulesWithoutOverrides() {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
@@ -81,18 +81,18 @@ class GoogleCalendarEventsClientTest {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         GoogleCalendarEventsClient client = client(builder);
-        server.expect(requestTo(allOf(containsString("/events/master-1/instances"),
+        server.expect(requestTo(allOf(containsString("/events/recurrence-event-1/instances"),
                         containsString("originalStart=2026-09-04T00:00:00Z"))))
                 .andExpect(method(HttpMethod.GET))
                 .andRespond(withSuccess("""
                         {"items":[{"id":"occurrence-1","status":"confirmed","etag":"etag-i",
-                        "recurringEventId":"master-1",
+                        "recurringEventId":"recurrence-event-1",
                         "originalStartTime":{"dateTime":"2026-09-04T00:00:00Z","timeZone":"UTC"},
                         "start":{"dateTime":"2026-09-04T02:00:00Z","timeZone":"UTC"},
                         "end":{"dateTime":"2026-09-04T03:00:00Z","timeZone":"UTC"}}]}
                         """, MediaType.APPLICATION_JSON));
 
-        assertThat(client.getRecurrenceOccurrence("token", "master-1",
+        assertThat(client.getRecurrenceOccurrence("token", "recurrence-event-1",
                 Instant.parse("2026-09-04T00:00:00Z"))).isPresent();
         server.verify();
     }
@@ -522,12 +522,12 @@ class GoogleCalendarEventsClientTest {
         MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
         GoogleCalendarEventsClient client = client(restClientBuilder);
         server.expect(request -> assertThat(request.getURI().getRawPath())
-                        .endsWith("/master%2Fsegment%3Fopaque"))
+                        .endsWith("/recurrence-event%2Fsegment%3Fopaque"))
                 .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer current-token"))
                 .andRespond(withSuccess(
                         """
                                 {
-                                  "id": "master/segment?opaque",
+                                  "id": "recurrence-event/segment?opaque",
                                   "status": "confirmed",
                                   "recurrence": ["RRULE:FREQ=DAILY"],
                                   "start": {
@@ -546,11 +546,11 @@ class GoogleCalendarEventsClientTest {
         // when
         var result = client.getEvent(
                 "current-token",
-                "master/segment?opaque"
+                "recurrence-event/segment?opaque"
         );
 
         // then
-        assertThat(result).map(event -> event.id()).contains("master/segment?opaque");
+        assertThat(result).map(event -> event.id()).contains("recurrence-event/segment?opaque");
         server.verify();
     }
 
@@ -582,11 +582,11 @@ class GoogleCalendarEventsClientTest {
         RestClient.Builder restClientBuilder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
         GoogleCalendarEventsClient client = client(restClientBuilder);
-        server.expect(requestTo(containsString("/events/master-id")))
+        server.expect(requestTo(containsString("/events/recurrence-event-id")))
                 .andRespond(withStatus(HttpStatus.UNAUTHORIZED));
 
         // when, then
-        assertThatThrownBy(() -> client.getEvent("current-token", "master-id"))
+        assertThatThrownBy(() -> client.getEvent("current-token", "recurrence-event-id"))
                 .isInstanceOf(GoogleCalendarUnauthorizedException.class);
         server.verify();
     }
@@ -598,7 +598,7 @@ class GoogleCalendarEventsClientTest {
         RestClient.Builder restClientBuilder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
         GoogleCalendarEventsClient client = client(restClientBuilder);
-        server.expect(requestTo(containsString("/events/master-id")))
+        server.expect(requestTo(containsString("/events/recurrence-event-id")))
                 .andRespond(withStatus(HttpStatus.FORBIDDEN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .body("""
@@ -612,7 +612,7 @@ class GoogleCalendarEventsClientTest {
                                 """));
 
         // when, then
-        assertThatThrownBy(() -> client.getEvent("current-token", "master-id"))
+        assertThatThrownBy(() -> client.getEvent("current-token", "recurrence-event-id"))
                 .isInstanceOfSatisfying(CalioException.class, exception ->
                         assertThat(exception.getErrorCode())
                                 .isEqualTo(ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED));
@@ -626,11 +626,11 @@ class GoogleCalendarEventsClientTest {
         RestClient.Builder restClientBuilder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
         GoogleCalendarEventsClient client = client(restClientBuilder);
-        server.expect(requestTo(containsString("/events/master-id")))
+        server.expect(requestTo(containsString("/events/recurrence-event-id")))
                 .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS));
 
         // when, then
-        assertThatThrownBy(() -> client.getEvent("current-token", "master-id"))
+        assertThatThrownBy(() -> client.getEvent("current-token", "recurrence-event-id"))
                 .isInstanceOfSatisfying(CalioException.class, exception ->
                         assertThat(exception.getErrorCode())
                                 .isEqualTo(ErrorCode.GOOGLE_CALENDAR_SYNC_FAILED));
@@ -644,13 +644,13 @@ class GoogleCalendarEventsClientTest {
         RestClient.Builder restClientBuilder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
         GoogleCalendarEventsClient client = client(restClientBuilder);
-        server.expect(requestTo(containsString("/events/master-id")))
+        server.expect(requestTo(containsString("/events/recurrence-event-id")))
                 .andRespond(request -> {
                     throw new IOException("network failure");
                 });
 
         // when, then
-        assertThatThrownBy(() -> client.getEvent("current-token", "master-id"))
+        assertThatThrownBy(() -> client.getEvent("current-token", "recurrence-event-id"))
                 .isInstanceOfSatisfying(CalioException.class, exception ->
                         assertThat(exception.getErrorCode())
                                 .isEqualTo(ErrorCode.GOOGLE_CALENDAR_SYNC_FAILED));
@@ -664,11 +664,11 @@ class GoogleCalendarEventsClientTest {
         RestClient.Builder restClientBuilder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
         GoogleCalendarEventsClient client = client(restClientBuilder);
-        server.expect(requestTo(containsString("/events/master-id")))
+        server.expect(requestTo(containsString("/events/recurrence-event-id")))
                 .andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE));
 
         // when, then
-        assertThatThrownBy(() -> client.getEvent("current-token", "master-id"))
+        assertThatThrownBy(() -> client.getEvent("current-token", "recurrence-event-id"))
                 .isInstanceOfSatisfying(CalioException.class, exception ->
                         assertThat(exception.getErrorCode())
                                 .isEqualTo(ErrorCode.GOOGLE_CALENDAR_SYNC_FAILED));
@@ -682,11 +682,11 @@ class GoogleCalendarEventsClientTest {
         RestClient.Builder restClientBuilder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
         GoogleCalendarEventsClient client = client(restClientBuilder);
-        server.expect(requestTo(containsString("/events/master-id")))
+        server.expect(requestTo(containsString("/events/recurrence-event-id")))
                 .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
 
         // when, then
-        assertThatThrownBy(() -> client.getEvent("current-token", "master-id"))
+        assertThatThrownBy(() -> client.getEvent("current-token", "recurrence-event-id"))
                 .isInstanceOfSatisfying(CalioException.class, exception ->
                         assertThat(exception.getErrorCode())
                                 .isEqualTo(ErrorCode.GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID));
