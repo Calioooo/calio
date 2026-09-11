@@ -13,6 +13,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import java.time.Instant;
 
 @Entity
 @Table(
@@ -44,7 +45,7 @@ public class GoogleCalendarRecurrenceOverrideMapping extends BaseEntity {
     private GoogleCalendarRecurrenceEventMapping recurrenceEventMapping;
 
     @Column(name = "origin_start_at", nullable = false, updatable = false)
-    private java.time.Instant originStartAt;
+    private Instant originStartAt;
 
     @Column(name = "external_event_id", nullable = false, length = 1024)
     private String externalEventId;
@@ -60,7 +61,7 @@ public class GoogleCalendarRecurrenceOverrideMapping extends BaseEntity {
 
     public GoogleCalendarRecurrenceOverrideMapping(
             GoogleCalendarRecurrenceEventMapping recurrenceEventMapping,
-            java.time.Instant originStartAt,
+            Instant originStartAt,
             String externalEventId,
             String providerEtag
     ) {
@@ -78,7 +79,7 @@ public class GoogleCalendarRecurrenceOverrideMapping extends BaseEntity {
         return recurrenceEventMapping;
     }
 
-    public java.time.Instant getOriginStartAt() {
+    public Instant getOriginStartAt() {
         return originStartAt;
     }
 

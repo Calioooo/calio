@@ -6,7 +6,7 @@ import com.calio.calendar.external.google.GoogleCalendarInvalidGrantException;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.integration.sync.GoogleCalendarEventJobService;
-import com.calio.calendar.integration.sync.GoogleCalendarRecurrenceJobService;
+import com.calio.calendar.integration.sync.GoogleCalendarRecurrenceJobHandler;
 import com.calio.calendar.integration.sync.GoogleCalendarSyncService;
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEventJob;
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarRecurrenceJob;
@@ -25,7 +25,7 @@ public class GoogleOperationProcessor {
     private final GoogleOperationLeaseService operationLeaseService;
     private final GoogleCalendarSyncService syncService;
     private final GoogleCalendarEventJobService eventJobService;
-    private final GoogleCalendarRecurrenceJobService recurrenceJobService;
+    private final GoogleCalendarRecurrenceJobHandler recurrenceJobHandler;
     private final GoogleOperationFailureClassifier failureClassifier;
     private final GoogleCalendarConnectionCommandService connectionCommandService;
     private final GoogleCalendarIntegrationQueryService integrationQueryService;
@@ -36,7 +36,7 @@ public class GoogleOperationProcessor {
             GoogleOperationLeaseService operationLeaseService,
             GoogleCalendarSyncService syncService,
             GoogleCalendarEventJobService eventJobService,
-            GoogleCalendarRecurrenceJobService recurrenceJobService,
+            GoogleCalendarRecurrenceJobHandler recurrenceJobHandler,
             GoogleOperationFailureClassifier failureClassifier,
             GoogleCalendarConnectionCommandService connectionCommandService,
             GoogleCalendarIntegrationQueryService integrationQueryService,
@@ -46,7 +46,7 @@ public class GoogleOperationProcessor {
         this.operationLeaseService = operationLeaseService;
         this.syncService = syncService;
         this.eventJobService = eventJobService;
-        this.recurrenceJobService = recurrenceJobService;
+        this.recurrenceJobHandler = recurrenceJobHandler;
         this.failureClassifier = failureClassifier;
         this.connectionCommandService = connectionCommandService;
         this.integrationQueryService = integrationQueryService;
@@ -119,7 +119,7 @@ public class GoogleOperationProcessor {
             String workerToken
     ) {
         try {
-            recurrenceJobService.execute(job, workerToken);
+            recurrenceJobHandler.execute(job, workerToken);
             return JobExecutionResult.CONTINUE_WITH_NEXT_JOB;
         } catch (RuntimeException failure) {
             return handleJobFailure(job, workerToken, failure);

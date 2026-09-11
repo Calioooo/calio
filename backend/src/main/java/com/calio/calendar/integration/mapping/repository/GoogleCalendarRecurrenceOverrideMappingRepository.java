@@ -1,6 +1,7 @@
 package com.calio.calendar.integration.mapping.repository;
 
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarRecurrenceOverrideMapping;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -30,8 +31,33 @@ public interface GoogleCalendarRecurrenceOverrideMappingRepository
             @Param("externalEventIds") Collection<String> externalEventIds
     );
 
-    Optional<GoogleCalendarRecurrenceOverrideMapping>
-    findByRecurrenceEventMapping_IdAndOriginStartAt(Long recurrenceEventMappingId, java.time.Instant originStartAt);
+    @Query("""
+            select mapping
+            from GoogleCalendarRecurrenceOverrideMapping mapping
+            where mapping.recurrenceEventMapping.id = :recurrenceEventMappingId
+              and mapping.originStartAt = :originStartAt
+            """)
+    Optional<GoogleCalendarRecurrenceOverrideMapping> findByRecurrenceEventMappingIdAndOriginStartAt(
+            @Param("recurrenceEventMappingId") Long recurrenceEventMappingId,
+            @Param("originStartAt") Instant originStartAt
+    );
+
+    @Query("""
+            select overrideMapping
+            from GoogleCalendarRecurrenceOverrideMapping overrideMapping
+            join overrideMapping.recurrenceEventMapping recurrenceEventMapping
+            join recurrenceEventMapping.connection connection
+            where connection.integration.id = :integrationId
+              and connection.state <> com.calio.calendar.integration.connection.domain.GoogleCalendarConnectionState.CONNECTED
+              and recurrenceEventMapping.recurrenceEventId = :recurrenceEventId
+              and overrideMapping.originStartAt = :originStartAt
+              and overrideMapping.localChanged = false
+            """)
+    List<GoogleCalendarRecurrenceOverrideMapping> findAllInactiveAndUnchangedByIdentity(
+            @Param("integrationId") Long integrationId,
+            @Param("recurrenceEventId") Long recurrenceEventId,
+            @Param("originStartAt") Instant originStartAt
+    );
 
     @EntityGraph(attributePaths = "recurrenceEventMapping")
     @Query("""

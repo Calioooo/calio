@@ -4,9 +4,9 @@ import com.calio.calendar.integration.mapping.domain.GoogleCalendarRecurrenceEve
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarRecurrenceOverrideMapping;
 import com.calio.calendar.integration.mapping.repository.GoogleCalendarRecurrenceEventMappingRepository;
 import com.calio.calendar.integration.mapping.repository.GoogleCalendarRecurrenceOverrideMappingRepository;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
-import java.time.Instant;
 import java.util.Optional;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -39,19 +39,25 @@ public class GoogleCalendarRecurrenceMappingQueryService {
         );
     }
 
-    public List<GoogleCalendarRecurrenceEventMapping> listRecurrenceEventMappingsForJob(
-            Long integrationId, Long recurrenceEventId
+    public Optional<GoogleCalendarRecurrenceEventMapping> getRecurrenceEventMappingIfExists(
+            Long connectionId, Long recurrenceEventId
     ) {
-        return recurrenceMappingRepository.findAllWithConnectionByIntegrationIdAndRecurrenceEventId(
-                integrationId,
+        return recurrenceMappingRepository.findByConnectionIdAndRecurrenceEventId(
+                connectionId,
                 recurrenceEventId
         );
+    }
+
+    public Optional<GoogleCalendarRecurrenceEventMapping> getRecurrenceEventMappingIfExists(
+            Long mappingId
+    ) {
+        return recurrenceMappingRepository.findById(mappingId);
     }
 
     public Optional<GoogleCalendarRecurrenceOverrideMapping> getOverrideMappingIfExists(
             Long recurrenceEventMappingId, Instant originStartAt
     ) {
-        return overrideMappingRepository.findByRecurrenceEventMapping_IdAndOriginStartAt(
+        return overrideMappingRepository.findByRecurrenceEventMappingIdAndOriginStartAt(
                 recurrenceEventMappingId, originStartAt);
     }
 

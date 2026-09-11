@@ -247,9 +247,9 @@ public class GoogleCalendarEventsClient {
                 .toUri();
     }
 
-    private URI occurrenceUri(String externalMasterId, Instant originStartAt) {
+    private URI occurrenceUri(String externalRecurrenceEventId, Instant originStartAt) {
         return UriComponentsBuilder.fromUriString(properties.getCalendarEventsUrl())
-                .pathSegment(externalMasterId, "instances")
+                .pathSegment(externalRecurrenceEventId, "instances")
                 .queryParam("originalStart", originStartAt.toString())
                 .queryParam("showDeleted", true)
                 .queryParam("maxResults", 2)
