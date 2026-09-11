@@ -122,8 +122,7 @@ class GoogleCalendarEventJobServiceTest {
                 org.mockito.ArgumentMatchers.anyString(),
                 org.mockito.ArgumentMatchers.anyString(),
                 org.mockito.ArgumentMatchers.any());
-        verify(jobService).recordSyncConflict(50L, 10L, "worker");
-        verify(jobService).completeSyncRun(50L, 10L, "worker");
+        verify(jobService).completeWithConflict(50L, 10L, "worker");
     }
 
     @Test
@@ -150,7 +149,7 @@ class GoogleCalendarEventJobServiceTest {
                 org.mockito.ArgumentMatchers.any(GoogleCalendarEventWriteRequest.class));
         verify(mappingCommandService, never()).createEventMapping(
                 org.mockito.ArgumentMatchers.any(GoogleCalendarEventMapping.class));
-        verify(jobService).completeSyncRun(50L, 10L, "worker");
+        verify(jobService).completeWithConflict(50L, 10L, "worker");
     }
 
     @Test
@@ -179,8 +178,7 @@ class GoogleCalendarEventJobServiceTest {
 
         // then
         assertThat(mapping.isConflicted()).isTrue();
-        verify(jobService).recordSyncConflict(50L, 10L, "worker");
-        verify(jobService).completeSyncRun(50L, 10L, "worker");
+        verify(jobService).completeWithConflict(50L, 10L, "worker");
     }
 
     @Test
@@ -225,8 +223,7 @@ class GoogleCalendarEventJobServiceTest {
         // then
         assertThat(mapping.isConflicted()).isTrue();
         verify(mappingCommandService, never()).deleteEventMappings(any());
-        verify(jobService).recordSyncConflict(50L, 10L, "worker");
-        verify(jobService).completeSyncRun(50L, 10L, "worker");
+        verify(jobService).completeWithConflict(50L, 10L, "worker");
     }
 
     @Test

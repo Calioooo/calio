@@ -268,8 +268,7 @@ public class GoogleCalendarEventJobService {
             return true;
         }
         if (outcome == MappingOutcome.CONFLICT_DETECTED) {
-            jobService.recordSyncConflict(job.getId(), job.getAccountId(), workerToken);
-            jobService.completeSyncRun(job.getId(), job.getAccountId(), workerToken);
+            jobService.completeWithConflict(job.getId(), job.getAccountId(), workerToken);
             return true;
         }
         return false;
