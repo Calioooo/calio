@@ -7,7 +7,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import java.time.LocalTime;
+import java.util.Objects;
 
 @Entity
 @Table(name = "accounts")
@@ -18,7 +18,7 @@ public class Account extends BaseEntity {
     private Long id;
 
     @Embedded
-    private AccountNotificationSettings notificationSettings = new AccountNotificationSettings();
+    private AccountNotificationSettings notificationSettings = AccountNotificationSettings.defaults();
 
     public Account() {
     }
@@ -31,21 +31,7 @@ public class Account extends BaseEntity {
         return notificationSettings;
     }
 
-    public void updateNotificationSettings(
-            boolean calendarNotificationsEnabled,
-            TimedReminderOffset timedReminderOffset,
-            ImportantReminderOffset importantReminderOffset,
-            LocalTime allDayReminderTime,
-            boolean dailyBriefingEnabled,
-            LocalTime dailyBriefingTime
-    ) {
-        notificationSettings = new AccountNotificationSettings(
-                calendarNotificationsEnabled,
-                timedReminderOffset,
-                importantReminderOffset,
-                allDayReminderTime,
-                dailyBriefingEnabled,
-                dailyBriefingTime
-        );
+    public void changeNotificationSettings(AccountNotificationSettings notificationSettings) {
+        this.notificationSettings = Objects.requireNonNull(notificationSettings);
     }
 }

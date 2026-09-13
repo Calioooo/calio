@@ -32,14 +32,17 @@ public class AccountNotificationSettingsService {
             UpdateNotificationSettingsRequest request
     ) {
         Account account = accountQueryService.getAccount(accountId);
-        return accountCommandService.updateNotificationSettings(
-                account,
+        AccountNotificationSettings notificationSettings = new AccountNotificationSettings(
                 request.calendarNotificationsEnabled(),
                 request.timedReminderOffset(),
                 request.importantReminderOffset(),
                 request.allDayReminderTime(),
                 request.dailyBriefingEnabled(),
                 request.dailyBriefingTime()
+        );
+        return accountCommandService.changeNotificationSettings(
+                account,
+                notificationSettings
         );
     }
 }

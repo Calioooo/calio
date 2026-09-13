@@ -16,12 +16,12 @@ public record NotificationSettingsResponse(
 
     public static NotificationSettingsResponse from(AccountNotificationSettings settings) {
         return new NotificationSettingsResponse(
-                settings.isCalendarNotificationsEnabled(),
-                settings.getTimedReminderOffset(),
-                settings.getImportantReminderOffset(),
-                settings.getAllDayReminderTime(),
-                settings.isDailyBriefingEnabled(),
-                settings.getDailyBriefingTime()
+                settings.calendarNotificationsEnabled(),
+                settings.timedReminderOffset(),
+                settings.importantReminderOffset(),
+                settings.allDayReminderTime(),
+                settings.dailyBriefingEnabled(),
+                settings.dailyBriefingTime()
         );
     }
 }

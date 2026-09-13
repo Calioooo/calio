@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.calio.calendar.notification.repository.IosPushDeviceRepository;
 import com.calio.calendar.security.AuthenticatedAccountMockMvcTestConfig;
 import com.calio.calendar.security.WithAuthenticatedAccount;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,6 +40,9 @@ class NotificationControllerIntegrationTest {
 
     @Autowired
     private IosPushDeviceRepository endpointRepository;
+
+    @Autowired
+    private EntityManager entityManager;
 
     @Test
     @DisplayName("알림 설정 조회는 서버 기본값과 시간 타입을 직렬화해 반환한다")
@@ -71,6 +75,8 @@ class NotificationControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.timedReminderOffset").value("NONE"))
                 .andExpect(jsonPath("$.importantReminderOffset").value("MINUTES_60"));
+
+        entityManager.clear();
 
         mockMvc.perform(get("/api/notification-settings"))
                 .andExpect(status().isOk())
