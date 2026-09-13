@@ -24,7 +24,6 @@ CREATE TABLE notification_dispatches (
     target_date DATE NOT NULL,
     title VARCHAR(255),
     group_name VARCHAR(255),
-    status VARCHAR(32) NOT NULL,
     created_at DATETIME(6) NOT NULL,
     updated_at DATETIME(6) NOT NULL,
     PRIMARY KEY (id),

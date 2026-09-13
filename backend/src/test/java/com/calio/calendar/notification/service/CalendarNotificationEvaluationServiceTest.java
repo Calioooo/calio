@@ -15,7 +15,9 @@ import com.calio.calendar.groupspace.service.GroupMembershipQueryService;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingQueryService;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarRecurrenceMappingQueryService;
 import com.calio.calendar.notification.domain.AccountNotificationSettings;
+import com.calio.calendar.notification.domain.CalendarNotificationType;
 import com.calio.calendar.notification.domain.ImportantReminderOffset;
+import com.calio.calendar.notification.domain.NotificationScheduleKey;
 import com.calio.calendar.notification.domain.TimedReminderOffset;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -82,8 +84,8 @@ class CalendarNotificationEvaluationServiceTest {
         ArgumentCaptor<LocalDate> targetDateCaptor = ArgumentCaptor.forClass(LocalDate.class);
         verify(notificationDispatcher).dispatch(
                 eq(1L),
-                eq("REMINDER"),
-                eq("personal:10"),
+                eq(CalendarNotificationType.REMINDER),
+                eq(NotificationScheduleKey.personalEvent(10L)),
                 eq(startAt),
                 targetDateCaptor.capture(),
                 eq("해외 회의"),
@@ -142,8 +144,8 @@ class CalendarNotificationEvaluationServiceTest {
         // then
         verify(notificationDispatcher).dispatch(
                 eq(1L),
-                eq("BRIEFING"),
-                eq("briefing:2026-06-02"),
+                eq(CalendarNotificationType.BRIEFING),
+                eq(NotificationScheduleKey.briefing(LocalDate.of(2026, 6, 2))),
                 eq(briefingTime),
                 eq(LocalDate.of(2026, 6, 2)),
                 eq("1"),

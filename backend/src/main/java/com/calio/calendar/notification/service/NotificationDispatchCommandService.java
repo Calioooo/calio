@@ -1,7 +1,9 @@
 package com.calio.calendar.notification.service;
 
 import com.calio.calendar.account.domain.Account;
+import com.calio.calendar.notification.domain.CalendarNotificationType;
 import com.calio.calendar.notification.domain.NotificationDispatch;
+import com.calio.calendar.notification.domain.NotificationScheduleKey;
 import com.calio.calendar.notification.repository.NotificationDispatchRepository;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -21,8 +23,8 @@ public class NotificationDispatchCommandService {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public NotificationDispatch create(
             Account account,
-            String type,
-            String key,
+            CalendarNotificationType type,
+            NotificationScheduleKey key,
             Instant scheduledAt,
             LocalDate targetDate,
             String title,

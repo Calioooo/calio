@@ -1,5 +1,6 @@
 package com.calio.calendar.notification.repository;
 
+import com.calio.calendar.notification.domain.CalendarNotificationType;
 import com.calio.calendar.notification.domain.NotificationDispatch;
 import java.time.Instant;
 import java.util.Optional;
@@ -9,7 +10,7 @@ public interface NotificationDispatchRepository extends JpaRepository<Notificati
 
     Optional<NotificationDispatch> findByAccount_IdAndNotificationTypeAndScheduleKeyAndScheduledAt(
             Long accountId,
-            String type,
+            CalendarNotificationType type,
             String key,
             Instant scheduledAt
     );

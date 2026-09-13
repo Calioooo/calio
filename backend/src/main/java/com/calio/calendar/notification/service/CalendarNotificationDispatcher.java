@@ -1,12 +1,14 @@
 package com.calio.calendar.notification.service;
 
 import com.calio.calendar.account.service.AccountQueryService;
+import com.calio.calendar.notification.client.ApnsClient;
 import com.calio.calendar.notification.client.ApnsMessage;
 import com.calio.calendar.notification.client.ApnsSendResult;
 import com.calio.calendar.notification.client.ApnsSendResultType;
-import com.calio.calendar.notification.client.ApnsClient;
+import com.calio.calendar.notification.domain.CalendarNotificationType;
 import com.calio.calendar.notification.domain.IosPushDevice;
 import com.calio.calendar.notification.domain.NotificationDispatch;
+import com.calio.calendar.notification.domain.NotificationScheduleKey;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -16,7 +18,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
@@ -48,11 +49,10 @@ public class CalendarNotificationDispatcher {
         this.objectMapper = objectMapper;
     }
 
-    @Transactional
     public void dispatch(
             Long accountId,
-            String notificationType,
-            String scheduleKey,
+            CalendarNotificationType notificationType,
+            NotificationScheduleKey scheduleKey,
             Instant scheduledAt,
             LocalDate targetDate,
             String title,
@@ -71,17 +71,21 @@ public class CalendarNotificationDispatcher {
 
         pushDeviceService.listEligiblePushDevices(accountId)
                 .forEach(pushDevice -> sendToPushDevice(dispatch, pushDevice));
-        dispatch.complete("DISPATCHED");
     }
 
-    private boolean isAlreadyClaimed(Long accountId, String type, String key, Instant scheduledAt) {
+    private boolean isAlreadyClaimed(
+            Long accountId,
+            CalendarNotificationType type,
+            NotificationScheduleKey key,
+            Instant scheduledAt
+    ) {
         return dispatchQueryService.hasDispatchClaim(accountId, type, key, scheduledAt);
     }
 
     private NotificationDispatch createClaim(
             Long accountId,
-            String type,
-            String key,
+            CalendarNotificationType type,
+            NotificationScheduleKey key,
             Instant scheduledAt,
             LocalDate targetDate,
             String title,
@@ -153,13 +157,13 @@ public class CalendarNotificationDispatcher {
 
     private Map<String, String> metadata(NotificationDispatch dispatch) {
         Map<String, String> metadata = new LinkedHashMap<>();
-        metadata.put("notificationType", dispatch.getNotificationType());
+        metadata.put("notificationType", dispatch.getNotificationType().name());
         metadata.put("targetDate", dispatch.getTargetDate().toString());
         return metadata;
     }
 
     private String visibleBody(NotificationDispatch dispatch) {
-        if ("BRIEFING".equals(dispatch.getNotificationType())) {
+        if (dispatch.getNotificationType() == CalendarNotificationType.BRIEFING) {
             return "오늘 일정이 " + dispatch.getTitle() + "개 있어요";
         }
         if (dispatch.getGroupName() == null) {

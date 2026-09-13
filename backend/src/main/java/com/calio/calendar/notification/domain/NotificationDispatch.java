@@ -4,6 +4,8 @@ import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.common.domain.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -14,6 +16,7 @@ import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Objects;
 
 @Entity
 @Table(
@@ -33,8 +36,9 @@ public class NotificationDispatch extends BaseEntity {
     @JoinColumn(name = "account_id", nullable = false)
     private Account account;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private String notificationType;
+    private CalendarNotificationType notificationType;
 
     @Column(nullable = false)
     private String scheduleKey;
@@ -48,32 +52,28 @@ public class NotificationDispatch extends BaseEntity {
     private String title;
     private String groupName;
 
-    @Column(nullable = false)
-    private String status;
-
     protected NotificationDispatch() {
     }
 
     public NotificationDispatch(
             Account account,
-            String notificationType,
-            String scheduleKey,
+            CalendarNotificationType notificationType,
+            NotificationScheduleKey scheduleKey,
             Instant scheduledAt,
             LocalDate targetDate,
             String title,
             String groupName
     ) {
-        this.account = account;
-        this.notificationType = notificationType;
-        this.scheduleKey = scheduleKey;
-        this.scheduledAt = scheduledAt;
-        this.targetDate = targetDate;
+        this.account = Objects.requireNonNull(account);
+        this.notificationType = Objects.requireNonNull(notificationType);
+        this.scheduleKey = Objects.requireNonNull(scheduleKey).value();
+        this.scheduledAt = Objects.requireNonNull(scheduledAt);
+        this.targetDate = Objects.requireNonNull(targetDate);
         this.title = title;
         this.groupName = groupName;
-        status = "CLAIMED";
     }
 
-    public String getNotificationType() {
+    public CalendarNotificationType getNotificationType() {
         return notificationType;
     }
 
@@ -95,9 +95,5 @@ public class NotificationDispatch extends BaseEntity {
 
     public Instant getScheduledAt() {
         return scheduledAt;
-    }
-
-    public void complete(String status) {
-        this.status = status;
     }
 }

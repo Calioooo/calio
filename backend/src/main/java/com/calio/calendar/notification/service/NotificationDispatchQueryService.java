@@ -1,5 +1,7 @@
 package com.calio.calendar.notification.service;
 
+import com.calio.calendar.notification.domain.CalendarNotificationType;
+import com.calio.calendar.notification.domain.NotificationScheduleKey;
 import com.calio.calendar.notification.repository.NotificationDispatchRepository;
 import java.time.Instant;
 import org.springframework.stereotype.Service;
@@ -15,11 +17,16 @@ public class NotificationDispatchQueryService {
         this.dispatchRepository = dispatchRepository;
     }
 
-    public boolean hasDispatchClaim(Long accountId, String type, String key, Instant scheduledAt) {
+    public boolean hasDispatchClaim(
+            Long accountId,
+            CalendarNotificationType type,
+            NotificationScheduleKey key,
+            Instant scheduledAt
+    ) {
         return dispatchRepository.findByAccount_IdAndNotificationTypeAndScheduleKeyAndScheduledAt(
                 accountId,
                 type,
-                key,
+                key.value(),
                 scheduledAt
         ).isPresent();
     }

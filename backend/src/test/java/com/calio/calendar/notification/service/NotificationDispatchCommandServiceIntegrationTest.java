@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
+import com.calio.calendar.notification.domain.CalendarNotificationType;
+import com.calio.calendar.notification.domain.NotificationScheduleKey;
 import java.time.Instant;
 import java.time.LocalDate;
 import org.junit.jupiter.api.DisplayName;
@@ -36,8 +38,8 @@ class NotificationDispatchCommandServiceIntegrationTest {
         Instant scheduledAt = Instant.parse("2026-09-08T00:00:00Z");
         dispatchCommandService.create(
                 account,
-                "REMINDER",
-                "personal:1",
+                CalendarNotificationType.REMINDER,
+                NotificationScheduleKey.personalEvent(1L),
                 scheduledAt,
                 LocalDate.of(2026, 9, 8),
                 "회의",
@@ -47,8 +49,8 @@ class NotificationDispatchCommandServiceIntegrationTest {
         // when & then
         assertThatThrownBy(() -> dispatchCommandService.create(
                 account,
-                "REMINDER",
-                "personal:1",
+                CalendarNotificationType.REMINDER,
+                NotificationScheduleKey.personalEvent(1L),
                 scheduledAt,
                 LocalDate.of(2026, 9, 8),
                 "회의",
