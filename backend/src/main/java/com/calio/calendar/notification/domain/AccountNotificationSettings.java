@@ -14,6 +14,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import java.time.LocalTime;
+import java.util.Objects;
 
 @Entity
 @Table(name = "account_notification_settings")
@@ -63,11 +64,11 @@ public class AccountNotificationSettings extends BaseEntity {
             LocalTime dailyBriefingTime
     ) {
         this.calendarNotificationsEnabled = calendarNotificationsEnabled;
-        this.timedReminderOffset = timedReminderOffset;
-        this.importantReminderOffset = importantReminderOffset;
-        this.allDayReminderTime = allDayReminderTime;
+        this.timedReminderOffset = Objects.requireNonNull(timedReminderOffset);
+        this.importantReminderOffset = Objects.requireNonNull(importantReminderOffset);
+        this.allDayReminderTime = Objects.requireNonNull(allDayReminderTime);
         this.dailyBriefingEnabled = dailyBriefingEnabled;
-        this.dailyBriefingTime = dailyBriefingTime;
+        this.dailyBriefingTime = Objects.requireNonNull(dailyBriefingTime);
     }
 
     public Long getAccountId() {

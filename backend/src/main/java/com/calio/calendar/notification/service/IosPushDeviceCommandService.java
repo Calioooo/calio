@@ -20,7 +20,12 @@ public class IosPushDeviceCommandService {
         return pushDeviceRepository.saveAndFlush(pushDevice);
     }
 
-    public void change(IosPushDevice pushDevice) {
+    public void refresh(
+            IosPushDevice pushDevice,
+            String apnsToken,
+            String environment
+    ) {
+        pushDevice.refresh(apnsToken, environment);
         pushDeviceRepository.saveAndFlush(pushDevice);
     }
 
@@ -30,8 +35,7 @@ public class IosPushDeviceCommandService {
     }
 
     public void deactivateAndReleaseToken(IosPushDevice pushDevice, Instant now) {
-        pushDevice.deactivate(now);
-        pushDevice.clearApnsToken();
+        pushDevice.deactivateAndReleaseToken(now);
         pushDeviceRepository.saveAndFlush(pushDevice);
     }
 }

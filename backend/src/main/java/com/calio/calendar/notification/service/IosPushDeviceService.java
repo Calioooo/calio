@@ -47,7 +47,7 @@ public class IosPushDeviceService {
                         apnsToken,
                         apnsProperties.environment()
                 ));
-        refreshPushDevice(pushDevice, apnsToken);
+        savePushDevice(pushDevice, apnsToken);
     }
 
     public void deactivate(Long accountId, String installationId) {
@@ -70,33 +70,22 @@ public class IosPushDeviceService {
             String apnsToken
     ) {
         pushDeviceQueryService.getPushDeviceWithTokenIfExists(apnsToken)
-                .filter(pushDevice -> !isSameInstallation(pushDevice, accountId, installationId))
+                .filter(pushDevice -> !pushDevice.belongsToInstallation(accountId, installationId))
                 .ifPresent(pushDevice -> pushDeviceCommandService.deactivateAndReleaseToken(pushDevice, Instant.now()));
     }
 
-    private void refreshPushDevice(
+    private void savePushDevice(
             IosPushDevice pushDevice,
             String apnsToken
     ) {
-        pushDevice.refresh(apnsToken, apnsProperties.environment());
         try {
             if (pushDevice.getId() == null) {
                 pushDeviceCommandService.create(pushDevice);
                 return;
             }
-            pushDeviceCommandService.change(pushDevice);
+            pushDeviceCommandService.refresh(pushDevice, apnsToken, apnsProperties.environment());
         } catch (DataIntegrityViolationException exception) {
             throw new CalioException(ErrorCode.NOTIFICATION_ENDPOINT_TOKEN_CONFLICT, exception);
         }
-    }
-
-    private boolean isSameInstallation(
-            IosPushDevice pushDevice,
-            Long accountId,
-            String installationId
-    ) {
-        return pushDeviceQueryService.getPushDeviceIfExists(accountId, installationId)
-                .map(currentPushDevice -> currentPushDevice.getId().equals(pushDevice.getId()))
-                .orElse(false);
     }
 }

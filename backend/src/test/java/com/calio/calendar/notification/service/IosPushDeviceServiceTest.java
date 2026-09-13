@@ -1,11 +1,12 @@
 package com.calio.calendar.notification.service;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.service.AccountQueryService;
@@ -68,6 +69,29 @@ class IosPushDeviceServiceTest {
         // then
         verify(pushDeviceCommandService).deactivateAndReleaseToken(eq(previousPushDevice), any());
         verify(pushDeviceCommandService).create(any(IosPushDevice.class));
+    }
+
+    @Test
+    @DisplayName("같은 설치본이 기존 APNs 토큰을 다시 등록하면 기기를 비활성화하지 않는다")
+    void givenTokenOwnedBySameInstallation_whenRegister_thenKeepsPushDeviceActive() {
+        // given
+        when(pushDeviceQueryService.getPushDeviceWithTokenIfExists("token"))
+                .thenReturn(Optional.of(previousPushDevice));
+        when(previousPushDevice.belongsToInstallation(1L, "installation")).thenReturn(true);
+        when(pushDeviceQueryService.getPushDeviceIfExists(1L, "installation"))
+                .thenReturn(Optional.of(previousPushDevice));
+        when(previousPushDevice.getId()).thenReturn(1L);
+
+        // when
+        pushDeviceService.register(1L, "installation", "token");
+
+        // then
+        verify(pushDeviceCommandService, never()).deactivateAndReleaseToken(any(), any());
+        verify(pushDeviceCommandService).refresh(
+                previousPushDevice,
+                "token",
+                "development"
+        );
     }
 
     @Test
