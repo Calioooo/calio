@@ -1,7 +1,7 @@
 package com.calio.calendar.notification.controller.dto;
 
-import com.calio.calendar.notification.domain.ImportantReminderOffset;
-import com.calio.calendar.notification.domain.TimedReminderOffset;
+import com.calio.calendar.account.domain.ImportantReminderOffset;
+import com.calio.calendar.account.domain.TimedReminderOffset;
 import jakarta.validation.constraints.NotNull;
 import java.time.LocalTime;
 

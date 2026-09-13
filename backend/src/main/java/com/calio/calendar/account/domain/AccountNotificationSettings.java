@@ -1,61 +1,39 @@
-package com.calio.calendar.notification.domain;
+package com.calio.calendar.account.domain;
 
-import com.calio.calendar.account.domain.Account;
-import com.calio.calendar.common.domain.BaseEntity;
 import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
+import jakarta.persistence.Embeddable;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.OneToOne;
-import jakarta.persistence.Table;
 import java.time.LocalTime;
 import java.util.Objects;
 
-@Entity
-@Table(name = "account_notification_settings")
-public class AccountNotificationSettings extends BaseEntity {
+@Embeddable
+public class AccountNotificationSettings {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "account_id", nullable = false, unique = true)
-    private Account account;
-
-    @Column(nullable = false)
+    @Column(name = "calendar_notifications_enabled", nullable = false)
     private boolean calendarNotificationsEnabled = true;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(name = "timed_reminder_offset", nullable = false)
     private TimedReminderOffset timedReminderOffset = TimedReminderOffset.MINUTES_10;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(name = "important_reminder_offset", nullable = false)
     private ImportantReminderOffset importantReminderOffset = ImportantReminderOffset.MINUTES_120;
 
-    @Column(nullable = false)
+    @Column(name = "all_day_reminder_time", nullable = false)
     private LocalTime allDayReminderTime = LocalTime.of(9, 0);
 
-    @Column(nullable = false)
+    @Column(name = "daily_briefing_enabled", nullable = false)
     private boolean dailyBriefingEnabled;
 
-    @Column(nullable = false)
+    @Column(name = "daily_briefing_time", nullable = false)
     private LocalTime dailyBriefingTime = LocalTime.of(8, 0);
 
     protected AccountNotificationSettings() {
     }
 
-    public AccountNotificationSettings(Account account) {
-        this.account = account;
-    }
-
-    public void update(
+    AccountNotificationSettings(
             boolean calendarNotificationsEnabled,
             TimedReminderOffset timedReminderOffset,
             ImportantReminderOffset importantReminderOffset,
@@ -69,10 +47,6 @@ public class AccountNotificationSettings extends BaseEntity {
         this.allDayReminderTime = Objects.requireNonNull(allDayReminderTime);
         this.dailyBriefingEnabled = dailyBriefingEnabled;
         this.dailyBriefingTime = Objects.requireNonNull(dailyBriefingTime);
-    }
-
-    public Long getAccountId() {
-        return account.getId();
     }
 
     public boolean isCalendarNotificationsEnabled() {
@@ -97,5 +71,33 @@ public class AccountNotificationSettings extends BaseEntity {
 
     public LocalTime getDailyBriefingTime() {
         return dailyBriefingTime;
+    }
+
+    @Override
+    public boolean equals(Object object) {
+        if (this == object) {
+            return true;
+        }
+        if (!(object instanceof AccountNotificationSettings settings)) {
+            return false;
+        }
+        return calendarNotificationsEnabled == settings.calendarNotificationsEnabled
+                && dailyBriefingEnabled == settings.dailyBriefingEnabled
+                && timedReminderOffset == settings.timedReminderOffset
+                && importantReminderOffset == settings.importantReminderOffset
+                && allDayReminderTime.equals(settings.allDayReminderTime)
+                && dailyBriefingTime.equals(settings.dailyBriefingTime);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(
+                calendarNotificationsEnabled,
+                timedReminderOffset,
+                importantReminderOffset,
+                allDayReminderTime,
+                dailyBriefingEnabled,
+                dailyBriefingTime
+        );
     }
 }

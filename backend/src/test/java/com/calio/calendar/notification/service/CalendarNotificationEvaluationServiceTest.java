@@ -8,17 +8,16 @@ import static org.mockito.Mockito.when;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.calio.calendar.account.domain.Account;
+import com.calio.calendar.account.domain.ImportantReminderOffset;
+import com.calio.calendar.account.domain.TimedReminderOffset;
 import com.calio.calendar.event.controller.dto.EventResponse;
 import com.calio.calendar.event.service.EventService;
 import com.calio.calendar.groupcalendar.service.GroupCalendarService;
 import com.calio.calendar.groupspace.service.GroupMembershipQueryService;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingQueryService;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarRecurrenceMappingQueryService;
-import com.calio.calendar.notification.domain.AccountNotificationSettings;
 import com.calio.calendar.notification.domain.CalendarNotificationType;
-import com.calio.calendar.notification.domain.ImportantReminderOffset;
 import com.calio.calendar.notification.domain.NotificationScheduleKey;
-import com.calio.calendar.notification.domain.TimedReminderOffset;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -78,7 +77,7 @@ class CalendarNotificationEvaluationServiceTest {
         when(eventMappingQueryService.hasExternalEventMapping(10L, 1L)).thenReturn(false);
 
         // when
-        evaluationService.evaluate(settings(TimedReminderOffset.AT_START, false), startAt);
+        evaluationService.evaluate(account(TimedReminderOffset.AT_START, false), startAt);
 
         // then
         ArgumentCaptor<LocalDate> targetDateCaptor = ArgumentCaptor.forClass(LocalDate.class);
@@ -105,7 +104,7 @@ class CalendarNotificationEvaluationServiceTest {
         when(eventMappingQueryService.hasExternalEventMapping(10L, 1L)).thenReturn(true);
 
         // when
-        evaluationService.evaluate(settings(TimedReminderOffset.AT_START, false), startAt);
+        evaluationService.evaluate(account(TimedReminderOffset.AT_START, false), startAt);
 
         // then
         verify(notificationDispatcher, never()).dispatch(any(), any(), any(), any(), any(), any(), any());
@@ -119,7 +118,7 @@ class CalendarNotificationEvaluationServiceTest {
         when(eventService.listEvents(eq(1L), any(), any())).thenReturn(List.of());
 
         // when
-        evaluationService.evaluate(settings(TimedReminderOffset.MINUTES_10, true), briefingTime);
+        evaluationService.evaluate(account(TimedReminderOffset.MINUTES_10, true), briefingTime);
 
         // then
         verify(notificationDispatcher, never()).dispatch(any(), any(), any(), any(), any(), any(), any());
@@ -139,7 +138,7 @@ class CalendarNotificationEvaluationServiceTest {
         when(eventMappingQueryService.hasExternalEventMapping(10L, 1L)).thenReturn(false);
 
         // when
-        evaluationService.evaluate(settings(TimedReminderOffset.MINUTES_10, true), briefingTime);
+        evaluationService.evaluate(account(TimedReminderOffset.MINUTES_10, true), briefingTime);
 
         // then
         verify(notificationDispatcher).dispatch(
@@ -153,11 +152,10 @@ class CalendarNotificationEvaluationServiceTest {
         );
     }
 
-    private AccountNotificationSettings settings(TimedReminderOffset timedReminderOffset, boolean briefingEnabled) {
+    private Account account(TimedReminderOffset timedReminderOffset, boolean briefingEnabled) {
         Account account = new Account();
         ReflectionTestUtils.setField(account, "id", 1L);
-        AccountNotificationSettings settings = new AccountNotificationSettings(account);
-        settings.update(
+        account.updateNotificationSettings(
                 true,
                 timedReminderOffset,
                 ImportantReminderOffset.MINUTES_120,
@@ -165,7 +163,7 @@ class CalendarNotificationEvaluationServiceTest {
                 briefingEnabled,
                 LocalTime.of(8, 0)
         );
-        return settings;
+        return account;
     }
 
     private EventResponse timedEvent(Instant startAt, String timeZone) {

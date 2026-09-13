@@ -18,6 +18,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest(properties = {
         "spring.datasource.url=jdbc:h2:mem:calendar-notification-test;"
@@ -30,6 +31,7 @@ import org.springframework.test.web.servlet.MockMvc;
 @AutoConfigureMockMvc
 @WithAuthenticatedAccount
 @Import(AuthenticatedAccountMockMvcTestConfig.class)
+@Transactional
 class NotificationControllerIntegrationTest {
 
     @Autowired
@@ -40,7 +42,7 @@ class NotificationControllerIntegrationTest {
 
     @Test
     @DisplayName("알림 설정 조회는 서버 기본값과 시간 타입을 직렬화해 반환한다")
-    void givenNoSettings_whenGetSettings_thenReturnsDefaultPolicy() throws Exception {
+    void givenNewAccount_whenGetSettings_thenReturnsDefaultPolicy() throws Exception {
         mockMvc.perform(get("/api/notification-settings"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.calendarNotificationsEnabled").value(true))
