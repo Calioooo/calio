@@ -19,100 +19,78 @@ import org.springframework.security.web.util.matcher.RegexRequestMatcher;
 @EnableWebSecurity
 public class SecurityConfig {
 
-  private final BearerTokenAuthenticationFilter bearerTokenAuthenticationFilter;
-  private final AuthenticationErrorResponseWriter authenticationErrorResponseWriter;
+    private final BearerTokenAuthenticationFilter bearerTokenAuthenticationFilter;
+    private final AuthenticationErrorResponseWriter authenticationErrorResponseWriter;
 
-  public SecurityConfig(
-      BearerTokenAuthenticationFilter bearerTokenAuthenticationFilter,
-      AuthenticationErrorResponseWriter authenticationErrorResponseWriter) {
-    this.bearerTokenAuthenticationFilter = bearerTokenAuthenticationFilter;
-    this.authenticationErrorResponseWriter = authenticationErrorResponseWriter;
-  }
+    public SecurityConfig(
+            BearerTokenAuthenticationFilter bearerTokenAuthenticationFilter,
+            AuthenticationErrorResponseWriter authenticationErrorResponseWriter
+    ) {
+        this.bearerTokenAuthenticationFilter = bearerTokenAuthenticationFilter;
+        this.authenticationErrorResponseWriter = authenticationErrorResponseWriter;
+    }
 
-  @Bean
-  public SecurityFilterChain securityFilterChain(HttpSecurity http) {
-    return http.csrf(AbstractHttpConfigurer::disable)
-        .httpBasic(AbstractHttpConfigurer::disable)
-        .formLogin(AbstractHttpConfigurer::disable)
-        .logout(AbstractHttpConfigurer::disable)
-        .sessionManagement(
-            session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-        .authorizeHttpRequests(
-            auth ->
-                auth.requestMatchers("/actuator/health", "/actuator/prometheus")
-                    .permitAll()
-                    .requestMatchers(HttpMethod.POST, "/api/auth/guest")
-                    .permitAll()
-                    .requestMatchers(HttpMethod.GET, "/api/national-holidays")
-                    .permitAll()
-                    .requestMatchers(HttpMethod.POST, "/api/group-invitations/preview")
-                    .authenticated()
-                    .requestMatchers("/api/events")
-                    .authenticated()
-                    .requestMatchers("/api/events/**")
-                    .authenticated()
-                    .requestMatchers("/api/recurrence-events")
-                    .authenticated()
-                    .requestMatchers("/api/recurrence-events/**")
-                    .authenticated()
-                    .requestMatchers("/api/tasks")
-                    .authenticated()
-                    .requestMatchers("/api/tasks/**")
-                    .authenticated()
-                    .requestMatchers("/api/tags")
-                    .authenticated()
-                    .requestMatchers("/api/custom-tags")
-                    .authenticated()
-                    .requestMatchers("/api/custom-tags/**")
-                    .authenticated()
-                    .requestMatchers(HttpMethod.POST, "/api/vote-rooms/*/participants")
-                    .permitAll()
-                    .requestMatchers(HttpMethod.PUT, "/api/vote-rooms/*/votes")
-                    .permitAll()
-                    .requestMatchers(
-                        new RegexRequestMatcher(
-                            "^/api/vote-rooms/[0-9a-fA-F-]{36}(?:\\?.*)?$", HttpMethod.GET.name()))
-                    .permitAll()
-                    .requestMatchers("/api/vote-rooms")
-                    .authenticated()
-                    .requestMatchers("/api/vote-rooms/**")
-                    .authenticated()
-                    .requestMatchers("/api/integrations/**")
-                    .authenticated()
-                    .requestMatchers("/api/ai/calendar/**")
-                    .authenticated()
-                    .requestMatchers("/api/notification-endpoints/**")
-                    .authenticated()
-                    .requestMatchers("/api/group-spaces")
-                    .authenticated()
-                    .requestMatchers("/api/group-spaces/**")
-                    .authenticated()
-                    .requestMatchers(HttpMethod.POST, "/api/group-invitations/accept")
-                    .authenticated()
-                    .anyRequest()
-                    .denyAll())
-        .exceptionHandling(
-            exception ->
-                exception.authenticationEntryPoint(
-                    (request, response, authException) ->
-                        authenticationErrorResponseWriter.write(
-                            request, response, ErrorCode.AUTH_TOKEN_REQUIRED)))
-        .addFilterBefore(
-            bearerTokenAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
-        .build();
-  }
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) {
+        return http
+                .csrf(AbstractHttpConfigurer::disable)
+                .httpBasic(AbstractHttpConfigurer::disable)
+                .formLogin(AbstractHttpConfigurer::disable)
+                .logout(AbstractHttpConfigurer::disable)
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/actuator/health", "/actuator/prometheus").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/guest").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/national-holidays").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/group-invitations/preview").authenticated()
+                        .requestMatchers("/api/events").authenticated()
+                        .requestMatchers("/api/events/**").authenticated()
+                        .requestMatchers("/api/recurrence-events").authenticated()
+                        .requestMatchers("/api/recurrence-events/**").authenticated()
+                        .requestMatchers("/api/tasks").authenticated()
+                        .requestMatchers("/api/tasks/**").authenticated()
+                        .requestMatchers("/api/tags").authenticated()
+                        .requestMatchers("/api/custom-tags").authenticated()
+                        .requestMatchers("/api/custom-tags/**").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/vote-rooms/*/participants").permitAll()
+                        .requestMatchers(HttpMethod.PUT, "/api/vote-rooms/*/votes").permitAll()
+                        .requestMatchers(new RegexRequestMatcher(
+                                "^/api/vote-rooms/[0-9a-fA-F-]{36}(?:\\?.*)?$",
+                                HttpMethod.GET.name()
+                        )).permitAll()
+                        .requestMatchers("/api/vote-rooms").authenticated()
+                        .requestMatchers("/api/vote-rooms/**").authenticated()
+                        .requestMatchers("/api/integrations/**").authenticated()
+                        .requestMatchers("/api/ai/calendar/**").authenticated()
+                        .requestMatchers("/api/notification-endpoints/**").authenticated()
+                        .requestMatchers("/api/notification-settings/**").authenticated()
+                        .requestMatchers("/api/group-spaces").authenticated()
+                        .requestMatchers("/api/group-spaces/**").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/group-invitations/accept").authenticated()
+                        .anyRequest().denyAll()
+                )
+                .exceptionHandling(exception -> exception.authenticationEntryPoint(
+                        (request, response, authException) ->
+                                authenticationErrorResponseWriter.write(
+                                        request,
+                                        response,
+                                        ErrorCode.AUTH_TOKEN_REQUIRED
+                                )
+                ))
+                .addFilterBefore(bearerTokenAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                .build();
+    }
 
-  @Bean
-  public PasswordEncoder passwordEncoder() {
-    return new BCryptPasswordEncoder();
-  }
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
 
-  @Bean
-  public FilterRegistrationBean<BearerTokenAuthenticationFilter> bearerTokenFilterRegistration() {
-    FilterRegistrationBean<BearerTokenAuthenticationFilter> registration =
-        new FilterRegistrationBean<>();
-    registration.setFilter(bearerTokenAuthenticationFilter);
-    registration.setEnabled(false);
-    return registration;
-  }
+    @Bean
+    public FilterRegistrationBean<BearerTokenAuthenticationFilter> bearerTokenFilterRegistration() {
+        FilterRegistrationBean<BearerTokenAuthenticationFilter> registration = new FilterRegistrationBean<>();
+        registration.setFilter(bearerTokenAuthenticationFilter);
+        registration.setEnabled(false);
+        return registration;
+    }
 }
