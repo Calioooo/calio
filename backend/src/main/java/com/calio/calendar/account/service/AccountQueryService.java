@@ -4,6 +4,7 @@ import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
+import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -12,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class AccountQueryService {
 
     private final AccountRepository accountRepository;
+
     public AccountQueryService(AccountRepository accountRepository) {
         this.accountRepository = accountRepository;
     }
@@ -23,5 +25,9 @@ public class AccountQueryService {
 
     public boolean hasAccount(Long accountId) {
         return accountRepository.existsById(accountId);
+    }
+
+    public List<Account> listNotificationEnabledAccounts() {
+        return accountRepository.findByNotificationSettingsCalendarNotificationsEnabledTrue();
     }
 }

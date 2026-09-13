@@ -3,7 +3,6 @@ package com.calio.calendar.notification.service;
 import com.calio.calendar.account.service.AccountQueryService;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
-import com.calio.calendar.notification.client.ApnsProperties;
 import com.calio.calendar.notification.domain.IosPushDevice;
 import java.time.Instant;
 import java.util.List;
@@ -16,18 +15,15 @@ import org.springframework.transaction.annotation.Transactional;
 public class IosPushDeviceService {
 
     private final AccountQueryService accountQueryService;
-    private final ApnsProperties apnsProperties;
     private final IosPushDeviceQueryService pushDeviceQueryService;
     private final IosPushDeviceCommandService pushDeviceCommandService;
 
     public IosPushDeviceService(
             AccountQueryService accountQueryService,
-            ApnsProperties apnsProperties,
             IosPushDeviceQueryService pushDeviceQueryService,
             IosPushDeviceCommandService pushDeviceCommandService
     ) {
         this.accountQueryService = accountQueryService;
-        this.apnsProperties = apnsProperties;
         this.pushDeviceQueryService = pushDeviceQueryService;
         this.pushDeviceCommandService = pushDeviceCommandService;
     }
@@ -44,10 +40,9 @@ public class IosPushDeviceService {
                 .orElseGet(() -> new IosPushDevice(
                         accountQueryService.getAccount(accountId),
                         installationId,
-                        apnsToken,
-                        apnsProperties.environment()
+                        apnsToken
                 ));
-        refreshPushDevice(pushDevice, apnsToken);
+        savePushDevice(pushDevice, apnsToken);
     }
 
     public void deactivate(Long accountId, String installationId) {
@@ -70,33 +65,22 @@ public class IosPushDeviceService {
             String apnsToken
     ) {
         pushDeviceQueryService.getPushDeviceWithTokenIfExists(apnsToken)
-                .filter(pushDevice -> !isSameInstallation(pushDevice, accountId, installationId))
-                .ifPresent(pushDevice -> pushDeviceCommandService.deactivateAndReleaseToken(pushDevice, Instant.now()));
+                .filter(pushDevice -> !pushDevice.belongsToInstallation(accountId, installationId))
+                .ifPresent(pushDevice -> pushDeviceCommandService.deactivate(pushDevice, Instant.now()));
     }
 
-    private void refreshPushDevice(
+    private void savePushDevice(
             IosPushDevice pushDevice,
             String apnsToken
     ) {
-        pushDevice.refresh(apnsToken, apnsProperties.environment());
         try {
             if (pushDevice.getId() == null) {
                 pushDeviceCommandService.create(pushDevice);
                 return;
             }
-            pushDeviceCommandService.change(pushDevice);
+            pushDeviceCommandService.refresh(pushDevice, apnsToken);
         } catch (DataIntegrityViolationException exception) {
             throw new CalioException(ErrorCode.NOTIFICATION_ENDPOINT_TOKEN_CONFLICT, exception);
         }
-    }
-
-    private boolean isSameInstallation(
-            IosPushDevice pushDevice,
-            Long accountId,
-            String installationId
-    ) {
-        return pushDeviceQueryService.getPushDeviceIfExists(accountId, installationId)
-                .map(currentPushDevice -> currentPushDevice.getId().equals(pushDevice.getId()))
-                .orElse(false);
     }
 }

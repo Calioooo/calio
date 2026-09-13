@@ -12,6 +12,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.util.Objects;
 
 @Entity
 @Table(name = "ios_push_devices")
@@ -34,9 +35,6 @@ public class IosPushDevice extends BaseEntity {
     @Column(nullable = false)
     private boolean active;
 
-    @Column(nullable = false)
-    private String environment;
-
     private Instant deactivatedAt;
 
     protected IosPushDevice() {
@@ -45,31 +43,28 @@ public class IosPushDevice extends BaseEntity {
     public IosPushDevice(
             Account account,
             String installationId,
-            String apnsToken,
-            String environment
+            String apnsToken
     ) {
         this.account = account;
         this.installationId = installationId;
-        refresh(apnsToken, environment);
+        refresh(apnsToken);
     }
 
-    public void refresh(
-            String apnsToken,
-            String environment
-    ) {
-        this.apnsToken = apnsToken;
-        this.environment = environment;
+    public void refresh(String apnsToken) {
+        this.apnsToken = Objects.requireNonNull(apnsToken);
         active = true;
         deactivatedAt = null;
     }
 
-    public void deactivate(Instant now) {
-        active = false;
-        deactivatedAt = now;
+    public boolean belongsToInstallation(Long accountId, String installationId) {
+        return Objects.equals(account.getId(), accountId)
+                && Objects.equals(this.installationId, installationId);
     }
 
-    public void clearApnsToken() {
+    public void deactivate(Instant now) {
+        active = false;
         apnsToken = null;
+        deactivatedAt = now;
     }
 
     public Long getId() {
