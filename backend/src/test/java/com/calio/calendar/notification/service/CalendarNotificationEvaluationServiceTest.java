@@ -51,7 +51,7 @@ class CalendarNotificationEvaluationServiceTest {
     private GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService;
 
     @Mock
-    private CalendarNotificationDispatcher notificationDispatcher;
+    private CalendarNotificationService calendarNotificationService;
 
     private CalendarNotificationEvaluationService evaluationService;
 
@@ -63,7 +63,7 @@ class CalendarNotificationEvaluationServiceTest {
                 groupMembershipQueryService,
                 eventMappingQueryService,
                 recurrenceMappingQueryService,
-                notificationDispatcher
+                calendarNotificationService
         );
         when(groupMembershipQueryService.listActiveMemberships(1L)).thenReturn(List.of());
     }
@@ -82,7 +82,7 @@ class CalendarNotificationEvaluationServiceTest {
 
         // then
         ArgumentCaptor<LocalDate> targetDateCaptor = ArgumentCaptor.forClass(LocalDate.class);
-        verify(notificationDispatcher).dispatch(
+        verify(calendarNotificationService).dispatch(
                 eq(1L),
                 eq(CalendarNotificationType.REMINDER),
                 eq(NotificationScheduleKey.personalEvent(10L)),
@@ -108,7 +108,7 @@ class CalendarNotificationEvaluationServiceTest {
         evaluationService.evaluate(account(TimedReminderOffset.AT_START, false), startAt);
 
         // then
-        verify(notificationDispatcher, never()).dispatch(any(), any(), any(), any(), any(), any(), any());
+        verify(calendarNotificationService, never()).dispatch(any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -122,7 +122,7 @@ class CalendarNotificationEvaluationServiceTest {
         evaluationService.evaluate(account(TimedReminderOffset.MINUTES_10, true), briefingTime);
 
         // then
-        verify(notificationDispatcher, never()).dispatch(any(), any(), any(), any(), any(), any(), any());
+        verify(calendarNotificationService, never()).dispatch(any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -142,7 +142,7 @@ class CalendarNotificationEvaluationServiceTest {
         evaluationService.evaluate(account(TimedReminderOffset.MINUTES_10, true), briefingTime);
 
         // then
-        verify(notificationDispatcher).dispatch(
+        verify(calendarNotificationService).dispatch(
                 eq(1L),
                 eq(CalendarNotificationType.BRIEFING),
                 eq(NotificationScheduleKey.briefing(LocalDate.of(2026, 6, 2))),

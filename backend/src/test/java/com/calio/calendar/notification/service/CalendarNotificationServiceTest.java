@@ -28,7 +28,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import tools.jackson.databind.ObjectMapper;
 
 @ExtendWith(MockitoExtension.class)
-class CalendarNotificationDispatcherTest {
+class CalendarNotificationServiceTest {
 
     @Mock
     private NotificationDispatchQueryService dispatchQueryService;
@@ -51,11 +51,11 @@ class CalendarNotificationDispatcherTest {
     @Mock
     private IosPushDevice ipadPushDevice;
 
-    private CalendarNotificationDispatcher dispatcher;
+    private CalendarNotificationService calendarNotificationService;
 
     @BeforeEach
     void setUp() {
-        dispatcher = new CalendarNotificationDispatcher(
+        calendarNotificationService = new CalendarNotificationService(
                 dispatchQueryService,
                 dispatchCommandService,
                 accountQueryService,
@@ -98,7 +98,7 @@ class CalendarNotificationDispatcherTest {
         ));
 
         // when
-        dispatcher.dispatch(
+        calendarNotificationService.dispatch(
                 1L,
                 CalendarNotificationType.REMINDER,
                 NotificationScheduleKey.personalEvent(1L),
@@ -126,7 +126,7 @@ class CalendarNotificationDispatcherTest {
                 .thenReturn(true);
 
         // when
-        dispatcher.dispatch(
+        calendarNotificationService.dispatch(
                 1L,
                 CalendarNotificationType.REMINDER,
                 NotificationScheduleKey.personalEvent(1L),
