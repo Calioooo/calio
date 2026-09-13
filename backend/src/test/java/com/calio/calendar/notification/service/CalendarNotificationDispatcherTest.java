@@ -9,11 +9,13 @@ import static org.mockito.Mockito.when;
 
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.service.AccountQueryService;
+import com.calio.calendar.notification.client.ApnsClient;
 import com.calio.calendar.notification.client.ApnsSendResult;
 import com.calio.calendar.notification.client.ApnsSendResultType;
-import com.calio.calendar.notification.client.ApnsClient;
+import com.calio.calendar.notification.domain.CalendarNotificationType;
 import com.calio.calendar.notification.domain.IosPushDevice;
 import com.calio.calendar.notification.domain.NotificationDispatch;
+import com.calio.calendar.notification.domain.NotificationScheduleKey;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -69,13 +71,18 @@ class CalendarNotificationDispatcherTest {
         // given
         Instant scheduledAt = Instant.parse("2026-09-08T00:00:00Z");
         NotificationDispatch dispatch = dispatch(scheduledAt);
-        when(dispatchQueryService.hasDispatchClaim(1L, "REMINDER", "personal:1", scheduledAt))
+        when(dispatchQueryService.hasDispatchClaim(
+                1L,
+                CalendarNotificationType.REMINDER,
+                NotificationScheduleKey.personalEvent(1L),
+                scheduledAt
+        ))
                 .thenReturn(false);
         when(accountQueryService.getAccount(1L)).thenReturn(new Account());
         when(dispatchCommandService.create(
                 any(Account.class),
-                eq("REMINDER"),
-                eq("personal:1"),
+                eq(CalendarNotificationType.REMINDER),
+                eq(NotificationScheduleKey.personalEvent(1L)),
                 eq(scheduledAt),
                 eq(LocalDate.of(2026, 9, 8)),
                 eq("회의"),
@@ -93,8 +100,8 @@ class CalendarNotificationDispatcherTest {
         // when
         dispatcher.dispatch(
                 1L,
-                "REMINDER",
-                "personal:1",
+                CalendarNotificationType.REMINDER,
+                NotificationScheduleKey.personalEvent(1L),
                 scheduledAt,
                 LocalDate.of(2026, 9, 8),
                 "회의",
@@ -110,14 +117,19 @@ class CalendarNotificationDispatcherTest {
     void givenExistingDeliveryClaim_whenDispatch_thenSkipsApnsSend() {
         // given
         Instant scheduledAt = Instant.parse("2026-09-08T00:00:00Z");
-        when(dispatchQueryService.hasDispatchClaim(1L, "REMINDER", "personal:1", scheduledAt))
+        when(dispatchQueryService.hasDispatchClaim(
+                1L,
+                CalendarNotificationType.REMINDER,
+                NotificationScheduleKey.personalEvent(1L),
+                scheduledAt
+        ))
                 .thenReturn(true);
 
         // when
         dispatcher.dispatch(
                 1L,
-                "REMINDER",
-                "personal:1",
+                CalendarNotificationType.REMINDER,
+                NotificationScheduleKey.personalEvent(1L),
                 scheduledAt,
                 LocalDate.of(2026, 9, 8),
                 "회의",
@@ -132,8 +144,8 @@ class CalendarNotificationDispatcherTest {
     private NotificationDispatch dispatch(Instant scheduledAt) {
         return new NotificationDispatch(
                 new Account(),
-                "REMINDER",
-                "personal:1",
+                CalendarNotificationType.REMINDER,
+                NotificationScheduleKey.personalEvent(1L),
                 scheduledAt,
                 LocalDate.of(2026, 9, 8),
                 "회의",

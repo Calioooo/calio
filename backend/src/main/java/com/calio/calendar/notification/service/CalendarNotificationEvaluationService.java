@@ -9,7 +9,9 @@ import com.calio.calendar.groupspace.service.GroupMembershipQueryService;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingQueryService;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarRecurrenceMappingQueryService;
 import com.calio.calendar.notification.domain.AccountNotificationSettings;
+import com.calio.calendar.notification.domain.CalendarNotificationType;
 import com.calio.calendar.notification.domain.ImportantReminderOffset;
+import com.calio.calendar.notification.domain.NotificationScheduleKey;
 import com.calio.calendar.notification.domain.TimedReminderOffset;
 import java.time.Duration;
 import java.time.Instant;
@@ -76,7 +78,7 @@ public class CalendarNotificationEvaluationService {
             Instant dueFrom,
             Instant dueTo
     ) {
-        String scheduleKey = personalScheduleKey(event);
+        NotificationScheduleKey scheduleKey = personalScheduleKey(event);
         dispatchGeneralReminder(
                 accountId,
                 settings,
@@ -98,7 +100,7 @@ public class CalendarNotificationEvaluationService {
         }
         dispatchTimedReminder(
                 accountId,
-                "IMPORTANT",
+                CalendarNotificationType.IMPORTANT,
                 reminderOffset.minutes(),
                 scheduleKey,
                 event.startAt(),
@@ -138,7 +140,7 @@ public class CalendarNotificationEvaluationService {
             Instant startAt,
             boolean allDay,
             String timeZone,
-            String scheduleKey,
+            NotificationScheduleKey scheduleKey,
             String title,
             String groupName,
             Instant dueFrom,
@@ -147,7 +149,18 @@ public class CalendarNotificationEvaluationService {
         if (allDay) {
             Instant dueAt = startAt.atZone(POLICY_ZONE).toLocalDate()
                     .atTime(settings.getAllDayReminderTime()).atZone(POLICY_ZONE).toInstant();
-            dispatchIfDue(accountId, "ALL_DAY", scheduleKey, dueAt, startAt, null, title, groupName, dueFrom, dueTo);
+            dispatchIfDue(
+                    accountId,
+                    CalendarNotificationType.ALL_DAY,
+                    scheduleKey,
+                    dueAt,
+                    startAt,
+                    null,
+                    title,
+                    groupName,
+                    dueFrom,
+                    dueTo
+            );
             return;
         }
         TimedReminderOffset reminderOffset = settings.getTimedReminderOffset();
@@ -156,7 +169,7 @@ public class CalendarNotificationEvaluationService {
         }
         dispatchTimedReminder(
                 accountId,
-                "REMINDER",
+                CalendarNotificationType.REMINDER,
                 reminderOffset.minutes(),
                 scheduleKey,
                 startAt,
@@ -170,9 +183,9 @@ public class CalendarNotificationEvaluationService {
 
     private void dispatchTimedReminder(
             Long accountId,
-            String type,
+            CalendarNotificationType type,
             int minutes,
-            String key,
+            NotificationScheduleKey key,
             Instant startAt,
             String timeZone,
             String title,
@@ -196,8 +209,8 @@ public class CalendarNotificationEvaluationService {
 
     private void dispatchIfDue(
             Long accountId,
-            String type,
-            String key,
+            CalendarNotificationType type,
+            NotificationScheduleKey key,
             Instant dueAt,
             Instant startAt,
             String timeZone,
@@ -249,8 +262,8 @@ public class CalendarNotificationEvaluationService {
 
         notificationDispatcher.dispatch(
                 accountId,
-                "BRIEFING",
-                "briefing:" + targetDate,
+                CalendarNotificationType.BRIEFING,
+                NotificationScheduleKey.briefing(targetDate),
                 dueAt,
                 targetDate,
                 Long.toString(remainingScheduleCount),
@@ -290,16 +303,16 @@ public class CalendarNotificationEvaluationService {
         return allDay || endAt.isAfter(now);
     }
 
-    private String personalScheduleKey(EventResponse event) {
+    private NotificationScheduleKey personalScheduleKey(EventResponse event) {
         return event.isRecurrenceOccurrence()
-                ? "personal-recurrence:" + event.recurrenceId() + ":" + event.originStartAt()
-                : "personal:" + event.id();
+                ? NotificationScheduleKey.personalRecurrence(event.recurrenceId(), event.originStartAt())
+                : NotificationScheduleKey.personalEvent(event.id());
     }
 
-    private String groupScheduleKey(GroupCalendarItemResponse event) {
+    private NotificationScheduleKey groupScheduleKey(GroupCalendarItemResponse event) {
         return event.isRecurrenceOccurrence()
-                ? "group-recurrence:" + event.recurrenceId() + ":" + event.originStartAt()
-                : "group:" + event.id();
+                ? NotificationScheduleKey.groupRecurrence(event.recurrenceId(), event.originStartAt())
+                : NotificationScheduleKey.groupEvent(event.id());
     }
 
     private List<GroupMember> listActiveMemberships(Long accountId) {
