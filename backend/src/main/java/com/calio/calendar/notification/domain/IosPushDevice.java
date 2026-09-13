@@ -35,9 +35,6 @@ public class IosPushDevice extends BaseEntity {
     @Column(nullable = false)
     private boolean active;
 
-    @Column(nullable = false)
-    private String environment;
-
     private Instant deactivatedAt;
 
     protected IosPushDevice() {
@@ -46,20 +43,15 @@ public class IosPushDevice extends BaseEntity {
     public IosPushDevice(
             Account account,
             String installationId,
-            String apnsToken,
-            String environment
+            String apnsToken
     ) {
         this.account = account;
         this.installationId = installationId;
-        refresh(apnsToken, environment);
+        refresh(apnsToken);
     }
 
-    public void refresh(
-            String apnsToken,
-            String environment
-    ) {
+    public void refresh(String apnsToken) {
         this.apnsToken = Objects.requireNonNull(apnsToken);
-        this.environment = Objects.requireNonNull(environment);
         active = true;
         deactivatedAt = null;
     }
@@ -71,12 +63,8 @@ public class IosPushDevice extends BaseEntity {
 
     public void deactivate(Instant now) {
         active = false;
-        deactivatedAt = now;
-    }
-
-    public void deactivateAndReleaseToken(Instant now) {
-        deactivate(now);
         apnsToken = null;
+        deactivatedAt = now;
     }
 
     public Long getId() {

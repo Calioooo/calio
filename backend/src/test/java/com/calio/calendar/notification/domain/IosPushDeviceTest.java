@@ -16,7 +16,7 @@ class IosPushDeviceTest {
         // given
         Account account = new Account();
         ReflectionTestUtils.setField(account, "id", 1L);
-        IosPushDevice pushDevice = new IosPushDevice(account, "installation", "token", "development");
+        IosPushDevice pushDevice = new IosPushDevice(account, "installation", "token");
 
         // when & then
         assertThat(pushDevice.belongsToInstallation(1L, "installation")).isTrue();
@@ -26,17 +26,12 @@ class IosPushDeviceTest {
 
     @Test
     @DisplayName("푸시 기기를 해제하면 비활성화와 APNs 토큰 제거를 함께 수행한다")
-    void givenActivePushDevice_whenDeactivateAndReleaseToken_thenCannotReceivePush() {
+    void givenActivePushDevice_whenDeactivate_thenCannotReceivePush() {
         // given
-        IosPushDevice pushDevice = new IosPushDevice(
-                new Account(),
-                "installation",
-                "token",
-                "development"
-        );
+        IosPushDevice pushDevice = new IosPushDevice(new Account(), "installation", "token");
 
         // when
-        pushDevice.deactivateAndReleaseToken(Instant.parse("2026-09-08T00:00:00Z"));
+        pushDevice.deactivate(Instant.parse("2026-09-08T00:00:00Z"));
 
         // then
         assertThat(pushDevice.isEligible()).isFalse();

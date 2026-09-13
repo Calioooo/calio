@@ -12,7 +12,6 @@ import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.service.AccountQueryService;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
-import com.calio.calendar.notification.client.ApnsProperties;
 import com.calio.calendar.notification.domain.IosPushDevice;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,7 +43,6 @@ class IosPushDeviceServiceTest {
     void setUp() {
         pushDeviceService = new IosPushDeviceService(
                 accountQueryService,
-                new ApnsProperties("development", "team", "key", "bundle", "private-key"),
                 pushDeviceQueryService,
                 pushDeviceCommandService
         );
@@ -67,7 +65,7 @@ class IosPushDeviceServiceTest {
         );
 
         // then
-        verify(pushDeviceCommandService).deactivateAndReleaseToken(eq(previousPushDevice), any());
+        verify(pushDeviceCommandService).deactivate(eq(previousPushDevice), any());
         verify(pushDeviceCommandService).create(any(IosPushDevice.class));
     }
 
@@ -86,12 +84,8 @@ class IosPushDeviceServiceTest {
         pushDeviceService.register(1L, "installation", "token");
 
         // then
-        verify(pushDeviceCommandService, never()).deactivateAndReleaseToken(any(), any());
-        verify(pushDeviceCommandService).refresh(
-                previousPushDevice,
-                "token",
-                "development"
-        );
+        verify(pushDeviceCommandService, never()).deactivate(any(), any());
+        verify(pushDeviceCommandService).refresh(previousPushDevice, "token");
     }
 
     @Test
