@@ -22,9 +22,9 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
 @Service
-public class CalendarNotificationDispatcher {
+public class CalendarNotificationService {
 
-    private static final Logger log = LoggerFactory.getLogger(CalendarNotificationDispatcher.class);
+    private static final Logger log = LoggerFactory.getLogger(CalendarNotificationService.class);
 
     private final NotificationDispatchQueryService dispatchQueryService;
     private final NotificationDispatchCommandService dispatchCommandService;
@@ -33,7 +33,7 @@ public class CalendarNotificationDispatcher {
     private final ApnsClient apnsClient;
     private final ObjectMapper objectMapper;
 
-    public CalendarNotificationDispatcher(
+    public CalendarNotificationService(
             NotificationDispatchQueryService dispatchQueryService,
             NotificationDispatchCommandService dispatchCommandService,
             AccountQueryService accountQueryService,

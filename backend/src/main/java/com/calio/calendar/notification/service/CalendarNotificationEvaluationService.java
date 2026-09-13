@@ -33,7 +33,7 @@ public class CalendarNotificationEvaluationService {
     private final GroupMembershipQueryService groupMembershipQueryService;
     private final GoogleCalendarEventMappingQueryService eventMappingQueryService;
     private final GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService;
-    private final CalendarNotificationDispatcher notificationDispatcher;
+    private final CalendarNotificationService calendarNotificationService;
 
     public CalendarNotificationEvaluationService(
             EventService eventService,
@@ -41,14 +41,14 @@ public class CalendarNotificationEvaluationService {
             GroupMembershipQueryService groupMembershipQueryService,
             GoogleCalendarEventMappingQueryService eventMappingQueryService,
             GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService,
-            CalendarNotificationDispatcher notificationDispatcher
+            CalendarNotificationService calendarNotificationService
     ) {
         this.eventService = eventService;
         this.groupCalendarService = groupCalendarService;
         this.groupMembershipQueryService = groupMembershipQueryService;
         this.eventMappingQueryService = eventMappingQueryService;
         this.recurrenceMappingQueryService = recurrenceMappingQueryService;
-        this.notificationDispatcher = notificationDispatcher;
+        this.calendarNotificationService = calendarNotificationService;
     }
 
     @Transactional
@@ -225,7 +225,7 @@ public class CalendarNotificationEvaluationService {
             return;
         }
         LocalDate targetDate = startAt.atZone(timeZone == null ? POLICY_ZONE : ZoneId.of(timeZone)).toLocalDate();
-        notificationDispatcher.dispatch(accountId, type, key, dueAt, targetDate, title, groupName);
+        calendarNotificationService.dispatch(accountId, type, key, dueAt, targetDate, title, groupName);
     }
 
     private boolean isGoogleMapped(Long accountId, EventResponse event) {
@@ -262,7 +262,7 @@ public class CalendarNotificationEvaluationService {
             return;
         }
 
-        notificationDispatcher.dispatch(
+        calendarNotificationService.dispatch(
                 accountId,
                 CalendarNotificationType.BRIEFING,
                 NotificationScheduleKey.briefing(targetDate),
