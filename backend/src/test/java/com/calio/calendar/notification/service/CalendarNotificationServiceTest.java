@@ -9,6 +9,11 @@ import static org.mockito.Mockito.when;
 
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.service.AccountQueryService;
+import com.calio.calendar.event.service.EventService;
+import com.calio.calendar.groupcalendar.service.GroupCalendarService;
+import com.calio.calendar.groupspace.service.GroupMembershipQueryService;
+import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingQueryService;
+import com.calio.calendar.integration.mapping.service.GoogleCalendarRecurrenceMappingQueryService;
 import com.calio.calendar.notification.client.ApnsClient;
 import com.calio.calendar.notification.client.ApnsSendResult;
 import com.calio.calendar.notification.client.ApnsSendResultType;
@@ -29,6 +34,21 @@ import tools.jackson.databind.ObjectMapper;
 
 @ExtendWith(MockitoExtension.class)
 class CalendarNotificationServiceTest {
+
+    @Mock
+    private EventService eventService;
+
+    @Mock
+    private GroupCalendarService groupCalendarService;
+
+    @Mock
+    private GroupMembershipQueryService groupMembershipQueryService;
+
+    @Mock
+    private GoogleCalendarEventMappingQueryService eventMappingQueryService;
+
+    @Mock
+    private GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService;
 
     @Mock
     private NotificationDispatchQueryService dispatchQueryService;
@@ -56,6 +76,11 @@ class CalendarNotificationServiceTest {
     @BeforeEach
     void setUp() {
         calendarNotificationService = new CalendarNotificationService(
+                eventService,
+                groupCalendarService,
+                groupMembershipQueryService,
+                eventMappingQueryService,
+                recurrenceMappingQueryService,
                 dispatchQueryService,
                 dispatchCommandService,
                 accountQueryService,

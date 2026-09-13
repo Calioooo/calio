@@ -2,8 +2,11 @@ package com.calio.calendar.notification.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -11,12 +14,14 @@ import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.domain.AccountNotificationSettings;
 import com.calio.calendar.account.domain.ImportantReminderOffset;
 import com.calio.calendar.account.domain.TimedReminderOffset;
+import com.calio.calendar.account.service.AccountQueryService;
 import com.calio.calendar.event.controller.dto.EventResponse;
 import com.calio.calendar.event.service.EventService;
 import com.calio.calendar.groupcalendar.service.GroupCalendarService;
 import com.calio.calendar.groupspace.service.GroupMembershipQueryService;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingQueryService;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarRecurrenceMappingQueryService;
+import com.calio.calendar.notification.client.ApnsClient;
 import com.calio.calendar.notification.domain.CalendarNotificationType;
 import com.calio.calendar.notification.domain.NotificationScheduleKey;
 import java.time.Instant;
@@ -31,9 +36,10 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
+import tools.jackson.databind.ObjectMapper;
 
 @ExtendWith(MockitoExtension.class)
-class CalendarNotificationEvaluationServiceTest {
+class CalendarNotificationDueTest {
 
     @Mock
     private EventService eventService;
@@ -51,34 +57,52 @@ class CalendarNotificationEvaluationServiceTest {
     private GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService;
 
     @Mock
-    private CalendarNotificationService calendarNotificationService;
+    private NotificationDispatchQueryService dispatchQueryService;
 
-    private CalendarNotificationEvaluationService evaluationService;
+    @Mock
+    private NotificationDispatchCommandService dispatchCommandService;
+
+    @Mock
+    private AccountQueryService accountQueryService;
+
+    @Mock
+    private IosPushDeviceService pushDeviceService;
+
+    @Mock
+    private ApnsClient apnsClient;
+
+    private CalendarNotificationService calendarNotificationService;
 
     @BeforeEach
     void setUp() {
-        evaluationService = new CalendarNotificationEvaluationService(
+        calendarNotificationService = spy(new CalendarNotificationService(
                 eventService,
                 groupCalendarService,
                 groupMembershipQueryService,
                 eventMappingQueryService,
                 recurrenceMappingQueryService,
-                calendarNotificationService
-        );
+                dispatchQueryService,
+                dispatchCommandService,
+                accountQueryService,
+                pushDeviceService,
+                apnsClient,
+                new ObjectMapper()
+        ));
         when(groupMembershipQueryService.listActiveMemberships(1L)).thenReturn(List.of());
     }
 
     @Test
     @DisplayName("시간 일정 알림의 targetDate는 일정의 IANA timezone 기준 날짜를 사용한다")
-    void givenTimedEventInAnotherTimeZone_whenEvaluate_thenUsesScheduleLocalTargetDate() {
+    void givenTimedEventInAnotherTimeZone_whenDispatchingDueNotifications_thenUsesScheduleLocalTargetDate() {
         // given
         Instant startAt = Instant.parse("2026-06-01T01:00:00Z");
         EventResponse event = timedEvent(startAt, "America/Los_Angeles");
         when(eventService.listEvents(eq(1L), any(), any())).thenReturn(List.of(event));
         when(eventMappingQueryService.hasExternalEventMapping(10L, 1L)).thenReturn(false);
+        stubDispatch();
 
         // when
-        evaluationService.evaluate(account(TimedReminderOffset.AT_START, false), startAt);
+        calendarNotificationService.dispatchDueNotifications(account(TimedReminderOffset.AT_START, false), startAt);
 
         // then
         ArgumentCaptor<LocalDate> targetDateCaptor = ArgumentCaptor.forClass(LocalDate.class);
@@ -97,7 +121,7 @@ class CalendarNotificationEvaluationServiceTest {
 
     @Test
     @DisplayName("Google 연동 일정은 due minute에도 서버 알림을 만들지 않는다")
-    void givenGoogleMappedEvent_whenEvaluate_thenSkipsNotification() {
+    void givenGoogleMappedEvent_whenDispatchingDueNotifications_thenSkipsNotification() {
         // given
         Instant startAt = Instant.parse("2026-06-01T01:00:00Z");
         EventResponse event = timedEvent(startAt, "UTC");
@@ -105,7 +129,7 @@ class CalendarNotificationEvaluationServiceTest {
         when(eventMappingQueryService.hasExternalEventMapping(10L, 1L)).thenReturn(true);
 
         // when
-        evaluationService.evaluate(account(TimedReminderOffset.AT_START, false), startAt);
+        calendarNotificationService.dispatchDueNotifications(account(TimedReminderOffset.AT_START, false), startAt);
 
         // then
         verify(calendarNotificationService, never()).dispatch(any(), any(), any(), any(), any(), any(), any());
@@ -119,7 +143,7 @@ class CalendarNotificationEvaluationServiceTest {
         when(eventService.listEvents(eq(1L), any(), any())).thenReturn(List.of());
 
         // when
-        evaluationService.evaluate(account(TimedReminderOffset.MINUTES_10, true), briefingTime);
+        calendarNotificationService.dispatchDueNotifications(account(TimedReminderOffset.MINUTES_10, true), briefingTime);
 
         // then
         verify(calendarNotificationService, never()).dispatch(any(), any(), any(), any(), any(), any(), any());
@@ -127,7 +151,7 @@ class CalendarNotificationEvaluationServiceTest {
 
     @Test
     @DisplayName("브리핑은 Seoul 기준 당일의 남은 일정만 집계한다")
-    void givenSchedulesOutsideBriefingDate_whenEvaluate_thenCountsOnlyTargetDateSchedules() {
+    void givenSchedulesOutsideBriefingDate_whenDispatchingDueNotifications_thenCountsOnlyTargetDateSchedules() {
         // given
         Instant briefingTime = Instant.parse("2026-06-01T23:00:00Z");
         Instant dayStart = Instant.parse("2026-06-01T15:00:00Z");
@@ -137,9 +161,10 @@ class CalendarNotificationEvaluationServiceTest {
         when(eventService.listEvents(eq(1L), any(), any())).thenReturn(List.of(targetDateEvent, nextDateEvent));
         when(eventService.listEvents(1L, dayStart, dayEnd)).thenReturn(List.of(targetDateEvent));
         when(eventMappingQueryService.hasExternalEventMapping(10L, 1L)).thenReturn(false);
+        stubDispatch();
 
         // when
-        evaluationService.evaluate(account(TimedReminderOffset.MINUTES_10, true), briefingTime);
+        calendarNotificationService.dispatchDueNotifications(account(TimedReminderOffset.MINUTES_10, true), briefingTime);
 
         // then
         verify(calendarNotificationService).dispatch(
@@ -165,6 +190,11 @@ class CalendarNotificationEvaluationServiceTest {
                 LocalTime.of(8, 0)
         ));
         return account;
+    }
+
+    private void stubDispatch() {
+        doNothing().when(calendarNotificationService)
+                .dispatch(anyLong(), any(), any(), any(), any(), any(), any());
     }
 
     private EventResponse timedEvent(Instant startAt, String timeZone) {
