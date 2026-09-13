@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class AccountQueryService {
 
     private final AccountRepository accountRepository;
+
     public AccountQueryService(AccountRepository accountRepository) {
         this.accountRepository = accountRepository;
     }
@@ -26,7 +27,7 @@ public class AccountQueryService {
         return accountRepository.existsById(accountId);
     }
 
-    public List<Account> listAccounts() {
-        return accountRepository.findAll();
+    public List<Account> listNotificationEnabledAccounts() {
+        return accountRepository.findByNotificationSettingsCalendarNotificationsEnabledTrue();
     }
 }

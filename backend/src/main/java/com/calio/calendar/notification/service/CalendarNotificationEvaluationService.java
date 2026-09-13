@@ -1,5 +1,9 @@
 package com.calio.calendar.notification.service;
 
+import com.calio.calendar.account.domain.Account;
+import com.calio.calendar.account.domain.AccountNotificationSettings;
+import com.calio.calendar.account.domain.ImportantReminderOffset;
+import com.calio.calendar.account.domain.TimedReminderOffset;
 import com.calio.calendar.event.controller.dto.EventResponse;
 import com.calio.calendar.event.service.EventService;
 import com.calio.calendar.groupcalendar.controller.dto.GroupCalendarItemResponse;
@@ -8,11 +12,8 @@ import com.calio.calendar.groupspace.domain.GroupMember;
 import com.calio.calendar.groupspace.service.GroupMembershipQueryService;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingQueryService;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarRecurrenceMappingQueryService;
-import com.calio.calendar.notification.domain.AccountNotificationSettings;
 import com.calio.calendar.notification.domain.CalendarNotificationType;
-import com.calio.calendar.notification.domain.ImportantReminderOffset;
 import com.calio.calendar.notification.domain.NotificationScheduleKey;
-import com.calio.calendar.notification.domain.TimedReminderOffset;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -51,8 +52,9 @@ public class CalendarNotificationEvaluationService {
     }
 
     @Transactional
-    public void evaluate(AccountNotificationSettings settings, Instant now) {
-        Long accountId = settings.getAccountId();
+    public void evaluate(Account account, Instant now) {
+        Long accountId = account.getId();
+        AccountNotificationSettings settings = account.getNotificationSettings();
         Instant dueFrom = now.truncatedTo(ChronoUnit.MINUTES).minus(5, ChronoUnit.MINUTES);
         Instant dueTo = now.truncatedTo(ChronoUnit.MINUTES);
         Instant queryFrom = dueFrom.minus(1, ChronoUnit.DAYS);

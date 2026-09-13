@@ -1,4 +1,4 @@
-package com.calio.calendar.notification.domain;
+package com.calio.calendar.account.domain;
 
 public enum TimedReminderOffset {
     NONE,

@@ -1,9 +1,10 @@
 package com.calio.calendar.notification.service;
 
+import com.calio.calendar.account.domain.Account;
+import com.calio.calendar.account.domain.AccountNotificationSettings;
+import com.calio.calendar.account.service.AccountCommandService;
 import com.calio.calendar.account.service.AccountQueryService;
 import com.calio.calendar.notification.controller.dto.UpdateNotificationSettingsRequest;
-import com.calio.calendar.notification.domain.AccountNotificationSettings;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -12,38 +13,33 @@ import org.springframework.transaction.annotation.Transactional;
 public class AccountNotificationSettingsService {
 
     private final AccountQueryService accountQueryService;
-    private final AccountNotificationSettingsQueryService settingsQueryService;
-    private final AccountNotificationSettingsCommandService settingsCommandService;
+    private final AccountCommandService accountCommandService;
 
     public AccountNotificationSettingsService(
             AccountQueryService accountQueryService,
-            AccountNotificationSettingsQueryService settingsQueryService,
-            AccountNotificationSettingsCommandService settingsCommandService
+            AccountCommandService accountCommandService
     ) {
         this.accountQueryService = accountQueryService;
-        this.settingsQueryService = settingsQueryService;
-        this.settingsCommandService = settingsCommandService;
+        this.accountCommandService = accountCommandService;
     }
 
     public AccountNotificationSettings get(Long accountId) {
-        return settingsQueryService.getSettingsIfExists(accountId)
-                .orElseGet(() -> createDefaultSettings(accountId));
+        return accountQueryService.getAccount(accountId).getNotificationSettings();
     }
 
     public AccountNotificationSettings update(
             Long accountId,
             UpdateNotificationSettingsRequest request
     ) {
-        AccountNotificationSettings settings = get(accountId);
-        return settingsCommandService.update(settings, request);
-    }
-
-    private AccountNotificationSettings createDefaultSettings(Long accountId) {
-        try {
-            settingsCommandService.createDefaultSettings(accountQueryService.getAccount(accountId));
-        } catch (DataIntegrityViolationException ignored) {
-        }
-        return settingsQueryService.getSettingsIfExists(accountId)
-                .orElseThrow(() -> new IllegalStateException("Notification settings creation failed."));
+        Account account = accountQueryService.getAccount(accountId);
+        return accountCommandService.updateNotificationSettings(
+                account,
+                request.calendarNotificationsEnabled(),
+                request.timedReminderOffset(),
+                request.importantReminderOffset(),
+                request.allDayReminderTime(),
+                request.dailyBriefingEnabled(),
+                request.dailyBriefingTime()
+        );
     }
 }
