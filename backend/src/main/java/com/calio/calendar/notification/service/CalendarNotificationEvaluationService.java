@@ -96,7 +96,7 @@ public class CalendarNotificationEvaluationService {
         if (event.allDay() || event.isRecurrenceOccurrence() || !event.importantEvent()) {
             return;
         }
-        ImportantReminderOffset reminderOffset = settings.getImportantReminderOffset();
+        ImportantReminderOffset reminderOffset = settings.importantReminderOffset();
         if (reminderOffset.isDisabled()) {
             return;
         }
@@ -150,7 +150,7 @@ public class CalendarNotificationEvaluationService {
     ) {
         if (allDay) {
             Instant dueAt = startAt.atZone(POLICY_ZONE).toLocalDate()
-                    .atTime(settings.getAllDayReminderTime()).atZone(POLICY_ZONE).toInstant();
+                    .atTime(settings.allDayReminderTime()).atZone(POLICY_ZONE).toInstant();
             dispatchIfDue(
                     accountId,
                     CalendarNotificationType.ALL_DAY,
@@ -165,7 +165,7 @@ public class CalendarNotificationEvaluationService {
             );
             return;
         }
-        TimedReminderOffset reminderOffset = settings.getTimedReminderOffset();
+        TimedReminderOffset reminderOffset = settings.timedReminderOffset();
         if (reminderOffset.isDisabled()) {
             return;
         }
@@ -242,12 +242,12 @@ public class CalendarNotificationEvaluationService {
             Instant dueFrom,
             Instant dueTo
     ) {
-        if (!settings.isDailyBriefingEnabled()) {
+        if (!settings.dailyBriefingEnabled()) {
             return;
         }
 
         LocalDate targetDate = now.atZone(POLICY_ZONE).toLocalDate();
-        Instant dueAt = targetDate.atTime(settings.getDailyBriefingTime())
+        Instant dueAt = targetDate.atTime(settings.dailyBriefingTime())
                 .atZone(POLICY_ZONE)
                 .toInstant();
         if (dueAt.isBefore(dueFrom) || dueAt.isAfter(dueTo)) {

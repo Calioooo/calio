@@ -1,13 +1,14 @@
 package com.calio.calendar.notification.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.assertj.core.api.Assertions.assertThat;
 
 import com.calio.calendar.account.domain.Account;
+import com.calio.calendar.account.domain.AccountNotificationSettings;
 import com.calio.calendar.account.domain.ImportantReminderOffset;
 import com.calio.calendar.account.domain.TimedReminderOffset;
 import com.calio.calendar.event.controller.dto.EventResponse;
@@ -155,14 +156,14 @@ class CalendarNotificationEvaluationServiceTest {
     private Account account(TimedReminderOffset timedReminderOffset, boolean briefingEnabled) {
         Account account = new Account();
         ReflectionTestUtils.setField(account, "id", 1L);
-        account.updateNotificationSettings(
+        account.changeNotificationSettings(new AccountNotificationSettings(
                 true,
                 timedReminderOffset,
                 ImportantReminderOffset.MINUTES_120,
                 LocalTime.of(9, 0),
                 briefingEnabled,
                 LocalTime.of(8, 0)
-        );
+        ));
         return account;
     }
 

@@ -18,12 +18,12 @@ class AccountNotificationSettingsTest {
         AccountNotificationSettings settings = account.getNotificationSettings();
 
         // then
-        assertThat(settings.isCalendarNotificationsEnabled()).isTrue();
-        assertThat(settings.getTimedReminderOffset()).isEqualTo(TimedReminderOffset.MINUTES_10);
-        assertThat(settings.getImportantReminderOffset()).isEqualTo(ImportantReminderOffset.MINUTES_120);
-        assertThat(settings.getAllDayReminderTime()).isEqualTo(LocalTime.of(9, 0));
-        assertThat(settings.isDailyBriefingEnabled()).isFalse();
-        assertThat(settings.getDailyBriefingTime()).isEqualTo(LocalTime.of(8, 0));
+        assertThat(settings.calendarNotificationsEnabled()).isTrue();
+        assertThat(settings.timedReminderOffset()).isEqualTo(TimedReminderOffset.MINUTES_10);
+        assertThat(settings.importantReminderOffset()).isEqualTo(ImportantReminderOffset.MINUTES_120);
+        assertThat(settings.allDayReminderTime()).isEqualTo(LocalTime.of(9, 0));
+        assertThat(settings.dailyBriefingEnabled()).isFalse();
+        assertThat(settings.dailyBriefingTime()).isEqualTo(LocalTime.of(8, 0));
     }
 
     @Test
@@ -34,23 +34,23 @@ class AccountNotificationSettingsTest {
         AccountNotificationSettings previousSettings = account.getNotificationSettings();
 
         // when
-        account.updateNotificationSettings(
+        account.changeNotificationSettings(new AccountNotificationSettings(
                 false,
                 TimedReminderOffset.NONE,
                 ImportantReminderOffset.MINUTES_60,
                 LocalTime.of(10, 0),
                 true,
                 LocalTime.of(7, 30)
-        );
+        ));
 
         // then
         AccountNotificationSettings updatedSettings = account.getNotificationSettings();
         assertThat(updatedSettings).isNotSameAs(previousSettings);
-        assertThat(updatedSettings.isCalendarNotificationsEnabled()).isFalse();
-        assertThat(updatedSettings.getTimedReminderOffset()).isEqualTo(TimedReminderOffset.NONE);
-        assertThat(updatedSettings.getImportantReminderOffset()).isEqualTo(ImportantReminderOffset.MINUTES_60);
-        assertThat(updatedSettings.getAllDayReminderTime()).isEqualTo(LocalTime.of(10, 0));
-        assertThat(updatedSettings.isDailyBriefingEnabled()).isTrue();
-        assertThat(updatedSettings.getDailyBriefingTime()).isEqualTo(LocalTime.of(7, 30));
+        assertThat(updatedSettings.calendarNotificationsEnabled()).isFalse();
+        assertThat(updatedSettings.timedReminderOffset()).isEqualTo(TimedReminderOffset.NONE);
+        assertThat(updatedSettings.importantReminderOffset()).isEqualTo(ImportantReminderOffset.MINUTES_60);
+        assertThat(updatedSettings.allDayReminderTime()).isEqualTo(LocalTime.of(10, 0));
+        assertThat(updatedSettings.dailyBriefingEnabled()).isTrue();
+        assertThat(updatedSettings.dailyBriefingTime()).isEqualTo(LocalTime.of(7, 30));
     }
 }

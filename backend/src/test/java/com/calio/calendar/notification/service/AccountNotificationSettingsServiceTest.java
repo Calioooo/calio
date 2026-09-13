@@ -47,8 +47,8 @@ class AccountNotificationSettingsServiceTest {
 
         // then
         assertThat(settings).isSameAs(account.getNotificationSettings());
-        assertThat(settings.getTimedReminderOffset()).isEqualTo(TimedReminderOffset.MINUTES_10);
-        assertThat(settings.getImportantReminderOffset()).isEqualTo(ImportantReminderOffset.MINUTES_120);
+        assertThat(settings.timedReminderOffset()).isEqualTo(TimedReminderOffset.MINUTES_10);
+        assertThat(settings.importantReminderOffset()).isEqualTo(ImportantReminderOffset.MINUTES_120);
     }
 
     @Test
@@ -64,25 +64,7 @@ class AccountNotificationSettingsServiceTest {
                 false,
                 LocalTime.of(8, 0)
         );
-        AccountNotificationSettings expected = account.getNotificationSettings();
-        when(accountQueryService.getAccount(1L)).thenReturn(account);
-        when(accountCommandService.updateNotificationSettings(
-                account,
-                true,
-                TimedReminderOffset.NONE,
-                ImportantReminderOffset.MINUTES_60,
-                LocalTime.of(9, 0),
-                false,
-                LocalTime.of(8, 0)
-        )).thenReturn(expected);
-
-        // when
-        AccountNotificationSettings updated = settingsService.update(1L, request);
-
-        // then
-        assertThat(updated).isSameAs(expected);
-        verify(accountCommandService).updateNotificationSettings(
-                account,
+        AccountNotificationSettings expected = new AccountNotificationSettings(
                 true,
                 TimedReminderOffset.NONE,
                 ImportantReminderOffset.MINUTES_60,
@@ -90,5 +72,14 @@ class AccountNotificationSettingsServiceTest {
                 false,
                 LocalTime.of(8, 0)
         );
+        when(accountQueryService.getAccount(1L)).thenReturn(account);
+        when(accountCommandService.changeNotificationSettings(account, expected)).thenReturn(expected);
+
+        // when
+        AccountNotificationSettings updated = settingsService.update(1L, request);
+
+        // then
+        assertThat(updated).isSameAs(expected);
+        verify(accountCommandService).changeNotificationSettings(account, expected);
     }
 }
