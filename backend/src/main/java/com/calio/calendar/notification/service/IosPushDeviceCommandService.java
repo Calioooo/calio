@@ -10,28 +10,32 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class IosPushDeviceCommandService {
 
-  private final IosPushDeviceRepository pushDeviceRepository;
+    private final IosPushDeviceRepository pushDeviceRepository;
 
-  public IosPushDeviceCommandService(IosPushDeviceRepository pushDeviceRepository) {
-    this.pushDeviceRepository = pushDeviceRepository;
-  }
+    public IosPushDeviceCommandService(IosPushDeviceRepository pushDeviceRepository) {
+        this.pushDeviceRepository = pushDeviceRepository;
+    }
 
-  public IosPushDevice create(IosPushDevice pushDevice) {
-    return pushDeviceRepository.saveAndFlush(pushDevice);
-  }
+    public IosPushDevice create(IosPushDevice pushDevice) {
+        return pushDeviceRepository.saveAndFlush(pushDevice);
+    }
 
-  public void change(IosPushDevice pushDevice) {
-    pushDeviceRepository.saveAndFlush(pushDevice);
-  }
+    public void refresh(
+            IosPushDevice pushDevice,
+            String apnsToken,
+            String environment
+    ) {
+        pushDevice.refresh(apnsToken, environment);
+        pushDeviceRepository.saveAndFlush(pushDevice);
+    }
 
-  public void deactivate(IosPushDevice pushDevice, Instant now) {
-    pushDevice.deactivate(now);
-    pushDeviceRepository.saveAndFlush(pushDevice);
-  }
+    public void deactivate(IosPushDevice pushDevice, Instant now) {
+        pushDevice.deactivate(now);
+        pushDeviceRepository.saveAndFlush(pushDevice);
+    }
 
-  public void deactivateAndReleaseToken(IosPushDevice pushDevice, Instant now) {
-    pushDevice.deactivate(now);
-    pushDevice.clearApnsToken();
-    pushDeviceRepository.saveAndFlush(pushDevice);
-  }
+    public void deactivateAndReleaseToken(IosPushDevice pushDevice, Instant now) {
+        pushDevice.deactivateAndReleaseToken(now);
+        pushDeviceRepository.saveAndFlush(pushDevice);
+    }
 }

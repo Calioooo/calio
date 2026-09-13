@@ -65,8 +65,8 @@ class AccountNotificationSettingsServiceTest {
     }
 
     @Test
-    @DisplayName("시간 일정과 중요 일정 offset은 서로 독립적으로 갱신한다")
-    void givenIndependentReminderOffsets_whenUpdate_thenKeepsEachConfiguredValue() {
+    @DisplayName("알림 설정 변경을 command service에 위임한다")
+    void givenNotificationSettingsUpdate_whenUpdate_thenDelegatesToCommandService() {
         // given
         AccountNotificationSettings settings = new AccountNotificationSettings(new Account());
         when(settingsQueryService.getSettingsIfExists(1L)).thenReturn(Optional.of(settings));
@@ -78,12 +78,13 @@ class AccountNotificationSettingsServiceTest {
                 false,
                 LocalTime.of(8, 0)
         );
+        when(settingsCommandService.update(settings, request)).thenReturn(settings);
 
         // when
         AccountNotificationSettings updated = settingsService.update(1L, request);
 
         // then
-        assertThat(updated.getTimedReminderOffset()).isEqualTo(TimedReminderOffset.NONE);
-        assertThat(updated.getImportantReminderOffset()).isEqualTo(ImportantReminderOffset.MINUTES_60);
+        assertThat(updated).isSameAs(settings);
+        verify(settingsCommandService).update(settings, request);
     }
 }

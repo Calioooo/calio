@@ -15,81 +15,77 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class IosPushDeviceService {
 
-  private final AccountQueryService accountQueryService;
-  private final ApnsProperties apnsProperties;
-  private final IosPushDeviceQueryService pushDeviceQueryService;
-  private final IosPushDeviceCommandService pushDeviceCommandService;
+    private final AccountQueryService accountQueryService;
+    private final ApnsProperties apnsProperties;
+    private final IosPushDeviceQueryService pushDeviceQueryService;
+    private final IosPushDeviceCommandService pushDeviceCommandService;
 
-  public IosPushDeviceService(
-      AccountQueryService accountQueryService,
-      ApnsProperties apnsProperties,
-      IosPushDeviceQueryService pushDeviceQueryService,
-      IosPushDeviceCommandService pushDeviceCommandService) {
-    this.accountQueryService = accountQueryService;
-    this.apnsProperties = apnsProperties;
-    this.pushDeviceQueryService = pushDeviceQueryService;
-    this.pushDeviceCommandService = pushDeviceCommandService;
-  }
+    public IosPushDeviceService(
+            AccountQueryService accountQueryService,
+            ApnsProperties apnsProperties,
+            IosPushDeviceQueryService pushDeviceQueryService,
+            IosPushDeviceCommandService pushDeviceCommandService
+    ) {
+        this.accountQueryService = accountQueryService;
+        this.apnsProperties = apnsProperties;
+        this.pushDeviceQueryService = pushDeviceQueryService;
+        this.pushDeviceCommandService = pushDeviceCommandService;
+    }
 
-  public void register(Long accountId, String installationId, String apnsToken) {
-    deactivatePushDeviceOwnedByAnotherInstallation(accountId, installationId, apnsToken);
+    public void register(
+            Long accountId,
+            String installationId,
+            String apnsToken
+    ) {
+        deactivatePushDeviceOwnedByAnotherInstallation(accountId, installationId, apnsToken);
 
-    IosPushDevice pushDevice =
-        pushDeviceQueryService
-            .getPushDeviceIfExists(accountId, installationId)
-            .orElseGet(
-                () ->
-                    new IosPushDevice(
+        IosPushDevice pushDevice = pushDeviceQueryService
+                .getPushDeviceIfExists(accountId, installationId)
+                .orElseGet(() -> new IosPushDevice(
                         accountQueryService.getAccount(accountId),
                         installationId,
                         apnsToken,
-                        apnsProperties.environment().value()));
-    refreshPushDevice(pushDevice, apnsToken);
-  }
-
-  public void deactivate(Long accountId, String installationId) {
-    pushDeviceQueryService
-        .getPushDeviceIfExists(accountId, installationId)
-        .ifPresent(pushDevice -> pushDeviceCommandService.deactivate(pushDevice, Instant.now()));
-  }
-
-  @Transactional(readOnly = true)
-  public List<IosPushDevice> listEligiblePushDevices(Long accountId) {
-    return pushDeviceQueryService.listEligiblePushDevices(accountId);
-  }
-
-  public void deactivateInvalidPushDevice(IosPushDevice pushDevice) {
-    pushDeviceCommandService.deactivate(pushDevice, Instant.now());
-  }
-
-  private void deactivatePushDeviceOwnedByAnotherInstallation(
-      Long accountId, String installationId, String apnsToken) {
-    pushDeviceQueryService
-        .getPushDeviceWithTokenIfExists(apnsToken)
-        .filter(pushDevice -> !isSameInstallation(pushDevice, accountId, installationId))
-        .ifPresent(
-            pushDevice ->
-                pushDeviceCommandService.deactivateAndReleaseToken(pushDevice, Instant.now()));
-  }
-
-  private void refreshPushDevice(IosPushDevice pushDevice, String apnsToken) {
-    pushDevice.refresh(apnsToken, apnsProperties.environment().value());
-    try {
-      if (pushDevice.getId() == null) {
-        pushDeviceCommandService.create(pushDevice);
-        return;
-      }
-      pushDeviceCommandService.change(pushDevice);
-    } catch (DataIntegrityViolationException exception) {
-      throw new CalioException(ErrorCode.NOTIFICATION_ENDPOINT_TOKEN_CONFLICT, exception);
+                        apnsProperties.environment()
+                ));
+        savePushDevice(pushDevice, apnsToken);
     }
-  }
 
-  private boolean isSameInstallation(
-      IosPushDevice pushDevice, Long accountId, String installationId) {
-    return pushDeviceQueryService
-        .getPushDeviceIfExists(accountId, installationId)
-        .map(currentPushDevice -> currentPushDevice.getId().equals(pushDevice.getId()))
-        .orElse(false);
-  }
+    public void deactivate(Long accountId, String installationId) {
+        pushDeviceQueryService.getPushDeviceIfExists(accountId, installationId)
+                .ifPresent(pushDevice -> pushDeviceCommandService.deactivate(pushDevice, Instant.now()));
+    }
+
+    @Transactional(readOnly = true)
+    public List<IosPushDevice> listEligiblePushDevices(Long accountId) {
+        return pushDeviceQueryService.listEligiblePushDevices(accountId);
+    }
+
+    public void deactivateInvalidPushDevice(IosPushDevice pushDevice) {
+        pushDeviceCommandService.deactivate(pushDevice, Instant.now());
+    }
+
+    private void deactivatePushDeviceOwnedByAnotherInstallation(
+            Long accountId,
+            String installationId,
+            String apnsToken
+    ) {
+        pushDeviceQueryService.getPushDeviceWithTokenIfExists(apnsToken)
+                .filter(pushDevice -> !pushDevice.belongsToInstallation(accountId, installationId))
+                .ifPresent(pushDevice -> pushDeviceCommandService.deactivateAndReleaseToken(pushDevice, Instant.now()));
+    }
+
+    private void savePushDevice(
+            IosPushDevice pushDevice,
+            String apnsToken
+    ) {
+        try {
+            if (pushDevice.getId() == null) {
+                pushDeviceCommandService.create(pushDevice);
+                return;
+            }
+            pushDeviceCommandService.refresh(pushDevice, apnsToken, apnsProperties.environment());
+        } catch (DataIntegrityViolationException exception) {
+            throw new CalioException(ErrorCode.NOTIFICATION_ENDPOINT_TOKEN_CONFLICT, exception);
+        }
+    }
 }
