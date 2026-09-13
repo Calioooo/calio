@@ -101,18 +101,20 @@ class NotificationControllerIntegrationTest {
                                 """))
                 .andExpect(status().isNoContent());
 
-        assertThat(endpointRepository.findByApnsToken("device-token"))
+        Long pushDeviceId = endpointRepository.findByApnsToken("device-token")
                 .get()
-                .extracting(endpoint -> endpoint.isEligible())
-                .isEqualTo(true);
+                .getId();
 
         mockMvc.perform(delete("/api/notification-endpoints/ios/{installationId}", "iphone-installation"))
                 .andExpect(status().isNoContent());
 
-        assertThat(endpointRepository.findByApnsToken("device-token"))
+        assertThat(endpointRepository.findByApnsToken("device-token")).isEmpty();
+        assertThat(endpointRepository.findById(pushDeviceId))
                 .get()
-                .extracting(endpoint -> endpoint.isEligible())
-                .isEqualTo(false);
+                .satisfies(endpoint -> {
+                    assertThat(endpoint.isEligible()).isFalse();
+                    assertThat(endpoint.getApnsToken()).isNull();
+                });
     }
 
     @Test
