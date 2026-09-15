@@ -3,6 +3,7 @@ package com.calio.calendar.groupspace.repository;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.calio.calendar.groupspace.domain.GroupMember;
+import com.calio.calendar.common.testsupport.SharedIntegrationDatabase;
 import com.calio.calendar.groupspace.domain.GroupMemberStatus;
 import com.calio.calendar.groupspace.domain.GroupSpace;
 import jakarta.persistence.EntityManager;
@@ -16,13 +17,14 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest(properties = {
-        "spring.datasource.url=jdbc:h2:mem:group-member-repository-test;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE",
+        "spring.datasource.url=jdbc:h2:mem:calendar-shared-integration-test;MODE=MySQL;DB_CLOSE_ON_EXIT=FALSE",
         "spring.datasource.driver-class-name=org.h2.Driver",
         "spring.datasource.username=sa",
         "spring.datasource.password=",
         "spring.jpa.hibernate.ddl-auto=create-drop"
 })
 @Transactional
+@SharedIntegrationDatabase
 class GroupMemberRepositoryTest {
 
     @Autowired
