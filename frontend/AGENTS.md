@@ -6,6 +6,15 @@
 - 화면 표현, 사용자 입력, 상태 표시, backend 응답 소비를 명확히 분리한다.
 - backend가 API 계약과 비즈니스 의미의 source of truth다.
 
+## 상세 개발 지침
+
+Frontend 코드를 변경하기 전에 변경 내용과 관련된 문서를 확인한다.
+
+- 일반적인 Swift 및 iOS 구현: `docs/development/frontend/conventions.md`
+- 화면 구조, 상태 관리, 계층 또는 의존성: `docs/development/frontend/architecture.md`
+
+두 범위에 모두 해당하는 변경이면 관련 문서를 모두 확인한다.
+
 ## 구조 원칙
 
 - 패키지는 전역 레이어 기준으로 나눈다.
