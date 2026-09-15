@@ -1,0 +1,18 @@
+included:
+  - Calio
+
+only_rules:
+  - assertion_message
+  - duplicate_conditions
+  - duplicated_key_in_dictionary_literal
+  - empty_xctest_method
+  - fatal_error_message
+  - force_cast
+  - force_try
+  - identical_operands
+  - implicitly_unwrapped_optional
+  - invisible_character
+  - private_unit_test
+  - private_swiftui_state
+  - unhandled_throwing_task
+  - unowned_variable_capture

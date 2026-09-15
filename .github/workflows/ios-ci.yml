@@ -13,9 +13,22 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
 
     - name: Show Xcode version
-      run: xcodebuild -version
+      run: |
+        xcodebuild -version
+        xcrun swift-format --version
+
+    - name: Check Swift formatting
+      run: python3 scripts/format-ci.py frontend
+
+    - name: Install SwiftLint
+      run: brew install swiftlint
+
+    - name: Lint Swift
+      run: swiftlint lint --strict --config frontend/.swiftlint.yml
 
     - name: Select iOS simulator
       id: simulator
