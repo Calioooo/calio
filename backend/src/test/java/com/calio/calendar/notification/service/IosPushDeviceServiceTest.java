@@ -3,21 +3,23 @@ package com.calio.calendar.notification.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.calio.calendar.account.domain.Account;
-import com.calio.calendar.account.service.AccountQueryService;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.notification.domain.IosPushDevice;
+import com.calio.calendar.notification.repository.IosPushDeviceRepository;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -25,110 +27,90 @@ import org.springframework.dao.DataIntegrityViolationException;
 @ExtendWith(MockitoExtension.class)
 class IosPushDeviceServiceTest {
 
-    @Mock
-    private AccountQueryService accountQueryService;
+  private static final Instant NOW = Instant.parse("2026-09-17T00:00:00Z");
 
-    @Mock
-    private IosPushDevice previousPushDevice;
+  @Mock private IosPushDeviceRepository pushDeviceRepository;
 
-    @Mock
-    private IosPushDeviceQueryService pushDeviceQueryService;
+  private IosPushDeviceService pushDeviceService;
 
-    @Mock
-    private IosPushDeviceCommandService pushDeviceCommandService;
+  @BeforeEach
+  void setUp() {
+    pushDeviceService =
+        new IosPushDeviceService(pushDeviceRepository, Clock.fixed(NOW, ZoneOffset.UTC));
+  }
 
-    private IosPushDeviceService pushDeviceService;
+  @Test
+  @DisplayName("다른 설치가 가진 토큰을 등록하면 이전 푸시 기기를 비활성화하고 새 설치에 토큰을 연결한다")
+  void givenTokenOwnedByAnotherInstallation_whenRegister_thenTransfersTokenOwnership() {
+    // given
+    IosPushDevice previousPushDevice = new IosPushDevice(2L, "previous-installation", "token");
+    when(pushDeviceRepository.lockDeviceWithToken("token"))
+        .thenReturn(Optional.of(previousPushDevice));
+    when(pushDeviceRepository.findByAccountIdAndInstallationId(1L, "installation"))
+        .thenReturn(Optional.empty());
 
-    @BeforeEach
-    void setUp() {
-        pushDeviceService = new IosPushDeviceService(
-                accountQueryService,
-                pushDeviceQueryService,
-                pushDeviceCommandService
-        );
-    }
+    // when
+    pushDeviceService.register(1L, "installation", "token");
 
-    @Test
-    @DisplayName("다른 설치가 가진 토큰을 등록하면 이전 endpoint를 비활성화하고 토큰을 비운다")
-    void givenTokenOwnedByAnotherInstallation_whenRegister_thenRetiresPreviousToken() {
-        // given
-        when(pushDeviceQueryService.getPushDeviceWithTokenIfExists("token")).thenReturn(Optional.of(previousPushDevice));
-        when(pushDeviceQueryService.getPushDeviceIfExists(1L, "installation"))
-                .thenReturn(Optional.empty());
-        when(accountQueryService.getAccount(1L)).thenReturn(new Account());
+    // then
+    assertThat(previousPushDevice.isEligible()).isFalse();
+    assertThat(previousPushDevice.getApnsToken()).isNull();
+    ArgumentCaptor<IosPushDevice> deviceCaptor = ArgumentCaptor.forClass(IosPushDevice.class);
+    verify(pushDeviceRepository, times(2)).saveAndFlush(deviceCaptor.capture());
+    IosPushDevice registeredPushDevice = deviceCaptor.getAllValues().get(1);
+    assertThat(registeredPushDevice.isEligible()).isTrue();
+    assertThat(registeredPushDevice.getApnsToken()).isEqualTo("token");
+  }
 
-        // when
-        pushDeviceService.register(
-                1L,
-                "installation",
-                "token"
-        );
+  @Test
+  @DisplayName("등록된 설치를 해제하면 푸시 기기가 토큰을 반납하고 비활성화된다")
+  void givenRegisteredPushDevice_whenDeactivate_thenReleasesToken() {
+    // given
+    IosPushDevice pushDevice = new IosPushDevice(1L, "installation", "token");
+    when(pushDeviceRepository.findByAccountIdAndInstallationId(1L, "installation"))
+        .thenReturn(Optional.of(pushDevice));
 
-        // then
-        verify(pushDeviceCommandService).deactivate(eq(previousPushDevice), any());
-        verify(pushDeviceCommandService).create(any(IosPushDevice.class));
-    }
+    // when
+    pushDeviceService.deactivate(1L, "installation");
 
-    @Test
-    @DisplayName("같은 설치본이 기존 APNs 토큰을 다시 등록하면 기기를 비활성화하지 않는다")
-    void givenTokenOwnedBySameInstallation_whenRegister_thenKeepsPushDeviceActive() {
-        // given
-        when(pushDeviceQueryService.getPushDeviceWithTokenIfExists("token"))
-                .thenReturn(Optional.of(previousPushDevice));
-        when(previousPushDevice.belongsToInstallation(1L, "installation")).thenReturn(true);
-        when(pushDeviceQueryService.getPushDeviceIfExists(1L, "installation"))
-                .thenReturn(Optional.of(previousPushDevice));
-        when(previousPushDevice.getId()).thenReturn(1L);
+    // then
+    assertThat(pushDevice.isEligible()).isFalse();
+    assertThat(pushDevice.getApnsToken()).isNull();
+    verify(pushDeviceRepository).saveAndFlush(pushDevice);
+  }
 
-        // when
-        pushDeviceService.register(1L, "installation", "token");
+  @Test
+  @DisplayName("APNs가 무효로 판정한 푸시 기기는 토큰을 반납하고 비활성화된다")
+  void givenInvalidPushDevice_whenDeactivate_thenReleasesToken() {
+    // given
+    IosPushDevice pushDevice = new IosPushDevice(1L, "installation", "token");
+    when(pushDeviceRepository.findById(10L)).thenReturn(Optional.of(pushDevice));
 
-        // then
-        verify(pushDeviceCommandService, never()).deactivate(any(), any());
-        verify(pushDeviceCommandService).refresh(previousPushDevice, "token");
-    }
+    // when
+    pushDeviceService.deactivateInvalidPushDevice(10L);
 
-    @Test
-    @DisplayName("설치본의 푸시 기기를 비활성화하면 command service에 상태 전이를 위임한다")
-    void givenRegisteredPushDevice_whenDeactivate_thenDelegatesStateTransitionToCommandService() {
-        // given
-        when(pushDeviceQueryService.getPushDeviceIfExists(1L, "installation"))
-                .thenReturn(Optional.of(previousPushDevice));
+    // then
+    assertThat(pushDevice.isEligible()).isFalse();
+    assertThat(pushDevice.getApnsToken()).isNull();
+    verify(pushDeviceRepository).saveAndFlush(pushDevice);
+  }
 
-        // when
-        pushDeviceService.deactivate(1L, "installation");
+  @Test
+  @DisplayName("동시 등록으로 APNs 토큰 소유권이 충돌하면 명시적인 conflict 오류를 반환한다")
+  void givenConcurrentTokenRegistration_whenRegister_thenThrowsTokenConflict() {
+    // given
+    when(pushDeviceRepository.lockDeviceWithToken("token")).thenReturn(Optional.empty());
+    when(pushDeviceRepository.findByAccountIdAndInstallationId(1L, "installation"))
+        .thenReturn(Optional.empty());
+    when(pushDeviceRepository.saveAndFlush(any(IosPushDevice.class)))
+        .thenThrow(new DataIntegrityViolationException("duplicate token"));
 
-        // then
-        verify(pushDeviceCommandService).deactivate(eq(previousPushDevice), any());
-    }
-
-    @Test
-    @DisplayName("유효하지 않은 APNs 기기를 비활성화하면 command service에 상태 전이를 위임한다")
-    void givenInvalidPushDevice_whenDeactivate_thenDelegatesStateTransitionToCommandService() {
-        // when
-        pushDeviceService.deactivateInvalidPushDevice(previousPushDevice);
-
-        // then
-        verify(pushDeviceCommandService).deactivate(eq(previousPushDevice), any());
-    }
-
-    @Test
-    @DisplayName("동시에 등록된 APNs token이 충돌하면 명시적인 conflict 오류를 반환한다")
-    void givenConcurrentTokenRegistration_whenRegister_thenThrowsTokenConflict() {
-        // given
-        when(pushDeviceQueryService.getPushDeviceWithTokenIfExists("token")).thenReturn(Optional.empty());
-        when(pushDeviceQueryService.getPushDeviceIfExists(1L, "installation")).thenReturn(Optional.empty());
-        when(accountQueryService.getAccount(1L)).thenReturn(new Account());
-        when(pushDeviceCommandService.create(any(IosPushDevice.class)))
-                .thenThrow(new DataIntegrityViolationException("duplicate token"));
-
-        // when & then
-        assertThatThrownBy(() -> pushDeviceService.register(
-                1L,
-                "installation",
-                "token"
-        )).isInstanceOfSatisfying(CalioException.class, exception ->
-                assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.NOTIFICATION_ENDPOINT_TOKEN_CONFLICT)
-        );
-    }
+    // when & then
+    assertThatThrownBy(() -> pushDeviceService.register(1L, "installation", "token"))
+        .isInstanceOfSatisfying(
+            CalioException.class,
+            exception ->
+                assertThat(exception.getErrorCode())
+                    .isEqualTo(ErrorCode.NOTIFICATION_ENDPOINT_TOKEN_CONFLICT));
+  }
 }

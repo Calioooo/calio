@@ -1,15 +1,11 @@
 package com.calio.calendar.notification.domain;
 
-import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.common.domain.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.Objects;
@@ -18,64 +14,58 @@ import java.util.Objects;
 @Table(name = "ios_push_devices")
 public class IosPushDevice extends BaseEntity {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "account_id", nullable = false)
-    private Account account;
+  @Column(name = "account_id", nullable = false)
+  private Long accountId;
 
-    @Column(name = "installation_id", nullable = false)
-    private String installationId;
+  @Column(name = "installation_id", nullable = false)
+  private String installationId;
 
-    @Column(name = "apns_token")
-    private String apnsToken;
+  @Column(name = "apns_token")
+  private String apnsToken;
 
-    @Column(nullable = false)
-    private boolean active;
+  @Column(nullable = false)
+  private boolean active;
 
-    private Instant deactivatedAt;
+  private Instant deactivatedAt;
 
-    protected IosPushDevice() {
-    }
+  protected IosPushDevice() {}
 
-    public IosPushDevice(
-            Account account,
-            String installationId,
-            String apnsToken
-    ) {
-        this.account = account;
-        this.installationId = installationId;
-        refresh(apnsToken);
-    }
+  public IosPushDevice(Long accountId, String installationId, String apnsToken) {
+    this.accountId = Objects.requireNonNull(accountId);
+    this.installationId = Objects.requireNonNull(installationId);
+    refresh(apnsToken);
+  }
 
-    public void refresh(String apnsToken) {
-        this.apnsToken = Objects.requireNonNull(apnsToken);
-        active = true;
-        deactivatedAt = null;
-    }
+  public void refresh(String apnsToken) {
+    this.apnsToken = Objects.requireNonNull(apnsToken);
+    active = true;
+    deactivatedAt = null;
+  }
 
-    public boolean belongsToInstallation(Long accountId, String installationId) {
-        return Objects.equals(account.getId(), accountId)
-                && Objects.equals(this.installationId, installationId);
-    }
+  public boolean belongsToInstallation(Long accountId, String installationId) {
+    return Objects.equals(this.accountId, accountId)
+        && Objects.equals(this.installationId, installationId);
+  }
 
-    public void deactivate(Instant now) {
-        active = false;
-        apnsToken = null;
-        deactivatedAt = now;
-    }
+  public void deactivate(Instant now) {
+    active = false;
+    apnsToken = null;
+    deactivatedAt = Objects.requireNonNull(now);
+  }
 
-    public Long getId() {
-        return id;
-    }
+  public Long getId() {
+    return id;
+  }
 
-    public String getApnsToken() {
-        return apnsToken;
-    }
+  public String getApnsToken() {
+    return apnsToken;
+  }
 
-    public boolean isEligible() {
-        return active && apnsToken != null;
-    }
+  public boolean isEligible() {
+    return active && apnsToken != null;
+  }
 }
