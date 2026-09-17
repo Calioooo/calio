@@ -1,4 +1,4 @@
-package com.calio.calendar.notification.service;
+package com.calio.calendar.notification.usecase;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -25,18 +25,18 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 
 @ExtendWith(MockitoExtension.class)
-class IosPushDeviceServiceTest {
+class RegisterIosPushDeviceUseCaseTest {
 
   private static final Instant NOW = Instant.parse("2026-09-17T00:00:00Z");
 
   @Mock private IosPushDeviceRepository pushDeviceRepository;
 
-  private IosPushDeviceService pushDeviceService;
+  private RegisterIosPushDeviceUseCase registerIosPushDeviceUseCase;
 
   @BeforeEach
   void setUp() {
-    pushDeviceService =
-        new IosPushDeviceService(pushDeviceRepository, Clock.fixed(NOW, ZoneOffset.UTC));
+    registerIosPushDeviceUseCase =
+        new RegisterIosPushDeviceUseCase(pushDeviceRepository, Clock.fixed(NOW, ZoneOffset.UTC));
   }
 
   @Test
@@ -50,49 +50,16 @@ class IosPushDeviceServiceTest {
         .thenReturn(Optional.empty());
 
     // when
-    pushDeviceService.register(1L, "installation", "token");
+    registerIosPushDeviceUseCase.execute(1L, "installation", "token");
 
     // then
-    assertThat(previousPushDevice.isEligible()).isFalse();
+    assertThat(previousPushDevice.canReceivePushNotifications()).isFalse();
     assertThat(previousPushDevice.getApnsToken()).isNull();
     ArgumentCaptor<IosPushDevice> deviceCaptor = ArgumentCaptor.forClass(IosPushDevice.class);
     verify(pushDeviceRepository, times(2)).saveAndFlush(deviceCaptor.capture());
     IosPushDevice registeredPushDevice = deviceCaptor.getAllValues().get(1);
-    assertThat(registeredPushDevice.isEligible()).isTrue();
+    assertThat(registeredPushDevice.canReceivePushNotifications()).isTrue();
     assertThat(registeredPushDevice.getApnsToken()).isEqualTo("token");
-  }
-
-  @Test
-  @DisplayName("등록된 설치를 해제하면 푸시 기기가 토큰을 반납하고 비활성화된다")
-  void givenRegisteredPushDevice_whenDeactivate_thenReleasesToken() {
-    // given
-    IosPushDevice pushDevice = new IosPushDevice(1L, "installation", "token");
-    when(pushDeviceRepository.findByAccountIdAndInstallationId(1L, "installation"))
-        .thenReturn(Optional.of(pushDevice));
-
-    // when
-    pushDeviceService.deactivate(1L, "installation");
-
-    // then
-    assertThat(pushDevice.isEligible()).isFalse();
-    assertThat(pushDevice.getApnsToken()).isNull();
-    verify(pushDeviceRepository).saveAndFlush(pushDevice);
-  }
-
-  @Test
-  @DisplayName("APNs가 무효로 판정한 푸시 기기는 토큰을 반납하고 비활성화된다")
-  void givenInvalidPushDevice_whenDeactivate_thenReleasesToken() {
-    // given
-    IosPushDevice pushDevice = new IosPushDevice(1L, "installation", "token");
-    when(pushDeviceRepository.findById(10L)).thenReturn(Optional.of(pushDevice));
-
-    // when
-    pushDeviceService.deactivateInvalidPushDevice(10L);
-
-    // then
-    assertThat(pushDevice.isEligible()).isFalse();
-    assertThat(pushDevice.getApnsToken()).isNull();
-    verify(pushDeviceRepository).saveAndFlush(pushDevice);
   }
 
   @Test
@@ -106,7 +73,7 @@ class IosPushDeviceServiceTest {
         .thenThrow(new DataIntegrityViolationException("duplicate token"));
 
     // when & then
-    assertThatThrownBy(() -> pushDeviceService.register(1L, "installation", "token"))
+    assertThatThrownBy(() -> registerIosPushDeviceUseCase.execute(1L, "installation", "token"))
         .isInstanceOfSatisfying(
             CalioException.class,
             exception ->

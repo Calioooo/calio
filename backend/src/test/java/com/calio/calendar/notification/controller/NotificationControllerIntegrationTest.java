@@ -119,7 +119,7 @@ class NotificationControllerIntegrationTest {
         .get()
         .satisfies(
             endpoint -> {
-              assertThat(endpoint.isEligible()).isFalse();
+              assertThat(endpoint.canReceivePushNotifications()).isFalse();
               assertThat(endpoint.getApnsToken()).isNull();
             });
   }
@@ -150,11 +150,11 @@ class NotificationControllerIntegrationTest {
         .satisfies(
             endpoint -> {
               assertThat(endpoint.getApnsToken()).isNull();
-              assertThat(endpoint.isEligible()).isFalse();
+              assertThat(endpoint.canReceivePushNotifications()).isFalse();
             });
     assertThat(endpointRepository.findByApnsToken("transferred-device-token"))
         .get()
-        .extracting(endpoint -> endpoint.isEligible())
+        .extracting(endpoint -> endpoint.canReceivePushNotifications())
         .isEqualTo(true);
   }
 

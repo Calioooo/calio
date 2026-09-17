@@ -32,6 +32,7 @@ class ArchitectureTest {
   private static final String CONTROLLER_PACKAGE = "..controller..";
   private static final String DOMAIN_PACKAGE = "..domain..";
   private static final String REPOSITORY_PACKAGE = "..repository..";
+  private static final String USE_CASE_PACKAGE = "..usecase..";
   private static final Set<String> FIELD_INJECTION_ANNOTATIONS =
       Set.of(
           "org.springframework.beans.factory.annotation.Autowired",
@@ -140,6 +141,31 @@ class ArchitectureTest {
         .areAssignableTo(Repository.class)
         .should()
         .resideInAPackage(REPOSITORY_PACKAGE)
+        .check(productionClasses);
+  }
+
+  @Test
+  @DisplayName("UseCase는 Application 유스케이스 패키지에 위치하고 Spring Service로 등록한다")
+  void useCasesResideInUseCasePackages() {
+    classes()
+        .that()
+        .haveSimpleNameEndingWith("UseCase")
+        .should()
+        .resideInAPackage(USE_CASE_PACKAGE)
+        .andShould()
+        .beAnnotatedWith(Service.class)
+        .check(productionClasses);
+  }
+
+  @Test
+  @DisplayName("UseCase는 다른 UseCase를 직접 호출하지 않는다")
+  void useCasesDoNotDependOnOtherUseCases() {
+    noClasses()
+        .that()
+        .haveSimpleNameEndingWith("UseCase")
+        .should()
+        .dependOnClassesThat()
+        .haveSimpleNameEndingWith("UseCase")
         .check(productionClasses);
   }
 

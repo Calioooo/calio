@@ -1,29 +1,27 @@
-package com.calio.calendar.notification.service;
+package com.calio.calendar.notification.usecase;
 
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.notification.domain.IosPushDevice;
 import com.calio.calendar.notification.repository.IosPushDeviceRepository;
-import com.calio.calendar.notification.service.dto.IosPushDeviceTarget;
 import java.time.Clock;
-import java.util.List;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Transactional
-public class IosPushDeviceService {
+public class RegisterIosPushDeviceUseCase {
 
   private final IosPushDeviceRepository pushDeviceRepository;
   private final Clock clock;
 
-  public IosPushDeviceService(IosPushDeviceRepository pushDeviceRepository, Clock clock) {
+  public RegisterIosPushDeviceUseCase(IosPushDeviceRepository pushDeviceRepository, Clock clock) {
     this.pushDeviceRepository = pushDeviceRepository;
     this.clock = clock;
   }
 
-  public void register(Long accountId, String installationId, String apnsToken) {
+  public void execute(Long accountId, String installationId, String apnsToken) {
     deactivatePushDeviceOwnedByAnotherInstallation(accountId, installationId, apnsToken);
 
     IosPushDevice pushDevice =
@@ -31,25 +29,6 @@ public class IosPushDeviceService {
             .findByAccountIdAndInstallationId(accountId, installationId)
             .orElseGet(() -> new IosPushDevice(accountId, installationId, apnsToken));
     savePushDevice(pushDevice, apnsToken);
-  }
-
-  public void deactivate(Long accountId, String installationId) {
-    pushDeviceRepository
-        .findByAccountIdAndInstallationId(accountId, installationId)
-        .ifPresent(this::deactivate);
-  }
-
-  @Transactional(readOnly = true)
-  public List<IosPushDeviceTarget> listEligiblePushDevices(Long accountId) {
-    return pushDeviceRepository
-        .findByAccountIdAndActiveTrueAndApnsTokenIsNotNull(accountId)
-        .stream()
-        .map(IosPushDeviceTarget::from)
-        .toList();
-  }
-
-  public void deactivateInvalidPushDevice(Long pushDeviceId) {
-    pushDeviceRepository.findById(pushDeviceId).ifPresent(this::deactivate);
   }
 
   private void deactivatePushDeviceOwnedByAnotherInstallation(

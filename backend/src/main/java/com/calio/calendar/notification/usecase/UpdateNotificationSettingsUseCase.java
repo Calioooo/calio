@@ -1,4 +1,4 @@
-package com.calio.calendar.notification.service;
+package com.calio.calendar.notification.usecase;
 
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.domain.AccountNotificationSettings;
@@ -11,19 +11,15 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Transactional
-public class AccountNotificationSettingsService {
+public class UpdateNotificationSettingsUseCase {
 
   private final AccountRepository accountRepository;
 
-  public AccountNotificationSettingsService(AccountRepository accountRepository) {
+  public UpdateNotificationSettingsUseCase(AccountRepository accountRepository) {
     this.accountRepository = accountRepository;
   }
 
-  public AccountNotificationSettings get(Long accountId) {
-    return getAccount(accountId).getNotificationSettings();
-  }
-
-  public AccountNotificationSettings update(
+  public AccountNotificationSettings execute(
       Long accountId, UpdateNotificationSettingsRequest request) {
     Account account = getAccount(accountId);
     AccountNotificationSettings notificationSettings =

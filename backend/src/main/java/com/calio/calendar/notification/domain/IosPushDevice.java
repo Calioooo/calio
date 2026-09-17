@@ -65,7 +65,7 @@ public class IosPushDevice extends BaseEntity {
     return apnsToken;
   }
 
-  public boolean isEligible() {
+  public boolean canReceivePushNotifications() {
     return active && apnsToken != null;
   }
 }

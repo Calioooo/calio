@@ -30,7 +30,7 @@ class IosPushDeviceTest {
     pushDevice.deactivate(Instant.parse("2026-09-08T00:00:00Z"));
 
     // then
-    assertThat(pushDevice.isEligible()).isFalse();
+    assertThat(pushDevice.canReceivePushNotifications()).isFalse();
     assertThat(pushDevice.getApnsToken()).isNull();
   }
 }
