@@ -83,6 +83,8 @@ public class SecurityConfig {
                     .authenticated()
                     .requestMatchers("/api/notification-endpoints/**")
                     .authenticated()
+                    .requestMatchers("/api/notification-settings/**")
+                    .authenticated()
                     .requestMatchers("/api/group-spaces")
                     .authenticated()
                     .requestMatchers("/api/group-spaces/**")

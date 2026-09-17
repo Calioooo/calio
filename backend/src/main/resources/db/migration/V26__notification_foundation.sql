@@ -4,7 +4,6 @@ CREATE TABLE ios_push_devices (
     installation_id VARCHAR(128) NOT NULL,
     apns_token VARCHAR(512),
     active BOOLEAN NOT NULL,
-    environment VARCHAR(32) NOT NULL,
     deactivated_at DATETIME(6),
     created_at DATETIME(6) NOT NULL,
     updated_at DATETIME(6) NOT NULL,

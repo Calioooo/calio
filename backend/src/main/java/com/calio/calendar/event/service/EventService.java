@@ -12,12 +12,12 @@ import com.calio.calendar.event.controller.dto.UpdateImportantEventRequest;
 import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.event.service.dto.CalendarFreeTime;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingQueryService;
+import com.calio.calendar.recurrence.domain.PersonalRecurrenceOccurrence;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceOccurrence;
-import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
+import com.calio.calendar.recurrence.service.PersonalRecurrenceOccurrenceResolver;
 import com.calio.calendar.recurrence.service.RecurrenceEventQueryService;
-import com.calio.calendar.recurrence.service.Rfc5545RecurrenceEngine;
 import com.calio.calendar.sharing.event.service.PersonalEventGroupShareCommandService;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.service.TagQueryService;
@@ -44,373 +44,312 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class EventService {
 
-    private static final Duration MAX_EVENT_QUERY_RANGE = Duration.ofDays(366);
+  private static final Duration MAX_EVENT_QUERY_RANGE = Duration.ofDays(366);
 
-    private final EventQueryService eventQueryService;
-    private final EventCommandService eventCommandService;
-    private final GoogleCalendarEventMappingQueryService eventMappingQueryService;
-    private final AccountQueryService accountQueryService;
-    private final TagQueryService tagQueryService;
-    private final RecurrenceEventQueryService recurrenceEventQueryService;
-    private final Rfc5545RecurrenceEngine recurrenceEngine;
-    private final PersonalEventGroupShareCommandService eventShareCommandService;
+  private final EventQueryService eventQueryService;
+  private final EventCommandService eventCommandService;
+  private final GoogleCalendarEventMappingQueryService eventMappingQueryService;
+  private final AccountQueryService accountQueryService;
+  private final TagQueryService tagQueryService;
+  private final RecurrenceEventQueryService recurrenceEventQueryService;
+  private final PersonalRecurrenceOccurrenceResolver recurrenceOccurrenceResolver;
+  private final PersonalEventGroupShareCommandService eventShareCommandService;
 
-    public EventService(
-            EventQueryService eventQueryService,
-            EventCommandService eventCommandService,
-            GoogleCalendarEventMappingQueryService eventMappingQueryService,
-            AccountQueryService accountQueryService,
-            TagQueryService tagQueryService,
-            RecurrenceEventQueryService recurrenceEventQueryService,
-            Rfc5545RecurrenceEngine recurrenceEngine,
-            PersonalEventGroupShareCommandService eventShareCommandService
-    ) {
-        this.eventQueryService = eventQueryService;
-        this.eventCommandService = eventCommandService;
-        this.eventMappingQueryService = eventMappingQueryService;
-        this.accountQueryService = accountQueryService;
-        this.tagQueryService = tagQueryService;
-        this.recurrenceEventQueryService = recurrenceEventQueryService;
-        this.recurrenceEngine = recurrenceEngine;
-        this.eventShareCommandService = eventShareCommandService;
-    }
+  public EventService(
+      EventQueryService eventQueryService,
+      EventCommandService eventCommandService,
+      GoogleCalendarEventMappingQueryService eventMappingQueryService,
+      AccountQueryService accountQueryService,
+      TagQueryService tagQueryService,
+      RecurrenceEventQueryService recurrenceEventQueryService,
+      PersonalRecurrenceOccurrenceResolver recurrenceOccurrenceResolver,
+      PersonalEventGroupShareCommandService eventShareCommandService) {
+    this.eventQueryService = eventQueryService;
+    this.eventCommandService = eventCommandService;
+    this.eventMappingQueryService = eventMappingQueryService;
+    this.accountQueryService = accountQueryService;
+    this.tagQueryService = tagQueryService;
+    this.recurrenceEventQueryService = recurrenceEventQueryService;
+    this.recurrenceOccurrenceResolver = recurrenceOccurrenceResolver;
+    this.eventShareCommandService = eventShareCommandService;
+  }
 
-    @Transactional
-    public EventResponse createEvent(Long accountId, CreateEventRequest request) {
+  @Transactional
+  public EventResponse createEvent(Long accountId, CreateEventRequest request) {
+    CanonicalSchedule.event(
+        request.startAt(), request.endAt(), request.allDay(), request.timeZone());
+    Account account = accountQueryService.getAccount(accountId);
+    Tag tag = tagQueryService.getTagOrDefault(accountId, request.tagId());
+    Event event = eventCommandService.createEvent(request.toEntity(tag, account));
+    return EventResponse.from(event);
+  }
+
+  public EventResponse getEvent(Long accountId, Long eventId) {
+    return EventResponse.from(eventQueryService.getEvent(accountId, eventId));
+  }
+
+  @Transactional
+  public EventResponse updateEvent(Long accountId, Long eventId, UpdateEventRequest request) {
+    Event event = eventCommandService.lockEvent(accountId, eventId);
+    rejectExternalEventMutation(accountId, eventId);
+    CanonicalSchedule schedule =
         CanonicalSchedule.event(
-                request.startAt(),
-                request.endAt(),
-                request.allDay(),
-                request.timeZone()
-        );
-        Account account = accountQueryService.getAccount(accountId);
-        Tag tag = tagQueryService.getTagOrDefault(accountId, request.tagId());
-        Event event = eventCommandService.createEvent(request.toEntity(tag, account));
-        return EventResponse.from(event);
+            request.startAt(), request.endAt(), request.allDay(), request.timeZone());
+    Tag tag = tagQueryService.getTagOrDefault(accountId, request.tagId());
+    eventCommandService.updateEvent(event, request, schedule, tag);
+    return EventResponse.from(event);
+  }
+
+  @Transactional
+  public EventResponse updateImportantEvent(
+      Long accountId, Long eventId, UpdateImportantEventRequest request) {
+    Event event = eventCommandService.lockEvent(accountId, eventId);
+    rejectExternalEventMutation(accountId, eventId);
+    eventCommandService.updateImportantEvent(event, request.importantEvent());
+    return EventResponse.from(event);
+  }
+
+  @Transactional
+  public void deleteEvent(Long accountId, Long eventId) {
+    Event event = eventCommandService.lockEvent(accountId, eventId);
+    rejectExternalEventMutation(accountId, eventId);
+    eventShareCommandService.deleteAllForSourceEvent(eventId);
+    eventCommandService.deleteEvent(event);
+  }
+
+  public List<EventResponse> listEvents(Long accountId, Instant from, Instant to) {
+    validateListTimeRange(from, to);
+    List<EventResponse> responses =
+        eventQueryService.listEvents(accountId, from, to).stream()
+            .map(EventResponse::from)
+            .collect(Collectors.toCollection(ArrayList::new));
+    responses.addAll(listRecurrenceOccurrences(accountId, from, to));
+    responses.sort(Comparator.comparing(EventResponse::startAt));
+    return responses;
+  }
+
+  @Transactional(readOnly = true)
+  public List<CalendarFreeTime> findAvailableTimes(
+      Long accountId,
+      LocalDate startDate,
+      LocalDate endDate,
+      ZoneId timeZone,
+      LocalTime availableFrom,
+      LocalTime availableUntil,
+      Duration minimumDuration) {
+    validateAvailabilityCriteria(availableFrom, availableUntil, minimumDuration);
+    List<EventResponse> events = listEventsForDateRange(accountId, startDate, endDate, timeZone);
+    List<CalendarFreeTime> availableTimes = new ArrayList<>();
+    for (LocalDate date = startDate; !date.isAfter(endDate); date = date.plusDays(1)) {
+      addAvailableTimesForDate(
+          events, date, timeZone, availableFrom, availableUntil, minimumDuration, availableTimes);
+    }
+    return availableTimes;
+  }
+
+  private void validateAvailabilityCriteria(
+      LocalTime availableFrom, LocalTime availableUntil, Duration minimumDuration) {
+    if (!availableFrom.isBefore(availableUntil)
+        || minimumDuration.isZero()
+        || minimumDuration.isNegative()) {
+      throw new IllegalArgumentException("Availability window and duration must be positive.");
+    }
+  }
+
+  private List<EventResponse> listEventsForDateRange(
+      Long accountId, LocalDate startDate, LocalDate endDate, ZoneId timeZone) {
+    Instant rangeStart = startDate.atStartOfDay(timeZone).toInstant();
+    Instant rangeEnd = endDate.plusDays(1).atStartOfDay(timeZone).toInstant();
+    return listEvents(accountId, rangeStart, rangeEnd);
+  }
+
+  private void addAvailableTimesForDate(
+      List<EventResponse> events,
+      LocalDate date,
+      ZoneId timeZone,
+      LocalTime availableFrom,
+      LocalTime availableUntil,
+      Duration minimumDuration,
+      List<CalendarFreeTime> availableTimes) {
+    Instant windowStart = LocalDateTime.of(date, availableFrom).atZone(timeZone).toInstant();
+    Instant windowEnd = LocalDateTime.of(date, availableUntil).atZone(timeZone).toInstant();
+    List<TimeRange> occupiedRanges = findOccupiedRanges(events, windowStart, windowEnd);
+    List<String> allDayEventTitles = findAllDayEventTitles(events, date);
+    addAvailableGaps(
+        windowStart,
+        windowEnd,
+        occupiedRanges,
+        minimumDuration,
+        allDayEventTitles,
+        timeZone,
+        availableTimes);
+  }
+
+  private List<TimeRange> findOccupiedRanges(
+      List<EventResponse> events, Instant windowStart, Instant windowEnd) {
+    return events.stream()
+        .filter(event -> !event.allDay())
+        .map(event -> TimeRange.overlapping(event.startAt(), event.endAt(), windowStart, windowEnd))
+        .filter(TimeRange::hasDuration)
+        .sorted(Comparator.comparing(TimeRange::start))
+        .toList();
+  }
+
+  private List<String> findAllDayEventTitles(List<EventResponse> events, LocalDate date) {
+    return events.stream()
+        .filter(EventResponse::allDay)
+        .filter(event -> occursOnDate(event, date))
+        .map(EventResponse::title)
+        .toList();
+  }
+
+  private void addAvailableGaps(
+      Instant windowStart,
+      Instant windowEnd,
+      List<TimeRange> occupiedRanges,
+      Duration minimumDuration,
+      List<String> allDayEventTitles,
+      ZoneId timeZone,
+      List<CalendarFreeTime> availableTimes) {
+    Instant availableStart = windowStart;
+    for (TimeRange occupiedRange : occupiedRanges) {
+      addAvailableTimeWhenLongEnough(
+          availableStart,
+          occupiedRange.start(),
+          minimumDuration,
+          allDayEventTitles,
+          timeZone,
+          availableTimes);
+      if (occupiedRange.end().isAfter(availableStart)) {
+        availableStart = occupiedRange.end();
+      }
+    }
+    addAvailableTimeWhenLongEnough(
+        availableStart, windowEnd, minimumDuration, allDayEventTitles, timeZone, availableTimes);
+  }
+
+  private void addAvailableTimeWhenLongEnough(
+      Instant start,
+      Instant end,
+      Duration minimumDuration,
+      List<String> allDayEventTitles,
+      ZoneId timeZone,
+      List<CalendarFreeTime> availableTimes) {
+    if (Duration.between(start, end).compareTo(minimumDuration) >= 0) {
+      availableTimes.add(
+          new CalendarFreeTime(
+              formatTime(start, timeZone), formatTime(end, timeZone), allDayEventTitles));
+    }
+  }
+
+  private boolean occursOnDate(EventResponse event, LocalDate date) {
+    LocalDate startDate = event.startAt().atZone(ZoneOffset.UTC).toLocalDate();
+    LocalDate endDate = event.endAt().atZone(ZoneOffset.UTC).toLocalDate();
+    return !date.isBefore(startDate) && date.isBefore(endDate);
+  }
+
+  private String formatTime(Instant instant, ZoneId timeZone) {
+    return instant.atZone(timeZone).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
+  }
+
+  private record TimeRange(Instant start, Instant end) {
+
+    private static TimeRange overlapping(
+        Instant start, Instant end, Instant rangeStart, Instant rangeEnd) {
+      Instant overlapStart = start.isAfter(rangeStart) ? start : rangeStart;
+      Instant overlapEnd = end.isBefore(rangeEnd) ? end : rangeEnd;
+      return new TimeRange(overlapStart, overlapEnd);
     }
 
-    public EventResponse getEvent(Long accountId, Long eventId) {
-        return EventResponse.from(eventQueryService.getEvent(accountId, eventId));
+    private boolean hasDuration() {
+      return start.isBefore(end);
     }
+  }
 
-    @Transactional
-    public EventResponse updateEvent(Long accountId, Long eventId, UpdateEventRequest request) {
-        Event event = eventCommandService.lockEvent(accountId, eventId);
-        rejectExternalEventMutation(accountId, eventId);
-        CanonicalSchedule schedule = CanonicalSchedule.event(
-                request.startAt(),
-                request.endAt(),
-                request.allDay(),
-                request.timeZone()
-        );
-        Tag tag = tagQueryService.getTagOrDefault(accountId, request.tagId());
-        eventCommandService.updateEvent(event, request, schedule, tag);
-        return EventResponse.from(event);
+  private List<EventResponse> listRecurrenceOccurrences(Long accountId, Instant from, Instant to) {
+    List<EventResponse> responses = new ArrayList<>();
+    Set<OccurrenceKey> responseKeys = new HashSet<>();
+    List<RecurrenceEvent> recurrenceEvents =
+        recurrenceEventQueryService.listExpansionCandidatesStartedBefore(accountId, to);
+    for (RecurrenceEvent recurrenceEvent : recurrenceEvents) {
+      addExpandedOccurrences(recurrenceEvent, from, to, responseKeys, responses);
     }
+    addMovedInOverrides(accountId, from, to, responseKeys, responses);
+    return responses;
+  }
 
-    @Transactional
-    public EventResponse updateImportantEvent(Long accountId, Long eventId, UpdateImportantEventRequest request) {
-        Event event = eventCommandService.lockEvent(accountId, eventId);
-        rejectExternalEventMutation(accountId, eventId);
-        eventCommandService.updateImportantEvent(event, request.importantEvent());
-        return EventResponse.from(event);
+  private void addExpandedOccurrences(
+      RecurrenceEvent recurrenceEvent,
+      Instant from,
+      Instant to,
+      Set<OccurrenceKey> responseKeys,
+      List<EventResponse> responses) {
+    List<RecurrenceOccurrence> occurrences =
+        recurrenceOccurrenceResolver.expand(recurrenceEvent, from, to);
+    Map<Instant, RecurrenceEventOverride> overridesByOrigin =
+        findOverridesByOrigin(recurrenceEvent, occurrences);
+    recurrenceOccurrenceResolver
+        .resolve(recurrenceEvent, occurrences, List.copyOf(overridesByOrigin.values()), from, to)
+        .forEach(occurrence -> addResolvedOccurrence(occurrence, responseKeys, responses));
+  }
+
+  private Map<Instant, RecurrenceEventOverride> findOverridesByOrigin(
+      RecurrenceEvent recurrenceEvent, List<RecurrenceOccurrence> occurrences) {
+    List<Instant> originStartAts =
+        occurrences.stream().map(RecurrenceOccurrence::originStartAt).toList();
+    if (originStartAts.isEmpty()) {
+      return Map.of();
     }
+    return recurrenceEventQueryService
+        .listOverrides(recurrenceEvent.getId(), originStartAts)
+        .stream()
+        .collect(Collectors.toMap(RecurrenceEventOverride::getOriginStartAt, Function.identity()));
+  }
 
-    @Transactional
-    public void deleteEvent(Long accountId, Long eventId) {
-        Event event = eventCommandService.lockEvent(accountId, eventId);
-        rejectExternalEventMutation(accountId, eventId);
-        eventShareCommandService.deleteAllForSourceEvent(eventId);
-        eventCommandService.deleteEvent(event);
+  private void addResolvedOccurrence(
+      PersonalRecurrenceOccurrence occurrence,
+      Set<OccurrenceKey> responseKeys,
+      List<EventResponse> responses) {
+    OccurrenceKey key =
+        new OccurrenceKey(occurrence.recurrenceEvent().getId(), occurrence.originStartAt());
+    if (responseKeys.add(key)) {
+      responses.add(EventResponse.recurrenceOccurrence(occurrence));
     }
+  }
 
-    public List<EventResponse> listEvents(Long accountId, Instant from, Instant to) {
-        validateListTimeRange(from, to);
-        List<EventResponse> responses = eventQueryService.listEvents(accountId, from, to)
-                .stream()
-                .map(EventResponse::from)
-                .collect(Collectors.toCollection(ArrayList::new));
-        responses.addAll(listRecurrenceOccurrences(accountId, from, to));
-        responses.sort(Comparator.comparing(EventResponse::startAt));
-        return responses;
+  private void addMovedInOverrides(
+      Long accountId,
+      Instant from,
+      Instant to,
+      Set<OccurrenceKey> responseKeys,
+      List<EventResponse> responses) {
+    recurrenceOccurrenceResolver
+        .resolveMovedIn(
+            recurrenceEventQueryService.listActiveOverlappingOverrides(accountId, from, to),
+            from,
+            to)
+        .forEach(occurrence -> addResolvedOccurrence(occurrence, responseKeys, responses));
+  }
+
+  private void validateListTimeRange(Instant from, Instant to) {
+    if (!from.isBefore(to)) {
+      throw new CalioException(ErrorCode.INVALID_TIME_RANGE);
     }
-
-    @Transactional(readOnly = true)
-    public List<CalendarFreeTime> findAvailableTimes(
-            Long accountId,
-            LocalDate startDate,
-            LocalDate endDate,
-            ZoneId timeZone,
-            LocalTime availableFrom,
-            LocalTime availableUntil,
-            Duration minimumDuration
-    ) {
-        validateAvailabilityCriteria(availableFrom, availableUntil, minimumDuration);
-        List<EventResponse> events = listEventsForDateRange(accountId, startDate, endDate, timeZone);
-        List<CalendarFreeTime> availableTimes = new ArrayList<>();
-        for (LocalDate date = startDate; !date.isAfter(endDate); date = date.plusDays(1)) {
-            addAvailableTimesForDate(
-                    events,
-                    date,
-                    timeZone,
-                    availableFrom,
-                    availableUntil,
-                    minimumDuration,
-                    availableTimes
-            );
-        }
-        return availableTimes;
+    if (Duration.between(from, to).compareTo(MAX_EVENT_QUERY_RANGE) > 0) {
+      throw new CalioException(ErrorCode.EVENT_QUERY_RANGE_TOO_LARGE);
     }
+  }
 
-    private void validateAvailabilityCriteria(
-            LocalTime availableFrom,
-            LocalTime availableUntil,
-            Duration minimumDuration
-    ) {
-        if (!availableFrom.isBefore(availableUntil)
-                || minimumDuration.isZero()
-                || minimumDuration.isNegative()) {
-            throw new IllegalArgumentException("Availability window and duration must be positive.");
-        }
+  private void rejectExternalEventMutation(Long accountId, Long eventId) {
+    if (eventMappingQueryService.hasExternalEventMapping(eventId, accountId)) {
+      throw new CalioException(ErrorCode.EXTERNAL_EVENT_MUTATION_NOT_SUPPORTED);
     }
+  }
 
-    private List<EventResponse> listEventsForDateRange(
-            Long accountId,
-            LocalDate startDate,
-            LocalDate endDate,
-            ZoneId timeZone
-    ) {
-        Instant rangeStart = startDate.atStartOfDay(timeZone).toInstant();
-        Instant rangeEnd = endDate.plusDays(1).atStartOfDay(timeZone).toInstant();
-        return listEvents(accountId, rangeStart, rangeEnd);
+  private record OccurrenceKey(Long recurrenceId, Instant originStartAt) {
+
+    private static OccurrenceKey from(RecurrenceEventOverride override) {
+      return new OccurrenceKey(override.getRecurrenceId(), override.getOriginStartAt());
     }
-
-    private void addAvailableTimesForDate(
-            List<EventResponse> events,
-            LocalDate date,
-            ZoneId timeZone,
-            LocalTime availableFrom,
-            LocalTime availableUntil,
-            Duration minimumDuration,
-            List<CalendarFreeTime> availableTimes
-    ) {
-        Instant windowStart = LocalDateTime.of(date, availableFrom).atZone(timeZone).toInstant();
-        Instant windowEnd = LocalDateTime.of(date, availableUntil).atZone(timeZone).toInstant();
-        List<TimeRange> occupiedRanges = findOccupiedRanges(events, windowStart, windowEnd);
-        List<String> allDayEventTitles = findAllDayEventTitles(events, date);
-        addAvailableGaps(
-                windowStart,
-                windowEnd,
-                occupiedRanges,
-                minimumDuration,
-                allDayEventTitles,
-                timeZone,
-                availableTimes
-        );
-    }
-
-    private List<TimeRange> findOccupiedRanges(
-            List<EventResponse> events,
-            Instant windowStart,
-            Instant windowEnd
-    ) {
-        return events.stream()
-                .filter(event -> !event.allDay())
-                .map(event -> TimeRange.overlapping(event.startAt(), event.endAt(), windowStart, windowEnd))
-                .filter(TimeRange::hasDuration)
-                .sorted(Comparator.comparing(TimeRange::start))
-                .toList();
-    }
-
-    private List<String> findAllDayEventTitles(List<EventResponse> events, LocalDate date) {
-        return events.stream()
-                .filter(EventResponse::allDay)
-                .filter(event -> occursOnDate(event, date))
-                .map(EventResponse::title)
-                .toList();
-    }
-
-    private void addAvailableGaps(
-            Instant windowStart,
-            Instant windowEnd,
-            List<TimeRange> occupiedRanges,
-            Duration minimumDuration,
-            List<String> allDayEventTitles,
-            ZoneId timeZone,
-            List<CalendarFreeTime> availableTimes
-    ) {
-        Instant availableStart = windowStart;
-        for (TimeRange occupiedRange : occupiedRanges) {
-            addAvailableTimeWhenLongEnough(
-                    availableStart,
-                    occupiedRange.start(),
-                    minimumDuration,
-                    allDayEventTitles,
-                    timeZone,
-                    availableTimes
-            );
-            if (occupiedRange.end().isAfter(availableStart)) {
-                availableStart = occupiedRange.end();
-            }
-        }
-        addAvailableTimeWhenLongEnough(
-                availableStart,
-                windowEnd,
-                minimumDuration,
-                allDayEventTitles,
-                timeZone,
-                availableTimes
-        );
-    }
-
-    private void addAvailableTimeWhenLongEnough(
-            Instant start,
-            Instant end,
-            Duration minimumDuration,
-            List<String> allDayEventTitles,
-            ZoneId timeZone,
-            List<CalendarFreeTime> availableTimes
-    ) {
-        if (Duration.between(start, end).compareTo(minimumDuration) >= 0) {
-            availableTimes.add(new CalendarFreeTime(
-                    formatTime(start, timeZone),
-                    formatTime(end, timeZone),
-                    allDayEventTitles
-            ));
-        }
-    }
-
-    private boolean occursOnDate(EventResponse event, LocalDate date) {
-        LocalDate startDate = event.startAt().atZone(ZoneOffset.UTC).toLocalDate();
-        LocalDate endDate = event.endAt().atZone(ZoneOffset.UTC).toLocalDate();
-        return !date.isBefore(startDate) && date.isBefore(endDate);
-    }
-
-    private String formatTime(Instant instant, ZoneId timeZone) {
-        return instant.atZone(timeZone).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
-    }
-
-    private record TimeRange(Instant start, Instant end) {
-
-        private static TimeRange overlapping(
-                Instant start,
-                Instant end,
-                Instant rangeStart,
-                Instant rangeEnd
-        ) {
-            Instant overlapStart = start.isAfter(rangeStart) ? start : rangeStart;
-            Instant overlapEnd = end.isBefore(rangeEnd) ? end : rangeEnd;
-            return new TimeRange(overlapStart, overlapEnd);
-        }
-
-        private boolean hasDuration() {
-            return start.isBefore(end);
-        }
-    }
-
-    private List<EventResponse> listRecurrenceOccurrences(Long accountId, Instant from, Instant to) {
-        List<EventResponse> responses = new ArrayList<>();
-        Set<OccurrenceKey> responseKeys = new HashSet<>();
-        List<RecurrenceEvent> recurrenceEvents =
-                recurrenceEventQueryService.listExpansionCandidatesStartedBefore(accountId, to);
-        for (RecurrenceEvent recurrenceEvent : recurrenceEvents) {
-            addExpandedOccurrences(recurrenceEvent, from, to, responseKeys, responses);
-        }
-        addMovedInOverrides(accountId, from, to, responseKeys, responses);
-        return responses;
-    }
-
-    private void addExpandedOccurrences(
-            RecurrenceEvent recurrenceEvent,
-            Instant from,
-            Instant to,
-            Set<OccurrenceKey> responseKeys,
-            List<EventResponse> responses
-    ) {
-        List<RecurrenceOccurrence> occurrences = recurrenceEngine.expand(
-                RecurrenceSchedule.from(recurrenceEvent),
-                recurrenceEvent.getRecurrenceRules(),
-                from,
-                to
-        );
-        Map<Instant, RecurrenceEventOverride> overridesByOrigin = findOverridesByOrigin(recurrenceEvent, occurrences);
-        for (RecurrenceOccurrence occurrence : occurrences) {
-            OccurrenceKey key = new OccurrenceKey(recurrenceEvent.getId(), occurrence.originStartAt());
-            RecurrenceEventOverride override = overridesByOrigin.get(occurrence.originStartAt());
-            EventResponse response = finalOccurrenceResponse(recurrenceEvent, occurrence, override);
-            if (response != null && overlaps(response, from, to) && responseKeys.add(key)) {
-                responses.add(response);
-            }
-        }
-    }
-
-    private Map<Instant, RecurrenceEventOverride> findOverridesByOrigin(
-            RecurrenceEvent recurrenceEvent,
-            List<RecurrenceOccurrence> occurrences
-    ) {
-        List<Instant> originStartAts = occurrences.stream()
-                .map(RecurrenceOccurrence::originStartAt)
-                .toList();
-        if (originStartAts.isEmpty()) {
-            return Map.of();
-        }
-        return recurrenceEventQueryService
-                .listOverrides(recurrenceEvent.getId(), originStartAts)
-                .stream()
-                .collect(Collectors.toMap(
-                        RecurrenceEventOverride::getOriginStartAt,
-                        Function.identity()
-                ));
-    }
-
-    private EventResponse finalOccurrenceResponse(
-            RecurrenceEvent recurrenceEvent,
-            RecurrenceOccurrence occurrence,
-            RecurrenceEventOverride override
-    ) {
-        if (override == null) {
-            return EventResponse.recurrenceOccurrence(recurrenceEvent, occurrence);
-        }
-        return override.isDeleted() ? null : EventResponse.recurrenceOverride(override);
-    }
-
-    private void addMovedInOverrides(
-            Long accountId,
-            Instant from,
-            Instant to,
-            Set<OccurrenceKey> responseKeys,
-            List<EventResponse> responses
-    ) {
-        recurrenceEventQueryService.listActiveOverlappingOverrides(accountId, from, to)
-                .stream()
-                .filter(override -> responseKeys.add(OccurrenceKey.from(override)))
-                .map(EventResponse::recurrenceOverride)
-                .forEach(responses::add);
-    }
-
-    private boolean overlaps(EventResponse response, Instant from, Instant to) {
-        return response.startAt().isBefore(to) && response.endAt().isAfter(from);
-    }
-
-    private void validateListTimeRange(Instant from, Instant to) {
-        if (!from.isBefore(to)) {
-            throw new CalioException(ErrorCode.INVALID_TIME_RANGE);
-        }
-        if (Duration.between(from, to).compareTo(MAX_EVENT_QUERY_RANGE) > 0) {
-            throw new CalioException(ErrorCode.EVENT_QUERY_RANGE_TOO_LARGE);
-        }
-    }
-
-    private void rejectExternalEventMutation(Long accountId, Long eventId) {
-        if (eventMappingQueryService.hasExternalEventMapping(eventId, accountId)) {
-            throw new CalioException(ErrorCode.EXTERNAL_EVENT_MUTATION_NOT_SUPPORTED);
-        }
-    }
-
-    private record OccurrenceKey(Long recurrenceId, Instant originStartAt) {
-
-        private static OccurrenceKey from(RecurrenceEventOverride override) {
-            return new OccurrenceKey(override.getRecurrenceId(), override.getOriginStartAt());
-        }
-    }
+  }
 }

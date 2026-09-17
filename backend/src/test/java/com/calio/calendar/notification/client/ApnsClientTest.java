@@ -21,6 +21,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
+import tools.jackson.databind.ObjectMapper;
 
 class ApnsClientTest {
 
@@ -198,7 +199,11 @@ class ApnsClientTest {
   }
 
   private ApnsClient apnsClient(ApnsProperties properties, RestClient restClient, Clock clock) {
-    return new ApnsClient(properties, new ApnsProviderTokenProvider(properties, clock), restClient);
+    return new ApnsClient(
+        properties,
+        new ApnsProviderTokenProvider(properties, clock),
+        restClient,
+        new ObjectMapper());
   }
 
   private ApnsProperties properties() {
@@ -206,7 +211,8 @@ class ApnsClientTest {
   }
 
   private ApnsMessage message() {
-    return new ApnsMessage("token", "{}", Instant.parse("2026-09-08T00:05:00Z"));
+    return new ApnsMessage(
+        "token", "Calio", "회의", java.util.Map.of(), Instant.parse("2026-09-08T00:05:00Z"));
   }
 
   private String privateKey() {

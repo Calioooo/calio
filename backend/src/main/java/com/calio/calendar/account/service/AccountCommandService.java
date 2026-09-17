@@ -7,12 +7,13 @@ import org.springframework.stereotype.Service;
 @Service
 public class AccountCommandService {
 
-    private final AccountRepository accountRepository;
-    public AccountCommandService(AccountRepository accountRepository) {
-        this.accountRepository = accountRepository;
-    }
+  private final AccountRepository accountRepository;
 
-    public Account createAccount() {
-        return accountRepository.save(new Account());
-    }
+  public AccountCommandService(AccountRepository accountRepository) {
+    this.accountRepository = accountRepository;
+  }
+
+  public Account createAccount() {
+    return accountRepository.save(new Account());
+  }
 }
