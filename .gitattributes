@@ -1,0 +1,2 @@
+# The Gradle shell wrapper must also run on Linux and macOS checkouts.
+backend/gradlew text eol=lf

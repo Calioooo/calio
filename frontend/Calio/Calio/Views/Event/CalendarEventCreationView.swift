@@ -81,34 +81,49 @@ struct CalendarEventCreationView: View {
                 )
             }
             .scrollContentBackground(.hidden)
-            .background(Color(uiColor: .systemGroupedBackground))
+            .background(Color.calioBackground)
+            .tint(.calioBrand)
             .navigationTitle("새 일정")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button {
-                        if let onBack {
-                            onBack()
-                        } else {
-                            dismiss()
-                        }
-                    } label: {
-                        if onBack != nil {
-                            Label("빠른 입력", systemImage: "chevron.left")
-                        } else {
-                            Text("취소")
-                        }
-                    }
-                }
-                
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("저장") {
-                        save()
-                    }
-                    .disabled(!canSave || isSaving)
-                }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                saveAction
             }
         }
+    }
+
+    private var saveAction: some View {
+        HStack(spacing: 12) {
+            Button("취소", action: cancel)
+                .font(.headline.weight(.semibold))
+                .foregroundStyle(.calioPrimary)
+                .frame(maxWidth: .infinity, minHeight: 52)
+                .background(RoundedRectangle(cornerRadius: 12).fill(Color.calioSelection))
+                .accessibilityIdentifier("event_creation_cancel_button")
+                .disabled(Self.isCancelDisabled(isSaving: isSaving))
+
+            Button {
+                save()
+            } label: {
+                HStack(spacing: 8) {
+                    if isSaving {
+                        ProgressView()
+                            .tint(.white)
+                    }
+                    Text(isSaving ? "저장 중" : "일정 생성")
+                }
+                .font(.headline.weight(.semibold))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity, minHeight: 52)
+                .background(RoundedRectangle(cornerRadius: 12).fill(Color.calioBrand))
+            }
+            .disabled(!canSave || isSaving)
+            .opacity(canSave && !isSaving ? 1 : 0.45)
+            .accessibilityIdentifier("event_creation_save_button")
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 12)
+        .padding(.bottom, 8)
+        .background(.ultraThinMaterial)
     }
 
     @ViewBuilder
@@ -117,13 +132,14 @@ struct CalendarEventCreationView: View {
             Section {
                 HStack(alignment: .top, spacing: 10) {
                     Image(systemName: "exclamationmark.circle.fill")
-                        .foregroundStyle(.red)
+                        .foregroundStyle(Color.calendarHoliday)
                     Text(failureMessage)
                         .font(.subheadline)
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(.calioTextPrimary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(.vertical, 2)
+                .listRowBackground(Color.calioSelection)
                 .accessibilityIdentifier("event_creation_failure_message")
             }
         }
@@ -140,6 +156,14 @@ struct CalendarEventCreationView: View {
             if didSave {
                 dismiss()
             }
+        }
+    }
+
+    private func cancel() {
+        if let onBack {
+            onBack()
+        } else {
+            dismiss()
         }
     }
 
@@ -160,9 +184,13 @@ struct CalendarEventCreationView: View {
         )
     }
 
+    nonisolated static func isCancelDisabled(isSaving: Bool) -> Bool {
+        isSaving
+    }
+
     private func resetRecurrenceFieldsFromSingleEventTime() {
         recurrenceInput.startDate = eventInput.startAt
-        recurrenceInput.endDate = eventInput.endAt
+        recurrenceInput.endDate = Calendar.current.date(byAdding: .year, value: 1, to: eventInput.startAt) ?? eventInput.startAt
         recurrenceInput.startTime = eventInput.startAt
         recurrenceInput.endTime = eventInput.endAt
         recurrenceInput.frequency = .daily

@@ -16,6 +16,8 @@ public interface GoogleCalendarRecurrenceEventMappingRepository
 
     Optional<GoogleCalendarRecurrenceEventMapping> findByRecurrenceEvent_Id(Long recurrenceEventId);
 
+    boolean existsByRecurrenceEvent_IdAndIntegration_AccountId(Long recurrenceEventId, Long accountId);
+
     Optional<GoogleCalendarRecurrenceEventMapping>
     findByIntegration_IdAndCalendarKeyAndExternalEventId(
             Long integrationId,

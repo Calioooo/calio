@@ -28,7 +28,7 @@ struct NationalHolidayService {
                 to: range.to
             )
             return try response.map(mapToNationalHoliday(_:))
-        } catch let error as NationalHolidayRepositoryError {
+        } catch let error as APIError {
             throw mapToServiceError(error)
         } catch let error as NationalHolidayServiceError {
             throw error
@@ -103,13 +103,13 @@ struct NationalHolidayService {
         return DayKey(year: year, month: month, day: day)
     }
 
-    private func mapToServiceError(_ error: NationalHolidayRepositoryError) -> NationalHolidayServiceError {
+    private func mapToServiceError(_ error: APIError) -> NationalHolidayServiceError {
         switch error {
         case .network:
             return .network
         case .decoding:
             return .decoding
-        case .invalidURL, .invalidResponse, .backend, .unexpected:
+        case .invalidRequest, .invalidResponse, .backend, .encoding, .unexpected:
             return .unexpected
         }
     }

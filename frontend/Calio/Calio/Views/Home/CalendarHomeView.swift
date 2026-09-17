@@ -11,6 +11,7 @@ struct CalendarHomeView: View {
     @StateObject private var viewModel: CalendarHomeViewModel
     @State private var displayMode: CalendarDisplayMode = .week
     @State private var isShowingEventCreationView = false
+    @State private var isShowingAssistant = false
     private let onGoogleCalendarConnectTapped: () -> Void
     
     private let minimumStripViewHeight: CGFloat = 110
@@ -52,6 +53,7 @@ struct CalendarHomeView: View {
                     onResetEventMutation: viewModel.resetMutationState,
                     onResetTagMutation: viewModel.resetTagMutationState,
                     onFetchRecurrenceEvent: viewModel.fetchRecurrenceEvent(recurrenceId:),
+                    onUpdateImportantEvent: viewModel.updateImportantEvent(_:importantEvent:),
                     onUpdateSingleEvent: viewModel.updateSingleEvent(_:input:),
                     onUpdateRecurrenceOccurrence: viewModel.updateRecurrenceOccurrence(_:input:),
                     onUpdateRecurrenceSeries: viewModel.updateRecurrenceSeries(recurrenceId:input:),
@@ -63,6 +65,7 @@ struct CalendarHomeView: View {
                     onDeleteCustomTag: viewModel.deleteCustomTag(_:)
                 )
             }
+            .background(Color.calioBackground)
             .animation(.easeInOut(duration: 0.2), value: displayMode)
             .task {
                 viewModel.loadTagsIfNeeded()
@@ -72,6 +75,10 @@ struct CalendarHomeView: View {
                 isPresented: $isShowingEventCreationView,
                 viewModel: viewModel,
                 referenceDay: viewModel.referenceDay
+            )
+            .calendarAssistantFloatingEntry(
+                isPresented: $isShowingAssistant,
+                onCalendarRefreshNeeded: viewModel.refreshAfterAssistantResponse
             )
         }
     }

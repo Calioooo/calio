@@ -10,7 +10,6 @@ public final class GroupSpaceFields {
     private static final int MAX_NAME_CODE_POINTS = 30;
     private static final int MAX_EMOJI_CODE_POINTS = 64;
     private static final Pattern NICKNAME_PATTERN = Pattern.compile("^[A-Za-z0-9가-힣]{1,9}$");
-
     private GroupSpaceFields() {
     }
 

@@ -99,7 +99,7 @@ class EventCommandServiceTest {
     void givenCanonicalUpdate_whenUpdateEvent_thenReplacesStateAndFlushes() {
         // given
         Event event = event();
-        Tag updatedTag = new Tag(TagType.CUSTOM, "업무", "#112233", account());
+        Tag updatedTag = Tag.personalCustom(account(), "업무", "#112233");
         UpdateEventRequest request = new UpdateEventRequest(
                 "Updated",
                 null,
@@ -166,7 +166,7 @@ class EventCommandServiceTest {
                 false,
                 "UTC",
                 null,
-                new Tag(TagType.DEFAULT, "기타", "#64748B"),
+                Tag.personalDefault("기타", "#64748B"),
                 account()
         );
         ReflectionTestUtils.setField(event, "id", 10L);

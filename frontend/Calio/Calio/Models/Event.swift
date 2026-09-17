@@ -10,6 +10,21 @@ import Foundation
 enum CalendarTagType: String, Decodable, Equatable {
     case defaultTag = "DEFAULT"
     case custom = "CUSTOM"
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        switch try container.decode(String.self) {
+        case "DEFAULT", "PERSONAL_DEFAULT", "GROUP_DEFAULT":
+            self = .defaultTag
+        case "CUSTOM":
+            self = .custom
+        default:
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "Unsupported calendar tag type."
+            )
+        }
+    }
 }
 
 struct CalendarTag: Identifiable, Equatable {
@@ -43,11 +58,16 @@ struct Event: Identifiable {
     let startAt: Date
     let endAt: Date
     let isAllDay: Bool
+    let timeZone: String?
     let tag: CalendarTag
     let importantEvent: Bool
     let recurrenceId: Int64?
     let isRecurrenceOccurrence: Bool
     let originStartAt: Date?
+
+    var isRepeated: Bool {
+        isRecurrenceOccurrence || recurrenceId != nil
+    }
     
     init(
         id: Int64? = nil,
@@ -56,6 +76,7 @@ struct Event: Identifiable {
         startAt: Date,
         endAt: Date,
         isAllDay: Bool = false,
+        timeZone: String? = nil,
         tag: CalendarTag = .fallback,
         importantEvent: Bool = false,
         recurrenceId: Int64? = nil,
@@ -68,6 +89,7 @@ struct Event: Identifiable {
         self.startAt = startAt
         self.endAt = endAt
         self.isAllDay = isAllDay
+        self.timeZone = timeZone
         self.tag = tag
         self.importantEvent = importantEvent
         self.recurrenceId = recurrenceId
