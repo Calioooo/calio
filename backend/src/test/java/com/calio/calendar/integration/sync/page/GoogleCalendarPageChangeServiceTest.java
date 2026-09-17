@@ -37,7 +37,6 @@ import com.calio.calendar.integration.sync.page.dto.GoogleCalendarNormalizedPage
 import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.tag.domain.Tag;
-import com.calio.calendar.tag.domain.TagType;
 import com.calio.calendar.tag.repository.TagRepository;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -199,7 +198,7 @@ class GoogleCalendarPageChangeServiceTest {
   void
       givenConflictedRecurrenceEventConversion_whenPersistEventUpsert_thenDoesNotCreateEventMapping() {
     // given
-    tagRepository.saveAndFlush(new Tag(TagType.DEFAULT, "기타", "#64748B"));
+    tagRepository.saveAndFlush(Tag.personalDefault("기타", "#64748B"));
     String externalEventId = "converted-event";
     applyNormalizedPage(
         integration.getId(),
@@ -268,7 +267,7 @@ class GoogleCalendarPageChangeServiceTest {
   void
       givenConflictedEventConversion_whenPersistRecurrenceUpsert_thenDoesNotCreateRecurrenceEventMapping() {
     // given
-    tagRepository.saveAndFlush(new Tag(TagType.DEFAULT, "기타", "#64748B"));
+    tagRepository.saveAndFlush(Tag.personalDefault("기타", "#64748B"));
     String externalEventId = "converted-recurrence";
     applyNormalizedPage(
         integration.getId(),
