@@ -126,8 +126,16 @@ def formatter_commands(mode, paths, root=ROOT):
         for offset in range(0, len(java), 50):
             selected = json.dumps(list(map(str, java[offset:offset + 50])))
             commands.append((
-                ["bash", str(root / "backend/gradlew"), task, "--console=plain", "-q",
-                 "-PcalioFormatFiles=" + selected], root / "backend",
+                [
+                    "java",
+                    "-jar",
+                    str(root / "backend/gradle/wrapper/gradle-wrapper.jar"),
+                    task,
+                    "--console=plain",
+                    "-q",
+                    "-PcalioFormatFiles=" + selected,
+                ],
+                root / "backend",
             ))
     if swift:
         command = swift_command(root)
