@@ -6,6 +6,7 @@ import com.calio.calendar.vote.controller.dto.SubmitVoteRequest;
 import com.calio.calendar.vote.controller.dto.VoteParticipantResponse;
 import com.calio.calendar.vote.controller.dto.VoteParticipantSelectionResponse;
 import com.calio.calendar.vote.controller.dto.VoteSubmissionResponse;
+import com.calio.calendar.vote.service.VoteParticipantSelectionLookupService;
 import com.calio.calendar.vote.service.VoteParticipantService;
 import jakarta.validation.Valid;
 import java.util.UUID;
@@ -23,9 +24,14 @@ import org.springframework.web.bind.annotation.RestController;
 public class VoteParticipantController {
 
     private final VoteParticipantService voteParticipantService;
+    private final VoteParticipantSelectionLookupService voteParticipantSelectionLookupService;
 
-    public VoteParticipantController(VoteParticipantService voteParticipantService) {
+    public VoteParticipantController(
+            VoteParticipantService voteParticipantService,
+            VoteParticipantSelectionLookupService voteParticipantSelectionLookupService
+    ) {
         this.voteParticipantService = voteParticipantService;
+        this.voteParticipantSelectionLookupService = voteParticipantSelectionLookupService;
     }
 
     @PostMapping("/participants")
@@ -50,6 +56,6 @@ public class VoteParticipantController {
             @PathVariable UUID publicId,
             @Valid @RequestBody LookupVoteParticipantSelectionRequest request
     ) {
-        return voteParticipantService.lookupSelection(publicId, request);
+        return voteParticipantSelectionLookupService.lookup(publicId, request);
     }
 }

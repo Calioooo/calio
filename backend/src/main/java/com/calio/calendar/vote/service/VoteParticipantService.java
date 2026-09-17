@@ -3,15 +3,12 @@ package com.calio.calendar.vote.service;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.vote.controller.dto.CreateVoteParticipantRequest;
-import com.calio.calendar.vote.controller.dto.LookupVoteParticipantSelectionRequest;
 import com.calio.calendar.vote.controller.dto.SubmitVoteRequest;
 import com.calio.calendar.vote.controller.dto.VoteParticipantResponse;
-import com.calio.calendar.vote.controller.dto.VoteParticipantSelectionResponse;
 import com.calio.calendar.vote.controller.dto.VoteSubmissionResponse;
 import com.calio.calendar.vote.domain.Vote;
 import com.calio.calendar.vote.domain.VoteParticipant;
 import com.calio.calendar.vote.domain.VoteRoom;
-import com.calio.calendar.vote.domain.VoteParticipantStatus;
 import java.time.LocalDate;
 import java.text.Normalizer;
 import java.util.LinkedHashSet;
@@ -31,20 +28,17 @@ public class VoteParticipantService {
     private final VoteParticipantQueryService voteParticipantQueryService;
     private final VoteParticipantCommandService voteParticipantCommandService;
     private final VoteCommandService voteCommandService;
-    private final VoteRoomQueryService voteRoomQueryService;
     private final PasswordEncoder passwordEncoder;
 
     public VoteParticipantService(
             VoteParticipantQueryService voteParticipantQueryService,
             VoteParticipantCommandService voteParticipantCommandService,
             VoteCommandService voteCommandService,
-            VoteRoomQueryService voteRoomQueryService,
             PasswordEncoder passwordEncoder
     ) {
         this.voteParticipantQueryService = voteParticipantQueryService;
         this.voteParticipantCommandService = voteParticipantCommandService;
         this.voteCommandService = voteCommandService;
-        this.voteRoomQueryService = voteRoomQueryService;
         this.passwordEncoder = passwordEncoder;
     }
 
@@ -83,22 +77,6 @@ public class VoteParticipantService {
                 .toList();
         voteCommandService.replaceVotes(lockedParticipant, votes);
         return VoteSubmissionResponse.from(lockedParticipant, unavailableDates);
-    }
-
-    public VoteParticipantSelectionResponse lookupSelection(
-            UUID voteRoomPublicId,
-            LookupVoteParticipantSelectionRequest request
-    ) {
-        voteRoomQueryService.getByPublicId(voteRoomPublicId);
-        String nickname = normalizeNickname(request.nickname());
-        VoteParticipant participant = voteParticipantQueryService
-                .getParticipantByVoteRoomPublicIdAndNicknameIfExists(voteRoomPublicId, nickname)
-                .orElseThrow(() -> new CalioException(ErrorCode.VOTE_PARTICIPANT_CREDENTIAL_INVALID));
-        requireValidPassword(participant, request.password());
-        List<LocalDate> unavailableDates = participant.getStatus() == VoteParticipantStatus.SUBMITTED
-                ? voteParticipantQueryService.listUnavailableDatesByVoteParticipantId(participant.getId())
-                : List.of();
-        return VoteParticipantSelectionResponse.from(participant, unavailableDates);
     }
 
     private void requireNicknameAvailable(UUID voteRoomPublicId, String nickname) {

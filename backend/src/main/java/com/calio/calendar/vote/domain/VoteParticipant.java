@@ -72,6 +72,10 @@ public class VoteParticipant extends BaseEntity {
         return status;
     }
 
+    public boolean hasSubmittedVotes() {
+        return status == VoteParticipantStatus.SUBMITTED;
+    }
+
     public void submit() {
         this.status = VoteParticipantStatus.SUBMITTED;
     }
