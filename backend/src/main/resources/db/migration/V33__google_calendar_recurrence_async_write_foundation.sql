@@ -66,21 +66,31 @@ ALTER TABLE google_operation_jobs
              AND target_payload IS NULL
              AND job_trigger IN ('MANUAL', 'PERIODIC'))
             OR
-            (job_scope = 'EVENT' AND event_operation_kind IN ('CREATE', 'UPDATE', 'DELETE')
-             AND event_id IS NOT NULL AND target_payload IS NOT NULL AND job_trigger IS NULL
+            (job_scope = 'EVENT' AND event_id IS NOT NULL AND job_trigger IS NULL
+             AND ((event_operation_kind IN ('CREATE', 'UPDATE') AND target_payload IS NOT NULL)
+                  OR (event_operation_kind = 'DELETE' AND target_payload IS NULL))
              AND recurrence_operation_kind IS NULL AND recurrence_event_id IS NULL
              AND origin_start_at IS NULL AND recurrence_target_payload IS NULL
              AND recurrence_provider_identity IS NULL)
             OR
             (job_scope = 'RECURRENCE'
              AND recurrence_operation_kind IN ('MASTER_CREATE', 'MASTER_UPDATE', 'MASTER_DELETE', 'OVERRIDE_UPSERT', 'OVERRIDE_DELETE')
-             AND recurrence_event_id IS NOT NULL AND recurrence_target_payload IS NOT NULL
+             AND recurrence_event_id IS NOT NULL
              AND job_trigger IS NULL AND event_operation_kind IS NULL AND event_id IS NULL
              AND target_payload IS NULL
              AND ((recurrence_operation_kind = 'MASTER_CREATE'
-                   AND origin_start_at IS NULL AND recurrence_provider_identity IS NOT NULL)
-                  OR (recurrence_operation_kind IN ('MASTER_UPDATE', 'MASTER_DELETE')
-                      AND origin_start_at IS NULL AND recurrence_provider_identity IS NULL)
-                  OR (recurrence_operation_kind IN ('OVERRIDE_UPSERT', 'OVERRIDE_DELETE')
-                      AND origin_start_at IS NOT NULL AND recurrence_provider_identity IS NULL)))
+                   AND origin_start_at IS NULL AND recurrence_provider_identity IS NOT NULL
+                   AND recurrence_target_payload IS NOT NULL)
+                  OR (recurrence_operation_kind = 'MASTER_UPDATE'
+                      AND origin_start_at IS NULL AND recurrence_provider_identity IS NULL
+                      AND recurrence_target_payload IS NOT NULL)
+                  OR (recurrence_operation_kind = 'MASTER_DELETE'
+                      AND origin_start_at IS NULL AND recurrence_provider_identity IS NULL
+                      AND recurrence_target_payload IS NULL)
+                  OR (recurrence_operation_kind = 'OVERRIDE_UPSERT'
+                      AND origin_start_at IS NOT NULL AND recurrence_provider_identity IS NULL
+                      AND recurrence_target_payload IS NOT NULL)
+                  OR (recurrence_operation_kind = 'OVERRIDE_DELETE'
+                      AND origin_start_at IS NOT NULL AND recurrence_provider_identity IS NULL
+                      AND recurrence_target_payload IS NULL)))
         );

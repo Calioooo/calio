@@ -364,36 +364,6 @@ class GoogleCalendarRecurrenceJobHandlerTest {
     verifyNoInteractions(tokens, client);
   }
 
-  @Test
-  @DisplayName("null recurrence payload는 invalid request로 종료한다")
-  void nullRecurrencePayloadIsRejected() {
-    GoogleCalendarRecurrenceJob job = job(GoogleCalendarRecurrenceJobKind.RECURRENCE_UPDATE, null);
-    ReflectionTestUtils.setField(job, "targetPayload", "null");
-
-    assertThatThrownBy(() -> handlerWith(new ObjectMapper()).execute(job, "worker"))
-        .isInstanceOfSatisfying(
-            CalioException.class,
-            exception ->
-                assertThat(exception.getErrorCode())
-                    .isEqualTo(ErrorCode.GOOGLE_CALENDAR_REQUEST_INVALID));
-    verifyNoInteractions(tokens, client);
-  }
-
-  @Test
-  @DisplayName("recurrence가 누락된 recurrence-event payload는 invalid request로 종료한다")
-  void missingRecurrencePayloadIsRejected() {
-    GoogleCalendarRecurrenceJob job = job(GoogleCalendarRecurrenceJobKind.RECURRENCE_UPDATE, null);
-    ReflectionTestUtils.setField(job, "targetPayload", "{\"title\":\"daily\"}");
-
-    assertThatThrownBy(() -> handlerWith(new ObjectMapper()).execute(job, "worker"))
-        .isInstanceOfSatisfying(
-            CalioException.class,
-            exception ->
-                assertThat(exception.getErrorCode())
-                    .isEqualTo(ErrorCode.GOOGLE_CALENDAR_REQUEST_INVALID));
-    verifyNoInteractions(tokens, client);
-  }
-
   private void givenConnectedConnectionWithoutMapping(GoogleCalendarConnection connection) {
     when(connections.getConnectedConnectionByIntegrationIdIfExists(20L))
         .thenReturn(Optional.of(connection));
@@ -423,7 +393,7 @@ class GoogleCalendarRecurrenceJobHandlerTest {
 
   private GoogleCalendarRecurrenceJobHandler handlerWith(ObjectMapper mapper) {
     return new GoogleCalendarRecurrenceJobHandler(
-        connections, mappings, mappingCommands, tokens, client, mapper, jobs, transaction);
+        connections, mappings, mappingCommands, tokens, client, jobs, transaction);
   }
 
   private GoogleCalendarRecurrenceJob job(GoogleCalendarRecurrenceJobKind kind, Instant origin) {
@@ -436,7 +406,7 @@ class GoogleCalendarRecurrenceJobHandlerTest {
             kind,
             40L,
             origin,
-            "payload",
+            recurrencePayload(kind),
             kind == GoogleCalendarRecurrenceJobKind.RECURRENCE_CREATE ? "provider-id" : null,
             Instant.parse("2026-09-01T00:00:00Z"));
     ReflectionTestUtils.setField(job, "id", 50L);
@@ -486,6 +456,17 @@ class GoogleCalendarRecurrenceJobHandlerTest {
         false,
         "UTC",
         List.of("RRULE:FREQ=DAILY"));
+  }
+
+  private GoogleRecurrenceJobPayload recurrencePayload(GoogleCalendarRecurrenceJobKind kind) {
+    if (kind == GoogleCalendarRecurrenceJobKind.RECURRENCE_DELETE
+        || kind == GoogleCalendarRecurrenceJobKind.OVERRIDE_DELETE) {
+      return null;
+    }
+    if (kind == GoogleCalendarRecurrenceJobKind.OVERRIDE_UPSERT) {
+      return GoogleRecurrenceJobPayload.from(overridePayload());
+    }
+    return recurrenceEventPayload();
   }
 
   private GoogleRecurrenceOverrideJobPayload overridePayload() {
