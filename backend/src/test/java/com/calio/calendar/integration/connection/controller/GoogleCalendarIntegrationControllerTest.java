@@ -15,7 +15,9 @@ import com.calio.calendar.external.google.GoogleOAuthProperties;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventPage;
 import com.calio.calendar.external.google.dto.GoogleTokenResponse;
 import com.calio.calendar.external.google.dto.GoogleUserInfoResponse;
+import com.calio.calendar.integration.connection.domain.GoogleCalendarConnection;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
+import com.calio.calendar.integration.connection.repository.GoogleCalendarConnectionRepository;
 import com.calio.calendar.integration.connection.repository.GoogleCalendarIntegrationRepository;
 import com.calio.calendar.integration.sync.GoogleCalendarSyncMode;
 import com.calio.calendar.integration.sync.operation.GoogleOperationWorker;
@@ -71,6 +73,8 @@ class GoogleCalendarIntegrationControllerTest {
 
   @Autowired private GoogleCalendarIntegrationRepository googleCalendarIntegrationRepository;
 
+  @Autowired private GoogleCalendarConnectionRepository googleCalendarConnectionRepository;
+
   @Autowired private GoogleOperationJobRepository googleOperationJobRepository;
 
   @MockitoBean private GoogleOperationWorker googleOperationWorker;
@@ -78,6 +82,7 @@ class GoogleCalendarIntegrationControllerTest {
   @BeforeEach
   void setUp() {
     googleOperationJobRepository.deleteAll();
+    googleCalendarConnectionRepository.deleteAll();
     googleCalendarIntegrationRepository.deleteAll();
     googleOAuthClient.reset();
     googleCalendarEventsClient.reset();
@@ -170,6 +175,7 @@ class GoogleCalendarIntegrationControllerTest {
 
     GoogleCalendarIntegration integration =
         googleCalendarIntegrationRepository.findAll().getFirst();
+    GoogleCalendarConnection connection = googleCalendarConnectionRepository.findAll().getFirst();
     List<GoogleOperationJob> jobs = googleOperationJobRepository.findAll();
     assertThat(jobs).hasSize(2);
     GoogleOperationJob job =
@@ -178,7 +184,8 @@ class GoogleCalendarIntegrationControllerTest {
             .findFirst()
             .orElseThrow();
     assertThat(job.getOperationId()).isNotBlank();
-    assertThat(job.getIntegrationId()).isEqualTo(integration.getId());
+    assertThat(connection.getIntegration().getId()).isEqualTo(integration.getId());
+    assertThat(job.getConnectionId()).isEqualTo(connection.getId());
     assertThat(job.getAccountId()).isEqualTo(integration.getAccountId());
     assertThat(job.getAccountSequence()).isEqualTo(2L);
     assertThat(job.getKind()).isEqualTo(GoogleOperationJob.SYNC_KIND);

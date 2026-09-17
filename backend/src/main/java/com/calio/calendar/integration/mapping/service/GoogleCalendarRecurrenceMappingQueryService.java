@@ -14,90 +14,59 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class GoogleCalendarRecurrenceMappingQueryService {
 
-    private final GoogleCalendarRecurrenceEventMappingRepository recurrenceMappingRepository;
-    private final GoogleCalendarRecurrenceOverrideMappingRepository overrideMappingRepository;
+  private final GoogleCalendarRecurrenceEventMappingRepository recurrenceMappingRepository;
+  private final GoogleCalendarRecurrenceOverrideMappingRepository overrideMappingRepository;
 
-    public GoogleCalendarRecurrenceMappingQueryService(
-            GoogleCalendarRecurrenceEventMappingRepository recurrenceMappingRepository,
-            GoogleCalendarRecurrenceOverrideMappingRepository overrideMappingRepository
-    ) {
-        this.recurrenceMappingRepository = recurrenceMappingRepository;
-        this.overrideMappingRepository = overrideMappingRepository;
-    }
+  public GoogleCalendarRecurrenceMappingQueryService(
+      GoogleCalendarRecurrenceEventMappingRepository recurrenceMappingRepository,
+      GoogleCalendarRecurrenceOverrideMappingRepository overrideMappingRepository) {
+    this.recurrenceMappingRepository = recurrenceMappingRepository;
+    this.overrideMappingRepository = overrideMappingRepository;
+  }
 
-    public List<GoogleCalendarRecurrenceEventMapping> listRecurrenceEventMappings(
-            Long integrationId,
-            String calendarKey,
-            Collection<String> externalEventIds
-    ) {
-        return recurrenceMappingRepository.findAllWithRecurrenceEventAndTagByExternalIdentity(
-                integrationId,
-                calendarKey,
-                externalEventIds
-        );
-    }
+  public List<GoogleCalendarRecurrenceEventMapping> listRecurrenceEventMappings(
+      Long connectionId, String calendarKey, Collection<String> externalEventIds) {
+    return recurrenceMappingRepository.findAllWithRecurrenceEventAndTagByExternalIdentity(
+        connectionId, calendarKey, externalEventIds);
+  }
 
-    public List<GoogleCalendarRecurrenceEventMapping> listRecurrenceEventMappings(
-            Long integrationId
-    ) {
-        return recurrenceMappingRepository.findAllWithRecurrenceEventByIntegrationId(integrationId);
-    }
+  public List<GoogleCalendarRecurrenceEventMapping> listRecurrenceEventMappings(Long connectionId) {
+    return recurrenceMappingRepository.findAllWithRecurrenceEventByConnectionId(connectionId);
+  }
 
-    public boolean hasExternalRecurrenceEventMapping(Long recurrenceEventId, Long accountId) {
-        return recurrenceMappingRepository
-                .existsByRecurrenceEvent_IdAndIntegration_AccountId(recurrenceEventId, accountId);
-    }
+  public boolean hasExternalRecurrenceEventMapping(Long recurrenceEventId, Long accountId) {
+    return recurrenceMappingRepository.existsByRecurrenceEvent_IdAndIntegration_AccountId(
+        recurrenceEventId, accountId);
+  }
 
-    public List<GoogleCalendarRecurrenceEventMapping> listRecurrenceEventMappingBatch(
-            Long integrationId,
-            Long afterId,
-            int limit
-    ) {
-        return recurrenceMappingRepository.findNextBatchWithRecurrenceEventByIntegrationId(
-                integrationId,
-                afterId,
-                PageRequest.of(0, limit)
-        );
-    }
+  public List<GoogleCalendarRecurrenceEventMapping> listRecurrenceEventMappingBatch(
+      Long connectionId, Long afterId, int limit) {
+    return recurrenceMappingRepository.findNextBatchWithRecurrenceEventByConnectionId(
+        connectionId, afterId, PageRequest.of(0, limit));
+  }
 
-    public List<GoogleCalendarRecurrenceOverrideMapping> listOverrideMappings(
-            Collection<Long> recurrenceEventMappingIds
-    ) {
-        return overrideMappingRepository
-                .findAllWithRecurrenceEventMappingAndRecurrenceEventOverrideByRecurrenceEventMappingIds(
-                        recurrenceEventMappingIds
-                );
-    }
+  public List<GoogleCalendarRecurrenceOverrideMapping> listOverrideMappings(
+      Collection<Long> recurrenceEventMappingIds) {
+    return overrideMappingRepository
+        .findAllWithRecurrenceEventMappingAndRecurrenceEventOverrideByRecurrenceEventMappingIds(
+            recurrenceEventMappingIds);
+  }
 
-    public List<GoogleCalendarRecurrenceOverrideMapping> listOverrideMappings(
-            Long integrationId,
-            String calendarKey,
-            Collection<String> externalEventIds
-    ) {
-        return overrideMappingRepository.findAllWithRecurrenceEventMappingByExternalEventIds(
-                integrationId,
-                calendarKey,
-                externalEventIds
-        );
-    }
+  public List<GoogleCalendarRecurrenceOverrideMapping> listOverrideMappings(
+      Long connectionId, String calendarKey, Collection<String> externalEventIds) {
+    return overrideMappingRepository.findAllWithRecurrenceEventMappingByExternalEventIds(
+        connectionId, calendarKey, externalEventIds);
+  }
 
-    public List<GoogleCalendarRecurrenceOverrideMapping> listOverrideMappings(Long integrationId) {
-        return overrideMappingRepository
-                .findAllWithRecurrenceEventMappingAndRecurrenceEventOverrideByIntegrationId(
-                        integrationId
-                );
-    }
+  public List<GoogleCalendarRecurrenceOverrideMapping> listOverrideMappings(Long connectionId) {
+    return overrideMappingRepository
+        .findAllWithRecurrenceEventMappingAndRecurrenceEventOverrideByConnectionId(connectionId);
+  }
 
-    public List<GoogleCalendarRecurrenceOverrideMapping> listOverrideMappingBatch(
-            Long integrationId,
-            Long afterId,
-            int limit
-    ) {
-        return overrideMappingRepository
-                .findNextBatchWithRecurrenceEventMappingAndRecurrenceEventOverrideByIntegrationId(
-                        integrationId,
-                        afterId,
-                        PageRequest.of(0, limit)
-                );
-    }
+  public List<GoogleCalendarRecurrenceOverrideMapping> listOverrideMappingBatch(
+      Long connectionId, Long afterId, int limit) {
+    return overrideMappingRepository
+        .findNextBatchWithRecurrenceEventMappingAndRecurrenceEventOverrideByConnectionId(
+            connectionId, afterId, PageRequest.of(0, limit));
+  }
 }

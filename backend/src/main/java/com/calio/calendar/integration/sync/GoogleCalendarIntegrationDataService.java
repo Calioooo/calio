@@ -3,7 +3,7 @@ package com.calio.calendar.integration.sync;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.event.service.EventCommandService;
-import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrationCommandService;
+import com.calio.calendar.integration.connection.service.GoogleCalendarConnectionCommandService;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarRecurrenceEventMapping;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarRecurrenceOverrideMapping;
@@ -29,7 +29,7 @@ public class GoogleCalendarIntegrationDataService {
   private static final int SYNC_CLEANUP_BATCH_SIZE = 500;
   private static final long FIRST_MAPPING_ID = 0L;
 
-  private final GoogleCalendarIntegrationCommandService integrationCommandService;
+  private final GoogleCalendarConnectionCommandService connectionCommandService;
   private final GoogleCalendarEventMappingQueryService eventMappingQueryService;
   private final GoogleCalendarEventMappingCommandService eventMappingCommandService;
   private final GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService;
@@ -42,7 +42,7 @@ public class GoogleCalendarIntegrationDataService {
   private final GoogleOperationJobQueryService operationJobQueryService;
 
   public GoogleCalendarIntegrationDataService(
-      GoogleCalendarIntegrationCommandService integrationCommandService,
+      GoogleCalendarConnectionCommandService connectionCommandService,
       GoogleCalendarEventMappingQueryService eventMappingQueryService,
       GoogleCalendarEventMappingCommandService eventMappingCommandService,
       GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService,
@@ -53,7 +53,7 @@ public class GoogleCalendarIntegrationDataService {
       GoogleOperationLeaseService operationLeaseService,
       GoogleOperationJobService operationJobService,
       GoogleOperationJobQueryService operationJobQueryService) {
-    this.integrationCommandService = integrationCommandService;
+    this.connectionCommandService = connectionCommandService;
     this.eventMappingQueryService = eventMappingQueryService;
     this.eventMappingCommandService = eventMappingCommandService;
     this.recurrenceMappingQueryService = recurrenceMappingQueryService;
@@ -67,9 +67,9 @@ public class GoogleCalendarIntegrationDataService {
   }
 
   @Transactional
-  public void deleteIntegrationData(Long integrationId) {
-    deleteAllMappedRecurrenceData(integrationId);
-    deleteAllMappedEventData(integrationId);
+  public void deleteConnectionData(Long connectionId) {
+    deleteAllMappedRecurrenceData(connectionId);
+    deleteAllMappedEventData(connectionId);
   }
 
   @Transactional
@@ -82,7 +82,7 @@ public class GoogleCalendarIntegrationDataService {
   public void completeSyncRun(
       Long jobId,
       Long accountId,
-      Long integrationId,
+      Long connectionId,
       String workerToken,
       GoogleCalendarSyncMode syncMode,
       Set<String> seenEventIds,
@@ -93,8 +93,9 @@ public class GoogleCalendarIntegrationDataService {
     operationLeaseService.extend(ownership.jobId(), ownership.accountId(), ownership.workerToken());
     requireNextSyncToken(nextSyncToken);
     removeDataMissingFromFullSync(
-        integrationId, ownership, syncMode, seenEventIds, seenRecurrenceEventIds, seenOverrideIds);
-    integrationCommandService.changeNextSyncToken(integrationId, nextSyncToken);
+        connectionId, ownership, syncMode, seenEventIds, seenRecurrenceEventIds, seenOverrideIds);
+    connectionCommandService.changeNextSyncToken(
+        connectionCommandService.lockConnectedConnectionById(connectionId), nextSyncToken);
     completeOperationJob(ownership);
   }
 
@@ -105,7 +106,7 @@ public class GoogleCalendarIntegrationDataService {
   }
 
   private void removeDataMissingFromFullSync(
-      Long integrationId,
+      Long connectionId,
       OperationOwnership ownership,
       GoogleCalendarSyncMode syncMode,
       Set<String> seenEventIds,
@@ -114,18 +115,18 @@ public class GoogleCalendarIntegrationDataService {
     if (syncMode != GoogleCalendarSyncMode.FULL) {
       return;
     }
-    deleteUnseenOverridesInBatches(integrationId, ownership, seenOverrideIds);
-    deleteUnseenEventsInBatches(integrationId, ownership, seenEventIds);
-    deleteUnseenRecurrenceEventsInBatches(integrationId, ownership, seenRecurrenceEventIds);
+    deleteUnseenOverridesInBatches(connectionId, ownership, seenOverrideIds);
+    deleteUnseenEventsInBatches(connectionId, ownership, seenEventIds);
+    deleteUnseenRecurrenceEventsInBatches(connectionId, ownership, seenRecurrenceEventIds);
   }
 
   private void deleteUnseenOverridesInBatches(
-      Long integrationId,
+      Long connectionId,
       OperationOwnership ownership,
       Set<GoogleCalendarRecurrenceOverrideExternalKey> seenOverrideIds) {
     long afterId = FIRST_MAPPING_ID;
     while (true) {
-      Long nextId = deleteNextOverrideBatch(integrationId, ownership, seenOverrideIds, afterId);
+      Long nextId = deleteNextOverrideBatch(connectionId, ownership, seenOverrideIds, afterId);
       if (nextId == null) {
         return;
       }
@@ -134,14 +135,14 @@ public class GoogleCalendarIntegrationDataService {
   }
 
   private Long deleteNextOverrideBatch(
-      Long integrationId,
+      Long connectionId,
       OperationOwnership ownership,
       Set<GoogleCalendarRecurrenceOverrideExternalKey> seenOverrideIds,
       long afterId) {
     operationLeaseService.extend(ownership.jobId(), ownership.accountId(), ownership.workerToken());
     List<GoogleCalendarRecurrenceOverrideMapping> mappings =
         recurrenceMappingQueryService.listOverrideMappingBatch(
-            integrationId, afterId, SYNC_CLEANUP_BATCH_SIZE);
+            connectionId, afterId, SYNC_CLEANUP_BATCH_SIZE);
     if (mappings.isEmpty()) {
       return null;
     }
@@ -168,10 +169,10 @@ public class GoogleCalendarIntegrationDataService {
   }
 
   private void deleteUnseenEventsInBatches(
-      Long integrationId, OperationOwnership ownership, Set<String> seenEventIds) {
+      Long connectionId, OperationOwnership ownership, Set<String> seenEventIds) {
     long afterId = FIRST_MAPPING_ID;
     while (true) {
-      Long nextId = deleteNextEventBatch(integrationId, ownership, seenEventIds, afterId);
+      Long nextId = deleteNextEventBatch(connectionId, ownership, seenEventIds, afterId);
       if (nextId == null) {
         return;
       }
@@ -180,11 +181,11 @@ public class GoogleCalendarIntegrationDataService {
   }
 
   private Long deleteNextEventBatch(
-      Long integrationId, OperationOwnership ownership, Set<String> seenEventIds, long afterId) {
+      Long connectionId, OperationOwnership ownership, Set<String> seenEventIds, long afterId) {
     operationLeaseService.extend(ownership.jobId(), ownership.accountId(), ownership.workerToken());
     List<GoogleCalendarEventMapping> mappings =
         eventMappingQueryService.listEventMappingBatch(
-            integrationId, afterId, SYNC_CLEANUP_BATCH_SIZE);
+            connectionId, afterId, SYNC_CLEANUP_BATCH_SIZE);
     if (mappings.isEmpty()) {
       return null;
     }
@@ -206,11 +207,11 @@ public class GoogleCalendarIntegrationDataService {
   }
 
   private void deleteUnseenRecurrenceEventsInBatches(
-      Long integrationId, OperationOwnership ownership, Set<String> seenRecurrenceEventIds) {
+      Long connectionId, OperationOwnership ownership, Set<String> seenRecurrenceEventIds) {
     long afterId = FIRST_MAPPING_ID;
     while (true) {
       Long nextId =
-          deleteNextRecurrenceEventBatch(integrationId, ownership, seenRecurrenceEventIds, afterId);
+          deleteNextRecurrenceEventBatch(connectionId, ownership, seenRecurrenceEventIds, afterId);
       if (nextId == null) {
         return;
       }
@@ -219,14 +220,14 @@ public class GoogleCalendarIntegrationDataService {
   }
 
   private Long deleteNextRecurrenceEventBatch(
-      Long integrationId,
+      Long connectionId,
       OperationOwnership ownership,
       Set<String> seenRecurrenceEventIds,
       long afterId) {
     operationLeaseService.extend(ownership.jobId(), ownership.accountId(), ownership.workerToken());
     List<GoogleCalendarRecurrenceEventMapping> mappings =
         recurrenceMappingQueryService.listRecurrenceEventMappingBatch(
-            integrationId, afterId, SYNC_CLEANUP_BATCH_SIZE);
+            connectionId, afterId, SYNC_CLEANUP_BATCH_SIZE);
     if (mappings.isEmpty()) {
       return null;
     }
@@ -267,7 +268,7 @@ public class GoogleCalendarIntegrationDataService {
     GoogleCalendarEffectiveScope scope =
         GoogleCalendarEffectiveScope.event(mapping.getEvent().getId());
     if (!operationJobQueryService.hasPendingOutboundJob(
-        mapping.getIntegration().getAccountId(), mapping.getIntegration().getId(), scope)) {
+        mapping.getConnection().getAccountId(), mapping.getConnection().getId(), scope)) {
       return true;
     }
     mapping.markConflicted();
@@ -284,7 +285,7 @@ public class GoogleCalendarIntegrationDataService {
     GoogleCalendarEffectiveScope scope =
         GoogleCalendarEffectiveScope.recurrenceEvent(mapping.getRecurrenceEvent().getId());
     if (!operationJobQueryService.hasPendingOutboundJob(
-        mapping.getIntegration().getAccountId(), mapping.getIntegration().getId(), scope)) {
+        mapping.getConnection().getAccountId(), mapping.getConnection().getId(), scope)) {
       return true;
     }
     mapping.markConflicted();
@@ -303,8 +304,8 @@ public class GoogleCalendarIntegrationDataService {
             mapping.getRecurrenceEventMapping().getRecurrenceEvent().getId(),
             mapping.getRecurrenceEventOverride().getOriginStartAt());
     if (!operationJobQueryService.hasPendingOutboundJob(
-        mapping.getRecurrenceEventMapping().getIntegration().getAccountId(),
-        mapping.getRecurrenceEventMapping().getIntegration().getId(),
+        mapping.getRecurrenceEventMapping().getConnection().getAccountId(),
+        mapping.getRecurrenceEventMapping().getConnection().getId(),
         scope)) {
       return true;
     }
@@ -314,15 +315,15 @@ public class GoogleCalendarIntegrationDataService {
     return false;
   }
 
-  private void deleteAllMappedRecurrenceData(Long integrationId) {
-    deleteOverrides(recurrenceMappingQueryService.listOverrideMappings(integrationId));
+  private void deleteAllMappedRecurrenceData(Long connectionId) {
+    deleteOverrides(recurrenceMappingQueryService.listOverrideMappings(connectionId));
     recurrenceMappingQueryService
-        .listRecurrenceEventMappings(integrationId)
+        .listRecurrenceEventMappings(connectionId)
         .forEach(recurrenceChangeService::deleteRecurrenceEvent);
   }
 
-  private void deleteAllMappedEventData(Long integrationId) {
-    deleteEventMappings(eventMappingQueryService.listEventMappings(integrationId));
+  private void deleteAllMappedEventData(Long connectionId) {
+    deleteEventMappings(eventMappingQueryService.listEventMappings(connectionId));
   }
 
   private void deleteOverrides(List<GoogleCalendarRecurrenceOverrideMapping> mappings) {

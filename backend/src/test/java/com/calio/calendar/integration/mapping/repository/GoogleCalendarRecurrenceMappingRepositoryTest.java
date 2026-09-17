@@ -6,7 +6,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.common.domain.CanonicalSchedule;
+import com.calio.calendar.integration.connection.domain.GoogleCalendarConnection;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
+import com.calio.calendar.integration.connection.repository.GoogleCalendarConnectionRepository;
 import com.calio.calendar.integration.connection.repository.GoogleCalendarIntegrationRepository;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarRecurrenceEventMapping;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarRecurrenceOverrideMapping;
@@ -46,6 +48,8 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
 
   @Autowired private GoogleCalendarIntegrationRepository integrationRepository;
 
+  @Autowired private GoogleCalendarConnectionRepository connectionRepository;
+
   @Autowired private GoogleCalendarRecurrenceEventMappingRepository eventMappingRepository;
 
   @Autowired private GoogleCalendarRecurrenceOverrideMappingRepository overrideMappingRepository;
@@ -57,8 +61,7 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
     // given
     Account account = accountRepository.saveAndFlush(new Account());
     Tag tag = tagRepository.saveAndFlush(Tag.personalDefault("기타", "#64748B"));
-    GoogleCalendarIntegration integration =
-        integrationRepository.saveAndFlush(integration(account.getId()));
+    GoogleCalendarConnection connection = connection(account.getId());
     RecurrenceEvent recurrenceEvent =
         recurrenceEventRepository.saveAndFlush(recurrenceEvent(account, tag));
     RecurrenceEventOverride recurrenceOverride =
@@ -78,7 +81,7 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
     GoogleCalendarRecurrenceEventMapping eventMapping =
         eventMappingRepository.saveAndFlush(
             new GoogleCalendarRecurrenceEventMapping(
-                integration, recurrenceEvent, externalRecurrenceEventId, "a".repeat(64)));
+                connection, recurrenceEvent, externalRecurrenceEventId, "a".repeat(64)));
     GoogleCalendarRecurrenceOverrideMapping overrideMapping =
         overrideMappingRepository.saveAndFlush(
             new GoogleCalendarRecurrenceOverrideMapping(
@@ -90,7 +93,7 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
         .contains(externalRecurrenceEventId);
     assertThat(
             overrideMappingRepository.findAllWithRecurrenceEventMappingByExternalEventIds(
-                integration.getId(),
+                connection.getId(),
                 GoogleCalendarRecurrenceEventMapping.PRIMARY_CALENDAR_KEY,
                 List.of(externalRecurrenceOverrideId)))
         .extracting(GoogleCalendarRecurrenceOverrideMapping::getId)
@@ -221,15 +224,18 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
         .isInstanceOf(DataIntegrityViolationException.class);
   }
 
-  private GoogleCalendarIntegration integration(Long accountId) {
-    return new GoogleCalendarIntegration(
-        accountId,
-        "subject",
-        "user@example.com",
-        "encrypted-refresh",
-        "encrypted-access",
-        Instant.parse("2026-07-01T01:00:00Z"),
-        Instant.parse("2026-07-01T00:00:00Z"));
+  private GoogleCalendarConnection connection(Long accountId) {
+    GoogleCalendarIntegration integration =
+        integrationRepository.saveAndFlush(new GoogleCalendarIntegration(accountId));
+    return connectionRepository.saveAndFlush(
+        new GoogleCalendarConnection(
+            integration,
+            "subject",
+            "user@example.com",
+            "encrypted-refresh",
+            "encrypted-access",
+            Instant.parse("2026-07-01T01:00:00Z"),
+            Instant.parse("2026-07-01T00:00:00Z")));
   }
 
   private RecurrenceEvent recurrenceEvent(Account account, Tag tag) {
@@ -249,17 +255,16 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
   private RecurrenceFixture recurrenceFixture() {
     Account account = accountRepository.saveAndFlush(new Account());
     Tag tag = tagRepository.saveAndFlush(Tag.personalDefault("기타", "#64748B"));
-    GoogleCalendarIntegration integration =
-        integrationRepository.saveAndFlush(integration(account.getId()));
+    GoogleCalendarConnection connection = connection(account.getId());
     RecurrenceEvent recurrenceEvent =
         recurrenceEventRepository.saveAndFlush(recurrenceEvent(account, tag));
-    return new RecurrenceFixture(account, tag, integration, recurrenceEvent);
+    return new RecurrenceFixture(account, tag, connection, recurrenceEvent);
   }
 
   private GoogleCalendarRecurrenceEventMapping eventMapping(
       RecurrenceFixture fixture, RecurrenceEvent recurrenceEvent, String externalEventId) {
     return new GoogleCalendarRecurrenceEventMapping(
-        fixture.integration(), recurrenceEvent, externalEventId, "a".repeat(64));
+        fixture.connection(), recurrenceEvent, externalEventId, "a".repeat(64));
   }
 
   private RecurrenceEventOverride recurrenceOverride(
@@ -288,6 +293,6 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
   private record RecurrenceFixture(
       Account account,
       Tag tag,
-      GoogleCalendarIntegration integration,
+      GoogleCalendarConnection connection,
       RecurrenceEvent recurrenceEvent) {}
 }

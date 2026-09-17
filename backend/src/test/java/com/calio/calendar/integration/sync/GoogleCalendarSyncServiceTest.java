@@ -13,9 +13,9 @@ import com.calio.calendar.external.google.GoogleCalendarSyncTokenExpiredExceptio
 import com.calio.calendar.external.google.GoogleCalendarUnauthorizedException;
 import com.calio.calendar.external.google.GoogleOAuthProperties;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventPage;
-import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
+import com.calio.calendar.integration.connection.domain.GoogleCalendarConnection;
 import com.calio.calendar.integration.connection.service.GoogleCalendarAccessTokenService;
-import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrationQueryService;
+import com.calio.calendar.integration.connection.service.GoogleCalendarConnectionQueryService;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingQueryService;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarRecurrenceMappingQueryService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobQueryService;
@@ -255,6 +255,9 @@ class GoogleCalendarSyncServiceTest {
     assertThat(providerDataService.finalizeCount).isOne();
     assertThat(providerDataService.finalizedMode).isEqualTo(GoogleCalendarSyncMode.FULL);
     assertThat(providerDataService.finalizedCursor).isEqualTo("next-cursor");
+    assertThat(accessTokenService.requestedConnectionIds).containsExactly(20L);
+    assertThat(pagePersistenceService.persistedConnectionIds).containsExactly(20L, 20L);
+    assertThat(providerDataService.finalizedConnectionId).isEqualTo(20L);
     assertThat(providerDataService.finalizedSeenEventIds)
         .containsExactlyInAnyOrder("event-1", "event-2");
     assertThat(providerDataService.finalizedSeenRecurrenceEventIds)
@@ -326,27 +329,28 @@ class GoogleCalendarSyncServiceTest {
   }
 
   private static final class FakeIntegrationQueryService
-      extends GoogleCalendarIntegrationQueryService {
+      extends GoogleCalendarConnectionQueryService {
 
-    private final GoogleCalendarIntegration integration;
+    private final GoogleCalendarConnection connection;
 
     private FakeIntegrationQueryService(String nextSyncToken) {
       super(null);
-      integration = mock(GoogleCalendarIntegration.class);
-      when(integration.getId()).thenReturn(20L);
-      when(integration.getAccountId()).thenReturn(ACCOUNT_ID);
-      when(integration.getNextSyncToken()).thenReturn(nextSyncToken);
+      connection = mock(GoogleCalendarConnection.class);
+      when(connection.getId()).thenReturn(20L);
+      when(connection.getAccountId()).thenReturn(ACCOUNT_ID);
+      when(connection.getNextSyncToken()).thenReturn(nextSyncToken);
     }
 
     @Override
-    public GoogleCalendarIntegration getIntegration(Long accountId) {
-      return integration;
+    public GoogleCalendarConnection getConnectedConnection(Long accountId) {
+      return connection;
     }
   }
 
   private static final class FakeProviderDataService extends GoogleCalendarIntegrationDataService {
 
     private int finalizeCount;
+    private Long finalizedConnectionId;
     private GoogleCalendarSyncMode finalizedMode;
     private String finalizedCursor;
     private Set<String> finalizedSeenEventIds = Set.of();
@@ -372,7 +376,7 @@ class GoogleCalendarSyncServiceTest {
     public void completeSyncRun(
         Long jobId,
         Long accountId,
-        Long integrationId,
+        Long connectionId,
         String workerToken,
         GoogleCalendarSyncMode syncMode,
         Set<String> seenEventIds,
@@ -380,6 +384,7 @@ class GoogleCalendarSyncServiceTest {
         Set<GoogleCalendarRecurrenceOverrideExternalKey> seenOverrideIds,
         String nextSyncToken) {
       finalizeCount++;
+      finalizedConnectionId = connectionId;
       finalizedMode = syncMode;
       finalizedCursor = nextSyncToken;
       finalizedSeenEventIds = Set.copyOf(seenEventIds);
@@ -391,6 +396,7 @@ class GoogleCalendarSyncServiceTest {
   private static final class FakeAccessTokenService extends GoogleCalendarAccessTokenService {
 
     private int forceRefreshCount;
+    private final List<Long> requestedConnectionIds = new ArrayList<>();
 
     private FakeAccessTokenService() {
       super(
@@ -404,12 +410,13 @@ class GoogleCalendarSyncServiceTest {
     }
 
     @Override
-    public String getAccessToken(Long integrationId) {
+    public String getAccessToken(Long connectionId) {
+      requestedConnectionIds.add(connectionId);
       return "access-token";
     }
 
     @Override
-    public String forceRefresh(Long integrationId) {
+    public String forceRefresh(Long connectionId) {
       forceRefreshCount++;
       return "refreshed-access-token";
     }
@@ -462,10 +469,11 @@ class GoogleCalendarSyncServiceTest {
   private static final class FakePagePersistenceService extends GoogleCalendarPageChangeService {
 
     private int normalizedPersistCount;
+    private final List<Long> persistedConnectionIds = new ArrayList<>();
 
     private FakePagePersistenceService() {
       super(
-          mock(GoogleCalendarIntegrationQueryService.class),
+          mock(GoogleCalendarConnectionQueryService.class),
           mock(GoogleCalendarEventMappingQueryService.class),
           mock(GoogleCalendarEventChangeService.class),
           mock(GoogleCalendarRecurrenceMappingQueryService.class),
@@ -478,11 +486,12 @@ class GoogleCalendarSyncServiceTest {
 
     @Override
     public void applyNormalizedPage(
-        Long integrationId,
+        Long connectionId,
         Long accountId,
         GoogleCalendarPageOwnership ownership,
         GoogleCalendarNormalizedPage page) {
       normalizedPersistCount++;
+      persistedConnectionIds.add(connectionId);
     }
   }
 

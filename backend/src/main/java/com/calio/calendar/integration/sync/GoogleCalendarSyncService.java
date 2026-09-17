@@ -4,9 +4,9 @@ import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.external.google.GoogleCalendarSyncTokenExpiredException;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventPage;
-import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
+import com.calio.calendar.integration.connection.domain.GoogleCalendarConnection;
 import com.calio.calendar.integration.connection.service.GoogleCalendarAccessTokenService;
-import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrationQueryService;
+import com.calio.calendar.integration.connection.service.GoogleCalendarConnectionQueryService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationLeaseService;
 import com.calio.calendar.integration.sync.page.GoogleCalendarPageChangeService;
 import com.calio.calendar.integration.sync.page.GoogleCalendarPageNormalizer;
@@ -19,7 +19,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class GoogleCalendarSyncService {
 
-  private final GoogleCalendarIntegrationQueryService integrationQueryService;
+  private final GoogleCalendarConnectionQueryService connectionQueryService;
   private final GoogleCalendarIntegrationDataService integrationDataService;
   private final GoogleCalendarAccessTokenService accessTokenService;
   private final GoogleCalendarEventRequestService eventRequestService;
@@ -28,14 +28,14 @@ public class GoogleCalendarSyncService {
   private final GoogleOperationLeaseService operationLeaseService;
 
   public GoogleCalendarSyncService(
-      GoogleCalendarIntegrationQueryService integrationQueryService,
+      GoogleCalendarConnectionQueryService connectionQueryService,
       GoogleCalendarIntegrationDataService integrationDataService,
       GoogleCalendarAccessTokenService accessTokenService,
       GoogleCalendarEventRequestService eventRequestService,
       GoogleCalendarPageChangeService pageChangeService,
       GoogleCalendarPageNormalizer pageNormalizer,
       GoogleOperationLeaseService operationLeaseService) {
-    this.integrationQueryService = integrationQueryService;
+    this.connectionQueryService = connectionQueryService;
     this.integrationDataService = integrationDataService;
     this.accessTokenService = accessTokenService;
     this.eventRequestService = eventRequestService;
@@ -46,16 +46,16 @@ public class GoogleCalendarSyncService {
 
   public void synchronize(Long jobId, Long accountId, String workerToken) {
     operationLeaseService.extend(jobId, accountId, workerToken);
-    GoogleCalendarIntegration integration = integrationQueryService.getIntegration(accountId);
+    GoogleCalendarConnection connection = connectionQueryService.getConnectedConnection(accountId);
     SyncExecution execution =
         new SyncExecution(
-            integration.getId(),
-            integration.getAccountId(),
-            integration.getNextSyncToken(),
+            connection.getId(),
+            connection.getAccountId(),
+            connection.getNextSyncToken(),
             workerToken);
     GoogleCalendarSyncRunContext context =
         new GoogleCalendarSyncRunContext(
-            accessTokenService.getAccessToken(execution.integrationId()));
+            accessTokenService.getAccessToken(execution.connectionId()));
     synchronize(jobId, execution, context);
   }
 
@@ -85,12 +85,12 @@ public class GoogleCalendarSyncService {
       operationLeaseService.extend(jobId, execution.accountId(), execution.workerToken());
       GoogleCalendarEventPage page =
           eventRequestService.listEvents(
-              execution.integrationId(), mode, execution.nextSyncToken(), pageToken, context);
+              execution.connectionId(), mode, execution.nextSyncToken(), pageToken, context);
       GoogleCalendarNormalizedPage normalizedPage =
-          pageNormalizer.normalize(execution.integrationId(), page, context);
+          pageNormalizer.normalize(execution.connectionId(), page, context);
       operationLeaseService.extend(jobId, execution.accountId(), execution.workerToken());
       pageChangeService.applyNormalizedPage(
-          execution.integrationId(),
+          execution.connectionId(),
           execution.accountId(),
           new GoogleCalendarPageOwnership(jobId, execution.workerToken()),
           normalizedPage);
@@ -101,7 +101,7 @@ public class GoogleCalendarSyncService {
     integrationDataService.completeSyncRun(
         jobId,
         execution.accountId(),
-        execution.integrationId(),
+        execution.connectionId(),
         execution.workerToken(),
         mode,
         context.seenEventIds(),
@@ -123,5 +123,5 @@ public class GoogleCalendarSyncService {
   }
 
   private record SyncExecution(
-      Long integrationId, Long accountId, String nextSyncToken, String workerToken) {}
+      Long connectionId, Long accountId, String nextSyncToken, String workerToken) {}
 }
