@@ -212,8 +212,8 @@ class EventControllerTest {
                         .content("""
                                 {
                                   "title": "Invalid all day",
-                                  "startAt": "2026-06-10T01:00:00Z",
-                                  "endAt": "2026-06-11T01:00:00Z",
+                                  "startAt": "2026-06-10T03:59:59.999Z",
+                                  "endAt": "2026-06-11T03:59:59.999Z",
                                   "allDay": true
                                 }
                                 """))
