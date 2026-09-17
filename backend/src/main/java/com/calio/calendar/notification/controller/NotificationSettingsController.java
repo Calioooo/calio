@@ -16,24 +16,21 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/notification-settings")
 public class NotificationSettingsController {
 
-    private final AccountNotificationSettingsService settingsService;
+  private final AccountNotificationSettingsService settingsService;
 
-    public NotificationSettingsController(AccountNotificationSettingsService settingsService) {
-        this.settingsService = settingsService;
-    }
+  public NotificationSettingsController(AccountNotificationSettingsService settingsService) {
+    this.settingsService = settingsService;
+  }
 
-    @GetMapping
-    public NotificationSettingsResponse get(
-            @AuthenticationPrincipal AuthenticatedAccount account
-    ) {
-        return NotificationSettingsResponse.from(settingsService.get(account.accountId()));
-    }
+  @GetMapping
+  public NotificationSettingsResponse get(@AuthenticationPrincipal AuthenticatedAccount account) {
+    return NotificationSettingsResponse.from(settingsService.get(account.accountId()));
+  }
 
-    @PutMapping
-    public NotificationSettingsResponse update(
-            @AuthenticationPrincipal AuthenticatedAccount account,
-            @Valid @RequestBody UpdateNotificationSettingsRequest request
-    ) {
-        return NotificationSettingsResponse.from(settingsService.update(account.accountId(), request));
-    }
+  @PutMapping
+  public NotificationSettingsResponse update(
+      @AuthenticationPrincipal AuthenticatedAccount account,
+      @Valid @RequestBody UpdateNotificationSettingsRequest request) {
+    return NotificationSettingsResponse.from(settingsService.update(account.accountId(), request));
+  }
 }

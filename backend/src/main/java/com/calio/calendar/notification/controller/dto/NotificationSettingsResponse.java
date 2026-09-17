@@ -6,22 +6,20 @@ import com.calio.calendar.account.domain.TimedReminderOffset;
 import java.time.LocalTime;
 
 public record NotificationSettingsResponse(
-        boolean calendarNotificationsEnabled,
-        TimedReminderOffset timedReminderOffset,
-        ImportantReminderOffset importantReminderOffset,
-        LocalTime allDayReminderTime,
-        boolean dailyBriefingEnabled,
-        LocalTime dailyBriefingTime
-) {
+    boolean calendarNotificationsEnabled,
+    TimedReminderOffset timedReminderOffset,
+    ImportantReminderOffset importantReminderOffset,
+    LocalTime allDayReminderTime,
+    boolean dailyBriefingEnabled,
+    LocalTime dailyBriefingTime) {
 
-    public static NotificationSettingsResponse from(AccountNotificationSettings settings) {
-        return new NotificationSettingsResponse(
-                settings.calendarNotificationsEnabled(),
-                settings.timedReminderOffset(),
-                settings.importantReminderOffset(),
-                settings.allDayReminderTime(),
-                settings.dailyBriefingEnabled(),
-                settings.dailyBriefingTime()
-        );
-    }
+  public static NotificationSettingsResponse from(AccountNotificationSettings settings) {
+    return new NotificationSettingsResponse(
+        settings.calendarNotificationsEnabled(),
+        settings.timedReminderOffset(),
+        settings.importantReminderOffset(),
+        settings.allDayReminderTime(),
+        settings.dailyBriefingEnabled(),
+        settings.dailyBriefingTime());
+  }
 }

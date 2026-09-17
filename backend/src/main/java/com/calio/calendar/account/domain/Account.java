@@ -13,25 +13,24 @@ import java.util.Objects;
 @Table(name = "accounts")
 public class Account extends BaseEntity {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
 
-    @Embedded
-    private AccountNotificationSettings notificationSettings = AccountNotificationSettings.defaults();
+  @Embedded
+  private AccountNotificationSettings notificationSettings = AccountNotificationSettings.defaults();
 
-    public Account() {
-    }
+  public Account() {}
 
-    public Long getId() {
-        return id;
-    }
+  public Long getId() {
+    return id;
+  }
 
-    public AccountNotificationSettings getNotificationSettings() {
-        return notificationSettings;
-    }
+  public AccountNotificationSettings getNotificationSettings() {
+    return notificationSettings;
+  }
 
-    public void changeNotificationSettings(AccountNotificationSettings notificationSettings) {
-        this.notificationSettings = Objects.requireNonNull(notificationSettings);
-    }
+  public void changeNotificationSettings(AccountNotificationSettings notificationSettings) {
+    this.notificationSettings = Objects.requireNonNull(notificationSettings);
+  }
 }

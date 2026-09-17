@@ -1,26 +1,24 @@
 package com.calio.calendar.notification.service;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.calio.calendar.account.domain.Account;
-import com.calio.calendar.account.service.AccountQueryService;
+import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.event.service.EventService;
 import com.calio.calendar.groupcalendar.service.GroupCalendarService;
 import com.calio.calendar.groupspace.service.GroupMembershipQueryService;
-import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingQueryService;
-import com.calio.calendar.integration.mapping.service.GoogleCalendarRecurrenceMappingQueryService;
 import com.calio.calendar.notification.client.ApnsClient;
 import com.calio.calendar.notification.client.ApnsSendResult;
 import com.calio.calendar.notification.client.ApnsSendResultType;
+import com.calio.calendar.notification.domain.CalendarNotificationContent;
 import com.calio.calendar.notification.domain.CalendarNotificationType;
-import com.calio.calendar.notification.domain.IosPushDevice;
 import com.calio.calendar.notification.domain.NotificationDispatch;
 import com.calio.calendar.notification.domain.NotificationScheduleKey;
+import com.calio.calendar.notification.repository.NotificationDispatchRepository;
+import com.calio.calendar.notification.service.dto.IosPushDeviceTarget;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -35,146 +33,90 @@ import tools.jackson.databind.ObjectMapper;
 @ExtendWith(MockitoExtension.class)
 class CalendarNotificationServiceTest {
 
-    @Mock
-    private EventService eventService;
+  @Mock private AccountRepository accountRepository;
 
-    @Mock
-    private GroupCalendarService groupCalendarService;
+  @Mock private EventService eventService;
 
-    @Mock
-    private GroupMembershipQueryService groupMembershipQueryService;
+  @Mock private GroupCalendarService groupCalendarService;
 
-    @Mock
-    private GoogleCalendarEventMappingQueryService eventMappingQueryService;
+  @Mock private GroupMembershipQueryService groupMembershipQueryService;
 
-    @Mock
-    private GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService;
+  @Mock private NotificationDispatchRepository dispatchRepository;
 
-    @Mock
-    private NotificationDispatchQueryService dispatchQueryService;
+  @Mock private IosPushDeviceService pushDeviceService;
 
-    @Mock
-    private NotificationDispatchCommandService dispatchCommandService;
+  @Mock private ApnsClient apnsClient;
 
-    @Mock
-    private AccountQueryService accountQueryService;
+  private CalendarNotificationService calendarNotificationService;
 
-    @Mock
-    private IosPushDeviceService pushDeviceService;
+  @BeforeEach
+  void setUp() {
+    calendarNotificationService =
+        new CalendarNotificationService(
+            accountRepository,
+            eventService,
+            groupCalendarService,
+            groupMembershipQueryService,
+            dispatchRepository,
+            pushDeviceService,
+            apnsClient,
+            new ObjectMapper());
+  }
 
-    @Mock
-    private ApnsClient apnsClient;
+  @Test
+  @DisplayName("하나의 리마인더 claim은 권한이 있는 모든 iOS 기기에 각각 발송한다")
+  void givenTwoEligibleDevices_whenDispatch_thenSendsToEachDevice() {
+    // given
+    Instant scheduledAt = Instant.parse("2026-09-08T00:00:00Z");
+    NotificationDispatch dispatch = dispatch(scheduledAt);
+    when(dispatchRepository.saveAndFlush(any(NotificationDispatch.class))).thenReturn(dispatch);
+    when(pushDeviceService.listEligiblePushDevices(1L))
+        .thenReturn(
+            List.of(
+                new IosPushDeviceTarget(10L, "iphone-token"),
+                new IosPushDeviceTarget(20L, "ipad-token")));
+    when(apnsClient.send(any()))
+        .thenReturn(new ApnsSendResult(ApnsSendResultType.ACCEPTED, "apns-id", null));
 
-    @Mock
-    private IosPushDevice iphonePushDevice;
+    // when
+    calendarNotificationService.dispatch(
+        1L,
+        NotificationScheduleKey.personalEvent(1L),
+        scheduledAt,
+        CalendarNotificationContent.schedule(
+            CalendarNotificationType.REMINDER, LocalDate.of(2026, 9, 8), "회의", null));
 
-    @Mock
-    private IosPushDevice ipadPushDevice;
+    // then
+    verify(apnsClient, times(2)).send(any());
+  }
 
-    private CalendarNotificationService calendarNotificationService;
+  @Test
+  @DisplayName("이미 claim된 리마인더는 APNs에 다시 발송하지 않는다")
+  void givenExistingDispatchClaim_whenDispatch_thenSkipsApnsSend() {
+    // given
+    Instant scheduledAt = Instant.parse("2026-09-08T00:00:00Z");
+    when(dispatchRepository.existsByAccountIdAndNotificationTypeAndScheduleKeyAndScheduledAt(
+            1L, CalendarNotificationType.REMINDER, "personal:1", scheduledAt))
+        .thenReturn(true);
 
-    @BeforeEach
-    void setUp() {
-        calendarNotificationService = new CalendarNotificationService(
-                eventService,
-                groupCalendarService,
-                groupMembershipQueryService,
-                eventMappingQueryService,
-                recurrenceMappingQueryService,
-                dispatchQueryService,
-                dispatchCommandService,
-                accountQueryService,
-                pushDeviceService,
-                apnsClient,
-                new ObjectMapper()
-        );
-    }
+    // when
+    calendarNotificationService.dispatch(
+        1L,
+        NotificationScheduleKey.personalEvent(1L),
+        scheduledAt,
+        CalendarNotificationContent.schedule(
+            CalendarNotificationType.REMINDER, LocalDate.of(2026, 9, 8), "회의", null));
 
-    @Test
-    @DisplayName("하나의 리마인더 claim은 권한이 있는 모든 iOS 기기에 각각 발송한다")
-    void givenTwoEligibleEndpoints_whenDispatch_thenSendsToEachEndpoint() {
-        // given
-        Instant scheduledAt = Instant.parse("2026-09-08T00:00:00Z");
-        NotificationDispatch dispatch = dispatch(scheduledAt);
-        when(dispatchQueryService.hasDispatchClaim(
-                1L,
-                CalendarNotificationType.REMINDER,
-                NotificationScheduleKey.personalEvent(1L),
-                scheduledAt
-        ))
-                .thenReturn(false);
-        when(accountQueryService.getAccount(1L)).thenReturn(new Account());
-        when(dispatchCommandService.create(
-                any(Account.class),
-                eq(CalendarNotificationType.REMINDER),
-                eq(NotificationScheduleKey.personalEvent(1L)),
-                eq(scheduledAt),
-                eq(LocalDate.of(2026, 9, 8)),
-                eq("회의"),
-                eq(null)
-        )).thenReturn(dispatch);
-        when(pushDeviceService.listEligiblePushDevices(1L)).thenReturn(List.of(iphonePushDevice, ipadPushDevice));
-        when(iphonePushDevice.getApnsToken()).thenReturn("iphone-token");
-        when(ipadPushDevice.getApnsToken()).thenReturn("ipad-token");
-        when(apnsClient.send(any())).thenReturn(new ApnsSendResult(
-                ApnsSendResultType.ACCEPTED,
-                "apns-id",
-                null
-        ));
+    // then
+    verify(dispatchRepository, never()).saveAndFlush(any());
+    verify(apnsClient, never()).send(any());
+  }
 
-        // when
-        calendarNotificationService.dispatch(
-                1L,
-                CalendarNotificationType.REMINDER,
-                NotificationScheduleKey.personalEvent(1L),
-                scheduledAt,
-                LocalDate.of(2026, 9, 8),
-                "회의",
-                null
-        );
-
-        // then
-        verify(apnsClient, times(2)).send(any());
-    }
-
-    @Test
-    @DisplayName("이미 claim된 리마인더는 APNs에 다시 발송하지 않는다")
-    void givenExistingDeliveryClaim_whenDispatch_thenSkipsApnsSend() {
-        // given
-        Instant scheduledAt = Instant.parse("2026-09-08T00:00:00Z");
-        when(dispatchQueryService.hasDispatchClaim(
-                1L,
-                CalendarNotificationType.REMINDER,
-                NotificationScheduleKey.personalEvent(1L),
-                scheduledAt
-        ))
-                .thenReturn(true);
-
-        // when
-        calendarNotificationService.dispatch(
-                1L,
-                CalendarNotificationType.REMINDER,
-                NotificationScheduleKey.personalEvent(1L),
-                scheduledAt,
-                LocalDate.of(2026, 9, 8),
-                "회의",
-                null
-        );
-
-        // then
-        verify(dispatchCommandService, never()).create(any(), any(), any(), any(), any(), any(), any());
-        verify(apnsClient, never()).send(any());
-    }
-
-    private NotificationDispatch dispatch(Instant scheduledAt) {
-        return new NotificationDispatch(
-                new Account(),
-                CalendarNotificationType.REMINDER,
-                NotificationScheduleKey.personalEvent(1L),
-                scheduledAt,
-                LocalDate.of(2026, 9, 8),
-                "회의",
-                null
-        );
-    }
+  private NotificationDispatch dispatch(Instant scheduledAt) {
+    return new NotificationDispatch(
+        1L,
+        CalendarNotificationType.REMINDER,
+        NotificationScheduleKey.personalEvent(1L),
+        scheduledAt);
+  }
 }
