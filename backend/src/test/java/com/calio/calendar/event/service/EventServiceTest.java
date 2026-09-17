@@ -3,13 +3,11 @@ package com.calio.calendar.event.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.inOrder;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -22,7 +20,6 @@ import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.event.controller.dto.CreateEventRequest;
 import com.calio.calendar.event.controller.dto.EventResponse;
 import com.calio.calendar.event.controller.dto.UpdateEventRequest;
-import com.calio.calendar.event.controller.dto.UpdateImportantEventRequest;
 import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.event.repository.EventRepository;
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobEnqueueService;
@@ -37,6 +34,7 @@ import com.calio.calendar.recurrence.service.Rfc5545RecurrenceEngine;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.domain.TagType;
 import com.calio.calendar.tag.service.TagQueryService;
+import com.calio.calendar.sharing.event.service.PersonalEventGroupShareCommandService;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -79,6 +77,9 @@ class EventServiceTest {
 
     @Mock
     private Rfc5545RecurrenceEngine recurrenceEngine;
+
+    @Mock
+    private PersonalEventGroupShareCommandService eventShareCommandService;
 
     @InjectMocks
     private EventService eventService;
@@ -173,7 +174,7 @@ class EventServiceTest {
     }
 
     @Test
-    @DisplayName("일정 삭제는 canonical 삭제 전에 snapshot을 만들고 DELETE Job을 함께 등록한다")
+    @DisplayName("일정 삭제는 공유 mapping과 canonical 일정을 정리한 뒤 DELETE Job을 등록한다")
     void givenOwnedInternalEvent_whenDeleteEvent_thenDeletesAndEnqueuesDeleteSnapshot() {
         // given
         Event event = event("Delete me", tag("기존"));
@@ -183,8 +184,13 @@ class EventServiceTest {
         eventService.deleteEvent(1L, 10L);
 
         // then
-        InOrder order = inOrder(eventCommandService, jobEnqueueService);
+        InOrder order = inOrder(
+                eventShareCommandService,
+                eventCommandService,
+                jobEnqueueService
+        );
         order.verify(eventCommandService).lockEvent(1L, 10L);
+        order.verify(eventShareCommandService).deleteAllForSourceEvent(10L);
         order.verify(eventCommandService).deleteEvent(event);
         order.verify(jobEnqueueService).enqueueEventDeleted(1L, 10L);
     }
@@ -345,7 +351,8 @@ class EventServiceTest {
                 accountQueryService,
                 tagQueryService,
                 recurrenceQueryService,
-                recurrenceEngine
+                recurrenceEngine,
+                eventShareCommandService
         );
     }
 
@@ -442,6 +449,6 @@ class EventServiceTest {
     }
 
     private Tag tag(String title) {
-        return new Tag(TagType.DEFAULT, title, "#64748B");
+        return Tag.personalDefault(title, "#64748B");
     }
 }

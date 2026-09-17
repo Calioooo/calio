@@ -18,7 +18,6 @@ import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
 import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.tag.domain.Tag;
-import com.calio.calendar.tag.domain.TagType;
 import com.calio.calendar.tag.repository.TagRepository;
 import java.time.Instant;
 import java.util.List;
@@ -68,7 +67,7 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
     void givenRecurrenceMappings_whenLookup_thenKeepsCanonicalAndProviderIdentitySeparate() {
         // given
         Account account = accountRepository.saveAndFlush(new Account());
-        Tag tag = tagRepository.saveAndFlush(new Tag(TagType.DEFAULT, "기타", "#64748B"));
+        Tag tag = tagRepository.saveAndFlush(Tag.personalDefault("기타", "#64748B"));
         GoogleCalendarConnection connection = connection(account.getId());
         RecurrenceEvent recurrenceEvent = recurrenceEventRepository.saveAndFlush(
                 recurrenceEvent(account, tag)
@@ -340,7 +339,7 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
 
     private RecurrenceFixture recurrenceFixture() {
         Account account = accountRepository.saveAndFlush(new Account());
-        Tag tag = tagRepository.saveAndFlush(new Tag(TagType.DEFAULT, "기타", "#64748B"));
+        Tag tag = tagRepository.saveAndFlush(Tag.personalDefault("기타", "#64748B"));
         GoogleCalendarConnection connection = connection(account.getId());
         RecurrenceEvent recurrenceEvent = recurrenceEventRepository.saveAndFlush(
                 recurrenceEvent(account, tag)

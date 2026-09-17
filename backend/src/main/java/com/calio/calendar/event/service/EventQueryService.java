@@ -29,6 +29,10 @@ public class EventQueryService {
         return eventRepository.findByIdAndAccount_Id(eventId, accountId);
     }
 
+    public List<Event> listShareableEvents(Long accountId, List<Long> eventIds) {
+        return eventRepository.findAllShareableByIdsAndAccountId(eventIds, accountId);
+    }
+
     public List<Event> listEvents(Long accountId, Instant from, Instant to) {
         return eventRepository.findNormalEvents(accountId, from, to);
     }

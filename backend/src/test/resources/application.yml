@@ -1,6 +1,15 @@
 spring:
   flyway:
     enabled: false
+  ai:
+    model:
+      chat: none
+      embedding: none
+      image: none
+      moderation: none
+      audio:
+        speech: none
+        transcription: none
 
 security:
   token-encryption:

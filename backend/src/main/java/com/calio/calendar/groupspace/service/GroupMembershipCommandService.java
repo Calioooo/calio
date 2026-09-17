@@ -68,6 +68,11 @@ public class GroupMembershipCommandService {
         groupMemberRepository.flush();
     }
 
+    public void changeAnonymous(GroupMember member, boolean isAnonymous) {
+        member.changeAnonymous(isAnonymous);
+        groupMemberRepository.flush();
+    }
+
     public void changeOwnership(GroupSpace groupSpace, Long ownerAccountId) {
         groupSpace.transferOwnershipTo(ownerAccountId);
         groupSpaceRepository.flush();
