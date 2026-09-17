@@ -10,13 +10,13 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface IosPushDeviceRepository extends JpaRepository<IosPushDevice, Long> {
-    Optional<IosPushDevice> findByAccount_IdAndInstallationId(Long accountId, String installationId);
+  Optional<IosPushDevice> findByAccount_IdAndInstallationId(Long accountId, String installationId);
 
-    Optional<IosPushDevice> findByApnsToken(String apnsToken);
+  Optional<IosPushDevice> findByApnsToken(String apnsToken);
 
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select device from IosPushDevice device where device.apnsToken = :apnsToken")
-    Optional<IosPushDevice> lockDeviceWithToken(@Param("apnsToken") String apnsToken);
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("select device from IosPushDevice device where device.apnsToken = :apnsToken")
+  Optional<IosPushDevice> lockDeviceWithToken(@Param("apnsToken") String apnsToken);
 
-    List<IosPushDevice> findByAccount_IdAndActiveTrueAndApnsTokenIsNotNull(Long accountId);
+  List<IosPushDevice> findByAccount_IdAndActiveTrueAndApnsTokenIsNotNull(Long accountId);
 }

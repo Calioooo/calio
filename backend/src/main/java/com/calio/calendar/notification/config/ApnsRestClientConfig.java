@@ -13,24 +13,19 @@ import org.springframework.web.client.RestClient;
 @EnableConfigurationProperties(ApnsProperties.class)
 public class ApnsRestClientConfig {
 
-    private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
-    private static final Duration READ_TIMEOUT = Duration.ofSeconds(5);
+  private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
+  private static final Duration READ_TIMEOUT = Duration.ofSeconds(5);
 
-    @Bean
-    public RestClient apnsRestClient(
-            RestClient.Builder builder,
-            ApnsProperties properties
-    ) {
-        HttpClient httpClient = HttpClient.newBuilder()
-                .version(HttpClient.Version.HTTP_2)
-                .connectTimeout(CONNECT_TIMEOUT)
-                .build();
-        JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient);
-        requestFactory.setReadTimeout(READ_TIMEOUT);
+  @Bean
+  public RestClient apnsRestClient(RestClient.Builder builder, ApnsProperties properties) {
+    HttpClient httpClient =
+        HttpClient.newBuilder()
+            .version(HttpClient.Version.HTTP_2)
+            .connectTimeout(CONNECT_TIMEOUT)
+            .build();
+    JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient);
+    requestFactory.setReadTimeout(READ_TIMEOUT);
 
-        return builder
-                .baseUrl(properties.host())
-                .requestFactory(requestFactory)
-                .build();
-    }
+    return builder.baseUrl(properties.host()).requestFactory(requestFactory).build();
+  }
 }

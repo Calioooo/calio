@@ -17,31 +17,24 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/notification-endpoints/ios")
 public class IosPushDeviceController {
 
-    private final IosPushDeviceService pushDeviceService;
+  private final IosPushDeviceService pushDeviceService;
 
-    public IosPushDeviceController(IosPushDeviceService pushDeviceService) {
-        this.pushDeviceService = pushDeviceService;
-    }
+  public IosPushDeviceController(IosPushDeviceService pushDeviceService) {
+    this.pushDeviceService = pushDeviceService;
+  }
 
-    @PutMapping
-    public ResponseEntity<Void> register(
-            @AuthenticationPrincipal AuthenticatedAccount account,
-            @Valid @RequestBody RegisterIosPushDeviceRequest request
-    ) {
-        pushDeviceService.register(
-                account.accountId(),
-                request.installationId(),
-                request.apnsToken()
-        );
-        return ResponseEntity.noContent().build();
-    }
+  @PutMapping
+  public ResponseEntity<Void> register(
+      @AuthenticationPrincipal AuthenticatedAccount account,
+      @Valid @RequestBody RegisterIosPushDeviceRequest request) {
+    pushDeviceService.register(account.accountId(), request.installationId(), request.apnsToken());
+    return ResponseEntity.noContent().build();
+  }
 
-    @DeleteMapping("/{installationId}")
-    public ResponseEntity<Void> deactivate(
-            @AuthenticationPrincipal AuthenticatedAccount account,
-            @PathVariable String installationId
-    ) {
-        pushDeviceService.deactivate(account.accountId(), installationId);
-        return ResponseEntity.noContent().build();
-    }
+  @DeleteMapping("/{installationId}")
+  public ResponseEntity<Void> deactivate(
+      @AuthenticationPrincipal AuthenticatedAccount account, @PathVariable String installationId) {
+    pushDeviceService.deactivate(account.accountId(), installationId);
+    return ResponseEntity.noContent().build();
+  }
 }

@@ -17,70 +17,62 @@ import java.time.Instant;
 @Table(name = "ios_push_devices")
 public class IosPushDevice extends BaseEntity {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "account_id", nullable = false)
-    private Account account;
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "account_id", nullable = false)
+  private Account account;
 
-    @Column(name = "installation_id", nullable = false)
-    private String installationId;
+  @Column(name = "installation_id", nullable = false)
+  private String installationId;
 
-    @Column(name = "apns_token")
-    private String apnsToken;
+  @Column(name = "apns_token")
+  private String apnsToken;
 
-    @Column(nullable = false)
-    private boolean active;
+  @Column(nullable = false)
+  private boolean active;
 
-    @Column(nullable = false)
-    private String environment;
+  @Column(nullable = false)
+  private String environment;
 
-    private Instant deactivatedAt;
+  private Instant deactivatedAt;
 
-    protected IosPushDevice() {
-    }
+  protected IosPushDevice() {}
 
-    public IosPushDevice(
-            Account account,
-            String installationId,
-            String apnsToken,
-            String environment
-    ) {
-        this.account = account;
-        this.installationId = installationId;
-        refresh(apnsToken, environment);
-    }
+  public IosPushDevice(
+      Account account, String installationId, String apnsToken, String environment) {
+    this.account = account;
+    this.installationId = installationId;
+    refresh(apnsToken, environment);
+  }
 
-    public void refresh(
-            String apnsToken,
-            String environment
-    ) {
-        this.apnsToken = apnsToken;
-        this.environment = environment;
-        active = true;
-        deactivatedAt = null;
-    }
+  public void refresh(String apnsToken, String environment) {
+    this.apnsToken = apnsToken;
+    this.environment = environment;
+    active = true;
+    deactivatedAt = null;
+  }
 
-    public void deactivate(Instant now) {
-        active = false;
-        deactivatedAt = now;
-    }
+  public void deactivate(Instant now) {
+    active = false;
+    deactivatedAt = now;
+  }
 
-    public void clearApnsToken() {
-        apnsToken = null;
-    }
+  public void clearApnsToken() {
+    apnsToken = null;
+  }
 
-    public Long getId() {
-        return id;
-    }
+  public Long getId() {
+    return id;
+  }
 
-    public String getApnsToken() {
-        return apnsToken;
-    }
+  public String getApnsToken() {
+    return apnsToken;
+  }
 
-    public boolean isEligible() {
-        return active && apnsToken != null;
-    }
+  public boolean isEligible() {
+    return active && apnsToken != null;
+  }
 }
