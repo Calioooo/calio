@@ -6,8 +6,10 @@ import com.calio.calendar.external.google.GoogleCalendarInvalidGrantException;
 import com.calio.calendar.integration.connection.service.GoogleCalendarConnectionCommandService;
 import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrationQueryService;
 import com.calio.calendar.integration.sync.GoogleCalendarEventJobService;
+import com.calio.calendar.integration.sync.GoogleCalendarRecurrenceJobHandler;
 import com.calio.calendar.integration.sync.GoogleCalendarSyncService;
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEventJob;
+import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarRecurrenceJob;
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarSyncJob;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJob;
 import com.calio.calendar.integration.sync.operation.dto.GoogleOperationFailureDecision;
@@ -19,12 +21,11 @@ import org.springframework.stereotype.Service;
 @Service
 public class GoogleOperationProcessor {
 
-  private static final String UNSUPPORTED_JOB_SCOPE = "UNSUPPORTED_JOB_SCOPE";
-
   private final GoogleOperationJobService jobService;
   private final GoogleOperationLeaseService operationLeaseService;
   private final GoogleCalendarSyncService syncService;
   private final GoogleCalendarEventJobService eventJobService;
+  private final GoogleCalendarRecurrenceJobHandler recurrenceJobHandler;
   private final GoogleOperationFailureClassifier failureClassifier;
   private final GoogleCalendarConnectionCommandService connectionCommandService;
   private final GoogleCalendarIntegrationQueryService integrationQueryService;
@@ -35,6 +36,7 @@ public class GoogleOperationProcessor {
       GoogleOperationLeaseService operationLeaseService,
       GoogleCalendarSyncService syncService,
       GoogleCalendarEventJobService eventJobService,
+      GoogleCalendarRecurrenceJobHandler recurrenceJobHandler,
       GoogleOperationFailureClassifier failureClassifier,
       GoogleCalendarConnectionCommandService connectionCommandService,
       GoogleCalendarIntegrationQueryService integrationQueryService,
@@ -43,6 +45,7 @@ public class GoogleOperationProcessor {
     this.operationLeaseService = operationLeaseService;
     this.syncService = syncService;
     this.eventJobService = eventJobService;
+    this.recurrenceJobHandler = recurrenceJobHandler;
     this.failureClassifier = failureClassifier;
     this.connectionCommandService = connectionCommandService;
     this.integrationQueryService = integrationQueryService;
@@ -73,20 +76,19 @@ public class GoogleOperationProcessor {
     return execute(job, workerToken);
   }
 
-  private JobExecutionResult terminateUnsupported(
-      GoogleOperationJob job, String workerToken, String reason) {
-    jobService.terminate(job.getId(), job.getAccountId(), workerToken, reason);
+  private JobExecutionResult terminateUnsupported(GoogleOperationJob job, String workerToken) {
+    jobService.terminate(job.getId(), job.getAccountId(), workerToken, "UNSUPPORTED_JOB_SCOPE");
     return JobExecutionResult.CONTINUE_WITH_NEXT_JOB;
   }
 
   private JobExecutionResult execute(GoogleOperationJob job, String workerToken) {
-    if (job instanceof GoogleCalendarSyncJob syncJob) {
-      return executeSyncJob(syncJob, workerToken);
-    }
-    if (job instanceof GoogleCalendarEventJob eventJob) {
-      return executeEventJob(eventJob, workerToken);
-    }
-    return terminateUnsupported(job, workerToken, UNSUPPORTED_JOB_SCOPE);
+    return switch (job) {
+      case GoogleCalendarSyncJob syncJob -> executeSyncJob(syncJob, workerToken);
+      case GoogleCalendarEventJob eventJob -> executeEventJob(eventJob, workerToken);
+      case GoogleCalendarRecurrenceJob recurrenceJob ->
+          executeRecurrenceJob(recurrenceJob, workerToken);
+      default -> terminateUnsupported(job, workerToken);
+    };
   }
 
   private JobExecutionResult executeSyncJob(GoogleCalendarSyncJob job, String workerToken) {
@@ -101,6 +103,16 @@ public class GoogleOperationProcessor {
   private JobExecutionResult executeEventJob(GoogleCalendarEventJob job, String workerToken) {
     try {
       eventJobService.execute(job, workerToken);
+      return JobExecutionResult.CONTINUE_WITH_NEXT_JOB;
+    } catch (RuntimeException failure) {
+      return handleJobFailure(job, workerToken, failure);
+    }
+  }
+
+  private JobExecutionResult executeRecurrenceJob(
+      GoogleCalendarRecurrenceJob job, String workerToken) {
+    try {
+      recurrenceJobHandler.execute(job, workerToken);
       return JobExecutionResult.CONTINUE_WITH_NEXT_JOB;
     } catch (RuntimeException failure) {
       return handleJobFailure(job, workerToken, failure);

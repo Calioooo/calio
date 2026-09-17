@@ -48,8 +48,9 @@ ALTER TABLE google_operation_jobs
             (job_scope = 'SYNC' AND event_operation_kind IS NULL AND event_id IS NULL
              AND job_trigger IN ('MANUAL', 'PERIODIC'))
             OR
-            (job_scope = 'EVENT' AND event_operation_kind IN ('CREATE', 'UPDATE', 'DELETE')
-             AND event_id IS NOT NULL AND target_payload IS NOT NULL AND job_trigger IS NULL)
+            (job_scope = 'EVENT' AND event_id IS NOT NULL AND job_trigger IS NULL
+             AND ((event_operation_kind IN ('CREATE', 'UPDATE') AND target_payload IS NOT NULL)
+                  OR (event_operation_kind = 'DELETE' AND target_payload IS NULL)))
         );
 
 CREATE INDEX idx_google_operation_jobs_pending_event

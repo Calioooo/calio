@@ -44,6 +44,18 @@ public interface GoogleCalendarConnectionRepository
       """
             select connection
             from GoogleCalendarConnection connection
+            where connection.integration.id = :integrationId
+              and connection.state = :state
+            """)
+  Optional<GoogleCalendarConnection> findWithIntegrationByIntegrationIdAndState(
+      @Param("integrationId") Long integrationId,
+      @Param("state") GoogleCalendarConnectionState state);
+
+  @EntityGraph(attributePaths = "integration")
+  @Query(
+      """
+            select connection
+            from GoogleCalendarConnection connection
             where connection.id = :connectionId
             """)
   Optional<GoogleCalendarConnection> findWithIntegrationById(

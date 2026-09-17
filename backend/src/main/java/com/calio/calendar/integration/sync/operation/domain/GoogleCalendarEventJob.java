@@ -6,6 +6,9 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import java.time.Instant;
+import com.calio.calendar.integration.sync.operation.dto.GoogleEventJobPayload;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @DiscriminatorValue("EVENT")
@@ -21,8 +24,9 @@ public class GoogleCalendarEventJob extends GoogleOperationJob {
   @Column(name = "provider_identity", updatable = false, length = 1024)
   private String providerIdentity;
 
+  @JdbcTypeCode(SqlTypes.JSON)
   @Column(name = "target_payload", updatable = false, columnDefinition = "JSON")
-  private String targetPayload;
+  private GoogleEventJobPayload targetPayload;
 
   protected GoogleCalendarEventJob() {}
 
@@ -34,9 +38,12 @@ public class GoogleCalendarEventJob extends GoogleOperationJob {
       GoogleCalendarEventJobKind kind,
       Long eventId,
       String providerIdentity,
-      String targetPayload,
+      GoogleEventJobPayload targetPayload,
       Instant runnableAt) {
-    if (kind == null || eventId == null || !hasText(targetPayload)) {
+    if (kind == null
+        || eventId == null
+        || (kind == GoogleCalendarEventJobKind.DELETE && targetPayload != null)
+        || (kind != GoogleCalendarEventJobKind.DELETE && targetPayload == null)) {
       throw new IllegalArgumentException("Google Event job fields are required");
     }
     if (kind == GoogleCalendarEventJobKind.CREATE && !hasText(providerIdentity)) {
@@ -51,10 +58,6 @@ public class GoogleCalendarEventJob extends GoogleOperationJob {
     return job;
   }
 
-  private static boolean hasText(String value) {
-    return value != null && !value.isBlank();
-  }
-
   public GoogleCalendarEventJobKind getKind() {
     return kind;
   }
@@ -67,7 +70,11 @@ public class GoogleCalendarEventJob extends GoogleOperationJob {
     return providerIdentity;
   }
 
-  public String getTargetPayload() {
+  public GoogleEventJobPayload getTargetPayload() {
     return targetPayload;
+  }
+
+  private static boolean hasText(String value) {
+    return value != null && !value.isBlank();
   }
 }
