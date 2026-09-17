@@ -34,106 +34,100 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 @ExtendWith(MockitoExtension.class)
 class VoteParticipantSelectionLookupServiceTest {
 
-    private static final UUID VOTE_ROOM_PUBLIC_ID = UUID.fromString("7ab6b7d8-11cd-4ce2-83e3-b81ad87ea3c9");
+  private static final UUID VOTE_ROOM_PUBLIC_ID =
+      UUID.fromString("7ab6b7d8-11cd-4ce2-83e3-b81ad87ea3c9");
 
-    @Mock
-    private VoteRoomRepository voteRoomRepository;
+  @Mock private VoteRoomRepository voteRoomRepository;
 
-    @Mock
-    private VoteParticipantRepository voteParticipantRepository;
+  @Mock private VoteParticipantRepository voteParticipantRepository;
 
-    @Mock
-    private VoteRepository voteRepository;
+  @Mock private VoteRepository voteRepository;
 
-    private VoteParticipantSelectionLookupService lookupService;
-    private PasswordEncoder passwordEncoder;
+  private VoteParticipantSelectionLookupService lookupService;
+  private PasswordEncoder passwordEncoder;
 
-    @BeforeEach
-    void setUp() {
-        passwordEncoder = new BCryptPasswordEncoder();
-        lookupService = new VoteParticipantSelectionLookupService(
-                voteRoomRepository,
-                voteParticipantRepository,
-                voteRepository,
-                passwordEncoder
-        );
-    }
+  @BeforeEach
+  void setUp() {
+    passwordEncoder = new BCryptPasswordEncoder();
+    lookupService =
+        new VoteParticipantSelectionLookupService(
+            voteRoomRepository, voteParticipantRepository, voteRepository, passwordEncoder);
+  }
 
-    @Test
-    @DisplayName("제출한 참여자의 기존 불가능한 날짜 선택을 날짜순으로 복원한다")
-    void givenSubmittedParticipant_whenLookup_thenReturnsSavedUnavailableDates() {
-        // given
-        VoteRoom voteRoom = voteRoom();
-        VoteParticipant participant = new VoteParticipant(voteRoom, "calio", passwordEncoder.encode("secret"));
-        participant.submit();
-        when(voteRoomRepository.findByPublicId(VOTE_ROOM_PUBLIC_ID)).thenReturn(Optional.of(voteRoom));
-        when(voteParticipantRepository.findByVoteRoomPublicIdAndNickname(VOTE_ROOM_PUBLIC_ID, "calio"))
-                .thenReturn(Optional.of(participant));
-        when(voteRepository.findAllByVoteParticipantId(participant.getId())).thenReturn(List.of(
+  @Test
+  @DisplayName("제출한 참여자의 기존 불가능한 날짜 선택을 날짜순으로 복원한다")
+  void givenSubmittedParticipant_whenLookup_thenReturnsSavedUnavailableDates() {
+    // given
+    VoteRoom voteRoom = voteRoom();
+    VoteParticipant participant =
+        new VoteParticipant(voteRoom, "calio", passwordEncoder.encode("secret"));
+    participant.submit();
+    when(voteRoomRepository.findByPublicId(VOTE_ROOM_PUBLIC_ID)).thenReturn(Optional.of(voteRoom));
+    when(voteParticipantRepository.findByVoteRoomPublicIdAndNickname(VOTE_ROOM_PUBLIC_ID, "calio"))
+        .thenReturn(Optional.of(participant));
+    when(voteRepository.findAllByVoteParticipantId(participant.getId()))
+        .thenReturn(
+            List.of(
                 new Vote(participant, LocalDate.of(2026, 8, 15)),
-                new Vote(participant, LocalDate.of(2026, 8, 17))
-        ));
+                new Vote(participant, LocalDate.of(2026, 8, 17))));
 
-        // when
-        var response = lookupService.lookup(
-                VOTE_ROOM_PUBLIC_ID,
-                new LookupVoteParticipantSelectionRequest("calio", "secret")
-        );
+    // when
+    var response =
+        lookupService.lookup(
+            VOTE_ROOM_PUBLIC_ID, new LookupVoteParticipantSelectionRequest("calio", "secret"));
 
-        // then
-        assertThat(response.nickname()).isEqualTo("calio");
-        assertThat(response.status()).isEqualTo(VoteParticipantStatus.SUBMITTED);
-        assertThat(response.unavailableDates()).containsExactly(
-                LocalDate.of(2026, 8, 15),
-                LocalDate.of(2026, 8, 17)
-        );
-    }
+    // then
+    assertThat(response.nickname()).isEqualTo("calio");
+    assertThat(response.status()).isEqualTo(VoteParticipantStatus.SUBMITTED);
+    assertThat(response.unavailableDates())
+        .containsExactly(LocalDate.of(2026, 8, 15), LocalDate.of(2026, 8, 17));
+  }
 
-    @Test
-    @DisplayName("제출 전 REGISTERED 참여자의 기존 선택 복원은 Vote 조회 없이 빈 날짜 목록을 반환한다")
-    void givenRegisteredParticipant_whenLookup_thenReturnsEmptyUnavailableDates() {
-        // given
-        VoteRoom voteRoom = voteRoom();
-        VoteParticipant participant = new VoteParticipant(voteRoom, "calio", null);
-        when(voteRoomRepository.findByPublicId(VOTE_ROOM_PUBLIC_ID)).thenReturn(Optional.of(voteRoom));
-        when(voteParticipantRepository.findByVoteRoomPublicIdAndNickname(VOTE_ROOM_PUBLIC_ID, "calio"))
-                .thenReturn(Optional.of(participant));
+  @Test
+  @DisplayName("제출 전 REGISTERED 참여자의 기존 선택 복원은 Vote 조회 없이 빈 날짜 목록을 반환한다")
+  void givenRegisteredParticipant_whenLookup_thenReturnsEmptyUnavailableDates() {
+    // given
+    VoteRoom voteRoom = voteRoom();
+    VoteParticipant participant = new VoteParticipant(voteRoom, "calio", null);
+    when(voteRoomRepository.findByPublicId(VOTE_ROOM_PUBLIC_ID)).thenReturn(Optional.of(voteRoom));
+    when(voteParticipantRepository.findByVoteRoomPublicIdAndNickname(VOTE_ROOM_PUBLIC_ID, "calio"))
+        .thenReturn(Optional.of(participant));
 
-        // when
-        var response = lookupService.lookup(
-                VOTE_ROOM_PUBLIC_ID,
-                new LookupVoteParticipantSelectionRequest("calio", null)
-        );
+    // when
+    var response =
+        lookupService.lookup(
+            VOTE_ROOM_PUBLIC_ID, new LookupVoteParticipantSelectionRequest("calio", null));
 
-        // then
-        assertThat(response.status()).isEqualTo(VoteParticipantStatus.REGISTERED);
-        assertThat(response.unavailableDates()).isEmpty();
-        verify(voteRepository, never()).findAllByVoteParticipantId(participant.getId());
-    }
+    // then
+    assertThat(response.status()).isEqualTo(VoteParticipantStatus.REGISTERED);
+    assertThat(response.unavailableDates()).isEmpty();
+    verify(voteRepository, never()).findAllByVoteParticipantId(participant.getId());
+  }
 
-    @Test
-    @DisplayName("선택 복원은 존재하지 않는 VoteRoom에 대해 참여자 자격증명을 조회하지 않고 404를 반환한다")
-    void givenMissingVoteRoom_whenLookup_thenRejectsBeforeCredentialLookup() {
-        // given
-        when(voteRoomRepository.findByPublicId(VOTE_ROOM_PUBLIC_ID)).thenReturn(Optional.empty());
+  @Test
+  @DisplayName("선택 복원은 존재하지 않는 VoteRoom에 대해 참여자 자격증명을 조회하지 않고 404를 반환한다")
+  void givenMissingVoteRoom_whenLookup_thenRejectsBeforeCredentialLookup() {
+    // given
+    when(voteRoomRepository.findByPublicId(VOTE_ROOM_PUBLIC_ID)).thenReturn(Optional.empty());
 
-        // when, then
-        assertThatThrownBy(() -> lookupService.lookup(
-                VOTE_ROOM_PUBLIC_ID,
-                new LookupVoteParticipantSelectionRequest("calio", null)
-        )).isInstanceOfSatisfying(CalioException.class, exception ->
-                assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.VOTE_ROOM_NOT_FOUND)
-        );
-        verifyNoInteractions(voteParticipantRepository, voteRepository);
-    }
+    // when, then
+    assertThatThrownBy(
+            () ->
+                lookupService.lookup(
+                    VOTE_ROOM_PUBLIC_ID, new LookupVoteParticipantSelectionRequest("calio", null)))
+        .isInstanceOfSatisfying(
+            CalioException.class,
+            exception ->
+                assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.VOTE_ROOM_NOT_FOUND));
+    verifyNoInteractions(voteParticipantRepository, voteRepository);
+  }
 
-    private VoteRoom voteRoom() {
-        return new VoteRoom(
-                VOTE_ROOM_PUBLIC_ID,
-                "여행 일정",
-                LocalDate.of(2026, 8, 14),
-                LocalDate.of(2026, 8, 20),
-                new Account()
-        );
-    }
+  private VoteRoom voteRoom() {
+    return new VoteRoom(
+        VOTE_ROOM_PUBLIC_ID,
+        "여행 일정",
+        LocalDate.of(2026, 8, 14),
+        LocalDate.of(2026, 8, 20),
+        new Account());
+  }
 }

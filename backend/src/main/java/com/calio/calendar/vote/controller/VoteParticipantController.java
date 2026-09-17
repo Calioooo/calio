@@ -23,39 +23,33 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/vote-rooms/{publicId}")
 public class VoteParticipantController {
 
-    private final VoteParticipantService voteParticipantService;
-    private final VoteParticipantSelectionLookupService voteParticipantSelectionLookupService;
+  private final VoteParticipantService voteParticipantService;
+  private final VoteParticipantSelectionLookupService voteParticipantSelectionLookupService;
 
-    public VoteParticipantController(
-            VoteParticipantService voteParticipantService,
-            VoteParticipantSelectionLookupService voteParticipantSelectionLookupService
-    ) {
-        this.voteParticipantService = voteParticipantService;
-        this.voteParticipantSelectionLookupService = voteParticipantSelectionLookupService;
-    }
+  public VoteParticipantController(
+      VoteParticipantService voteParticipantService,
+      VoteParticipantSelectionLookupService voteParticipantSelectionLookupService) {
+    this.voteParticipantService = voteParticipantService;
+    this.voteParticipantSelectionLookupService = voteParticipantSelectionLookupService;
+  }
 
-    @PostMapping("/participants")
-    public ResponseEntity<VoteParticipantResponse> create(
-            @PathVariable UUID publicId,
-            @Valid @RequestBody CreateVoteParticipantRequest request
-    ) {
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(voteParticipantService.create(publicId, request));
-    }
+  @PostMapping("/participants")
+  public ResponseEntity<VoteParticipantResponse> create(
+      @PathVariable UUID publicId, @Valid @RequestBody CreateVoteParticipantRequest request) {
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(voteParticipantService.create(publicId, request));
+  }
 
-    @PutMapping("/votes")
-    public VoteSubmissionResponse submitVotes(
-            @PathVariable UUID publicId,
-            @Valid @RequestBody SubmitVoteRequest request
-    ) {
-        return voteParticipantService.submitVotes(publicId, request);
-    }
+  @PutMapping("/votes")
+  public VoteSubmissionResponse submitVotes(
+      @PathVariable UUID publicId, @Valid @RequestBody SubmitVoteRequest request) {
+    return voteParticipantService.submitVotes(publicId, request);
+  }
 
-    @PostMapping("/votes/lookup")
-    public VoteParticipantSelectionResponse lookupSelection(
-            @PathVariable UUID publicId,
-            @Valid @RequestBody LookupVoteParticipantSelectionRequest request
-    ) {
-        return voteParticipantSelectionLookupService.lookup(publicId, request);
-    }
+  @PostMapping("/votes/lookup")
+  public VoteParticipantSelectionResponse lookupSelection(
+      @PathVariable UUID publicId,
+      @Valid @RequestBody LookupVoteParticipantSelectionRequest request) {
+    return voteParticipantSelectionLookupService.lookup(publicId, request);
+  }
 }

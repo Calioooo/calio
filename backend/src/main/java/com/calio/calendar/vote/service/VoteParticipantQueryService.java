@@ -11,16 +11,14 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class VoteParticipantQueryService {
 
-    private final VoteParticipantRepository voteParticipantRepository;
+  private final VoteParticipantRepository voteParticipantRepository;
 
-    public VoteParticipantQueryService(VoteParticipantRepository voteParticipantRepository) {
-        this.voteParticipantRepository = voteParticipantRepository;
-    }
+  public VoteParticipantQueryService(VoteParticipantRepository voteParticipantRepository) {
+    this.voteParticipantRepository = voteParticipantRepository;
+  }
 
-    public Optional<VoteParticipant> getParticipantByVoteRoomPublicIdAndNicknameIfExists(
-            UUID voteRoomPublicId,
-            String nickname
-    ) {
-        return voteParticipantRepository.findByVoteRoomPublicIdAndNickname(voteRoomPublicId, nickname);
-    }
+  public Optional<VoteParticipant> getParticipantByVoteRoomPublicIdAndNicknameIfExists(
+      UUID voteRoomPublicId, String nickname) {
+    return voteParticipantRepository.findByVoteRoomPublicIdAndNickname(voteRoomPublicId, nickname);
+  }
 }
