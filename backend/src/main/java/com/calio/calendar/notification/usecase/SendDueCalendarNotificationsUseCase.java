@@ -122,7 +122,7 @@ public class SendDueCalendarNotificationsUseCase {
         listGroupSchedules(accountId, scheduleQueryRange.from(), scheduleQueryRange.to());
 
     personalSchedules.forEach(
-        schedule -> dispatchPersonalScheduleReminders(accountId, settings, schedule, dueRange));
+        schedule -> dispatchPersonalScheduleNotifications(accountId, settings, schedule, dueRange));
     groupSchedules.forEach(
         schedule -> dispatchGeneralReminder(accountId, settings, schedule, dueRange));
     dispatchBriefingIfDue(accountId, settings, now, dueRange, personalSchedules, groupSchedules);
@@ -255,7 +255,7 @@ public class SendDueCalendarNotificationsUseCase {
             });
   }
 
-  private void dispatchPersonalScheduleReminders(
+  private void dispatchPersonalScheduleNotifications(
       Long accountId,
       AccountNotificationSettings settings,
       NotificationSchedule schedule,
