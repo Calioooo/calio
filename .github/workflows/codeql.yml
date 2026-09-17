@@ -57,7 +57,7 @@
           run: chmod +x ./gradlew
 
         - name: Build backend
-          run: ./gradlew build -x test
+          run: ./gradlew classes
 
         - uses: github/codeql-action/analyze@v3
 

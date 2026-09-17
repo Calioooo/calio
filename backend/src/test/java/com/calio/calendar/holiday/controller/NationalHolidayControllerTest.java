@@ -55,7 +55,7 @@ class NationalHolidayControllerTest {
         eventRepository.deleteAll();
         nationalHolidayRepository.deleteAll();
         tagRepository.deleteAll();
-        tagRepository.save(new Tag(TagType.DEFAULT, "기타", "#64748B"));
+        tagRepository.save(Tag.personalDefault("기타", "#64748B"));
     }
 
     @Test

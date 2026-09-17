@@ -2,6 +2,7 @@ plugins {
     id 'java'
     id 'org.springframework.boot' version '4.0.6'
     id 'io.spring.dependency-management' version '1.1.7'
+    id 'com.diffplug.spotless' version '8.10.2'
 }
 
 group = 'com.calio'
@@ -18,7 +19,25 @@ repositories {
     mavenCentral()
 }
 
+spotless {
+    java {
+        def selectedFiles = providers.gradleProperty('calioFormatFiles').orNull
+        if (selectedFiles != null) {
+            def paths = new groovy.json.JsonSlurper().parseText(selectedFiles)
+            if (!(paths instanceof List) || paths.any { !(it instanceof String) }) {
+                throw new GradleException('calioFormatFiles must be a JSON array of source paths')
+            }
+            target paths.collect { file(it) }
+        } else {
+            target 'src/main/java/**/*.java', 'src/test/java/**/*.java'
+        }
+        targetExclude '**/generated/**', '**/build/**'
+        googleJavaFormat('1.36.1')
+    }
+}
+
 dependencies {
+    implementation platform('org.springframework.ai:spring-ai-bom:2.0.0')
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'org.springframework.boot:spring-boot-starter-restclient'
@@ -26,6 +45,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
     implementation 'org.springframework.boot:spring-boot-flyway'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'org.springframework.ai:spring-ai-starter-model-openai'
     implementation 'org.flywaydb:flyway-core'
     runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
     implementation 'org.mnode.ical4j:ical4j:4.3.0'
@@ -36,12 +56,50 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
     testImplementation 'org.springframework.security:spring-security-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+    testImplementation 'com.tngtech.archunit:archunit:1.5.0'
     testCompileOnly 'org.projectlombok:lombok'
     testRuntimeOnly 'com.h2database:h2'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     testAnnotationProcessor 'org.projectlombok:lombok'
 }
 
-tasks.named('test') {
+tasks.register('architectureTest', Test) {
+    group = 'verification'
+    description = 'Runs executable backend architecture rules in an isolated test process.'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
     useJUnitPlatform()
+    include '**/architecture/ArchitectureTest.class'
+}
+
+tasks.named('test') {
+    dependsOn tasks.named('architectureTest')
+    useJUnitPlatform()
+    exclude '**/*EvalTest.class', '**/architecture/ArchitectureTest.class'
+}
+
+tasks.register('aiCalendarEval', Test) {
+    group = 'verification'
+    description = 'Runs AI calendar evaluations against the configured OpenAI model.'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    systemProperty 'spring.profiles.active', 'ai-calendar-eval'
+    useJUnitPlatform()
+    include '**/*EvalTest.class'
+    testLogging {
+        showStandardStreams = true
+    }
+    outputs.upToDateWhen { false }
+    doFirst {
+        if (System.getenv('OPENAI_API_KEY') == null || System.getenv('OPENAI_API_KEY').isBlank()) {
+            throw new GradleException('OPENAI_API_KEY is required to run aiCalendarEval.')
+        }
+        if (System.getenv('OPENAI_CHAT_MODEL') == null || System.getenv('OPENAI_CHAT_MODEL').isBlank()) {
+            throw new GradleException('OPENAI_CHAT_MODEL is required to run aiCalendarEval.')
+        }
+        if (System.getenv('OPENAI_CHAT_REASONING_EFFORT') == null
+                || System.getenv('OPENAI_CHAT_REASONING_EFFORT').isBlank()) {
+            throw new GradleException('OPENAI_CHAT_REASONING_EFFORT is required to run aiCalendarEval.')
+        }
+    }
 }

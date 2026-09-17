@@ -35,6 +35,7 @@ final class CalendarHomeViewModel: ObservableObject {
     private var lastVisibleMonthKeys: Set<YearMonthKey> = []
     private var lastHandledVisibleRange: CalendarVisibleIndexRange?
     private var monthEventCache: [YearMonthKey: CalendarMonthEventCacheEntry]
+    private var activeEventRequestIDs: [YearMonthKey: UUID] = [:]
     private var monthHolidayCache: [YearMonthKey: CalendarMonthHolidayCacheEntry]
     private var pendingCreatedEventsByMonth: [YearMonthKey: [Event]] = [:]
     private var isLoadingTags = false
@@ -224,6 +225,11 @@ final class CalendarHomeViewModel: ObservableObject {
         requestMonths([YearMonthKey(day: referenceDay)], retryFailed: true)
     }
 
+    func refreshAfterAssistantResponse() {
+        invalidateMonthEventCache()
+        refetchDefaultPrefetchRange()
+    }
+
     func resetCreateState() {
         createState = .idle
     }
@@ -252,7 +258,7 @@ final class CalendarHomeViewModel: ObservableObject {
             await reloadTags()
             tagMutationState = .idle
             return true
-        } catch let error as EventServiceError {
+        } catch let error as TagServiceError {
             tagMutationState = .failed(CalendarTagMutationFailure(error: error))
             return false
         } catch {
@@ -277,7 +283,7 @@ final class CalendarHomeViewModel: ObservableObject {
             refetchDefaultPrefetchRange()
             tagMutationState = .idle
             return true
-        } catch let error as EventServiceError {
+        } catch let error as TagServiceError {
             tagMutationState = .failed(CalendarTagMutationFailure(error: error))
             return false
         } catch {
@@ -302,7 +308,7 @@ final class CalendarHomeViewModel: ObservableObject {
             refetchDefaultPrefetchRange()
             tagMutationState = .idle
             return true
-        } catch let error as EventServiceError {
+        } catch let error as TagServiceError {
             tagMutationState = .failed(CalendarTagMutationFailure(error: error))
             return false
         } catch {
@@ -383,11 +389,49 @@ final class CalendarHomeViewModel: ObservableObject {
             mutationState = .idle
             return true
         } catch let error as EventServiceError {
+            if case .recurrenceEventNotFound = error {
+                invalidateMonthEventCache()
+                refetchDefaultPrefetchRange()
+            } else if case .recurrenceOccurrenceNotFound = error {
+                invalidateMonthEventCache()
+                refetchDefaultPrefetchRange()
+            }
             mutationState = .failed(CalendarEventMutationFailure(error: error))
             return false
         } catch {
             mutationState = .failed(.unexpected)
             return false
+        }
+    }
+
+    func updateImportantEvent(_ event: Event, importantEvent: Bool) async -> Event? {
+        guard let eventId = event.backendId,
+              !event.isRecurrenceOccurrence,
+              event.recurrenceId == nil,
+              !mutationState.isMutating
+        else {
+            return nil
+        }
+
+        mutationState = .saving
+
+        do {
+            let updatedEvent = try await eventService.updateImportantEvent(
+                eventId: eventId,
+                importantEvent: importantEvent
+            )
+            invalidateAndRefetchMonths([
+                YearMonthKey(date: event.startAt, calendar: calendar),
+                YearMonthKey(date: updatedEvent.startAt, calendar: calendar)
+            ])
+            mutationState = .idle
+            return updatedEvent
+        } catch let error as EventServiceError {
+            mutationState = .failed(CalendarEventMutationFailure(error: error))
+            return nil
+        } catch {
+            mutationState = .failed(.unexpected)
+            return nil
         }
     }
 
@@ -403,6 +447,13 @@ final class CalendarHomeViewModel: ObservableObject {
             mutationState = .idle
             return details
         } catch let error as EventServiceError {
+            if case .recurrenceEventNotFound = error {
+                invalidateMonthEventCache()
+                refetchDefaultPrefetchRange()
+            } else if case .recurrenceOccurrenceNotFound = error {
+                invalidateMonthEventCache()
+                refetchDefaultPrefetchRange()
+            }
             mutationState = .failed(CalendarEventMutationFailure(error: error))
             return nil
         } catch {
@@ -428,9 +479,12 @@ final class CalendarHomeViewModel: ObservableObject {
                 recurrenceId: recurrenceId,
                 originStartAt: originStartAt,
                 input: RecurrenceOccurrenceUpdateInput(
+                    title: input.title,
+                    description: input.description,
                     startAt: input.startAt,
                     endAt: input.endAt,
-                    isAllDay: input.isAllDay
+                    isAllDay: input.isAllDay,
+                    timeZone: input.isAllDay ? nil : input.timeZone ?? event.timeZone
                 )
             )
             invalidateMonthEventCache()
@@ -438,6 +492,13 @@ final class CalendarHomeViewModel: ObservableObject {
             mutationState = .idle
             return true
         } catch let error as EventServiceError {
+            if case .recurrenceEventNotFound = error {
+                invalidateMonthEventCache()
+                refetchDefaultPrefetchRange()
+            } else if case .recurrenceOccurrenceNotFound = error {
+                invalidateMonthEventCache()
+                refetchDefaultPrefetchRange()
+            }
             mutationState = .failed(CalendarEventMutationFailure(error: error))
             return false
         } catch {
@@ -468,6 +529,7 @@ final class CalendarHomeViewModel: ObservableObject {
                     recurrenceEndTime: input.recurrenceEndTime,
                     recurrenceFrequency: input.recurrenceFrequency,
                     isAllDay: input.isAllDay,
+                    timeZone: input.timeZone,
                     tagId: input.tagId
                 )
             )
@@ -476,6 +538,13 @@ final class CalendarHomeViewModel: ObservableObject {
             mutationState = .idle
             return true
         } catch let error as EventServiceError {
+            if case .recurrenceEventNotFound = error {
+                invalidateMonthEventCache()
+                refetchDefaultPrefetchRange()
+            } else if case .recurrenceOccurrenceNotFound = error {
+                invalidateMonthEventCache()
+                refetchDefaultPrefetchRange()
+            }
             mutationState = .failed(CalendarEventMutationFailure(error: error))
             return false
         } catch {
@@ -531,6 +600,13 @@ final class CalendarHomeViewModel: ObservableObject {
             mutationState = .idle
             return true
         } catch let error as EventServiceError {
+            if case .recurrenceEventNotFound = error {
+                invalidateMonthEventCache()
+                refetchDefaultPrefetchRange()
+            } else if case .recurrenceOccurrenceNotFound = error {
+                invalidateMonthEventCache()
+                refetchDefaultPrefetchRange()
+            }
             mutationState = .failed(CalendarEventMutationFailure(error: error))
             return false
         } catch {
@@ -603,20 +679,35 @@ final class CalendarHomeViewModel: ObservableObject {
         )
     }
     
-    private func fetchMonth(_ key: YearMonthKey) {
+    private func fetchMonth(_ key: YearMonthKey, requestID: UUID) {
         let range = key.dateRange(calendar: calendar)
 
         Task {
             do {
                 let events = try await eventService.fetchEvents(from: range.from, to: range.to)
+                guard isActiveEventRequest(requestID, for: key) else {
+                    return
+                }
+
+                activeEventRequestIDs.removeValue(forKey: key)
                 let pendingEvents = self.pendingCreatedEventsByMonth.removeValue(forKey: key) ?? []
                 self.setMonthCacheEntry(
                     .loaded(self.mergedSortedEvents(events, with: pendingEvents)),
                     for: key
                 )
             } catch let error as EventServiceError {
+                guard isActiveEventRequest(requestID, for: key) else {
+                    return
+                }
+
+                activeEventRequestIDs.removeValue(forKey: key)
                 self.setFailedMonthCacheEntry(CalendarMonthEventFailure(error: error), for: key)
             } catch {
+                guard isActiveEventRequest(requestID, for: key) else {
+                    return
+                }
+
+                activeEventRequestIDs.removeValue(forKey: key)
                 self.setFailedMonthCacheEntry(.unexpected, for: key)
             }
         }
@@ -859,6 +950,7 @@ final class CalendarHomeViewModel: ObservableObject {
     }
 
     private func invalidateMonthEventCache() {
+        activeEventRequestIDs.removeAll()
         monthEventCache.removeAll()
         pendingCreatedEventsByMonth.removeAll()
         state = state.replacingMonthEventCache(
@@ -879,6 +971,7 @@ final class CalendarHomeViewModel: ObservableObject {
 
     private func invalidateMonthEventCache(for keys: Set<YearMonthKey>) {
         keys.forEach { key in
+            activeEventRequestIDs.removeValue(forKey: key)
             monthEventCache.removeValue(forKey: key)
             pendingCreatedEventsByMonth.removeValue(forKey: key)
         }
@@ -902,7 +995,9 @@ final class CalendarHomeViewModel: ObservableObject {
     }
 
     private func refetchDefaultPrefetchRange() {
-        prefetchReferenceMonthAndAdjacent(retryFailed: false)
+        let referenceKeys = adjacentMonthKeys(around: YearMonthKey(day: referenceDay))
+        let visibleKeys = lastVisibleMonthKeys.flatMap(adjacentMonthKeys(around:))
+        requestMonths(referenceKeys + visibleKeys, retryFailed: false)
     }
 
     private func prefetchMonthsForVisibleItemsIfNeeded(_ visibleItems: [CalendarDayItem]) {
@@ -933,8 +1028,10 @@ final class CalendarHomeViewModel: ObservableObject {
             return
         }
 
+        let requestID = UUID()
+        activeEventRequestIDs[key] = requestID
         setMonthCacheEntry(.loading, for: key)
-        fetchMonth(key)
+        fetchMonth(key, requestID: requestID)
     }
 
     private func requestHolidayMonth(_ key: YearMonthKey) {
@@ -968,6 +1065,10 @@ final class CalendarHomeViewModel: ObservableObject {
         case .loading, .loaded:
             return false
         }
+    }
+
+    private func isActiveEventRequest(_ requestID: UUID, for key: YearMonthKey) -> Bool {
+        activeEventRequestIDs[key] == requestID
     }
 
     private func adjacentMonthKeys(around key: YearMonthKey) -> [YearMonthKey] {
@@ -1256,7 +1357,7 @@ enum CalendarEventCreateFailure: Equatable {
 
     init(error: EventServiceError) {
         switch error {
-        case .eventNotFound, .recurrenceEventNotFound, .recurrenceOccurrenceNotFound:
+        case .eventNotFound, .recurrenceEventNotFound, .recurrenceOccurrenceNotFound, .seriesMutationNotAllowed:
             self = .unexpected
         case .validationFailed:
             self = .validationFailed
@@ -1305,6 +1406,7 @@ enum CalendarEventMutationFailure: Equatable {
     case eventNotFound
     case recurrenceEventNotFound
     case recurrenceOccurrenceNotFound
+    case seriesMutationNotAllowed
     case validationFailed
     case invalidTimeRange
     case network
@@ -1318,6 +1420,8 @@ enum CalendarEventMutationFailure: Equatable {
             self = .recurrenceEventNotFound
         case .recurrenceOccurrenceNotFound:
             self = .recurrenceOccurrenceNotFound
+        case .seriesMutationNotAllowed:
+            self = .seriesMutationNotAllowed
         case .validationFailed:
             self = .validationFailed
         case .invalidTimeRange:
@@ -1337,6 +1441,8 @@ enum CalendarEventMutationFailure: Equatable {
             return "반복 일정을 찾을 수 없습니다."
         case .recurrenceOccurrenceNotFound:
             return "반복 일정 항목을 찾을 수 없습니다."
+        case .seriesMutationNotAllowed:
+            return "외부 캘린더 일정은 전체 반복 일정을 수정할 수 없습니다."
         case .validationFailed:
             return "입력값을 확인해 주세요."
         case .invalidTimeRange:
@@ -1372,13 +1478,13 @@ enum CalendarTagMutationFailure: Equatable {
     case network
     case unexpected
 
-    init(error: EventServiceError) {
+    init(error: TagServiceError) {
         switch error {
-        case .validationFailed, .invalidTimeRange:
+        case .validationFailed:
             self = .validationFailed
         case .network:
             self = .network
-        case .eventNotFound, .recurrenceEventNotFound, .recurrenceOccurrenceNotFound, .decoding, .unexpected:
+        case .decoding, .unexpected:
             self = .unexpected
         }
     }

@@ -75,10 +75,10 @@ public class HolidayApiClient {
         return restClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .queryParam("solYear", year)
-                        .queryParam("ServiceKey", holidayApiProperties.getServiceKey())
+                        .queryParam("ServiceKey", "{serviceKey}")
                         .queryParam("_type", "json")
                         .queryParam("numOfRows", 365)
-                        .build())
+                        .build(holidayApiProperties.getServiceKey()))
                 .retrieve()
                 .body(String.class);
     }
