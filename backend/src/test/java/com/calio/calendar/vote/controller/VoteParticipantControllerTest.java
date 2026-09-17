@@ -10,6 +10,7 @@ import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.vote.domain.VoteParticipant;
 import com.calio.calendar.vote.domain.VoteRoom;
+import com.calio.calendar.vote.domain.Vote;
 import com.calio.calendar.vote.repository.VoteParticipantRepository;
 import com.calio.calendar.vote.repository.VoteRepository;
 import com.calio.calendar.vote.repository.VoteRoomRepository;
@@ -95,5 +96,70 @@ class VoteParticipantControllerTest {
                     .andExpect(status().isUnauthorized())
                     .andExpect(jsonPath("$.errorCode").value("VOTE_PARTICIPANT_CREDENTIAL_INVALID"));
         }
+    }
+
+    @Test
+    @DisplayName("비인증 공개 요청으로 제출된 참여자의 기존 선택을 복원한다")
+    void publicLookupRestoresSubmittedParticipantSelection() throws Exception {
+        VoteParticipant participant = participantRepository.saveAndFlush(new VoteParticipant(
+                voteRoom, "calio", new BCryptPasswordEncoder().encode("secret")));
+        participant.submit();
+        participantRepository.saveAndFlush(participant);
+        voteRepository.saveAllAndFlush(java.util.List.of(
+                new Vote(participant, LocalDate.of(2026, 8, 17)),
+                new Vote(participant, LocalDate.of(2026, 8, 15))
+        ));
+
+        mockMvc.perform(post("/api/vote-rooms/{publicId}/votes/lookup", voteRoom.getPublicId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nickname\":\"calio\",\"password\":\"secret\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.nickname").value("calio"))
+                .andExpect(jsonPath("$.status").value("SUBMITTED"))
+                .andExpect(jsonPath("$.unavailableDates", hasSize(2)))
+                .andExpect(jsonPath("$.unavailableDates[0]").value("2026-08-15"))
+                .andExpect(jsonPath("$.unavailableDates[1]").value("2026-08-17"))
+                .andExpect(jsonPath("$.password").doesNotExist())
+                .andExpect(jsonPath("$.passwordHash").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("선택 복원은 REGISTERED 참여자에게 빈 날짜 목록을 반환한다")
+    void lookupReturnsEmptyDatesForRegisteredParticipant() throws Exception {
+        participantRepository.saveAndFlush(new VoteParticipant(voteRoom, "calio", null));
+
+        mockMvc.perform(post("/api/vote-rooms/{publicId}/votes/lookup", voteRoom.getPublicId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nickname\":\"calio\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("REGISTERED"))
+                .andExpect(jsonPath("$.unavailableDates", hasSize(0)));
+    }
+
+    @Test
+    @DisplayName("선택 복원의 잘못된 자격증명은 참여자 존재 여부와 무관하게 401을 반환한다")
+    void lookupInvalidCredentialUsesSameResponse() throws Exception {
+        participantRepository.saveAndFlush(new VoteParticipant(
+                voteRoom, "calio", new BCryptPasswordEncoder().encode("secret")));
+        String wrongPassword = "{\"nickname\":\"calio\",\"password\":\"wrong\"}";
+        String missingName = "{\"nickname\":\"other\",\"password\":\"secret\"}";
+
+        for (String request : java.util.List.of(wrongPassword, missingName)) {
+            mockMvc.perform(post("/api/vote-rooms/{publicId}/votes/lookup", voteRoom.getPublicId())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(request))
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.errorCode").value("VOTE_PARTICIPANT_CREDENTIAL_INVALID"));
+        }
+    }
+
+    @Test
+    @DisplayName("선택 복원은 삭제되었거나 존재하지 않는 VoteRoom에 404를 반환한다")
+    void lookupMissingVoteRoomReturnsNotFound() throws Exception {
+        mockMvc.perform(post("/api/vote-rooms/{publicId}/votes/lookup", UUID.randomUUID())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nickname\":\"calio\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("VOTE_ROOM_NOT_FOUND"));
     }
 }

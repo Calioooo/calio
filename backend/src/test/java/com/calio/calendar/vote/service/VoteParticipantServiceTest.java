@@ -15,6 +15,7 @@ import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.vote.controller.dto.SubmitVoteRequest;
+import com.calio.calendar.vote.controller.dto.LookupVoteParticipantSelectionRequest;
 import com.calio.calendar.vote.domain.VoteParticipant;
 import com.calio.calendar.vote.domain.VoteParticipantStatus;
 import com.calio.calendar.vote.domain.VoteRoom;
@@ -47,6 +48,9 @@ class VoteParticipantServiceTest {
     @Mock
     private VoteCommandService voteCommandService;
 
+    @Mock
+    private VoteRoomQueryService voteRoomQueryService;
+
     private VoteParticipantService voteParticipantService;
     private PasswordEncoder passwordEncoder;
 
@@ -57,6 +61,7 @@ class VoteParticipantServiceTest {
                 voteParticipantQueryService,
                 voteParticipantCommandService,
                 voteCommandService,
+                voteRoomQueryService,
                 passwordEncoder
         );
     }
@@ -250,6 +255,77 @@ class VoteParticipantServiceTest {
         verify(voteParticipantCommandService, never())
                 .getParticipantForVoteSubmission(VOTE_ROOM_PUBLIC_ID, "calio");
         verifyNoInteractions(voteCommandService);
+    }
+
+    @Test
+    @DisplayName("제출한 참여자의 기존 불가능한 날짜 선택을 날짜순으로 복원한다")
+    void givenSubmittedParticipant_whenLookupSelection_thenReturnsSavedUnavailableDates() {
+        // given
+        VoteRoom voteRoom = voteRoom();
+        VoteParticipant participant = new VoteParticipant(voteRoom, "calio", passwordEncoder.encode("secret"));
+        participant.submit();
+        when(voteRoomQueryService.getByPublicId(VOTE_ROOM_PUBLIC_ID)).thenReturn(voteRoom);
+        when(voteParticipantQueryService.getParticipantByVoteRoomPublicIdAndNicknameIfExists(
+                VOTE_ROOM_PUBLIC_ID,
+                "calio"
+        )).thenReturn(Optional.of(participant));
+        when(voteParticipantQueryService.listUnavailableDatesByVoteParticipantId(participant.getId()))
+                .thenReturn(java.util.List.of(LocalDate.of(2026, 8, 15), LocalDate.of(2026, 8, 17)));
+
+        // when
+        var response = voteParticipantService.lookupSelection(
+                VOTE_ROOM_PUBLIC_ID,
+                new LookupVoteParticipantSelectionRequest("calio", "secret")
+        );
+
+        // then
+        assertThat(response.nickname()).isEqualTo("calio");
+        assertThat(response.status()).isEqualTo(VoteParticipantStatus.SUBMITTED);
+        assertThat(response.unavailableDates()).containsExactly(
+                LocalDate.of(2026, 8, 15),
+                LocalDate.of(2026, 8, 17)
+        );
+    }
+
+    @Test
+    @DisplayName("제출 전 REGISTERED 참여자의 기존 선택 복원은 빈 날짜 목록을 반환한다")
+    void givenRegisteredParticipant_whenLookupSelection_thenReturnsEmptyUnavailableDates() {
+        // given
+        VoteRoom voteRoom = voteRoom();
+        VoteParticipant participant = new VoteParticipant(voteRoom, "calio", null);
+        when(voteRoomQueryService.getByPublicId(VOTE_ROOM_PUBLIC_ID)).thenReturn(voteRoom);
+        when(voteParticipantQueryService.getParticipantByVoteRoomPublicIdAndNicknameIfExists(
+                VOTE_ROOM_PUBLIC_ID,
+                "calio"
+        )).thenReturn(Optional.of(participant));
+
+        // when
+        var response = voteParticipantService.lookupSelection(
+                VOTE_ROOM_PUBLIC_ID,
+                new LookupVoteParticipantSelectionRequest("calio", null)
+        );
+
+        // then
+        assertThat(response.status()).isEqualTo(VoteParticipantStatus.REGISTERED);
+        assertThat(response.unavailableDates()).isEmpty();
+        verify(voteParticipantQueryService, never()).listUnavailableDatesByVoteParticipantId(any());
+    }
+
+    @Test
+    @DisplayName("선택 복원은 존재하지 않는 VoteRoom에 대해 참여자 자격증명을 조회하지 않고 404를 반환한다")
+    void givenMissingVoteRoom_whenLookupSelection_thenRejectsBeforeCredentialLookup() {
+        // given
+        when(voteRoomQueryService.getByPublicId(VOTE_ROOM_PUBLIC_ID))
+                .thenThrow(new CalioException(ErrorCode.VOTE_ROOM_NOT_FOUND));
+
+        // when, then
+        assertThatThrownBy(() -> voteParticipantService.lookupSelection(
+                VOTE_ROOM_PUBLIC_ID,
+                new LookupVoteParticipantSelectionRequest("calio", null)
+        )).isInstanceOfSatisfying(CalioException.class, exception ->
+                assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.VOTE_ROOM_NOT_FOUND)
+        );
+        verifyNoInteractions(voteParticipantQueryService);
     }
 
     private VoteRoom voteRoom() {
