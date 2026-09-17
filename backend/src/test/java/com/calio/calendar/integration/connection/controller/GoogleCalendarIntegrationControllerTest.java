@@ -21,6 +21,7 @@ import com.calio.calendar.integration.connection.repository.GoogleCalendarConnec
 import com.calio.calendar.integration.connection.repository.GoogleCalendarIntegrationRepository;
 import com.calio.calendar.integration.sync.GoogleCalendarSyncMode;
 import com.calio.calendar.integration.sync.operation.GoogleOperationWorker;
+import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarSyncJob;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJob;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobTrigger;
@@ -188,8 +189,9 @@ class GoogleCalendarIntegrationControllerTest {
     assertThat(job.getIntegrationId()).isEqualTo(integration.getId());
     assertThat(job.getAccountId()).isEqualTo(integration.getAccountId());
     assertThat(job.getIntegrationSequence()).isEqualTo(2L);
-    assertThat(job.getKind()).isEqualTo(GoogleOperationJob.SYNC_KIND);
-    assertThat(job.getTrigger()).isEqualTo(GoogleOperationJobTrigger.MANUAL);
+    assertThat(job).isInstanceOf(GoogleCalendarSyncJob.class);
+    assertThat(((GoogleCalendarSyncJob) job).getTrigger())
+        .isEqualTo(GoogleOperationJobTrigger.MANUAL);
     assertThat(job.getState()).isEqualTo(GoogleOperationJobState.PENDING);
     assertThat(job.getRunnableAt()).isNotNull();
     assertThat(job.getRetryCount()).isZero();

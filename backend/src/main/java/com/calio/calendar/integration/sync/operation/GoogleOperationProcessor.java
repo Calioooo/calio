@@ -6,6 +6,7 @@ import com.calio.calendar.external.google.GoogleCalendarInvalidGrantException;
 import com.calio.calendar.integration.connection.service.GoogleCalendarConnectionCommandService;
 import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrationQueryService;
 import com.calio.calendar.integration.sync.GoogleCalendarSyncService;
+import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarSyncJob;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJob;
 import com.calio.calendar.integration.sync.operation.dto.GoogleOperationFailureDecision;
 import java.time.Clock;
@@ -16,7 +17,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class GoogleOperationProcessor {
 
-  private static final String UNSUPPORTED_JOB_KIND = "UNSUPPORTED_JOB_KIND";
+  private static final String UNSUPPORTED_JOB_SCOPE = "UNSUPPORTED_JOB_SCOPE";
 
   private final GoogleOperationJobService jobService;
   private final GoogleOperationLeaseService operationLeaseService;
@@ -64,16 +65,21 @@ public class GoogleOperationProcessor {
     if (job == null) {
       return JobExecutionResult.STOP_ACCOUNT_PROCESSING;
     }
-    if (!GoogleOperationJob.SYNC_KIND.equals(job.getKind())) {
-      jobService.terminate(job.getId(), job.getAccountId(), workerToken, UNSUPPORTED_JOB_KIND);
-      return JobExecutionResult.CONTINUE_WITH_NEXT_JOB;
-    }
-    return executeSync(job, workerToken);
+    return execute(job, workerToken);
   }
 
-  private JobExecutionResult executeSync(GoogleOperationJob job, String workerToken) {
+  private JobExecutionResult terminateUnsupported(
+      GoogleOperationJob job, String workerToken, String reason) {
+    jobService.terminate(job.getId(), job.getAccountId(), workerToken, reason);
+    return JobExecutionResult.CONTINUE_WITH_NEXT_JOB;
+  }
+
+  private JobExecutionResult execute(GoogleOperationJob job, String workerToken) {
+    if (!(job instanceof GoogleCalendarSyncJob syncJob)) {
+      return terminateUnsupported(job, workerToken, UNSUPPORTED_JOB_SCOPE);
+    }
     try {
-      syncService.synchronize(job.getId(), job.getAccountId(), workerToken);
+      syncService.synchronize(syncJob.getId(), syncJob.getAccountId(), workerToken);
       return JobExecutionResult.CONTINUE_WITH_NEXT_JOB;
     } catch (RuntimeException failure) {
       return handleSyncFailure(job, workerToken, failure);
