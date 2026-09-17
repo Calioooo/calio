@@ -349,13 +349,13 @@ class GoogleCalendarSyncMigrationTest {
   }
 
   @Test
-  @DisplayName("V20은 retained integration lifecycle 상태와 credential 제약을 적용한다")
-  void givenV19Schema_whenMigrateToV20_thenEnforcesRetainedIntegrationLifecycle() throws Exception {
+  @DisplayName("V28은 retained integration lifecycle 상태와 credential 제약을 적용한다")
+  void givenV27Schema_whenMigrateToV28_thenEnforcesRetainedIntegrationLifecycle() throws Exception {
     String url = "jdbc:h2:mem:google-retained-integration-lifecycle;MODE=MySQL;DB_CLOSE_DELAY=-1";
-    migrateTo(url, MigrationVersion.fromVersion("19"));
+    migrateTo(url, MigrationVersion.fromVersion("27"));
     insertCurrentEventAndIntegration(url);
 
-    migrateTo(url, MigrationVersion.fromVersion("20"));
+    migrateTo(url, MigrationVersion.fromVersion("28"));
 
     try (Connection connection = DriverManager.getConnection(url, "sa", "");
         Statement statement = connection.createStatement()) {
