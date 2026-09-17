@@ -4,8 +4,10 @@ import com.calio.calendar.integration.mapping.domain.GoogleCalendarRecurrenceEve
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarRecurrenceOverrideMapping;
 import com.calio.calendar.integration.mapping.repository.GoogleCalendarRecurrenceEventMappingRepository;
 import com.calio.calendar.integration.mapping.repository.GoogleCalendarRecurrenceOverrideMappingRepository;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,12 +32,47 @@ public class GoogleCalendarRecurrenceMappingQueryService {
         connectionId, calendarKey, externalEventIds);
   }
 
+  public List<GoogleCalendarRecurrenceEventMapping> listRecurrenceEventMappingsForJob(
+      Long integrationId, Long recurrenceEventId) {
+    return recurrenceMappingRepository
+        .findAllWithConnectionAndIntegrationByIntegrationIdAndRecurrenceEventId(
+            integrationId, recurrenceEventId);
+  }
+
+  public Optional<GoogleCalendarRecurrenceEventMapping> getRecurrenceEventMappingIfExists(
+      Long connectionId, Long recurrenceEventId) {
+    return recurrenceMappingRepository.findByConnectionIdAndRecurrenceEventId(
+        connectionId, recurrenceEventId);
+  }
+
+  public List<Long> listRecurrenceEventIdsWithMappings(Collection<Long> recurrenceEventIds) {
+    if (recurrenceEventIds.isEmpty()) {
+      return List.of();
+    }
+    return recurrenceMappingRepository.findRecurrenceEventIdsWithMappings(recurrenceEventIds);
+  }
+
+  public Optional<GoogleCalendarRecurrenceOverrideMapping> getOverrideMappingIfExists(
+      Long recurrenceEventMappingId, Instant originStartAt) {
+    return overrideMappingRepository.findByRecurrenceEventMapping_IdAndOriginStartAt(
+        recurrenceEventMappingId, originStartAt);
+  }
+
+  public List<GoogleCalendarRecurrenceOverrideMapping> listOverrideMappingsByRecurrenceEventIds(
+      Collection<Long> recurrenceEventIds) {
+    if (recurrenceEventIds.isEmpty()) {
+      return List.of();
+    }
+    return overrideMappingRepository.findAllWithRecurrenceEventMappingByRecurrenceEventIds(
+        recurrenceEventIds);
+  }
+
   public List<GoogleCalendarRecurrenceEventMapping> listRecurrenceEventMappings(Long connectionId) {
     return recurrenceMappingRepository.findAllWithRecurrenceEventByConnectionId(connectionId);
   }
 
   public boolean hasExternalRecurrenceEventMapping(Long recurrenceEventId, Long accountId) {
-    return recurrenceMappingRepository.existsByRecurrenceEvent_IdAndIntegration_AccountId(
+    return recurrenceMappingRepository.existsByRecurrenceEventIdAndConnection_Integration_AccountId(
         recurrenceEventId, accountId);
   }
 

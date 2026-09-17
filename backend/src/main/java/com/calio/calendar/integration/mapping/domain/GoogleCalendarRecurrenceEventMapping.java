@@ -12,7 +12,6 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 
@@ -24,8 +23,8 @@ import jakarta.persistence.UniqueConstraint;
           name = "uk_google_calendar_recurrence_event_external",
           columnNames = {"connection_id", "calendar_key", "external_event_id"}),
       @UniqueConstraint(
-          name = "uk_google_calendar_recurrence_event_canonical",
-          columnNames = "recurrence_event_id")
+          name = "uk_google_calendar_recurrence_event_connection_canonical",
+          columnNames = {"connection_id", "recurrence_event_id"})
     })
 public class GoogleCalendarRecurrenceEventMapping extends BaseEntity {
 
@@ -39,9 +38,8 @@ public class GoogleCalendarRecurrenceEventMapping extends BaseEntity {
   @JoinColumn(name = "connection_id", nullable = false)
   private GoogleCalendarConnection connection;
 
-  @OneToOne(fetch = FetchType.LAZY, optional = false)
-  @JoinColumn(name = "recurrence_event_id", nullable = false)
-  private RecurrenceEvent recurrenceEvent;
+  @Column(name = "recurrence_event_id", nullable = false, updatable = false)
+  private Long recurrenceEventId;
 
   @Column(name = "calendar_key", nullable = false, length = 32)
   private String calendarKey;
@@ -51,15 +49,18 @@ public class GoogleCalendarRecurrenceEventMapping extends BaseEntity {
 
   @Embedded private GoogleCalendarMappingSyncState syncState;
 
+  @Column(name = "local_changed", nullable = false)
+  private boolean localChanged;
+
   protected GoogleCalendarRecurrenceEventMapping() {}
 
   public GoogleCalendarRecurrenceEventMapping(
       GoogleCalendarConnection connection,
-      RecurrenceEvent recurrenceEvent,
+      Long recurrenceEventId,
       String externalEventId,
       String providerEtag) {
     this.connection = connection;
-    this.recurrenceEvent = recurrenceEvent;
+    this.recurrenceEventId = recurrenceEventId;
     this.calendarKey = PRIMARY_CALENDAR_KEY;
     this.externalEventId = externalEventId;
     this.syncState = GoogleCalendarMappingSyncState.active(providerEtag);
@@ -73,8 +74,8 @@ public class GoogleCalendarRecurrenceEventMapping extends BaseEntity {
     return connection;
   }
 
-  public RecurrenceEvent getRecurrenceEvent() {
-    return recurrenceEvent;
+  public Long getRecurrenceEventId() {
+    return recurrenceEventId;
   }
 
   public String getExternalEventId() {
@@ -87,6 +88,22 @@ public class GoogleCalendarRecurrenceEventMapping extends BaseEntity {
 
   public void markConflicted() {
     syncState.markConflicted();
+  }
+
+  public GoogleCalendarRecurrenceEventMapping(
+      GoogleCalendarConnection connection,
+      RecurrenceEvent recurrenceEvent,
+      String externalEventId,
+      String providerEtag) {
+    this(connection, recurrenceEvent.getId(), externalEventId, providerEtag);
+  }
+
+  public void markLocalChanged() {
+    localChanged = true;
+  }
+
+  public boolean isLocalChanged() {
+    return localChanged;
   }
 
   public boolean isConflicted() {
