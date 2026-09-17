@@ -11,6 +11,7 @@ import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.service.AccountQueryService;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
+import com.calio.calendar.notification.client.ApnsEnvironment;
 import com.calio.calendar.notification.client.ApnsProperties;
 import com.calio.calendar.notification.domain.IosPushDevice;
 import java.util.Optional;
@@ -40,7 +41,7 @@ class IosPushDeviceServiceTest {
     pushDeviceService =
         new IosPushDeviceService(
             accountQueryService,
-            new ApnsProperties("development", "team", "key", "bundle", "private-key"),
+            new ApnsProperties(ApnsEnvironment.DEVELOPMENT, "team", "key", "bundle", "private-key"),
             pushDeviceQueryService,
             pushDeviceCommandService);
   }

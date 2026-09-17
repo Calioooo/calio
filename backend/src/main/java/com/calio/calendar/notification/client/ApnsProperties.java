@@ -1,13 +1,14 @@
 package com.calio.calendar.notification.client;
 
+import java.util.Objects;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "notifications.apns")
 public record ApnsProperties(
-    String environment, String teamId, String keyId, String bundleId, String privateKey) {
+    ApnsEnvironment environment, String teamId, String keyId, String bundleId, String privateKey) {
 
   public ApnsProperties {
-    environment = isBlank(environment) ? "development" : environment;
+    Objects.requireNonNull(environment, "APNs environment must be configured.");
   }
 
   public boolean configured() {
@@ -15,9 +16,7 @@ public record ApnsProperties(
   }
 
   public String host() {
-    return "production".equalsIgnoreCase(environment)
-        ? "https://api.push.apple.com"
-        : "https://api.sandbox.push.apple.com";
+    return environment.host();
   }
 
   private static boolean isBlank(String value) {

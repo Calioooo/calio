@@ -154,7 +154,7 @@ class ApnsClientTest {
     // given
     ApnsClient client =
         apnsClient(
-            new ApnsProperties("development", "", "", "", ""),
+            new ApnsProperties(ApnsEnvironment.DEVELOPMENT, "", "", "", ""),
             RestClient.builder().build(),
             Clock.systemUTC());
 
@@ -174,7 +174,7 @@ class ApnsClientTest {
     ApnsClient client =
         apnsClient(
             new ApnsProperties(
-                "development",
+                ApnsEnvironment.DEVELOPMENT,
                 "team",
                 "key",
                 "bundle",
@@ -202,7 +202,7 @@ class ApnsClientTest {
   }
 
   private ApnsProperties properties() {
-    return new ApnsProperties("development", "team", "key", "bundle", privateKey());
+    return new ApnsProperties(ApnsEnvironment.DEVELOPMENT, "team", "key", "bundle", privateKey());
   }
 
   private ApnsMessage message() {

@@ -78,7 +78,7 @@ ai-calendar:
 
 notifications:
   apns:
-    environment: development
+    environment: ${APNS_ENVIRONMENT}
     team-id: ${APNS_TEAM_ID:}
     key-id: ${APNS_KEY_ID:}
     bundle-id: ${APNS_BUNDLE_ID:}

@@ -34,7 +34,7 @@ class ApnsProviderTokenProviderTest {
   }
 
   private ApnsProperties properties() {
-    return new ApnsProperties("development", "team", "key", "bundle", privateKey());
+    return new ApnsProperties(ApnsEnvironment.DEVELOPMENT, "team", "key", "bundle", privateKey());
   }
 
   private String privateKey() {

@@ -43,7 +43,7 @@ public class IosPushDeviceService {
                         accountQueryService.getAccount(accountId),
                         installationId,
                         apnsToken,
-                        apnsProperties.environment()));
+                        apnsProperties.environment().value()));
     refreshPushDevice(pushDevice, apnsToken);
   }
 
@@ -73,7 +73,7 @@ public class IosPushDeviceService {
   }
 
   private void refreshPushDevice(IosPushDevice pushDevice, String apnsToken) {
-    pushDevice.refresh(apnsToken, apnsProperties.environment());
+    pushDevice.refresh(apnsToken, apnsProperties.environment().value());
     try {
       if (pushDevice.getId() == null) {
         pushDeviceCommandService.create(pushDevice);
