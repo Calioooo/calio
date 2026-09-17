@@ -34,6 +34,7 @@ struct CalendarWeekTimelineView: View {
     let onResetEventMutation: () -> Void
     let onResetTagMutation: () -> Void
     let onFetchRecurrenceEvent: (Int64) async -> RecurrenceEventDetails?
+    let onUpdateImportantEvent: (Event, Bool) async -> Event?
     let onUpdateSingleEvent: (Event, EventUpdateInput) async -> Bool
     let onUpdateRecurrenceOccurrence: (Event, EventUpdateInput) async -> Bool
     let onUpdateRecurrenceSeries: (Int64, RecurrenceEventSeriesEditInput) async -> Bool
@@ -64,6 +65,7 @@ struct CalendarWeekTimelineView: View {
         onResetEventMutation: @escaping () -> Void = {},
         onResetTagMutation: @escaping () -> Void = {},
         onFetchRecurrenceEvent: @escaping (Int64) async -> RecurrenceEventDetails? = { _ in nil },
+        onUpdateImportantEvent: @escaping (Event, Bool) async -> Event?,
         onUpdateSingleEvent: @escaping (Event, EventUpdateInput) async -> Bool = { _, _ in true },
         onUpdateRecurrenceOccurrence: @escaping (Event, EventUpdateInput) async -> Bool = { _, _ in true },
         onUpdateRecurrenceSeries: @escaping (Int64, RecurrenceEventSeriesEditInput) async -> Bool = { _, _ in true },
@@ -93,6 +95,7 @@ struct CalendarWeekTimelineView: View {
         self.onResetEventMutation = onResetEventMutation
         self.onResetTagMutation = onResetTagMutation
         self.onFetchRecurrenceEvent = onFetchRecurrenceEvent
+        self.onUpdateImportantEvent = onUpdateImportantEvent
         self.onUpdateSingleEvent = onUpdateSingleEvent
         self.onUpdateRecurrenceOccurrence = onUpdateRecurrenceOccurrence
         self.onUpdateRecurrenceSeries = onUpdateRecurrenceSeries
@@ -110,6 +113,7 @@ struct CalendarWeekTimelineView: View {
     @State private var activeTimelinePopover: TimelinePopoverPresentation?
     @State private var detailEvent: Event?
     @State private var timelineEventFrames: [String: CGRect] = [:]
+    @Environment(\.sizeCategory) private var sizeCategory
     
     var body: some View {
         GeometryReader { geometry in
@@ -163,7 +167,7 @@ struct CalendarWeekTimelineView: View {
                 height: geometry.size.height,
                 alignment: .top
             )
-            .background(Color(uiColor: .systemBackground))
+            .background(Color.calioBackground)
             .coordinateSpace(name: timelineCoordinateSpace)
             .onPreferenceChange(TimelineEventFramePreferenceKey.self) { frames in
                 timelineEventFrames = frames
@@ -179,6 +183,7 @@ struct CalendarWeekTimelineView: View {
                 mutationFailureMessage: eventMutationFailureMessage,
                 tagMutationFailureMessage: tagMutationFailureMessage,
                 onFetchRecurrenceEvent: onFetchRecurrenceEvent,
+                onUpdateImportantEvent: onUpdateImportantEvent,
                 onUpdateSingleEvent: onUpdateSingleEvent,
                 onUpdateRecurrenceOccurrence: onUpdateRecurrenceOccurrence,
                 onUpdateRecurrenceSeries: onUpdateRecurrenceSeries,
@@ -246,7 +251,7 @@ struct CalendarWeekTimelineView: View {
             path.move(to: CGPoint(x: 0, y: metrics.headerGridLineStartY))
             path.addLine(to: CGPoint(x: 0, y: metrics.headerHeight))
         }
-        .stroke(Color.secondary.opacity(0.28), lineWidth: 0.7)
+        .stroke(Color.calioDivider, lineWidth: 0.7)
     }
     
     private func dayHeader(for item: CalendarDayItem, metrics: TimelineMetrics) -> some View {
@@ -270,14 +275,14 @@ struct CalendarWeekTimelineView: View {
                     .background {
                         if item.isToday {
                             Circle()
-                                .fill(Color(red: 0.56, green: 0.61, blue: 0.96))
+                                .fill(Color.calioBrand)
                         }
                     }
                 
                 Capsule()
                     .fill(
                         isReferenceDay
-                            ? Color(red: 0.56, green: 0.61, blue: 0.96)
+                            ? Color.calioPrimary
                             : Color.clear
                     )
                     .frame(
@@ -294,6 +299,15 @@ struct CalendarWeekTimelineView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(
+            Self.dayHeaderAccessibilityLabel(
+                weekday: item.weekday,
+                day: item.id.day,
+                isToday: item.isToday,
+                isSelected: isReferenceDay
+            )
+        )
+        .accessibilityIdentifier("week_day_header_\(item.id.idValue)")
     }
     
     private func fullDayEventRow(metrics: TimelineMetrics) -> some View {
@@ -331,7 +345,7 @@ struct CalendarWeekTimelineView: View {
                 path.addLine(to: CGPoint(x: x, y: metrics.fullDayEventRowHeight))
             }
         }
-        .stroke(Color.secondary.opacity(0.28), lineWidth: 0.7)
+        .stroke(Color.calioDivider, lineWidth: 0.7)
     }
     
     private func fullDayEventCell(
@@ -353,7 +367,7 @@ struct CalendarWeekTimelineView: View {
             if chips.count > metrics.maxVisibleFullDayEventCount {
                 Text("+\(chips.count - metrics.maxVisibleFullDayEventCount)")
                     .font(.system(size: metrics.fullDayEventFontSize, weight: .medium))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.calioTextSecondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
@@ -383,9 +397,18 @@ struct CalendarWeekTimelineView: View {
         _ event: Event,
         metrics: TimelineMetrics
     ) -> some View {
-        Text(event.title)
-            .font(.system(size: metrics.fullDayEventFontSize, weight: .semibold))
-            .lineLimit(1)
+        HStack(spacing: 4) {
+            Text(event.title)
+                .font(.system(size: metrics.fullDayEventFontSize, weight: .semibold))
+                .lineLimit(1)
+
+            if event.importantEvent {
+                Image(systemName: "star.fill")
+                    .font(.caption2)
+                    .foregroundStyle(Color.calioImportantStar)
+                    .accessibilityLabel("중요 일정")
+            }
+        }
             .foregroundStyle(.white)
             .padding(.horizontal, metrics.eventHorizontalPadding)
             .frame(maxWidth: .infinity, minHeight: metrics.fullDayEventHeight)
@@ -394,6 +417,9 @@ struct CalendarWeekTimelineView: View {
                     .fill(Color(hex: event.tag.colorCode))
             )
             .contentShape(Rectangle())
+            .accessibilityLabel("\(event.title), \(event.importantEvent ? "중요 일정, " : "")종일 일정")
+            .accessibilityAddTraits(.isButton)
+            .accessibilityIdentifier("week_full_day_event_\(event.id)")
             .onTapGesture {
                 selectedFullDayEvent = event
             }
@@ -427,7 +453,7 @@ struct CalendarWeekTimelineView: View {
         ForEach(Array(timelineHours.enumerated()), id: \.element) { index, hour in
             Text(timeText(for: hour))
                 .font(.system(size: metrics.timeLabelFontSize, weight: .regular))
-                .foregroundStyle(.primary)
+                .foregroundStyle(.calioTextSecondary)
                 .frame(
                     width: metrics.timeLabelWidth,
                     height: metrics.timeLabelHeight,
@@ -455,7 +481,7 @@ struct CalendarWeekTimelineView: View {
                     path.addLine(to: CGPoint(x: x, y: metrics.totalGridHeight))
                 }
             }
-            .stroke(Color.secondary.opacity(0.28), lineWidth: 0.7)
+            .stroke(Color.calioDivider, lineWidth: 0.7)
         }
         .frame(
             width: metrics.totalWidth,
@@ -466,9 +492,17 @@ struct CalendarWeekTimelineView: View {
     
     private func eventBlocks(metrics: TimelineMetrics, containerSize: CGSize) -> some View {
         ForEach(eventLayouts(metrics: metrics)) { layout in
-            Text(layout.title)
+            HStack(spacing: 4) {
+                Text(layout.title)
+                    .lineLimit(1)
+
+                if layout.showsImportantIndicator {
+                    Image(systemName: "star.fill")
+                        .font(.caption2)
+                        .foregroundStyle(Color.calioImportantStar)
+                }
+            }
                 .font(.system(size: metrics.eventFontSize, weight: .semibold))
-                .lineLimit(1)
                 .foregroundStyle(layout.foregroundColor)
                 .padding(.horizontal, metrics.eventHorizontalPadding)
                 .padding(.vertical, metrics.eventVerticalPadding)
@@ -492,6 +526,9 @@ struct CalendarWeekTimelineView: View {
                     }
                 }
                 .contentShape(Rectangle())
+                .accessibilityLabel(layout.accessibilityLabel)
+                .accessibilityAddTraits(.isButton)
+                .accessibilityIdentifier("week_timeline_event_\(layout.id)")
                 .gesture(
                     SpatialTapGesture()
                         .onEnded { value in
@@ -523,12 +560,12 @@ struct CalendarWeekTimelineView: View {
             timelinePopoverContent(selection: selection)
                 .background(
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(Color(uiColor: .secondarySystemBackground))
+                        .fill(Color.calioSurface)
                         .shadow(color: .black.opacity(0.16), radius: 16, x: 0, y: 8)
                 )
                 .overlay(alignment: selection.arrowAlignment) {
                     TimelinePopoverArrow(direction: selection.arrowDirection)
-                        .fill(Color(uiColor: .secondarySystemBackground))
+                        .fill(Color.calioSurface)
                         .frame(
                             width: selection.arrowSize.width,
                             height: selection.arrowSize.height
@@ -820,11 +857,11 @@ struct CalendarWeekTimelineView: View {
     private func dayHeaderColor(for weekday: CalendarWeekday) -> Color {
         switch weekday {
         case .sunday:
-            return .red
+            return .calioCalendarSunday
         case .saturday:
-            return .blue
+            return .calioBrand
         default:
-            return .primary
+            return .calioTextPrimary
         }
     }
     
@@ -834,9 +871,10 @@ struct CalendarWeekTimelineView: View {
             (size.width - timeColumnWidth) / CGFloat(visibleDayCount),
             1
         )
+        let textScale = sizeCategory.isAccessibilityCategory ? 1.15 : 1
         let topBarHeight = min(max(size.height * 0.07, 44), 58)
-        let headerHeight = min(max(size.height * 0.11, 78), 110)
-        let fullDayEventRowHeight = min(max(size.height * 0.07, 46), 58)
+        let headerHeight = min(max(size.height * 0.11, 78) * textScale, 126)
+        let fullDayEventRowHeight = min(max(size.height * 0.07, 46) * textScale, 68)
         let availableTimelineHeight = max(
             size.height - topBarHeight - headerHeight - fullDayEventRowHeight,
             1
@@ -851,8 +889,25 @@ struct CalendarWeekTimelineView: View {
             fullDayEventRowHeight: fullDayEventRowHeight,
             hourHeight: hourHeight,
             visibleDayCount: visibleDayCount,
-            hourCount: timelineHours.count
+            hourCount: timelineHours.count,
+            textScale: textScale
         )
+    }
+
+    nonisolated static func dayHeaderAccessibilityLabel(
+        weekday: CalendarWeekday,
+        day: Int,
+        isToday: Bool,
+        isSelected: Bool
+    ) -> String {
+        let states = [
+            isToday ? "오늘" : nil,
+            isSelected ? "선택됨" : nil,
+        ]
+        .compactMap { $0 }
+
+        let stateText = states.isEmpty ? "" : ", \(states.joined(separator: ", "))"
+        return "\(weekday.fullKoreanText) \(day)일\(stateText)"
     }
 }
 
@@ -1009,15 +1064,15 @@ private struct TimelinePopoverArrow: Shape {
     }
 }
 
-private struct CalendarTimelineOverlapPopoverView: View {
+struct CalendarTimelineOverlapPopoverView: View {
     let events: [Event]
     let onShowDetail: (Event) -> Void
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("일정 \(events.count)개")
+            Text("겹치는 일정 \(events.count)개")
                 .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(.primary)
+                .foregroundStyle(.calioTextPrimary)
             
             VStack(spacing: 0) {
                 ForEach(events) { event in
@@ -1030,10 +1085,18 @@ private struct CalendarTimelineOverlapPopoverView: View {
                                 .frame(width: 5, height: 34)
                             
                             VStack(alignment: .leading, spacing: 3) {
-                                Text(event.title)
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .foregroundStyle(.primary)
-                                    .lineLimit(1)
+                                HStack(spacing: 4) {
+                                    Text(event.title)
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .foregroundStyle(.calioTextPrimary)
+                                        .lineLimit(1)
+
+                                    if event.importantEvent {
+                                        Image(systemName: "star.fill")
+                                            .font(.caption)
+                                            .foregroundStyle(Color.calioImportantStar)
+                                    }
+                                }
                                 
                                 Text(
                                     CalendarEventDisplayText.compactDateTimeRange(
@@ -1042,24 +1105,33 @@ private struct CalendarTimelineOverlapPopoverView: View {
                                     )
                                 )
                                 .font(.system(size: 12, weight: .medium))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(.calioTextSecondary)
                             }
                             
                             Spacer(minLength: 0)
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.calioTextSecondary)
                         }
                         .contentShape(Rectangle())
                         .padding(.vertical, 8)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("\(event.title), \(event.importantEvent ? "중요 일정, " : "")\(CalendarEventDisplayText.compactDateTimeRange(startAt: event.startAt, endAt: event.endAt))")
+                    .accessibilityHint("일정 상세 보기")
+                    .accessibilityIdentifier("timeline_overlap_event_\(event.id)")
                     
                     if event.id != events.last?.id {
                         Divider()
+                            .overlay(Color.calioDivider)
                     }
                 }
             }
         }
         .padding(14)
         .frame(width: 260, alignment: .leading)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("timeline_overlap_panel")
     }
 }
 
@@ -1178,6 +1250,7 @@ private extension UIView {
         onSelectedDay: { _ in },
         onVisibleRangeChanged: { _ in },
         onSelectedYearMonth: { _, _ in },
-        onRetryEventLoading: {}
+        onRetryEventLoading: {},
+        onUpdateImportantEvent: { _, _ in nil }
     )
 }

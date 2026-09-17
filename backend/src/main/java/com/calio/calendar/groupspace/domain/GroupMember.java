@@ -40,6 +40,9 @@ public class GroupMember extends BaseEntity {
     @Column(nullable = false, length = 9)
     private String nickname;
 
+    @Column(name = "is_anonymous", nullable = false)
+    private boolean isAnonymous;
+
     @Column(name = "status_changed_at", nullable = false)
     private Instant statusChangedAt;
 
@@ -78,6 +81,10 @@ public class GroupMember extends BaseEntity {
         return statusChangedAt;
     }
 
+    public boolean isAnonymous() {
+        return isAnonymous;
+    }
+
     public GroupMemberRole roleIn(GroupSpace groupSpace) {
         return groupSpace.getOwnerAccountId().equals(accountId)
                 ? GroupMemberRole.OWNER
@@ -96,6 +103,10 @@ public class GroupMember extends BaseEntity {
         this.status = GroupMemberStatus.ACTIVE;
         this.nickname = nickname;
         this.statusChangedAt = normalize(now);
+    }
+
+    public void changeAnonymous(boolean isAnonymous) {
+        this.isAnonymous = isAnonymous;
     }
 
     private static Instant normalize(Instant instant) {

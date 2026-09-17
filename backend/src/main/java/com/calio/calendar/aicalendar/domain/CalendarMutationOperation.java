@@ -1,0 +1,12 @@
+package com.calio.calendar.aicalendar.domain;
+
+public enum CalendarMutationOperation {
+
+    CREATE_EVENT,
+    UPDATE_EVENT,
+    DELETE_EVENT,
+    UPDATE_RECURRENCE_OCCURRENCE,
+    DELETE_RECURRENCE_OCCURRENCE,
+    UPDATE_RECURRENCE_SERIES,
+    DELETE_RECURRENCE_SERIES
+}

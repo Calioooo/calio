@@ -27,7 +27,7 @@ enum CalendarEventFormRules {
         endAt: Date,
         isRecurrenceEnabled: Bool,
         recurrenceStartDate: Date,
-        recurrenceEndDate: Date,
+        recurrenceEndDate: Date?,
         recurrenceStartTime: Date,
         recurrenceEndTime: Date,
         isAllDay: Bool = false
@@ -40,7 +40,7 @@ enum CalendarEventFormRules {
             return endAt > startAt
         }
 
-        return !isUTCDate(recurrenceEndDate, before: recurrenceStartDate)
+        return recurrenceEndDate.map { !isUTCDate($0, before: recurrenceStartDate) } ?? true
             && (isAllDay || isUTCTime(recurrenceStartTime, before: recurrenceEndTime))
     }
 

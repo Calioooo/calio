@@ -101,18 +101,14 @@ struct CalendarDateService {
         )
     }
 
-    nonisolated static func localAllDayRange(
+    nonisolated static func localAllDayDisplayRange(
         utcStartAt: Date,
         utcEndAt: Date,
         calendar: Calendar = .current
-    ) throws -> (startAt: Date, endAt: Date)? {
-        guard let range = canonicalUTCAllDayRange(startAt: utcStartAt, endAt: utcEndAt) else {
-            return nil
-        }
-
+    ) throws -> (startAt: Date, endAt: Date) {
         return (
-            try localDate(from: utcDateString(from: range.startAt), calendar: calendar),
-            try localDate(from: utcDateString(from: range.endAt), calendar: calendar)
+            try localDate(from: utcDateString(from: utcStartAt), calendar: calendar),
+            try localDate(from: utcDateString(from: utcEndAt), calendar: calendar)
         )
     }
 
@@ -174,38 +170,6 @@ struct CalendarDateService {
             minute: timeComponents.minute,
             second: timeComponents.second
         )
-    }
-
-    private nonisolated static func canonicalUTCAllDayRange(
-        startAt: Date,
-        endAt: Date
-    ) -> (startAt: Date, endAt: Date)? {
-        let secondsPerDay: TimeInterval = 86_400
-        guard startAt < endAt, isUTCMidnight(startAt) else {
-            return nil
-        }
-
-        let duration = endAt.timeIntervalSince(startAt)
-        if isUTCMidnight(endAt), duration.truncatingRemainder(dividingBy: secondsPerDay) == 0 {
-            return (startAt, endAt)
-        }
-
-        let exclusiveEndAt = endAt.addingTimeInterval(1)
-        let exclusiveDuration = exclusiveEndAt.timeIntervalSince(startAt)
-        if isUTCMidnight(exclusiveEndAt),
-           exclusiveDuration.truncatingRemainder(dividingBy: secondsPerDay) == 0 {
-            return (startAt, exclusiveEndAt)
-        }
-
-        return nil
-    }
-
-    private nonisolated static func isUTCMidnight(_ date: Date) -> Bool {
-        let components = makeUTCCalendar().dateComponents([.hour, .minute, .second, .nanosecond], from: date)
-        return components.hour == 0
-            && components.minute == 0
-            && components.second == 0
-            && components.nanosecond == 0
     }
 
     private nonisolated static func utcDate(
