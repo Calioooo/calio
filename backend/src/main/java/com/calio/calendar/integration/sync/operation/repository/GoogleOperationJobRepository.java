@@ -169,7 +169,7 @@ public interface GoogleOperationJobRepository extends JpaRepository<GoogleOperat
             from GoogleCalendarRecurrenceJob job
             where job.accountId = :accountId
               and job.integrationId = :integrationId
-              and job.recurrenceEventId = :recurrenceEventId
+              and job.target.recurrenceEventId = :recurrenceEventId
               and job.state in (
                   com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState.PENDING,
                   com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState.PROCESSING
@@ -185,8 +185,8 @@ public interface GoogleOperationJobRepository extends JpaRepository<GoogleOperat
             from GoogleCalendarRecurrenceJob job
             where job.accountId = :accountId
               and job.integrationId = :integrationId
-              and job.recurrenceEventId = :recurrenceEventId
-              and job.originStartAt = :originStartAt
+              and job.target.recurrenceEventId = :recurrenceEventId
+              and job.target.originStartAt = :originStartAt
               and job.state in (
                   com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState.PENDING,
                   com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState.PROCESSING
