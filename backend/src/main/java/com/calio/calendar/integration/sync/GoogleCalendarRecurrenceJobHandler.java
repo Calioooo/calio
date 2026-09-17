@@ -124,7 +124,7 @@ public class GoogleCalendarRecurrenceJobHandler {
             .map(connection -> connection.getId())
             .orElse(null);
     if (connectionId == null) {
-      completeRecurrenceEventLocally(job, workerToken);
+      completeRecurrenceDeleteLocally(job, workerToken);
       return;
     }
     RecurrenceMappingSnapshot mapping =
@@ -133,11 +133,11 @@ public class GoogleCalendarRecurrenceJobHandler {
             .map(found -> RecurrenceMappingSnapshot.from(found, connectionId))
             .orElse(null);
     if (mapping == null) {
-      completeRecurrenceEventLocally(job, workerToken);
+      completeRecurrenceDeleteLocally(job, workerToken);
       return;
     }
     if (mapping.conflicted()) {
-      skipConflictedRecurrenceEvent(job, workerToken);
+      skipConflictedRecurrenceDelete(job, workerToken);
       return;
     }
     try {
@@ -146,7 +146,7 @@ public class GoogleCalendarRecurrenceJobHandler {
       transactionTemplate.executeWithoutResult(
           status -> completeRecurrenceDelete(job, workerToken, mapping.mappingId()));
     } catch (GoogleCalendarEventVersionConflictException exception) {
-      completeRecurrenceEventConflict(job, workerToken, mapping.mappingId());
+      completeRecurrenceDeleteConflict(job, workerToken, mapping.mappingId());
     }
   }
 
@@ -374,7 +374,7 @@ public class GoogleCalendarRecurrenceJobHandler {
 
   private void completeRecurrenceDelete(
       GoogleCalendarRecurrenceJob job, String workerToken, Long mappingId) {
-    markInactiveRecurrenceEventMappingsLocalChanged(job);
+    markInactiveRecurrenceEventMappingsDeletePending(job);
     mappingQueryService
         .getRecurrenceEventMappingIfExists(mappingId)
         .ifPresent(mappingCommandService::deleteRecurrenceAggregateMappings);
@@ -405,10 +405,28 @@ public class GoogleCalendarRecurrenceJobHandler {
         });
   }
 
+  private void completeRecurrenceDeleteLocally(
+      GoogleCalendarRecurrenceJob job, String workerToken) {
+    transactionTemplate.executeWithoutResult(
+        status -> {
+          mappingCommandService.markInactiveRecurrenceEventMappingsDeletePending(
+              job.getIntegrationId(), job.getRecurrenceEventId());
+          jobService.succeed(job.getId(), job.getAccountId(), workerToken);
+        });
+  }
+
   private void skipConflictedRecurrenceEvent(GoogleCalendarRecurrenceJob job, String workerToken) {
     transactionTemplate.executeWithoutResult(
         status -> {
           markInactiveRecurrenceEventMappingsLocalChanged(job);
+          jobService.skipConflictedScope(job.getId(), job.getAccountId(), workerToken);
+        });
+  }
+
+  private void skipConflictedRecurrenceDelete(GoogleCalendarRecurrenceJob job, String workerToken) {
+    transactionTemplate.executeWithoutResult(
+        status -> {
+          markInactiveRecurrenceEventMappingsDeletePending(job);
           jobService.skipConflictedScope(job.getId(), job.getAccountId(), workerToken);
         });
   }
@@ -418,6 +436,22 @@ public class GoogleCalendarRecurrenceJobHandler {
     transactionTemplate.executeWithoutResult(
         status -> {
           markInactiveRecurrenceEventMappingsLocalChanged(job);
+          GoogleCalendarRecurrenceEventMapping mapping =
+              mappingQueryService.getRecurrenceEventMappingIfExists(mappingId).orElse(null);
+          if (mapping == null) {
+            jobService.succeed(job.getId(), job.getAccountId(), workerToken);
+            return;
+          }
+          mapping.markConflicted();
+          jobService.completeWithConflict(job.getId(), job.getAccountId(), workerToken);
+        });
+  }
+
+  private void completeRecurrenceDeleteConflict(
+      GoogleCalendarRecurrenceJob job, String workerToken, Long mappingId) {
+    transactionTemplate.executeWithoutResult(
+        status -> {
+          markInactiveRecurrenceEventMappingsDeletePending(job);
           GoogleCalendarRecurrenceEventMapping mapping =
               mappingQueryService.getRecurrenceEventMappingIfExists(mappingId).orElse(null);
           if (mapping == null) {
@@ -543,6 +577,11 @@ public class GoogleCalendarRecurrenceJobHandler {
 
   private void markInactiveRecurrenceEventMappingsLocalChanged(GoogleCalendarRecurrenceJob job) {
     mappingCommandService.markInactiveRecurrenceEventMappingsLocalChanged(
+        job.getIntegrationId(), job.getRecurrenceEventId());
+  }
+
+  private void markInactiveRecurrenceEventMappingsDeletePending(GoogleCalendarRecurrenceJob job) {
+    mappingCommandService.markInactiveRecurrenceEventMappingsDeletePending(
         job.getIntegrationId(), job.getRecurrenceEventId());
   }
 

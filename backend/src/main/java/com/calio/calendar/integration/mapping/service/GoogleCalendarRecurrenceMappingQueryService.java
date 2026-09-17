@@ -69,11 +69,6 @@ public class GoogleCalendarRecurrenceMappingQueryService {
     return recurrenceMappingRepository.findAllWithRecurrenceEventByConnectionId(connectionId);
   }
 
-  public boolean hasExternalRecurrenceEventMapping(Long recurrenceEventId, Long accountId) {
-    return recurrenceMappingRepository.existsByRecurrenceEventIdAndConnection_Integration_AccountId(
-        recurrenceEventId, accountId);
-  }
-
   public List<GoogleCalendarRecurrenceEventMapping> listRecurrenceEventMappingBatch(
       Long connectionId, Long afterId, int limit) {
     return recurrenceMappingRepository.findNextBatchWithRecurrenceEventByConnectionId(

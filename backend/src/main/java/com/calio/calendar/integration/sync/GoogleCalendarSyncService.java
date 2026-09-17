@@ -26,6 +26,8 @@ public class GoogleCalendarSyncService {
   private final GoogleCalendarPageChangeService pageChangeService;
   private final GoogleCalendarPageNormalizer pageNormalizer;
   private final GoogleOperationLeaseService operationLeaseService;
+  private final GoogleCalendarRecurrenceDeleteReconciliationService
+      recurrenceDeleteReconciliationService;
 
   public GoogleCalendarSyncService(
       GoogleCalendarConnectionQueryService connectionQueryService,
@@ -34,7 +36,8 @@ public class GoogleCalendarSyncService {
       GoogleCalendarEventRequestService eventRequestService,
       GoogleCalendarPageChangeService pageChangeService,
       GoogleCalendarPageNormalizer pageNormalizer,
-      GoogleOperationLeaseService operationLeaseService) {
+      GoogleOperationLeaseService operationLeaseService,
+      GoogleCalendarRecurrenceDeleteReconciliationService recurrenceDeleteReconciliationService) {
     this.connectionQueryService = connectionQueryService;
     this.integrationDataService = integrationDataService;
     this.accessTokenService = accessTokenService;
@@ -42,11 +45,13 @@ public class GoogleCalendarSyncService {
     this.pageChangeService = pageChangeService;
     this.pageNormalizer = pageNormalizer;
     this.operationLeaseService = operationLeaseService;
+    this.recurrenceDeleteReconciliationService = recurrenceDeleteReconciliationService;
   }
 
   public void synchronize(Long jobId, Long accountId, String workerToken) {
     operationLeaseService.extend(jobId, accountId, workerToken);
     GoogleCalendarConnection connection = connectionQueryService.getConnectedConnection(accountId);
+    recurrenceDeleteReconciliationService.reconcilePendingDeletes(connection);
     SyncExecution execution =
         new SyncExecution(
             connection.getId(),

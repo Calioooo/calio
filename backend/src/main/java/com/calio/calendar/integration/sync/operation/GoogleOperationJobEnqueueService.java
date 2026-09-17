@@ -13,9 +13,6 @@ import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobTr
 import com.calio.calendar.integration.sync.operation.dto.GoogleEventJobPayload;
 import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceJobPayload;
 import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceOverrideJobPayload;
-import com.calio.calendar.recurrence.domain.RecurrenceEvent;
-import com.calio.calendar.recurrence.domain.RecurrenceEventChangePublisher;
-import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
@@ -25,7 +22,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
-public class GoogleOperationJobEnqueueService implements RecurrenceEventChangePublisher {
+public class GoogleOperationJobEnqueueService {
 
   private final GoogleCalendarConnectionCommandService connectionCommandService;
   private final GoogleCalendarIntegrationCommandService integrationCommandService;
@@ -89,8 +86,7 @@ public class GoogleOperationJobEnqueueService implements RecurrenceEventChangePu
 
   private boolean enqueueEventSnapshot(
       Long accountId, Event event, GoogleCalendarEventJobKind kind) {
-    return enqueueEventJob(
-        accountId, event.getId(), kind, GoogleEventJobPayload.from(event));
+    return enqueueEventJob(accountId, event.getId(), kind, GoogleEventJobPayload.from(event));
   }
 
   private boolean enqueueEventJob(
@@ -125,8 +121,7 @@ public class GoogleOperationJobEnqueueService implements RecurrenceEventChangePu
       Long recurrenceEventId,
       GoogleCalendarRecurrenceJobKind kind,
       GoogleRecurrenceJobPayload payload) {
-    return enqueueRecurrenceJob(
-        accountId, recurrenceEventId, kind, null, payload);
+    return enqueueRecurrenceJob(accountId, recurrenceEventId, kind, null, payload);
   }
 
   @Transactional
@@ -162,45 +157,6 @@ public class GoogleOperationJobEnqueueService implements RecurrenceEventChangePu
         GoogleCalendarRecurrenceJobKind.OVERRIDE_DELETE,
         originStartAt,
         null);
-  }
-
-  @Override
-  public void recurrenceEventCreated(Long accountId, RecurrenceEvent recurrenceEvent) {
-    enqueueRecurrence(
-        accountId,
-        recurrenceEvent.getId(),
-        GoogleCalendarRecurrenceJobKind.RECURRENCE_CREATE,
-        GoogleRecurrenceJobPayload.from(recurrenceEvent));
-  }
-
-  @Override
-  public void recurrenceEventUpdated(Long accountId, RecurrenceEvent recurrenceEvent) {
-    enqueueRecurrence(
-        accountId,
-        recurrenceEvent.getId(),
-        GoogleCalendarRecurrenceJobKind.RECURRENCE_UPDATE,
-        GoogleRecurrenceJobPayload.from(recurrenceEvent));
-  }
-
-  @Override
-  public void recurrenceEventDeleted(Long accountId, Long recurrenceEventId) {
-    enqueueRecurrenceDeleted(accountId, recurrenceEventId);
-  }
-
-  @Override
-  public void recurrenceOccurrenceUpdated(
-      Long accountId, RecurrenceEventOverride recurrenceEventOverride) {
-    enqueueRecurrenceOverride(
-        accountId,
-        recurrenceEventOverride.getRecurrenceId(),
-        recurrenceEventOverride.getOriginStartAt(),
-        GoogleRecurrenceOverrideJobPayload.from(recurrenceEventOverride));
-  }
-
-  @Override
-  public void recurrenceOccurrenceDeleted(
-      Long accountId, Long recurrenceEventId, Instant originStartAt) {
-    enqueueRecurrenceOverrideDeleted(accountId, recurrenceEventId, originStartAt);
   }
 
   private boolean enqueueRecurrenceJob(
