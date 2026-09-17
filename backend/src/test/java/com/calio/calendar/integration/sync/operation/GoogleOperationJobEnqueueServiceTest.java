@@ -41,8 +41,7 @@ class GoogleOperationJobEnqueueServiceTest {
           integrationCommandService,
           jobCommandService,
           worker,
-          Clock.fixed(Instant.parse("2026-09-04T00:00:00Z"), ZoneOffset.UTC),
-          objectMapper);
+          Clock.fixed(Instant.parse("2026-09-04T00:00:00Z"), ZoneOffset.UTC));
 
   @AfterEach
   void clearTransactionSynchronization() {
@@ -58,6 +57,10 @@ class GoogleOperationJobEnqueueServiceTest {
     Event event = mock();
     GoogleCalendarIntegration integration = mock();
     when(event.getId()).thenReturn(40L);
+    when(event.getTitle()).thenReturn("title");
+    when(event.getStartAt()).thenReturn(Instant.parse("2026-09-04T00:00:00Z"));
+    when(event.getEndAt()).thenReturn(Instant.parse("2026-09-04T01:00:00Z"));
+    when(event.getTimeZone()).thenReturn("UTC");
     when(integration.getId()).thenReturn(20L);
     when(integration.allocateGoogleOperationSequence()).thenReturn(1L);
     when(integrationCommandService.tryLockIntegration(10L)).thenReturn(Optional.of(integration));
@@ -92,7 +95,6 @@ class GoogleOperationJobEnqueueServiceTest {
     when(integration.getId()).thenReturn(20L);
     when(integration.allocateGoogleOperationSequence()).thenReturn(1L);
     when(integrationCommandService.tryLockIntegration(10L)).thenReturn(Optional.of(integration));
-    when(objectMapper.writeValueAsString(payload)).thenReturn("master-payload");
     TransactionSynchronizationManager.initSynchronization();
 
     boolean enqueued =
@@ -105,7 +107,7 @@ class GoogleOperationJobEnqueueServiceTest {
     assertThat(enqueued).isTrue();
     assertThat(job.getRecurrenceEventId()).isEqualTo(40L);
     assertThat(job.getOriginStartAt()).isNull();
-    assertThat(job.getTargetPayload()).isEqualTo("master-payload");
+    assertThat(job.getTargetPayload()).isEqualTo(payload);
     assertThat(job.getProviderIdentity()).isEqualTo("c1" + job.getOperationId().replace("-", ""));
     org.mockito.Mockito.verifyNoInteractions(connectionCommandService);
   }
@@ -139,7 +141,6 @@ class GoogleOperationJobEnqueueServiceTest {
     when(integration.getId()).thenReturn(20L);
     when(integration.allocateGoogleOperationSequence()).thenReturn(1L);
     when(integrationCommandService.tryLockIntegration(10L)).thenReturn(Optional.of(integration));
-    when(objectMapper.writeValueAsString(payload)).thenReturn("override-payload");
     TransactionSynchronizationManager.initSynchronization();
 
     service.enqueueRecurrenceOverride(10L, 40L, origin, payload);
@@ -149,7 +150,7 @@ class GoogleOperationJobEnqueueServiceTest {
     GoogleCalendarRecurrenceJob job = (GoogleCalendarRecurrenceJob) captor.getValue();
     assertThat(job.getRecurrenceEventId()).isEqualTo(40L);
     assertThat(job.getOriginStartAt()).isEqualTo(origin);
-    assertThat(job.getTargetPayload()).isEqualTo("override-payload");
+    assertThat(job.getTargetPayload()).isEqualTo(GoogleRecurrenceJobPayload.from(payload));
     assertThat(job.getProviderIdentity()).isNull();
   }
 }

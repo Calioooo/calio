@@ -1,7 +1,5 @@
 package com.calio.calendar.integration.sync;
 
-import com.calio.calendar.common.error.CalioException;
-import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.external.google.GoogleCalendarEventVersionConflictException;
 import com.calio.calendar.external.google.GoogleCalendarEventsClient;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventResponse;
@@ -19,8 +17,6 @@ import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceOverrid
 import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
-import tools.jackson.core.JacksonException;
-import tools.jackson.databind.ObjectMapper;
 
 @Service
 public class GoogleCalendarRecurrenceJobHandler {
@@ -29,7 +25,6 @@ public class GoogleCalendarRecurrenceJobHandler {
   private final GoogleCalendarRecurrenceMappingCommandService mappingCommandService;
   private final GoogleCalendarAccessTokenService accessTokenService;
   private final GoogleCalendarEventsClient eventsClient;
-  private final ObjectMapper objectMapper;
   private final GoogleOperationJobService jobService;
   private final TransactionTemplate transactionTemplate;
 
@@ -39,7 +34,6 @@ public class GoogleCalendarRecurrenceJobHandler {
       GoogleCalendarRecurrenceMappingCommandService mappingCommandService,
       GoogleCalendarAccessTokenService accessTokenService,
       GoogleCalendarEventsClient eventsClient,
-      ObjectMapper objectMapper,
       GoogleOperationJobService jobService,
       TransactionTemplate transactionTemplate) {
     this.connectionQueryService = connectionQueryService;
@@ -47,7 +41,6 @@ public class GoogleCalendarRecurrenceJobHandler {
     this.mappingCommandService = mappingCommandService;
     this.accessTokenService = accessTokenService;
     this.eventsClient = eventsClient;
-    this.objectMapper = objectMapper;
     this.jobService = jobService;
     this.transactionTemplate = transactionTemplate;
   }
@@ -187,7 +180,7 @@ public class GoogleCalendarRecurrenceJobHandler {
   }
 
   private void upsertOverride(GoogleCalendarRecurrenceJob job, String workerToken) {
-    GoogleRecurrenceOverrideJobPayload payload = readRecurrenceOverrideSnapshot(job);
+    GoogleRecurrenceOverrideJobPayload payload = recurrenceOverridePayload(job);
     OverrideMappingScope scope = loadConnectedOverrideScope(job);
     if (scope == null) {
       completeOverrideWithoutProviderWrite(job, workerToken, false);
@@ -598,30 +591,18 @@ public class GoogleCalendarRecurrenceJobHandler {
   }
 
   private GoogleRecurrenceJobPayload readRecurrenceSnapshot(GoogleCalendarRecurrenceJob job) {
-    try {
-      GoogleRecurrenceJobPayload payload =
-          objectMapper.readValue(job.getTargetPayload(), GoogleRecurrenceJobPayload.class);
-      if (payload == null) {
-        throw new CalioException(ErrorCode.GOOGLE_CALENDAR_REQUEST_INVALID);
-      }
-      return payload;
-    } catch (JacksonException exception) {
-      throw new CalioException(ErrorCode.GOOGLE_CALENDAR_REQUEST_INVALID, exception);
-    }
+    return job.getTargetPayload();
   }
 
-  private GoogleRecurrenceOverrideJobPayload readRecurrenceOverrideSnapshot(
-      GoogleCalendarRecurrenceJob job) {
-    try {
-      GoogleRecurrenceOverrideJobPayload payload =
-          objectMapper.readValue(job.getTargetPayload(), GoogleRecurrenceOverrideJobPayload.class);
-      if (payload == null) {
-        throw new CalioException(ErrorCode.GOOGLE_CALENDAR_REQUEST_INVALID);
-      }
-      return payload;
-    } catch (JacksonException exception) {
-      throw new CalioException(ErrorCode.GOOGLE_CALENDAR_REQUEST_INVALID, exception);
-    }
+  private GoogleRecurrenceOverrideJobPayload recurrenceOverridePayload(GoogleCalendarRecurrenceJob job) {
+    GoogleRecurrenceJobPayload payload = job.getTargetPayload();
+    return new GoogleRecurrenceOverrideJobPayload(
+        payload.title(),
+        payload.description(),
+        payload.startAt(),
+        payload.endAt(),
+        payload.allDay(),
+        payload.timeZone());
   }
 
   private record RecurrenceMappingSnapshot(

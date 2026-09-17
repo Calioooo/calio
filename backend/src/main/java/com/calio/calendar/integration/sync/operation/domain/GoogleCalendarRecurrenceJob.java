@@ -1,13 +1,13 @@
 package com.calio.calendar.integration.sync.operation.domain;
 
 import jakarta.persistence.Column;
-import jakarta.persistence.Convert;
 import jakarta.persistence.DiscriminatorValue;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import java.time.Instant;
+import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceJobPayload;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -21,10 +21,9 @@ public class GoogleCalendarRecurrenceJob extends GoogleOperationJob {
 
   @Embedded private GoogleCalendarRecurrenceJobTarget target;
 
-  @Convert(converter = JsonPayloadConverter.class)
   @JdbcTypeCode(SqlTypes.JSON)
   @Column(name = "recurrence_target_payload", updatable = false, columnDefinition = "JSON")
-  private String targetPayload;
+  private GoogleRecurrenceJobPayload targetPayload;
 
   @Column(name = "recurrence_provider_identity", updatable = false, length = 1024)
   private String providerIdentity;
@@ -39,10 +38,21 @@ public class GoogleCalendarRecurrenceJob extends GoogleOperationJob {
       GoogleCalendarRecurrenceJobKind kind,
       Long recurrenceEventId,
       Instant originStartAt,
-      String targetPayload,
+      GoogleRecurrenceJobPayload targetPayload,
       String providerIdentity,
       Instant runnableAt) {
-    if (kind == null || targetPayload == null || targetPayload.isBlank()) {
+    if (kind == null
+        || (kind == GoogleCalendarRecurrenceJobKind.RECURRENCE_DELETE
+                || kind == GoogleCalendarRecurrenceJobKind.OVERRIDE_DELETE)
+            && targetPayload != null
+        || (kind != GoogleCalendarRecurrenceJobKind.RECURRENCE_DELETE
+                && kind != GoogleCalendarRecurrenceJobKind.OVERRIDE_DELETE)
+            && targetPayload == null
+        || (kind.isRecurrenceJob()
+            && kind != GoogleCalendarRecurrenceJobKind.RECURRENCE_DELETE
+            && !targetPayload.hasRecurrence())
+        || (kind == GoogleCalendarRecurrenceJobKind.OVERRIDE_UPSERT
+            && targetPayload.hasRecurrence())) {
       throw new IllegalArgumentException("Google recurrence job fields are required");
     }
     if ((kind == GoogleCalendarRecurrenceJobKind.RECURRENCE_CREATE) && !hasText(providerIdentity)) {
@@ -70,7 +80,7 @@ public class GoogleCalendarRecurrenceJob extends GoogleOperationJob {
     return target.originStartAt();
   }
 
-  public String getTargetPayload() {
+  public GoogleRecurrenceJobPayload getTargetPayload() {
     return targetPayload;
   }
 

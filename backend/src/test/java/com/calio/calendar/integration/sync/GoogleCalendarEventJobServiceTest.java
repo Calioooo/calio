@@ -85,7 +85,6 @@ class GoogleCalendarEventJobServiceTest {
             mappingCommandService,
             accessTokenService,
             eventsClient,
-            objectMapper,
             jobService,
             jobTransaction);
   }
@@ -282,7 +281,7 @@ class GoogleCalendarEventJobServiceTest {
             kind,
             40L,
             providerIdentity(kind),
-            "payload",
+            kind == GoogleCalendarEventJobKind.DELETE ? null : payload(),
             Instant.parse("2026-09-03T00:00:00Z"));
     ReflectionTestUtils.setField(job, "id", 50L);
     return job;

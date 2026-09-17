@@ -27,8 +27,10 @@ import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarRecurr
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarSyncJob;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJob;
 import com.calio.calendar.integration.sync.operation.dto.GoogleOperationFailureDecision;
+import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceJobPayload;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -105,7 +107,7 @@ class GoogleOperationProcessorTest {
             GoogleCalendarRecurrenceJobKind.RECURRENCE_UPDATE,
             40L,
             null,
-            "payload",
+            recurrencePayload(),
             null,
             Instant.parse("2026-09-01T00:00:00Z"));
     org.springframework.test.util.ReflectionTestUtils.setField(job, "id", 50L);
@@ -314,5 +316,16 @@ class GoogleOperationProcessorTest {
     when(job.getAccountId()).thenReturn(accountId);
     when(job.getIntegrationId()).thenReturn(20L);
     return job;
+  }
+
+  private GoogleRecurrenceJobPayload recurrencePayload() {
+    return new GoogleRecurrenceJobPayload(
+        "title",
+        null,
+        Instant.parse("2026-09-01T00:00:00Z"),
+        Instant.parse("2026-09-01T01:00:00Z"),
+        false,
+        "UTC",
+        List.of("RRULE:FREQ=DAILY"));
   }
 }

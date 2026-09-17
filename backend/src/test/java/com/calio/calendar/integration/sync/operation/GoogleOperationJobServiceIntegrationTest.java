@@ -16,7 +16,9 @@ import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJob;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobTrigger;
 import com.calio.calendar.integration.sync.operation.repository.GoogleOperationJobRepository;
+import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceJobPayload;
 import java.time.Instant;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -62,7 +64,14 @@ class GoogleOperationJobServiceIntegrationTest {
                 GoogleCalendarRecurrenceJobKind.OVERRIDE_UPSERT,
                 40L,
                 origin,
-                "{\"title\":\"moved\"}",
+                new GoogleRecurrenceJobPayload(
+                    "moved",
+                    null,
+                    Instant.parse("2026-09-04T00:00:00Z"),
+                    Instant.parse("2026-09-04T01:00:00Z"),
+                    false,
+                    "UTC",
+                    List.of()),
                 null,
                 Instant.now()));
     org.springframework.test.context.transaction.TestTransaction.flagForCommit();
@@ -79,7 +88,7 @@ class GoogleOperationJobServiceIntegrationTest {
                   .isEqualTo(GoogleCalendarRecurrenceJobKind.OVERRIDE_UPSERT);
               assertThat(recurrence.getRecurrenceEventId()).isEqualTo(40L);
               assertThat(recurrence.getOriginStartAt()).isEqualTo(origin);
-              assertThat(recurrence.getTargetPayload()).isEqualTo("{\"title\":\"moved\"}");
+              assertThat(recurrence.getTargetPayload().title()).isEqualTo("moved");
             });
   }
 

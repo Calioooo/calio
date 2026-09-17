@@ -23,8 +23,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
-import tools.jackson.core.JacksonException;
-import tools.jackson.databind.ObjectMapper;
 
 @Service
 public class GoogleOperationJobEnqueueService implements RecurrenceEventChangePublisher {
@@ -34,21 +32,18 @@ public class GoogleOperationJobEnqueueService implements RecurrenceEventChangePu
   private final GoogleOperationJobCommandService jobCommandService;
   private final GoogleOperationWorker worker;
   private final Clock clock;
-  private final ObjectMapper objectMapper;
 
   public GoogleOperationJobEnqueueService(
       GoogleCalendarConnectionCommandService connectionCommandService,
       GoogleCalendarIntegrationCommandService integrationCommandService,
       GoogleOperationJobCommandService jobCommandService,
       GoogleOperationWorker worker,
-      Clock clock,
-      ObjectMapper objectMapper) {
+      Clock clock) {
     this.connectionCommandService = connectionCommandService;
     this.integrationCommandService = integrationCommandService;
     this.jobCommandService = jobCommandService;
     this.worker = worker;
     this.clock = clock;
-    this.objectMapper = objectMapper;
   }
 
   @Transactional
@@ -89,17 +84,20 @@ public class GoogleOperationJobEnqueueService implements RecurrenceEventChangePu
 
   @Transactional
   public boolean enqueueEventDeleted(Long accountId, Long eventId) {
-    return enqueueEventJob(accountId, eventId, GoogleCalendarEventJobKind.DELETE, "{}");
+    return enqueueEventJob(accountId, eventId, GoogleCalendarEventJobKind.DELETE, null);
   }
 
   private boolean enqueueEventSnapshot(
       Long accountId, Event event, GoogleCalendarEventJobKind kind) {
     return enqueueEventJob(
-        accountId, event.getId(), kind, serializePayload(GoogleEventJobPayload.from(event)));
+        accountId, event.getId(), kind, GoogleEventJobPayload.from(event));
   }
 
   private boolean enqueueEventJob(
-      Long accountId, Long eventId, GoogleCalendarEventJobKind kind, String targetPayload) {
+      Long accountId,
+      Long eventId,
+      GoogleCalendarEventJobKind kind,
+      GoogleEventJobPayload targetPayload) {
     var integration = integrationCommandService.tryLockIntegration(accountId).orElse(null);
     if (integration == null) {
       return false;
@@ -128,7 +126,7 @@ public class GoogleOperationJobEnqueueService implements RecurrenceEventChangePu
       GoogleCalendarRecurrenceJobKind kind,
       GoogleRecurrenceJobPayload payload) {
     return enqueueRecurrenceJob(
-        accountId, recurrenceEventId, kind, null, serializePayload(payload));
+        accountId, recurrenceEventId, kind, null, payload);
   }
 
   @Transactional
@@ -138,7 +136,7 @@ public class GoogleOperationJobEnqueueService implements RecurrenceEventChangePu
         recurrenceEventId,
         GoogleCalendarRecurrenceJobKind.RECURRENCE_DELETE,
         null,
-        "{}");
+        null);
   }
 
   @Transactional
@@ -152,7 +150,7 @@ public class GoogleOperationJobEnqueueService implements RecurrenceEventChangePu
         recurrenceEventId,
         GoogleCalendarRecurrenceJobKind.OVERRIDE_UPSERT,
         originStartAt,
-        serializePayload(payload));
+        GoogleRecurrenceJobPayload.from(payload));
   }
 
   @Transactional
@@ -163,7 +161,7 @@ public class GoogleOperationJobEnqueueService implements RecurrenceEventChangePu
         recurrenceEventId,
         GoogleCalendarRecurrenceJobKind.OVERRIDE_DELETE,
         originStartAt,
-        "{}");
+        null);
   }
 
   @Override
@@ -210,7 +208,7 @@ public class GoogleOperationJobEnqueueService implements RecurrenceEventChangePu
       Long recurrenceEventId,
       GoogleCalendarRecurrenceJobKind kind,
       Instant originStartAt,
-      String targetPayload) {
+      GoogleRecurrenceJobPayload targetPayload) {
     var integration = integrationCommandService.tryLockIntegration(accountId).orElse(null);
     if (integration == null) {
       return false;
@@ -240,23 +238,6 @@ public class GoogleOperationJobEnqueueService implements RecurrenceEventChangePu
       return null;
     }
     return "c1" + operationId.replace("-", "");
-  }
-
-  private String serializePayload(GoogleEventJobPayload payload) {
-    try {
-      return objectMapper.writeValueAsString(payload);
-    } catch (JacksonException exception) {
-      throw new IllegalArgumentException("Google Event job payload cannot be encoded", exception);
-    }
-  }
-
-  private String serializePayload(Object payload) {
-    try {
-      return objectMapper.writeValueAsString(payload);
-    } catch (JacksonException exception) {
-      throw new IllegalArgumentException(
-          "Google recurrence job payload cannot be encoded", exception);
-    }
   }
 
   private void wakeAfterCommit(Long accountId) {
