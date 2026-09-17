@@ -18,6 +18,7 @@ import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEffect
 import com.calio.calendar.integration.sync.page.GoogleCalendarRecurrenceChangeService;
 import com.calio.calendar.integration.sync.page.dto.GoogleCalendarRecurrenceOverrideExternalKey;
 import com.calio.calendar.recurrence.service.RecurrenceEventCommandService;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import org.springframework.stereotype.Service;
@@ -197,11 +198,7 @@ public class GoogleCalendarIntegrationDataService {
     if (!unseenMappings.isEmpty()) {
       eventMappingCommandService.deleteEventMappingsWithIds(
           unseenMappings.stream().map(GoogleCalendarEventMapping::getId).toList());
-      eventCommandService.deleteEventsByIds(
-          unseenMappings.stream()
-              .map(GoogleCalendarEventMapping::getEvent)
-              .map(event -> event.getId())
-              .toList());
+      deleteEventsWithoutMappings(unseenMappings);
     }
     return mappings.getLast().getId();
   }
@@ -265,8 +262,7 @@ public class GoogleCalendarIntegrationDataService {
     if (mapping.isConflicted()) {
       return false;
     }
-    GoogleCalendarEffectiveScope scope =
-        GoogleCalendarEffectiveScope.event(mapping.getEvent().getId());
+    GoogleCalendarEffectiveScope scope = GoogleCalendarEffectiveScope.event(mapping.getEventId());
     if (!operationJobQueryService.hasPendingOutboundJob(
         mapping.getConnection().getAccountId(),
         mapping.getConnection().getIntegration().getId(),
@@ -347,13 +343,20 @@ public class GoogleCalendarIntegrationDataService {
     if (mappings.isEmpty()) {
       return;
     }
-    List<Long> eventIds =
-        mappings.stream()
-            .map(GoogleCalendarEventMapping::getEvent)
-            .map(event -> event.getId())
-            .toList();
     eventMappingCommandService.deleteEventMappings(mappings);
-    eventCommandService.deleteEventsByIds(eventIds);
+    deleteEventsWithoutMappings(mappings);
+  }
+
+  private void deleteEventsWithoutMappings(List<GoogleCalendarEventMapping> deletedMappings) {
+    List<Long> eventIds =
+        deletedMappings.stream().map(GoogleCalendarEventMapping::getEventId).distinct().toList();
+    Set<Long> mappedEventIds =
+        new HashSet<>(eventMappingQueryService.listEventIdsWithMappings(eventIds));
+    List<Long> unmappedEventIds =
+        eventIds.stream().filter(eventId -> !mappedEventIds.contains(eventId)).toList();
+    if (!unmappedEventIds.isEmpty()) {
+      eventCommandService.deleteEventsByIds(unmappedEventIds);
+    }
   }
 
   private boolean hasText(String value) {

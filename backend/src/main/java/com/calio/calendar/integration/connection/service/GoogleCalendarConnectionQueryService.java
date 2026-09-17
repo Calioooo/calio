@@ -43,4 +43,8 @@ public class GoogleCalendarConnectionQueryService {
     return connectionRepository.findAccountIdsByStateAfter(
         afterAccountId, GoogleCalendarConnectionState.CONNECTED, PageRequest.of(0, limit));
   }
+
+  public List<GoogleCalendarConnection> listConnections(Long integrationId) {
+    return connectionRepository.findAllWithIntegrationByIntegrationId(integrationId);
+  }
 }
