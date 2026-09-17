@@ -4,13 +4,13 @@ import java.time.Instant;
 
 public interface RecurrenceEventChangePublisher {
 
-    void recurrenceEventCreated(Long accountId, RecurrenceEvent recurrenceEvent);
+  void recurrenceEventCreated(Long accountId, RecurrenceEvent recurrenceEvent);
 
-    void recurrenceEventUpdated(Long accountId, RecurrenceEvent recurrenceEvent);
+  void recurrenceEventUpdated(Long accountId, RecurrenceEvent recurrenceEvent);
 
-    void recurrenceEventDeleted(Long accountId, Long recurrenceEventId);
+  void recurrenceEventDeleted(Long accountId, Long recurrenceEventId);
 
-    void recurrenceOccurrenceUpdated(Long accountId, RecurrenceEventOverride recurrenceEventOverride);
+  void recurrenceOccurrenceUpdated(Long accountId, RecurrenceEventOverride recurrenceEventOverride);
 
-    void recurrenceOccurrenceDeleted(Long accountId, Long recurrenceEventId, Instant originStartAt);
+  void recurrenceOccurrenceDeleted(Long accountId, Long recurrenceEventId, Instant originStartAt);
 }

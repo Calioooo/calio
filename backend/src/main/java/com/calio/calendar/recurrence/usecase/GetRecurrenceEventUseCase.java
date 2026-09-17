@@ -10,16 +10,17 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class GetRecurrenceEventUseCase {
 
-    private final RecurrenceEventRepository recurrenceEventRepository;
+  private final RecurrenceEventRepository recurrenceEventRepository;
 
-    public GetRecurrenceEventUseCase(RecurrenceEventRepository recurrenceEventRepository) {
-        this.recurrenceEventRepository = recurrenceEventRepository;
-    }
+  public GetRecurrenceEventUseCase(RecurrenceEventRepository recurrenceEventRepository) {
+    this.recurrenceEventRepository = recurrenceEventRepository;
+  }
 
-    @Transactional(readOnly = true)
-    public RecurrenceEventResponse get(Long accountId, Long recurrenceEventId) {
-        return recurrenceEventRepository.findByIdAndAccount_Id(recurrenceEventId, accountId)
-                .map(recurrenceEvent -> RecurrenceEventResponse.from(recurrenceEvent, true))
-                .orElseThrow(() -> new CalioException(ErrorCode.RECURRENCE_EVENT_NOT_FOUND));
-    }
+  @Transactional(readOnly = true)
+  public RecurrenceEventResponse get(Long accountId, Long recurrenceEventId) {
+    return recurrenceEventRepository
+        .findByIdAndAccount_Id(recurrenceEventId, accountId)
+        .map(recurrenceEvent -> RecurrenceEventResponse.from(recurrenceEvent, true))
+        .orElseThrow(() -> new CalioException(ErrorCode.RECURRENCE_EVENT_NOT_FOUND));
+  }
 }

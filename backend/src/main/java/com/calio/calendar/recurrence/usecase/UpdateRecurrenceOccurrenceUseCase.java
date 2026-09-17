@@ -20,75 +20,66 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class UpdateRecurrenceOccurrenceUseCase {
 
-    private final RecurrenceEventRepository recurrenceEventRepository;
-    private final RecurrenceEventOverrideRepository recurrenceEventOverrideRepository;
-    private final Rfc5545RecurrenceEngine recurrenceEngine;
-    private final RecurrenceEventChangePublisher changePublisher;
+  private final RecurrenceEventRepository recurrenceEventRepository;
+  private final RecurrenceEventOverrideRepository recurrenceEventOverrideRepository;
+  private final Rfc5545RecurrenceEngine recurrenceEngine;
+  private final RecurrenceEventChangePublisher changePublisher;
 
-    public UpdateRecurrenceOccurrenceUseCase(
-            RecurrenceEventRepository recurrenceEventRepository,
-            RecurrenceEventOverrideRepository recurrenceEventOverrideRepository,
-            Rfc5545RecurrenceEngine recurrenceEngine,
-            RecurrenceEventChangePublisher changePublisher
-    ) {
-        this.recurrenceEventRepository = recurrenceEventRepository;
-        this.recurrenceEventOverrideRepository = recurrenceEventOverrideRepository;
-        this.recurrenceEngine = recurrenceEngine;
-        this.changePublisher = changePublisher;
-    }
+  public UpdateRecurrenceOccurrenceUseCase(
+      RecurrenceEventRepository recurrenceEventRepository,
+      RecurrenceEventOverrideRepository recurrenceEventOverrideRepository,
+      Rfc5545RecurrenceEngine recurrenceEngine,
+      RecurrenceEventChangePublisher changePublisher) {
+    this.recurrenceEventRepository = recurrenceEventRepository;
+    this.recurrenceEventOverrideRepository = recurrenceEventOverrideRepository;
+    this.recurrenceEngine = recurrenceEngine;
+    this.changePublisher = changePublisher;
+  }
 
-    @Transactional
-    public EventResponse update(
-            Long accountId,
-            Long recurrenceEventId,
-            UpdateRecurrenceOccurrenceRequest request
-    ) {
-        RecurrenceEvent recurrenceEvent = lockRecurrenceEvent(accountId, recurrenceEventId);
-        Optional<RecurrenceEventOverride> existingOverride = findOverrideOrRejectIneligible(
-                recurrenceEvent,
-                request.originStartAt()
-        );
-        CanonicalSchedule schedule = CanonicalSchedule.recurrenceOverride(
-                request.startAt(),
-                request.endAt(),
-                request.allDay(),
-                request.timeZone()
-        );
-        RecurrenceEventOverride recurrenceEventOverride = existingOverride.orElseGet(
-                () -> RecurrenceEventOverride.active(
-                        recurrenceEvent,
-                        request.originStartAt(),
-                        request.title(),
-                        request.description(),
-                        schedule
-                )
-        );
-        if (existingOverride.isPresent()) {
-            recurrenceEventOverride.activate(request.title(), request.description(), schedule);
-        }
-        recurrenceEventOverrideRepository.saveAndFlush(recurrenceEventOverride);
-        changePublisher.recurrenceOccurrenceUpdated(accountId, recurrenceEventOverride);
-        return EventResponse.recurrenceOverride(recurrenceEventOverride);
+  @Transactional
+  public EventResponse update(
+      Long accountId, Long recurrenceEventId, UpdateRecurrenceOccurrenceRequest request) {
+    RecurrenceEvent recurrenceEvent = lockRecurrenceEvent(accountId, recurrenceEventId);
+    Optional<RecurrenceEventOverride> existingOverride =
+        findOverrideOrRejectIneligible(recurrenceEvent, request.originStartAt());
+    CanonicalSchedule schedule =
+        CanonicalSchedule.recurrenceOverride(
+            request.startAt(), request.endAt(), request.allDay(), request.timeZone());
+    RecurrenceEventOverride recurrenceEventOverride =
+        existingOverride.orElseGet(
+            () ->
+                RecurrenceEventOverride.active(
+                    recurrenceEvent,
+                    request.originStartAt(),
+                    request.title(),
+                    request.description(),
+                    schedule));
+    if (existingOverride.isPresent()) {
+      recurrenceEventOverride.activate(request.title(), request.description(), schedule);
     }
+    recurrenceEventOverrideRepository.saveAndFlush(recurrenceEventOverride);
+    changePublisher.recurrenceOccurrenceUpdated(accountId, recurrenceEventOverride);
+    return EventResponse.recurrenceOverride(recurrenceEventOverride);
+  }
 
-    private RecurrenceEvent lockRecurrenceEvent(Long accountId, Long recurrenceEventId) {
-        return recurrenceEventRepository.findByIdAndAccountIdForUpdate(recurrenceEventId, accountId)
-                .orElseThrow(() -> new CalioException(ErrorCode.RECURRENCE_EVENT_NOT_FOUND));
-    }
+  private RecurrenceEvent lockRecurrenceEvent(Long accountId, Long recurrenceEventId) {
+    return recurrenceEventRepository
+        .findByIdAndAccountIdForUpdate(recurrenceEventId, accountId)
+        .orElseThrow(() -> new CalioException(ErrorCode.RECURRENCE_EVENT_NOT_FOUND));
+  }
 
-    private Optional<RecurrenceEventOverride> findOverrideOrRejectIneligible(
-            RecurrenceEvent recurrenceEvent,
-            Instant originStartAt
-    ) {
-        Optional<RecurrenceEventOverride> existingOverride = recurrenceEventOverrideRepository
-                .findByRecurrenceEvent_IdAndOriginStartAt(recurrenceEvent.getId(), originStartAt);
-        if (existingOverride.isEmpty() && !recurrenceEngine.containsOrigin(
-                RecurrenceSchedule.from(recurrenceEvent),
-                recurrenceEvent.getRecurrenceRules(),
-                originStartAt
-        )) {
-            throw new CalioException(ErrorCode.RECURRENCE_OCCURRENCE_NOT_FOUND);
-        }
-        return existingOverride;
+  private Optional<RecurrenceEventOverride> findOverrideOrRejectIneligible(
+      RecurrenceEvent recurrenceEvent, Instant originStartAt) {
+    Optional<RecurrenceEventOverride> existingOverride =
+        recurrenceEventOverrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(
+            recurrenceEvent.getId(), originStartAt);
+    if (existingOverride.isEmpty()
+        && !recurrenceEngine.containsOrigin(
+            RecurrenceSchedule.from(recurrenceEvent),
+            recurrenceEvent.getRecurrenceRules(),
+            originStartAt)) {
+      throw new CalioException(ErrorCode.RECURRENCE_OCCURRENCE_NOT_FOUND);
     }
+    return existingOverride;
+  }
 }

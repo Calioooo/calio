@@ -14,34 +14,34 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class DeleteRecurrenceEventUseCase {
 
-    private final RecurrenceEventRepository recurrenceEventRepository;
-    private final RecurrenceEventOverrideRepository recurrenceEventOverrideRepository;
-    private final EventRepository eventRepository;
-    private final PersonalRecurrenceGroupShareRepository recurrenceGroupShareRepository;
-    private final RecurrenceEventChangePublisher changePublisher;
+  private final RecurrenceEventRepository recurrenceEventRepository;
+  private final RecurrenceEventOverrideRepository recurrenceEventOverrideRepository;
+  private final EventRepository eventRepository;
+  private final PersonalRecurrenceGroupShareRepository recurrenceGroupShareRepository;
+  private final RecurrenceEventChangePublisher changePublisher;
 
-    public DeleteRecurrenceEventUseCase(
-            RecurrenceEventRepository recurrenceEventRepository,
-            RecurrenceEventOverrideRepository recurrenceEventOverrideRepository,
-            EventRepository eventRepository,
-            PersonalRecurrenceGroupShareRepository recurrenceGroupShareRepository,
-            RecurrenceEventChangePublisher changePublisher
-    ) {
-        this.recurrenceEventRepository = recurrenceEventRepository;
-        this.recurrenceEventOverrideRepository = recurrenceEventOverrideRepository;
-        this.eventRepository = eventRepository;
-        this.recurrenceGroupShareRepository = recurrenceGroupShareRepository;
-        this.changePublisher = changePublisher;
-    }
+  public DeleteRecurrenceEventUseCase(
+      RecurrenceEventRepository recurrenceEventRepository,
+      RecurrenceEventOverrideRepository recurrenceEventOverrideRepository,
+      EventRepository eventRepository,
+      PersonalRecurrenceGroupShareRepository recurrenceGroupShareRepository,
+      RecurrenceEventChangePublisher changePublisher) {
+    this.recurrenceEventRepository = recurrenceEventRepository;
+    this.recurrenceEventOverrideRepository = recurrenceEventOverrideRepository;
+    this.eventRepository = eventRepository;
+    this.recurrenceGroupShareRepository = recurrenceGroupShareRepository;
+    this.changePublisher = changePublisher;
+  }
 
-    @Transactional
-    public void delete(Long accountId, Long recurrenceEventId) {
-        recurrenceEventRepository.findByIdAndAccountIdForUpdate(recurrenceEventId, accountId)
-                .orElseThrow(() -> new CalioException(ErrorCode.RECURRENCE_EVENT_NOT_FOUND));
-        recurrenceGroupShareRepository.deleteAllByRecurrenceEventId(recurrenceEventId);
-        recurrenceEventOverrideRepository.deleteAllByRecurrenceEventIds(List.of(recurrenceEventId));
-        eventRepository.deleteAllByRecurrenceEventIds(List.of(recurrenceEventId));
-        recurrenceEventRepository.deleteAllByIds(List.of(recurrenceEventId));
-        changePublisher.recurrenceEventDeleted(accountId, recurrenceEventId);
-    }
+  @Transactional
+  public void delete(Long accountId, Long recurrenceEventId) {
+    recurrenceEventRepository
+        .findByIdAndAccountIdForUpdate(recurrenceEventId, accountId)
+        .orElseThrow(() -> new CalioException(ErrorCode.RECURRENCE_EVENT_NOT_FOUND));
+    recurrenceGroupShareRepository.deleteAllByRecurrenceEventId(recurrenceEventId);
+    recurrenceEventOverrideRepository.deleteAllByRecurrenceEventIds(List.of(recurrenceEventId));
+    eventRepository.deleteAllByRecurrenceEventIds(List.of(recurrenceEventId));
+    recurrenceEventRepository.deleteAllByIds(List.of(recurrenceEventId));
+    changePublisher.recurrenceEventDeleted(accountId, recurrenceEventId);
+  }
 }
