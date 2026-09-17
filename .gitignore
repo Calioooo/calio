@@ -7,3 +7,15 @@ DerivedData/
 
 # macOS
 .DS_Store
+
+# Local OpenSpec workflow configuration and generated Codex skills
+/openspec/
+/.agents/*
+!/.agents/skills/
+/.agents/skills/*
+!/.agents/skills/project-review/
+
+# Local hook state, legacy formatter caches and Python test caches
+/.cache/formatters/
+/scripts/__pycache__/
+/scripts/tests/__pycache__/

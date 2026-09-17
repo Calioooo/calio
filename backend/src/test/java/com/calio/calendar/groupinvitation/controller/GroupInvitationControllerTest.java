@@ -31,6 +31,7 @@ import com.calio.calendar.groupspace.service.GroupMembershipService;
 import com.calio.calendar.groupspace.service.GroupSpaceService;
 import com.calio.calendar.security.AuthenticatedAccountMockMvcTestConfig;
 import com.calio.calendar.security.WithAuthenticatedAccount;
+import com.calio.calendar.tag.repository.TagRepository;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -85,6 +86,9 @@ class GroupInvitationControllerTest {
     private GroupMemberRepository memberRepository;
 
     @Autowired
+    private TagRepository tagRepository;
+
+    @Autowired
     private GroupSpaceRepository groupSpaceRepository;
 
     @Autowired
@@ -110,6 +114,7 @@ class GroupInvitationControllerTest {
         accountAuthTokenRepository.deleteAll();
         invitationRepository.deleteAll();
         memberRepository.deleteAll();
+        tagRepository.deleteAll();
         groupSpaceRepository.deleteAll();
     }
 

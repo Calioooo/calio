@@ -17,6 +17,18 @@ public interface EventRepository extends JpaRepository<Event, Long> {
 
     Optional<Event> findByIdAndAccount_Id(Long id, Long accountId);
 
+    @Query("""
+            select event
+            from Event event
+            where event.id in :eventIds
+              and event.account.id = :accountId
+              and event.recurrenceId is null
+            """)
+    List<Event> findAllShareableByIdsAndAccountId(
+            @Param("eventIds") List<Long> eventIds,
+            @Param("accountId") Long accountId
+    );
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             select event

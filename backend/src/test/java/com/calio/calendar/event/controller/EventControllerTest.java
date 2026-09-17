@@ -75,8 +75,8 @@ class EventControllerTest {
 
     @BeforeEach
     void setUpDefaultTag() {
-        tagRepository.findFirstByTagTypeAndTitleAndAccountIsNullOrderByIdAsc(TagType.DEFAULT, "기타")
-                .orElseGet(() -> tagRepository.save(new Tag(TagType.DEFAULT, "기타", "#64748B")));
+        tagRepository.findFirstByTagTypeAndTitleAndAccountIsNullAndGroupSpaceIsNullOrderByIdAsc(TagType.PERSONAL_DEFAULT, "기타")
+                .orElseGet(() -> tagRepository.save(Tag.personalDefault("기타", "#64748B")));
     }
 
     @Test
@@ -249,10 +249,10 @@ class EventControllerTest {
     }
 
     @Test
-    @DisplayName("사용자는 DEFAULT tagId를 지정해 일정을 생성하면 해당 태그가 저장된 응답을 받는다")
-    void givenDefaultTagId_whenCreateEvent_thenStoresSelectedTag() throws Exception {
+    @DisplayName("사용자는 PERSONAL_DEFAULT tagId를 지정해 일정을 생성하면 해당 태그가 저장된 응답을 받는다")
+    void givenPersonalDefaultTagId_whenCreateEvent_thenStoresSelectedTag() throws Exception {
         // given
-        Tag workTag = tagRepository.save(new Tag(TagType.DEFAULT, "업무", "#2563eb"));
+        Tag workTag = tagRepository.save(Tag.personalDefault("업무", "#2563eb"));
 
         // when
         mockMvc.perform(post("/api/events")
@@ -272,14 +272,14 @@ class EventControllerTest {
                 .andExpect(jsonPath("$.tag.id").value(workTag.getId()))
                 .andExpect(jsonPath("$.tag.title").value("업무"))
                 .andExpect(jsonPath("$.tag.colorCode").value("#2563EB"))
-                .andExpect(jsonPath("$.tag.tagType").value("DEFAULT"));
+                .andExpect(jsonPath("$.tag.tagType").value("PERSONAL_DEFAULT"));
     }
 
     @Test
     @DisplayName("사용자는 CUSTOM tagId를 지정해 일정을 생성하면 해당 태그가 저장된 응답을 받는다")
     void givenCustomTagId_whenCreateEvent_thenStoresSelectedTag() throws Exception {
         // given
-        Tag customTag = tagRepository.save(new Tag(TagType.CUSTOM, "사용자", "#111111", currentAccountReference()));
+        Tag customTag = tagRepository.save(Tag.personalCustom(currentAccountReference(), "사용자", "#111111"));
 
         // when
         mockMvc.perform(post("/api/events")
@@ -303,10 +303,10 @@ class EventControllerTest {
     }
 
     @Test
-    @DisplayName("사용자는 tagId 없이 일정을 수정하면 fallback DEFAULT 기타 태그로 변경된다")
+    @DisplayName("사용자는 tagId 없이 일정을 수정하면 fallback PERSONAL_DEFAULT 기타 태그로 변경된다")
     void givenNullTagId_whenUpdateEvent_thenChangesToFallbackTag() throws Exception {
         // given
-        Tag workTag = tagRepository.save(new Tag(TagType.DEFAULT, "업무 수정", "#2563EB"));
+        Tag workTag = tagRepository.save(Tag.personalDefault("업무 수정", "#2563EB"));
         MvcResult createResult = mockMvc.perform(post("/api/events")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -346,7 +346,7 @@ class EventControllerTest {
     @DisplayName("사용자는 CUSTOM tagId를 지정해 일정을 수정하면 해당 태그가 저장된 응답을 받는다")
     void givenCustomTagId_whenUpdateEvent_thenStoresSelectedTag() throws Exception {
         // given
-        Tag customTag = tagRepository.save(new Tag(TagType.CUSTOM, "수정 사용자", "#8b5cf6", currentAccountReference()));
+        Tag customTag = tagRepository.save(Tag.personalCustom(currentAccountReference(), "수정 사용자", "#8b5cf6"));
         long eventId = createEvent("Custom update target", "2026-06-19T00:00:00Z", "2026-06-19T01:00:00Z");
 
         // when
@@ -397,7 +397,7 @@ class EventControllerTest {
         // given
         Account otherAccount = accountRepository.saveAndFlush(new Account());
         Tag otherAccountTag = tagRepository.save(
-                new Tag(TagType.CUSTOM, "다른 계정", "#111111", otherAccount)
+                Tag.personalCustom(otherAccount, "다른 계정", "#111111")
         );
 
         // when
@@ -770,7 +770,7 @@ class EventControllerTest {
         long eventId = createEvent("Stable", "2026-06-07T00:00:00Z", "2026-06-07T01:00:00Z");
         Event before = eventRepository.findById(eventId).orElseThrow();
         Long originalTagId = before.getTag().getId();
-        Tag replacementTag = tagRepository.save(new Tag(TagType.DEFAULT, "교체 대상", "#123456"));
+        Tag replacementTag = tagRepository.save(Tag.personalDefault("교체 대상", "#123456"));
 
         // when
         mockMvc.perform(put("/api/events/{eventId}", eventId)

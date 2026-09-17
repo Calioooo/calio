@@ -105,10 +105,19 @@ struct CalendarDayTimelineView: View {
             
             VStack(spacing: 3) {
                 ForEach(Array(fullDayEvents.prefix(metrics.maxVisibleFullDayEventCount))) { event in
-                    Text(event.title)
-                        .font(.system(size: metrics.fullDayEventFontSize, weight: .semibold))
-                        .lineLimit(1)
-                        .foregroundStyle(.white)
+                    HStack(spacing: 3) {
+                        if event.importantEvent {
+                            Image(systemName: "star.fill")
+                                .font(.system(size: metrics.fullDayEventFontSize - 1, weight: .semibold))
+                                .foregroundStyle(Color.calioImportantStar)
+                                .accessibilityHidden(true)
+                        }
+
+                        Text(event.title)
+                            .lineLimit(1)
+                    }
+                    .font(.system(size: metrics.fullDayEventFontSize, weight: .semibold))
+                    .foregroundStyle(.white)
                         .padding(.horizontal, metrics.eventHorizontalPadding)
                         .frame(maxWidth: .infinity, minHeight: metrics.fullDayEventHeight)
                         .background(
@@ -203,10 +212,19 @@ struct CalendarDayTimelineView: View {
     
     private func eventBlocks(metrics: DayTimelineMetrics) -> some View {
         ForEach(eventLayouts(metrics: metrics)) { layout in
-            Text(layout.event.title)
-                .font(.system(size: metrics.eventFontSize, weight: .semibold))
-                .lineLimit(2)
-                .foregroundStyle(.white)
+            HStack(alignment: .top, spacing: 3) {
+                if layout.event.importantEvent {
+                    Image(systemName: "star.fill")
+                        .font(.system(size: metrics.eventFontSize - 1, weight: .semibold))
+                        .foregroundStyle(Color.calioImportantStar)
+                        .accessibilityHidden(true)
+                }
+
+                Text(layout.event.title)
+                    .lineLimit(2)
+            }
+            .font(.system(size: metrics.eventFontSize, weight: .semibold))
+            .foregroundStyle(.white)
                 .padding(.horizontal, metrics.eventHorizontalPadding)
                 .padding(.vertical, metrics.eventVerticalPadding)
                 .frame(

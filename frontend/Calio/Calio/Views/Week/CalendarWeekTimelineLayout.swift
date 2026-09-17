@@ -16,13 +16,14 @@ struct TimelineMetrics {
     let hourHeight: CGFloat
     let visibleDayCount: Int
     let hourCount: Int
+    let textScale: CGFloat
 
     var gridStartX: CGFloat {
         timeColumnWidth
     }
 
     var timeLabelFontSize: CGFloat {
-        dayColumnWidth < 44 ? 11 : 14
+        (dayColumnWidth < 44 ? 11 : 14) * textScale
     }
 
     var timeLabelTrailingPadding: CGFloat {
@@ -50,11 +51,11 @@ struct TimelineMetrics {
     }
 
     var fullDayEventFontSize: CGFloat {
-        dayColumnWidth < 44 ? 9 : 11
+        (dayColumnWidth < 44 ? 9 : 11) * textScale
     }
 
     var fullDayEventHeight: CGFloat {
-        dayColumnWidth < 44 ? 18 : 22
+        (dayColumnWidth < 44 ? 18 : 22) * textScale
     }
 
     var maxVisibleFullDayEventCount: Int {
@@ -62,7 +63,7 @@ struct TimelineMetrics {
     }
 
     var eventFontSize: CGFloat {
-        dayColumnWidth < 44 ? 9 : 11
+        (dayColumnWidth < 44 ? 9 : 11) * textScale
     }
 
     var eventHorizontalPadding: CGFloat {
@@ -74,7 +75,7 @@ struct TimelineMetrics {
     }
 
     var minimumEventHeight: CGFloat {
-        dayColumnWidth < 44 ? 20 : 24
+        (dayColumnWidth < 44 ? 20 : 24) * textScale
     }
 
     var eventHorizontalMargin: CGFloat {
@@ -90,11 +91,11 @@ struct TimelineMetrics {
     }
 
     var weekdayFontSize: CGFloat {
-        dayColumnWidth < 44 ? 9 : 12
+        (dayColumnWidth < 44 ? 9 : 12) * textScale
     }
 
     var dayNumberFontSize: CGFloat {
-        dayColumnWidth < 44 ? 18 : 24
+        (dayColumnWidth < 44 ? 18 : 24) * textScale
     }
 
     var dayCircleSize: CGFloat {
@@ -616,7 +617,7 @@ struct TimelineEventLayout: Identifiable {
         case .event:
             return Color(hex: event.tag.colorCode)
         case .overflow:
-            return Color(uiColor: .secondarySystemBackground)
+            return .calioSelection
         }
     }
 
@@ -625,7 +626,20 @@ struct TimelineEventLayout: Identifiable {
         case .event:
             return .white
         case .overflow:
-            return Color.accentColor
+            return .calioPrimary
+        }
+    }
+
+    var showsImportantIndicator: Bool {
+        style == .event && event.importantEvent
+    }
+
+    var accessibilityLabel: String {
+        switch tapAction {
+        case .showEvent(let event):
+            return "\(event.title), \(event.importantEvent ? "중요 일정, " : "")일정 상세 보기"
+        case .showOverlapGroup(let events):
+            return "겹친 일정 \(events.count)개 보기"
         }
     }
 }
