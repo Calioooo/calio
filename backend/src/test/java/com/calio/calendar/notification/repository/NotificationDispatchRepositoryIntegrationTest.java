@@ -1,5 +1,6 @@
-package com.calio.calendar.notification.service;
+package com.calio.calendar.notification.repository;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.calio.calendar.account.domain.Account;
@@ -7,7 +8,6 @@ import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.notification.domain.CalendarNotificationType;
 import com.calio.calendar.notification.domain.NotificationDispatch;
 import com.calio.calendar.notification.domain.NotificationScheduleKey;
-import com.calio.calendar.notification.repository.NotificationDispatchRepository;
 import java.time.Instant;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -28,6 +28,31 @@ class NotificationDispatchRepositoryIntegrationTest {
   @Autowired private AccountRepository accountRepository;
 
   @Autowired private NotificationDispatchRepository dispatchRepository;
+
+  @Test
+  @DisplayName("동일한 계정과 일정 알림 시각으로 생성된 dispatch claim을 조회한다")
+  void givenStoredDispatchClaim_whenCheckClaim_thenReturnsExistence() {
+    // given
+    Account account = accountRepository.saveAndFlush(new Account());
+    Instant scheduledAt = Instant.parse("2026-09-08T00:00:00Z");
+    NotificationScheduleKey scheduleKey = NotificationScheduleKey.personalEvent(1L);
+    dispatchRepository.saveAndFlush(
+        new NotificationDispatch(
+            account.getId(), CalendarNotificationType.REMINDER, scheduleKey, scheduledAt));
+
+    // when & then
+    assertThat(
+            dispatchRepository.hasDispatchClaim(
+                account.getId(), CalendarNotificationType.REMINDER, scheduleKey, scheduledAt))
+        .isTrue();
+    assertThat(
+            dispatchRepository.hasDispatchClaim(
+                account.getId(),
+                CalendarNotificationType.REMINDER,
+                scheduleKey,
+                scheduledAt.plusSeconds(60)))
+        .isFalse();
+  }
 
   @Test
   @DisplayName("같은 수신자와 일정 시각의 dispatch claim은 한 번만 생성된다")

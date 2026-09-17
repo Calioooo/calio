@@ -1,10 +1,14 @@
 package com.calio.calendar.notification.domain;
 
+import jakarta.persistence.Column;
+import jakarta.persistence.Embeddable;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Objects;
 
-public record NotificationScheduleKey(String value) {
+@Embeddable
+public record NotificationScheduleKey(
+    @Column(name = "schedule_key", nullable = false) String value) {
 
   public NotificationScheduleKey {
     if (value == null || value.isBlank()) {

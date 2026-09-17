@@ -2,6 +2,7 @@ package com.calio.calendar.notification.domain;
 
 import com.calio.calendar.common.domain.BaseEntity;
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -33,8 +34,7 @@ public class NotificationDispatch extends BaseEntity {
   @Column(nullable = false)
   private CalendarNotificationType notificationType;
 
-  @Column(nullable = false)
-  private String scheduleKey;
+  @Embedded private NotificationScheduleKey scheduleKey;
 
   @Column(nullable = false)
   private Instant scheduledAt;
@@ -48,7 +48,7 @@ public class NotificationDispatch extends BaseEntity {
       Instant scheduledAt) {
     this.accountId = Objects.requireNonNull(accountId);
     this.notificationType = Objects.requireNonNull(notificationType);
-    this.scheduleKey = Objects.requireNonNull(scheduleKey).value();
+    this.scheduleKey = Objects.requireNonNull(scheduleKey);
     this.scheduledAt = Objects.requireNonNull(scheduledAt);
   }
 
@@ -62,5 +62,9 @@ public class NotificationDispatch extends BaseEntity {
 
   public Instant getScheduledAt() {
     return scheduledAt;
+  }
+
+  public NotificationScheduleKey getScheduleKey() {
+    return scheduleKey;
   }
 }

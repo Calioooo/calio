@@ -1,6 +1,6 @@
 package com.calio.calendar.notification.scheduler;
 
-import com.calio.calendar.notification.service.CalendarNotificationService;
+import com.calio.calendar.notification.usecase.SendDueCalendarNotificationsUseCase;
 import java.time.Clock;
 import java.time.Instant;
 import org.springframework.beans.factory.annotation.Value;
@@ -10,15 +10,15 @@ import org.springframework.stereotype.Component;
 @Component
 public class CalendarNotificationScheduler {
 
-  private final CalendarNotificationService calendarNotificationService;
+  private final SendDueCalendarNotificationsUseCase sendDueCalendarNotificationsUseCase;
   private final Clock clock;
   private final boolean schedulerEnabled;
 
   public CalendarNotificationScheduler(
-      CalendarNotificationService calendarNotificationService,
+      SendDueCalendarNotificationsUseCase sendDueCalendarNotificationsUseCase,
       Clock clock,
       @Value("${notifications.scheduler-enabled:false}") boolean schedulerEnabled) {
-    this.calendarNotificationService = calendarNotificationService;
+    this.sendDueCalendarNotificationsUseCase = sendDueCalendarNotificationsUseCase;
     this.clock = clock;
     this.schedulerEnabled = schedulerEnabled;
   }
@@ -30,6 +30,6 @@ public class CalendarNotificationScheduler {
     }
 
     Instant now = clock.instant();
-    calendarNotificationService.dispatchDueNotifications(now);
+    sendDueCalendarNotificationsUseCase.execute(now);
   }
 }

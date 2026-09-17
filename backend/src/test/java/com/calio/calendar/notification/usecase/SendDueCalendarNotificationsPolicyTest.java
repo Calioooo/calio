@@ -1,4 +1,4 @@
-package com.calio.calendar.notification.service;
+package com.calio.calendar.notification.usecase;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -14,18 +14,27 @@ import com.calio.calendar.account.domain.AccountNotificationSettings;
 import com.calio.calendar.account.domain.ImportantReminderOffset;
 import com.calio.calendar.account.domain.TimedReminderOffset;
 import com.calio.calendar.account.repository.AccountRepository;
-import com.calio.calendar.event.controller.dto.EventResponse;
-import com.calio.calendar.event.service.EventService;
-import com.calio.calendar.groupcalendar.service.GroupCalendarService;
-import com.calio.calendar.groupspace.service.GroupMembershipQueryService;
+import com.calio.calendar.event.domain.Event;
+import com.calio.calendar.event.repository.EventRepository;
+import com.calio.calendar.groupcalendar.event.repository.GroupCalendarEventRepository;
+import com.calio.calendar.groupcalendar.recurrence.repository.GroupCalendarRecurrenceEventRepository;
+import com.calio.calendar.groupcalendar.recurrence.repository.GroupCalendarRecurrenceOverrideRepository;
+import com.calio.calendar.groupcalendar.recurrence.service.GroupCalendarRecurrenceOccurrenceResolver;
+import com.calio.calendar.groupspace.repository.GroupMemberRepository;
 import com.calio.calendar.notification.client.ApnsClient;
 import com.calio.calendar.notification.domain.CalendarNotificationContent;
 import com.calio.calendar.notification.domain.CalendarNotificationType;
 import com.calio.calendar.notification.domain.NotificationScheduleKey;
+import com.calio.calendar.notification.repository.IosPushDeviceRepository;
 import com.calio.calendar.notification.repository.NotificationDispatchRepository;
+import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
+import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
+import com.calio.calendar.recurrence.service.PersonalRecurrenceOccurrenceResolver;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -35,41 +44,57 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
-import tools.jackson.databind.ObjectMapper;
 
 @ExtendWith(MockitoExtension.class)
-class CalendarNotificationDueTest {
+class SendDueCalendarNotificationsPolicyTest {
 
   @Mock private AccountRepository accountRepository;
 
-  @Mock private EventService eventService;
+  @Mock private EventRepository eventRepository;
 
-  @Mock private GroupCalendarService groupCalendarService;
+  @Mock private RecurrenceEventRepository recurrenceEventRepository;
 
-  @Mock private GroupMembershipQueryService groupMembershipQueryService;
+  @Mock private RecurrenceEventOverrideRepository recurrenceOverrideRepository;
+
+  @Mock private PersonalRecurrenceOccurrenceResolver personalRecurrenceOccurrenceResolver;
+
+  @Mock private GroupMemberRepository groupMemberRepository;
+
+  @Mock private GroupCalendarEventRepository groupCalendarEventRepository;
+
+  @Mock private GroupCalendarRecurrenceEventRepository groupCalendarRecurrenceEventRepository;
+
+  @Mock private GroupCalendarRecurrenceOverrideRepository groupCalendarRecurrenceOverrideRepository;
+
+  @Mock private GroupCalendarRecurrenceOccurrenceResolver groupRecurrenceOccurrenceResolver;
 
   @Mock private NotificationDispatchRepository dispatchRepository;
 
-  @Mock private IosPushDeviceService pushDeviceService;
+  @Mock private IosPushDeviceRepository pushDeviceRepository;
 
   @Mock private ApnsClient apnsClient;
 
-  private CalendarNotificationService calendarNotificationService;
+  private SendDueCalendarNotificationsUseCase sendDueCalendarNotificationsUseCase;
 
   @BeforeEach
   void setUp() {
-    calendarNotificationService =
+    sendDueCalendarNotificationsUseCase =
         spy(
-            new CalendarNotificationService(
+            new SendDueCalendarNotificationsUseCase(
                 accountRepository,
-                eventService,
-                groupCalendarService,
-                groupMembershipQueryService,
+                eventRepository,
+                recurrenceEventRepository,
+                recurrenceOverrideRepository,
+                personalRecurrenceOccurrenceResolver,
+                groupMemberRepository,
+                groupCalendarEventRepository,
+                groupCalendarRecurrenceEventRepository,
+                groupCalendarRecurrenceOverrideRepository,
+                groupRecurrenceOccurrenceResolver,
                 dispatchRepository,
-                pushDeviceService,
+                pushDeviceRepository,
                 apnsClient,
-                new ObjectMapper()));
-    when(groupMembershipQueryService.listActiveMemberships(1L)).thenReturn(List.of());
+                Clock.fixed(Instant.parse("2026-06-01T00:00:00Z"), ZoneOffset.UTC)));
   }
 
   @Test
@@ -78,18 +103,18 @@ class CalendarNotificationDueTest {
       givenTimedEventInAnotherTimeZone_whenDispatchingDueNotifications_thenUsesScheduleLocalTargetDate() {
     // given
     Instant startAt = Instant.parse("2026-06-01T01:00:00Z");
-    EventResponse event = timedEvent(startAt, "America/Los_Angeles");
-    when(eventService.listEvents(eq(1L), any(), any())).thenReturn(List.of(event));
+    Event event = timedEvent(startAt, "America/Los_Angeles");
+    when(eventRepository.findNormalEvents(eq(1L), any(), any())).thenReturn(List.of(event));
     stubDispatch();
 
     // when
-    calendarNotificationService.dispatchDueNotifications(
+    sendDueCalendarNotificationsUseCase.dispatchAccountNotifications(
         account(TimedReminderOffset.AT_START, false), startAt);
 
     // then
     ArgumentCaptor<CalendarNotificationContent> contentCaptor =
         ArgumentCaptor.forClass(CalendarNotificationContent.class);
-    verify(calendarNotificationService)
+    verify(sendDueCalendarNotificationsUseCase)
         .dispatch(
             eq(1L),
             eq(NotificationScheduleKey.personalEvent(10L)),
@@ -103,16 +128,16 @@ class CalendarNotificationDueTest {
   void givenSynchronizedEvent_whenDispatchingDueNotifications_thenDispatchesNotification() {
     // given
     Instant startAt = Instant.parse("2026-06-01T01:00:00Z");
-    EventResponse event = timedEvent(startAt, "UTC");
-    when(eventService.listEvents(eq(1L), any(), any())).thenReturn(List.of(event));
+    Event event = timedEvent(startAt, "UTC");
+    when(eventRepository.findNormalEvents(eq(1L), any(), any())).thenReturn(List.of(event));
     stubDispatch();
 
     // when
-    calendarNotificationService.dispatchDueNotifications(
+    sendDueCalendarNotificationsUseCase.dispatchAccountNotifications(
         account(TimedReminderOffset.AT_START, false), startAt);
 
     // then
-    verify(calendarNotificationService)
+    verify(sendDueCalendarNotificationsUseCase)
         .dispatch(
             eq(1L),
             eq(NotificationScheduleKey.personalEvent(10L)),
@@ -125,14 +150,14 @@ class CalendarNotificationDueTest {
   void givenNoRemainingSchedules_whenBriefingIsDue_thenSkipsNotification() {
     // given
     Instant briefingTime = Instant.parse("2026-06-01T23:00:00Z");
-    when(eventService.listEvents(eq(1L), any(), any())).thenReturn(List.of());
+    when(eventRepository.findNormalEvents(eq(1L), any(), any())).thenReturn(List.of());
 
     // when
-    calendarNotificationService.dispatchDueNotifications(
+    sendDueCalendarNotificationsUseCase.dispatchAccountNotifications(
         account(TimedReminderOffset.MINUTES_10, true), briefingTime);
 
     // then
-    verify(calendarNotificationService, org.mockito.Mockito.never())
+    verify(sendDueCalendarNotificationsUseCase, org.mockito.Mockito.never())
         .dispatch(any(), any(), any(), any());
   }
 
@@ -142,23 +167,20 @@ class CalendarNotificationDueTest {
       givenSchedulesOutsideBriefingDate_whenDispatchingDueNotifications_thenCountsOnlyTargetDateSchedules() {
     // given
     Instant briefingTime = Instant.parse("2026-06-01T23:00:00Z");
-    Instant dayStart = Instant.parse("2026-06-01T15:00:00Z");
-    Instant dayEnd = Instant.parse("2026-06-02T15:00:00Z");
-    EventResponse targetDateEvent = timedEvent(Instant.parse("2026-06-02T01:00:00Z"), "Asia/Seoul");
-    EventResponse nextDateEvent = timedEvent(Instant.parse("2026-06-03T01:00:00Z"), "Asia/Seoul");
-    when(eventService.listEvents(eq(1L), any(), any()))
+    Event targetDateEvent = timedEvent(Instant.parse("2026-06-02T01:00:00Z"), "Asia/Seoul");
+    Event nextDateEvent = timedEvent(Instant.parse("2026-06-03T01:00:00Z"), "Asia/Seoul");
+    when(eventRepository.findNormalEvents(eq(1L), any(), any()))
         .thenReturn(List.of(targetDateEvent, nextDateEvent));
-    when(eventService.listEvents(1L, dayStart, dayEnd)).thenReturn(List.of(targetDateEvent));
     stubDispatch();
 
     // when
-    calendarNotificationService.dispatchDueNotifications(
+    sendDueCalendarNotificationsUseCase.dispatchAccountNotifications(
         account(TimedReminderOffset.MINUTES_10, true), briefingTime);
 
     // then
     ArgumentCaptor<CalendarNotificationContent> contentCaptor =
         ArgumentCaptor.forClass(CalendarNotificationContent.class);
-    verify(calendarNotificationService)
+    verify(sendDueCalendarNotificationsUseCase)
         .dispatch(
             eq(1L),
             eq(NotificationScheduleKey.briefing(LocalDate.of(2026, 6, 2))),
@@ -183,24 +205,14 @@ class CalendarNotificationDueTest {
   }
 
   private void stubDispatch() {
-    doNothing().when(calendarNotificationService).dispatch(anyLong(), any(), any(), any());
+    doNothing().when(sendDueCalendarNotificationsUseCase).dispatch(anyLong(), any(), any(), any());
   }
 
-  private EventResponse timedEvent(Instant startAt, String timeZone) {
-    return new EventResponse(
-        10L,
-        "해외 회의",
-        "설명",
-        startAt,
-        startAt.plusSeconds(3_600),
-        false,
-        timeZone,
-        false,
-        null,
-        false,
-        null,
-        null,
-        startAt,
-        startAt);
+  private Event timedEvent(Instant startAt, String timeZone) {
+    Event event =
+        new Event(
+            "해외 회의", "설명", startAt, startAt.plusSeconds(3_600), false, timeZone, null, null, null);
+    ReflectionTestUtils.setField(event, "id", 10L);
+    return event;
   }
 }
