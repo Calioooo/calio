@@ -5,12 +5,7 @@ import com.calio.calendar.recurrence.controller.dto.CreateRecurrenceEventRequest
 import com.calio.calendar.recurrence.controller.dto.RecurrenceEventResponse;
 import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceEventRequest;
 import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceOccurrenceRequest;
-import com.calio.calendar.recurrence.usecase.CreateRecurrenceEventUseCase;
-import com.calio.calendar.recurrence.usecase.DeleteRecurrenceEventUseCase;
-import com.calio.calendar.recurrence.usecase.DeleteRecurrenceOccurrenceUseCase;
-import com.calio.calendar.recurrence.usecase.GetRecurrenceEventUseCase;
-import com.calio.calendar.recurrence.usecase.UpdateRecurrenceEventUseCase;
-import com.calio.calendar.recurrence.usecase.UpdateRecurrenceOccurrenceUseCase;
+import com.calio.calendar.recurrence.service.RecurrenceEventApplicationService;
 import com.calio.calendar.security.AuthenticatedAccount;
 import com.calio.calendar.sharing.recurrence.controller.dto.CreateRecurrenceGroupSharesRequest;
 import com.calio.calendar.sharing.recurrence.controller.dto.CreateRecurrenceGroupSharesResponse;
@@ -38,28 +33,13 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/recurrence-events")
 public class RecurrenceEventController {
 
-  private final CreateRecurrenceEventUseCase createRecurrenceEventUseCase;
-  private final GetRecurrenceEventUseCase getRecurrenceEventUseCase;
-  private final UpdateRecurrenceEventUseCase updateRecurrenceEventUseCase;
-  private final UpdateRecurrenceOccurrenceUseCase updateRecurrenceOccurrenceUseCase;
-  private final DeleteRecurrenceEventUseCase deleteRecurrenceEventUseCase;
-  private final DeleteRecurrenceOccurrenceUseCase deleteRecurrenceOccurrenceUseCase;
+  private final RecurrenceEventApplicationService recurrenceEventApplicationService;
   private final PersonalRecurrenceGroupShareService recurrenceGroupShareService;
 
   public RecurrenceEventController(
-      CreateRecurrenceEventUseCase createRecurrenceEventUseCase,
-      GetRecurrenceEventUseCase getRecurrenceEventUseCase,
-      UpdateRecurrenceEventUseCase updateRecurrenceEventUseCase,
-      UpdateRecurrenceOccurrenceUseCase updateRecurrenceOccurrenceUseCase,
-      DeleteRecurrenceEventUseCase deleteRecurrenceEventUseCase,
-      DeleteRecurrenceOccurrenceUseCase deleteRecurrenceOccurrenceUseCase,
+      RecurrenceEventApplicationService recurrenceEventApplicationService,
       PersonalRecurrenceGroupShareService recurrenceGroupShareService) {
-    this.createRecurrenceEventUseCase = createRecurrenceEventUseCase;
-    this.getRecurrenceEventUseCase = getRecurrenceEventUseCase;
-    this.updateRecurrenceEventUseCase = updateRecurrenceEventUseCase;
-    this.updateRecurrenceOccurrenceUseCase = updateRecurrenceOccurrenceUseCase;
-    this.deleteRecurrenceEventUseCase = deleteRecurrenceEventUseCase;
-    this.deleteRecurrenceOccurrenceUseCase = deleteRecurrenceOccurrenceUseCase;
+    this.recurrenceEventApplicationService = recurrenceEventApplicationService;
     this.recurrenceGroupShareService = recurrenceGroupShareService;
   }
 
@@ -68,7 +48,7 @@ public class RecurrenceEventController {
       @AuthenticationPrincipal AuthenticatedAccount account,
       @Valid @RequestBody CreateRecurrenceEventRequest request) {
     RecurrenceEventResponse response =
-        createRecurrenceEventUseCase.create(account.accountId(), request);
+        recurrenceEventApplicationService.createRecurrenceEvent(account.accountId(), request);
     return ResponseEntity.status(HttpStatus.CREATED).body(response);
   }
 
@@ -76,14 +56,14 @@ public class RecurrenceEventController {
   public RecurrenceEventResponse getRecurrenceEvent(
       @AuthenticationPrincipal AuthenticatedAccount account,
       @PathVariable("recurrenceId") Long recurrenceId) {
-    return getRecurrenceEventUseCase.get(account.accountId(), recurrenceId);
+    return recurrenceEventApplicationService.getRecurrenceEvent(account.accountId(), recurrenceId);
   }
 
   @DeleteMapping("/{recurrenceId}")
   public ResponseEntity<Void> deleteRecurrenceEvent(
       @AuthenticationPrincipal AuthenticatedAccount account,
       @PathVariable("recurrenceId") Long recurrenceId) {
-    deleteRecurrenceEventUseCase.delete(account.accountId(), recurrenceId);
+    recurrenceEventApplicationService.deleteRecurrenceEvent(account.accountId(), recurrenceId);
     return ResponseEntity.noContent().build();
   }
 
@@ -101,7 +81,8 @@ public class RecurrenceEventController {
       @AuthenticationPrincipal AuthenticatedAccount account,
       @PathVariable("recurrenceId") Long recurrenceId,
       @Valid @RequestBody UpdateRecurrenceEventRequest request) {
-    return updateRecurrenceEventUseCase.update(account.accountId(), recurrenceId, request);
+    return recurrenceEventApplicationService.updateRecurrenceEvent(
+        account.accountId(), recurrenceId, request);
   }
 
   @PatchMapping("/{recurrenceId}/occurrences")
@@ -109,7 +90,8 @@ public class RecurrenceEventController {
       @AuthenticationPrincipal AuthenticatedAccount account,
       @PathVariable("recurrenceId") Long recurrenceId,
       @Valid @RequestBody UpdateRecurrenceOccurrenceRequest request) {
-    return updateRecurrenceOccurrenceUseCase.update(account.accountId(), recurrenceId, request);
+    return recurrenceEventApplicationService.updateRecurrenceOccurrence(
+        account.accountId(), recurrenceId, request);
   }
 
   @DeleteMapping("/{recurrenceId}/occurrences")
@@ -118,7 +100,8 @@ public class RecurrenceEventController {
       @PathVariable("recurrenceId") Long recurrenceId,
       @RequestParam("originStartAt") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
           Instant originStartAt) {
-    deleteRecurrenceOccurrenceUseCase.delete(account.accountId(), recurrenceId, originStartAt);
+    recurrenceEventApplicationService.deleteRecurrenceOccurrence(
+        account.accountId(), recurrenceId, originStartAt);
     return ResponseEntity.noContent().build();
   }
 }
