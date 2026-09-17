@@ -1,6 +1,7 @@
 package com.calio.calendar.tag.domain;
 
 public enum TagType {
-    DEFAULT,
+    PERSONAL_DEFAULT,
+    GROUP_DEFAULT,
     CUSTOM
 }

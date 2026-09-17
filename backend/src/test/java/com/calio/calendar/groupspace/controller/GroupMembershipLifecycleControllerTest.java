@@ -6,6 +6,7 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -229,6 +230,23 @@ class GroupMembershipLifecycleControllerTest {
         assertThat(membership.get("statusChangedAt").isTextual()).isTrue();
         assertThat(Instant.parse(membership.get("statusChangedAt").asString()))
                 .isEqualTo(MEMBER_CREATED_AT);
+    }
+
+    @Test
+    @DisplayName("그룹 설정에서 익명 공유를 변경하면 내 membership 전체 공유 정책을 반환한다")
+    void changeAnonymousSharingUpdatesMyGroupMembershipPolicy() throws Exception {
+        // given
+        GroupFixture fixture = createGroupFixture();
+
+        // when, then
+        mockMvc.perform(patch("/api/group-spaces/{groupSpaceId}/members/me/anonymous-sharing", fixture.groupSpace().getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"isAnonymous\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isAnonymous").value(true));
+
+        assertThat(groupMemberRepository.findById(fixture.ownerMember().getId()).orElseThrow().isAnonymous())
+                .isTrue();
     }
 
     @Test
