@@ -1,6 +1,6 @@
 import Foundation
 
-struct CreateVoteRoomRequestDTO: Encodable {
+struct CreateVoteRoomRequestDTO: Encodable, Equatable {
     let name: String
     let candidateEndDate: String
 }
@@ -32,7 +32,7 @@ enum VoteParticipantStatusDTO: String, Decodable {
     case submitted = "SUBMITTED"
 }
 
-struct CreateVoteParticipantRequestDTO: Encodable {
+struct CreateVoteParticipantRequestDTO: Encodable, Equatable {
     let nickname: String
     let password: String?
 }
@@ -42,7 +42,7 @@ struct VoteParticipantResponseDTO: Decodable {
     let status: VoteParticipantStatusDTO
 }
 
-struct LookupVoteParticipantSelectionRequestDTO: Encodable {
+struct LookupVoteParticipantSelectionRequestDTO: Encodable, Equatable {
     let nickname: String
     let password: String?
 }
@@ -53,7 +53,7 @@ struct VoteParticipantSelectionResponseDTO: Decodable {
     let unavailableDates: [String]
 }
 
-struct SubmitVoteRequestDTO: Encodable {
+struct SubmitVoteRequestDTO: Encodable, Equatable {
     let nickname: String
     let password: String?
     let unavailableDates: [String]

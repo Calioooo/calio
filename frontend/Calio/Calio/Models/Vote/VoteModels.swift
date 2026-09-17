@@ -11,6 +11,22 @@ struct VoteDay: Hashable, Comparable, Identifiable {
         self.day = day
     }
 
+    init?(apiDateString: String) {
+        let components = apiDateString.split(separator: "-", omittingEmptySubsequences: false)
+        guard components.count == 3,
+              components[0].count == 4,
+              components[1].count == 2,
+              components[2].count == 2,
+              let year = Int(components[0]),
+              let month = Int(components[1]),
+              let day = Int(components[2]),
+              Self.isValid(year: year, month: month, day: day) else {
+            return nil
+        }
+
+        self.init(year: year, month: month, day: day)
+    }
+
     var id: String {
         apiDateString
     }
@@ -27,6 +43,17 @@ struct VoteDay: Hashable, Comparable, Identifiable {
             return lhs.month < rhs.month
         }
         return lhs.day < rhs.day
+    }
+
+    private static func isValid(year: Int, month: Int, day: Int) -> Bool {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let components = DateComponents(year: year, month: month, day: day)
+        guard let date = calendar.date(from: components) else {
+            return false
+        }
+        let validated = calendar.dateComponents([.year, .month, .day], from: date)
+        return validated.year == year && validated.month == month && validated.day == day
     }
 }
 
