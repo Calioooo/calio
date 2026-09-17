@@ -1,23 +1,26 @@
 package com.calio.calendar.account.domain;
 
 public enum ImportantReminderOffset {
-  NONE,
-  MINUTES_30,
-  MINUTES_60,
-  MINUTES_120,
-  MINUTES_1440;
+  NONE(null),
+  MINUTES_30(30),
+  MINUTES_60(60),
+  MINUTES_120(120),
+  MINUTES_1440(1440);
+
+  private final Integer minutes;
+
+  ImportantReminderOffset(Integer minutes) {
+    this.minutes = minutes;
+  }
 
   public boolean isDisabled() {
     return this == NONE;
   }
 
   public int minutes() {
-    return switch (this) {
-      case MINUTES_30 -> 30;
-      case MINUTES_60 -> 60;
-      case MINUTES_120 -> 120;
-      case MINUTES_1440 -> 1440;
-      case NONE -> throw new IllegalStateException("Disabled reminder does not have an offset.");
-    };
+    if (this == NONE) {
+      throw new IllegalStateException("Disabled reminder does not have an offset.");
+    }
+    return minutes;
   }
 }
