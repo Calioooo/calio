@@ -9,17 +9,18 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @Transactional(readOnly = true)
 public class GoogleCalendarIntegrationQueryService {
-    private final GoogleCalendarIntegrationRepository integrationRepository;
+  private final GoogleCalendarIntegrationRepository integrationRepository;
 
-    public GoogleCalendarIntegrationQueryService(GoogleCalendarIntegrationRepository integrationRepository) {
-        this.integrationRepository = integrationRepository;
-    }
+  public GoogleCalendarIntegrationQueryService(
+      GoogleCalendarIntegrationRepository integrationRepository) {
+    this.integrationRepository = integrationRepository;
+  }
 
-    public Optional<GoogleCalendarIntegration> getIntegrationIfExists(Long accountId) {
-        return integrationRepository.findByAccountId(accountId);
-    }
+  public Optional<GoogleCalendarIntegration> getIntegrationIfExists(Long accountId) {
+    return integrationRepository.findByAccountId(accountId);
+  }
 
-    public boolean hasIntegration(Long accountId) {
-        return integrationRepository.existsByAccountId(accountId);
-    }
+  public boolean hasIntegration(Long accountId) {
+    return integrationRepository.existsByAccountId(accountId);
+  }
 }

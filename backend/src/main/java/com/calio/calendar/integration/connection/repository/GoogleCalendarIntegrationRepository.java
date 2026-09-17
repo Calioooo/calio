@@ -8,13 +8,15 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-public interface GoogleCalendarIntegrationRepository extends JpaRepository<GoogleCalendarIntegration, Long> {
+public interface GoogleCalendarIntegrationRepository
+    extends JpaRepository<GoogleCalendarIntegration, Long> {
 
-    Optional<GoogleCalendarIntegration> findByAccountId(Long accountId);
+  Optional<GoogleCalendarIntegration> findByAccountId(Long accountId);
 
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select integration from GoogleCalendarIntegration integration where integration.accountId = :accountId")
-    Optional<GoogleCalendarIntegration> findByAccountIdForUpdate(@Param("accountId") Long accountId);
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query(
+      "select integration from GoogleCalendarIntegration integration where integration.accountId = :accountId")
+  Optional<GoogleCalendarIntegration> findByAccountIdForUpdate(@Param("accountId") Long accountId);
 
-    boolean existsByAccountId(Long accountId);
+  boolean existsByAccountId(Long accountId);
 }

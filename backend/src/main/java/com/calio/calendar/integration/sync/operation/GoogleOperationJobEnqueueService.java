@@ -15,53 +15,54 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 @Service
 public class GoogleOperationJobEnqueueService {
 
-    private final GoogleCalendarConnectionCommandService connectionCommandService;
-    private final GoogleOperationJobCommandService jobCommandService;
-    private final GoogleOperationWorker worker;
-    private final Clock clock;
+  private final GoogleCalendarConnectionCommandService connectionCommandService;
+  private final GoogleOperationJobCommandService jobCommandService;
+  private final GoogleOperationWorker worker;
+  private final Clock clock;
 
-    public GoogleOperationJobEnqueueService(
-            GoogleCalendarConnectionCommandService connectionCommandService,
-            GoogleOperationJobCommandService jobCommandService,
-            GoogleOperationWorker worker,
-            Clock clock
-    ) {
-        this.connectionCommandService = connectionCommandService;
-        this.jobCommandService = jobCommandService;
-        this.worker = worker;
-        this.clock = clock;
-    }
+  public GoogleOperationJobEnqueueService(
+      GoogleCalendarConnectionCommandService connectionCommandService,
+      GoogleOperationJobCommandService jobCommandService,
+      GoogleOperationWorker worker,
+      Clock clock) {
+    this.connectionCommandService = connectionCommandService;
+    this.jobCommandService = jobCommandService;
+    this.worker = worker;
+    this.clock = clock;
+  }
 
-    @Transactional
-    public void enqueueManualSync(Long accountId) {
-        enqueueSync(accountId, GoogleOperationJobTrigger.MANUAL);
-    }
+  @Transactional
+  public void enqueueManualSync(Long accountId) {
+    enqueueSync(accountId, GoogleOperationJobTrigger.MANUAL);
+  }
 
-    @Transactional
-    public void enqueuePeriodicSync(Long accountId) {
-        enqueueSync(accountId, GoogleOperationJobTrigger.PERIODIC);
-    }
+  @Transactional
+  public void enqueuePeriodicSync(Long accountId) {
+    enqueueSync(accountId, GoogleOperationJobTrigger.PERIODIC);
+  }
 
-    private void enqueueSync(Long accountId, GoogleOperationJobTrigger trigger) {
-        GoogleCalendarConnection connection = connectionCommandService.lockConnectedConnection(accountId);
-        GoogleOperationJob job = GoogleOperationJob.sync(
-                UUID.randomUUID().toString(),
-                connection.getId(),
-                accountId,
-                connectionCommandService.allocateOperationSequence(connection),
-                trigger,
-                Instant.now(clock)
-        );
-        jobCommandService.enqueueOperationJob(job);
-        wakeAfterCommit(accountId);
-    }
+  private void enqueueSync(Long accountId, GoogleOperationJobTrigger trigger) {
+    GoogleCalendarConnection connection =
+        connectionCommandService.lockConnectedConnection(accountId);
+    GoogleOperationJob job =
+        GoogleOperationJob.sync(
+            UUID.randomUUID().toString(),
+            connection.getId(),
+            accountId,
+            connectionCommandService.allocateOperationSequence(connection),
+            trigger,
+            Instant.now(clock));
+    jobCommandService.enqueueOperationJob(job);
+    wakeAfterCommit(accountId);
+  }
 
-    private void wakeAfterCommit(Long accountId) {
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                worker.wake(accountId);
-            }
+  private void wakeAfterCommit(Long accountId) {
+    TransactionSynchronizationManager.registerSynchronization(
+        new TransactionSynchronization() {
+          @Override
+          public void afterCommit() {
+            worker.wake(accountId);
+          }
         });
-    }
+  }
 }

@@ -11,22 +11,30 @@ import jakarta.persistence.UniqueConstraint;
 
 @Entity
 @Table(
-        name = "google_calendar_integrations",
-        uniqueConstraints = @UniqueConstraint(
-                name = "uk_google_calendar_integration_account_id",
-                columnNames = "account_id"
-        )
-)
+    name = "google_calendar_integrations",
+    uniqueConstraints =
+        @UniqueConstraint(
+            name = "uk_google_calendar_integration_account_id",
+            columnNames = "account_id"))
 public class GoogleCalendarIntegration extends BaseEntity {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
 
-    @Column(name = "account_id", nullable = false, updatable = false)
-    private Long accountId;
+  @Column(name = "account_id", nullable = false, updatable = false)
+  private Long accountId;
 
-    protected GoogleCalendarIntegration() { }
-    public GoogleCalendarIntegration(Long accountId) { this.accountId = accountId; }
-    public Long getId() { return id; }
-    public Long getAccountId() { return accountId; }
+  protected GoogleCalendarIntegration() {}
+
+  public GoogleCalendarIntegration(Long accountId) {
+    this.accountId = accountId;
+  }
+
+  public Long getId() {
+    return id;
+  }
+
+  public Long getAccountId() {
+    return accountId;
+  }
 }
