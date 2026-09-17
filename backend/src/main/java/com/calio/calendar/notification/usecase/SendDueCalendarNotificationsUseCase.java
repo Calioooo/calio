@@ -111,17 +111,21 @@ public class SendDueCalendarNotificationsUseCase {
   void dispatchAccountNotifications(Account account, Instant now) {
     Long accountId = account.getId();
     AccountNotificationSettings settings = account.getNotificationSettings();
-    NotificationEvaluationWindow window = NotificationEvaluationWindow.from(now);
+    Instant dueTo = now.truncatedTo(ChronoUnit.MINUTES);
+    TimeRange dueRange = new TimeRange(dueTo.minus(Duration.ofMinutes(5)), dueTo);
+    TimeRange scheduleQueryRange =
+        new TimeRange(
+            dueRange.from().minus(Duration.ofDays(1)), dueRange.to().plus(Duration.ofDays(2)));
     List<NotificationSchedule> personalSchedules =
-        listPersonalSchedules(accountId, window.queryFrom(), window.queryTo());
+        listPersonalSchedules(accountId, scheduleQueryRange.from(), scheduleQueryRange.to());
     List<NotificationSchedule> groupSchedules =
-        listGroupSchedules(accountId, window.queryFrom(), window.queryTo());
+        listGroupSchedules(accountId, scheduleQueryRange.from(), scheduleQueryRange.to());
 
     personalSchedules.forEach(
-        schedule -> dispatchPersonalScheduleReminders(accountId, settings, schedule, window));
+        schedule -> dispatchPersonalScheduleReminders(accountId, settings, schedule, dueRange));
     groupSchedules.forEach(
-        schedule -> dispatchGeneralReminder(accountId, settings, schedule, window));
-    dispatchBriefingIfDue(accountId, settings, now, window, personalSchedules, groupSchedules);
+        schedule -> dispatchGeneralReminder(accountId, settings, schedule, dueRange));
+    dispatchBriefingIfDue(accountId, settings, now, dueRange, personalSchedules, groupSchedules);
   }
 
   void dispatch(
@@ -255,8 +259,8 @@ public class SendDueCalendarNotificationsUseCase {
       Long accountId,
       AccountNotificationSettings settings,
       NotificationSchedule schedule,
-      NotificationEvaluationWindow window) {
-    dispatchGeneralReminder(accountId, settings, schedule, window);
+      TimeRange dueRange) {
+    dispatchGeneralReminder(accountId, settings, schedule, dueRange);
     if (!schedule.canReceiveImportantReminder()) {
       return;
     }
@@ -265,19 +269,19 @@ public class SendDueCalendarNotificationsUseCase {
         .ifPresent(
             dueAt ->
                 dispatchIfDue(
-                    accountId, CalendarNotificationType.IMPORTANT, schedule, dueAt, window));
+                    accountId, CalendarNotificationType.IMPORTANT, schedule, dueAt, dueRange));
   }
 
   private void dispatchGeneralReminder(
       Long accountId,
       AccountNotificationSettings settings,
       NotificationSchedule schedule,
-      NotificationEvaluationWindow window) {
+      TimeRange dueRange) {
     if (schedule.allDay()) {
       Instant dueAt =
           settings.allDayReminderAt(
               schedule.startAt().atZone(POLICY_ZONE).toLocalDate(), POLICY_ZONE);
-      dispatchIfDue(accountId, CalendarNotificationType.ALL_DAY, schedule, dueAt, window);
+      dispatchIfDue(accountId, CalendarNotificationType.ALL_DAY, schedule, dueAt, dueRange);
       return;
     }
     settings
@@ -285,7 +289,7 @@ public class SendDueCalendarNotificationsUseCase {
         .ifPresent(
             dueAt ->
                 dispatchIfDue(
-                    accountId, CalendarNotificationType.REMINDER, schedule, dueAt, window));
+                    accountId, CalendarNotificationType.REMINDER, schedule, dueAt, dueRange));
   }
 
   private void dispatchIfDue(
@@ -293,8 +297,8 @@ public class SendDueCalendarNotificationsUseCase {
       CalendarNotificationType type,
       NotificationSchedule schedule,
       Instant dueAt,
-      NotificationEvaluationWindow window) {
-    if (!window.contains(dueAt)) {
+      TimeRange dueRange) {
+    if (!dueRange.contains(dueAt)) {
       return;
     }
     dispatch(
@@ -309,13 +313,13 @@ public class SendDueCalendarNotificationsUseCase {
       Long accountId,
       AccountNotificationSettings settings,
       Instant now,
-      NotificationEvaluationWindow window,
+      TimeRange dueRange,
       List<NotificationSchedule> personalSchedules,
       List<NotificationSchedule> groupSchedules) {
     LocalDate targetDate = now.atZone(POLICY_ZONE).toLocalDate();
     settings
         .dailyBriefingAt(targetDate, POLICY_ZONE)
-        .filter(window::contains)
+        .filter(dueRange::contains)
         .ifPresent(
             dueAt -> {
               long scheduleCount =
@@ -401,18 +405,10 @@ public class SendDueCalendarNotificationsUseCase {
         result.reason());
   }
 
-  private record NotificationEvaluationWindow(
-      Instant dueFrom, Instant dueTo, Instant queryFrom, Instant queryTo) {
+  private record TimeRange(Instant from, Instant to) {
 
-    private static NotificationEvaluationWindow from(Instant now) {
-      Instant dueTo = now.truncatedTo(ChronoUnit.MINUTES);
-      Instant dueFrom = dueTo.minus(Duration.ofMinutes(5));
-      return new NotificationEvaluationWindow(
-          dueFrom, dueTo, dueFrom.minus(Duration.ofDays(1)), dueTo.plus(Duration.ofDays(2)));
-    }
-
-    private boolean contains(Instant scheduledAt) {
-      return !scheduledAt.isBefore(dueFrom) && !scheduledAt.isAfter(dueTo);
+    private boolean contains(Instant instant) {
+      return !instant.isBefore(from) && !instant.isAfter(to);
     }
   }
 
