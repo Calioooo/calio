@@ -12,73 +12,77 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-public interface GoogleCalendarConnectionRepository extends JpaRepository<GoogleCalendarConnection, Long> {
+public interface GoogleCalendarConnectionRepository
+    extends JpaRepository<GoogleCalendarConnection, Long> {
 
-    @EntityGraph(attributePaths = "integration")
-    @Query("""
+  @EntityGraph(attributePaths = "integration")
+  @Query(
+      """
             select connection
             from GoogleCalendarConnection connection
             join connection.integration integration
             where integration.accountId = :accountId
               and connection.state = :state
             """)
-    Optional<GoogleCalendarConnection> findWithIntegrationByAccountIdAndState(
-            @Param("accountId") Long accountId,
-            @Param("state") GoogleCalendarConnectionState state
-    );
+  Optional<GoogleCalendarConnection> findWithIntegrationByAccountIdAndState(
+      @Param("accountId") Long accountId, @Param("state") GoogleCalendarConnectionState state);
 
-    @EntityGraph(attributePaths = "integration")
-    @Query("""
+  @EntityGraph(attributePaths = "integration")
+  @Query(
+      """
             select connection
             from GoogleCalendarConnection connection
             where connection.id = :connectionId
             """)
-    Optional<GoogleCalendarConnection> findWithIntegrationById(@Param("connectionId") Long connectionId);
+  Optional<GoogleCalendarConnection> findWithIntegrationById(
+      @Param("connectionId") Long connectionId);
 
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @EntityGraph(attributePaths = "integration")
-    @Query("""
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @EntityGraph(attributePaths = "integration")
+  @Query(
+      """
             select connection
             from GoogleCalendarConnection connection
             join connection.integration integration
             where integration.accountId = :accountId
             """)
-    Optional<GoogleCalendarConnection> findWithIntegrationByAccountIdForUpdate(@Param("accountId") Long accountId);
+  Optional<GoogleCalendarConnection> findWithIntegrationByAccountIdForUpdate(
+      @Param("accountId") Long accountId);
 
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @EntityGraph(attributePaths = "integration")
-    @Query("""
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @EntityGraph(attributePaths = "integration")
+  @Query(
+      """
             select connection
             from GoogleCalendarConnection connection
             join connection.integration integration
             where integration.accountId = :accountId
               and connection.state = :state
             """)
-    Optional<GoogleCalendarConnection> findWithIntegrationByAccountIdAndStateForUpdate(
-            @Param("accountId") Long accountId,
-            @Param("state") GoogleCalendarConnectionState state
-    );
+  Optional<GoogleCalendarConnection> findWithIntegrationByAccountIdAndStateForUpdate(
+      @Param("accountId") Long accountId, @Param("state") GoogleCalendarConnectionState state);
 
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @EntityGraph(attributePaths = "integration")
-    @Query("""
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @EntityGraph(attributePaths = "integration")
+  @Query(
+      """
             select connection
             from GoogleCalendarConnection connection
             where connection.id = :connectionId
             """)
-    Optional<GoogleCalendarConnection> findWithIntegrationByIdForUpdate(@Param("connectionId") Long connectionId);
+  Optional<GoogleCalendarConnection> findWithIntegrationByIdForUpdate(
+      @Param("connectionId") Long connectionId);
 
-    @Query("""
+  @Query(
+      """
             select connection.integration.accountId
             from GoogleCalendarConnection connection
             where connection.integration.accountId > :lastAccountId
               and connection.state = :state
             order by connection.integration.accountId
             """)
-    List<Long> findAccountIdsByStateAfter(
-            @Param("lastAccountId") Long lastAccountId,
-            @Param("state") GoogleCalendarConnectionState state,
-            Pageable pageable
-    );
-
+  List<Long> findAccountIdsByStateAfter(
+      @Param("lastAccountId") Long lastAccountId,
+      @Param("state") GoogleCalendarConnectionState state,
+      Pageable pageable);
 }

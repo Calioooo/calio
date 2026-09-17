@@ -21,48 +21,39 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/integrations/google-calendar")
 public class GoogleCalendarIntegrationController {
 
-    private final GoogleCalendarConnectionService googleCalendarConnectionService;
-    private final GoogleOperationJobEnqueueService operationJobEnqueueService;
+  private final GoogleCalendarConnectionService googleCalendarConnectionService;
+  private final GoogleOperationJobEnqueueService operationJobEnqueueService;
 
-    public GoogleCalendarIntegrationController(
-            GoogleCalendarConnectionService googleCalendarConnectionService,
-            GoogleOperationJobEnqueueService operationJobEnqueueService
-    ) {
-        this.googleCalendarConnectionService = googleCalendarConnectionService;
-        this.operationJobEnqueueService = operationJobEnqueueService;
-    }
+  public GoogleCalendarIntegrationController(
+      GoogleCalendarConnectionService googleCalendarConnectionService,
+      GoogleOperationJobEnqueueService operationJobEnqueueService) {
+    this.googleCalendarConnectionService = googleCalendarConnectionService;
+    this.operationJobEnqueueService = operationJobEnqueueService;
+  }
 
-    @PostMapping
-    public GoogleCalendarConnectionResponse connect(
-            @AuthenticationPrincipal AuthenticatedAccount account,
-            @Valid @RequestBody GoogleCalendarConnectRequest request
-    ) {
-        return googleCalendarConnectionService.connect(
-                account.accountId(),
-                request.authorizationCode()
-        );
-    }
+  @PostMapping
+  public GoogleCalendarConnectionResponse connect(
+      @AuthenticationPrincipal AuthenticatedAccount account,
+      @Valid @RequestBody GoogleCalendarConnectRequest request) {
+    return googleCalendarConnectionService.connect(
+        account.accountId(), request.authorizationCode());
+  }
 
-    @GetMapping
-    public GoogleCalendarConnectionResponse getConnectionStatus(
-            @AuthenticationPrincipal AuthenticatedAccount account
-    ) {
-        return googleCalendarConnectionService.getConnectionStatus(account.accountId());
-    }
+  @GetMapping
+  public GoogleCalendarConnectionResponse getConnectionStatus(
+      @AuthenticationPrincipal AuthenticatedAccount account) {
+    return googleCalendarConnectionService.getConnectionStatus(account.accountId());
+  }
 
-    @DeleteMapping
-    public ResponseEntity<Void> disconnect(
-            @AuthenticationPrincipal AuthenticatedAccount account
-    ) {
-        googleCalendarConnectionService.disconnect(account.accountId());
-        return ResponseEntity.noContent().build();
-    }
+  @DeleteMapping
+  public ResponseEntity<Void> disconnect(@AuthenticationPrincipal AuthenticatedAccount account) {
+    googleCalendarConnectionService.disconnect(account.accountId());
+    return ResponseEntity.noContent().build();
+  }
 
-    @PostMapping("/sync")
-    public ResponseEntity<Void> sync(
-            @AuthenticationPrincipal AuthenticatedAccount account
-    ) {
-        operationJobEnqueueService.enqueueManualSync(account.accountId());
-        return ResponseEntity.accepted().build();
-    }
+  @PostMapping("/sync")
+  public ResponseEntity<Void> sync(@AuthenticationPrincipal AuthenticatedAccount account) {
+    operationJobEnqueueService.enqueueManualSync(account.accountId());
+    return ResponseEntity.accepted().build();
+  }
 }
