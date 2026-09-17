@@ -101,6 +101,10 @@ class SourceSelectionTests(WorkspaceTest):
         commands = formatter.formatter_commands("check", [path], self.root)
         arguments, cwd = commands[0]
         self.assertEqual(cwd, self.root / "backend")
+        self.assertEqual(
+            arguments[:3],
+            ["java", "-jar", str(self.root / "backend/gradle/wrapper/gradle-wrapper.jar")],
+        )
         self.assertIn("spotlessJavaCheck", arguments)
         self.assertEqual(json.loads(arguments[-1].split("=", 1)[1]), [str(path)])
 
