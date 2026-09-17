@@ -16,6 +16,7 @@ import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.event.controller.dto.EventResponse;
 import com.calio.calendar.event.service.EventCommandService;
+import com.calio.calendar.integration.mapping.service.GoogleCalendarRecurrenceMappingQueryService;
 import com.calio.calendar.recurrence.controller.dto.CreateRecurrenceEventRequest;
 import com.calio.calendar.recurrence.controller.dto.RecurrenceEventResponse;
 import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceEventRequest;
@@ -28,6 +29,7 @@ import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.domain.TagType;
 import com.calio.calendar.tag.service.TagQueryService;
+import com.calio.calendar.sharing.recurrence.service.PersonalRecurrenceGroupShareCommandService;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -66,6 +68,12 @@ class RecurrenceEventServiceTest {
     @Mock
     private Clock clock;
 
+    @Mock
+    private PersonalRecurrenceGroupShareCommandService recurrenceShareCommandService;
+
+    @Mock
+    private GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService;
+
     private RecurrenceEventService recurrenceEventService;
 
     @BeforeEach
@@ -85,7 +93,9 @@ class RecurrenceEventServiceTest {
                 tagQueryService,
                 eventCommandService,
                 recurrenceEngine,
-                clock
+                clock,
+                recurrenceShareCommandService,
+                recurrenceMappingQueryService
         );
     }
 
@@ -105,7 +115,7 @@ class RecurrenceEventServiceTest {
         CreateRecurrenceEventRequest request = timedCreateRequest();
 
         // when
-        recurrenceEventService.createRecurrenceEvent(1L, request);
+        var response = recurrenceEventService.createRecurrenceEvent(1L, request);
 
         // then
         ArgumentCaptor<RecurrenceEvent> captor = ArgumentCaptor.forClass(RecurrenceEvent.class);
@@ -117,6 +127,7 @@ class RecurrenceEventServiceTest {
         assertThat(captor.getValue().getTimeZone()).isEqualTo("Asia/Seoul");
         assertThat(captor.getValue().getRecurrenceRules()).containsExactlyElementsOf(normalized);
         verifyNoInteractions(eventCommandService);
+        assertThat(response.canUpdateSeries()).isTrue();
     }
 
     @Test
@@ -171,6 +182,32 @@ class RecurrenceEventServiceTest {
     }
 
     @Test
+    @DisplayName("외부 반복 일정의 전체 수정은 정책 오류로 거절하고 master를 보존한다")
+    void givenExternalRecurrence_whenUpdateSeries_thenRejectsMutation() {
+        RecurrenceEvent recurrenceEvent = recurrenceEvent();
+        when(recurrenceEventRepository.findByIdAndAccountIdForUpdate(10L, 1L))
+                .thenReturn(Optional.of(recurrenceEvent));
+        when(recurrenceMappingQueryService.hasExternalRecurrenceEventMapping(10L, 1L))
+                .thenReturn(true);
+
+        assertThatThrownBy(() -> recurrenceEventService.updateRecurrenceEvent(
+                1L,
+                10L,
+                new UpdateRecurrenceEventRequest(
+                        "Updated", null, false,
+                        Instant.parse("2027-01-02T00:00:00Z"),
+                        Instant.parse("2027-01-02T01:00:00Z"),
+                        "Asia/Seoul", List.of("RRULE:FREQ=DAILY;COUNT=2"), null
+                )
+        )).isInstanceOf(CalioException.class)
+                .extracting(exception -> ((CalioException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.EXTERNAL_EVENT_MUTATION_NOT_SUPPORTED);
+
+        assertThat(recurrenceEvent.getTitle()).isEqualTo("Rule");
+        verify(recurrenceEngine, never()).validate(any(), any());
+    }
+
+    @Test
     @DisplayName("전체 recurrence 삭제는 override와 account legacy Event를 master보다 먼저 제거한다")
     void givenRecurrenceChildren_whenDeleteMaster_thenDeletesChildrenBeforeMaster() {
         // given
@@ -185,12 +222,36 @@ class RecurrenceEventServiceTest {
         InOrder deletionOrder = inOrder(
                 recurrenceEventRepository,
                 recurrenceEventOverrideRepository,
-                eventCommandService
+                eventCommandService,
+                recurrenceShareCommandService,
+                recurrenceMappingQueryService
         );
         deletionOrder.verify(recurrenceEventRepository).findByIdAndAccountIdForUpdate(10L, 1L);
+        deletionOrder.verify(recurrenceMappingQueryService).hasExternalRecurrenceEventMapping(10L, 1L);
+        deletionOrder.verify(recurrenceShareCommandService).deleteAllForSourceRecurrence(10L);
         deletionOrder.verify(recurrenceEventOverrideRepository).deleteAllByRecurrenceEventIds(List.of(10L));
         deletionOrder.verify(eventCommandService).deleteEventsByRecurrenceEventIds(List.of(10L));
         deletionOrder.verify(recurrenceEventRepository).deleteAllByIds(List.of(10L));
+    }
+
+    @Test
+    @DisplayName("외부 반복 일정의 전체 삭제는 정책 오류로 거절하고 child를 보존한다")
+    void givenExternalRecurrence_whenDeleteSeries_thenRejectsMutation() {
+        RecurrenceEvent recurrenceEvent = recurrenceEvent();
+        when(recurrenceEventRepository.findByIdAndAccountIdForUpdate(10L, 1L))
+                .thenReturn(Optional.of(recurrenceEvent));
+        when(recurrenceMappingQueryService.hasExternalRecurrenceEventMapping(10L, 1L))
+                .thenReturn(true);
+
+        assertThatThrownBy(() -> recurrenceEventService.deleteRecurrenceEvent(1L, 10L))
+                .isInstanceOf(CalioException.class)
+                .extracting(exception -> ((CalioException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.EXTERNAL_EVENT_MUTATION_NOT_SUPPORTED);
+
+        verify(recurrenceEventOverrideRepository, never()).deleteAllByRecurrenceEventIds(any());
+        verify(eventCommandService, never()).deleteEventsByRecurrenceEventIds(any());
+        verify(recurrenceEventRepository, never()).deleteAllByIds(any());
+        verify(recurrenceShareCommandService, never()).deleteAllForSourceRecurrence(any());
     }
 
     @Test
@@ -356,6 +417,39 @@ class RecurrenceEventServiceTest {
     }
 
     @Test
+    @DisplayName("다른 날짜로 이동된 recurrence-occurrence는 origin identity로 현재 override를 조회한다")
+    void givenMovedOccurrenceOverride_whenGetOccurrence_thenReturnsOverrideRegardlessOfOriginalRange() {
+        // given
+        RecurrenceEvent recurrenceEvent = recurrenceEvent();
+        Instant originStartAt = Instant.parse("2027-01-01T00:00:00Z");
+        RecurrenceEventOverride movedOverride = RecurrenceEventOverride.active(
+                recurrenceEvent,
+                originStartAt,
+                "이동한 회의",
+                "변경된 설명",
+                CanonicalSchedule.recurrenceOverride(
+                        Instant.parse("2027-01-05T02:00:00Z"),
+                        Instant.parse("2027-01-05T03:00:00Z"),
+                        false,
+                        "Asia/Seoul"
+                )
+        );
+        when(recurrenceEventRepository.findByIdAndAccount_Id(10L, 1L))
+                .thenReturn(Optional.of(recurrenceEvent));
+        when(recurrenceEventOverrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(10L, originStartAt))
+                .thenReturn(Optional.of(movedOverride));
+
+        // when
+        EventResponse occurrence = recurrenceEventService.getRecurrenceOccurrence(1L, 10L, originStartAt);
+
+        // then
+        assertThat(occurrence.title()).isEqualTo("이동한 회의");
+        assertThat(occurrence.startAt()).isEqualTo(Instant.parse("2027-01-05T02:00:00Z"));
+        assertThat(occurrence.originStartAt()).isEqualTo(originStartAt);
+        verify(recurrenceEngine, never()).expand(any(), any(), any(), any());
+    }
+
+    @Test
     @DisplayName("현재 rule과 exact override에 없는 origin은 상태를 만들지 않고 거절한다")
     void givenUnknownOriginWithoutOverride_whenDelete_thenRejectsWithoutStateChange() {
         // given
@@ -409,7 +503,7 @@ class RecurrenceEventServiceTest {
     }
 
     private Tag tag() {
-        return new Tag(TagType.DEFAULT, "기타", "#64748B");
+        return Tag.personalDefault("기타", "#64748B");
     }
 
     private Account account() {

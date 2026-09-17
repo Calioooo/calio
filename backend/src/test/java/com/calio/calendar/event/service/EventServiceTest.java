@@ -36,6 +36,7 @@ import com.calio.calendar.recurrence.service.Rfc5545RecurrenceEngine;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.domain.TagType;
 import com.calio.calendar.tag.service.TagQueryService;
+import com.calio.calendar.sharing.event.service.PersonalEventGroupShareCommandService;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -78,6 +79,9 @@ class EventServiceTest {
 
     @Mock
     private Rfc5545RecurrenceEngine recurrenceEngine;
+
+    @Mock
+    private PersonalEventGroupShareCommandService eventShareCommandService;
 
     @InjectMocks
     private EventService eventService;
@@ -214,6 +218,20 @@ class EventServiceTest {
                                 .isEqualTo(ErrorCode.EXTERNAL_EVENT_MUTATION_NOT_SUPPORTED)
                 );
         verify(eventCommandService, never()).deleteEvent(any());
+    }
+
+    @Test
+    @DisplayName("개인 일정 삭제는 원본 삭제 전에 Group Space 공유 mapping을 정리한다")
+    void givenPersonalEvent_whenDeleteEvent_thenCleansShareMappingsBeforeSource() {
+        Event event = event("Personal", tag("기타"));
+        when(eventCommandService.lockEvent(1L, 10L)).thenReturn(event);
+        when(eventMappingQueryService.hasExternalEventMapping(10L, 1L)).thenReturn(false);
+
+        eventService.deleteEvent(1L, 10L);
+
+        InOrder deletionOrder = inOrder(eventShareCommandService, eventCommandService);
+        deletionOrder.verify(eventShareCommandService).deleteAllForSourceEvent(10L);
+        deletionOrder.verify(eventCommandService).deleteEvent(event);
     }
 
     @Test
@@ -396,7 +414,8 @@ class EventServiceTest {
                 accountQueryService,
                 tagQueryService,
                 recurrenceQueryService,
-                recurrenceEngine
+                recurrenceEngine,
+                eventShareCommandService
         );
     }
 
@@ -493,6 +512,6 @@ class EventServiceTest {
     }
 
     private Tag tag(String title) {
-        return new Tag(TagType.DEFAULT, title, "#64748B");
+        return Tag.personalDefault(title, "#64748B");
     }
 }

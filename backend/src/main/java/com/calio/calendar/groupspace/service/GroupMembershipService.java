@@ -11,12 +11,16 @@ import com.calio.calendar.groupspace.controller.dto.AcceptGroupInvitationRequest
 import com.calio.calendar.groupspace.controller.dto.AcceptGroupInvitationResponse;
 import com.calio.calendar.groupspace.controller.dto.GroupInvitationAcceptCredentialType;
 import com.calio.calendar.groupspace.controller.dto.GroupMemberListResponse;
+import com.calio.calendar.groupspace.controller.dto.GroupMembershipResponse;
 import com.calio.calendar.groupspace.controller.dto.TransferGroupOwnerResponse;
 import com.calio.calendar.groupspace.domain.GroupJoinResult;
 import com.calio.calendar.groupspace.domain.GroupMember;
 import com.calio.calendar.groupspace.domain.GroupMemberStatus;
 import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.domain.GroupSpaceFields;
+import com.calio.calendar.groupcalendar.event.service.GroupCalendarEventCommandService;
+import com.calio.calendar.groupcalendar.recurrence.service.GroupCalendarRecurrenceCommandService;
+import com.calio.calendar.tag.service.GroupTagService;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -36,6 +40,9 @@ public class GroupMembershipService {
     private final GroupInvitationCommandService invitationCommandService;
     private final InvitationCredentialService credentialService;
     private final GroupScheduleShareCleanupPort groupScheduleShareCleanupPort;
+    private final GroupCalendarEventCommandService groupCalendarEventCommandService;
+    private final GroupCalendarRecurrenceCommandService groupCalendarRecurrenceCommandService;
+    private final GroupTagService groupTagService;
     private final Clock clock;
 
     public GroupMembershipService(
@@ -47,6 +54,9 @@ public class GroupMembershipService {
             GroupInvitationCommandService invitationCommandService,
             InvitationCredentialService credentialService,
             GroupScheduleShareCleanupPort groupScheduleShareCleanupPort,
+            GroupCalendarEventCommandService groupCalendarEventCommandService,
+            GroupCalendarRecurrenceCommandService groupCalendarRecurrenceCommandService,
+            GroupTagService groupTagService,
             Clock clock
     ) {
         this.queryService = queryService;
@@ -57,6 +67,9 @@ public class GroupMembershipService {
         this.invitationCommandService = invitationCommandService;
         this.credentialService = credentialService;
         this.groupScheduleShareCleanupPort = groupScheduleShareCleanupPort;
+        this.groupCalendarEventCommandService = groupCalendarEventCommandService;
+        this.groupCalendarRecurrenceCommandService = groupCalendarRecurrenceCommandService;
+        this.groupTagService = groupTagService;
         this.clock = clock;
     }
 
@@ -116,6 +129,17 @@ public class GroupMembershipService {
                 .sorted(memberOrder(groupSpace))
                 .toList();
         return GroupMemberListResponse.from(activeMembers, groupSpace);
+    }
+
+    @Transactional
+    public GroupMembershipResponse changeAnonymousSharing(
+            Long accountId,
+            Long groupSpaceId,
+            boolean isAnonymous
+    ) {
+        GroupMember member = commandService.lockActiveMember(groupSpaceId, accountId);
+        commandService.changeAnonymous(member, isAnonymous);
+        return GroupMembershipResponse.from(member, member.getGroupSpace());
     }
 
     @Transactional
@@ -240,13 +264,24 @@ public class GroupMembershipService {
             Instant now
     ) {
         groupScheduleShareCleanupPort.cleanupMemberShares(groupSpaceId, member.getId());
+        groupCalendarEventCommandService.deleteAllByGroupSpaceIdAndCreatedById(
+                groupSpaceId,
+                member.getAccountId()
+        );
+        groupCalendarRecurrenceCommandService.deleteAllCreatedByMember(
+                groupSpaceId,
+                member.getAccountId()
+        );
         deleteIssuerInvitations(member.getId());
         commandService.changeStatus(member, inactiveStatus, now);
     }
 
     private void deleteSoleOwnerGroup(GroupSpace groupSpace) {
         groupScheduleShareCleanupPort.cleanupGroupShares(groupSpace.getId());
+        groupCalendarEventCommandService.deleteAllByGroupSpaceId(groupSpace.getId());
+        groupCalendarRecurrenceCommandService.deleteAllInGroupSpace(groupSpace.getId());
         invitationCommandService.deleteAllByGroupSpaceId(groupSpace.getId());
+        groupTagService.deleteAll(groupSpace.getId());
         groupSpaceCommandService.delete(groupSpace);
     }
 

@@ -1,8 +1,10 @@
 package com.calio.calendar.groupspace.controller;
 
 import com.calio.calendar.groupspace.controller.dto.GroupMemberListResponse;
+import com.calio.calendar.groupspace.controller.dto.GroupMembershipResponse;
 import com.calio.calendar.groupspace.controller.dto.TransferGroupOwnerRequest;
 import com.calio.calendar.groupspace.controller.dto.TransferGroupOwnerResponse;
+import com.calio.calendar.groupspace.controller.dto.UpdateAnonymousSharingRequest;
 import com.calio.calendar.groupspace.service.GroupMembershipService;
 import com.calio.calendar.security.AuthenticatedAccount;
 import jakarta.validation.Valid;
@@ -12,6 +14,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -46,6 +49,19 @@ public class GroupMemberController {
                 account.accountId(),
                 groupSpaceId,
                 request.targetMemberId()
+        );
+    }
+
+    @PatchMapping("/members/me/anonymous-sharing")
+    public GroupMembershipResponse changeAnonymousSharing(
+            @AuthenticationPrincipal AuthenticatedAccount account,
+            @PathVariable("groupSpaceId") Long groupSpaceId,
+            @Valid @RequestBody UpdateAnonymousSharingRequest request
+    ) {
+        return groupMembershipService.changeAnonymousSharing(
+                account.accountId(),
+                groupSpaceId,
+                request.isAnonymous()
         );
     }
 

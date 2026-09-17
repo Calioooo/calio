@@ -78,6 +78,7 @@ class GoogleCalendarAccessTokenServiceTest {
                 .isInstanceOfSatisfying(CalioException.class, exception ->
                         assertThat(exception.getErrorCode())
                                 .isEqualTo(ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED));
+        verify(connectionCommandService).tryLockConnectedConnectionById(10L);
         verifyNoInteractions(jobCommandService);
     }
 
