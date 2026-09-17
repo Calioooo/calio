@@ -25,70 +25,69 @@ import org.springframework.transaction.support.DefaultTransactionStatus;
 
 class GoogleCalendarAccessTokenServiceTest {
 
-    private static final Instant NOW = Instant.parse("2026-08-23T00:00:00Z");
+  private static final Instant NOW = Instant.parse("2026-08-23T00:00:00Z");
 
-    private final GoogleCalendarIntegrationQueryService integrationQueryService =
-            mock(GoogleCalendarIntegrationQueryService.class);
-    private final GoogleCalendarIntegrationCommandService integrationCommandService =
-            mock(GoogleCalendarIntegrationCommandService.class);
-    private final GoogleOAuthClient googleOAuthClient = mock(GoogleOAuthClient.class);
-    private final TokenEncryptor tokenEncryptor = mock(TokenEncryptor.class);
-    private final GoogleOperationJobCommandService jobCommandService =
-            mock(GoogleOperationJobCommandService.class);
-    private final GoogleCalendarAccessTokenService service = new GoogleCalendarAccessTokenService(
-            integrationQueryService,
-            integrationCommandService,
-            googleOAuthClient,
-            tokenEncryptor,
-            jobCommandService,
-            new NoOpTransactionManager(),
-            Clock.fixed(NOW, ZoneOffset.UTC)
-    );
+  private final GoogleCalendarIntegrationQueryService integrationQueryService =
+      mock(GoogleCalendarIntegrationQueryService.class);
+  private final GoogleCalendarIntegrationCommandService integrationCommandService =
+      mock(GoogleCalendarIntegrationCommandService.class);
+  private final GoogleOAuthClient googleOAuthClient = mock(GoogleOAuthClient.class);
+  private final TokenEncryptor tokenEncryptor = mock(TokenEncryptor.class);
+  private final GoogleOperationJobCommandService jobCommandService =
+      mock(GoogleOperationJobCommandService.class);
+  private final GoogleCalendarAccessTokenService service =
+      new GoogleCalendarAccessTokenService(
+          integrationQueryService,
+          integrationCommandService,
+          googleOAuthClient,
+          tokenEncryptor,
+          jobCommandService,
+          new NoOpTransactionManager(),
+          Clock.fixed(NOW, ZoneOffset.UTC));
 
-    @Test
-    @DisplayName("confirmed invalid_grant는 retained disconnect 후 재연결 필요 오류를 반환한다")
-    void givenInvalidGrantDuringRefresh_whenForceRefresh_thenDisconnectsRetainedIntegration() {
-        // given
-        GoogleCalendarIntegration integration = mock(GoogleCalendarIntegration.class);
-        when(integration.getId()).thenReturn(10L);
-        when(integration.isConnected()).thenReturn(true);
-        when(integration.getEncryptedRefreshToken()).thenReturn("encrypted-refresh-token");
-        when(integration.getEncryptedAccessToken()).thenReturn("encrypted-access-token");
-        when(integration.getAccessTokenExpiresAt()).thenReturn(NOW.plusSeconds(3600));
-        when(integrationQueryService.getIntegrationById(10L)).thenReturn(integration);
-        when(integrationCommandService.tryLockIntegrationById(10L))
-                .thenReturn(Optional.of(integration));
-        when(tokenEncryptor.decrypt("encrypted-refresh-token")).thenReturn("refresh-token");
-        when(googleOAuthClient.refreshAccessToken("refresh-token"))
-                .thenThrow(new GoogleCalendarInvalidGrantException(new RuntimeException("invalid_grant")));
+  @Test
+  @DisplayName("confirmed invalid_grant는 retained disconnect 후 재연결 필요 오류를 반환한다")
+  void givenInvalidGrantDuringRefresh_whenForceRefresh_thenDisconnectsRetainedIntegration() {
+    // given
+    GoogleCalendarIntegration integration = mock(GoogleCalendarIntegration.class);
+    when(integration.getId()).thenReturn(10L);
+    when(integration.isConnected()).thenReturn(true);
+    when(integration.getEncryptedRefreshToken()).thenReturn("encrypted-refresh-token");
+    when(integration.getEncryptedAccessToken()).thenReturn("encrypted-access-token");
+    when(integration.getAccessTokenExpiresAt()).thenReturn(NOW.plusSeconds(3600));
+    when(integrationQueryService.getIntegrationById(10L)).thenReturn(integration);
+    when(integrationCommandService.tryLockIntegrationById(10L))
+        .thenReturn(Optional.of(integration));
+    when(tokenEncryptor.decrypt("encrypted-refresh-token")).thenReturn("refresh-token");
+    when(googleOAuthClient.refreshAccessToken("refresh-token"))
+        .thenThrow(new GoogleCalendarInvalidGrantException(new RuntimeException("invalid_grant")));
 
-        // when, then
-        assertThatThrownBy(() -> service.forceRefresh(10L))
-                .isInstanceOfSatisfying(CalioException.class, exception ->
-                        assertThat(exception.getErrorCode())
-                                .isEqualTo(ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED));
-        verify(integrationCommandService).tryLockIntegrationById(10L);
-        verify(jobCommandService).deleteJobsForIntegration(10L);
-        verify(integrationCommandService).disconnectIntegration(integration, NOW);
+    // when, then
+    assertThatThrownBy(() -> service.forceRefresh(10L))
+        .isInstanceOfSatisfying(
+            CalioException.class,
+            exception ->
+                assertThat(exception.getErrorCode())
+                    .isEqualTo(ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED));
+    verify(integrationCommandService).tryLockIntegrationById(10L);
+    verify(jobCommandService).deleteJobsForIntegration(10L);
+    verify(integrationCommandService).disconnectIntegration(integration, NOW);
+  }
+
+  private static class NoOpTransactionManager extends AbstractPlatformTransactionManager {
+
+    @Override
+    protected Object doGetTransaction() {
+      return new Object();
     }
 
-    private static class NoOpTransactionManager extends AbstractPlatformTransactionManager {
+    @Override
+    protected void doBegin(Object transaction, TransactionDefinition definition) {}
 
-        @Override
-        protected Object doGetTransaction() {
-            return new Object();
-        }
+    @Override
+    protected void doCommit(DefaultTransactionStatus status) {}
 
-        @Override
-        protected void doBegin(Object transaction, TransactionDefinition definition) {
-        }
-
-        @Override
-        protected void doCommit(DefaultTransactionStatus status) {
-        }
-
-        @Override
-        protected void doRollback(DefaultTransactionStatus status) {
-        }
-    }
+    @Override
+    protected void doRollback(DefaultTransactionStatus status) {}
+  }
 }

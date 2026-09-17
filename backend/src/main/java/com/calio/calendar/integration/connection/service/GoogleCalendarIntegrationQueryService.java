@@ -14,38 +14,37 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class GoogleCalendarIntegrationQueryService {
 
-    private final GoogleCalendarIntegrationRepository integrationRepository;
+  private final GoogleCalendarIntegrationRepository integrationRepository;
 
-    public GoogleCalendarIntegrationQueryService(
-            GoogleCalendarIntegrationRepository integrationRepository
-    ) {
-        this.integrationRepository = integrationRepository;
-    }
+  public GoogleCalendarIntegrationQueryService(
+      GoogleCalendarIntegrationRepository integrationRepository) {
+    this.integrationRepository = integrationRepository;
+  }
 
-    public GoogleCalendarIntegration getIntegration(Long accountId) {
-        return integrationRepository.findByAccountId(accountId)
-                .filter(GoogleCalendarIntegration::isConnected)
-                .orElseThrow(() -> new CalioException(ErrorCode.GOOGLE_CALENDAR_NOT_CONNECTED));
-    }
+  public GoogleCalendarIntegration getIntegration(Long accountId) {
+    return integrationRepository
+        .findByAccountId(accountId)
+        .filter(GoogleCalendarIntegration::isConnected)
+        .orElseThrow(() -> new CalioException(ErrorCode.GOOGLE_CALENDAR_NOT_CONNECTED));
+  }
 
-    public GoogleCalendarIntegration getIntegrationById(Long integrationId) {
-        return integrationRepository.findById(integrationId)
-                .filter(GoogleCalendarIntegration::isConnected)
-                .orElseThrow(() -> new CalioException(ErrorCode.GOOGLE_CALENDAR_NOT_CONNECTED));
-    }
+  public GoogleCalendarIntegration getIntegrationById(Long integrationId) {
+    return integrationRepository
+        .findById(integrationId)
+        .filter(GoogleCalendarIntegration::isConnected)
+        .orElseThrow(() -> new CalioException(ErrorCode.GOOGLE_CALENDAR_NOT_CONNECTED));
+  }
 
-    public Optional<GoogleCalendarIntegration> getIntegrationIfExists(Long accountId) {
-        return integrationRepository.findByAccountId(accountId);
-    }
+  public Optional<GoogleCalendarIntegration> getIntegrationIfExists(Long accountId) {
+    return integrationRepository.findByAccountId(accountId);
+  }
 
-    public boolean hasIntegration(Long accountId) {
-        return integrationRepository.existsByAccountId(accountId);
-    }
+  public boolean hasIntegration(Long accountId) {
+    return integrationRepository.existsByAccountId(accountId);
+  }
 
-    public List<Long> listConnectedAccountIds(Long afterAccountId, int limit) {
-        return integrationRepository.findConnectedAccountIdsAfter(
-                afterAccountId,
-                PageRequest.of(0, limit)
-        );
-    }
+  public List<Long> listConnectedAccountIds(Long afterAccountId, int limit) {
+    return integrationRepository.findConnectedAccountIdsAfter(
+        afterAccountId, PageRequest.of(0, limit));
+  }
 }
