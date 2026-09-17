@@ -255,14 +255,14 @@ class GoogleCalendarSyncMigrationTest {
   }
 
   @Test
-  @DisplayName("V18은 empty mapping deployment에 conflict 상태와 pending scope index를 추가한다")
-  void givenEmptyV17Schema_whenMigrateToV18_thenAddsConflictFoundation() throws Exception {
+  @DisplayName("V26은 empty mapping deployment에 conflict 상태와 pending scope index를 추가한다")
+  void givenEmptyV17Schema_whenMigrateToV26_thenAddsConflictFoundation() throws Exception {
     // given
     String url = "jdbc:h2:mem:google-mapping-conflict-foundation;MODE=MySQL;DB_CLOSE_DELAY=-1";
     migrateTo(url, MigrationVersion.fromVersion("17"));
 
     // when
-    migrateTo(url, MigrationVersion.fromVersion("18"));
+    migrateTo(url, MigrationVersion.fromVersion("26"));
 
     // then
     try (Connection connection = DriverManager.getConnection(url, "sa", "")) {
@@ -284,14 +284,14 @@ class GoogleCalendarSyncMigrationTest {
   }
 
   @Test
-  @DisplayName("V19는 Google operation Job의 target payload 이름을 적용한다")
-  void givenV18Schema_whenMigrateToV19_thenRenamesTargetPayload() throws Exception {
+  @DisplayName("V27는 Google operation Job의 target payload 이름을 적용한다")
+  void givenV26Schema_whenMigrateToV27_thenRenamesTargetPayload() throws Exception {
     // given
     String url = "jdbc:h2:mem:google-operation-job-target-fields;MODE=MySQL;DB_CLOSE_DELAY=-1";
-    migrateTo(url, MigrationVersion.fromVersion("18"));
+    migrateTo(url, MigrationVersion.fromVersion("26"));
 
     // when
-    migrateTo(url, MigrationVersion.fromVersion("19"));
+    migrateTo(url, MigrationVersion.fromVersion("27"));
 
     // then
     try (Connection connection = DriverManager.getConnection(url, "sa", "")) {
@@ -302,12 +302,12 @@ class GoogleCalendarSyncMigrationTest {
   }
 
   @Test
-  @DisplayName("V18은 mapping eTag와 status의 null 또는 잘못된 값을 거부한다")
-  void givenV18Schema_whenInsertInvalidMappingState_thenRejectsIt() throws Exception {
+  @DisplayName("V26은 mapping eTag와 status의 null 또는 잘못된 값을 거부한다")
+  void givenV26Schema_whenInsertInvalidMappingState_thenRejectsIt() throws Exception {
     String url = "jdbc:h2:mem:google-mapping-conflict-constraints;MODE=MySQL;DB_CLOSE_DELAY=-1";
     migrateTo(url, MigrationVersion.fromVersion("17"));
     insertCurrentEventAndIntegration(url);
-    migrateTo(url, MigrationVersion.fromVersion("18"));
+    migrateTo(url, MigrationVersion.fromVersion("26"));
 
     try (Connection connection = DriverManager.getConnection(url, "sa", "");
         Statement statement = connection.createStatement()) {
