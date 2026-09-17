@@ -343,6 +343,9 @@ class GoogleCalendarSyncServiceTest {
         assertThat(providerDataService.finalizeCount).isOne();
         assertThat(providerDataService.finalizedMode).isEqualTo(GoogleCalendarSyncMode.FULL);
         assertThat(providerDataService.finalizedCursor).isEqualTo("next-cursor");
+        assertThat(accessTokenService.requestedConnectionIds).containsExactly(20L);
+        assertThat(pagePersistenceService.persistedConnectionIds).containsExactly(20L, 20L);
+        assertThat(providerDataService.finalizedConnectionId).isEqualTo(20L);
         assertThat(providerDataService.finalizedSeenEventIds)
                 .containsExactlyInAnyOrder("event-1", "event-2");
         assertThat(providerDataService.finalizedSeenRecurrenceEventIds)
@@ -461,6 +464,7 @@ class GoogleCalendarSyncServiceTest {
             extends GoogleCalendarIntegrationDataService {
 
         private int finalizeCount;
+        private Long finalizedConnectionId;
         private GoogleCalendarSyncMode finalizedMode;
         private String finalizedCursor;
         private Set<String> finalizedSeenEventIds = Set.of();
@@ -488,7 +492,7 @@ class GoogleCalendarSyncServiceTest {
         public void completeSyncRun(
                 Long jobId,
                 Long accountId,
-                Long integrationId,
+                Long connectionId,
                 String workerToken,
                 GoogleCalendarSyncMode syncMode,
                 Set<String> seenEventIds,
@@ -498,6 +502,7 @@ class GoogleCalendarSyncServiceTest {
                 String nextSyncToken
         ) {
             finalizeCount++;
+            finalizedConnectionId = connectionId;
             finalizedMode = syncMode;
             finalizedCursor = nextSyncToken;
             finalizedSeenEventIds = Set.copyOf(seenEventIds);
@@ -510,6 +515,7 @@ class GoogleCalendarSyncServiceTest {
             extends GoogleCalendarAccessTokenService {
 
         private int forceRefreshCount;
+        private final List<Long> requestedConnectionIds = new ArrayList<>();
 
         private FakeAccessTokenService() {
             super(null, null, null, null, null,
@@ -517,12 +523,13 @@ class GoogleCalendarSyncServiceTest {
         }
 
         @Override
-        public String getAccessToken(Long integrationId) {
+        public String getAccessToken(Long connectionId) {
+            requestedConnectionIds.add(connectionId);
             return "access-token";
         }
 
         @Override
-        public String forceRefresh(Long integrationId) {
+        public String forceRefresh(Long connectionId) {
             forceRefreshCount++;
             return "refreshed-access-token";
         }
@@ -584,6 +591,7 @@ class GoogleCalendarSyncServiceTest {
             extends GoogleCalendarPageChangeService {
 
         private int normalizedPersistCount;
+        private final List<Long> persistedConnectionIds = new ArrayList<>();
 
         private FakePagePersistenceService() {
             super(
@@ -601,12 +609,13 @@ class GoogleCalendarSyncServiceTest {
 
         @Override
         public void applyNormalizedPage(
-                Long integrationId,
+                Long connectionId,
                 Long accountId,
                 GoogleCalendarPageOwnership ownership,
                 GoogleCalendarNormalizedPage page
         ) {
             normalizedPersistCount++;
+            persistedConnectionIds.add(connectionId);
         }
     }
 

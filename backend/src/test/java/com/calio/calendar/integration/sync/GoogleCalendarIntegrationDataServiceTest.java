@@ -118,7 +118,9 @@ class GoogleCalendarIntegrationDataServiceTest {
         verify(eventCommandService).deleteEventsByIds(List.of(20L));
         verify(eventMappingQueryService, times(2))
                 .listEventMappingBatch(eq(1L), any(Long.class), eq(500));
-        verify(connectionCommandService).changeNextSyncToken(connection, "next-token");
+        InOrder syncTokenUpdate = inOrder(connectionCommandService);
+        syncTokenUpdate.verify(connectionCommandService).lockConnectedConnectionById(1L);
+        syncTokenUpdate.verify(connectionCommandService).changeNextSyncToken(connection, "next-token");
         verify(operationLeaseService, times(6)).extend(9L, 2L, "run-1");
         verify(operationJobPersistenceService).completeSyncRun(9L, 2L, "run-1");
     }
