@@ -21,115 +21,107 @@ import java.util.List;
 @Table(name = "recurrence_events")
 public class RecurrenceEvent extends BaseEntity {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
 
-    @Column(name = "recurrence_title", nullable = false)
-    private String title;
+  @Column(name = "recurrence_title", nullable = false)
+  private String title;
 
-    @Column(name = "recurrence_description")
-    private String description;
+  @Column(name = "recurrence_description")
+  private String description;
 
-    @Embedded
-    private RecurrenceSchedule schedule;
+  @Embedded private RecurrenceSchedule schedule;
 
-    @Column(name = "recurrence_rule", nullable = false, columnDefinition = "TEXT")
-    @Convert(converter = RecurrenceRuleJsonConverter.class)
-    private List<String> recurrenceRules = List.of();
+  @Column(name = "recurrence_rule", nullable = false, columnDefinition = "TEXT")
+  @Convert(converter = RecurrenceRuleJsonConverter.class)
+  private List<String> recurrenceRules = List.of();
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "account_id", nullable = false)
-    private Account account;
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "account_id", nullable = false)
+  private Account account;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "tag_id", nullable = false)
-    private Tag tag;
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "tag_id", nullable = false)
+  private Tag tag;
 
-    protected RecurrenceEvent() {
-    }
+  protected RecurrenceEvent() {}
 
-    public RecurrenceEvent(
-            String title,
-            String description,
-            RecurrenceSchedule schedule,
-            List<String> recurrenceRules,
-            Tag tag,
-            Account account
-    ) {
-        this.title = title;
-        this.description = description;
-        replaceSchedule(schedule, recurrenceRules);
-        this.tag = tag;
-        this.account = account;
-    }
+  public RecurrenceEvent(
+      String title,
+      String description,
+      RecurrenceSchedule schedule,
+      List<String> recurrenceRules,
+      Tag tag,
+      Account account) {
+    this.title = title;
+    this.description = description;
+    replaceSchedule(schedule, recurrenceRules);
+    this.tag = tag;
+    this.account = account;
+  }
 
-    public void update(
-            String title,
-            String description,
-            RecurrenceSchedule schedule,
-            List<String> recurrenceRules,
-            Tag tag
-    ) {
-        this.title = title;
-        this.description = description;
-        replaceSchedule(schedule, recurrenceRules);
-        this.tag = tag;
-    }
+  public void update(
+      String title,
+      String description,
+      RecurrenceSchedule schedule,
+      List<String> recurrenceRules,
+      Tag tag) {
+    this.title = title;
+    this.description = description;
+    replaceSchedule(schedule, recurrenceRules);
+    this.tag = tag;
+  }
 
-    public void updateProviderContent(
-            String title,
-            String description,
-            RecurrenceSchedule schedule,
-            List<String> recurrenceRules
-    ) {
-        this.title = title;
-        this.description = description;
-        replaceSchedule(schedule, recurrenceRules);
-    }
+  public void updateProviderContent(
+      String title, String description, RecurrenceSchedule schedule, List<String> recurrenceRules) {
+    this.title = title;
+    this.description = description;
+    replaceSchedule(schedule, recurrenceRules);
+  }
 
-    private void replaceSchedule(RecurrenceSchedule schedule, List<String> recurrenceRules) {
-        this.schedule = schedule;
-        this.recurrenceRules = List.copyOf(recurrenceRules);
-    }
+  private void replaceSchedule(RecurrenceSchedule schedule, List<String> recurrenceRules) {
+    this.schedule = schedule;
+    this.recurrenceRules = List.copyOf(recurrenceRules);
+  }
 
-    public Long getId() {
-        return id;
-    }
+  public Long getId() {
+    return id;
+  }
 
-    public String getTitle() {
-        return title;
-    }
+  public String getTitle() {
+    return title;
+  }
 
-    public String getDescription() {
-        return description;
-    }
+  public String getDescription() {
+    return description;
+  }
 
-    public boolean isAllDay() {
-        return schedule.allDay();
-    }
+  public boolean isAllDay() {
+    return schedule.allDay();
+  }
 
-    public String getTimeZone() {
-        return schedule.timeZone();
-    }
+  public String getTimeZone() {
+    return schedule.timeZone();
+  }
 
-    public Instant getFirstOccurrenceStartAt() {
-        return schedule.firstOccurrenceStartAt();
-    }
+  public Instant getFirstOccurrenceStartAt() {
+    return schedule.firstOccurrenceStartAt();
+  }
 
-    public Instant getFirstOccurrenceEndAt() {
-        return schedule.firstOccurrenceEndAt();
-    }
+  public Instant getFirstOccurrenceEndAt() {
+    return schedule.firstOccurrenceEndAt();
+  }
 
-    public List<String> getRecurrenceRules() {
-        return recurrenceRules;
-    }
+  public List<String> getRecurrenceRules() {
+    return recurrenceRules;
+  }
 
-    public Tag getTag() {
-        return tag;
-    }
+  public Tag getTag() {
+    return tag;
+  }
 
-    public Account getAccount() {
-        return account;
-    }
+  public Account getAccount() {
+    return account;
+  }
 }
