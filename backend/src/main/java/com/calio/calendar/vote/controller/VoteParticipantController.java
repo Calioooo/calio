@@ -1,8 +1,10 @@
 package com.calio.calendar.vote.controller;
 
 import com.calio.calendar.vote.controller.dto.CreateVoteParticipantRequest;
+import com.calio.calendar.vote.controller.dto.LookupVoteParticipantSelectionRequest;
 import com.calio.calendar.vote.controller.dto.SubmitVoteRequest;
 import com.calio.calendar.vote.controller.dto.VoteParticipantResponse;
+import com.calio.calendar.vote.controller.dto.VoteParticipantSelectionResponse;
 import com.calio.calendar.vote.controller.dto.VoteSubmissionResponse;
 import com.calio.calendar.vote.service.VoteParticipantService;
 import jakarta.validation.Valid;
@@ -41,5 +43,13 @@ public class VoteParticipantController {
             @Valid @RequestBody SubmitVoteRequest request
     ) {
         return voteParticipantService.submitVotes(publicId, request);
+    }
+
+    @PostMapping("/votes/lookup")
+    public VoteParticipantSelectionResponse lookupSelection(
+            @PathVariable UUID publicId,
+            @Valid @RequestBody LookupVoteParticipantSelectionRequest request
+    ) {
+        return voteParticipantService.lookupSelection(publicId, request);
     }
 }

@@ -53,6 +53,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/custom-tags").authenticated()
                         .requestMatchers("/api/custom-tags/**").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/vote-rooms/*/participants").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/vote-rooms/*/votes/lookup").permitAll()
                         .requestMatchers(HttpMethod.PUT, "/api/vote-rooms/*/votes").permitAll()
                         .requestMatchers(new RegexRequestMatcher(
                                 "^/api/vote-rooms/[0-9a-fA-F-]{36}(?:\\?.*)?$",
