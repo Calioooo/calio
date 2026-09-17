@@ -2,12 +2,16 @@ package com.calio.calendar.notification.client;
 
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 
 @Component
 public class ApnsClient {
@@ -16,14 +20,17 @@ public class ApnsClient {
   private final ApnsProperties properties;
   private final ApnsProviderTokenProvider providerTokenProvider;
   private final RestClient restClient;
+  private final ObjectMapper objectMapper;
 
   public ApnsClient(
       ApnsProperties properties,
       ApnsProviderTokenProvider providerTokenProvider,
-      @Qualifier("apnsRestClient") RestClient restClient) {
+      @Qualifier("apnsRestClient") RestClient restClient,
+      ObjectMapper objectMapper) {
     this.properties = properties;
     this.providerTokenProvider = providerTokenProvider;
     this.restClient = restClient;
+    this.objectMapper = objectMapper;
   }
 
   public ApnsSendResult send(ApnsMessage message) {
@@ -41,17 +48,15 @@ public class ApnsClient {
               .uri(DEVICE_URI_TEMPLATE, message.token())
               .headers(headers -> applyHeaders(headers, message, providerToken))
               .contentType(MediaType.APPLICATION_JSON)
-              .body(message.payload())
+              .body(payload(message))
               .retrieve()
               .toEntity(String.class);
       return classify(
-          response.getStatusCode().value(),
-          response.getHeaders().getFirst("apns-id"),
-          response.getBody());
+          response.getStatusCode(), response.getHeaders().getFirst("apns-id"), response.getBody());
     } catch (RestClientResponseException exception) {
       HttpHeaders headers = exception.getResponseHeaders();
       return classify(
-          exception.getStatusCode().value(),
+          exception.getStatusCode(),
           headers == null ? null : headers.getFirst("apns-id"),
           exception.getResponseBodyAsString());
     } catch (RestClientException exception) {
@@ -72,16 +77,33 @@ public class ApnsClient {
     headers.set("apns-expiration", Long.toString(message.expiration().getEpochSecond()));
   }
 
-  private ApnsSendResult classify(int statusCode, String requestId, String reason) {
-    if (statusCode >= 200 && statusCode < 300) {
+  private String payload(ApnsMessage message) {
+    try {
+      return objectMapper.writeValueAsString(
+          java.util.Map.of(
+              "aps",
+              java.util.Map.of(
+                  "alert",
+                  java.util.Map.of("title", message.title(), "body", message.body()),
+                  "sound",
+                  "default"),
+              "calio",
+              message.metadata()));
+    } catch (JacksonException exception) {
+      throw new IllegalStateException("Cannot serialize APNs payload.", exception);
+    }
+  }
+
+  private ApnsSendResult classify(HttpStatusCode statusCode, String requestId, String reason) {
+    if (statusCode.is2xxSuccessful()) {
       return new ApnsSendResult(ApnsSendResultType.ACCEPTED, requestId, null);
     }
-    if (statusCode == 410
+    if (statusCode == HttpStatus.GONE
         || contains(reason, "BadDeviceToken")
         || contains(reason, "Unregistered")) {
       return new ApnsSendResult(ApnsSendResultType.INVALID_ENDPOINT, requestId, reason);
     }
-    if (statusCode >= 500 || statusCode == 429) {
+    if (statusCode.is5xxServerError() || statusCode == HttpStatus.TOO_MANY_REQUESTS) {
       return new ApnsSendResult(ApnsSendResultType.TRANSIENT_FAILURE, requestId, reason);
     }
     return new ApnsSendResult(ApnsSendResultType.REJECTED, requestId, reason);
