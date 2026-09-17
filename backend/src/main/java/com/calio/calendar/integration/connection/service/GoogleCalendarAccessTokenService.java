@@ -113,6 +113,9 @@ public class GoogleCalendarAccessTokenService {
         status -> {
           GoogleCalendarConnection connection =
               connectionCommandService.lockConnectedConnectionById(tokenState.connectionId());
+          if (!connection.getEncryptedRefreshToken().equals(tokenState.encryptedRefreshToken())) {
+            throw new CalioException(ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED);
+          }
           connectionCommandService.replaceAccessToken(
               connection, encryptedAccessToken, accessTokenExpiresAt);
         });

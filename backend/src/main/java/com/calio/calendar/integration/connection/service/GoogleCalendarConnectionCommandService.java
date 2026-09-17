@@ -7,6 +7,7 @@ import com.calio.calendar.integration.connection.domain.GoogleCalendarConnection
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.connection.repository.GoogleCalendarConnectionRepository;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
 
@@ -31,8 +32,23 @@ public class GoogleCalendarConnectionCommandService {
         accountId, GoogleCalendarConnectionState.CONNECTED);
   }
 
-  public Optional<GoogleCalendarConnection> tryLockConnection(Long accountId) {
-    return connectionRepository.findWithIntegrationByAccountIdForUpdate(accountId);
+  public Optional<GoogleCalendarConnection> tryLockConnection(
+      Long integrationId, String googleSubject) {
+    return connectionRepository.findWithIntegrationByIntegrationIdAndGoogleSubjectForUpdate(
+        integrationId, googleSubject);
+  }
+
+  public Optional<GoogleCalendarConnection> tryLockConnectionByIntegrationAndState(
+      Long integrationId, GoogleCalendarConnectionState state) {
+    return connectionRepository.findWithIntegrationByIntegrationIdAndStateForUpdate(
+        integrationId, state);
+  }
+
+  public Optional<GoogleCalendarConnection> tryLockDisconnectableConnectionByIntegration(
+      Long integrationId) {
+    return connectionRepository.findWithIntegrationByIntegrationIdAndStateInForUpdate(
+        integrationId,
+        List.of(GoogleCalendarConnectionState.CONNECTED, GoogleCalendarConnectionState.SYNC_ERROR));
   }
 
   public GoogleCalendarConnection lockConnectedConnectionById(Long connectionId) {

@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.event.service.EventCommandService;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarConnection;
+import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.connection.service.GoogleCalendarConnectionCommandService;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingCommandService;
@@ -56,12 +57,15 @@ class GoogleCalendarIntegrationDataServiceTest {
     // given
     Event event = mock(Event.class);
     GoogleCalendarConnection connection = mock(GoogleCalendarConnection.class);
+    GoogleCalendarIntegration integration = mock(GoogleCalendarIntegration.class);
     when(eventMapping.getId()).thenReturn(10L);
     when(eventMapping.getExternalEventId()).thenReturn("unseen-event");
     when(eventMapping.getEvent()).thenReturn(event);
     when(eventMapping.getConnection()).thenReturn(connection);
     when(connection.getId()).thenReturn(1L);
     when(connection.getAccountId()).thenReturn(2L);
+    when(connection.getIntegration()).thenReturn(integration);
+    when(integration.getId()).thenReturn(3L);
     when(connectionCommandService.lockConnectedConnectionById(1L)).thenReturn(connection);
     when(event.getId()).thenReturn(20L);
     when(operationJobQueryService.hasPendingOutboundJob(any(), any(), any())).thenReturn(false);
