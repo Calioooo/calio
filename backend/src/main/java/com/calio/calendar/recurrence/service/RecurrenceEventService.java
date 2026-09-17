@@ -7,6 +7,10 @@ import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.event.controller.dto.EventResponse;
 import com.calio.calendar.event.service.EventCommandService;
+import com.calio.calendar.integration.sync.operation.GoogleOperationJobEnqueueService;
+import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarRecurrenceJobKind;
+import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceJobPayload;
+import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceOverrideJobPayload;
 import com.calio.calendar.recurrence.controller.dto.CreateRecurrenceEventRequest;
 import com.calio.calendar.recurrence.controller.dto.RecurrenceEventResponse;
 import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceEventRequest;
@@ -37,6 +41,7 @@ public class RecurrenceEventService {
   private final Rfc5545RecurrenceEngine recurrenceEngine;
   private final Clock clock;
   private final PersonalRecurrenceGroupShareCommandService recurrenceShareCommandService;
+  private final GoogleOperationJobEnqueueService jobEnqueueService;
 
   public RecurrenceEventService(
       RecurrenceEventQueryService recurrenceEventQueryService,
@@ -46,7 +51,8 @@ public class RecurrenceEventService {
       EventCommandService eventCommandService,
       Rfc5545RecurrenceEngine recurrenceEngine,
       Clock clock,
-      PersonalRecurrenceGroupShareCommandService recurrenceShareCommandService) {
+      PersonalRecurrenceGroupShareCommandService recurrenceShareCommandService,
+      GoogleOperationJobEnqueueService jobEnqueueService) {
     this.recurrenceEventQueryService = recurrenceEventQueryService;
     this.recurrenceEventCommandService = recurrenceEventCommandService;
     this.accountQueryService = accountQueryService;
@@ -55,6 +61,7 @@ public class RecurrenceEventService {
     this.recurrenceEngine = recurrenceEngine;
     this.clock = clock;
     this.recurrenceShareCommandService = recurrenceShareCommandService;
+    this.jobEnqueueService = jobEnqueueService;
   }
 
   @Transactional
@@ -68,6 +75,11 @@ public class RecurrenceEventService {
         recurrenceEventCommandService.createRecurrenceEvent(
             new RecurrenceEvent(
                 request.title(), request.description(), schedule, recurrenceRules, tag, account));
+    jobEnqueueService.enqueueRecurrence(
+        accountId,
+        recurrenceEvent.getId(),
+        GoogleCalendarRecurrenceJobKind.RECURRENCE_CREATE,
+        GoogleRecurrenceJobPayload.from(recurrenceEvent));
     return toResponse(recurrenceEvent);
   }
 
@@ -101,6 +113,11 @@ public class RecurrenceEventService {
     Tag tag = tagQueryService.getTagOrDefault(accountId, request.tagId());
     recurrenceEventCommandService.updateRecurrenceEvent(
         recurrenceEvent, request, schedule, recurrenceRules, tag);
+    jobEnqueueService.enqueueRecurrence(
+        accountId,
+        recurrenceId,
+        GoogleCalendarRecurrenceJobKind.RECURRENCE_UPDATE,
+        GoogleRecurrenceJobPayload.from(recurrenceEvent));
     return toResponse(recurrenceEvent);
   }
 
@@ -127,6 +144,11 @@ public class RecurrenceEventService {
       override.activate(request.title(), request.description(), schedule);
     }
     recurrenceEventCommandService.createOrUpdateRecurrenceOverride(override);
+    jobEnqueueService.enqueueRecurrenceOverride(
+        accountId,
+        recurrenceId,
+        request.originStartAt(),
+        GoogleRecurrenceOverrideJobPayload.from(override));
     return EventResponse.recurrenceOverride(override);
   }
 
@@ -138,6 +160,7 @@ public class RecurrenceEventService {
         List.of(recurrenceId));
     eventCommandService.deleteEventsByRecurrenceEventIds(List.of(recurrenceId));
     recurrenceEventCommandService.deleteRecurrenceEventsByIds(List.of(recurrenceId));
+    jobEnqueueService.enqueueRecurrenceDeleted(accountId, recurrenceId);
   }
 
   @Transactional
@@ -149,6 +172,7 @@ public class RecurrenceEventService {
     Instant deletedAt = Instant.now(clock);
     recurrenceEventCommandService.deleteRecurrenceOccurrence(
         recurrenceEvent, existingOverride, originStartAt, deletedAt);
+    jobEnqueueService.enqueueRecurrenceOverrideDeleted(accountId, recurrenceId, originStartAt);
   }
 
   private RecurrenceSchedule createSchedule(CreateRecurrenceEventRequest request) {

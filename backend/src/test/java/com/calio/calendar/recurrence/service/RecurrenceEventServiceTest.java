@@ -16,6 +16,10 @@ import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.event.controller.dto.EventResponse;
 import com.calio.calendar.event.service.EventCommandService;
+import com.calio.calendar.integration.sync.operation.GoogleOperationJobEnqueueService;
+import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarRecurrenceJobKind;
+import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceJobPayload;
+import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceOverrideJobPayload;
 import com.calio.calendar.recurrence.controller.dto.CreateRecurrenceEventRequest;
 import com.calio.calendar.recurrence.controller.dto.RecurrenceEventResponse;
 import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceEventRequest;
@@ -61,6 +65,8 @@ class RecurrenceEventServiceTest {
 
   @Mock private PersonalRecurrenceGroupShareCommandService recurrenceShareCommandService;
 
+  @Mock private GoogleOperationJobEnqueueService jobEnqueueService;
+
   private RecurrenceEventService recurrenceEventService;
 
   @BeforeEach
@@ -80,7 +86,8 @@ class RecurrenceEventServiceTest {
             eventCommandService,
             recurrenceEngine,
             clock,
-            recurrenceShareCommandService);
+            recurrenceShareCommandService,
+            jobEnqueueService);
   }
 
   @Test
@@ -112,6 +119,19 @@ class RecurrenceEventServiceTest {
         .isEqualTo(Instant.parse("2027-01-01T01:00:00Z"));
     assertThat(captor.getValue().getTimeZone()).isEqualTo("Asia/Seoul");
     assertThat(captor.getValue().getRecurrenceRules()).containsExactlyElementsOf(normalized);
+    verify(jobEnqueueService)
+        .enqueueRecurrence(
+            1L,
+            10L,
+            GoogleCalendarRecurrenceJobKind.RECURRENCE_CREATE,
+            new GoogleRecurrenceJobPayload(
+                "Rule",
+                "memo",
+                Instant.parse("2027-01-01T00:00:00Z"),
+                Instant.parse("2027-01-01T01:00:00Z"),
+                false,
+                "Asia/Seoul",
+                normalized));
     verifyNoInteractions(eventCommandService);
     assertThat(response.canUpdateSeries()).isTrue();
   }
@@ -165,6 +185,19 @@ class RecurrenceEventServiceTest {
     assertThat(recurrenceEvent.getTimeZone()).isNull();
     verify(recurrenceEventOverrideRepository, never()).deleteAllByRecurrenceEventIds(any());
     verify(eventCommandService, never()).deleteEventsByRecurrenceEventIds(any());
+    verify(jobEnqueueService)
+        .enqueueRecurrence(
+            1L,
+            10L,
+            GoogleCalendarRecurrenceJobKind.RECURRENCE_UPDATE,
+            new GoogleRecurrenceJobPayload(
+                "Updated",
+                null,
+                Instant.parse("2027-02-01T00:00:00Z"),
+                Instant.parse("2027-02-03T00:00:00Z"),
+                true,
+                null,
+                normalized));
   }
 
   @Test
@@ -192,6 +225,7 @@ class RecurrenceEventServiceTest {
         .deleteAllByRecurrenceEventIds(List.of(10L));
     deletionOrder.verify(eventCommandService).deleteEventsByRecurrenceEventIds(List.of(10L));
     deletionOrder.verify(recurrenceEventRepository).deleteAllByIds(List.of(10L));
+    verify(jobEnqueueService).enqueueRecurrenceDeleted(1L, 10L);
   }
 
   @Test
@@ -229,6 +263,18 @@ class RecurrenceEventServiceTest {
     assertThat(captor.getValue().getOverrideDescription()).isNull();
     assertThat(captor.getValue().getOverrideTimeZone()).isEqualTo("Asia/Seoul");
     assertThat(response.title()).isEqualTo("Final title");
+    verify(jobEnqueueService)
+        .enqueueRecurrenceOverride(
+            1L,
+            10L,
+            originStartAt,
+            new GoogleRecurrenceOverrideJobPayload(
+                "Final title",
+                null,
+                Instant.parse("2027-01-03T02:00:00Z"),
+                Instant.parse("2027-01-03T03:00:00Z"),
+                false,
+                "Asia/Seoul"));
     assertThat(response.description()).isNull();
     assertThat(response.originStartAt()).isEqualTo(originStartAt);
   }
@@ -357,6 +403,7 @@ class RecurrenceEventServiceTest {
     assertThat(existingOverride.getOriginStartAt()).isEqualTo(originStartAt);
     assertThat(existingOverride.isDeleted()).isTrue();
     assertThat(existingOverride.getDeletedAt()).isEqualTo(deletedAt);
+    verify(jobEnqueueService).enqueueRecurrenceOverrideDeleted(1L, 10L, originStartAt);
   }
 
   @Test
