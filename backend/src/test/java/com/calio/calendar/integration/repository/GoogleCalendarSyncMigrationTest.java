@@ -481,14 +481,14 @@ class GoogleCalendarSyncMigrationTest {
   }
 
   @Test
-  @DisplayName("V22는 기존 Connection runtime을 Integration으로 보존해 옮긴다")
-  void givenV21ConnectionRuntime_whenMigrateToV22_thenMovesRuntimeToIntegration() throws Exception {
+  @DisplayName("V30은 기존 Connection runtime을 Integration으로 보존해 옮긴다")
+  void givenV29ConnectionRuntime_whenMigrateToV30_thenMovesRuntimeToIntegration() throws Exception {
     String url = "jdbc:h2:mem:google-integration-job-runtime;MODE=MySQL;DB_CLOSE_DELAY=-1";
     migrateTo(url, MigrationVersion.fromVersion("16"));
     insertV16IntegrationRuntime(url);
-    migrateTo(url, MigrationVersion.fromVersion("21"));
+    migrateTo(url, MigrationVersion.fromVersion("29"));
 
-    migrateTo(url, MigrationVersion.fromVersion("22"));
+    migrateTo(url, MigrationVersion.fromVersion("30"));
 
     try (Connection connection = DriverManager.getConnection(url, "sa", "")) {
       assertThat(columnNames(connection, "GOOGLE_CALENDAR_INTEGRATIONS"))
