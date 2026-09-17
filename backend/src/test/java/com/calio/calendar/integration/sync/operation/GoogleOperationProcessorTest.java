@@ -1,7 +1,7 @@
 package com.calio.calendar.integration.sync.operation;
 
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
@@ -14,17 +14,17 @@ import static org.mockito.Mockito.when;
 
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
+import com.calio.calendar.external.google.GoogleCalendarInvalidGrantException;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.connection.service.GoogleCalendarConnectionCommandService;
 import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrationQueryService;
-import com.calio.calendar.external.google.GoogleCalendarInvalidGrantException;
 import com.calio.calendar.integration.sync.GoogleCalendarEventJobService;
 import com.calio.calendar.integration.sync.GoogleCalendarRecurrenceJobHandler;
 import com.calio.calendar.integration.sync.GoogleCalendarSyncService;
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEventJob;
-import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarSyncJob;
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarRecurrenceJob;
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarRecurrenceJobKind;
+import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarSyncJob;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJob;
 import com.calio.calendar.integration.sync.operation.dto.GoogleOperationFailureDecision;
 import java.time.Clock;
@@ -37,281 +37,282 @@ import org.mockito.InOrder;
 
 class GoogleOperationProcessorTest {
 
-    private GoogleOperationJobService jobPersistenceService;
-    private GoogleOperationLeaseService operationLeaseService;
-    private GoogleCalendarSyncService syncService;
-    private GoogleCalendarEventJobService eventJobService;
-    private GoogleCalendarRecurrenceJobHandler recurrenceJobHandler;
-    private GoogleOperationFailureClassifier failureClassifier;
-    private GoogleCalendarConnectionCommandService connectionCommandService;
-    private GoogleCalendarIntegrationQueryService integrationQueryService;
-    private GoogleOperationProcessor processor;
+  private GoogleOperationJobService jobPersistenceService;
+  private GoogleOperationLeaseService operationLeaseService;
+  private GoogleCalendarSyncService syncService;
+  private GoogleCalendarEventJobService eventJobService;
+  private GoogleCalendarRecurrenceJobHandler recurrenceJobHandler;
+  private GoogleOperationFailureClassifier failureClassifier;
+  private GoogleCalendarConnectionCommandService connectionCommandService;
+  private GoogleCalendarIntegrationQueryService integrationQueryService;
+  private GoogleOperationProcessor processor;
 
-    @BeforeEach
-    void setUp() {
-        jobPersistenceService = mock(GoogleOperationJobService.class);
-        operationLeaseService = mock(GoogleOperationLeaseService.class);
-        syncService = mock(GoogleCalendarSyncService.class);
-        eventJobService = mock(GoogleCalendarEventJobService.class);
-        recurrenceJobHandler = mock(GoogleCalendarRecurrenceJobHandler.class);
-        failureClassifier = mock(GoogleOperationFailureClassifier.class);
-        connectionCommandService = mock(GoogleCalendarConnectionCommandService.class);
-        integrationQueryService = mock(GoogleCalendarIntegrationQueryService.class);
-        GoogleCalendarIntegration integration = mock(GoogleCalendarIntegration.class);
-        when(integration.getId()).thenReturn(20L);
-        when(integrationQueryService.getIntegrationIfExists(10L)).thenReturn(Optional.of(integration));
-        processor = new GoogleOperationProcessor(
-                jobPersistenceService,
-                operationLeaseService,
-                syncService,
-                eventJobService,
-                recurrenceJobHandler,
-                failureClassifier,
-                connectionCommandService,
-                integrationQueryService,
-                Clock.systemUTC()
-        );
-    }
+  @BeforeEach
+  void setUp() {
+    jobPersistenceService = mock(GoogleOperationJobService.class);
+    operationLeaseService = mock(GoogleOperationLeaseService.class);
+    syncService = mock(GoogleCalendarSyncService.class);
+    eventJobService = mock(GoogleCalendarEventJobService.class);
+    recurrenceJobHandler = mock(GoogleCalendarRecurrenceJobHandler.class);
+    failureClassifier = mock(GoogleOperationFailureClassifier.class);
+    connectionCommandService = mock(GoogleCalendarConnectionCommandService.class);
+    integrationQueryService = mock(GoogleCalendarIntegrationQueryService.class);
+    GoogleCalendarIntegration integration = mock(GoogleCalendarIntegration.class);
+    when(integration.getId()).thenReturn(20L);
+    when(integrationQueryService.getIntegrationIfExists(10L)).thenReturn(Optional.of(integration));
+    processor =
+        new GoogleOperationProcessor(
+            jobPersistenceService,
+            operationLeaseService,
+            syncService,
+            eventJobService,
+            recurrenceJobHandler,
+            failureClassifier,
+            connectionCommandService,
+            integrationQueryService,
+            Clock.systemUTC());
+  }
 
-    @Test
-    @DisplayName("같은 Account의 Sync Job은 account sequence 순서로 하나씩 실행한다")
-    void givenTwoJobsForAccount_whenProcess_thenExecutesInFifoOrder() {
-        // given
-        GoogleOperationJob firstJob = syncJob(1L, 10L);
-        GoogleOperationJob secondJob = syncJob(2L, 10L);
-        when(operationLeaseService.acquire(eq(10L), anyString())).thenReturn(true);
-        when(jobPersistenceService.claimNextJob(eq(10L), eq(20L), anyString()))
-                .thenReturn(firstJob, secondJob, null);
+  @Test
+  @DisplayName("같은 Account의 Sync Job은 account sequence 순서로 하나씩 실행한다")
+  void givenTwoJobsForAccount_whenProcess_thenExecutesInFifoOrder() {
+    // given
+    GoogleOperationJob firstJob = syncJob(1L, 10L);
+    GoogleOperationJob secondJob = syncJob(2L, 10L);
+    when(operationLeaseService.acquire(eq(10L), anyString())).thenReturn(true);
+    when(jobPersistenceService.claimNextJob(eq(10L), eq(20L), anyString()))
+        .thenReturn(firstJob, secondJob, null);
 
-        // when
-        processor.processAccount(10L);
+    // when
+    processor.processAccount(10L);
 
-        // then
-        InOrder executionOrder = inOrder(syncService);
-        executionOrder.verify(syncService).synchronize(eq(1L), eq(10L), anyString());
-        executionOrder.verify(syncService).synchronize(eq(2L), eq(10L), anyString());
-        verify(operationLeaseService).release(eq(10L), anyString());
-    }
+    // then
+    InOrder executionOrder = inOrder(syncService);
+    executionOrder.verify(syncService).synchronize(eq(1L), eq(10L), anyString());
+    executionOrder.verify(syncService).synchronize(eq(2L), eq(10L), anyString());
+    verify(operationLeaseService).release(eq(10L), anyString());
+  }
 
-    @Test
-    @DisplayName("concrete recurrence Job은 generic scope 해석 없이 recurrence handler로 직접 dispatch한다")
-    void recurrenceJobDispatchesDirectlyToRecurrenceHandler() {
-        GoogleCalendarRecurrenceJob job = GoogleCalendarRecurrenceJob.create(
-                "operation", 20L, 10L, 1L, GoogleCalendarRecurrenceJobKind.RECURRENCE_UPDATE,
-                40L, null, "payload", null, Instant.parse("2026-09-01T00:00:00Z"));
-        org.springframework.test.util.ReflectionTestUtils.setField(job, "id", 50L);
-        when(operationLeaseService.acquire(eq(10L), anyString())).thenReturn(true);
-        when(jobPersistenceService.claimNextJob(eq(10L), eq(20L), anyString()))
-                .thenReturn(job)
-                .thenReturn((GoogleOperationJob) null);
+  @Test
+  @DisplayName("concrete recurrence Job은 generic scope 해석 없이 recurrence handler로 직접 dispatch한다")
+  void recurrenceJobDispatchesDirectlyToRecurrenceHandler() {
+    GoogleCalendarRecurrenceJob job =
+        GoogleCalendarRecurrenceJob.create(
+            "operation",
+            20L,
+            10L,
+            1L,
+            GoogleCalendarRecurrenceJobKind.RECURRENCE_UPDATE,
+            40L,
+            null,
+            "payload",
+            null,
+            Instant.parse("2026-09-01T00:00:00Z"));
+    org.springframework.test.util.ReflectionTestUtils.setField(job, "id", 50L);
+    when(operationLeaseService.acquire(eq(10L), anyString())).thenReturn(true);
+    when(jobPersistenceService.claimNextJob(eq(10L), eq(20L), anyString()))
+        .thenReturn(job)
+        .thenReturn((GoogleOperationJob) null);
 
-        processor.processAccount(10L);
+    processor.processAccount(10L);
 
-        verify(recurrenceJobHandler).execute(eq(job), anyString());
-        verifyNoInteractions(eventJobService);
-    }
+    verify(recurrenceJobHandler).execute(eq(job), anyString());
+    verifyNoInteractions(eventJobService);
+  }
 
-    @Test
-    @DisplayName("retry로 판단된 Sync 실패는 재시도 상태로 변경하고 Account 처리를 중단한다")
-    void givenRetryableFailure_whenProcess_thenSchedulesRetryAndStopsAccount() {
-        // given
-        GoogleOperationJob job = syncJob(1L, 10L);
-        RuntimeException failure = new RuntimeException("temporary failure");
-        when(operationLeaseService.acquire(eq(10L), anyString())).thenReturn(true);
-        when(jobPersistenceService.claimNextJob(eq(10L), eq(20L), anyString())).thenReturn(job);
-        doThrow(failure).when(syncService).synchronize(eq(1L), eq(10L), anyString());
-        when(failureClassifier.classify(failure))
-                .thenReturn(GoogleOperationFailureDecision.retry("temporary"));
+  @Test
+  @DisplayName("retry로 판단된 Sync 실패는 재시도 상태로 변경하고 Account 처리를 중단한다")
+  void givenRetryableFailure_whenProcess_thenSchedulesRetryAndStopsAccount() {
+    // given
+    GoogleOperationJob job = syncJob(1L, 10L);
+    RuntimeException failure = new RuntimeException("temporary failure");
+    when(operationLeaseService.acquire(eq(10L), anyString())).thenReturn(true);
+    when(jobPersistenceService.claimNextJob(eq(10L), eq(20L), anyString())).thenReturn(job);
+    doThrow(failure).when(syncService).synchronize(eq(1L), eq(10L), anyString());
+    when(failureClassifier.classify(failure))
+        .thenReturn(GoogleOperationFailureDecision.retry("temporary"));
 
-        // when
-        processor.processAccount(10L);
+    // when
+    processor.processAccount(10L);
 
-        // then
-        verify(jobPersistenceService).retry(eq(job), anyString(), eq("temporary"));
-        verify(jobPersistenceService).claimNextJob(eq(10L), eq(20L), anyString());
-        verify(jobPersistenceService, never()).terminate(
-                eq(1L), eq(10L), anyString(), anyString()
-        );
-    }
+    // then
+    verify(jobPersistenceService).retry(eq(job), anyString(), eq("temporary"));
+    verify(jobPersistenceService).claimNextJob(eq(10L), eq(20L), anyString());
+    verify(jobPersistenceService, never()).terminate(eq(1L), eq(10L), anyString(), anyString());
+  }
 
-    @Test
-    @DisplayName("fail로 판단된 Sync 실패는 종료 상태로 변경하고 다음 Job을 확인한다")
-    void givenFailure_whenProcess_thenTerminatesAndContinuesAccount() {
-        // given
-        GoogleOperationJob job = syncJob(1L, 10L);
-        RuntimeException failure = new RuntimeException("permanent failure");
-        when(operationLeaseService.acquire(eq(10L), anyString())).thenReturn(true);
-        when(jobPersistenceService.claimNextJob(eq(10L), eq(20L), anyString()))
-                .thenReturn(job)
-                .thenReturn(null);
-        doThrow(failure).when(syncService).synchronize(eq(1L), eq(10L), anyString());
-        when(failureClassifier.classify(failure))
-                .thenReturn(GoogleOperationFailureDecision.fail("permanent"));
+  @Test
+  @DisplayName("fail로 판단된 Sync 실패는 종료 상태로 변경하고 다음 Job을 확인한다")
+  void givenFailure_whenProcess_thenTerminatesAndContinuesAccount() {
+    // given
+    GoogleOperationJob job = syncJob(1L, 10L);
+    RuntimeException failure = new RuntimeException("permanent failure");
+    when(operationLeaseService.acquire(eq(10L), anyString())).thenReturn(true);
+    when(jobPersistenceService.claimNextJob(eq(10L), eq(20L), anyString()))
+        .thenReturn(job)
+        .thenReturn(null);
+    doThrow(failure).when(syncService).synchronize(eq(1L), eq(10L), anyString());
+    when(failureClassifier.classify(failure))
+        .thenReturn(GoogleOperationFailureDecision.fail("permanent"));
 
-        // when
-        processor.processAccount(10L);
+    // when
+    processor.processAccount(10L);
 
-        // then
-        verify(jobPersistenceService).terminate(
-                eq(1L), eq(10L), anyString(), eq("permanent")
-        );
-        verify(jobPersistenceService, times(2)).claimNextJob(eq(10L), eq(20L), anyString());
-    }
+    // then
+    verify(jobPersistenceService).terminate(eq(1L), eq(10L), anyString(), eq("permanent"));
+    verify(jobPersistenceService, times(2)).claimNextJob(eq(10L), eq(20L), anyString());
+  }
 
-    @Test
-    @DisplayName("재연결이 필요한 provider 오류는 Job을 종료한 뒤 Integration을 SYNC_ERROR로 pause한다")
-    void givenReconnectRequiredFailure_whenProcess_thenPausesIntegrationAndStopsAccount() {
-        GoogleOperationJob job = syncJob(1L, 10L);
-        CalioException failure = new CalioException(ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED);
-        when(operationLeaseService.acquire(eq(10L), anyString())).thenReturn(true);
-        when(jobPersistenceService.claimNextJob(eq(10L), eq(20L), anyString())).thenReturn(job);
-        doThrow(failure).when(syncService).synchronize(eq(1L), eq(10L), anyString());
-        when(failureClassifier.classify(failure))
-                .thenReturn(GoogleOperationFailureDecision.fail("GOOGLE_CALENDAR_RECONNECT_REQUIRED"));
+  @Test
+  @DisplayName("재연결이 필요한 provider 오류는 Job을 종료한 뒤 Integration을 SYNC_ERROR로 pause한다")
+  void givenReconnectRequiredFailure_whenProcess_thenPausesIntegrationAndStopsAccount() {
+    GoogleOperationJob job = syncJob(1L, 10L);
+    CalioException failure = new CalioException(ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED);
+    when(operationLeaseService.acquire(eq(10L), anyString())).thenReturn(true);
+    when(jobPersistenceService.claimNextJob(eq(10L), eq(20L), anyString())).thenReturn(job);
+    doThrow(failure).when(syncService).synchronize(eq(1L), eq(10L), anyString());
+    when(failureClassifier.classify(failure))
+        .thenReturn(GoogleOperationFailureDecision.fail("GOOGLE_CALENDAR_RECONNECT_REQUIRED"));
 
-        processor.processAccount(10L);
+    processor.processAccount(10L);
 
-        verify(jobPersistenceService).terminate(eq(1L), eq(10L), anyString(),
-                eq("GOOGLE_CALENDAR_RECONNECT_REQUIRED"));
-        verify(connectionCommandService).markConnectedConnectionSyncError(eq(10L),
-                eq("GOOGLE_CALENDAR_RECONNECT_REQUIRED"), any());
-        verify(jobPersistenceService, times(1)).claimNextJob(eq(10L), eq(20L), anyString());
-    }
+    verify(jobPersistenceService)
+        .terminate(eq(1L), eq(10L), anyString(), eq("GOOGLE_CALENDAR_RECONNECT_REQUIRED"));
+    verify(connectionCommandService)
+        .markConnectedConnectionSyncError(eq(10L), eq("GOOGLE_CALENDAR_RECONNECT_REQUIRED"), any());
+    verify(jobPersistenceService, times(1)).claimNextJob(eq(10L), eq(20L), anyString());
+  }
 
-    @Test
-    @DisplayName("invalid_grant로 retained disconnect가 완료된 Sync 실패는 삭제된 Job을 다시 종료 처리하지 않는다")
-    void givenInvalidGrantAfterRetainedDisconnect_whenProcess_thenStopsWithoutJobTransition() {
-        GoogleOperationJob job = syncJob(1L, 10L);
-        CalioException failure = new CalioException(ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED,
-                        new GoogleCalendarInvalidGrantException(new RuntimeException())
-                );
-        when(operationLeaseService.acquire(eq(10L), anyString())).thenReturn(true);
-        when(jobPersistenceService.claimNextJob(eq(10L), eq(20L), anyString())).thenReturn(job);
-        doThrow(failure).when(syncService).synchronize(eq(1L), eq(10L), anyString());
+  @Test
+  @DisplayName("invalid_grant로 retained disconnect가 완료된 Sync 실패는 삭제된 Job을 다시 종료 처리하지 않는다")
+  void givenInvalidGrantAfterRetainedDisconnect_whenProcess_thenStopsWithoutJobTransition() {
+    GoogleOperationJob job = syncJob(1L, 10L);
+    CalioException failure =
+        new CalioException(
+            ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED,
+            new GoogleCalendarInvalidGrantException(new RuntimeException()));
+    when(operationLeaseService.acquire(eq(10L), anyString())).thenReturn(true);
+    when(jobPersistenceService.claimNextJob(eq(10L), eq(20L), anyString())).thenReturn(job);
+    doThrow(failure).when(syncService).synchronize(eq(1L), eq(10L), anyString());
 
-        processor.processAccount(10L);
+    processor.processAccount(10L);
 
-        verifyNoInteractions(failureClassifier);
-        verify(jobPersistenceService, never()).terminate(eq(1L), eq(10L), anyString(), anyString());
-        verifyNoInteractions(connectionCommandService);
-        verify(jobPersistenceService, times(1)).claimNextJob(eq(10L), eq(20L), anyString());
-    }
+    verifyNoInteractions(failureClassifier);
+    verify(jobPersistenceService, never()).terminate(eq(1L), eq(10L), anyString(), anyString());
+    verifyNoInteractions(connectionCommandService);
+    verify(jobPersistenceService, times(1)).claimNextJob(eq(10L), eq(20L), anyString());
+  }
 
-    @Test
-    @DisplayName("skip으로 판단된 Sync 실패는 Job 상태를 변경하지 않고 처리를 중단한다")
-    void givenSkippedFailure_whenProcess_thenStopsWithoutTransition() {
-        // given
-        GoogleOperationJob job = syncJob(1L, 10L);
-        RuntimeException failure = new RuntimeException("ownership lost");
-        when(operationLeaseService.acquire(eq(10L), anyString())).thenReturn(true);
-        when(jobPersistenceService.claimNextJob(eq(10L), eq(20L), anyString())).thenReturn(job);
-        doThrow(failure).when(syncService).synchronize(eq(1L), eq(10L), anyString());
-        when(failureClassifier.classify(failure))
-                .thenReturn(GoogleOperationFailureDecision.skip());
+  @Test
+  @DisplayName("skip으로 판단된 Sync 실패는 Job 상태를 변경하지 않고 처리를 중단한다")
+  void givenSkippedFailure_whenProcess_thenStopsWithoutTransition() {
+    // given
+    GoogleOperationJob job = syncJob(1L, 10L);
+    RuntimeException failure = new RuntimeException("ownership lost");
+    when(operationLeaseService.acquire(eq(10L), anyString())).thenReturn(true);
+    when(jobPersistenceService.claimNextJob(eq(10L), eq(20L), anyString())).thenReturn(job);
+    doThrow(failure).when(syncService).synchronize(eq(1L), eq(10L), anyString());
+    when(failureClassifier.classify(failure)).thenReturn(GoogleOperationFailureDecision.skip());
 
-        // when
-        processor.processAccount(10L);
+    // when
+    processor.processAccount(10L);
 
-        // then
-        verify(jobPersistenceService, never()).retry(eq(job), anyString(), anyString());
-        verify(jobPersistenceService, never()).terminate(
-                eq(1L), eq(10L), anyString(), anyString()
-        );
-    }
+    // then
+    verify(jobPersistenceService, never()).retry(eq(job), anyString(), anyString());
+    verify(jobPersistenceService, never()).terminate(eq(1L), eq(10L), anyString(), anyString());
+  }
 
-    @Test
-    @DisplayName("지원하지 않는 Job kind는 종료 상태로 변경하고 Provider Sync를 호출하지 않는다")
-    void givenUnsupportedJobKind_whenProcess_thenTerminatesWithoutSync() {
-        // given
-        GoogleOperationJob job = unsupportedJob(1L, 10L);
-        when(operationLeaseService.acquire(eq(10L), anyString())).thenReturn(true);
-        when(jobPersistenceService.claimNextJob(eq(10L), eq(20L), anyString()))
-                .thenReturn(job)
-                .thenReturn(null);
+  @Test
+  @DisplayName("지원하지 않는 Job kind는 종료 상태로 변경하고 Provider Sync를 호출하지 않는다")
+  void givenUnsupportedJobKind_whenProcess_thenTerminatesWithoutSync() {
+    // given
+    GoogleOperationJob job = unsupportedJob(1L, 10L);
+    when(operationLeaseService.acquire(eq(10L), anyString())).thenReturn(true);
+    when(jobPersistenceService.claimNextJob(eq(10L), eq(20L), anyString()))
+        .thenReturn(job)
+        .thenReturn(null);
 
-        // when
-        processor.processAccount(10L);
+    // when
+    processor.processAccount(10L);
 
-        // then
-        verify(jobPersistenceService).terminate(
-                eq(1L), eq(10L), anyString(), eq("UNSUPPORTED_JOB_SCOPE")
-        );
-        verifyNoInteractions(syncService);
-        verifyNoInteractions(eventJobService);
-        verifyNoInteractions(failureClassifier);
-    }
+    // then
+    verify(jobPersistenceService)
+        .terminate(eq(1L), eq(10L), anyString(), eq("UNSUPPORTED_JOB_SCOPE"));
+    verifyNoInteractions(syncService);
+    verifyNoInteractions(eventJobService);
+    verifyNoInteractions(failureClassifier);
+  }
 
-    @Test
-    @DisplayName("Event Job은 Event job service가 직접 처리한다")
-    void givenEventJob_whenProcess_thenAppliesEventJob() {
-        GoogleCalendarEventJob job = eventJob(1L, 10L);
-        when(operationLeaseService.acquire(eq(10L), anyString())).thenReturn(true);
-        when(jobPersistenceService.claimNextJob(eq(10L), eq(20L), anyString()))
-                .thenReturn(job)
-                .thenReturn(null);
+  @Test
+  @DisplayName("Event Job은 Event job service가 직접 처리한다")
+  void givenEventJob_whenProcess_thenAppliesEventJob() {
+    GoogleCalendarEventJob job = eventJob(1L, 10L);
+    when(operationLeaseService.acquire(eq(10L), anyString())).thenReturn(true);
+    when(jobPersistenceService.claimNextJob(eq(10L), eq(20L), anyString()))
+        .thenReturn(job)
+        .thenReturn(null);
 
-        processor.processAccount(10L);
+    processor.processAccount(10L);
 
-        verify(eventJobService).execute(eq(job), anyString());
-        verifyNoInteractions(syncService);
-    }
+    verify(eventJobService).execute(eq(job), anyString());
+    verifyNoInteractions(syncService);
+  }
 
-    @Test
-    @DisplayName("아직 지원하지 않는 recurrence scope Job은 명시적으로 종료한다")
-    void givenUnsupportedRecurrenceScope_whenProcess_thenTerminatesWithScopeReason() {
-        // given
-        GoogleOperationJob job = unsupportedJob(1L, 10L);
-        when(operationLeaseService.acquire(eq(10L), anyString())).thenReturn(true);
-        when(jobPersistenceService.claimNextJob(eq(10L), eq(20L), anyString()))
-                .thenReturn(job)
-                .thenReturn(null);
+  @Test
+  @DisplayName("아직 지원하지 않는 recurrence scope Job은 명시적으로 종료한다")
+  void givenUnsupportedRecurrenceScope_whenProcess_thenTerminatesWithScopeReason() {
+    // given
+    GoogleOperationJob job = unsupportedJob(1L, 10L);
+    when(operationLeaseService.acquire(eq(10L), anyString())).thenReturn(true);
+    when(jobPersistenceService.claimNextJob(eq(10L), eq(20L), anyString()))
+        .thenReturn(job)
+        .thenReturn(null);
 
-        // when
-        processor.processAccount(10L);
+    // when
+    processor.processAccount(10L);
 
-        // then
-        verify(jobPersistenceService).terminate(
-                eq(1L), eq(10L), anyString(), eq("UNSUPPORTED_JOB_SCOPE")
-        );
-        verifyNoInteractions(syncService);
-        verifyNoInteractions(eventJobService);
-    }
+    // then
+    verify(jobPersistenceService)
+        .terminate(eq(1L), eq(10L), anyString(), eq("UNSUPPORTED_JOB_SCOPE"));
+    verifyNoInteractions(syncService);
+    verifyNoInteractions(eventJobService);
+  }
 
-    @Test
-    @DisplayName("Account lease를 획득하지 못해도 현재 worker token의 lease 해제를 시도한다")
-    void givenLeaseNotAcquired_whenProcess_thenReleasesCurrentWorkerToken() {
-        // given
-        when(operationLeaseService.acquire(eq(10L), anyString())).thenReturn(false);
+  @Test
+  @DisplayName("Account lease를 획득하지 못해도 현재 worker token의 lease 해제를 시도한다")
+  void givenLeaseNotAcquired_whenProcess_thenReleasesCurrentWorkerToken() {
+    // given
+    when(operationLeaseService.acquire(eq(10L), anyString())).thenReturn(false);
 
-        // when
-        processor.processAccount(10L);
+    // when
+    processor.processAccount(10L);
 
-        // then
-        verify(operationLeaseService).release(eq(10L), anyString());
-        verify(jobPersistenceService, never()).claimNextJob(eq(10L), eq(20L), anyString());
-    }
+    // then
+    verify(operationLeaseService).release(eq(10L), anyString());
+    verify(jobPersistenceService, never()).claimNextJob(eq(10L), eq(20L), anyString());
+  }
 
-    private GoogleCalendarSyncJob syncJob(Long jobId, Long accountId) {
-        GoogleCalendarSyncJob job = mock(GoogleCalendarSyncJob.class);
-        when(job.getId()).thenReturn(jobId);
-        when(job.getAccountId()).thenReturn(accountId);
-        when(job.getIntegrationId()).thenReturn(20L);
-        return job;
-    }
+  private GoogleCalendarSyncJob syncJob(Long jobId, Long accountId) {
+    GoogleCalendarSyncJob job = mock(GoogleCalendarSyncJob.class);
+    when(job.getId()).thenReturn(jobId);
+    when(job.getAccountId()).thenReturn(accountId);
+    when(job.getIntegrationId()).thenReturn(20L);
+    return job;
+  }
 
-    private GoogleCalendarEventJob eventJob(Long jobId, Long accountId) {
-        GoogleCalendarEventJob job = mock(GoogleCalendarEventJob.class);
-        when(job.getId()).thenReturn(jobId);
-        when(job.getAccountId()).thenReturn(accountId);
-        when(job.getIntegrationId()).thenReturn(20L);
-        return job;
-    }
+  private GoogleCalendarEventJob eventJob(Long jobId, Long accountId) {
+    GoogleCalendarEventJob job = mock(GoogleCalendarEventJob.class);
+    when(job.getId()).thenReturn(jobId);
+    when(job.getAccountId()).thenReturn(accountId);
+    when(job.getIntegrationId()).thenReturn(20L);
+    return job;
+  }
 
-    private GoogleOperationJob unsupportedJob(Long jobId, Long accountId) {
-        GoogleOperationJob job = mock(GoogleOperationJob.class);
-        when(job.getId()).thenReturn(jobId);
-        when(job.getAccountId()).thenReturn(accountId);
-        when(job.getIntegrationId()).thenReturn(20L);
-        return job;
-    }
+  private GoogleOperationJob unsupportedJob(Long jobId, Long accountId) {
+    GoogleOperationJob job = mock(GoogleOperationJob.class);
+    when(job.getId()).thenReturn(jobId);
+    when(job.getAccountId()).thenReturn(accountId);
+    when(job.getIntegrationId()).thenReturn(20L);
+    return job;
+  }
 }

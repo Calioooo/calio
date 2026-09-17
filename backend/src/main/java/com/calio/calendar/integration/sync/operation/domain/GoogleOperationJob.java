@@ -21,82 +21,109 @@ import java.time.Instant;
 @DiscriminatorColumn(name = "job_scope", discriminatorType = DiscriminatorType.STRING, length = 64)
 public abstract class GoogleOperationJob extends BaseEntity {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
 
-    @Column(name = "operation_id", nullable = false, updatable = false, length = 36)
-    private String operationId;
+  @Column(name = "operation_id", nullable = false, updatable = false, length = 36)
+  private String operationId;
 
-    @Column(name = "integration_id", nullable = false, updatable = false)
-    private Long integrationId;
+  @Column(name = "integration_id", nullable = false, updatable = false)
+  private Long integrationId;
 
-    @Column(name = "account_id", nullable = false, updatable = false)
-    private Long accountId;
+  @Column(name = "account_id", nullable = false, updatable = false)
+  private Long accountId;
 
-    @Column(name = "integration_sequence", nullable = false, updatable = false)
-    private long integrationSequence;
+  @Column(name = "integration_sequence", nullable = false, updatable = false)
+  private long integrationSequence;
 
-    @Column(name = "conflict_detected", nullable = false)
-    private boolean conflictDetected;
+  @Column(name = "conflict_detected", nullable = false)
+  private boolean conflictDetected;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "job_state", nullable = false, length = 32)
-    private GoogleOperationJobState state;
+  @Enumerated(EnumType.STRING)
+  @Column(name = "job_state", nullable = false, length = 32)
+  private GoogleOperationJobState state;
 
-    @Column(name = "runnable_at", nullable = false)
-    private Instant runnableAt;
+  @Column(name = "runnable_at", nullable = false)
+  private Instant runnableAt;
 
-    @Column(name = "retry_count", nullable = false)
-    private int retryCount;
+  @Column(name = "retry_count", nullable = false)
+  private int retryCount;
 
-    @Column(name = "last_error_reason", length = 128)
-    private String lastErrorReason;
+  @Column(name = "last_error_reason", length = 128)
+  private String lastErrorReason;
 
-    @Column(name = "owner_token", length = 36)
-    private String ownerToken;
+  @Column(name = "owner_token", length = 36)
+  private String ownerToken;
 
-    @Column(name = "terminal_reason", length = 128)
-    private String terminalReason;
+  @Column(name = "terminal_reason", length = 128)
+  private String terminalReason;
 
-    @Column(name = "terminal_at")
-    private Instant terminalAt;
+  @Column(name = "terminal_at")
+  private Instant terminalAt;
 
-    protected GoogleOperationJob() {
-    }
+  protected GoogleOperationJob() {}
 
-    protected final void initialize(
-            String operationId,
-            Long integrationId,
-            Long accountId,
-            long integrationSequence,
-            Instant runnableAt
-    ) {
-        this.operationId = operationId;
-        this.integrationId = integrationId;
-        this.accountId = accountId;
-        this.integrationSequence = integrationSequence;
-        this.state = GoogleOperationJobState.PENDING;
-        this.runnableAt = runnableAt;
-    }
+  protected final void initialize(
+      String operationId,
+      Long integrationId,
+      Long accountId,
+      long integrationSequence,
+      Instant runnableAt) {
+    this.operationId = operationId;
+    this.integrationId = integrationId;
+    this.accountId = accountId;
+    this.integrationSequence = integrationSequence;
+    this.state = GoogleOperationJobState.PENDING;
+    this.runnableAt = runnableAt;
+  }
 
-    public boolean canBeClaimedAt(Instant now) {
-        return !runnableAt.isAfter(now);
-    }
+  public boolean canBeClaimedAt(Instant now) {
+    return !runnableAt.isAfter(now);
+  }
 
-    public void claim(String workerToken) {
-        state = GoogleOperationJobState.PROCESSING;
-        ownerToken = workerToken;
-    }
+  public void claim(String workerToken) {
+    state = GoogleOperationJobState.PROCESSING;
+    ownerToken = workerToken;
+  }
 
-    public Long getId() { return id; }
-    public String getOperationId() { return operationId; }
-    public Long getIntegrationId() { return integrationId; }
-    public Long getAccountId() { return accountId; }
-    public long getIntegrationSequence() { return integrationSequence; }
-    public GoogleOperationJobState getState() { return state; }
-    public Instant getRunnableAt() { return runnableAt; }
-    public int getRetryCount() { return retryCount; }
-    public String getLastErrorReason() { return lastErrorReason; }
-    public String getOwnerToken() { return ownerToken; }
+  public Long getId() {
+    return id;
+  }
+
+  public String getOperationId() {
+    return operationId;
+  }
+
+  public Long getIntegrationId() {
+    return integrationId;
+  }
+
+  public Long getAccountId() {
+    return accountId;
+  }
+
+  public long getIntegrationSequence() {
+    return integrationSequence;
+  }
+
+  public GoogleOperationJobState getState() {
+    return state;
+  }
+
+  public Instant getRunnableAt() {
+    return runnableAt;
+  }
+
+  public int getRetryCount() {
+    return retryCount;
+  }
+
+  public String getLastErrorReason() {
+    return lastErrorReason;
+  }
+
+  public String getOwnerToken() {
+    return ownerToken;
+  }
 }

@@ -13,45 +13,41 @@ import org.springframework.stereotype.Service;
 @Service
 public class GoogleCalendarRecurrenceDeleteReconciliationService {
 
-    private final GoogleCalendarRecurrenceMappingQueryService mappingQueryService;
-    private final GoogleCalendarRecurrenceMappingCommandService mappingCommandService;
-    private final GoogleCalendarAccessTokenService accessTokenService;
-    private final GoogleCalendarEventsClient eventsClient;
+  private final GoogleCalendarRecurrenceMappingQueryService mappingQueryService;
+  private final GoogleCalendarRecurrenceMappingCommandService mappingCommandService;
+  private final GoogleCalendarAccessTokenService accessTokenService;
+  private final GoogleCalendarEventsClient eventsClient;
 
-    public GoogleCalendarRecurrenceDeleteReconciliationService(
-            GoogleCalendarRecurrenceMappingQueryService mappingQueryService,
-            GoogleCalendarRecurrenceMappingCommandService mappingCommandService,
-            GoogleCalendarAccessTokenService accessTokenService,
-            GoogleCalendarEventsClient eventsClient
-    ) {
-        this.mappingQueryService = mappingQueryService;
-        this.mappingCommandService = mappingCommandService;
-        this.accessTokenService = accessTokenService;
-        this.eventsClient = eventsClient;
-    }
+  public GoogleCalendarRecurrenceDeleteReconciliationService(
+      GoogleCalendarRecurrenceMappingQueryService mappingQueryService,
+      GoogleCalendarRecurrenceMappingCommandService mappingCommandService,
+      GoogleCalendarAccessTokenService accessTokenService,
+      GoogleCalendarEventsClient eventsClient) {
+    this.mappingQueryService = mappingQueryService;
+    this.mappingCommandService = mappingCommandService;
+    this.accessTokenService = accessTokenService;
+    this.eventsClient = eventsClient;
+  }
 
-    public void reconcilePendingDeletes(GoogleCalendarConnection connection) {
-        List<GoogleCalendarRecurrenceEventMapping> pendingMappings =
-                mappingQueryService.listRecurrenceEventMappings(connection.getId()).stream()
-                        .filter(GoogleCalendarRecurrenceEventMapping::isProviderDeletePending)
-                        .toList();
-        if (pendingMappings.isEmpty()) {
-            return;
-        }
-        String accessToken = accessTokenService.getAccessToken(connection.getId());
-        pendingMappings.forEach(mapping -> deleteProviderAggregate(accessToken, mapping));
+  public void reconcilePendingDeletes(GoogleCalendarConnection connection) {
+    List<GoogleCalendarRecurrenceEventMapping> pendingMappings =
+        mappingQueryService.listRecurrenceEventMappings(connection.getId()).stream()
+            .filter(GoogleCalendarRecurrenceEventMapping::isProviderDeletePending)
+            .toList();
+    if (pendingMappings.isEmpty()) {
+      return;
     }
+    String accessToken = accessTokenService.getAccessToken(connection.getId());
+    pendingMappings.forEach(mapping -> deleteProviderAggregate(accessToken, mapping));
+  }
 
-    private void deleteProviderAggregate(
-            String accessToken,
-            GoogleCalendarRecurrenceEventMapping mapping
-    ) {
-        GoogleCalendarEventResponse providerEvent = eventsClient
-                .getEvent(accessToken, mapping.getExternalEventId())
-                .orElse(null);
-        if (providerEvent != null) {
-            eventsClient.delete(accessToken, mapping.getExternalEventId(), providerEvent.etag());
-        }
-        mappingCommandService.deleteRecurrenceAggregateMappings(mapping);
+  private void deleteProviderAggregate(
+      String accessToken, GoogleCalendarRecurrenceEventMapping mapping) {
+    GoogleCalendarEventResponse providerEvent =
+        eventsClient.getEvent(accessToken, mapping.getExternalEventId()).orElse(null);
+    if (providerEvent != null) {
+      eventsClient.delete(accessToken, mapping.getExternalEventId(), providerEvent.etag());
     }
+    mappingCommandService.deleteRecurrenceAggregateMappings(mapping);
+  }
 }

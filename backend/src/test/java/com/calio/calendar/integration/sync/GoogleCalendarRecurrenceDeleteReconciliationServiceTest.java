@@ -22,66 +22,74 @@ import org.junit.jupiter.api.Test;
 
 class GoogleCalendarRecurrenceDeleteReconciliationServiceTest {
 
-    @Test
-    @DisplayName("재연결 전 pending master delete는 최신 provider etag로 삭제한 뒤 retained mapping을 제거한다")
-    void pendingDeleteRemovesProviderAggregateBeforeInboundSync() {
-        GoogleCalendarRecurrenceMappingQueryService mappings = mock();
-        GoogleCalendarRecurrenceMappingCommandService mappingCommands = mock();
-        GoogleCalendarAccessTokenService tokens = mock();
-        GoogleCalendarEventsClient client = mock();
-        GoogleCalendarConnection connection = mock();
-        GoogleCalendarRecurrenceEventMapping mapping = mock();
-        when(connection.getId()).thenReturn(30L);
-        when(mapping.isProviderDeletePending()).thenReturn(true);
-        when(mapping.getExternalEventId()).thenReturn("master-1");
-        when(mappings.listRecurrenceEventMappings(30L)).thenReturn(List.of(mapping));
-        when(tokens.getAccessToken(30L)).thenReturn("token");
-        when(client.getEvent("token", "master-1")).thenReturn(Optional.of(provider("master-1", "new-etag")));
+  @Test
+  @DisplayName("재연결 전 pending master delete는 최신 provider etag로 삭제한 뒤 retained mapping을 제거한다")
+  void pendingDeleteRemovesProviderAggregateBeforeInboundSync() {
+    GoogleCalendarRecurrenceMappingQueryService mappings = mock();
+    GoogleCalendarRecurrenceMappingCommandService mappingCommands = mock();
+    GoogleCalendarAccessTokenService tokens = mock();
+    GoogleCalendarEventsClient client = mock();
+    GoogleCalendarConnection connection = mock();
+    GoogleCalendarRecurrenceEventMapping mapping = mock();
+    when(connection.getId()).thenReturn(30L);
+    when(mapping.isProviderDeletePending()).thenReturn(true);
+    when(mapping.getExternalEventId()).thenReturn("master-1");
+    when(mappings.listRecurrenceEventMappings(30L)).thenReturn(List.of(mapping));
+    when(tokens.getAccessToken(30L)).thenReturn("token");
+    when(client.getEvent("token", "master-1"))
+        .thenReturn(Optional.of(provider("master-1", "new-etag")));
 
-        GoogleCalendarRecurrenceDeleteReconciliationService service =
-                new GoogleCalendarRecurrenceDeleteReconciliationService(
-                        mappings, mappingCommands, tokens, client);
+    GoogleCalendarRecurrenceDeleteReconciliationService service =
+        new GoogleCalendarRecurrenceDeleteReconciliationService(
+            mappings, mappingCommands, tokens, client);
 
-        service.reconcilePendingDeletes(connection);
+    service.reconcilePendingDeletes(connection);
 
-        verify(client).delete("token", "master-1", "new-etag");
-        verify(mappingCommands).deleteRecurrenceAggregateMappings(mapping);
-    }
+    verify(client).delete("token", "master-1", "new-etag");
+    verify(mappingCommands).deleteRecurrenceAggregateMappings(mapping);
+  }
 
-    @Test
-    @DisplayName("원격 master가 이미 없으면 provider delete 없이 retained mapping을 제거한다")
-    void givenMissingProviderAggregate_whenReconcilingPendingDelete_thenRemovesRetainedMapping() {
-        // given
-        GoogleCalendarRecurrenceMappingQueryService mappings = mock();
-        GoogleCalendarRecurrenceMappingCommandService mappingCommands = mock();
-        GoogleCalendarAccessTokenService tokens = mock();
-        GoogleCalendarEventsClient client = mock();
-        GoogleCalendarConnection connection = mock();
-        GoogleCalendarRecurrenceEventMapping mapping = mock();
-        when(connection.getId()).thenReturn(30L);
-        when(mapping.isProviderDeletePending()).thenReturn(true);
-        when(mapping.getExternalEventId()).thenReturn("master-1");
-        when(mappings.listRecurrenceEventMappings(30L)).thenReturn(List.of(mapping));
-        when(tokens.getAccessToken(30L)).thenReturn("token");
-        when(client.getEvent("token", "master-1")).thenReturn(Optional.empty());
+  @Test
+  @DisplayName("원격 master가 이미 없으면 provider delete 없이 retained mapping을 제거한다")
+  void givenMissingProviderAggregate_whenReconcilingPendingDelete_thenRemovesRetainedMapping() {
+    // given
+    GoogleCalendarRecurrenceMappingQueryService mappings = mock();
+    GoogleCalendarRecurrenceMappingCommandService mappingCommands = mock();
+    GoogleCalendarAccessTokenService tokens = mock();
+    GoogleCalendarEventsClient client = mock();
+    GoogleCalendarConnection connection = mock();
+    GoogleCalendarRecurrenceEventMapping mapping = mock();
+    when(connection.getId()).thenReturn(30L);
+    when(mapping.isProviderDeletePending()).thenReturn(true);
+    when(mapping.getExternalEventId()).thenReturn("master-1");
+    when(mappings.listRecurrenceEventMappings(30L)).thenReturn(List.of(mapping));
+    when(tokens.getAccessToken(30L)).thenReturn("token");
+    when(client.getEvent("token", "master-1")).thenReturn(Optional.empty());
 
-        GoogleCalendarRecurrenceDeleteReconciliationService service =
-                new GoogleCalendarRecurrenceDeleteReconciliationService(
-                        mappings, mappingCommands, tokens, client);
+    GoogleCalendarRecurrenceDeleteReconciliationService service =
+        new GoogleCalendarRecurrenceDeleteReconciliationService(
+            mappings, mappingCommands, tokens, client);
 
-        // when
-        service.reconcilePendingDeletes(connection);
+    // when
+    service.reconcilePendingDeletes(connection);
 
-        // then
-        verify(client, never()).delete(any(), any(), any());
-        verify(mappingCommands).deleteRecurrenceAggregateMappings(mapping);
-    }
+    // then
+    verify(client, never()).delete(any(), any(), any());
+    verify(mappingCommands).deleteRecurrenceAggregateMappings(mapping);
+  }
 
-    private GoogleCalendarEventResponse provider(String id, String etag) {
-        return new GoogleCalendarEventResponse(id, "confirmed", etag,
-                Instant.parse("2026-09-01T00:00:00Z"), "Daily", null, List.of(), null,
-                null,
-                new GoogleCalendarEventTimeResponse(null, "2026-09-01T09:00:00Z", "UTC"),
-                new GoogleCalendarEventTimeResponse(null, "2026-09-01T10:00:00Z", "UTC"));
-    }
+  private GoogleCalendarEventResponse provider(String id, String etag) {
+    return new GoogleCalendarEventResponse(
+        id,
+        "confirmed",
+        etag,
+        Instant.parse("2026-09-01T00:00:00Z"),
+        "Daily",
+        null,
+        List.of(),
+        null,
+        null,
+        new GoogleCalendarEventTimeResponse(null, "2026-09-01T09:00:00Z", "UTC"),
+        new GoogleCalendarEventTimeResponse(null, "2026-09-01T10:00:00Z", "UTC"));
+  }
 }

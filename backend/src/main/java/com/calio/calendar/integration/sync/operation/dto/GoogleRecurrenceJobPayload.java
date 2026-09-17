@@ -5,23 +5,25 @@ import java.time.Instant;
 import java.util.List;
 
 public record GoogleRecurrenceJobPayload(
-        String title,
-        String description,
-        Instant startAt,
-        Instant endAt,
-        boolean allDay,
-        String timeZone,
-        List<String> recurrence
-) {
-    public GoogleRecurrenceJobPayload {
-        recurrence = List.copyOf(recurrence);
-    }
+    String title,
+    String description,
+    Instant startAt,
+    Instant endAt,
+    boolean allDay,
+    String timeZone,
+    List<String> recurrence) {
+  public GoogleRecurrenceJobPayload {
+    recurrence = List.copyOf(recurrence);
+  }
 
-    public static GoogleRecurrenceJobPayload from(RecurrenceEvent recurrenceEvent) {
-        return new GoogleRecurrenceJobPayload(
-                recurrenceEvent.getTitle(), recurrenceEvent.getDescription(),
-                recurrenceEvent.getFirstOccurrenceStartAt(), recurrenceEvent.getFirstOccurrenceEndAt(),
-                recurrenceEvent.isAllDay(), recurrenceEvent.getTimeZone(),
-                recurrenceEvent.getRecurrenceRules());
-    }
+  public static GoogleRecurrenceJobPayload from(RecurrenceEvent recurrenceEvent) {
+    return new GoogleRecurrenceJobPayload(
+        recurrenceEvent.getTitle(),
+        recurrenceEvent.getDescription(),
+        recurrenceEvent.getFirstOccurrenceStartAt(),
+        recurrenceEvent.getFirstOccurrenceEndAt(),
+        recurrenceEvent.isAllDay(),
+        recurrenceEvent.getTimeZone(),
+        recurrenceEvent.getRecurrenceRules());
+  }
 }
