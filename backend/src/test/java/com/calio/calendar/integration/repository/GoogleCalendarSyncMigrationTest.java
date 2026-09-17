@@ -535,13 +535,13 @@ class GoogleCalendarSyncMigrationTest {
   }
 
   @Test
-  @DisplayName("V24는 mapping event ID 조회를 위한 non-unique index를 유지한다")
-  void givenV23Schema_whenMigrateToV24_thenAddsEventIdLookupIndex() throws Exception {
+  @DisplayName("V32는 mapping event ID 조회를 위한 non-unique index를 유지한다")
+  void givenV31Schema_whenMigrateToV32_thenAddsEventIdLookupIndex() throws Exception {
     // given
     String url = "jdbc:h2:mem:google-event-mapping-event-id-index;MODE=MySQL;DB_CLOSE_DELAY=-1";
 
     // when
-    migrateTo(url, MigrationVersion.fromVersion("24"));
+    migrateTo(url, MigrationVersion.fromVersion("32"));
 
     // then
     try (Connection connection = DriverManager.getConnection(url, "sa", "")) {
