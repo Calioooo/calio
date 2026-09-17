@@ -15,6 +15,9 @@ import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarRecurr
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarRecurrenceJobKind;
 import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceJobPayload;
 import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceOverrideJobPayload;
+import com.calio.calendar.recurrence.domain.RecurrenceEvent;
+import com.calio.calendar.recurrence.domain.RecurrenceEventChangePublisher;
+import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
@@ -26,7 +29,7 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
 @Service
-public class GoogleOperationJobEnqueueService {
+public class GoogleOperationJobEnqueueService implements RecurrenceEventChangePublisher {
 
     private final GoogleCalendarConnectionCommandService connectionCommandService;
     private final GoogleCalendarIntegrationCommandService integrationCommandService;
@@ -156,6 +159,53 @@ public class GoogleOperationJobEnqueueService {
     ) {
         return enqueueRecurrenceJob(accountId, recurrenceEventId,
                 GoogleCalendarRecurrenceJobKind.OVERRIDE_DELETE, originStartAt, "{}");
+    }
+
+    @Override
+    public void recurrenceEventCreated(Long accountId, RecurrenceEvent recurrenceEvent) {
+        enqueueRecurrence(
+                accountId,
+                recurrenceEvent.getId(),
+                GoogleCalendarRecurrenceJobKind.RECURRENCE_CREATE,
+                GoogleRecurrenceJobPayload.from(recurrenceEvent)
+        );
+    }
+
+    @Override
+    public void recurrenceEventUpdated(Long accountId, RecurrenceEvent recurrenceEvent) {
+        enqueueRecurrence(
+                accountId,
+                recurrenceEvent.getId(),
+                GoogleCalendarRecurrenceJobKind.RECURRENCE_UPDATE,
+                GoogleRecurrenceJobPayload.from(recurrenceEvent)
+        );
+    }
+
+    @Override
+    public void recurrenceEventDeleted(Long accountId, Long recurrenceEventId) {
+        enqueueRecurrenceDeleted(accountId, recurrenceEventId);
+    }
+
+    @Override
+    public void recurrenceOccurrenceUpdated(
+            Long accountId,
+            RecurrenceEventOverride recurrenceEventOverride
+    ) {
+        enqueueRecurrenceOverride(
+                accountId,
+                recurrenceEventOverride.getRecurrenceId(),
+                recurrenceEventOverride.getOriginStartAt(),
+                GoogleRecurrenceOverrideJobPayload.from(recurrenceEventOverride)
+        );
+    }
+
+    @Override
+    public void recurrenceOccurrenceDeleted(
+            Long accountId,
+            Long recurrenceEventId,
+            Instant originStartAt
+    ) {
+        enqueueRecurrenceOverrideDeleted(accountId, recurrenceEventId, originStartAt);
     }
 
     private boolean enqueueRecurrenceJob(
