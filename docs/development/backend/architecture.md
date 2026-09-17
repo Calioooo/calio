@@ -18,13 +18,37 @@
 | 구성 요소                   | 역할                                                                                                |
 | ----------------------- | ------------------------------------------------------------------------------------------------- |
 | Controller              | HTTP 요청·응답 경계를 다루고 유스케이스를 호출한다.                                                                   |
-| Application Service     | 유스케이스의 조회·저장 순서, 협력 대상 및 트랜잭션을 조율한다.                                                              |
+| UseCase (Application Service) | 유스케이스의 조회·저장 순서, 협력 대상 및 트랜잭션을 조율한다.                                                        |
 | Repository              | JPA를 통한 조회와 저장소 접근을 담당한다.                                                                         |
 | Domain Model            | 비즈니스 상태와 행동을 표현한다. 구체적인 책임 기준은 `domain-responsibility.md`를 따른다.                                   |
 | Domain Service (필요한 경우) | 특정 Entity나 Value Object가 자연스럽게 소유하지 않는 도메인 정책을 표현한다. 구체적인 도입 기준은 `domain-responsibility.md`를 따른다. |
 
 
 계층 간 패키지 의존성처럼 기계적으로 판단할 수 있는 규칙은 정적 검증 대상으로 두고, 이 문서는 책임 배치와 경계의 의미적 판단에 집중한다.
+
+## 유스케이스 기반 Application 구조
+
+- 기능 영역은 기존처럼 `event`, `recurrence`, `notification` 등의 도메인 단위로 구분한다.
+- Application 계층의 구현 단위는 포괄적인 도메인 Service나 기술적인 Command/Query 구분이 아니라 유스케이스로 한다.
+- 하나의 UseCase는 하나의 명확한 외부 목적과 트랜잭션 경계를 표현한다.
+- Controller, Scheduler, Event Listener 등의 외부 진입점은 목적에 해당하는 UseCase를 직접 호출한다.
+- UseCase는 필요한 Repository를 직접 사용하며, Repository 호출만 위임하는 CommandService나 QueryService를 두지 않는다.
+- UseCase는 다른 UseCase를 호출하지 않는다. 여러 유스케이스에 필요한 규칙이나 로직은 책임에 따라 Domain Model, Domain Service 또는 별도의 협력 객체로 분리한다.
+- Entity, Value Object와 Domain Service는 특정 UseCase에 종속시키거나 UseCase마다 중복해서 정의하지 않는다.
+- 기존 구조는 기능 영역 단위로 점진적으로 전환한다.
+
+기능 영역은 다음 구조를 기본으로 한다.
+
+```text
+<feature>/
+├── controller/
+├── usecase/
+├── domain/
+├── repository/
+└── infrastructure/
+```
+
+유스케이스의 수와 복잡도가 커진 경우에만 `usecase` 아래를 개별 유스케이스 패키지로 나눈다.
 
 ## 조회와 변경의 기본 흐름
 
@@ -58,6 +82,14 @@ Application Service는 해당 기능의 Repository를 직접 사용한다.
 - Aggregate Root 사이에 영속성 cascade를 적용하지 않는다.
 - 식별자로 참조하더라도 데이터베이스의 외래 키 제약은 유지할 수 있다.
 - 다른 Aggregate의 상태가 필요한 변경 유스케이스는 Application Service가 각 Repository를 통해 Root를 명시적으로 조회한다.
+
+### Value Object 영속성 매핑
+
+- 도메인 의미와 규칙을 가진 Value Object는 Entity 필드에서도 해당 타입을 유지한다.
+- JPA 매핑을 위해 Value Object를 Entity 내부에서 원시값이나 문자열로 풀어 저장하지 않는다.
+- 여러 컬럼으로 표현되는 Value Object는 `@Embeddable`과 `@Embedded`를 기본으로 사용한다.
+- 단일 컬럼으로 저장되는 Value Object는 조회 방식과 재사용 범위를 고려하여 `@Embeddable` 또는 `AttributeConverter`를 선택한다.
+- 영속 상태에서 Value Object를 복원할 때도 유효성 검증을 우회하지 않는다.
 
 ## 트랜잭션과 외부 연동
 
