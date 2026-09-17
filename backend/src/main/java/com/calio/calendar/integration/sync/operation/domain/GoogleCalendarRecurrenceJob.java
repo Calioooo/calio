@@ -15,55 +15,70 @@ import org.hibernate.type.SqlTypes;
 @DiscriminatorValue("RECURRENCE")
 public class GoogleCalendarRecurrenceJob extends GoogleOperationJob {
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "recurrence_operation_kind", updatable = false, length = 64)
-    private GoogleCalendarRecurrenceJobKind kind;
+  @Enumerated(EnumType.STRING)
+  @Column(name = "recurrence_operation_kind", updatable = false, length = 64)
+  private GoogleCalendarRecurrenceJobKind kind;
 
-    @Embedded
-    private GoogleCalendarRecurrenceJobTarget target;
+  @Embedded private GoogleCalendarRecurrenceJobTarget target;
 
-    @Convert(converter = JsonPayloadConverter.class)
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "recurrence_target_payload", updatable = false, columnDefinition = "JSON")
-    private String targetPayload;
+  @Convert(converter = JsonPayloadConverter.class)
+  @JdbcTypeCode(SqlTypes.JSON)
+  @Column(name = "recurrence_target_payload", updatable = false, columnDefinition = "JSON")
+  private String targetPayload;
 
-    @Column(name = "recurrence_provider_identity", updatable = false, length = 1024)
-    private String providerIdentity;
+  @Column(name = "recurrence_provider_identity", updatable = false, length = 1024)
+  private String providerIdentity;
 
-    protected GoogleCalendarRecurrenceJob() { }
+  protected GoogleCalendarRecurrenceJob() {}
 
-    public static GoogleCalendarRecurrenceJob create(
-            String operationId, Long integrationId, Long accountId, long integrationSequence,
-            GoogleCalendarRecurrenceJobKind kind, Long recurrenceEventId, Instant originStartAt,
-            String targetPayload, String providerIdentity, Instant runnableAt
-    ) {
-        if (kind == null || targetPayload == null || targetPayload.isBlank()) {
-            throw new IllegalArgumentException("Google recurrence job fields are required");
-        }
-        if ((kind == GoogleCalendarRecurrenceJobKind.RECURRENCE_CREATE) && !hasText(providerIdentity)) {
-            throw new IllegalArgumentException(
-                    "Only Google recurrence-event create requires provider identity");
-        }
-        GoogleCalendarRecurrenceJob job = new GoogleCalendarRecurrenceJob();
-        job.initialize(operationId, integrationId, accountId, integrationSequence, runnableAt);
-        job.kind = kind;
-        job.target = GoogleCalendarRecurrenceJobTarget.forKind(
-                kind,
-                recurrenceEventId,
-                originStartAt
-        );
-        job.targetPayload = targetPayload;
-        job.providerIdentity = providerIdentity;
-        return job;
+  public static GoogleCalendarRecurrenceJob create(
+      String operationId,
+      Long integrationId,
+      Long accountId,
+      long integrationSequence,
+      GoogleCalendarRecurrenceJobKind kind,
+      Long recurrenceEventId,
+      Instant originStartAt,
+      String targetPayload,
+      String providerIdentity,
+      Instant runnableAt) {
+    if (kind == null || targetPayload == null || targetPayload.isBlank()) {
+      throw new IllegalArgumentException("Google recurrence job fields are required");
     }
-
-    public GoogleCalendarRecurrenceJobKind getKind() { return kind; }
-    public Long getRecurrenceEventId() { return target.recurrenceEventId(); }
-    public Instant getOriginStartAt() { return target.originStartAt(); }
-    public String getTargetPayload() { return targetPayload; }
-    public String getProviderIdentity() { return providerIdentity; }
-
-    private static boolean hasText(String value) {
-        return value != null && !value.isBlank();
+    if ((kind == GoogleCalendarRecurrenceJobKind.RECURRENCE_CREATE) && !hasText(providerIdentity)) {
+      throw new IllegalArgumentException(
+          "Only Google recurrence-event create requires provider identity");
     }
+    GoogleCalendarRecurrenceJob job = new GoogleCalendarRecurrenceJob();
+    job.initialize(operationId, integrationId, accountId, integrationSequence, runnableAt);
+    job.kind = kind;
+    job.target = GoogleCalendarRecurrenceJobTarget.forKind(kind, recurrenceEventId, originStartAt);
+    job.targetPayload = targetPayload;
+    job.providerIdentity = providerIdentity;
+    return job;
+  }
+
+  public GoogleCalendarRecurrenceJobKind getKind() {
+    return kind;
+  }
+
+  public Long getRecurrenceEventId() {
+    return target.recurrenceEventId();
+  }
+
+  public Instant getOriginStartAt() {
+    return target.originStartAt();
+  }
+
+  public String getTargetPayload() {
+    return targetPayload;
+  }
+
+  public String getProviderIdentity() {
+    return providerIdentity;
+  }
+
+  private static boolean hasText(String value) {
+    return value != null && !value.isBlank();
+  }
 }
