@@ -17,46 +17,46 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class RecurrenceEventQueryService {
 
-    private final RecurrenceEventRepository recurrenceEventRepository;
-    private final RecurrenceEventOverrideRepository recurrenceEventOverrideRepository;
+  private final RecurrenceEventRepository recurrenceEventRepository;
+  private final RecurrenceEventOverrideRepository recurrenceEventOverrideRepository;
 
-    public RecurrenceEventQueryService(
-            RecurrenceEventRepository recurrenceEventRepository,
-            RecurrenceEventOverrideRepository recurrenceEventOverrideRepository
-    ) {
-        this.recurrenceEventRepository = recurrenceEventRepository;
-        this.recurrenceEventOverrideRepository = recurrenceEventOverrideRepository;
-    }
+  public RecurrenceEventQueryService(
+      RecurrenceEventRepository recurrenceEventRepository,
+      RecurrenceEventOverrideRepository recurrenceEventOverrideRepository) {
+    this.recurrenceEventRepository = recurrenceEventRepository;
+    this.recurrenceEventOverrideRepository = recurrenceEventOverrideRepository;
+  }
 
-    public RecurrenceEvent getRecurrenceEvent(Long accountId, Long recurrenceId) {
-        return recurrenceEventRepository.findByIdAndAccount_Id(recurrenceId, accountId)
-                .orElseThrow(() -> new CalioException(ErrorCode.RECURRENCE_EVENT_NOT_FOUND));
-    }
+  public RecurrenceEvent getRecurrenceEvent(Long accountId, Long recurrenceId) {
+    return recurrenceEventRepository
+        .findByIdAndAccount_Id(recurrenceId, accountId)
+        .orElseThrow(() -> new CalioException(ErrorCode.RECURRENCE_EVENT_NOT_FOUND));
+  }
 
-    public RecurrenceEvent getRecurrenceEvent(Long recurrenceId) {
-        return recurrenceEventRepository.findById(recurrenceId)
-                .orElseThrow(() -> new CalioException(ErrorCode.RECURRENCE_EVENT_NOT_FOUND));
-    }
+  public RecurrenceEvent getRecurrenceEvent(Long recurrenceId) {
+    return recurrenceEventRepository
+        .findById(recurrenceId)
+        .orElseThrow(() -> new CalioException(ErrorCode.RECURRENCE_EVENT_NOT_FOUND));
+  }
 
-    public Optional<RecurrenceEventOverride> getOverrideIfExists(Long recurrenceId, Instant originStartAt) {
-        return recurrenceEventOverrideRepository
-                .findByRecurrenceEvent_IdAndOriginStartAt(recurrenceId, originStartAt);
-    }
+  public Optional<RecurrenceEventOverride> getOverrideIfExists(
+      Long recurrenceId, Instant originStartAt) {
+    return recurrenceEventOverrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(
+        recurrenceId, originStartAt);
+  }
 
-    public List<RecurrenceEvent> listExpansionCandidatesStartedBefore(Long accountId, Instant to) {
-        return recurrenceEventRepository.findExpansionCandidatesStartedBefore(accountId, to);
-    }
+  public List<RecurrenceEvent> listExpansionCandidatesStartedBefore(Long accountId, Instant to) {
+    return recurrenceEventRepository.findExpansionCandidatesStartedBefore(accountId, to);
+  }
 
-    public List<RecurrenceEventOverride> listOverrides(Long recurrenceId, Collection<Instant> originStartAts) {
-        return recurrenceEventOverrideRepository
-                .findByRecurrenceEvent_IdAndOriginStartAtIn(recurrenceId, originStartAts);
-    }
+  public List<RecurrenceEventOverride> listOverrides(
+      Long recurrenceId, Collection<Instant> originStartAts) {
+    return recurrenceEventOverrideRepository.findByRecurrenceEvent_IdAndOriginStartAtIn(
+        recurrenceId, originStartAts);
+  }
 
-    public List<RecurrenceEventOverride> listActiveOverlappingOverrides(
-            Long accountId,
-            Instant from,
-            Instant to
-    ) {
-        return recurrenceEventOverrideRepository.findActiveOverlappingOverrides(accountId, from, to);
-    }
+  public List<RecurrenceEventOverride> listActiveOverlappingOverrides(
+      Long accountId, Instant from, Instant to) {
+    return recurrenceEventOverrideRepository.findActiveOverlappingOverrides(accountId, from, to);
+  }
 }

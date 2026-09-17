@@ -9,34 +9,43 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-public interface GoogleCalendarIntegrationRepository extends JpaRepository<GoogleCalendarIntegration, Long> {
+public interface GoogleCalendarIntegrationRepository
+    extends JpaRepository<GoogleCalendarIntegration, Long> {
 
-    Optional<GoogleCalendarIntegration> findByAccountId(Long accountId);
+  Optional<GoogleCalendarIntegration> findByAccountId(Long accountId);
 
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("""
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query(
+      """
             select integration
             from GoogleCalendarIntegration integration
             where integration.accountId = :accountId
             """)
-    Optional<GoogleCalendarIntegration> findByAccountIdForUpdate(@Param("accountId") Long accountId);
+  Optional<GoogleCalendarIntegration> findByAccountIdForUpdate(@Param("accountId") Long accountId);
 
-    boolean existsByAccountId(Long accountId);
+  boolean existsByAccountId(Long accountId);
 
-    @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query(value = """
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      value =
+          """
             UPDATE google_calendar_integrations integration
             SET integration.google_operation_lease_owner = :owner,
                 integration.google_operation_lease_expires_at = TIMESTAMPADD(SECOND, :leaseDurationSeconds, CURRENT_TIMESTAMP)
             WHERE integration.account_id = :accountId
               AND (integration.google_operation_lease_owner IS NULL
                    OR integration.google_operation_lease_expires_at < CURRENT_TIMESTAMP)
-            """, nativeQuery = true)
-    int acquireGoogleOperationLease(@Param("accountId") Long accountId, @Param("owner") String owner,
-            @Param("leaseDurationSeconds") long leaseDurationSeconds);
+            """,
+      nativeQuery = true)
+  int acquireGoogleOperationLease(
+      @Param("accountId") Long accountId,
+      @Param("owner") String owner,
+      @Param("leaseDurationSeconds") long leaseDurationSeconds);
 
-    @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query(value = """
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      value =
+          """
             UPDATE google_calendar_integrations integration
             SET integration.google_operation_lease_expires_at = TIMESTAMPADD(SECOND, :leaseDurationSeconds, CURRENT_TIMESTAMP)
             WHERE integration.account_id = :accountId
@@ -49,17 +58,22 @@ public interface GoogleCalendarIntegrationRepository extends JpaRepository<Googl
                     AND job.job_state = 'PROCESSING'
                     AND job.owner_token = :owner
               )
-            """, nativeQuery = true)
-    int renewOwnedGoogleOperationLease(@Param("jobId") Long jobId, @Param("accountId") Long accountId,
-            @Param("owner") String owner, @Param("leaseDurationSeconds") long leaseDurationSeconds);
+            """,
+      nativeQuery = true)
+  int renewOwnedGoogleOperationLease(
+      @Param("jobId") Long jobId,
+      @Param("accountId") Long accountId,
+      @Param("owner") String owner,
+      @Param("leaseDurationSeconds") long leaseDurationSeconds);
 
-    @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query("""
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      """
             update GoogleCalendarIntegration integration
             set integration.googleOperationLeaseOwner = null,
                 integration.googleOperationLeaseExpiresAt = null
             where integration.accountId = :accountId
               and integration.googleOperationLeaseOwner = :owner
             """)
-    int releaseGoogleOperationLease(@Param("accountId") Long accountId, @Param("owner") String owner);
+  int releaseGoogleOperationLease(@Param("accountId") Long accountId, @Param("owner") String owner);
 }

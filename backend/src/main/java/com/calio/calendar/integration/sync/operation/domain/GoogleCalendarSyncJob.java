@@ -11,24 +11,31 @@ import java.time.Instant;
 @DiscriminatorValue("SYNC")
 public class GoogleCalendarSyncJob extends GoogleOperationJob {
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "job_trigger", updatable = false, length = 32)
-    private GoogleOperationJobTrigger trigger;
+  @Enumerated(EnumType.STRING)
+  @Column(name = "job_trigger", updatable = false, length = 32)
+  private GoogleOperationJobTrigger trigger;
 
-    protected GoogleCalendarSyncJob() {
+  protected GoogleCalendarSyncJob() {}
+
+  public static GoogleCalendarSyncJob create(
+      String operationId,
+      Long integrationId,
+      Long accountId,
+      long integrationSequence,
+      GoogleOperationJobTrigger trigger,
+      Instant runnableAt) {
+    if (trigger != GoogleOperationJobTrigger.MANUAL
+        && trigger != GoogleOperationJobTrigger.PERIODIC) {
+      throw new IllegalArgumentException(
+          "Sync Google operation trigger must be MANUAL or PERIODIC");
     }
+    GoogleCalendarSyncJob job = new GoogleCalendarSyncJob();
+    job.initialize(operationId, integrationId, accountId, integrationSequence, runnableAt);
+    job.trigger = trigger;
+    return job;
+  }
 
-    public static GoogleCalendarSyncJob create(String operationId, Long integrationId, Long accountId,
-                                                long integrationSequence, GoogleOperationJobTrigger trigger,
-                                                Instant runnableAt) {
-        if (trigger != GoogleOperationJobTrigger.MANUAL && trigger != GoogleOperationJobTrigger.PERIODIC) {
-            throw new IllegalArgumentException("Sync Google operation trigger must be MANUAL or PERIODIC");
-        }
-        GoogleCalendarSyncJob job = new GoogleCalendarSyncJob();
-        job.initialize(operationId, integrationId, accountId, integrationSequence, runnableAt);
-        job.trigger = trigger;
-        return job;
-    }
-
-    public GoogleOperationJobTrigger getTrigger() { return trigger; }
+  public GoogleOperationJobTrigger getTrigger() {
+    return trigger;
+  }
 }
