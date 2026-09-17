@@ -47,15 +47,6 @@ public class GoogleCalendarConnection extends BaseEntity {
   @Column(name = "next_sync_token", columnDefinition = "TEXT")
   private String nextSyncToken;
 
-  @Column(name = "next_google_operation_sequence", nullable = false)
-  private long nextGoogleOperationSequence = 1L;
-
-  @Column(name = "google_operation_lease_owner", length = 36)
-  private String googleOperationLeaseOwner;
-
-  @Column(name = "google_operation_lease_expires_at")
-  private Instant googleOperationLeaseExpiresAt;
-
   @Enumerated(EnumType.STRING)
   @Column(name = "connection_state", nullable = false, length = 32)
   private GoogleCalendarConnectionState state = GoogleCalendarConnectionState.CONNECTED;
@@ -104,8 +95,6 @@ public class GoogleCalendarConnection extends BaseEntity {
     disconnectedAt = null;
     syncErrorReason = null;
     syncErrorAt = null;
-    googleOperationLeaseOwner = null;
-    googleOperationLeaseExpiresAt = null;
     nextSyncToken = null;
   }
 
@@ -114,8 +103,6 @@ public class GoogleCalendarConnection extends BaseEntity {
     encryptedAccessToken = null;
     accessTokenExpiresAt = null;
     nextSyncToken = null;
-    googleOperationLeaseOwner = null;
-    googleOperationLeaseExpiresAt = null;
     state = GoogleCalendarConnectionState.DISCONNECTED;
     disconnectedAt = at;
     syncErrorReason = null;
@@ -123,8 +110,6 @@ public class GoogleCalendarConnection extends BaseEntity {
   }
 
   public void markSyncError(String reason, Instant at) {
-    googleOperationLeaseOwner = null;
-    googleOperationLeaseExpiresAt = null;
     state = GoogleCalendarConnectionState.SYNC_ERROR;
     disconnectedAt = null;
     syncErrorReason = reason;
@@ -142,10 +127,6 @@ public class GoogleCalendarConnection extends BaseEntity {
 
   public boolean isConnected() {
     return state == GoogleCalendarConnectionState.CONNECTED;
-  }
-
-  public long allocateGoogleOperationSequence() {
-    return nextGoogleOperationSequence++;
   }
 
   public Long getId() {

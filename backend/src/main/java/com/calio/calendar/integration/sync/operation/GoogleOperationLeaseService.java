@@ -1,6 +1,6 @@
 package com.calio.calendar.integration.sync.operation;
 
-import com.calio.calendar.integration.connection.service.GoogleCalendarConnectionCommandService;
+import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrationCommandService;
 import java.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,17 +13,17 @@ public class GoogleOperationLeaseService {
   private static final Logger log = LoggerFactory.getLogger(GoogleOperationLeaseService.class);
   private static final Duration LEASE_DURATION = Duration.ofMinutes(5);
 
-  private final GoogleCalendarConnectionCommandService connectionCommandService;
+  private final GoogleCalendarIntegrationCommandService integrationCommandService;
 
   public GoogleOperationLeaseService(
-      GoogleCalendarConnectionCommandService connectionCommandService) {
-    this.connectionCommandService = connectionCommandService;
+      GoogleCalendarIntegrationCommandService integrationCommandService) {
+    this.integrationCommandService = integrationCommandService;
   }
 
   @Transactional
   public boolean acquire(Long accountId, String workerToken) {
     boolean acquired =
-        connectionCommandService.acquireOperationLease(
+        integrationCommandService.acquireOperationLease(
             accountId, workerToken, LEASE_DURATION.toSeconds());
     if (acquired) {
       log.info("Google operation lease acquired. accountId={} state=ACQUIRED", accountId);
@@ -37,7 +37,7 @@ public class GoogleOperationLeaseService {
   @Transactional
   public void extend(Long jobId, Long accountId, String workerToken) {
     try {
-      connectionCommandService.extendOperationLease(
+      integrationCommandService.extendOperationLease(
           jobId, accountId, workerToken, LEASE_DURATION.toSeconds());
     } catch (GoogleOperationOwnershipLostException exception) {
       log.warn(
@@ -50,7 +50,7 @@ public class GoogleOperationLeaseService {
 
   @Transactional
   public void release(Long accountId, String workerToken) {
-    boolean released = connectionCommandService.releaseOperationLease(accountId, workerToken);
+    boolean released = integrationCommandService.releaseOperationLease(accountId, workerToken);
     if (released) {
       log.info("Google operation lease released. accountId={} state=RELEASED", accountId);
     } else {

@@ -99,7 +99,9 @@ public class GoogleCalendarRecurrenceChangeService {
       return;
     }
     if (operationJobQueryService.hasPendingOutboundJob(
-        mapping.getConnection().getAccountId(), mapping.getConnection().getId(), scope)) {
+        mapping.getConnection().getAccountId(),
+        mapping.getConnection().getIntegration().getId(),
+        scope)) {
       mapping.markConflicted();
       recordSyncConflict(mapping, ownership);
       return;
@@ -127,7 +129,7 @@ public class GoogleCalendarRecurrenceChangeService {
             recurrenceEventMapping.getRecurrenceEvent().getId());
     if (operationJobQueryService.hasPendingOutboundJob(
         recurrenceEventMapping.getConnection().getAccountId(),
-        recurrenceEventMapping.getConnection().getId(),
+        recurrenceEventMapping.getConnection().getIntegration().getId(),
         scope)) {
       recurrenceEventMapping.markConflicted();
       recordSyncConflict(recurrenceEventMapping, ownership);

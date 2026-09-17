@@ -1,5 +1,6 @@
 package com.calio.calendar.integration.connection.service;
 
+import com.calio.calendar.account.service.AccountCommandService;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.external.google.GoogleOAuthClient;
@@ -29,6 +30,7 @@ public class GoogleCalendarConnectionService {
   private final GoogleOAuthProperties properties;
   private final GoogleOAuthClient oauthClient;
   private final TokenEncryptor encryptor;
+  private final AccountCommandService accountCommandService;
   private final GoogleCalendarIntegrationCommandService integrationCommandService;
   private final GoogleCalendarConnectionQueryService connectionQueryService;
   private final GoogleCalendarConnectionCommandService connectionCommandService;
@@ -42,6 +44,7 @@ public class GoogleCalendarConnectionService {
       GoogleOAuthProperties properties,
       GoogleOAuthClient oauthClient,
       TokenEncryptor encryptor,
+      AccountCommandService accountCommandService,
       GoogleCalendarIntegrationCommandService integrationCommandService,
       GoogleCalendarConnectionQueryService connectionQueryService,
       GoogleCalendarConnectionCommandService connectionCommandService,
@@ -52,6 +55,7 @@ public class GoogleCalendarConnectionService {
     this.properties = properties;
     this.oauthClient = oauthClient;
     this.encryptor = encryptor;
+    this.accountCommandService = accountCommandService;
     this.integrationCommandService = integrationCommandService;
     this.connectionQueryService = connectionQueryService;
     this.connectionCommandService = connectionCommandService;
@@ -98,7 +102,8 @@ public class GoogleCalendarConnectionService {
                 .map(
                     connection -> {
                       String refreshToken = connection.getEncryptedRefreshToken();
-                      jobCommandService.deleteJobsForConnection(connection.getId());
+                      jobCommandService.deleteJobsForIntegration(
+                          connection.getIntegration().getId());
                       connectionCommandService.disconnect(connection, Instant.now(clock));
                       return refreshToken;
                     })
@@ -113,6 +118,7 @@ public class GoogleCalendarConnectionService {
       Instant connectedAt) {
     return registrationTransaction.execute(
         status -> {
+          accountCommandService.lockAccount(accountId);
           GoogleCalendarConnection connection =
               registerInTransaction(accountId, user, token, expiresAt, connectedAt);
           enqueueService.enqueueManualSync(accountId);

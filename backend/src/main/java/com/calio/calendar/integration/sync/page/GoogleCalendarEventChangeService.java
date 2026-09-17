@@ -76,7 +76,9 @@ public class GoogleCalendarEventChangeService {
       return;
     }
     if (operationJobQueryService.hasPendingOutboundJob(
-        mapping.getConnection().getAccountId(), mapping.getConnection().getId(), scope)) {
+        mapping.getConnection().getAccountId(),
+        mapping.getConnection().getIntegration().getId(),
+        scope)) {
       mapping.markConflicted();
       recordSyncConflict(mapping, ownership);
       return;
@@ -108,7 +110,9 @@ public class GoogleCalendarEventChangeService {
     GoogleCalendarEffectiveScope scope =
         GoogleCalendarEffectiveScope.event(eventMapping.getEvent().getId());
     if (operationJobQueryService.hasPendingOutboundJob(
-        eventMapping.getConnection().getAccountId(), eventMapping.getConnection().getId(), scope)) {
+        eventMapping.getConnection().getAccountId(),
+        eventMapping.getConnection().getIntegration().getId(),
+        scope)) {
       eventMapping.markConflicted();
       recordSyncConflict(eventMapping, ownership);
       return;

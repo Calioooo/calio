@@ -268,7 +268,9 @@ public class GoogleCalendarIntegrationDataService {
     GoogleCalendarEffectiveScope scope =
         GoogleCalendarEffectiveScope.event(mapping.getEvent().getId());
     if (!operationJobQueryService.hasPendingOutboundJob(
-        mapping.getConnection().getAccountId(), mapping.getConnection().getId(), scope)) {
+        mapping.getConnection().getAccountId(),
+        mapping.getConnection().getIntegration().getId(),
+        scope)) {
       return true;
     }
     mapping.markConflicted();
@@ -285,7 +287,9 @@ public class GoogleCalendarIntegrationDataService {
     GoogleCalendarEffectiveScope scope =
         GoogleCalendarEffectiveScope.recurrenceEvent(mapping.getRecurrenceEvent().getId());
     if (!operationJobQueryService.hasPendingOutboundJob(
-        mapping.getConnection().getAccountId(), mapping.getConnection().getId(), scope)) {
+        mapping.getConnection().getAccountId(),
+        mapping.getConnection().getIntegration().getId(),
+        scope)) {
       return true;
     }
     mapping.markConflicted();
@@ -305,7 +309,7 @@ public class GoogleCalendarIntegrationDataService {
             mapping.getRecurrenceEventOverride().getOriginStartAt());
     if (!operationJobQueryService.hasPendingOutboundJob(
         mapping.getRecurrenceEventMapping().getConnection().getAccountId(),
-        mapping.getRecurrenceEventMapping().getConnection().getId(),
+        mapping.getRecurrenceEventMapping().getConnection().getIntegration().getId(),
         scope)) {
       return true;
     }

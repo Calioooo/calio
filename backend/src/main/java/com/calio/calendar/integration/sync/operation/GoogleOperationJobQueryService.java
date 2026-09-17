@@ -28,17 +28,17 @@ public class GoogleOperationJobQueryService {
   }
 
   public boolean hasPendingOutboundJob(
-      Long accountId, Long connectionId, GoogleCalendarEffectiveScope scope) {
+      Long accountId, Long integrationId, GoogleCalendarEffectiveScope scope) {
     if (scope.isRecurrenceEventAggregate()) {
       return jobRepository.existsPendingOutboundJobForRecurrenceAggregate(
           accountId,
-          connectionId,
+          integrationId,
           GoogleCalendarEffectiveScopeType.RECURRENCE_EVENT.getStoredValue(),
           scope.storedKey(),
           GoogleCalendarEffectiveScopeType.RECURRENCE_OVERRIDE.getStoredValue(),
           scope.childOverrideKeyPrefix());
     }
     return jobRepository.existsPendingOutboundJob(
-        accountId, connectionId, scope.storedScope(), scope.storedKey());
+        accountId, integrationId, scope.storedScope(), scope.storedKey());
   }
 }
