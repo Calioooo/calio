@@ -28,6 +28,12 @@ Application Service는 유스케이스를 수행하기 위해 필요한 객체�
 - Aggregate 경계는 JPA 연관관계만으로 결정하지 않는다. 함께 일관성을 지켜야 하는 상태와 변경 경계를 기준으로 판단한다.
 - `@Entity`로 매핑되어 있다는 사실만으로 독립적인 Aggregate라고 판단하거나, 반대로 Value Object로 바꿔야 한다고 판단하지 않는다. 식별성, 생명주기, 변경 방식과 영속성 제약을 함께 검토한다.
 
+### Value Object의 유지
+
+- 도메인 의미, 유효성 검증 또는 생성 규칙을 가진 값은 Entity 내부에서도 Value Object 타입으로 유지한다.
+- Entity는 Value Object를 원시값이나 문자열로 풀어 저장하여 Value Object의 규칙을 우회하지 않는다.
+- 별도의 도메인 의미나 규칙이 없는 단순 타입 별칭은 Value Object로 만들지 않는다.
+
 ## Aggregate와 Aggregate Root
 
 - Aggregate는 하나의 트랜잭션에서 함께 일관성을 보호해야 하는 상태의 경계다.
