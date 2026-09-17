@@ -1,110 +1,101 @@
 package com.calio.calendar.event.controller.dto;
 
-import com.calio.calendar.tag.controller.dto.TagResponse;
 import com.calio.calendar.event.domain.Event;
+import com.calio.calendar.recurrence.domain.PersonalRecurrenceOccurrence;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceOccurrence;
-import com.calio.calendar.recurrence.domain.ResolvedPersonalRecurrenceOccurrence;
+import com.calio.calendar.tag.controller.dto.TagResponse;
 import java.time.Instant;
 
 public record EventResponse(
-        Long id,
-        String title,
-        String description,
-        Instant startAt,
-        Instant endAt,
-        boolean allDay,
-        String timeZone,
-        boolean importantEvent,
-        Long recurrenceId,
-        boolean isRecurrenceOccurrence,
-        TagResponse tag,
-        Instant originStartAt,
-        Instant createdAt,
-        Instant updatedAt
-) {
+    Long id,
+    String title,
+    String description,
+    Instant startAt,
+    Instant endAt,
+    boolean allDay,
+    String timeZone,
+    boolean importantEvent,
+    Long recurrenceId,
+    boolean isRecurrenceOccurrence,
+    TagResponse tag,
+    Instant originStartAt,
+    Instant createdAt,
+    Instant updatedAt) {
 
-    public static EventResponse from(Event event) {
-        return new EventResponse(
-                event.getId(),
-                event.getTitle(),
-                event.getDescription(),
-                event.getStartAt(),
-                event.getEndAt(),
-                event.isAllDay(),
-                event.isAllDay() ? null : event.getTimeZone(),
-                event.importantEvent(),
-                event.getRecurrenceId().orElse(null),
-                event.isRecurrenceOccurrence(),
-                TagResponse.from(event.getTag()),
-                null,
-                event.getCreatedAt(),
-                event.getUpdatedAt()
-        );
-    }
+  public static EventResponse from(Event event) {
+    return new EventResponse(
+        event.getId(),
+        event.getTitle(),
+        event.getDescription(),
+        event.getStartAt(),
+        event.getEndAt(),
+        event.isAllDay(),
+        event.isAllDay() ? null : event.getTimeZone(),
+        event.importantEvent(),
+        event.getRecurrenceId().orElse(null),
+        event.isRecurrenceOccurrence(),
+        TagResponse.from(event.getTag()),
+        null,
+        event.getCreatedAt(),
+        event.getUpdatedAt());
+  }
 
-    public static EventResponse recurrenceOccurrence(
-            RecurrenceEvent recurrenceEvent,
-            RecurrenceOccurrence occurrence
-    ) {
-        return new EventResponse(
-                null,
-                recurrenceEvent.getTitle(),
-                recurrenceEvent.getDescription(),
-                occurrence.startAt(),
-                occurrence.endAt(),
-                recurrenceEvent.isAllDay(),
-                recurrenceEvent.isAllDay() ? null : recurrenceEvent.getTimeZone(),
-                false,
-                recurrenceEvent.getId(),
-                true,
-                TagResponse.from(recurrenceEvent.getTag()),
-                occurrence.originStartAt(),
-                recurrenceEvent.getCreatedAt(),
-                recurrenceEvent.getUpdatedAt()
-        );
-    }
+  public static EventResponse recurrenceOccurrence(
+      RecurrenceEvent recurrenceEvent, RecurrenceOccurrence occurrence) {
+    return new EventResponse(
+        null,
+        recurrenceEvent.getTitle(),
+        recurrenceEvent.getDescription(),
+        occurrence.startAt(),
+        occurrence.endAt(),
+        recurrenceEvent.isAllDay(),
+        recurrenceEvent.isAllDay() ? null : recurrenceEvent.getTimeZone(),
+        false,
+        recurrenceEvent.getId(),
+        true,
+        TagResponse.from(recurrenceEvent.getTag()),
+        occurrence.originStartAt(),
+        recurrenceEvent.getCreatedAt(),
+        recurrenceEvent.getUpdatedAt());
+  }
 
-    public static EventResponse recurrenceOverride(RecurrenceEventOverride override) {
-        RecurrenceEvent recurrenceEvent = override.getRecurrenceEvent();
-        return new EventResponse(
-                null,
-                override.getOverrideTitle(),
-                override.getOverrideDescription(),
-                override.getOverrideStartAt(),
-                override.getOverrideEndAt(),
-                override.isOverrideAllDay(),
-                override.isOverrideAllDay() ? null : override.getOverrideTimeZone(),
-                false,
-                recurrenceEvent.getId(),
-                true,
-                TagResponse.from(recurrenceEvent.getTag()),
-                override.getOriginStartAt(),
-                recurrenceEvent.getCreatedAt(),
-                recurrenceEvent.getUpdatedAt()
-        );
-    }
+  public static EventResponse recurrenceOverride(RecurrenceEventOverride override) {
+    RecurrenceEvent recurrenceEvent = override.getRecurrenceEvent();
+    return new EventResponse(
+        null,
+        override.getOverrideTitle(),
+        override.getOverrideDescription(),
+        override.getOverrideStartAt(),
+        override.getOverrideEndAt(),
+        override.isOverrideAllDay(),
+        override.isOverrideAllDay() ? null : override.getOverrideTimeZone(),
+        false,
+        recurrenceEvent.getId(),
+        true,
+        TagResponse.from(recurrenceEvent.getTag()),
+        override.getOriginStartAt(),
+        recurrenceEvent.getCreatedAt(),
+        recurrenceEvent.getUpdatedAt());
+  }
 
-    public static EventResponse recurrenceOccurrence(
-            ResolvedPersonalRecurrenceOccurrence occurrence
-    ) {
-        RecurrenceEvent recurrenceEvent = occurrence.recurrenceEvent();
-        return new EventResponse(
-                null,
-                occurrence.title(),
-                occurrence.description(),
-                occurrence.startAt(),
-                occurrence.endAt(),
-                occurrence.allDay(),
-                occurrence.timeZone(),
-                false,
-                recurrenceEvent.getId(),
-                true,
-                TagResponse.from(recurrenceEvent.getTag()),
-                occurrence.originStartAt(),
-                recurrenceEvent.getCreatedAt(),
-                recurrenceEvent.getUpdatedAt()
-        );
-    }
+  public static EventResponse recurrenceOccurrence(PersonalRecurrenceOccurrence occurrence) {
+    RecurrenceEvent recurrenceEvent = occurrence.recurrenceEvent();
+    return new EventResponse(
+        null,
+        occurrence.title(),
+        occurrence.description(),
+        occurrence.startAt(),
+        occurrence.endAt(),
+        occurrence.allDay(),
+        occurrence.timeZone(),
+        false,
+        recurrenceEvent.getId(),
+        true,
+        TagResponse.from(recurrenceEvent.getTag()),
+        occurrence.originStartAt(),
+        recurrenceEvent.getCreatedAt(),
+        recurrenceEvent.getUpdatedAt());
+  }
 }

@@ -5,7 +5,7 @@ import java.time.Instant;
 import java.util.Objects;
 
 /** A group-calendar recurrence occurrence after applying its override, if one exists. */
-public record ResolvedGroupCalendarRecurrenceOccurrence(
+public record GroupCalendarRecurrenceOccurrence(
     GroupCalendarRecurrenceEvent recurrenceEvent,
     Instant originStartAt,
     String title,
@@ -15,7 +15,7 @@ public record ResolvedGroupCalendarRecurrenceOccurrence(
     boolean allDay,
     String timeZone) {
 
-  public ResolvedGroupCalendarRecurrenceOccurrence {
+  public GroupCalendarRecurrenceOccurrence {
     Objects.requireNonNull(recurrenceEvent);
     Objects.requireNonNull(originStartAt);
     Objects.requireNonNull(title);
@@ -23,9 +23,9 @@ public record ResolvedGroupCalendarRecurrenceOccurrence(
     Objects.requireNonNull(endAt);
   }
 
-  public static ResolvedGroupCalendarRecurrenceOccurrence generated(
+  public static GroupCalendarRecurrenceOccurrence generated(
       GroupCalendarRecurrenceEvent recurrenceEvent, RecurrenceOccurrence occurrence) {
-    return new ResolvedGroupCalendarRecurrenceOccurrence(
+    return new GroupCalendarRecurrenceOccurrence(
         recurrenceEvent,
         occurrence.originStartAt(),
         recurrenceEvent.getTitle(),
@@ -36,10 +36,10 @@ public record ResolvedGroupCalendarRecurrenceOccurrence(
         recurrenceEvent.getTimeZone());
   }
 
-  public static ResolvedGroupCalendarRecurrenceOccurrence overridden(
+  public static GroupCalendarRecurrenceOccurrence overridden(
       GroupCalendarRecurrenceOverride override) {
     GroupCalendarRecurrenceEvent recurrenceEvent = override.getRecurrenceEvent();
-    return new ResolvedGroupCalendarRecurrenceOccurrence(
+    return new GroupCalendarRecurrenceOccurrence(
         recurrenceEvent,
         override.getOriginStartAt(),
         override.getTitle(),

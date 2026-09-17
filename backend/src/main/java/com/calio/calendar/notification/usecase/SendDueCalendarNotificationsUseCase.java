@@ -8,8 +8,8 @@ import com.calio.calendar.event.repository.EventRepository;
 import com.calio.calendar.groupcalendar.event.domain.GroupCalendarEvent;
 import com.calio.calendar.groupcalendar.event.repository.GroupCalendarEventRepository;
 import com.calio.calendar.groupcalendar.recurrence.domain.GroupCalendarRecurrenceEvent;
+import com.calio.calendar.groupcalendar.recurrence.domain.GroupCalendarRecurrenceOccurrence;
 import com.calio.calendar.groupcalendar.recurrence.domain.GroupCalendarRecurrenceOverride;
-import com.calio.calendar.groupcalendar.recurrence.domain.ResolvedGroupCalendarRecurrenceOccurrence;
 import com.calio.calendar.groupcalendar.recurrence.repository.GroupCalendarRecurrenceEventRepository;
 import com.calio.calendar.groupcalendar.recurrence.repository.GroupCalendarRecurrenceOverrideRepository;
 import com.calio.calendar.groupcalendar.recurrence.service.GroupCalendarRecurrenceOccurrenceResolver;
@@ -27,10 +27,10 @@ import com.calio.calendar.notification.domain.NotificationDispatch;
 import com.calio.calendar.notification.domain.NotificationScheduleKey;
 import com.calio.calendar.notification.repository.IosPushDeviceRepository;
 import com.calio.calendar.notification.repository.NotificationDispatchRepository;
+import com.calio.calendar.recurrence.domain.PersonalRecurrenceOccurrence;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceOccurrence;
-import com.calio.calendar.recurrence.domain.ResolvedPersonalRecurrenceOccurrence;
 import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.recurrence.service.PersonalRecurrenceOccurrenceResolver;
@@ -434,7 +434,7 @@ public class SendDueCalendarNotificationsUseCase {
           event.importantEvent());
     }
 
-    private static NotificationSchedule personal(ResolvedPersonalRecurrenceOccurrence occurrence) {
+    private static NotificationSchedule personal(PersonalRecurrenceOccurrence occurrence) {
       return new NotificationSchedule(
           NotificationScheduleKey.personalRecurrence(
               occurrence.recurrenceEvent().getId(), occurrence.originStartAt()),
@@ -460,7 +460,7 @@ public class SendDueCalendarNotificationsUseCase {
     }
 
     private static NotificationSchedule group(
-        ResolvedGroupCalendarRecurrenceOccurrence occurrence, String groupName) {
+        GroupCalendarRecurrenceOccurrence occurrence, String groupName) {
       return new NotificationSchedule(
           NotificationScheduleKey.groupRecurrence(
               occurrence.recurrenceEvent().getId(), occurrence.originStartAt()),
@@ -488,13 +488,13 @@ public class SendDueCalendarNotificationsUseCase {
       return startAt.isBefore(dayEnd) && endAt.isAfter(dayStart);
     }
 
-    private boolean matches(ResolvedPersonalRecurrenceOccurrence occurrence) {
+    private boolean matches(PersonalRecurrenceOccurrence occurrence) {
       return scheduleKey.equals(
           NotificationScheduleKey.personalRecurrence(
               occurrence.recurrenceEvent().getId(), occurrence.originStartAt()));
     }
 
-    private boolean matches(ResolvedGroupCalendarRecurrenceOccurrence occurrence) {
+    private boolean matches(GroupCalendarRecurrenceOccurrence occurrence) {
       return scheduleKey.equals(
           NotificationScheduleKey.groupRecurrence(
               occurrence.recurrenceEvent().getId(), occurrence.originStartAt()));

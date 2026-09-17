@@ -4,7 +4,7 @@ import java.time.Instant;
 import java.util.Objects;
 
 /** A recurrence occurrence after applying its override, if one exists. */
-public record ResolvedPersonalRecurrenceOccurrence(
+public record PersonalRecurrenceOccurrence(
     RecurrenceEvent recurrenceEvent,
     Instant originStartAt,
     String title,
@@ -14,7 +14,7 @@ public record ResolvedPersonalRecurrenceOccurrence(
     boolean allDay,
     String timeZone) {
 
-  public ResolvedPersonalRecurrenceOccurrence {
+  public PersonalRecurrenceOccurrence {
     Objects.requireNonNull(recurrenceEvent);
     Objects.requireNonNull(originStartAt);
     Objects.requireNonNull(title);
@@ -22,9 +22,9 @@ public record ResolvedPersonalRecurrenceOccurrence(
     Objects.requireNonNull(endAt);
   }
 
-  public static ResolvedPersonalRecurrenceOccurrence generated(
+  public static PersonalRecurrenceOccurrence generated(
       RecurrenceEvent recurrenceEvent, RecurrenceOccurrence occurrence) {
-    return new ResolvedPersonalRecurrenceOccurrence(
+    return new PersonalRecurrenceOccurrence(
         recurrenceEvent,
         occurrence.originStartAt(),
         recurrenceEvent.getTitle(),
@@ -35,9 +35,9 @@ public record ResolvedPersonalRecurrenceOccurrence(
         recurrenceEvent.isAllDay() ? null : recurrenceEvent.getTimeZone());
   }
 
-  public static ResolvedPersonalRecurrenceOccurrence overridden(RecurrenceEventOverride override) {
+  public static PersonalRecurrenceOccurrence overridden(RecurrenceEventOverride override) {
     RecurrenceEvent recurrenceEvent = override.getRecurrenceEvent();
-    return new ResolvedPersonalRecurrenceOccurrence(
+    return new PersonalRecurrenceOccurrence(
         recurrenceEvent,
         override.getOriginStartAt(),
         override.getOverrideTitle(),

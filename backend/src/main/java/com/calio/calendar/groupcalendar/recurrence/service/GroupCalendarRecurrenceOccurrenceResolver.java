@@ -1,8 +1,8 @@
 package com.calio.calendar.groupcalendar.recurrence.service;
 
 import com.calio.calendar.groupcalendar.recurrence.domain.GroupCalendarRecurrenceEvent;
+import com.calio.calendar.groupcalendar.recurrence.domain.GroupCalendarRecurrenceOccurrence;
 import com.calio.calendar.groupcalendar.recurrence.domain.GroupCalendarRecurrenceOverride;
-import com.calio.calendar.groupcalendar.recurrence.domain.ResolvedGroupCalendarRecurrenceOccurrence;
 import com.calio.calendar.recurrence.domain.RecurrenceOccurrence;
 import com.calio.calendar.recurrence.service.Rfc5545RecurrenceEngine;
 import java.time.Instant;
@@ -28,7 +28,7 @@ public class GroupCalendarRecurrenceOccurrenceResolver {
         recurrenceEvent.toRecurrenceSchedule(), recurrenceEvent.getRecurrenceRules(), from, to);
   }
 
-  public List<ResolvedGroupCalendarRecurrenceOccurrence> resolve(
+  public List<GroupCalendarRecurrenceOccurrence> resolve(
       GroupCalendarRecurrenceEvent recurrenceEvent,
       List<RecurrenceOccurrence> occurrences,
       List<GroupCalendarRecurrenceOverride> overrides,
@@ -42,31 +42,32 @@ public class GroupCalendarRecurrenceOccurrenceResolver {
     return occurrences.stream()
         .map(
             occurrence ->
-                resolve(recurrenceEvent, occurrence, overridesByOrigin.get(occurrence.originStartAt())))
+                resolve(
+                    recurrenceEvent, occurrence, overridesByOrigin.get(occurrence.originStartAt())))
         .filter(java.util.Objects::nonNull)
         .filter(occurrence -> occurrence.overlaps(from, to))
         .toList();
   }
 
-  public List<ResolvedGroupCalendarRecurrenceOccurrence> resolveMovedIn(
+  public List<GroupCalendarRecurrenceOccurrence> resolveMovedIn(
       List<GroupCalendarRecurrenceOverride> overrides, Instant from, Instant to) {
     return overrides.stream()
         .filter(override -> !override.isDeleted())
-        .map(ResolvedGroupCalendarRecurrenceOccurrence::overridden)
+        .map(GroupCalendarRecurrenceOccurrence::overridden)
         .filter(occurrence -> occurrence.overlaps(from, to))
         .toList();
   }
 
-  private ResolvedGroupCalendarRecurrenceOccurrence resolve(
+  private GroupCalendarRecurrenceOccurrence resolve(
       GroupCalendarRecurrenceEvent recurrenceEvent,
       RecurrenceOccurrence occurrence,
       GroupCalendarRecurrenceOverride override) {
     if (override == null) {
-      return ResolvedGroupCalendarRecurrenceOccurrence.generated(recurrenceEvent, occurrence);
+      return GroupCalendarRecurrenceOccurrence.generated(recurrenceEvent, occurrence);
     }
     if (override.isDeleted()) {
       return null;
     }
-    return ResolvedGroupCalendarRecurrenceOccurrence.overridden(override);
+    return GroupCalendarRecurrenceOccurrence.overridden(override);
   }
 }
