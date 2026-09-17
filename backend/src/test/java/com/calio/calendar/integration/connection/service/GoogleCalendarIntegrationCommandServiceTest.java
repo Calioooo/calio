@@ -17,27 +17,28 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
 class GoogleCalendarIntegrationCommandServiceTest {
-    @Mock private GoogleCalendarIntegrationRepository integrationRepository;
-    @InjectMocks private GoogleCalendarIntegrationCommandService commandService;
+  @Mock private GoogleCalendarIntegrationRepository integrationRepository;
+  @InjectMocks private GoogleCalendarIntegrationCommandService commandService;
 
-    @Test
-    @DisplayName("Account Integration은 Account ID만으로 생성한다")
-    void givenAccount_whenCreateIntegration_thenPersistsAccountAggregate() {
-        GoogleCalendarIntegration integration = new GoogleCalendarIntegration(1L);
-        when(integrationRepository.saveAndFlush(ArgumentMatchers.any())).thenReturn(integration);
+  @Test
+  @DisplayName("Account Integration은 Account ID만으로 생성한다")
+  void givenAccount_whenCreateIntegration_thenPersistsAccountAggregate() {
+    GoogleCalendarIntegration integration = new GoogleCalendarIntegration(1L);
+    when(integrationRepository.saveAndFlush(ArgumentMatchers.any())).thenReturn(integration);
 
-        GoogleCalendarIntegration saved = commandService.createIntegration(1L);
+    GoogleCalendarIntegration saved = commandService.createIntegration(1L);
 
-        assertThat(saved).isSameAs(integration);
-        verify(integrationRepository).saveAndFlush(ArgumentMatchers.any(GoogleCalendarIntegration.class));
-    }
+    assertThat(saved).isSameAs(integration);
+    verify(integrationRepository)
+        .saveAndFlush(ArgumentMatchers.any(GoogleCalendarIntegration.class));
+  }
 
-    @Test
-    @DisplayName("Integration lock 조회는 Account별 aggregate를 반환한다")
-    void givenExistingIntegration_whenFindForUpdate_thenReturnsIt() {
-        GoogleCalendarIntegration integration = new GoogleCalendarIntegration(1L);
-        when(integrationRepository.findByAccountIdForUpdate(1L)).thenReturn(Optional.of(integration));
+  @Test
+  @DisplayName("Integration lock 조회는 Account별 aggregate를 반환한다")
+  void givenExistingIntegration_whenFindForUpdate_thenReturnsIt() {
+    GoogleCalendarIntegration integration = new GoogleCalendarIntegration(1L);
+    when(integrationRepository.findByAccountIdForUpdate(1L)).thenReturn(Optional.of(integration));
 
-        assertThat(commandService.tryLockIntegration(1L)).containsSame(integration);
-    }
+    assertThat(commandService.tryLockIntegration(1L)).containsSame(integration);
+  }
 }

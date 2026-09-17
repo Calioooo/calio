@@ -13,108 +13,98 @@ import org.springframework.dao.TransientDataAccessResourceException;
 
 class GoogleOperationFailureClassifierTest {
 
-    private final GoogleOperationFailureClassifier classifier =
-            new GoogleOperationFailureClassifier();
+  private final GoogleOperationFailureClassifier classifier =
+      new GoogleOperationFailureClassifier();
 
-    @Test
-    @DisplayName("operation ownership 상실은 상태 변경 없이 skip한다")
-    void givenOwnershipLost_whenClassify_thenSkips() {
-        // when
-        GoogleOperationFailureDecision decision = classifier.classify(
-                new GoogleOperationOwnershipLostException()
-        );
+  @Test
+  @DisplayName("operation ownership 상실은 상태 변경 없이 skip한다")
+  void givenOwnershipLost_whenClassify_thenSkips() {
+    // when
+    GoogleOperationFailureDecision decision =
+        classifier.classify(new GoogleOperationOwnershipLostException());
 
-        // then
-        assertThat(decision.action()).isEqualTo(Action.SKIP);
-        assertThat(decision.reason()).isNull();
-    }
+    // then
+    assertThat(decision.action()).isEqualTo(Action.SKIP);
+    assertThat(decision.reason()).isNull();
+  }
 
-    @Test
-    @DisplayName("Spring의 일시적인 DB 오류는 retry한다")
-    void givenTransientDataAccessFailure_whenClassify_thenRetries() {
-        // when
-        GoogleOperationFailureDecision decision = classifier.classify(
-                new TransientDataAccessResourceException("temporary")
-        );
+  @Test
+  @DisplayName("Spring의 일시적인 DB 오류는 retry한다")
+  void givenTransientDataAccessFailure_whenClassify_thenRetries() {
+    // when
+    GoogleOperationFailureDecision decision =
+        classifier.classify(new TransientDataAccessResourceException("temporary"));
 
-        // then
-        assertThat(decision.action()).isEqualTo(Action.RETRY);
-        assertThat(decision.reason())
-                .isEqualTo(TransientDataAccessResourceException.class.getSimpleName());
-    }
+    // then
+    assertThat(decision.action()).isEqualTo(Action.RETRY);
+    assertThat(decision.reason())
+        .isEqualTo(TransientDataAccessResourceException.class.getSimpleName());
+  }
 
-    @Test
-    @DisplayName("일시적인 SQL 오류가 있으면 retry한다")
-    void givenNestedTransientSqlFailure_whenClassify_thenRetries() {
-        // given
-        RuntimeException failure = new RuntimeException(
-                "database failure",
-                new SQLTransientException("temporary")
-        );
+  @Test
+  @DisplayName("일시적인 SQL 오류가 있으면 retry한다")
+  void givenNestedTransientSqlFailure_whenClassify_thenRetries() {
+    // given
+    RuntimeException failure =
+        new RuntimeException("database failure", new SQLTransientException("temporary"));
 
-        // when
-        GoogleOperationFailureDecision decision = classifier.classify(failure);
+    // when
+    GoogleOperationFailureDecision decision = classifier.classify(failure);
 
-        // then
-        assertThat(decision.action()).isEqualTo(Action.RETRY);
-        assertThat(decision.reason()).isEqualTo(SQLTransientException.class.getSimpleName());
-    }
+    // then
+    assertThat(decision.action()).isEqualTo(Action.RETRY);
+    assertThat(decision.reason()).isEqualTo(SQLTransientException.class.getSimpleName());
+  }
 
-    @Test
-    @DisplayName("재연결이 필요한 Google 오류는 fail 처리한다")
-    void givenPermanentCalioFailure_whenClassify_thenFails() {
-        // when
-        GoogleOperationFailureDecision decision = classifier.classify(
-                new CalioException(ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED)
-        );
+  @Test
+  @DisplayName("재연결이 필요한 Google 오류는 fail 처리한다")
+  void givenPermanentCalioFailure_whenClassify_thenFails() {
+    // when
+    GoogleOperationFailureDecision decision =
+        classifier.classify(new CalioException(ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED));
 
-        // then
-        assertThat(decision.action()).isEqualTo(Action.FAIL);
-        assertThat(decision.reason())
-                .isEqualTo(ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED.name());
-    }
+    // then
+    assertThat(decision.action()).isEqualTo(Action.FAIL);
+    assertThat(decision.reason()).isEqualTo(ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED.name());
+  }
 
-    @Test
-    @DisplayName("잘못된 Google 요청은 재시도 없이 fail 처리한다")
-    void givenInvalidGoogleRequest_whenClassify_thenFails() {
-        // when
-        GoogleOperationFailureDecision decision = classifier.classify(
-                new CalioException(ErrorCode.GOOGLE_CALENDAR_REQUEST_INVALID)
-        );
+  @Test
+  @DisplayName("잘못된 Google 요청은 재시도 없이 fail 처리한다")
+  void givenInvalidGoogleRequest_whenClassify_thenFails() {
+    // when
+    GoogleOperationFailureDecision decision =
+        classifier.classify(new CalioException(ErrorCode.GOOGLE_CALENDAR_REQUEST_INVALID));
 
-        // then
-        assertThat(decision.action()).isEqualTo(Action.FAIL);
-        assertThat(decision.reason()).isEqualTo(ErrorCode.GOOGLE_CALENDAR_REQUEST_INVALID.name());
-    }
+    // then
+    assertThat(decision.action()).isEqualTo(Action.FAIL);
+    assertThat(decision.reason()).isEqualTo(ErrorCode.GOOGLE_CALENDAR_REQUEST_INVALID.name());
+  }
 
-    @Test
-    @DisplayName("원인이 있는 Google Sync 실패는 root cause를 포함해 retry한다")
-    void givenCausedSyncFailure_whenClassify_thenRetriesWithCause() {
-        // when
-        GoogleOperationFailureDecision decision = classifier.classify(
-                new CalioException(
-                        ErrorCode.GOOGLE_CALENDAR_SYNC_FAILED,
-                        new IllegalStateException("provider failure")
-                )
-        );
+  @Test
+  @DisplayName("원인이 있는 Google Sync 실패는 root cause를 포함해 retry한다")
+  void givenCausedSyncFailure_whenClassify_thenRetriesWithCause() {
+    // when
+    GoogleOperationFailureDecision decision =
+        classifier.classify(
+            new CalioException(
+                ErrorCode.GOOGLE_CALENDAR_SYNC_FAILED,
+                new IllegalStateException("provider failure")));
 
-        // then
-        assertThat(decision.action()).isEqualTo(Action.RETRY);
-        assertThat(decision.reason()).isEqualTo(
-                ErrorCode.GOOGLE_CALENDAR_SYNC_FAILED.name() + ":IllegalStateException"
-        );
-    }
+    // then
+    assertThat(decision.action()).isEqualTo(Action.RETRY);
+    assertThat(decision.reason())
+        .isEqualTo(ErrorCode.GOOGLE_CALENDAR_SYNC_FAILED.name() + ":IllegalStateException");
+  }
 
-    @Test
-    @DisplayName("분류되지 않은 내부 오류는 fail 처리한다")
-    void givenUnknownFailure_whenClassify_thenFailsAsInternalError() {
-        // when
-        GoogleOperationFailureDecision decision = classifier.classify(
-                new IllegalStateException("unknown")
-        );
+  @Test
+  @DisplayName("분류되지 않은 내부 오류는 fail 처리한다")
+  void givenUnknownFailure_whenClassify_thenFailsAsInternalError() {
+    // when
+    GoogleOperationFailureDecision decision =
+        classifier.classify(new IllegalStateException("unknown"));
 
-        // then
-        assertThat(decision.action()).isEqualTo(Action.FAIL);
-        assertThat(decision.reason()).isEqualTo(ErrorCode.INTERNAL_SERVER_ERROR.name());
-    }
+    // then
+    assertThat(decision.action()).isEqualTo(Action.FAIL);
+    assertThat(decision.reason()).isEqualTo(ErrorCode.INTERNAL_SERVER_ERROR.name());
+  }
 }

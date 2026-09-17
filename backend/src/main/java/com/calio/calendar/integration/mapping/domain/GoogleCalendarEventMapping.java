@@ -3,8 +3,8 @@ package com.calio.calendar.integration.mapping.domain;
 import com.calio.calendar.common.domain.BaseEntity;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarConnection;
 import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
 import jakarta.persistence.Embedded;
+import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -16,98 +16,92 @@ import jakarta.persistence.UniqueConstraint;
 
 @Entity
 @Table(
-        name = "google_calendar_event_mappings",
-        uniqueConstraints = {
-                @UniqueConstraint(
-                        name = "uk_google_calendar_mapping_external_identity",
-                        columnNames = {"connection_id", "calendar_key", "external_event_id"}
-                ),
-                @UniqueConstraint(
-                        name = "uk_google_calendar_mapping_connection_event",
-                        columnNames = {"connection_id", "event_id"}
-                )
-        }
-)
+    name = "google_calendar_event_mappings",
+    uniqueConstraints = {
+      @UniqueConstraint(
+          name = "uk_google_calendar_mapping_external_identity",
+          columnNames = {"connection_id", "calendar_key", "external_event_id"}),
+      @UniqueConstraint(
+          name = "uk_google_calendar_mapping_connection_event",
+          columnNames = {"connection_id", "event_id"})
+    })
 public class GoogleCalendarEventMapping extends BaseEntity {
 
-    public static final String PRIMARY_CALENDAR_KEY = "primary";
+  public static final String PRIMARY_CALENDAR_KEY = "primary";
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "connection_id", nullable = false)
-    private GoogleCalendarConnection connection;
+  @ManyToOne(fetch = FetchType.LAZY, optional = false)
+  @JoinColumn(name = "connection_id", nullable = false)
+  private GoogleCalendarConnection connection;
 
-    @Column(name = "event_id", nullable = false, updatable = false)
-    private Long eventId;
+  @Column(name = "event_id", nullable = false, updatable = false)
+  private Long eventId;
 
-    @Column(name = "calendar_key", nullable = false, length = 32)
-    private String calendarKey;
+  @Column(name = "calendar_key", nullable = false, length = 32)
+  private String calendarKey;
 
-    @Column(name = "external_event_id", nullable = false, length = 1024)
-    private String externalEventId;
+  @Column(name = "external_event_id", nullable = false, length = 1024)
+  private String externalEventId;
 
-    @Embedded
-    private GoogleCalendarMappingSyncState syncState;
+  @Embedded private GoogleCalendarMappingSyncState syncState;
 
-    @Column(name = "local_changed", nullable = false)
-    private boolean localChanged;
+  @Column(name = "local_changed", nullable = false)
+  private boolean localChanged;
 
-    protected GoogleCalendarEventMapping() {
-    }
+  protected GoogleCalendarEventMapping() {}
 
-    public GoogleCalendarEventMapping(
-            GoogleCalendarConnection connection,
-            Long eventId,
-            String externalEventId,
-            String providerEtag
-    ) {
-        this.connection = connection;
-        this.eventId = eventId;
-        this.calendarKey = PRIMARY_CALENDAR_KEY;
-        this.externalEventId = externalEventId;
-        this.syncState = GoogleCalendarMappingSyncState.active(providerEtag);
-    }
+  public GoogleCalendarEventMapping(
+      GoogleCalendarConnection connection,
+      Long eventId,
+      String externalEventId,
+      String providerEtag) {
+    this.connection = connection;
+    this.eventId = eventId;
+    this.calendarKey = PRIMARY_CALENDAR_KEY;
+    this.externalEventId = externalEventId;
+    this.syncState = GoogleCalendarMappingSyncState.active(providerEtag);
+  }
 
-    public Long getId() {
-        return id;
-    }
+  public Long getId() {
+    return id;
+  }
 
-    public GoogleCalendarConnection getConnection() {
-        return connection;
-    }
+  public GoogleCalendarConnection getConnection() {
+    return connection;
+  }
 
-    public Long getEventId() {
-        return eventId;
-    }
+  public Long getEventId() {
+    return eventId;
+  }
 
-    public String getExternalEventId() {
-        return externalEventId;
-    }
+  public String getExternalEventId() {
+    return externalEventId;
+  }
 
-    public void updateProviderEtag(String providerEtag) {
-        syncState.updateProviderEtag(providerEtag);
-    }
+  public void updateProviderEtag(String providerEtag) {
+    syncState.updateProviderEtag(providerEtag);
+  }
 
-    public void markConflicted() {
-        syncState.markConflicted();
-    }
+  public void markConflicted() {
+    syncState.markConflicted();
+  }
 
-    public void markLocalChanged() {
-        localChanged = true;
-    }
+  public void markLocalChanged() {
+    localChanged = true;
+  }
 
-    public boolean isLocalChanged() {
-        return localChanged;
-    }
+  public boolean isLocalChanged() {
+    return localChanged;
+  }
 
-    public boolean isConflicted() {
-        return syncState.isConflicted();
-    }
+  public boolean isConflicted() {
+    return syncState.isConflicted();
+  }
 
-    public String getProviderEtag() {
-        return syncState.getProviderEtag();
-    }
+  public String getProviderEtag() {
+    return syncState.getProviderEtag();
+  }
 }
