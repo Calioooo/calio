@@ -14,36 +14,33 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @Transactional(readOnly = true)
 public class GoogleCalendarConnectionQueryService {
-    private final GoogleCalendarConnectionRepository connectionRepository;
+  private final GoogleCalendarConnectionRepository connectionRepository;
 
-    public GoogleCalendarConnectionQueryService(GoogleCalendarConnectionRepository connectionRepository) {
-        this.connectionRepository = connectionRepository;
-    }
+  public GoogleCalendarConnectionQueryService(
+      GoogleCalendarConnectionRepository connectionRepository) {
+    this.connectionRepository = connectionRepository;
+  }
 
-    public GoogleCalendarConnection getConnectedConnection(Long accountId) {
-        return connectionRepository.findWithIntegrationByAccountIdAndState(
-                        accountId, GoogleCalendarConnectionState.CONNECTED
-                )
-                .orElseThrow(() -> new CalioException(ErrorCode.GOOGLE_CALENDAR_NOT_CONNECTED));
-    }
+  public GoogleCalendarConnection getConnectedConnection(Long accountId) {
+    return connectionRepository
+        .findWithIntegrationByAccountIdAndState(accountId, GoogleCalendarConnectionState.CONNECTED)
+        .orElseThrow(() -> new CalioException(ErrorCode.GOOGLE_CALENDAR_NOT_CONNECTED));
+  }
 
-    public Optional<GoogleCalendarConnection> getConnectedConnectionIfExists(Long accountId) {
-        return connectionRepository.findWithIntegrationByAccountIdAndState(
-                accountId, GoogleCalendarConnectionState.CONNECTED
-        );
-    }
+  public Optional<GoogleCalendarConnection> getConnectedConnectionIfExists(Long accountId) {
+    return connectionRepository.findWithIntegrationByAccountIdAndState(
+        accountId, GoogleCalendarConnectionState.CONNECTED);
+  }
 
-    public GoogleCalendarConnection getConnectedConnectionById(Long connectionId) {
-        return connectionRepository.findWithIntegrationById(connectionId)
-                .filter(GoogleCalendarConnection::isConnected)
-                .orElseThrow(() -> new CalioException(ErrorCode.GOOGLE_CALENDAR_NOT_CONNECTED));
-    }
+  public GoogleCalendarConnection getConnectedConnectionById(Long connectionId) {
+    return connectionRepository
+        .findWithIntegrationById(connectionId)
+        .filter(GoogleCalendarConnection::isConnected)
+        .orElseThrow(() -> new CalioException(ErrorCode.GOOGLE_CALENDAR_NOT_CONNECTED));
+  }
 
-    public List<Long> listConnectedAccountIds(Long afterAccountId, int limit) {
-        return connectionRepository.findAccountIdsByStateAfter(
-                afterAccountId,
-                GoogleCalendarConnectionState.CONNECTED,
-                PageRequest.of(0, limit)
-        );
-    }
+  public List<Long> listConnectedAccountIds(Long afterAccountId, int limit) {
+    return connectionRepository.findAccountIdsByStateAfter(
+        afterAccountId, GoogleCalendarConnectionState.CONNECTED, PageRequest.of(0, limit));
+  }
 }
