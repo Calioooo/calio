@@ -6,16 +6,19 @@ import com.calio.calendar.common.domain.CanonicalSchedule;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.event.controller.dto.EventResponse;
+import com.calio.calendar.integration.mapping.service.GoogleCalendarRecurrenceMappingQueryService;
 import com.calio.calendar.recurrence.controller.dto.CreateRecurrenceEventRequest;
 import com.calio.calendar.recurrence.controller.dto.RecurrenceEventResponse;
 import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceEventRequest;
 import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceOccurrenceRequest;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
+import com.calio.calendar.recurrence.domain.RecurrenceOccurrence;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.event.service.EventCommandService;
 import com.calio.calendar.tag.service.TagQueryService;
+import com.calio.calendar.sharing.recurrence.service.PersonalRecurrenceGroupShareCommandService;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -34,6 +37,8 @@ public class RecurrenceEventService {
     private final EventCommandService eventCommandService;
     private final Rfc5545RecurrenceEngine recurrenceEngine;
     private final Clock clock;
+    private final PersonalRecurrenceGroupShareCommandService recurrenceShareCommandService;
+    private final GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService;
 
     public RecurrenceEventService(
             RecurrenceEventQueryService recurrenceEventQueryService,
@@ -42,7 +47,9 @@ public class RecurrenceEventService {
             TagQueryService tagQueryService,
             EventCommandService eventCommandService,
             Rfc5545RecurrenceEngine recurrenceEngine,
-            Clock clock
+            Clock clock,
+            PersonalRecurrenceGroupShareCommandService recurrenceShareCommandService,
+            GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService
     ) {
         this.recurrenceEventQueryService = recurrenceEventQueryService;
         this.recurrenceEventCommandService = recurrenceEventCommandService;
@@ -51,6 +58,8 @@ public class RecurrenceEventService {
         this.eventCommandService = eventCommandService;
         this.recurrenceEngine = recurrenceEngine;
         this.clock = clock;
+        this.recurrenceShareCommandService = recurrenceShareCommandService;
+        this.recurrenceMappingQueryService = recurrenceMappingQueryService;
     }
 
     @Transactional
@@ -67,12 +76,29 @@ public class RecurrenceEventService {
                 tag,
                 account
         ));
-        return RecurrenceEventResponse.from(recurrenceEvent);
+        return toResponseWithSeriesUpdatePermission(recurrenceEvent, accountId);
     }
 
     public RecurrenceEventResponse getRecurrenceEvent(Long accountId, Long recurrenceId) {
-        return RecurrenceEventResponse.from(
-                recurrenceEventQueryService.getRecurrenceEvent(accountId, recurrenceId)
+        return toResponseWithSeriesUpdatePermission(
+                recurrenceEventQueryService.getRecurrenceEvent(accountId, recurrenceId),
+                accountId
+        );
+    }
+
+    public EventResponse getRecurrenceOccurrence(Long accountId, Long recurrenceId, Instant originStartAt) {
+        RecurrenceEvent recurrenceEvent = recurrenceEventQueryService.getRecurrenceEvent(accountId, recurrenceId);
+        Optional<RecurrenceEventOverride> override = recurrenceEventQueryService
+                .getOverrideIfExists(recurrenceId, originStartAt);
+        if (override.isPresent()) {
+            if (override.get().isDeleted()) {
+                throw new CalioException(ErrorCode.RECURRENCE_OCCURRENCE_NOT_FOUND);
+            }
+            return EventResponse.recurrenceOverride(override.get());
+        }
+        return EventResponse.recurrenceOccurrence(
+                recurrenceEvent,
+                findGeneratedOccurrence(recurrenceEvent, originStartAt)
         );
     }
 
@@ -84,6 +110,7 @@ public class RecurrenceEventService {
     ) {
         RecurrenceEvent recurrenceEvent = recurrenceEventCommandService
                 .lockRecurrenceEvent(accountId, recurrenceId);
+        rejectExternalSeriesMutation(accountId, recurrenceId);
         RecurrenceSchedule schedule = createSchedule(request);
         List<String> recurrenceRules = recurrenceEngine.validate(schedule, request.recurrence());
         Tag tag = tagQueryService.getTagOrDefault(accountId, request.tagId());
@@ -94,7 +121,7 @@ public class RecurrenceEventService {
                 recurrenceRules,
                 tag
         );
-        return RecurrenceEventResponse.from(recurrenceEvent);
+        return toResponseWithSeriesUpdatePermission(recurrenceEvent, accountId);
     }
 
     @Transactional
@@ -130,6 +157,8 @@ public class RecurrenceEventService {
     @Transactional
     public void deleteRecurrenceEvent(Long accountId, Long recurrenceId) {
         recurrenceEventCommandService.lockRecurrenceEvent(accountId, recurrenceId);
+        rejectExternalSeriesMutation(accountId, recurrenceId);
+        recurrenceShareCommandService.deleteAllForSourceRecurrence(recurrenceId);
         recurrenceEventCommandService.deleteRecurrenceOverridesByRecurrenceEventIds(List.of(recurrenceId));
         eventCommandService.deleteEventsByRecurrenceEventIds(List.of(recurrenceId));
         recurrenceEventCommandService.deleteRecurrenceEventsByIds(List.of(recurrenceId));
@@ -186,5 +215,35 @@ public class RecurrenceEventService {
                 recurrenceEvent.getRecurrenceRules(),
                 originStartAt
         );
+    }
+    private RecurrenceEventResponse toResponseWithSeriesUpdatePermission(
+            RecurrenceEvent recurrenceEvent,
+            Long accountId
+    ) {
+        boolean canUpdateSeries = !recurrenceMappingQueryService
+                .hasExternalRecurrenceEventMapping(recurrenceEvent.getId(), accountId);
+        return RecurrenceEventResponse.from(recurrenceEvent, canUpdateSeries);
+    }
+
+    private RecurrenceOccurrence findGeneratedOccurrence(
+            RecurrenceEvent recurrenceEvent,
+            Instant originStartAt
+    ) {
+        return recurrenceEngine.expand(
+                        RecurrenceSchedule.from(recurrenceEvent),
+                        recurrenceEvent.getRecurrenceRules(),
+                        originStartAt,
+                        originStartAt.plusNanos(1)
+                )
+                .stream()
+                .filter(occurrence -> originStartAt.equals(occurrence.originStartAt()))
+                .findFirst()
+                .orElseThrow(() -> new CalioException(ErrorCode.RECURRENCE_OCCURRENCE_NOT_FOUND));
+    }
+
+    private void rejectExternalSeriesMutation(Long accountId, Long recurrenceId) {
+        if (recurrenceMappingQueryService.hasExternalRecurrenceEventMapping(recurrenceId, accountId)) {
+            throw new CalioException(ErrorCode.EXTERNAL_EVENT_MUTATION_NOT_SUPPORTED);
+        }
     }
 }
