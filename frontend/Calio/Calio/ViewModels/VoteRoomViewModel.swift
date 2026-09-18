@@ -122,7 +122,7 @@ final class VoteRoomViewModel: ObservableObject {
 
   func requestPersonalSchedule() async {
     guard participantFlow == .editing, !isLoadingSchedule else { return }
-    if hasUnsavedChanges && !draftUnavailableDays.isEmpty {
+    if hasUnsavedChanges {
       needsScheduleReloadConfirmation = true
       return
     }
@@ -264,6 +264,9 @@ final class VoteRoomViewModel: ObservableObject {
       failure = .unexpected
     }
     actionFailure = failure
+    if error == .participantCredentialInvalid {
+      participantFlow = .existingParticipant
+    }
     if result == nil {
       loadState = .failed(failure)
     }
