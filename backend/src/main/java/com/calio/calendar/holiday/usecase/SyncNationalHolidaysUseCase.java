@@ -10,8 +10,9 @@ import com.calio.calendar.holiday.domain.NationalHolidayContent;
 import com.calio.calendar.holiday.repository.NationalHolidayRepository;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -52,7 +53,7 @@ public class SyncNationalHolidaysUseCase {
         return;
       }
 
-      List<NationalHolidayContent> updatedHolidays =
+      Set<NationalHolidayContent> updatedHolidays =
           toNationalHolidayContents(year, response.items());
       if (updatedHolidays.isEmpty()) {
         log.warn("National holiday sync returned empty holiday entries. year={}", year);
@@ -72,35 +73,18 @@ public class SyncNationalHolidaysUseCase {
     }
   }
 
-  private void replaceHolidaysForYear(int year, List<NationalHolidayContent> updatedHolidays) {
+  private void replaceHolidaysForYear(int year, Set<NationalHolidayContent> updatedHolidays) {
     List<NationalHoliday> existingHolidays =
-        nationalHolidayRepository.findByHolidayDateBetweenOrderByHolidayDateAscHolidayTitleAsc(
+        nationalHolidayRepository.findByHolidayDateBetween(
             LocalDate.of(year, 1, 1), LocalDate.of(year, 12, 31));
-    List<NationalHolidayContent> holidaysToCreate = new ArrayList<>();
-    List<NationalHoliday> holidaysToDelete = new ArrayList<>();
-    int existingIndex = 0;
-    int updatedIndex = 0;
-
-    while (existingIndex < existingHolidays.size() && updatedIndex < updatedHolidays.size()) {
-      NationalHoliday existingHoliday = existingHolidays.get(existingIndex);
-      NationalHolidayContent existingContent = NationalHolidayContent.from(existingHoliday);
-      NationalHolidayContent updatedContent = updatedHolidays.get(updatedIndex);
-      int comparison = existingContent.compareTo(updatedContent);
-
-      if (comparison == 0) {
-        existingIndex++;
-        updatedIndex++;
-      } else if (comparison < 0) {
-        holidaysToDelete.add(existingHoliday);
-        existingIndex++;
-      } else {
-        holidaysToCreate.add(updatedContent);
-        updatedIndex++;
-      }
-    }
-
-    holidaysToDelete.addAll(existingHolidays.subList(existingIndex, existingHolidays.size()));
-    holidaysToCreate.addAll(updatedHolidays.subList(updatedIndex, updatedHolidays.size()));
+    Set<NationalHolidayContent> existingContents =
+        existingHolidays.stream().map(NationalHolidayContent::from).collect(Collectors.toSet());
+    List<NationalHolidayContent> holidaysToCreate =
+        updatedHolidays.stream().filter(content -> !existingContents.contains(content)).toList();
+    List<NationalHoliday> holidaysToDelete =
+        existingHolidays.stream()
+            .filter(holiday -> !updatedHolidays.contains(NationalHolidayContent.from(holiday)))
+            .toList();
 
     nationalHolidayRepository.saveAllAndFlush(
         holidaysToCreate.stream()
@@ -109,15 +93,13 @@ public class SyncNationalHolidaysUseCase {
     nationalHolidayRepository.deleteAll(holidaysToDelete);
   }
 
-  private List<NationalHolidayContent> toNationalHolidayContents(
+  private Set<NationalHolidayContent> toNationalHolidayContents(
       int year, List<HolidayApiItem> items) {
     return items.stream()
         .filter(item -> "Y".equals(item.isHoliday()))
         .map(this::toNationalHolidayContent)
         .peek(content -> requireRequestedYear(year, content))
-        .distinct()
-        .sorted()
-        .toList();
+        .collect(Collectors.toSet());
   }
 
   private NationalHolidayContent toNationalHolidayContent(HolidayApiItem item) {

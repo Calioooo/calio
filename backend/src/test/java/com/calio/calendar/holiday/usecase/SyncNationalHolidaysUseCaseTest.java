@@ -61,7 +61,7 @@ class SyncNationalHolidaysUseCaseTest {
                 List.of(
                     new HolidayApiItem("20260101", "신정", "Y"),
                     new HolidayApiItem("20260606", "현충일", "Y"))));
-    when(nationalHolidayRepository.findByHolidayDateBetweenOrderByHolidayDateAscHolidayTitleAsc(
+    when(nationalHolidayRepository.findByHolidayDateBetween(
             LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31)))
         .thenReturn(List.of(stale));
 
@@ -72,7 +72,7 @@ class SyncNationalHolidaysUseCaseTest {
     verify(nationalHolidayRepository).saveAllAndFlush(saved.capture());
     assertThat(saved.getValue())
         .extracting(NationalHoliday::getHolidayTitle)
-        .containsExactly("신정", "현충일");
+        .containsExactlyInAnyOrder("신정", "현충일");
     verify(nationalHolidayRepository).deleteAll(List.of(stale));
   }
 
