@@ -13,6 +13,7 @@ struct CalendarHomeView: View {
   @State private var isShowingEventCreationView = false
   @State private var isShowingAssistant = false
   @State private var isShowingVoteCreation = false
+  @State private var isShowingVoteList = false
   @State private var createdVoteRoom: VoteRoom?
   private let onGoogleCalendarConnectTapped: () -> Void
   private let onVoteRoomOpen: (VoteRoom) -> Void
@@ -85,6 +86,15 @@ struct CalendarHomeView: View {
         onCalendarRefreshNeeded: viewModel.refreshAfterAssistantResponse
       )
       .overlay { votePopover }
+      .fullScreenCover(isPresented: $isShowingVoteList) {
+        VoteListView(
+          createdRooms: [],
+          participatedRooms: [],
+          onClose: { isShowingVoteList = false },
+          onRoomSelected: openVoteRoomFromList(_:),
+          onCreateVote: startVoteCreationFromList
+        )
+      }
     }
   }
 
@@ -96,7 +106,8 @@ struct CalendarHomeView: View {
       onTodayTapped: viewModel.moveToToday,
       onGoogleCalendarConnectTapped: onGoogleCalendarConnectTapped,
       onCreateTapped: startCreatingEvent,
-      onCreateVoteTapped: { isShowingVoteCreation = true }
+      onCreateVoteTapped: { isShowingVoteCreation = true },
+      onMyVotesTapped: { isShowingVoteList = true }
     )
   }
 
@@ -173,6 +184,20 @@ struct CalendarHomeView: View {
   private func openVoteRoom(_ room: VoteRoom) {
     createdVoteRoom = nil
     onVoteRoomOpen(room)
+  }
+
+  private func openVoteRoomFromList(_ room: VoteRoom) {
+    isShowingVoteList = false
+    DispatchQueue.main.async {
+      onVoteRoomOpen(room)
+    }
+  }
+
+  private func startVoteCreationFromList() {
+    isShowingVoteList = false
+    DispatchQueue.main.async {
+      isShowingVoteCreation = true
+    }
   }
 }
 
