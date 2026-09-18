@@ -155,7 +155,7 @@ struct VoteCreationPopoverView: View {
   }
 
   private func dayText(_ day: VoteDay) -> String {
-    "\(day.year)년 \(day.month)월 \(day.day)일"
+    "\(String(day.year))년 \(day.month)월 \(day.day)일"
   }
 }
 
@@ -174,7 +174,7 @@ private struct VoteMonthCalendarView: View {
       HStack {
         monthButton(symbol: "chevron.left", direction: -1)
         Spacer()
-        Text("\(month.year)년 \(month.month)월")
+        Text("\(String(month.year))년 \(month.month)월")
           .font(.headline.weight(.semibold))
           .foregroundStyle(.calioPrimary)
         Spacer()
