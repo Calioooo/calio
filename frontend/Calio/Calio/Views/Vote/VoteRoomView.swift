@@ -271,11 +271,6 @@ struct VoteRoomView: View {
         )
       }
       Spacer(minLength: 0)
-      if viewModel.didSave {
-        Label("저장됨", systemImage: "checkmark.circle.fill")
-          .font(.footnote.weight(.semibold))
-          .foregroundStyle(.voteAccent)
-      }
       Button(viewModel.isSubmitting ? "저장하는 중" : "저장") {
         Task { await viewModel.submitVotes() }
       }
