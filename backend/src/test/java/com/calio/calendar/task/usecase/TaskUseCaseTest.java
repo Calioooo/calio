@@ -11,6 +11,7 @@ import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.task.controller.dto.TaskResponse;
 import com.calio.calendar.task.domain.Task;
+import com.calio.calendar.task.domain.TaskTitle;
 import com.calio.calendar.task.repository.TaskRepository;
 import java.time.Clock;
 import java.time.Instant;
@@ -106,7 +107,7 @@ class TaskUseCaseTest {
   }
 
   private Task task(String title) {
-    Task task = new Task(title, 1L);
+    Task task = new Task(new TaskTitle(title), 1L);
     ReflectionTestUtils.setField(task, "taskId", 10L);
     return task;
   }

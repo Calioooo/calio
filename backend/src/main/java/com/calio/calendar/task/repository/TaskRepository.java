@@ -12,11 +12,12 @@ import org.springframework.data.repository.query.Param;
 
 public interface TaskRepository extends JpaRepository<Task, Long> {
 
-  Page<Task> findByAccountIdAndCompletedFalse(Long accountId, Pageable pageable);
+  Page<Task> findByAccountIdAndStateCompletedFalse(Long accountId, Pageable pageable);
 
   Optional<Task> findByTaskIdAndAccountId(Long taskId, Long accountId);
 
   @Modifying(flushAutomatically = true, clearAutomatically = true)
-  @Query("delete from Task task where task.completed = true and task.completedAt < :cutoff")
+  @Query(
+      "delete from Task task where task.state.completed = true and task.state.completedAt < :cutoff")
   int deleteCompletedTasksBefore(@Param("cutoff") Instant cutoff);
 }

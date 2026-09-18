@@ -5,6 +5,7 @@ import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.task.controller.dto.TaskResponse;
 import com.calio.calendar.task.domain.Task;
+import com.calio.calendar.task.domain.TaskTitle;
 import com.calio.calendar.task.repository.TaskRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,7 +26,7 @@ public class CreateTaskUseCase {
     accountRepository
         .findById(accountId)
         .orElseThrow(() -> new CalioException(ErrorCode.ACCOUNT_NOT_FOUND));
-    Task task = taskRepository.save(new Task(taskTitle, accountId));
+    Task task = taskRepository.save(new Task(new TaskTitle(taskTitle), accountId));
     return TaskResponse.from(task);
   }
 }

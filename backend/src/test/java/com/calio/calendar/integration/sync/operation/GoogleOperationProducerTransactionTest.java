@@ -15,6 +15,7 @@ import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobSt
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobTrigger;
 import com.calio.calendar.integration.sync.operation.repository.GoogleOperationJobRepository;
 import com.calio.calendar.task.domain.Task;
+import com.calio.calendar.task.domain.TaskTitle;
 import com.calio.calendar.task.repository.TaskRepository;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
@@ -66,7 +67,7 @@ class GoogleOperationProducerTransactionTest {
     Task task =
         producerTransaction.mutate(
             account.getId(),
-            () -> taskRepository.save(new Task("Google 반영 작업", account.getId())),
+            () -> taskRepository.save(new Task(new TaskTitle("Google 반영 작업"), account.getId())),
             outboundDraft());
 
     // then
@@ -99,7 +100,9 @@ class GoogleOperationProducerTransactionTest {
             () ->
                 producerTransaction.mutate(
                     account.getId(),
-                    () -> taskRepository.save(new Task("rollback 대상", account.getId())),
+                    () ->
+                        taskRepository.save(
+                            new Task(new TaskTitle("rollback 대상"), account.getId())),
                     invalidDraft))
         .isInstanceOf(IllegalArgumentException.class);
     assertThat(taskRepository.count()).isZero();
@@ -138,7 +141,7 @@ class GoogleOperationProducerTransactionTest {
     Task task =
         producerTransaction.mutate(
             account.getId(),
-            () -> taskRepository.save(new Task("로컬 전용 작업", account.getId())),
+            () -> taskRepository.save(new Task(new TaskTitle("로컬 전용 작업"), account.getId())),
             outboundDraft());
 
     // then

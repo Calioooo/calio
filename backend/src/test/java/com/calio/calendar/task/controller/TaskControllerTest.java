@@ -14,6 +14,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.calio.calendar.security.AuthenticatedAccountMockMvcTestConfig;
 import com.calio.calendar.security.WithAuthenticatedAccount;
 import com.calio.calendar.task.domain.Task;
+import com.calio.calendar.task.domain.TaskTitle;
 import com.calio.calendar.task.repository.TaskRepository;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -141,6 +142,22 @@ class TaskControllerTest {
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"))
         .andExpect(jsonPath("$.detail").isString())
+        .andExpect(jsonPath("$.*", hasSize(6)));
+  }
+
+  @Test
+  @DisplayName("사용자는 40자를 초과한 taskTitle로 작업을 생성할 수 없다")
+  void givenTooLongTaskTitle_whenCreateTask_thenReturnsValidationFailed() throws Exception {
+    String taskTitle = "a".repeat(41);
+
+    mockMvc
+        .perform(
+            post("/api/tasks")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"taskTitle\": \"%s\"}".formatted(taskTitle)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"))
+        .andExpect(jsonPath("$.detail").value("Validation failed."))
         .andExpect(jsonPath("$.*", hasSize(6)));
   }
 
@@ -314,6 +331,23 @@ class TaskControllerTest {
                                 }
                                 """))
         // then
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"))
+        .andExpect(jsonPath("$.detail").value("Validation failed."))
+        .andExpect(jsonPath("$.*", hasSize(6)));
+  }
+
+  @Test
+  @DisplayName("사용자는 40자를 초과한 taskTitle로 작업 제목을 수정할 수 없다")
+  void givenTooLongTaskTitle_whenUpdateTaskTitle_thenReturnsValidationFailed() throws Exception {
+    long taskId = createTask("Original task");
+    String taskTitle = "a".repeat(41);
+
+    mockMvc
+        .perform(
+            patch("/api/tasks/{taskId}", taskId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"taskTitle\": \"%s\"}".formatted(taskTitle)))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"))
         .andExpect(jsonPath("$.detail").value("Validation failed."))
@@ -537,7 +571,7 @@ class TaskControllerTest {
   }
 
   private Task saveCompletedTask(String taskTitle, Instant completedAt) {
-    Task task = new Task(taskTitle, currentAccountReference().getId());
+    Task task = new Task(new TaskTitle(taskTitle), currentAccountReference().getId());
     task.changeCompleted(completedAt);
     return taskRepository.saveAndFlush(task);
   }

@@ -16,6 +16,8 @@ public enum ErrorCode {
   VOTE_PARTICIPANT_CREDENTIAL_INVALID(
       HttpStatus.UNAUTHORIZED, "Vote participant credential is invalid."),
   TASK_NOT_FOUND(HttpStatus.NOT_FOUND, "Task not found."),
+  INVALID_TASK_TITLE(
+      HttpStatus.BAD_REQUEST, "Task title must be non-blank and at most 40 characters."),
   COMPLETED_TASK_TITLE_UPDATE_NOT_ALLOWED(
       HttpStatus.CONFLICT, "Completed task title update is not allowed."),
   TAG_NOT_FOUND(HttpStatus.NOT_FOUND, "Tag not found."),

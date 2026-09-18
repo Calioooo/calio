@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.task.domain.Task;
+import com.calio.calendar.task.domain.TaskTitle;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -42,15 +43,15 @@ class TaskRepositoryTest {
   @DisplayName("미완료 Task 조회는 account 범위 안에서 taskId 오름차순으로 반환한다")
   void givenTasksAcrossAccountsAndStates_whenFindUncompleted_thenScopesAndSortsResults() {
     // given
-    Task first = taskRepository.saveAndFlush(new Task("첫 번째", account.getId()));
-    Task second = taskRepository.saveAndFlush(new Task("두 번째", account.getId()));
+    Task first = taskRepository.saveAndFlush(new Task(new TaskTitle("첫 번째"), account.getId()));
+    Task second = taskRepository.saveAndFlush(new Task(new TaskTitle("두 번째"), account.getId()));
     saveCompletedTask("완료", account, Instant.parse("2026-08-01T00:00:00Z"));
     Account otherAccount = accountRepository.saveAndFlush(new Account());
-    taskRepository.saveAndFlush(new Task("다른 계정", otherAccount.getId()));
+    taskRepository.saveAndFlush(new Task(new TaskTitle("다른 계정"), otherAccount.getId()));
     PageRequest pageRequest = PageRequest.of(0, 20, Sort.by(Sort.Direction.ASC, "taskId"));
 
     // when
-    var tasks = taskRepository.findByAccountIdAndCompletedFalse(account.getId(), pageRequest);
+    var tasks = taskRepository.findByAccountIdAndStateCompletedFalse(account.getId(), pageRequest);
 
     // then
     assertThat(tasks.getContent())
@@ -67,7 +68,7 @@ class TaskRepositoryTest {
     Task before = saveCompletedTask("이전", account, cutoff.minusSeconds(1));
     Task atCutoff = saveCompletedTask("경계", account, cutoff);
     Task after = saveCompletedTask("이후", account, cutoff.plusSeconds(1));
-    Task active = taskRepository.saveAndFlush(new Task("미완료", account.getId()));
+    Task active = taskRepository.saveAndFlush(new Task(new TaskTitle("미완료"), account.getId()));
 
     // when
     int deletedCount = taskRepository.deleteCompletedTasksBefore(cutoff);
@@ -81,7 +82,7 @@ class TaskRepositoryTest {
   }
 
   private Task saveCompletedTask(String title, Account owner, Instant completedAt) {
-    Task task = new Task(title, owner.getId());
+    Task task = new Task(new TaskTitle(title), owner.getId());
     task.changeCompleted(completedAt);
     return taskRepository.saveAndFlush(task);
   }

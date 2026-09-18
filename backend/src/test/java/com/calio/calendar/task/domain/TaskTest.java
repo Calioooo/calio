@@ -76,7 +76,7 @@ class TaskTest {
     task.changeCompleted(Instant.parse("2026-08-09T01:00:00Z"));
 
     // when, then
-    assertThatThrownBy(() -> task.updateTitle("변경 제목"))
+    assertThatThrownBy(() -> task.updateTitle(new TaskTitle("변경 제목")))
         .isInstanceOfSatisfying(
             CalioException.class,
             exception ->
@@ -86,6 +86,6 @@ class TaskTest {
   }
 
   private Task task() {
-    return new Task("할 일", 1L);
+    return new Task(new TaskTitle("할 일"), 1L);
   }
 }

@@ -4,6 +4,8 @@ import com.calio.calendar.common.domain.BaseEntity;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -19,22 +21,20 @@ public class Task extends BaseEntity {
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long taskId;
 
-  @Column(nullable = false)
-  private String taskTitle;
+  @Convert(converter = TaskTitleConverter.class)
+  @Column(name = "task_title", nullable = false, length = TaskTitle.MAX_LENGTH)
+  private TaskTitle taskTitle;
 
-  @Column(nullable = false)
-  private boolean completed = false;
-
-  @Column private Instant completedAt;
+  @Embedded private TaskState state;
 
   @Column(name = "account_id", nullable = false)
   private Long accountId;
 
   protected Task() {}
 
-  public Task(String taskTitle, Long accountId) {
+  public Task(TaskTitle taskTitle, Long accountId) {
     this.taskTitle = taskTitle;
-    this.completed = false;
+    this.state = TaskState.incomplete();
     this.accountId = accountId;
   }
 
@@ -43,36 +43,30 @@ public class Task extends BaseEntity {
   }
 
   public String getTaskTitle() {
-    return taskTitle;
+    return taskTitle.value();
   }
 
   public boolean isCompleted() {
-    return completed;
+    return state.isCompleted();
   }
 
   public Instant getCompletedAt() {
-    return completedAt;
+    return state.completedAt();
   }
 
-  public void updateTitle(String taskTitle) {
-    if (completed) {
+  public void updateTitle(TaskTitle taskTitle) {
+    if (state.isCompleted()) {
       throw new CalioException(ErrorCode.COMPLETED_TASK_TITLE_UPDATE_NOT_ALLOWED);
     }
     this.taskTitle = taskTitle;
   }
 
   public void changeCompleted(Instant completedAt) {
-    if (completed) {
-      return;
-    }
-
-    this.completed = true;
-    this.completedAt = completedAt;
+    this.state = state.complete(completedAt);
   }
 
   public void changeUncompleted() {
-    this.completed = false;
-    this.completedAt = null;
+    this.state = state.uncomplete();
   }
 
   public Long getAccountId() {

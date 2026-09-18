@@ -24,7 +24,7 @@ public class ListTasksUseCase {
     PageRequest pageRequest =
         PageRequest.of(0, DEFAULT_PAGE_SIZE, Sort.by(Sort.Direction.ASC, "taskId"));
     return taskRepository
-        .findByAccountIdAndCompletedFalse(accountId, pageRequest)
+        .findByAccountIdAndStateCompletedFalse(accountId, pageRequest)
         .map(TaskResponse::from)
         .getContent();
   }
