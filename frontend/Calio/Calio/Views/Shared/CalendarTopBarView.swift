@@ -80,9 +80,9 @@ struct CalendarTopBarView: View {
       .accessibilityHint("Google Calendar 인증을 시작합니다")
       .accessibilityIdentifier("calendar_navigation_google_connect")
 
-            if onCreateVoteTapped != nil {
-                voteButton
-            }
+      if onCreateVoteTapped != nil {
+        voteButton
+      }
 
       Button(action: onCreateTapped) {
         Label("일정 추가", systemImage: "plus")
@@ -115,9 +115,9 @@ struct CalendarTopBarView: View {
 
       HStack(spacing: 12) {
         googleCalendarButton
-                if onCreateVoteTapped != nil {
-                    voteButton
-                }
+        if onCreateVoteTapped != nil {
+          voteButton
+        }
         createButton
       }
     }
@@ -163,7 +163,7 @@ struct CalendarTopBarView: View {
   }
 
   private var voteButton: some View {
-        Button(action: { onCreateVoteTapped?() }) {
+    Button(action: { onCreateVoteTapped?() }) {
       Label("투표 만들기", systemImage: "checklist")
         .font(.subheadline.weight(.semibold))
         .foregroundStyle(.white)
@@ -183,8 +183,8 @@ struct CalendarTopBarView: View {
     showsTodayButton: true,
     onSelectedYearMonth: { _, _ in },
     onTodayTapped: {},
-        onGoogleCalendarConnectTapped: {},
-        onCreateTapped: {},
-        onCreateVoteTapped: {}
+    onGoogleCalendarConnectTapped: {},
+    onCreateTapped: {},
+    onCreateVoteTapped: {}
   )
 }

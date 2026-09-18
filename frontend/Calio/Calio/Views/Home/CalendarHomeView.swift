@@ -92,11 +92,11 @@ struct CalendarHomeView: View {
     CalendarTopBarView(
       referenceDay: viewModel.referenceDay,
       showsTodayButton: !viewModel.isReferenceDayToday,
-            onSelectedYearMonth: viewModel.selectYearMonth(year:month:),
-            onTodayTapped: viewModel.moveToToday,
-            onGoogleCalendarConnectTapped: onGoogleCalendarConnectTapped,
-            onCreateTapped: startCreatingEvent,
-            onCreateVoteTapped: { isShowingVoteCreation = true }
+      onSelectedYearMonth: viewModel.selectYearMonth(year:month:),
+      onTodayTapped: viewModel.moveToToday,
+      onGoogleCalendarConnectTapped: onGoogleCalendarConnectTapped,
+      onCreateTapped: startCreatingEvent,
+      onCreateVoteTapped: { isShowingVoteCreation = true }
     )
   }
 
