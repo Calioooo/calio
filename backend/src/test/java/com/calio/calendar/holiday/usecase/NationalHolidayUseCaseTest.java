@@ -132,18 +132,5 @@ class NationalHolidayUseCaseTest {
       verify(nationalHolidayRepository, never()).saveAllAndFlush(any());
       verifyNoInteractions(nationalHolidayRepository);
     }
-
-    @Test
-    @DisplayName("요청 연도 밖 공휴일 내용이 있으면 기존 공휴일을 변경하지 않는다")
-    void givenHolidayOutsideRequestedYear_whenSync_thenSkipsHolidayChangesBeforeTransaction() {
-      when(holidayApiClient.fetchHolidays(2026))
-          .thenReturn(List.of(new NationalHolidayContent(LocalDate.of(2027, 1, 1), "신정")));
-
-      syncNationalHolidaysUseCase.syncYearRange(2026, 2026);
-
-      verify(transactionTemplate, never()).executeWithoutResult(any());
-      verify(nationalHolidayRepository, never()).saveAllAndFlush(any());
-      verify(nationalHolidayRepository, never()).deleteAll(any());
-    }
   }
 }

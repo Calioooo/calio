@@ -1,7 +1,5 @@
 package com.calio.calendar.holiday.usecase;
 
-import com.calio.calendar.common.error.CalioException;
-import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.holiday.domain.NationalHoliday;
 import com.calio.calendar.holiday.repository.NationalHolidayRepository;
 import com.calio.calendar.holiday.usecase.dto.NationalHolidayContent;
@@ -41,7 +39,6 @@ public class SyncNationalHolidaysUseCase {
     try {
       List<NationalHolidayContent> fetchedHolidays = holidayApiClient.fetchHolidays(year);
       Set<NationalHolidayContent> updatedHolidays = Set.copyOf(fetchedHolidays);
-      requireRequestedYear(year, updatedHolidays);
       if (updatedHolidays.isEmpty()) {
         log.warn("National holiday sync returned empty holiday entries. year={}", year);
         return;
@@ -79,13 +76,5 @@ public class SyncNationalHolidaysUseCase {
             .map(content -> new NationalHoliday(content.holidayDate(), content.holidayTitle()))
             .toList());
     nationalHolidayRepository.deleteAll(holidaysToDelete);
-  }
-
-  private void requireRequestedYear(int year, Set<NationalHolidayContent> holidays) {
-    boolean hasHolidayOutsideRequestedYear =
-        holidays.stream().anyMatch(holiday -> holiday.holidayDate().getYear() != year);
-    if (hasHolidayOutsideRequestedYear) {
-      throw new CalioException(ErrorCode.INVALID_TIME_RANGE);
-    }
   }
 }
