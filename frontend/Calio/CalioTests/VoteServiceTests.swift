@@ -38,6 +38,32 @@ struct VoteServiceTests {
         ))
   }
 
+  @Test func fetchMyCreatedRoomsMapsVoteRoomResponses() async throws {
+    let repository = RecordingVoteRepository(
+      myVoteRoomResponses: [
+        VoteRoomResponseDTO(
+          publicId: publicId,
+          name: "가을 여행 일정",
+          candidateStartDate: "2026-09-18",
+          candidateEndDate: "2026-10-18"
+        )
+      ]
+    )
+    let service = VoteService(repository: repository)
+
+    let rooms = try await service.fetchMyCreatedRooms()
+
+    #expect(
+      rooms == [
+        VoteRoom(
+          publicId: publicId,
+          name: "가을 여행 일정",
+          candidateStartDay: VoteDay(year: 2026, month: 9, day: 18),
+          candidateEndDay: VoteDay(year: 2026, month: 10, day: 18)
+        )
+      ])
+  }
+
   @Test func fetchResultMapsCanonicalCountsAndNicknamesWithoutRecalculation() async throws {
     let repository = RecordingVoteRepository(
       resultResponse: VoteResultResponseDTO(
@@ -193,6 +219,7 @@ private final class RecordingVoteRepository: VoteRepository {
   var submitRequest: SubmitVoteRequestDTO?
 
   private let createRoomResponse: VoteRoomResponseDTO
+  private let myVoteRoomResponses: [VoteRoomResponseDTO]
   private let resultResponse: VoteResultResponseDTO
   private let selectionResponse: VoteParticipantSelectionResponseDTO
   private let submissionResponse: VoteSubmissionResponseDTO
@@ -205,6 +232,7 @@ private final class RecordingVoteRepository: VoteRepository {
       candidateStartDate: "2026-09-18",
       candidateEndDate: "2026-09-18"
     ),
+    myVoteRoomResponses: [VoteRoomResponseDTO] = [],
     resultResponse: VoteResultResponseDTO = VoteResultResponseDTO(
       publicId: UUID(),
       name: "투표방",
@@ -226,6 +254,7 @@ private final class RecordingVoteRepository: VoteRepository {
     resultError: Error? = nil
   ) {
     self.createRoomResponse = createRoomResponse
+    self.myVoteRoomResponses = myVoteRoomResponses
     self.resultResponse = resultResponse
     self.selectionResponse = selectionResponse
     self.submissionResponse = submissionResponse
@@ -235,6 +264,10 @@ private final class RecordingVoteRepository: VoteRepository {
   func createVoteRoom(_ request: CreateVoteRoomRequestDTO) async throws -> VoteRoomResponseDTO {
     createRoomRequest = request
     return createRoomResponse
+  }
+
+  func fetchMyVoteRooms() async throws -> [VoteRoomResponseDTO] {
+    myVoteRoomResponses
   }
 
   func fetchVoteResult(publicId: UUID) async throws -> VoteResultResponseDTO {

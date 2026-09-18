@@ -88,8 +88,6 @@ struct CalendarHomeView: View {
       .overlay { votePopover }
       .fullScreenCover(isPresented: $isShowingVoteList) {
         VoteListView(
-          createdRooms: [],
-          participatedRooms: [],
           onClose: { isShowingVoteList = false },
           onRoomSelected: openVoteRoomFromList(_:),
           onCreateVote: startVoteCreationFromList

@@ -1,5 +1,6 @@
 import SwiftUI
 
+@MainActor
 struct VoteListView: View {
   private enum Tab: CaseIterable, Hashable {
     case created
@@ -33,13 +34,35 @@ struct VoteListView: View {
     }
   }
 
-  let createdRooms: [VoteRoom]
-  let participatedRooms: [VoteRoom]
+  @StateObject private var viewModel: VoteListViewModel
   let onClose: () -> Void
   let onRoomSelected: (VoteRoom) -> Void
   let onCreateVote: () -> Void
 
   @State private var selectedTab: Tab = .created
+
+  init(
+    onClose: @escaping () -> Void,
+    onRoomSelected: @escaping (VoteRoom) -> Void,
+    onCreateVote: @escaping () -> Void
+  ) {
+    _viewModel = StateObject(wrappedValue: VoteListViewModel())
+    self.onClose = onClose
+    self.onRoomSelected = onRoomSelected
+    self.onCreateVote = onCreateVote
+  }
+
+  init(
+    viewModel: VoteListViewModel,
+    onClose: @escaping () -> Void,
+    onRoomSelected: @escaping (VoteRoom) -> Void,
+    onCreateVote: @escaping () -> Void
+  ) {
+    _viewModel = StateObject(wrappedValue: viewModel)
+    self.onClose = onClose
+    self.onRoomSelected = onRoomSelected
+    self.onCreateVote = onCreateVote
+  }
 
   var body: some View {
     VStack(spacing: 0) {
@@ -61,6 +84,7 @@ struct VoteListView: View {
     }
     .background(Color.calioBackground)
     .accessibilityIdentifier("vote_list")
+    .task { await viewModel.loadCreatedRoomsIfNeeded() }
   }
 
   private var header: some View {
@@ -114,18 +138,73 @@ struct VoteListView: View {
 
   @ViewBuilder
   private var roomList: some View {
-    let rooms = rooms(for: selectedTab)
-    if rooms.isEmpty {
+    switch selectedTab {
+    case .created:
+      createdRoomContent
+    case .participated:
       emptyState
-    } else {
-      VStack(spacing: 14) {
-        ForEach(rooms) { room in
-          roomButton(room)
-        }
+    }
+  }
+
+  @ViewBuilder
+  private var createdRoomContent: some View {
+    switch viewModel.createdRoomState {
+    case .idle, .loading:
+      ProgressView("투표를 불러오는 중")
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 56)
+
+    case .loaded(let rooms):
+      if rooms.isEmpty {
+        emptyState
+      } else {
+        roomCards(rooms)
       }
+
+    case .failed:
+      failedState
+    }
+  }
+
+  private func roomCards(_ rooms: [VoteRoom]) -> some View {
+    VStack(spacing: 14) {
+      ForEach(rooms) { room in
+        roomButton(room)
+      }
+    }
+    .overlay(alignment: .bottomLeading) {
       Text("투표를 선택하면 투표방으로 이동합니다.")
         .font(.footnote)
         .foregroundStyle(.calioTextSecondary)
+        .offset(y: 34)
+    }
+    .padding(.bottom, 34)
+  }
+
+  private var failedState: some View {
+    VStack(spacing: 12) {
+      Text("투표를 불러오지 못했습니다.")
+        .font(.headline)
+        .foregroundStyle(.calioPrimary)
+      Button("다시 시도") {
+        Task { await viewModel.reloadCreatedRooms() }
+      }
+      .font(.subheadline.weight(.semibold))
+      .foregroundStyle(.voteAccent)
+    }
+    .frame(maxWidth: .infinity)
+    .padding(.vertical, 56)
+  }
+
+  private func rooms(for tab: Tab) -> [VoteRoom] {
+    switch tab {
+    case .created:
+      if case .loaded(let rooms) = viewModel.createdRoomState {
+        return rooms
+      }
+      return []
+    case .participated:
+      return []
     }
   }
 
@@ -205,15 +284,6 @@ struct VoteListView: View {
     .accessibilityIdentifier("vote_list_create")
   }
 
-  private func rooms(for tab: Tab) -> [VoteRoom] {
-    switch tab {
-    case .created:
-      return createdRooms
-    case .participated:
-      return participatedRooms
-    }
-  }
-
   private func candidatePeriodText(for room: VoteRoom) -> String {
     "후보 기간 · \(startDateText(room.candidateStartDay)) - \(endDateText(for: room))"
   }
@@ -233,21 +303,22 @@ struct VoteListView: View {
 
 #Preview("만든 투표") {
   VoteListView(
-    createdRooms: [
-      VoteRoom(
-        publicId: UUID(),
-        name: "가을 여행 일정",
-        candidateStartDay: VoteDay(year: 2026, month: 10, day: 1),
-        candidateEndDay: VoteDay(year: 2026, month: 10, day: 31)
-      ),
-      VoteRoom(
-        publicId: UUID(),
-        name: "팀 워크숍 날짜",
-        candidateStartDay: VoteDay(year: 2026, month: 9, day: 21),
-        candidateEndDay: VoteDay(year: 2026, month: 10, day: 12)
-      ),
-    ],
-    participatedRooms: [],
+    viewModel: VoteListViewModel(
+      createdRoomState: .loaded([
+        VoteRoom(
+          publicId: UUID(),
+          name: "가을 여행 일정",
+          candidateStartDay: VoteDay(year: 2026, month: 10, day: 1),
+          candidateEndDay: VoteDay(year: 2026, month: 10, day: 31)
+        ),
+        VoteRoom(
+          publicId: UUID(),
+          name: "팀 워크숍 날짜",
+          candidateStartDay: VoteDay(year: 2026, month: 9, day: 21),
+          candidateEndDay: VoteDay(year: 2026, month: 10, day: 12)
+        ),
+      ])
+    ),
     onClose: {},
     onRoomSelected: { _ in },
     onCreateVote: {}
