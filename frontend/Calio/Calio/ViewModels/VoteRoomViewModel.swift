@@ -273,8 +273,8 @@ final class VoteRoomViewModel: ObservableObject {
   }
 }
 
-private extension String {
-  var nilIfEmpty: String? {
+extension String {
+  fileprivate var nilIfEmpty: String? {
     isEmpty ? nil : self
   }
 }
