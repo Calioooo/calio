@@ -418,28 +418,30 @@ private struct VoteRoomCalendarGrid: View {
     return Button {
       if isCandidateDay { onDayTap(day) }
     } label: {
-      ZStack(alignment: .topTrailing) {
-        Text("\(day.day)")
-          .font(.body.weight(.medium))
-          .foregroundStyle(isCandidateDay ? .calioPrimary : .calioTextSecondary)
-        if isEditing && selectedDays.contains(day) {
-          Image(systemName: "checkmark")
-            .font(.caption2.weight(.bold))
-            .foregroundStyle(.white)
-            .frame(width: 20, height: 20)
-            .background(Color.voteAccent, in: Circle())
-            .padding(7)
+      Text("\(day.day)")
+        .font(.body.weight(.medium))
+        .foregroundStyle(isCandidateDay ? .calioPrimary : .calioTextSecondary)
+        .frame(maxWidth: .infinity, minHeight: 58)
+        .background(
+          backgroundColor(for: day, result: result), in: RoundedRectangle(cornerRadius: 14)
+        )
+        .overlay(
+          RoundedRectangle(cornerRadius: 14)
+            .stroke(
+              isEditing && selectedDays.contains(day)
+                ? Color.voteAccent : Color.calioDivider.opacity(0.65), lineWidth: 1)
+        )
+        .overlay(alignment: .topTrailing) {
+          if isEditing && selectedDays.contains(day) {
+            Image(systemName: "checkmark")
+              .font(.caption2.weight(.bold))
+              .foregroundStyle(.white)
+              .frame(width: 14, height: 14)
+              .background(Color.voteAccent, in: Circle())
+              .padding(5)
+          }
         }
-      }
-      .frame(maxWidth: .infinity, minHeight: 58)
-      .background(backgroundColor(for: day, result: result), in: RoundedRectangle(cornerRadius: 14))
-      .overlay(
-        RoundedRectangle(cornerRadius: 14)
-          .stroke(
-            isEditing && selectedDays.contains(day)
-              ? Color.voteAccent : Color.calioDivider.opacity(0.65), lineWidth: 1)
-      )
-      .opacity(isCandidateDay ? 1 : 0.34)
+        .opacity(isCandidateDay ? 1 : 0.34)
     }
     .buttonStyle(.plain)
     .disabled(!isCandidateDay)
