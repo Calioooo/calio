@@ -9,9 +9,8 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.calio.calendar.holiday.client.HolidayApiClient;
-import com.calio.calendar.holiday.client.dto.HolidayApiItem;
-import com.calio.calendar.holiday.client.dto.HolidayApiResponse;
 import com.calio.calendar.holiday.domain.NationalHoliday;
+import com.calio.calendar.holiday.domain.NationalHolidayContent;
 import com.calio.calendar.holiday.repository.NationalHolidayRepository;
 import java.time.LocalDate;
 import java.util.List;
@@ -56,11 +55,9 @@ class SyncNationalHolidaysUseCaseTest {
     NationalHoliday stale = new NationalHoliday(LocalDate.of(2026, 5, 5), "어린이날");
     when(holidayApiClient.fetchHolidays(2026))
         .thenReturn(
-            new HolidayApiResponse(
-                "00",
-                List.of(
-                    new HolidayApiItem("20260101", "신정", "Y"),
-                    new HolidayApiItem("20260606", "현충일", "Y"))));
+            List.of(
+                new NationalHolidayContent(LocalDate.of(2026, 1, 1), "신정"),
+                new NationalHolidayContent(LocalDate.of(2026, 6, 6), "현충일")));
     when(nationalHolidayRepository.findByHolidayDateBetween(
             LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31)))
         .thenReturn(List.of(stale));
@@ -77,12 +74,10 @@ class SyncNationalHolidaysUseCaseTest {
   }
 
   @Test
-  @DisplayName("실패 응답 또는 공휴일 없는 성공 응답은 기존 공휴일을 변경하지 않는다")
-  void givenNonApplicableProviderResponse_whenSync_thenSkipsHolidayChanges() {
-    when(holidayApiClient.fetchHolidays(2026)).thenReturn(new HolidayApiResponse("99", List.of()));
-    when(holidayApiClient.fetchHolidays(2027))
-        .thenReturn(
-            new HolidayApiResponse("00", List.of(new HolidayApiItem("20270214", "기념일", "N"))));
+  @DisplayName("공휴일 내용이 없으면 기존 공휴일을 변경하지 않는다")
+  void givenEmptyFetchedHolidays_whenSync_thenSkipsHolidayChanges() {
+    when(holidayApiClient.fetchHolidays(2026)).thenReturn(List.of());
+    when(holidayApiClient.fetchHolidays(2027)).thenReturn(List.of());
 
     syncNationalHolidaysUseCase.syncYearRange(2026, 2027);
 
