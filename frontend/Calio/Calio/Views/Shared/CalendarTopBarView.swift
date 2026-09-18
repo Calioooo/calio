@@ -15,6 +15,25 @@ struct CalendarTopBarView: View {
   let onTodayTapped: () -> Void
   let onGoogleCalendarConnectTapped: () -> Void
   let onCreateTapped: () -> Void
+  let onCreateVoteTapped: (() -> Void)?
+
+  init(
+    referenceDay: DayKey,
+    showsTodayButton: Bool,
+    onSelectedYearMonth: @escaping (Int, Int) -> Void,
+    onTodayTapped: @escaping () -> Void,
+    onGoogleCalendarConnectTapped: @escaping () -> Void,
+    onCreateTapped: @escaping () -> Void,
+    onCreateVoteTapped: (() -> Void)? = nil
+  ) {
+    self.referenceDay = referenceDay
+    self.showsTodayButton = showsTodayButton
+    self.onSelectedYearMonth = onSelectedYearMonth
+    self.onTodayTapped = onTodayTapped
+    self.onGoogleCalendarConnectTapped = onGoogleCalendarConnectTapped
+    self.onCreateTapped = onCreateTapped
+    self.onCreateVoteTapped = onCreateVoteTapped
+  }
 
   var body: some View {
     Group {
@@ -61,6 +80,10 @@ struct CalendarTopBarView: View {
       .accessibilityHint("Google Calendar 인증을 시작합니다")
       .accessibilityIdentifier("calendar_navigation_google_connect")
 
+      if onCreateVoteTapped != nil {
+        voteButton
+      }
+
       Button(action: onCreateTapped) {
         Label("일정 추가", systemImage: "plus")
           .font(.subheadline.weight(.semibold))
@@ -92,6 +115,9 @@ struct CalendarTopBarView: View {
 
       HStack(spacing: 12) {
         googleCalendarButton
+        if onCreateVoteTapped != nil {
+          voteButton
+        }
         createButton
       }
     }
@@ -135,6 +161,20 @@ struct CalendarTopBarView: View {
     .accessibilityLabel("일정 추가")
     .accessibilityIdentifier("calendar_navigation_add_event")
   }
+
+  private var voteButton: some View {
+    Button(action: { onCreateVoteTapped?() }) {
+      Label("투표 만들기", systemImage: "checklist")
+        .font(.subheadline.weight(.semibold))
+        .foregroundStyle(.white)
+        .padding(.horizontal, 13)
+        .frame(minHeight: 40)
+        .background(RoundedRectangle(cornerRadius: 10).fill(Color.calioBrand))
+    }
+    .buttonStyle(.plain)
+    .accessibilityLabel("투표 만들기")
+    .accessibilityIdentifier("calendar_navigation_create_vote")
+  }
 }
 
 #Preview {
@@ -144,6 +184,7 @@ struct CalendarTopBarView: View {
     onSelectedYearMonth: { _, _ in },
     onTodayTapped: {},
     onGoogleCalendarConnectTapped: {},
-    onCreateTapped: {}
+    onCreateTapped: {},
+    onCreateVoteTapped: {}
   )
 }
