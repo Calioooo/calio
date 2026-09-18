@@ -45,10 +45,6 @@ struct VoteRoomView: View {
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .background(Color.calioBackground.ignoresSafeArea())
-    .popover(item: $resultDayForPopover, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
-      VoteResultNicknamePopover(result: $0)
-        .presentationCompactAdaptation(.popover)
-    }
     .task {
       await viewModel.load()
       updateDisplayedMonthFromRoom()
@@ -143,6 +139,10 @@ struct VoteRoomView: View {
           onMonthChange: moveMonth(by:),
           onDayTap: showResultPopover(for:)
         )
+        .popover(item: $resultDayForPopover, arrowEdge: .top) { result in
+          VoteResultNicknamePopover(result: result)
+            .presentationCompactAdaptation(.popover)
+        }
       }
       Spacer(minLength: 0)
       Button("투표 참여하기") { viewModel.showExistingParticipant() }
