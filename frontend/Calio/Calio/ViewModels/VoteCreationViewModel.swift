@@ -1,5 +1,11 @@
 import Foundation
 
+private let voteKoreaCalendar: Calendar = {
+  var calendar = Calendar(identifier: .gregorian)
+  calendar.timeZone = TimeZone(identifier: "Asia/Seoul")!
+  return calendar
+}()
+
 @MainActor
 final class VoteCreationViewModel: ObservableObject {
   @Published private(set) var name = ""
@@ -15,7 +21,7 @@ final class VoteCreationViewModel: ObservableObject {
   init(
     voteService: VoteService = VoteService(),
     currentDate: Date = Date(),
-    calendar: Calendar = Self.koreaCalendar
+    calendar: Calendar = voteKoreaCalendar
   ) {
     self.voteService = voteService
     self.calendar = calendar
@@ -120,11 +126,5 @@ final class VoteCreationViewModel: ObservableObject {
 
   private func dateComponents(for day: VoteDay) -> DateComponents {
     DateComponents(year: day.year, month: day.month, day: day.day)
-  }
-
-  private static var koreaCalendar: Calendar {
-    var calendar = Calendar(identifier: .gregorian)
-    calendar.timeZone = TimeZone(identifier: "Asia/Seoul")!
-    return calendar
   }
 }
