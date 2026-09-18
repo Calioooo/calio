@@ -1,4 +1,4 @@
-package com.calio.calendar.security;
+package com.calio.calendar.security.usecase;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -11,6 +11,7 @@ import com.calio.calendar.auth.service.AccessTokenEncoder;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.common.testsupport.SharedIntegrationDatabase;
+import com.calio.calendar.security.AuthenticatedAccount;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -27,9 +28,9 @@ import org.springframework.boot.test.context.SpringBootTest;
       "spring.jpa.hibernate.ddl-auto=create-drop"
     })
 @SharedIntegrationDatabase
-class AccountTokenAuthenticationServiceTest {
+class AuthenticateAccountTokenUseCaseTest {
 
-  @Autowired private AccountTokenAuthenticationService authenticationService;
+  @Autowired private AuthenticateAccountTokenUseCase authenticateAccountTokenUseCase;
 
   @Autowired private AccessTokenEncoder accessTokenEncoder;
 
@@ -55,7 +56,7 @@ class AccountTokenAuthenticationServiceTest {
     Instant beforeAuthentication = Instant.now();
 
     // when
-    AuthenticatedAccount principal = authenticationService.authenticate(rawToken);
+    AuthenticatedAccount principal = authenticateAccountTokenUseCase.authenticate(rawToken);
 
     // then
     AccountAuthToken updatedToken =
@@ -68,8 +69,7 @@ class AccountTokenAuthenticationServiceTest {
   @Test
   @DisplayName("저장된 tokenHash가 없으면 AUTH_TOKEN_INVALID로 거부한다")
   void givenUnknownToken_whenAuthenticate_thenThrowsInvalidToken() {
-    // when, then
-    assertThatThrownBy(() -> authenticationService.authenticate("missing-token"))
+    assertThatThrownBy(() -> authenticateAccountTokenUseCase.authenticate("missing-token"))
         .isInstanceOfSatisfying(
             CalioException.class,
             exception ->
@@ -87,7 +87,7 @@ class AccountTokenAuthenticationServiceTest {
     accountAuthTokenRepository.saveAndFlush(authToken);
 
     // when, then
-    assertThatThrownBy(() -> authenticationService.authenticate(rawToken))
+    assertThatThrownBy(() -> authenticateAccountTokenUseCase.authenticate(rawToken))
         .isInstanceOfSatisfying(
             CalioException.class,
             exception ->
