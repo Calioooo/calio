@@ -91,6 +91,7 @@ struct VoteRoomView: View {
         editingContent
       }
     }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
   }
 
   private var navigationBar: some View {
@@ -151,6 +152,7 @@ struct VoteRoomView: View {
         .padding(.bottom, 28)
         .accessibilityIdentifier("vote_room_join")
     }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
   }
 
   private var participantCredentials: some View {
@@ -282,6 +284,7 @@ struct VoteRoomView: View {
       .padding(.bottom, 28)
       .accessibilityIdentifier("vote_room_save")
     }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
   }
 
   private var unavailableView: some View {
@@ -378,7 +381,7 @@ private struct VoteRoomCalendarGrid: View {
     .padding(20)
     .background(Color.calioSurface, in: RoundedRectangle(cornerRadius: 26))
     .shadow(color: .black.opacity(0.06), radius: 16, y: 8)
-    .padding(.horizontal, 28)
+    .padding(.horizontal, 8)
     .gesture(
       DragGesture(minimumDistance: 30).onEnded { value in
         guard abs(value.translation.width) > abs(value.translation.height) else { return }
@@ -420,9 +423,11 @@ private struct VoteRoomCalendarGrid: View {
           .font(.body.weight(.medium))
           .foregroundStyle(isCandidateDay ? .calioPrimary : .calioTextSecondary)
         if isEditing && selectedDays.contains(day) {
-          Image(systemName: "checkmark.circle.fill")
-            .font(.caption)
+          Image(systemName: "checkmark")
+            .font(.caption2.weight(.bold))
             .foregroundStyle(.white)
+            .frame(width: 20, height: 20)
+            .background(Color.voteAccent, in: Circle())
             .padding(7)
         }
       }
