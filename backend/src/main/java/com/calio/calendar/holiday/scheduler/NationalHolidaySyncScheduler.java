@@ -42,12 +42,8 @@ public class NationalHolidaySyncScheduler {
 
   @Scheduled(cron = "0 0 4 1 * *", zone = "Asia/Seoul")
   public void syncMonthlyFullRange() {
-    runIfAvailable(
-        "monthly-full",
-        () -> {
-          int currentYear = currentYear();
-          syncNationalHolidaysUseCase.syncYearRange(currentYear - 20, currentYear + 20);
-        });
+    int currentYear = today().getYear();
+    syncIfAvailable(currentYear - 20, currentYear + 20);
   }
 
   @Scheduled(cron = "0 0 4 * * *", zone = "Asia/Seoul")
@@ -58,40 +54,38 @@ public class NationalHolidaySyncScheduler {
       return;
     }
 
-    runIfAvailable(
-        "daily-near",
-        () -> {
-          int currentYear = today.getYear();
-          syncNationalHolidaysUseCase.syncYearRange(currentYear, currentYear + 2);
-        });
+    int currentYear = today.getYear();
+    syncIfAvailable(currentYear, currentYear + 2);
   }
 
-  private void runIfAvailable(String jobName, Runnable syncJob) {
+  private void syncIfAvailable(int startYear, int endYear) {
     if (!holidayApiProperties.hasServiceKey()) {
-      log.info("National holiday sync skipped because service key is missing. job={}", jobName);
+      log.info(
+          "National holiday sync skipped because service key is missing. startYear={} endYear={}",
+          startYear,
+          endYear);
       return;
     }
 
     if (!syncRunning.compareAndSet(false, true)) {
-      log.info("National holiday sync skipped because another sync is running. job={}", jobName);
+      log.info(
+          "National holiday sync skipped because another sync is running. startYear={} endYear={}",
+          startYear,
+          endYear);
       return;
     }
 
     try {
-      syncJob.run();
+      syncNationalHolidaysUseCase.syncYearRange(startYear, endYear);
     } catch (Exception exception) {
       log.error(
-          "National holiday scheduled sync failed. job={} message={}",
-          jobName,
-          exception.getMessage(),
+          "National holiday scheduled sync failed. startYear={} endYear={}",
+          startYear,
+          endYear,
           exception);
     } finally {
       syncRunning.set(false);
     }
-  }
-
-  private int currentYear() {
-    return today().getYear();
   }
 
   private LocalDate today() {
