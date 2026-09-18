@@ -24,9 +24,7 @@ public class GetNationalHolidaysUseCase {
       throw new CalioException(ErrorCode.INVALID_TIME_RANGE);
     }
 
-    return nationalHolidayRepository
-        .findByHolidayDateBetweenOrderByHolidayDateAscHolidayTitleAsc(from, to)
-        .stream()
+    return nationalHolidayRepository.findAllInDateRange(from, to).stream()
         .map(NationalHolidayResponse::from)
         .toList();
   }

@@ -1,6 +1,6 @@
-package com.calio.calendar.holiday.client;
+package com.calio.calendar.holiday.usecase;
 
-import com.calio.calendar.holiday.domain.NationalHolidayContent;
+import com.calio.calendar.holiday.usecase.dto.NationalHolidayContent;
 import java.util.List;
 
 public interface HolidayApiClient {

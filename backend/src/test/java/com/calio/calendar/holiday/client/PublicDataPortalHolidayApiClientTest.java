@@ -9,14 +9,15 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
 
-class RestHolidayApiClientTest {
+class PublicDataPortalHolidayApiClientTest {
 
   @Test
   @DisplayName("공휴일 API service key가 없으면 명시적인 설정 오류를 반환한다")
   void givenMissingServiceKey_whenFetchHolidays_thenThrowsConfigurationError() {
     // given
     HolidayApiProperties properties = new HolidayApiProperties();
-    RestHolidayApiClient client = new RestHolidayApiClient(properties, new ObjectMapper());
+    PublicDataPortalHolidayApiClient client =
+        new PublicDataPortalHolidayApiClient(properties, new ObjectMapper());
 
     // when, then
     assertThatThrownBy(() -> client.fetchHolidays(2026))

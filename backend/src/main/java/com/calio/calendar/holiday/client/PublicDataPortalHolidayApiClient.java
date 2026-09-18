@@ -4,7 +4,8 @@ import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.holiday.client.dto.HolidayApiItem;
 import com.calio.calendar.holiday.client.dto.HolidayApiResponse;
-import com.calio.calendar.holiday.domain.NationalHolidayContent;
+import com.calio.calendar.holiday.usecase.HolidayApiClient;
+import com.calio.calendar.holiday.usecase.dto.NationalHolidayContent;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -20,9 +21,9 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
 @Component
-public class RestHolidayApiClient implements HolidayApiClient {
+public class PublicDataPortalHolidayApiClient implements HolidayApiClient {
 
-  private static final Logger log = LoggerFactory.getLogger(RestHolidayApiClient.class);
+  private static final Logger log = LoggerFactory.getLogger(PublicDataPortalHolidayApiClient.class);
   private static final int MAX_RETRY_COUNT = 1;
   private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
   private static final Duration READ_TIMEOUT = Duration.ofSeconds(15);
@@ -32,7 +33,7 @@ public class RestHolidayApiClient implements HolidayApiClient {
   private final ObjectMapper objectMapper;
   private final RestClient restClient;
 
-  public RestHolidayApiClient(
+  public PublicDataPortalHolidayApiClient(
       HolidayApiProperties holidayApiProperties, ObjectMapper objectMapper) {
     this.holidayApiProperties = holidayApiProperties;
     this.objectMapper = objectMapper;
@@ -61,21 +62,16 @@ public class RestHolidayApiClient implements HolidayApiClient {
       }
       return response.items().stream()
           .filter(item -> "Y".equals(item.isHoliday()))
-          .map(item -> toNationalHolidayContent(year, item))
+          .map(this::toNationalHolidayContent)
           .toList();
     } catch (JacksonException | RestClientException exception) {
       throw new CalioException(ErrorCode.EXTERNAL_API_UNAVAILABLE, exception);
     }
   }
 
-  private NationalHolidayContent toNationalHolidayContent(int year, HolidayApiItem item) {
-    NationalHolidayContent content =
-        new NationalHolidayContent(
-            LocalDate.parse(item.localDate(), PROVIDER_DATE_FORMAT), item.dateName());
-    if (content.holidayDate().getYear() != year) {
-      throw new CalioException(ErrorCode.INVALID_TIME_RANGE);
-    }
-    return content;
+  private NationalHolidayContent toNationalHolidayContent(HolidayApiItem item) {
+    return new NationalHolidayContent(
+        LocalDate.parse(item.localDate(), PROVIDER_DATE_FORMAT), item.dateName());
   }
 
   private String fetchResponseBodyWithRetry(int year) {

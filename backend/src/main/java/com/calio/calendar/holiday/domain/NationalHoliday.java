@@ -8,6 +8,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.LocalDate;
+import java.util.Objects;
 
 @Entity
 @Table(name = "national_holidays")
@@ -41,5 +42,21 @@ public class NationalHoliday extends BaseEntity {
 
     public String getHolidayTitle() {
         return holidayTitle;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (!(o instanceof NationalHoliday that)) {
+            return false;
+        }
+        return Objects.equals(nationalHolidayId, that.nationalHolidayId) && Objects.equals(
+                holidayDate,
+                that.holidayDate
+        ) && Objects.equals(holidayTitle, that.holidayTitle);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(nationalHolidayId, holidayDate, holidayTitle);
     }
 }

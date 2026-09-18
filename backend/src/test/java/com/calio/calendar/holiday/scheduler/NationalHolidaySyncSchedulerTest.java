@@ -40,6 +40,16 @@ class NationalHolidaySyncSchedulerTest {
   }
 
   @Test
+  @DisplayName("월초에는 daily near sync를 호출하지 않는다")
+  void givenFirstDayOfMonth_whenRunDailyNearSync_thenSkipsSyncYearRange() {
+    NationalHolidaySyncScheduler scheduler = scheduler(true, "2026-05-31T15:00:00Z");
+
+    scheduler.syncDailyNearRange();
+
+    verifyNoInteractions(syncNationalHolidaysUseCase);
+  }
+
+  @Test
   @DisplayName("service key가 없으면 scheduler는 동기화 UseCase를 호출하지 않는다")
   void givenMissingServiceKey_whenRunScheduledSync_thenSkipsSyncUseCase() {
     NationalHolidaySyncScheduler scheduler = scheduler(false, "2026-06-02T19:00:00Z");

@@ -1,9 +1,10 @@
 package com.calio.calendar.holiday.usecase;
 
-import com.calio.calendar.holiday.client.HolidayApiClient;
+import com.calio.calendar.common.error.CalioException;
+import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.holiday.domain.NationalHoliday;
-import com.calio.calendar.holiday.domain.NationalHolidayContent;
 import com.calio.calendar.holiday.repository.NationalHolidayRepository;
+import com.calio.calendar.holiday.usecase.dto.NationalHolidayContent;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
@@ -40,6 +41,7 @@ public class SyncNationalHolidaysUseCase {
     try {
       List<NationalHolidayContent> fetchedHolidays = holidayApiClient.fetchHolidays(year);
       Set<NationalHolidayContent> updatedHolidays = Set.copyOf(fetchedHolidays);
+      requireRequestedYear(year, updatedHolidays);
       if (updatedHolidays.isEmpty()) {
         log.warn("National holiday sync returned empty holiday entries. year={}", year);
         return;
@@ -60,10 +62,13 @@ public class SyncNationalHolidaysUseCase {
     List<NationalHoliday> existingHolidays =
         nationalHolidayRepository.findByHolidayDateBetween(
             LocalDate.of(year, 1, 1), LocalDate.of(year, 12, 31));
+
     Set<NationalHolidayContent> existingContents =
         existingHolidays.stream().map(NationalHolidayContent::from).collect(Collectors.toSet());
+
     List<NationalHolidayContent> holidaysToCreate =
         updatedHolidays.stream().filter(content -> !existingContents.contains(content)).toList();
+
     List<NationalHoliday> holidaysToDelete =
         existingHolidays.stream()
             .filter(holiday -> !updatedHolidays.contains(NationalHolidayContent.from(holiday)))
@@ -74,5 +79,13 @@ public class SyncNationalHolidaysUseCase {
             .map(content -> new NationalHoliday(content.holidayDate(), content.holidayTitle()))
             .toList());
     nationalHolidayRepository.deleteAll(holidaysToDelete);
+  }
+
+  private void requireRequestedYear(int year, Set<NationalHolidayContent> holidays) {
+    boolean hasHolidayOutsideRequestedYear =
+        holidays.stream().anyMatch(holiday -> holiday.holidayDate().getYear() != year);
+    if (hasHolidayOutsideRequestedYear) {
+      throw new CalioException(ErrorCode.INVALID_TIME_RANGE);
+    }
   }
 }
