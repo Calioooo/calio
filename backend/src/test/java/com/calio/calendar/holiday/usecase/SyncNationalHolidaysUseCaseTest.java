@@ -51,8 +51,8 @@ class SyncNationalHolidaysUseCaseTest {
   }
 
   @Test
-  @DisplayName("성공한 동기화는 외부 응답과 기존 snapshot의 차이만 저장하고 stale 공휴일을 삭제한다")
-  void givenSuccessfulProviderResponse_whenSync_thenReplacesSnapshotInsideTransaction() {
+  @DisplayName("성공한 동기화는 새 공휴일을 저장하고 더 이상 없는 공휴일을 삭제한다")
+  void givenSuccessfulProviderResponse_whenSync_thenAppliesHolidayChangesInsideTransaction() {
     NationalHoliday stale = new NationalHoliday(LocalDate.of(2026, 5, 5), "어린이날");
     when(holidayApiClient.fetchHolidays(2026))
         .thenReturn(
@@ -61,7 +61,7 @@ class SyncNationalHolidaysUseCaseTest {
                 List.of(
                     new HolidayApiItem("20260101", "신정", "Y"),
                     new HolidayApiItem("20260606", "현충일", "Y"))));
-    when(nationalHolidayRepository.findByHolidayDateBetween(
+    when(nationalHolidayRepository.findByHolidayDateBetweenOrderByHolidayDateAscHolidayTitleAsc(
             LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31)))
         .thenReturn(List.of(stale));
 
@@ -77,8 +77,8 @@ class SyncNationalHolidaysUseCaseTest {
   }
 
   @Test
-  @DisplayName("실패 응답 또는 공휴일 없는 성공 응답은 기존 snapshot을 변경하지 않는다")
-  void givenNonApplicableProviderResponse_whenSync_thenSkipsSnapshot() {
+  @DisplayName("실패 응답 또는 공휴일 없는 성공 응답은 기존 공휴일을 변경하지 않는다")
+  void givenNonApplicableProviderResponse_whenSync_thenSkipsHolidayChanges() {
     when(holidayApiClient.fetchHolidays(2026)).thenReturn(new HolidayApiResponse("99", List.of()));
     when(holidayApiClient.fetchHolidays(2027))
         .thenReturn(

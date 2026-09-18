@@ -6,12 +6,12 @@ import com.calio.calendar.holiday.client.HolidayApiClient;
 import com.calio.calendar.holiday.client.dto.HolidayApiItem;
 import com.calio.calendar.holiday.client.dto.HolidayApiResponse;
 import com.calio.calendar.holiday.domain.NationalHoliday;
+import com.calio.calendar.holiday.domain.NationalHolidayContent;
 import com.calio.calendar.holiday.repository.NationalHolidayRepository;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -52,13 +52,15 @@ public class SyncNationalHolidaysUseCase {
         return;
       }
 
-      Set<ProviderHoliday> providerHolidays = toProviderHolidays(year, response.items());
-      if (providerHolidays.isEmpty()) {
-        log.warn("National holiday sync returned empty provider rows. year={}", year);
+      List<NationalHolidayContent> updatedHolidays =
+          toNationalHolidayContents(year, response.items());
+      if (updatedHolidays.isEmpty()) {
+        log.warn("National holiday sync returned empty holiday entries. year={}", year);
         return;
       }
 
-      transactionTemplate.executeWithoutResult(status -> replaceSnapshot(year, providerHolidays));
+      transactionTemplate.executeWithoutResult(
+          status -> replaceHolidaysForYear(year, updatedHolidays));
     } catch (Exception exception) {
       log.warn(
           "National holiday sync failed. year={} resultCode={} errorCode={} message={}",
@@ -70,47 +72,61 @@ public class SyncNationalHolidaysUseCase {
     }
   }
 
-  private void replaceSnapshot(int year, Set<ProviderHoliday> providerHolidays) {
+  private void replaceHolidaysForYear(int year, List<NationalHolidayContent> updatedHolidays) {
     List<NationalHoliday> existingHolidays =
-        nationalHolidayRepository.findByHolidayDateBetween(
+        nationalHolidayRepository.findByHolidayDateBetweenOrderByHolidayDateAscHolidayTitleAsc(
             LocalDate.of(year, 1, 1), LocalDate.of(year, 12, 31));
-    Set<ProviderHoliday> existingRows =
-        existingHolidays.stream().map(ProviderHoliday::from).collect(Collectors.toSet());
-    List<NationalHoliday> missingHolidays =
-        providerHolidays.stream()
-            .filter(providerHoliday -> !existingRows.contains(providerHoliday))
-            .sorted(
-                java.util.Comparator.comparing(ProviderHoliday::holidayDate)
-                    .thenComparing(ProviderHoliday::holidayTitle))
-            .map(
-                providerHoliday ->
-                    new NationalHoliday(
-                        providerHoliday.holidayDate(), providerHoliday.holidayTitle()))
-            .toList();
-    List<NationalHoliday> staleHolidays =
-        existingHolidays.stream()
-            .filter(holiday -> !providerHolidays.contains(ProviderHoliday.from(holiday)))
-            .toList();
+    List<NationalHolidayContent> holidaysToCreate = new ArrayList<>();
+    List<NationalHoliday> holidaysToDelete = new ArrayList<>();
+    int existingIndex = 0;
+    int updatedIndex = 0;
 
-    nationalHolidayRepository.saveAllAndFlush(missingHolidays);
-    nationalHolidayRepository.deleteAll(staleHolidays);
+    while (existingIndex < existingHolidays.size() && updatedIndex < updatedHolidays.size()) {
+      NationalHoliday existingHoliday = existingHolidays.get(existingIndex);
+      NationalHolidayContent existingContent = NationalHolidayContent.from(existingHoliday);
+      NationalHolidayContent updatedContent = updatedHolidays.get(updatedIndex);
+      int comparison = existingContent.compareTo(updatedContent);
+
+      if (comparison == 0) {
+        existingIndex++;
+        updatedIndex++;
+      } else if (comparison < 0) {
+        holidaysToDelete.add(existingHoliday);
+        existingIndex++;
+      } else {
+        holidaysToCreate.add(updatedContent);
+        updatedIndex++;
+      }
+    }
+
+    holidaysToDelete.addAll(existingHolidays.subList(existingIndex, existingHolidays.size()));
+    holidaysToCreate.addAll(updatedHolidays.subList(updatedIndex, updatedHolidays.size()));
+
+    nationalHolidayRepository.saveAllAndFlush(
+        holidaysToCreate.stream()
+            .map(content -> new NationalHoliday(content.holidayDate(), content.holidayTitle()))
+            .toList());
+    nationalHolidayRepository.deleteAll(holidaysToDelete);
   }
 
-  private Set<ProviderHoliday> toProviderHolidays(int year, List<HolidayApiItem> items) {
+  private List<NationalHolidayContent> toNationalHolidayContents(
+      int year, List<HolidayApiItem> items) {
     return items.stream()
         .filter(item -> "Y".equals(item.isHoliday()))
-        .map(this::toProviderHoliday)
-        .peek(providerHoliday -> requireRequestedYear(year, providerHoliday))
-        .collect(Collectors.toSet());
+        .map(this::toNationalHolidayContent)
+        .peek(content -> requireRequestedYear(year, content))
+        .distinct()
+        .sorted()
+        .toList();
   }
 
-  private ProviderHoliday toProviderHoliday(HolidayApiItem item) {
-    return new ProviderHoliday(
+  private NationalHolidayContent toNationalHolidayContent(HolidayApiItem item) {
+    return new NationalHolidayContent(
         LocalDate.parse(item.localDate(), PROVIDER_DATE_FORMAT), item.dateName());
   }
 
-  private void requireRequestedYear(int year, ProviderHoliday providerHoliday) {
-    if (providerHoliday.holidayDate().getYear() != year) {
+  private void requireRequestedYear(int year, NationalHolidayContent content) {
+    if (content.holidayDate().getYear() != year) {
       throw new CalioException(ErrorCode.INVALID_TIME_RANGE);
     }
   }
@@ -120,12 +136,5 @@ public class SyncNationalHolidaysUseCase {
       return calioException.getErrorCode().name();
     }
     return null;
-  }
-
-  private record ProviderHoliday(LocalDate holidayDate, String holidayTitle) {
-
-    private static ProviderHoliday from(NationalHoliday holiday) {
-      return new ProviderHoliday(holiday.getHolidayDate(), holiday.getHolidayTitle());
-    }
   }
 }
