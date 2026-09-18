@@ -137,12 +137,9 @@ struct VoteRoomView: View {
             uniqueKeysWithValues: (viewModel.result?.dateResults ?? []).map { ($0.day, $0) }),
           isEditing: false,
           onMonthChange: moveMonth(by:),
-          onDayTap: showResultPopover(for:)
+          onDayTap: showResultPopover(for:),
+          resultDayForPopover: $resultDayForPopover
         )
-        .popover(item: $resultDayForPopover, arrowEdge: .top) { result in
-          VoteResultNicknamePopover(result: result)
-            .presentationCompactAdaptation(.popover)
-        }
       }
       Spacer(minLength: 0)
       Button("투표 참여하기") { viewModel.showExistingParticipant() }
@@ -265,7 +262,8 @@ struct VoteRoomView: View {
           dateResults: [:],
           isEditing: true,
           onMonthChange: moveMonth(by:),
-          onDayTap: viewModel.toggleUnavailableDay
+          onDayTap: viewModel.toggleUnavailableDay,
+          resultDayForPopover: .constant(nil)
         )
       }
       Spacer(minLength: 0)
@@ -357,6 +355,7 @@ private struct VoteRoomCalendarGrid: View {
   let isEditing: Bool
   let onMonthChange: (Int) -> Void
   let onDayTap: (VoteDay) -> Void
+  @Binding var resultDayForPopover: VoteDateResult?
 
   private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 7)
   private let weekdays = ["일", "월", "화", "수", "목", "금", "토"]
@@ -458,6 +457,24 @@ private struct VoteRoomCalendarGrid: View {
     .buttonStyle(.plain)
     .disabled(!isCandidateDay)
     .accessibilityLabel(accessibilityLabel(for: day, result: result))
+    .popover(
+      item: popoverResult(for: day),
+      attachmentAnchor: .rect(.bounds),
+      arrowEdge: .bottom
+    ) { result in
+      VoteResultNicknamePopover(result: result)
+        .presentationCompactAdaptation(.popover)
+    }
+  }
+
+  private func popoverResult(for day: VoteDay) -> Binding<VoteDateResult?> {
+    Binding(
+      get: { resultDayForPopover?.day == day ? resultDayForPopover : nil },
+      set: { result in
+        guard result != nil || resultDayForPopover?.day == day else { return }
+        resultDayForPopover = result
+      }
+    )
   }
 
   private func backgroundColor(for day: VoteDay, result: VoteDateResult?) -> Color {
