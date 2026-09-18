@@ -3,6 +3,7 @@ import SwiftUI
 @MainActor
 struct VoteCreationPopoverView: View {
   @StateObject private var viewModel: VoteCreationViewModel
+  @State private var creationTask: Task<Void, Never>?
 
   let onDismiss: () -> Void
   let onCreated: (VoteRoom) -> Void
@@ -53,7 +54,7 @@ struct VoteCreationPopoverView: View {
         .font(.title.bold())
         .foregroundStyle(.calioPrimary)
       Spacer()
-      Button(action: onDismiss) {
+      Button(action: dismissCreation) {
         Image(systemName: "xmark")
           .font(.headline.weight(.semibold))
           .foregroundStyle(.calioTextSecondary)
@@ -131,11 +132,7 @@ struct VoteCreationPopoverView: View {
           .frame(maxWidth: .infinity, alignment: .leading)
       }
       Button {
-        Task {
-          if let room = await viewModel.createRoom() {
-            onCreated(room)
-          }
-        }
+        createVoteRoom()
       } label: {
         Group {
           if viewModel.state.isCreating {
@@ -159,6 +156,27 @@ struct VoteCreationPopoverView: View {
 
   private func dayText(_ day: VoteDay) -> String {
     "\(String(day.year))년 \(day.month)월 \(day.day)일"
+  }
+
+  private func createVoteRoom() {
+    guard creationTask == nil else {
+      return
+    }
+
+    creationTask = Task {
+      defer { creationTask = nil }
+
+      guard let room = await viewModel.createRoom(), !Task.isCancelled else {
+        return
+      }
+      onCreated(room)
+    }
+  }
+
+  private func dismissCreation() {
+    creationTask?.cancel()
+    creationTask = nil
+    onDismiss()
   }
 }
 
