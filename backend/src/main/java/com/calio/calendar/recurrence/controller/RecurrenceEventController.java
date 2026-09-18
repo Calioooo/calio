@@ -1,6 +1,6 @@
 package com.calio.calendar.recurrence.controller;
 
-import com.calio.calendar.event.controller.dto.EventResponse;
+import com.calio.calendar.singleevent.controller.dto.EventResponse;
 import com.calio.calendar.recurrence.controller.dto.CreateRecurrenceEventRequest;
 import com.calio.calendar.recurrence.controller.dto.RecurrenceEventResponse;
 import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceEventRequest;

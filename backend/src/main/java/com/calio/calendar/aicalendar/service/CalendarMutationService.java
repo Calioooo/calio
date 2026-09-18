@@ -8,10 +8,13 @@ import com.calio.calendar.aicalendar.service.dto.CalendarMutationRecurrencePrevi
 import com.calio.calendar.aicalendar.service.tool.dto.CalendarMutationToolRequest;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
-import com.calio.calendar.event.controller.dto.CreateEventRequest;
-import com.calio.calendar.event.controller.dto.EventResponse;
-import com.calio.calendar.event.controller.dto.UpdateEventRequest;
-import com.calio.calendar.event.service.EventService;
+import com.calio.calendar.singleevent.controller.dto.CreateSingleEventRequest;
+import com.calio.calendar.singleevent.controller.dto.EventResponse;
+import com.calio.calendar.singleevent.controller.dto.UpdateSingleEventRequest;
+import com.calio.calendar.singleevent.usecase.CreateSingleEventUseCase;
+import com.calio.calendar.singleevent.usecase.DeleteSingleEventUseCase;
+import com.calio.calendar.singleevent.usecase.GetSingleEventUseCase;
+import com.calio.calendar.singleevent.usecase.UpdateSingleEventUseCase;
 import com.calio.calendar.recurrence.controller.dto.RecurrenceEventResponse;
 import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceEventRequest;
 import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceOccurrenceRequest;
@@ -25,16 +28,25 @@ import org.springframework.stereotype.Service;
 @Service
 public class CalendarMutationService {
 
-    private final EventService eventService;
+    private final CreateSingleEventUseCase createEventUseCase;
+    private final GetSingleEventUseCase getEventUseCase;
+    private final UpdateSingleEventUseCase updateEventUseCase;
+    private final DeleteSingleEventUseCase deleteEventUseCase;
     private final RecurrenceEventService recurrenceEventService;
     private final TagService tagService;
 
     public CalendarMutationService(
-            EventService eventService,
+            CreateSingleEventUseCase createEventUseCase,
+            GetSingleEventUseCase getEventUseCase,
+            UpdateSingleEventUseCase updateEventUseCase,
+            DeleteSingleEventUseCase deleteEventUseCase,
             RecurrenceEventService recurrenceEventService,
             TagService tagService
     ) {
-        this.eventService = eventService;
+        this.createEventUseCase = createEventUseCase;
+        this.getEventUseCase = getEventUseCase;
+        this.updateEventUseCase = updateEventUseCase;
+        this.deleteEventUseCase = deleteEventUseCase;
         this.recurrenceEventService = recurrenceEventService;
         this.tagService = tagService;
     }
@@ -53,7 +65,7 @@ public class CalendarMutationService {
 
     public List<EventResponse> apply(Long accountId, CalendarMutationToolRequest request) {
         return switch (requireOperation(request)) {
-            case CREATE_EVENT -> List.of(eventService.createEvent(accountId, createEventRequest(request)));
+            case CREATE_EVENT -> List.of(createEventUseCase.create(accountId, createEventRequest(request)));
             case UPDATE_EVENT -> applyEventUpdate(accountId, request);
             case DELETE_EVENT -> deleteEvent(accountId, request);
             case UPDATE_RECURRENCE_OCCURRENCE -> applyOccurrenceUpdate(accountId, request);
@@ -64,7 +76,7 @@ public class CalendarMutationService {
     }
 
     private CalendarMutationPreview previewEventCreation(Long accountId, CalendarMutationToolRequest request) {
-        CreateEventRequest eventRequest = createEventRequest(request);
+        CreateSingleEventRequest eventRequest = createEventRequest(request);
         return new CalendarMutationPreview(
                 CalendarMutationType.CREATE,
                 CalendarMutationScope.EVENT,
@@ -84,17 +96,17 @@ public class CalendarMutationService {
     }
 
     private CalendarMutationPreview previewEventDeletion(Long accountId, CalendarMutationToolRequest request) {
-        EventResponse before = eventService.getEvent(accountId, requireEventId(request));
+        EventResponse before = getEventUseCase.get(accountId, requireEventId(request));
         return new CalendarMutationPreview(CalendarMutationType.DELETE, CalendarMutationScope.EVENT, before, null);
     }
 
     private List<EventResponse> applyEventUpdate(Long accountId, CalendarMutationToolRequest request) {
         EventUpdate update = prepareEventUpdate(accountId, request);
-        return List.of(eventService.updateEvent(accountId, update.before().id(), update.request()));
+        return List.of(updateEventUseCase.update(accountId, update.before().id(), update.request()));
     }
 
     private List<EventResponse> deleteEvent(Long accountId, CalendarMutationToolRequest request) {
-        eventService.deleteEvent(accountId, requireEventId(request));
+        deleteEventUseCase.delete(accountId, requireEventId(request));
         return List.of();
     }
 
@@ -199,12 +211,12 @@ public class CalendarMutationService {
     }
 
     private EventUpdate prepareEventUpdate(Long accountId, CalendarMutationToolRequest request) {
-        EventResponse before = eventService.getEvent(accountId, requireEventId(request));
+        EventResponse before = getEventUseCase.get(accountId, requireEventId(request));
         return new EventUpdate(before, updateEventRequest(request, before));
     }
 
-    private CreateEventRequest createEventRequest(CalendarMutationToolRequest request) {
-        return new CreateEventRequest(
+    private CreateSingleEventRequest createEventRequest(CalendarMutationToolRequest request) {
+        return new CreateSingleEventRequest(
                 requireTitle(request),
                 request.description(),
                 requireStartAt(request),
@@ -215,11 +227,11 @@ public class CalendarMutationService {
         );
     }
 
-    private UpdateEventRequest updateEventRequest(
+    private UpdateSingleEventRequest updateEventRequest(
             CalendarMutationToolRequest request,
             EventResponse before
     ) {
-        return new UpdateEventRequest(
+        return new UpdateSingleEventRequest(
                 titleOrExisting(request, before.title()),
                 valueOrExisting(request.description(), before.description()),
                 valueOrExisting(request.startAt(), before.startAt()),
@@ -261,7 +273,7 @@ public class CalendarMutationService {
         );
     }
 
-    private EventResponse eventForCreation(Long accountId, CreateEventRequest request) {
+    private EventResponse eventForCreation(Long accountId, CreateSingleEventRequest request) {
         return new EventResponse(
                 null,
                 request.title(),
@@ -286,7 +298,7 @@ public class CalendarMutationService {
             EventUpdate update
     ) {
         EventResponse before = update.before();
-        UpdateEventRequest eventRequest = update.request();
+        UpdateSingleEventRequest eventRequest = update.request();
         return new EventResponse(
                 before.id(),
                 eventRequest.title(),
@@ -462,6 +474,6 @@ public class CalendarMutationService {
         return value;
     }
 
-    private record EventUpdate(EventResponse before, UpdateEventRequest request) {
+    private record EventUpdate(EventResponse before, UpdateSingleEventRequest request) {
     }
 }

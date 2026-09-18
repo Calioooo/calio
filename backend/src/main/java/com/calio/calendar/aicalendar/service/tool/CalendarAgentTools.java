@@ -9,9 +9,10 @@ import com.calio.calendar.aicalendar.service.tool.dto.CalendarLookupToolRequest;
 import com.calio.calendar.aicalendar.service.tool.dto.CalendarMutationToolRequest;
 import com.calio.calendar.aicalendar.service.tool.dto.FreeTimeSearchToolRequest;
 import com.calio.calendar.aicalendar.service.tool.dto.FreeTimeSearchToolResult;
-import com.calio.calendar.event.controller.dto.EventResponse;
-import com.calio.calendar.event.service.EventService;
-import com.calio.calendar.event.service.dto.CalendarFreeTime;
+import com.calio.calendar.singleevent.controller.dto.EventResponse;
+import com.calio.calendar.singleevent.usecase.FindAvailableTimesUseCase;
+import com.calio.calendar.singleevent.usecase.ListEventsUseCase;
+import com.calio.calendar.singleevent.service.dto.CalendarFreeTime;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalTime;
@@ -34,18 +35,21 @@ public class CalendarAgentTools {
     private static final String CALL_COUNTER_KEY = "calendarAgentToolCallCounter";
     private static final String RESULT_COLLECTOR_KEY = "calendarAgentToolResultCollector";
 
-    private final EventService eventService;
+    private final ListEventsUseCase listEventsUseCase;
+    private final FindAvailableTimesUseCase findAvailableTimesUseCase;
     private final CalendarMutationService mutationService;
     private final CalendarAIProperties properties;
     private final CalendarAgentObservationService observationService;
 
     public CalendarAgentTools(
-            EventService eventService,
+            ListEventsUseCase listEventsUseCase,
+            FindAvailableTimesUseCase findAvailableTimesUseCase,
             CalendarMutationService mutationService,
             CalendarAIProperties properties,
             CalendarAgentObservationService observationService
     ) {
-        this.eventService = eventService;
+        this.listEventsUseCase = listEventsUseCase;
+        this.findAvailableTimesUseCase = findAvailableTimesUseCase;
         this.mutationService = mutationService;
         this.properties = properties;
         this.observationService = observationService;
@@ -100,7 +104,7 @@ public class CalendarAgentTools {
             );
             LocalTime windowStart = LocalTime.parse(request.windowStart());
             LocalTime windowEnd = LocalTime.parse(request.windowEnd());
-            List<CalendarFreeTime> freeTimes = eventService.findAvailableTimes(
+            List<CalendarFreeTime> freeTimes = findAvailableTimesUseCase.find(
                     requestContext.accountId(),
                     range.startDate(),
                     range.endDate(),
@@ -207,6 +211,6 @@ public class CalendarAgentTools {
     ) {
         Instant from = range.startDate().atStartOfDay(range.timeZone()).toInstant();
         Instant to = range.endDate().plusDays(1).atStartOfDay(range.timeZone()).toInstant();
-        return eventService.listEvents(accountId, from, to);
+        return listEventsUseCase.list(accountId, from, to);
     }
 }

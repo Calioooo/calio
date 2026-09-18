@@ -5,7 +5,7 @@ import com.calio.calendar.account.service.AccountQueryService;
 import com.calio.calendar.common.domain.CanonicalSchedule;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
-import com.calio.calendar.event.controller.dto.EventResponse;
+import com.calio.calendar.singleevent.controller.dto.EventResponse;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarRecurrenceMappingQueryService;
 import com.calio.calendar.recurrence.controller.dto.CreateRecurrenceEventRequest;
 import com.calio.calendar.recurrence.controller.dto.RecurrenceEventResponse;
@@ -16,7 +16,6 @@ import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceOccurrence;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
 import com.calio.calendar.tag.domain.Tag;
-import com.calio.calendar.event.service.EventCommandService;
 import com.calio.calendar.tag.service.TagQueryService;
 import com.calio.calendar.sharing.recurrence.service.PersonalRecurrenceGroupShareCommandService;
 import java.time.Clock;
@@ -34,7 +33,6 @@ public class RecurrenceEventService {
     private final RecurrenceEventCommandService recurrenceEventCommandService;
     private final AccountQueryService accountQueryService;
     private final TagQueryService tagQueryService;
-    private final EventCommandService eventCommandService;
     private final Rfc5545RecurrenceEngine recurrenceEngine;
     private final Clock clock;
     private final PersonalRecurrenceGroupShareCommandService recurrenceShareCommandService;
@@ -45,7 +43,6 @@ public class RecurrenceEventService {
             RecurrenceEventCommandService recurrenceEventCommandService,
             AccountQueryService accountQueryService,
             TagQueryService tagQueryService,
-            EventCommandService eventCommandService,
             Rfc5545RecurrenceEngine recurrenceEngine,
             Clock clock,
             PersonalRecurrenceGroupShareCommandService recurrenceShareCommandService,
@@ -55,7 +52,6 @@ public class RecurrenceEventService {
         this.recurrenceEventCommandService = recurrenceEventCommandService;
         this.accountQueryService = accountQueryService;
         this.tagQueryService = tagQueryService;
-        this.eventCommandService = eventCommandService;
         this.recurrenceEngine = recurrenceEngine;
         this.clock = clock;
         this.recurrenceShareCommandService = recurrenceShareCommandService;
@@ -160,7 +156,6 @@ public class RecurrenceEventService {
         rejectExternalSeriesMutation(accountId, recurrenceId);
         recurrenceShareCommandService.deleteAllForSourceRecurrence(recurrenceId);
         recurrenceEventCommandService.deleteRecurrenceOverridesByRecurrenceEventIds(List.of(recurrenceId));
-        eventCommandService.deleteEventsByRecurrenceEventIds(List.of(recurrenceId));
         recurrenceEventCommandService.deleteRecurrenceEventsByIds(List.of(recurrenceId));
     }
 

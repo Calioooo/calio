@@ -1,8 +1,8 @@
 package com.calio.calendar.aicalendar.service.tool;
 
-import com.calio.calendar.event.controller.dto.EventResponse;
+import com.calio.calendar.singleevent.controller.dto.EventResponse;
 import com.calio.calendar.aicalendar.service.dto.CalendarMutationPreview;
-import com.calio.calendar.event.service.dto.CalendarFreeTime;
+import com.calio.calendar.singleevent.service.dto.CalendarFreeTime;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;

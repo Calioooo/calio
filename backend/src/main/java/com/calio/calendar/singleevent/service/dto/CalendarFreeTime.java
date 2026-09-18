@@ -1,4 +1,4 @@
-package com.calio.calendar.event.service.dto;
+package com.calio.calendar.singleevent.service.dto;
 
 import java.util.List;
 

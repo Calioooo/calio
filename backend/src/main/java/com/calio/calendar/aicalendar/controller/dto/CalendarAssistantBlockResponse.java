@@ -1,7 +1,7 @@
 package com.calio.calendar.aicalendar.controller.dto;
 
 import com.calio.calendar.aicalendar.domain.CalendarAssistantBlockType;
-import com.calio.calendar.event.controller.dto.EventResponse;
+import com.calio.calendar.singleevent.controller.dto.EventResponse;
 import java.util.List;
 
 public record CalendarAssistantBlockResponse<T>(

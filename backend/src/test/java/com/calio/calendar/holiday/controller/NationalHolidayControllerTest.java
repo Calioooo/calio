@@ -7,7 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.calio.calendar.event.repository.EventRepository;
+import com.calio.calendar.singleevent.repository.SingleEventRepository;
 import com.calio.calendar.holiday.repository.NationalHolidayRepository;
 import com.calio.calendar.security.AuthenticatedAccountMockMvcTestConfig;
 import com.calio.calendar.security.WithAuthenticatedAccount;
@@ -45,7 +45,7 @@ class NationalHolidayControllerTest {
     private NationalHolidayRepository nationalHolidayRepository;
 
     @Autowired
-    private EventRepository eventRepository;
+    private SingleEventRepository eventRepository;
 
     @Autowired
     private TagRepository tagRepository;

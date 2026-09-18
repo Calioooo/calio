@@ -14,7 +14,7 @@ public interface PersonalEventGroupShareRepository extends JpaRepository<Persona
 
     Optional<PersonalEventGroupShare> findByEvent_IdAndGroupSpace_Id(Long eventId, Long groupSpaceId);
 
-    @EntityGraph(attributePaths = {"event", "event.account", "groupSpace"})
+    @EntityGraph(attributePaths = {"event", "groupSpace"})
     @Query("""
             select share
             from PersonalEventGroupShare share
@@ -26,7 +26,7 @@ public interface PersonalEventGroupShareRepository extends JpaRepository<Persona
             @Param("groupSpaceIds") Collection<Long> groupSpaceIds
     );
 
-    @EntityGraph(attributePaths = {"event", "event.account", "groupSpace"})
+    @EntityGraph(attributePaths = {"event", "groupSpace"})
     @Query("""
             select share
             from PersonalEventGroupShare share
@@ -44,6 +44,13 @@ public interface PersonalEventGroupShareRepository extends JpaRepository<Persona
     @Modifying
     @Query("""
             delete from PersonalEventGroupShare share
+            where share.event.id in :eventIds
+            """)
+    void deleteAllByEventIds(@Param("eventIds") Collection<Long> eventIds);
+
+    @Modifying
+    @Query("""
+            delete from PersonalEventGroupShare share
             where share.groupSpace.id = :groupSpaceId
             """)
     void deleteAllByGroupSpaceId(@Param("groupSpaceId") Long groupSpaceId);
@@ -52,7 +59,7 @@ public interface PersonalEventGroupShareRepository extends JpaRepository<Persona
     @Query("""
             delete from PersonalEventGroupShare share
             where share.groupSpace.id = :groupSpaceId
-              and share.event.account.id = (
+              and share.event.accountId = (
                     select member.accountId
                     from GroupMember member
                     where member.id = :memberId

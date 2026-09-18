@@ -1,7 +1,7 @@
 package com.calio.calendar.sharing.event.domain;
 
 import com.calio.calendar.common.domain.BaseEntity;
-import com.calio.calendar.event.domain.Event;
+import com.calio.calendar.singleevent.domain.SingleEvent;
 import com.calio.calendar.groupspace.domain.GroupSpace;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -39,7 +39,7 @@ public class PersonalEventGroupShare extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "event_id", nullable = false)
-    private Event event;
+    private SingleEvent event;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "group_space_id", nullable = false)
@@ -52,13 +52,13 @@ public class PersonalEventGroupShare extends BaseEntity {
     protected PersonalEventGroupShare() {
     }
 
-    private PersonalEventGroupShare(Event event, GroupSpace groupSpace, UUID publicShareId) {
+    private PersonalEventGroupShare(SingleEvent event, GroupSpace groupSpace, UUID publicShareId) {
         this.event = event;
         this.groupSpace = groupSpace;
         this.publicShareId = publicShareId;
     }
 
-    public static PersonalEventGroupShare create(Event event, GroupSpace groupSpace) {
+    public static PersonalEventGroupShare create(SingleEvent event, GroupSpace groupSpace) {
         return new PersonalEventGroupShare(event, groupSpace, UUID.randomUUID());
     }
 
@@ -66,7 +66,7 @@ public class PersonalEventGroupShare extends BaseEntity {
         return id;
     }
 
-    public Event getEvent() {
+    public SingleEvent getEvent() {
         return event;
     }
 

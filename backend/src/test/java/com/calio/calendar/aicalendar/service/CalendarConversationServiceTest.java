@@ -16,7 +16,7 @@ import com.calio.calendar.aicalendar.service.dto.CalendarAssistantRequest;
 import com.calio.calendar.aicalendar.repository.CalendarConversationMessageRepository;
 import com.calio.calendar.aicalendar.repository.CalendarConversationRepository;
 import com.calio.calendar.aicalendar.service.dto.CalendarConversationHistoryMessage;
-import com.calio.calendar.event.controller.dto.EventResponse;
+import com.calio.calendar.singleevent.controller.dto.EventResponse;
 import java.time.Instant;
 import java.util.List;
 import java.util.stream.IntStream;

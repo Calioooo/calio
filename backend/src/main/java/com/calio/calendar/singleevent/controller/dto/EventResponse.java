@@ -1,7 +1,8 @@
-package com.calio.calendar.event.controller.dto;
+package com.calio.calendar.singleevent.controller.dto;
 
 import com.calio.calendar.tag.controller.dto.TagResponse;
-import com.calio.calendar.event.domain.Event;
+import com.calio.calendar.tag.domain.Tag;
+import com.calio.calendar.singleevent.domain.SingleEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceOccurrence;
@@ -24,7 +25,7 @@ public record EventResponse(
         Instant updatedAt
 ) {
 
-    public static EventResponse from(Event event) {
+    public static EventResponse from(SingleEvent event, Tag tag) {
         return new EventResponse(
                 event.getId(),
                 event.getTitle(),
@@ -34,9 +35,9 @@ public record EventResponse(
                 event.isAllDay(),
                 event.isAllDay() ? null : event.getTimeZone(),
                 event.importantEvent(),
-                event.getRecurrenceId().orElse(null),
-                event.isRecurrenceOccurrence(),
-                TagResponse.from(event.getTag()),
+                null,
+                false,
+                TagResponse.from(tag),
                 null,
                 event.getCreatedAt(),
                 event.getUpdatedAt()

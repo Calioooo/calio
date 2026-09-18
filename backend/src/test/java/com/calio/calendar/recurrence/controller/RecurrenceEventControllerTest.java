@@ -13,8 +13,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
-import com.calio.calendar.event.domain.Event;
-import com.calio.calendar.event.repository.EventRepository;
+import com.calio.calendar.singleevent.domain.SingleEvent;
+import com.calio.calendar.singleevent.repository.SingleEventRepository;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
@@ -64,7 +64,7 @@ class RecurrenceEventControllerTest {
     private ObjectMapper objectMapper;
 
     @Autowired
-    private EventRepository eventRepository;
+    private SingleEventRepository eventRepository;
 
     @Autowired
     private RecurrenceEventRepository recurrenceEventRepository;
@@ -88,14 +88,13 @@ class RecurrenceEventControllerTest {
     }
 
     @Test
-    @DisplayName("timed master는 timezone과 RFC line을 왕복하고 occurrence를 Event row 없이 전개한다")
+    @DisplayName("timed master는 timezone과 RFC line을 왕복하고 occurrence를 SingleEvent row 없이 전개한다")
     void givenTimedMaster_whenCreateDetailAndList_thenReturnsCanonicalContract() throws Exception {
         // given, when
         long recurrenceId = createTimedRecurrence("Daily", "2026-08-01", "Asia/Seoul");
 
         // then
-        assertThat(eventRepository.findByRecurrenceIdAndAccount_IdOrderByStartAtAsc(recurrenceId, accountId))
-                .isEmpty();
+        assertThat(eventRepository.count()).isZero();
         mockMvc.perform(get("/api/recurrence-events/{id}", recurrenceId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.title").value("Daily"))
@@ -381,7 +380,7 @@ class RecurrenceEventControllerTest {
     }
 
     @Test
-    @DisplayName("전체 master 수정은 active와 deleted override 및 legacy Event를 보존하고 orphan 조회를 유지한다")
+    @DisplayName("전체 master 수정은 active와 deleted override를 보존하고 orphan 조회를 유지한다")
     void givenActiveAndDeletedOverrides_whenReplaceMaster_thenPreservesChildStateAndOrphanQuery() throws Exception {
         // given
         long recurrenceId = createTimedRecurrence("Master", "2026-12-01", "UTC");
@@ -408,18 +407,6 @@ class RecurrenceEventControllerTest {
                 .findByRecurrenceEvent_IdAndOriginStartAt(recurrenceId, deletedOrigin)
                 .orElseThrow()
                 .getDeletedAt();
-        Tag originalTag = recurrenceEventRepository.findById(recurrenceId).orElseThrow().getTag();
-        Event legacyEvent = eventRepository.save(new Event(
-                "Legacy",
-                null,
-                Instant.parse("2026-12-20T09:00:00Z"),
-                Instant.parse("2026-12-20T10:00:00Z"),
-                false,
-                "UTC",
-                recurrenceId,
-                originalTag,
-                accountRepository.getReferenceById(accountId)
-        ));
         Tag replacementTag = tagRepository.save(Tag.personalCustom(
                 accountRepository.getReferenceById(accountId),
                 "Changed tag",
@@ -468,8 +455,6 @@ class RecurrenceEventControllerTest {
                     assertThat(override.getOverrideTimeZone()).isNull();
                     assertThat(override.getDeletedAt()).isEqualTo(deletedAt);
                 });
-        assertThat(eventRepository.findById(legacyEvent.getId())).isPresent();
-
         mockMvc.perform(get("/api/events")
                         .param("from", "2026-12-10T12:00:00Z")
                         .param("to", "2026-12-10T13:00:00Z"))
@@ -747,7 +732,7 @@ class RecurrenceEventControllerTest {
     }
 
     @Test
-    @DisplayName("전체 recurrence 삭제는 active와 deleted override, account legacy Event, master를 모두 제거한다")
+    @DisplayName("전체 recurrence 삭제는 active와 deleted override, master를 모두 제거한다")
     void givenRecurrenceChildren_whenDeleteMaster_thenRemovesAllChildrenAndMaster() throws Exception {
         // given
         long recurrenceId = createTimedRecurrence("Delete all", "2027-05-01", "UTC");
@@ -770,19 +755,6 @@ class RecurrenceEventControllerTest {
         mockMvc.perform(delete("/api/recurrence-events/{id}/occurrences", recurrenceId)
                         .param("originStartAt", deletedOrigin.toString()))
                 .andExpect(status().isNoContent());
-        RecurrenceEvent master = recurrenceEventRepository.findById(recurrenceId).orElseThrow();
-        Event legacyEvent = eventRepository.save(new Event(
-                "Legacy child",
-                null,
-                Instant.parse("2027-05-20T09:00:00Z"),
-                Instant.parse("2027-05-20T10:00:00Z"),
-                false,
-                "UTC",
-                recurrenceId,
-                master.getTag(),
-                accountRepository.getReferenceById(accountId)
-        ));
-
         // when
         mockMvc.perform(delete("/api/recurrence-events/{id}", recurrenceId))
                 .andExpect(status().isNoContent());
@@ -792,7 +764,6 @@ class RecurrenceEventControllerTest {
                 .isEmpty();
         assertThat(overrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(recurrenceId, deletedOrigin))
                 .isEmpty();
-        assertThat(eventRepository.findById(legacyEvent.getId())).isEmpty();
         assertThat(recurrenceEventRepository.findById(recurrenceId)).isEmpty();
     }
 

@@ -68,12 +68,10 @@ struct CalendarEventCreationDraft: Equatable {
     }
 
     var submitInput: CalendarEventCreationSubmitInput {
-        let title = eventInput.title.trimmingCharacters(in: .whitespacesAndNewlines)
-
         if recurrenceInput.isEnabled {
             return .recurring(
                 RecurrenceEventCreateInput(
-                    title: title,
+                    title: eventInput.title.trimmingCharacters(in: .whitespacesAndNewlines),
                     description: eventInput.description,
                     recurrenceStartDate: recurrenceInput.startDate,
                     recurrenceEndDate: recurrenceInput.endDate,
@@ -88,7 +86,7 @@ struct CalendarEventCreationDraft: Equatable {
 
         return .single(
             EventCreateInput(
-                title: title,
+                title: eventInput.title,
                 description: eventInput.description,
                 startAt: eventInput.startAt,
                 endAt: eventInput.endAt,

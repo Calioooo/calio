@@ -1,13 +1,14 @@
 package com.calio.calendar.integration.sync.page;
 
 import com.calio.calendar.account.domain.Account;
-import com.calio.calendar.event.domain.Event;
-import com.calio.calendar.event.service.EventCommandService;
+import com.calio.calendar.singleevent.domain.SingleEvent;
+import com.calio.calendar.singleevent.repository.SingleEventRepository;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingCommandService;
 import com.calio.calendar.integration.sync.page.dto.GoogleCalendarPageRecordCache;
 import com.calio.calendar.integration.sync.page.dto.GoogleCalendarNormalizedPage.EventUpsert;
+import com.calio.calendar.sharing.event.service.PersonalEventGroupShareCommandService;
 import com.calio.calendar.tag.domain.Tag;
 import org.springframework.stereotype.Service;
 
@@ -15,14 +16,17 @@ import org.springframework.stereotype.Service;
 public class GoogleCalendarEventChangeService {
 
     private final GoogleCalendarEventMappingCommandService eventMappingCommandService;
-    private final EventCommandService eventCommandService;
+    private final SingleEventRepository eventRepository;
+    private final PersonalEventGroupShareCommandService eventShareCommandService;
 
     public GoogleCalendarEventChangeService(
             GoogleCalendarEventMappingCommandService eventMappingCommandService,
-            EventCommandService eventCommandService
+            SingleEventRepository eventRepository,
+            PersonalEventGroupShareCommandService eventShareCommandService
     ) {
         this.eventMappingCommandService = eventMappingCommandService;
-        this.eventCommandService = eventCommandService;
+        this.eventRepository = eventRepository;
+        this.eventShareCommandService = eventShareCommandService;
     }
 
     public void applyUpsert(
@@ -46,16 +50,15 @@ public class GoogleCalendarEventChangeService {
             existingMapping.updateProviderVersion(item.googleEtag(), item.googleUpdatedAt());
             return;
         }
-        Event event = eventCommandService.createEvent(new Event(
+        SingleEvent event = eventRepository.save(new SingleEvent(
                 item.title(),
                 item.description(),
                 item.schedule().startAt(),
                 item.schedule().endAt(),
                 item.schedule().allDay(),
                 item.schedule().timeZone(),
-                null,
-                defaultTag,
-                account
+                defaultTag.getId(),
+                account.getId()
         ));
         GoogleCalendarEventMapping mapping = eventMappingCommandService.createEventMapping(
                 new GoogleCalendarEventMapping(
@@ -79,6 +82,7 @@ public class GoogleCalendarEventChangeService {
             return;
         }
         eventMappingCommandService.deleteEventMapping(eventMapping);
-        eventCommandService.deleteEvent(eventMapping.getEvent());
+        eventShareCommandService.deleteAllForSourceEvent(eventMapping.getEvent().getId());
+        eventRepository.delete(eventMapping.getEvent());
     }
 }

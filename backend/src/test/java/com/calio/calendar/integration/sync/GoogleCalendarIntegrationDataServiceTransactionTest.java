@@ -8,8 +8,8 @@ import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
-import com.calio.calendar.event.domain.Event;
-import com.calio.calendar.event.repository.EventRepository;
+import com.calio.calendar.singleevent.domain.SingleEvent;
+import com.calio.calendar.singleevent.repository.SingleEventRepository;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.mapping.repository.GoogleCalendarEventMappingRepository;
@@ -50,7 +50,7 @@ class GoogleCalendarIntegrationDataServiceTransactionTest {
     private GoogleCalendarEventMappingRepository eventMappingRepository;
 
     @Autowired
-    private EventRepository eventRepository;
+    private SingleEventRepository eventRepository;
 
     @Autowired
     private AccountRepository accountRepository;
@@ -70,16 +70,15 @@ class GoogleCalendarIntegrationDataServiceTransactionTest {
         GoogleCalendarIntegration integration = integrationRepository.saveAndFlush(
                 integration(account.getId())
         );
-        Event event = eventRepository.saveAndFlush(new Event(
+        SingleEvent event = eventRepository.saveAndFlush(new SingleEvent(
                 "Imported event",
                 null,
                 Instant.parse("2026-07-01T09:00:00Z"),
                 Instant.parse("2026-07-01T10:00:00Z"),
                 false,
                 "UTC",
-                null,
-                tag,
-                account
+                tag.getId(),
+                account.getId()
         ));
         GoogleCalendarEventMapping mapping = eventMappingRepository.saveAndFlush(
                 new GoogleCalendarEventMapping(

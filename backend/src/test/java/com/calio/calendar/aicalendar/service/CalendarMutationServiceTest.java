@@ -14,10 +14,13 @@ import com.calio.calendar.aicalendar.domain.CalendarMutationOperation;
 import com.calio.calendar.aicalendar.service.tool.dto.CalendarMutationToolRequest;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
-import com.calio.calendar.event.controller.dto.CreateEventRequest;
-import com.calio.calendar.event.controller.dto.EventResponse;
-import com.calio.calendar.event.controller.dto.UpdateEventRequest;
-import com.calio.calendar.event.service.EventService;
+import com.calio.calendar.singleevent.controller.dto.CreateSingleEventRequest;
+import com.calio.calendar.singleevent.controller.dto.EventResponse;
+import com.calio.calendar.singleevent.controller.dto.UpdateSingleEventRequest;
+import com.calio.calendar.singleevent.usecase.CreateSingleEventUseCase;
+import com.calio.calendar.singleevent.usecase.DeleteSingleEventUseCase;
+import com.calio.calendar.singleevent.usecase.GetSingleEventUseCase;
+import com.calio.calendar.singleevent.usecase.UpdateSingleEventUseCase;
 import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceOccurrenceRequest;
 import com.calio.calendar.recurrence.controller.dto.RecurrenceEventResponse;
 import com.calio.calendar.recurrence.service.RecurrenceEventService;
@@ -36,7 +39,16 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class CalendarMutationServiceTest {
 
     @Mock
-    private EventService eventService;
+    private CreateSingleEventUseCase createEventUseCase;
+
+    @Mock
+    private GetSingleEventUseCase getEventUseCase;
+
+    @Mock
+    private UpdateSingleEventUseCase updateEventUseCase;
+
+    @Mock
+    private DeleteSingleEventUseCase deleteEventUseCase;
 
     @Mock
     private RecurrenceEventService recurrenceEventService;
@@ -49,7 +61,7 @@ class CalendarMutationServiceTest {
     void givenEventUpdate_whenPreview_thenReturnsBeforeAndAfterWithoutChangingEvent() {
         // given
         EventResponse existingEvent = event("기존 회의", Instant.parse("2026-08-21T05:00:00Z"));
-        when(eventService.getEvent(1L, 10L)).thenReturn(existingEvent);
+        when(getEventUseCase.get(1L, 10L)).thenReturn(existingEvent);
         when(tagService.getTagOrDefault(1L, 1L)).thenReturn(Tag.personalDefault("업무", "#64748B"));
 
         // when
@@ -61,16 +73,16 @@ class CalendarMutationServiceTest {
         assertThat(preview.before()).isEqualTo(existingEvent);
         assertThat(preview.after().title()).isEqualTo("변경 회의");
         assertThat(preview.after().startAt()).isEqualTo(Instant.parse("2026-08-21T06:00:00Z"));
-        verify(eventService, never()).updateEvent(any(), any(), any());
+        verify(updateEventUseCase, never()).update(any(), any(), any());
     }
 
     @Test
-    @DisplayName("확정된 일정 수정은 기존 EventService 수정 유스케이스를 호출한다")
-    void givenConfirmedEventUpdate_whenApply_thenDelegatesToExistingEventService() {
+    @DisplayName("확정된 일정 수정은 변경된 일정 응답을 반환한다")
+    void givenConfirmedEventUpdate_whenApply_thenReturnsUpdatedEvent() {
         // given
-        when(eventService.getEvent(1L, 10L)).thenReturn(event("기존 회의", Instant.parse("2026-08-21T05:00:00Z")));
+        when(getEventUseCase.get(1L, 10L)).thenReturn(event("기존 회의", Instant.parse("2026-08-21T05:00:00Z")));
         EventResponse updatedEvent = event("변경 회의", Instant.parse("2026-08-21T06:00:00Z"));
-        when(eventService.updateEvent(eq(1L), eq(10L), any()))
+        when(updateEventUseCase.update(eq(1L), eq(10L), any()))
                 .thenReturn(updatedEvent);
 
         // when
@@ -78,8 +90,8 @@ class CalendarMutationServiceTest {
 
         // then
         assertThat(result).containsExactly(updatedEvent);
-        ArgumentCaptor<UpdateEventRequest> requestCaptor = ArgumentCaptor.forClass(UpdateEventRequest.class);
-        verify(eventService).updateEvent(eq(1L), eq(10L), requestCaptor.capture());
+        ArgumentCaptor<UpdateSingleEventRequest> requestCaptor = ArgumentCaptor.forClass(UpdateSingleEventRequest.class);
+        verify(updateEventUseCase).update(eq(1L), eq(10L), requestCaptor.capture());
         assertThat(requestCaptor.getValue().title()).isEqualTo("변경 회의");
         assertThat(requestCaptor.getValue().startAt()).isEqualTo(Instant.parse("2026-08-21T06:00:00Z"));
     }
@@ -98,23 +110,23 @@ class CalendarMutationServiceTest {
         assertThat(preview.scope()).isEqualTo(CalendarMutationScope.EVENT);
         assertThat(preview.before()).isNull();
         assertThat(preview.after().title()).isEqualTo("새 회의");
-        verify(eventService, never()).createEvent(any(), any());
+        verify(createEventUseCase, never()).create(any(), any());
     }
 
     @Test
-    @DisplayName("확정된 일정 생성은 기존 EventService 생성 유스케이스를 호출한다")
-    void givenConfirmedEventCreation_whenApply_thenDelegatesToExistingEventService() {
+    @DisplayName("확정된 일정 생성은 생성된 일정 응답을 반환한다")
+    void givenConfirmedEventCreation_whenApply_thenReturnsCreatedEvent() {
         // given
         EventResponse createdEvent = event("새 회의", Instant.parse("2026-08-22T05:00:00Z"));
-        when(eventService.createEvent(eq(1L), any())).thenReturn(createdEvent);
+        when(createEventUseCase.create(eq(1L), any())).thenReturn(createdEvent);
 
         // when
         List<EventResponse> result = service().apply(1L, createRequest());
 
         // then
         assertThat(result).containsExactly(createdEvent);
-        ArgumentCaptor<CreateEventRequest> requestCaptor = ArgumentCaptor.forClass(CreateEventRequest.class);
-        verify(eventService).createEvent(eq(1L), requestCaptor.capture());
+        ArgumentCaptor<CreateSingleEventRequest> requestCaptor = ArgumentCaptor.forClass(CreateSingleEventRequest.class);
+        verify(createEventUseCase).create(eq(1L), requestCaptor.capture());
         assertThat(requestCaptor.getValue().title()).isEqualTo("새 회의");
     }
 
@@ -123,7 +135,7 @@ class CalendarMutationServiceTest {
     void givenEventDeletion_whenPreview_thenReturnsBeforeWithoutDeletingEvent() {
         // given
         EventResponse existingEvent = event("기존 회의", Instant.parse("2026-08-21T05:00:00Z"));
-        when(eventService.getEvent(1L, 10L)).thenReturn(existingEvent);
+        when(getEventUseCase.get(1L, 10L)).thenReturn(existingEvent);
 
         // when
         var preview = service().preview(1L, deleteRequest());
@@ -133,18 +145,18 @@ class CalendarMutationServiceTest {
         assertThat(preview.scope()).isEqualTo(CalendarMutationScope.EVENT);
         assertThat(preview.before()).isEqualTo(existingEvent);
         assertThat(preview.after()).isNull();
-        verify(eventService, never()).deleteEvent(any(), any());
+        verify(deleteEventUseCase, never()).delete(any(), any());
     }
 
     @Test
-    @DisplayName("확정된 일정 삭제는 기존 EventService 삭제 유스케이스를 호출한다")
-    void givenConfirmedEventDeletion_whenApply_thenDelegatesToExistingEventService() {
+    @DisplayName("확정된 일정 삭제는 빈 결과를 반환한다")
+    void givenConfirmedEventDeletion_whenApply_thenReturnsEmptyResult() {
         // when
         List<EventResponse> result = service().apply(1L, deleteRequest());
 
         // then
         assertThat(result).isEmpty();
-        verify(eventService).deleteEvent(1L, 10L);
+        verify(deleteEventUseCase).delete(1L, 10L);
     }
 
     @Test
@@ -176,7 +188,7 @@ class CalendarMutationServiceTest {
     @DisplayName("존재하지 않는 일정의 변경 Preview는 event not found를 전파한다")
     void givenMissingEvent_whenPreviewUpdate_thenPropagatesEventNotFound() {
         // given
-        when(eventService.getEvent(1L, 10L)).thenThrow(new CalioException(ErrorCode.EVENT_NOT_FOUND));
+        when(getEventUseCase.get(1L, 10L)).thenThrow(new CalioException(ErrorCode.EVENT_NOT_FOUND));
 
         // when, then
         assertThatThrownBy(() -> service().preview(1L, updateRequest()))
@@ -225,11 +237,6 @@ class CalendarMutationServiceTest {
                 .isEqualTo(Instant.parse("2026-08-21T05:00:00Z"));
         assertThat(requestCaptor.getValue().startAt())
                 .isEqualTo(Instant.parse("2026-08-21T06:00:00Z"));
-        verify(eventService, never()).listEvents(
-                org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.any()
-        );
     }
 
     @Test
@@ -411,7 +418,14 @@ class CalendarMutationServiceTest {
     }
 
     private CalendarMutationService service() {
-        return new CalendarMutationService(eventService, recurrenceEventService, tagService);
+        return new CalendarMutationService(
+                createEventUseCase,
+                getEventUseCase,
+                updateEventUseCase,
+                deleteEventUseCase,
+                recurrenceEventService,
+                tagService
+        );
     }
 
     private CalendarMutationToolRequest updateRequest() {

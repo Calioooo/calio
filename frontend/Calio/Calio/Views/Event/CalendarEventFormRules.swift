@@ -8,6 +8,8 @@
 import Foundation
 
 enum CalendarEventFormRules {
+    static let eventTitleMaxLength = 255
+
     static func canSave(title: String, startAt: Date, endAt: Date) -> Bool {
         canSave(
             title: title,
@@ -32,7 +34,7 @@ enum CalendarEventFormRules {
         recurrenceEndTime: Date,
         isAllDay: Bool = false
     ) -> Bool {
-        guard !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        guard title.count <= eventTitleMaxLength else {
             return false
         }
 
@@ -40,7 +42,8 @@ enum CalendarEventFormRules {
             return endAt > startAt
         }
 
-        return recurrenceEndDate.map { !isUTCDate($0, before: recurrenceStartDate) } ?? true
+        return !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && (recurrenceEndDate.map { !isUTCDate($0, before: recurrenceStartDate) } ?? true)
             && (isAllDay || isUTCTime(recurrenceStartTime, before: recurrenceEndTime))
     }
 

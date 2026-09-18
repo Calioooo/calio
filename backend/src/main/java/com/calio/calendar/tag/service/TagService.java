@@ -4,7 +4,7 @@ import com.calio.calendar.tag.controller.dto.CustomTagRequest;
 import com.calio.calendar.tag.controller.dto.TagResponse;
 import com.calio.calendar.account.service.AccountQueryService;
 import com.calio.calendar.account.domain.Account;
-import com.calio.calendar.event.service.EventCommandService;
+import com.calio.calendar.singleevent.usecase.ReassignSingleEventTagsUseCase;
 import com.calio.calendar.recurrence.service.RecurrenceEventCommandService;
 import com.calio.calendar.tag.domain.Tag;
 import java.util.List;
@@ -18,20 +18,20 @@ public class TagService {
     private final TagQueryService tagQueryService;
     private final TagCommandService tagCommandService;
     private final AccountQueryService accountQueryService;
-    private final EventCommandService eventCommandService;
+    private final ReassignSingleEventTagsUseCase reassignEventTagsUseCase;
     private final RecurrenceEventCommandService recurrenceEventCommandService;
 
     public TagService(
             TagQueryService tagQueryService,
             TagCommandService tagCommandService,
             AccountQueryService accountQueryService,
-            EventCommandService eventCommandService,
+            ReassignSingleEventTagsUseCase reassignEventTagsUseCase,
             RecurrenceEventCommandService recurrenceEventCommandService
     ) {
         this.tagQueryService = tagQueryService;
         this.tagCommandService = tagCommandService;
         this.accountQueryService = accountQueryService;
-        this.eventCommandService = eventCommandService;
+        this.reassignEventTagsUseCase = reassignEventTagsUseCase;
         this.recurrenceEventCommandService = recurrenceEventCommandService;
     }
 
@@ -68,7 +68,7 @@ public class TagService {
         Tag tag = tagQueryService.getCustomTag(accountId, tagId);
         Tag fallbackTag = tagQueryService.getFallbackTag();
 
-        eventCommandService.changeTagForTargetEvents(accountId, tag, fallbackTag);
+        reassignEventTagsUseCase.reassign(accountId, tag.getId(), fallbackTag.getId());
         recurrenceEventCommandService.changeTagForRecurrenceEvents(accountId, tag, fallbackTag);
         tagCommandService.deleteTag(tag);
     }

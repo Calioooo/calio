@@ -21,9 +21,9 @@ import com.calio.calendar.aicalendar.service.dto.CalendarConversationHistoryMess
 import com.calio.calendar.aicalendar.service.dto.CalendarMutationPreview;
 import com.calio.calendar.aicalendar.service.dto.CalendarMutationRecurrencePreview;
 import com.calio.calendar.aicalendar.service.tool.dto.CalendarMutationToolRequest;
-import com.calio.calendar.event.controller.dto.EventResponse;
-import com.calio.calendar.event.service.EventService;
-import com.calio.calendar.event.service.dto.CalendarFreeTime;
+import com.calio.calendar.singleevent.controller.dto.EventResponse;
+import com.calio.calendar.singleevent.service.EventService;
+import com.calio.calendar.singleevent.service.dto.CalendarFreeTime;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;

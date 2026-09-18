@@ -2,7 +2,7 @@ package com.calio.calendar.aicalendar.service.dto;
 
 import com.calio.calendar.aicalendar.domain.CalendarMutationScope;
 import com.calio.calendar.aicalendar.domain.CalendarMutationType;
-import com.calio.calendar.event.controller.dto.EventResponse;
+import com.calio.calendar.singleevent.controller.dto.EventResponse;
 
 public record CalendarMutationPreview(
         CalendarMutationType type,

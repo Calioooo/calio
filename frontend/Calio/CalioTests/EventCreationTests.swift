@@ -29,12 +29,13 @@ struct EventCreationTests {
         #expect(endComponents.minute == 0)
     }
 
-    @Test func eventCreationSaveValidationRequiresTitleAndPositiveTimeRange() async throws {
+    @Test func eventCreationSaveValidationAllowsBlankTitleAndRequiresValidTimeRange() async throws {
         let startAt = Date()
         let endAt = startAt.addingTimeInterval(3600)
 
         #expect(CalendarEventFormRules.canSave(title: "회의", startAt: startAt, endAt: endAt))
-        #expect(!CalendarEventFormRules.canSave(title: "   ", startAt: startAt, endAt: endAt))
+        #expect(CalendarEventFormRules.canSave(title: "   ", startAt: startAt, endAt: endAt))
+        #expect(!CalendarEventFormRules.canSave(title: String(repeating: "a", count: 256), startAt: startAt, endAt: endAt))
         #expect(!CalendarEventFormRules.canSave(title: "회의", startAt: startAt, endAt: startAt))
         #expect(!CalendarEventFormRules.canSave(title: "회의", startAt: startAt, endAt: startAt.addingTimeInterval(-1)))
     }
@@ -374,12 +375,13 @@ struct EventCreationTests {
     @Test func detailedEventCreationPreservesUnparsedQuickInputAsTitle() async throws {
         let calendar = fixedCalendar
         let referenceDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 14, hour: 9)))
-        let draft = CalendarEventCreationDraft(
+        var draft = CalendarEventCreationDraft(
             referenceDay: DayKey(date: referenceDate, calendar: calendar),
             calendar: calendar
-        ).replacingTitle(with: "  파싱되지 않은 회의 제목  ")
+        )
+        draft.eventInput.title = "  파싱되지 않은 회의 제목  "
 
-        #expect(draft.eventInput.title == "파싱되지 않은 회의 제목")
+        #expect(draft.eventInput.title == "  파싱되지 않은 회의 제목  ")
         #expect(!draft.recurrenceInput.isEnabled)
         #expect(draft.canSave)
 
@@ -388,7 +390,7 @@ struct EventCreationTests {
             return
         }
 
-        #expect(input.title == "파싱되지 않은 회의 제목")
+        #expect(input.title == "  파싱되지 않은 회의 제목  ")
         #expect(input.startAt == draft.eventInput.startAt)
         #expect(input.endAt == draft.eventInput.endAt)
     }
