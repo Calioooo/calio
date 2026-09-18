@@ -47,6 +47,7 @@ struct VoteRoomView: View {
     .background(Color.calioBackground.ignoresSafeArea())
     .task {
       await viewModel.load()
+      updateDisplayedMonthFromRoom()
       if scenePhase == .active { viewModel.startPolling() }
     }
     .onChange(of: scenePhase) { _, phase in
@@ -308,8 +309,13 @@ struct VoteRoomView: View {
     VStack(spacing: 14) {
       Text(failure.message)
         .foregroundStyle(.calioPrimary)
-      Button("다시 시도") { Task { await viewModel.load() } }
-        .buttonStyle(.borderedProminent)
+      Button("다시 시도") {
+        Task {
+          await viewModel.load()
+          updateDisplayedMonthFromRoom()
+        }
+      }
+      .buttonStyle(.borderedProminent)
     }
   }
 
@@ -334,6 +340,11 @@ struct VoteRoomView: View {
       let moved = calendar.date(byAdding: .month, value: value, to: date)
     else { return }
     displayedMonth = VoteMonth(day: VoteDay(date: moved, calendar: calendar))
+  }
+
+  private func updateDisplayedMonthFromRoom() {
+    guard let candidateStartDay = viewModel.room?.candidateStartDay else { return }
+    displayedMonth = VoteMonth(day: candidateStartDay)
   }
 }
 
