@@ -11,10 +11,10 @@ struct VoteSharePopoverView: View {
     VotePopoverBackdrop {
       VStack(spacing: 24) {
         Image(systemName: "link")
-          .font(.system(size: 30, weight: .semibold))
+          .font(.system(size: 24, weight: .semibold))
           .foregroundStyle(.white)
-          .frame(width: 86, height: 86)
-          .background(Color.calioBrand, in: Circle())
+          .frame(width: 58, height: 58)
+          .background(VotePrimaryActionStyle.gradient, in: Circle())
 
         VStack(spacing: 8) {
           Text("투표가 만들어졌어요")
@@ -30,7 +30,7 @@ struct VoteSharePopoverView: View {
           .foregroundStyle(.calioPrimary)
           .frame(maxWidth: .infinity, alignment: .leading)
           .padding(18)
-          .background(Color.calioBackground, in: RoundedRectangle(cornerRadius: 16))
+          .background(Color.voteAccentSoft, in: RoundedRectangle(cornerRadius: 16))
 
         VStack(alignment: .leading, spacing: 10) {
           Text("공유 링크")
@@ -43,15 +43,17 @@ struct VoteSharePopoverView: View {
               .lineLimit(1)
               .truncationMode(.middle)
             Spacer(minLength: 0)
+            Divider()
+              .frame(height: 28)
             Button(didCopyLink ? "복사됨" : "복사") {
               UIPasteboard.general.url = publicLink
               didCopyLink = true
             }
             .font(.subheadline.weight(.semibold))
-            .foregroundStyle(.calioBrand)
+            .foregroundStyle(.voteAccent)
             .padding(.horizontal, 12)
             .frame(minHeight: 36)
-            .background(Color.calioSelection, in: Capsule())
+            .background(Color.voteAccentSoft, in: Capsule())
             .accessibilityIdentifier("vote_share_copy")
           }
           .padding(.leading, 16)
@@ -66,13 +68,13 @@ struct VoteSharePopoverView: View {
             .font(.headline.weight(.semibold))
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity, minHeight: 54)
-            .background(Color.calioBrand, in: RoundedRectangle(cornerRadius: 14))
+            .background(VotePrimaryActionStyle.gradient, in: RoundedRectangle(cornerRadius: 14))
         }
         .accessibilityIdentifier("vote_share_system")
 
         Button("투표방으로 이동") { onOpenRoom(room) }
           .font(.headline.weight(.semibold))
-          .foregroundStyle(.calioBrand)
+          .foregroundStyle(.voteAccent)
           .frame(minHeight: 44)
           .accessibilityIdentifier("vote_share_open_room")
       }
@@ -87,7 +89,7 @@ struct VoteSharePopoverView: View {
             .font(.headline.weight(.semibold))
             .foregroundStyle(.calioTextSecondary)
             .frame(width: 44, height: 44)
-            .background(Color.calioBackground, in: Circle())
+            .background(Color.voteAccentSoft, in: Circle())
         }
         .buttonStyle(.plain)
         .padding(18)
