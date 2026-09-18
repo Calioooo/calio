@@ -1,4 +1,4 @@
-package com.calio.calendar.tag.service;
+package com.calio.calendar.tag.usecase;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -20,11 +20,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
-class TagServiceTest {
+class TagLookupTest {
 
   @Mock private TagRepository tagRepository;
 
-  @InjectMocks private TagQueryService tagQueryService;
+  @InjectMocks private TagLookup tagLookup;
 
   @Test
   @DisplayName("유효한 tagId는 PERSONAL_DEFAULT 또는 CUSTOM 태그를 resolve한다")
@@ -42,8 +42,8 @@ class TagServiceTest {
         .thenReturn(Optional.of(customTag));
 
     // when
-    Tag resolvedDefaultTag = tagQueryService.getTagOrDefault(1L, 1L);
-    Tag resolvedCustomTag = tagQueryService.getTagOrDefault(1L, 2L);
+    Tag resolvedDefaultTag = tagLookup.getPersonalTagOrDefault(1L, 1L);
+    Tag resolvedCustomTag = tagLookup.getPersonalTagOrDefault(1L, 2L);
 
     // then
     assertThat(resolvedDefaultTag).isSameAs(defaultTag);
@@ -63,7 +63,7 @@ class TagServiceTest {
         .thenReturn(Optional.empty());
 
     // when, then
-    assertThatThrownBy(() -> tagQueryService.getTagOrDefault(1L, 1L))
+    assertThatThrownBy(() -> tagLookup.getPersonalTagOrDefault(1L, 1L))
         .isInstanceOfSatisfying(
             CalioException.class,
             exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.TAG_NOT_FOUND));
@@ -79,7 +79,7 @@ class TagServiceTest {
         .thenReturn(Optional.of(fallbackTag));
 
     // when
-    Tag resolvedTag = tagQueryService.getTagOrDefault(1L, null);
+    Tag resolvedTag = tagLookup.getPersonalTagOrDefault(1L, null);
 
     // then
     assertThat(resolvedTag).isSameAs(fallbackTag);
@@ -94,7 +94,7 @@ class TagServiceTest {
         .thenReturn(Optional.empty());
 
     // when, then
-    assertThatThrownBy(() -> tagQueryService.getTagOrDefault(1L, null))
+    assertThatThrownBy(() -> tagLookup.getPersonalTagOrDefault(1L, null))
         .isInstanceOfSatisfying(
             CalioException.class,
             exception ->
