@@ -28,7 +28,7 @@ struct VoteRoomViewModelTests {
     #expect(!viewModel.hasUnsavedChanges)
   }
 
-  @Test @MainActor func saveKeepsDraftAndRefreshesPublicResult() async {
+  @Test @MainActor func saveShowsResultAfterRefreshingPublicResult() async {
     let repository = VoteRoomRepositoryStub(
       resultResponse: resultResponse(unavailableCount: 1),
       lookupResponse: VoteParticipantSelectionResponseDTO(
@@ -45,7 +45,7 @@ struct VoteRoomViewModelTests {
 
     await viewModel.submitVotes()
 
-    #expect(viewModel.didSave)
+    #expect(viewModel.participantFlow == .result)
     #expect(!viewModel.hasUnsavedChanges)
     #expect(viewModel.result?.dateResults.first?.unavailableCount == 1)
     #expect(repository.submitRequests.count == 1)
