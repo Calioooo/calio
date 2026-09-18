@@ -26,15 +26,16 @@ struct VotePersonalScheduleService: VotePersonalScheduleProviding {
     }
 
     let events = try await eventService.fetchEvents(from: start, to: end)
-    return Set(candidateDays.filter { day in
-      guard
-        let dayStart = VoteRoomCalendar.start(of: day, calendar: calendar),
-        let dayEnd = VoteRoomCalendar.nextStart(of: day, calendar: calendar)
-      else {
-        return false
-      }
-      return events.contains { $0.startAt < dayEnd && $0.endAt > dayStart }
-    })
+    return Set(
+      candidateDays.filter { day in
+        guard
+          let dayStart = VoteRoomCalendar.start(of: day, calendar: calendar),
+          let dayEnd = VoteRoomCalendar.nextStart(of: day, calendar: calendar)
+        else {
+          return false
+        }
+        return events.contains { $0.startAt < dayEnd && $0.endAt > dayStart }
+      })
   }
 }
 
