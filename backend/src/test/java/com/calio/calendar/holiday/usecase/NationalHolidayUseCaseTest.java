@@ -115,6 +115,7 @@ class NationalHolidayUseCaseTest {
       @SuppressWarnings("unchecked")
       ArgumentCaptor<List<NationalHoliday>> saved = ArgumentCaptor.forClass(List.class);
       verify(nationalHolidayRepository).saveAllAndFlush(saved.capture());
+      verify(transactionTemplate).executeWithoutResult(any());
       assertThat(saved.getValue())
           .extracting(NationalHoliday::getHolidayTitle)
           .containsExactlyInAnyOrder("신정", "현충일");

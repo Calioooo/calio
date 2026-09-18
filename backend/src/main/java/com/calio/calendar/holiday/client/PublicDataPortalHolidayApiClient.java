@@ -6,13 +6,12 @@ import com.calio.calendar.holiday.client.dto.HolidayApiItem;
 import com.calio.calendar.holiday.client.dto.HolidayApiResponse;
 import com.calio.calendar.holiday.usecase.HolidayApiClient;
 import com.calio.calendar.holiday.usecase.dto.NationalHolidayContent;
-import java.time.Duration;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
@@ -25,8 +24,6 @@ public class PublicDataPortalHolidayApiClient implements HolidayApiClient {
 
   private static final Logger log = LoggerFactory.getLogger(PublicDataPortalHolidayApiClient.class);
   private static final int MAX_RETRY_COUNT = 1;
-  private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
-  private static final Duration READ_TIMEOUT = Duration.ofSeconds(15);
   private static final DateTimeFormatter PROVIDER_DATE_FORMAT = DateTimeFormatter.BASIC_ISO_DATE;
 
   private final HolidayApiProperties holidayApiProperties;
@@ -34,14 +31,12 @@ public class PublicDataPortalHolidayApiClient implements HolidayApiClient {
   private final RestClient restClient;
 
   public PublicDataPortalHolidayApiClient(
-      HolidayApiProperties holidayApiProperties, ObjectMapper objectMapper) {
+      HolidayApiProperties holidayApiProperties,
+      ObjectMapper objectMapper,
+      @Qualifier("publicDataPortalHolidayRestClient") RestClient restClient) {
     this.holidayApiProperties = holidayApiProperties;
     this.objectMapper = objectMapper;
-    this.restClient =
-        RestClient.builder()
-            .baseUrl(holidayApiProperties.getBaseUrl())
-            .requestFactory(createRequestFactory())
-            .build();
+    this.restClient = restClient;
   }
 
   @Override
@@ -58,7 +53,7 @@ public class PublicDataPortalHolidayApiClient implements HolidayApiClient {
             "Holiday API returned a failed result. year={} resultCode={}",
             year,
             response.resultCode());
-        return List.of();
+        throw new CalioException(ErrorCode.EXTERNAL_API_UNAVAILABLE);
       }
       return response.items().stream()
           .filter(item -> "Y".equals(item.isHoliday()))
@@ -106,12 +101,5 @@ public class PublicDataPortalHolidayApiClient implements HolidayApiClient {
                     .build(holidayApiProperties.getServiceKey()))
         .retrieve()
         .body(String.class);
-  }
-
-  private SimpleClientHttpRequestFactory createRequestFactory() {
-    SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
-    requestFactory.setConnectTimeout(CONNECT_TIMEOUT);
-    requestFactory.setReadTimeout(READ_TIMEOUT);
-    return requestFactory;
   }
 }
