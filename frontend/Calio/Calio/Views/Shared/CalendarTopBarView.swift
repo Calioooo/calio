@@ -63,26 +63,19 @@ struct CalendarTopBarView: View {
   }
 
   private var voteEnabledHeader: some View {
-    VStack(spacing: 8) {
-      HStack(spacing: 10) {
-        CalendarYearMonthTitleView(
-          referenceDay: referenceDay,
-          onSelectedYearMonth: onSelectedYearMonth
-        )
-        .frame(maxWidth: .infinity, alignment: .leading)
+    HStack(spacing: 4) {
+      CalendarYearMonthTitleView(
+        referenceDay: referenceDay,
+        onSelectedYearMonth: onSelectedYearMonth,
+        titleFontSize: 18,
+        minimumHitSize: 36
+      )
+      .layoutPriority(1)
 
-        if showsTodayButton {
-          todayButton
-        }
-
-        googleCalendarButton
-      }
-
-      HStack(spacing: 8) {
-        Spacer(minLength: 0)
-        voteActions
-        compactCreateButton
-      }
+      Spacer(minLength: 0)
+      compactGoogleCalendarButton
+      voteActions
+      compactCreateButton
     }
   }
 
@@ -173,6 +166,20 @@ struct CalendarTopBarView: View {
     .accessibilityIdentifier("calendar_navigation_google_connect")
   }
 
+  private var compactGoogleCalendarButton: some View {
+    Button(action: onGoogleCalendarConnectTapped) {
+      Image(systemName: "calendar.badge.plus")
+        .font(.system(size: 14, weight: .semibold))
+        .foregroundStyle(.calioTextSecondary)
+        .frame(width: 34, height: 34)
+        .background(RoundedRectangle(cornerRadius: 9).fill(Color.calioSurface))
+    }
+    .buttonStyle(.plain)
+    .accessibilityLabel("Google Calendar 연동")
+    .accessibilityHint("Google Calendar 인증을 시작합니다")
+    .accessibilityIdentifier("calendar_navigation_google_connect")
+  }
+
   private var standardCreateButton: some View {
     Button(action: onCreateTapped) {
       Label("일정 추가", systemImage: "plus")
@@ -194,7 +201,7 @@ struct CalendarTopBarView: View {
         .foregroundStyle(.white)
         .lineLimit(1)
         .minimumScaleFactor(0.8)
-        .frame(width: 86, height: 36)
+        .frame(width: 58, height: 34)
         .background(RoundedRectangle(cornerRadius: 10).fill(Color.calioBrand))
     }
     .buttonStyle(.plain)
@@ -225,7 +232,7 @@ struct CalendarTopBarView: View {
         .foregroundStyle(.white)
         .lineLimit(1)
         .minimumScaleFactor(0.85)
-        .frame(width: 86, height: 36)
+        .frame(width: 58, height: 34)
         .background(VotePrimaryActionStyle.gradient, in: RoundedRectangle(cornerRadius: 10))
     }
     .buttonStyle(.plain)
@@ -240,7 +247,7 @@ struct CalendarTopBarView: View {
         .foregroundStyle(.white)
         .lineLimit(1)
         .minimumScaleFactor(0.75)
-        .frame(width: 86, height: 36)
+        .frame(width: 80, height: 34)
         .background(VotePrimaryActionStyle.gradient, in: RoundedRectangle(cornerRadius: 10))
     }
     .buttonStyle(.plain)
