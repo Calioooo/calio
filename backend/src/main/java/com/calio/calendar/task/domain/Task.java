@@ -4,7 +4,6 @@ import com.calio.calendar.common.domain.BaseEntity;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import jakarta.persistence.Column;
-import jakarta.persistence.Convert;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -21,9 +20,7 @@ public class Task extends BaseEntity {
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long taskId;
 
-  @Convert(converter = TaskTitleConverter.class)
-  @Column(name = "task_title", nullable = false, length = TaskTitle.MAX_LENGTH)
-  private TaskTitle taskTitle;
+  @Embedded private TaskTitle taskTitle;
 
   @Embedded private TaskState state;
 
