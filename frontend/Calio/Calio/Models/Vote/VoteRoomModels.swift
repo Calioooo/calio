@@ -1,5 +1,31 @@
 import Foundation
 
+struct VoteRoomRoute: Identifiable, Equatable {
+  let publicId: UUID
+  let room: VoteRoom?
+
+  init(room: VoteRoom) {
+    publicId = room.publicId
+    self.room = room
+  }
+
+  init(publicId: UUID) {
+    self.publicId = publicId
+    room = nil
+  }
+
+  var id: UUID { publicId }
+
+  static func from(url: URL) -> VoteRoomRoute? {
+    guard url.host == CalioAPIConfig.baseURL.host else { return nil }
+    let components = url.pathComponents.filter { $0 != "/" }
+    guard components.count == 2, components[0] == "vote-rooms", let publicId = UUID(uuidString: components[1]) else {
+      return nil
+    }
+    return VoteRoomRoute(publicId: publicId)
+  }
+}
+
 enum VoteRoomLoadState: Equatable {
   case loading
   case loaded
