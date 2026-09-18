@@ -32,6 +32,17 @@ final class VoteRoomViewModel: ObservableObject {
     self.personalScheduleService = personalScheduleService
   }
 
+  init(
+    publicId: UUID,
+    voteService: VoteService = VoteService(),
+    personalScheduleService: any VotePersonalScheduleProviding = VotePersonalScheduleService()
+  ) {
+    self.publicId = publicId
+    initialRoom = nil
+    self.voteService = voteService
+    self.personalScheduleService = personalScheduleService
+  }
+
   var room: VoteRoom? {
     result?.room ?? initialRoom
   }

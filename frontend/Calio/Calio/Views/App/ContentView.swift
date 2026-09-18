@@ -6,12 +6,14 @@
 //
 
 import SwiftUI
+import GoogleSignIn
 
 struct ContentView: View {
     @State private var selectedTab = 0
     @State private var authState: AuthBootstrapState = .loading
     @State private var googleCalendarAuthCode: GoogleCalendarAuthCodeAlert?
     @State private var googleCalendarAuthFailureMessage: String?
+    @State private var activeVoteRoomRoute: VoteRoomRoute?
     @StateObject private var viewModel: CalendarHomeViewModel
     private let authService: AuthService
     private let googleCalendarAuthorizationService: GoogleCalendarAuthorizationService
@@ -51,6 +53,12 @@ struct ContentView: View {
         .task {
             await bootstrapAuthenticationIfNeeded()
         }
+        .onOpenURL(perform: handleIncomingURL(_:))
+        .fullScreenCover(item: $activeVoteRoomRoute) { route in
+            VoteRoomView(publicId: route.publicId) {
+                activeVoteRoomRoute = nil
+            }
+        }
         .alert(item: $googleCalendarAuthCode) { authCode in
             Alert(
                 title: Text("serverAuthCode"),
@@ -81,7 +89,8 @@ struct ContentView: View {
         TabView(selection: $selectedTab) {
             CalendarHomeView(
                 viewModel: viewModel,
-                onGoogleCalendarConnectTapped: requestGoogleCalendarAuthorization
+                onGoogleCalendarConnectTapped: requestGoogleCalendarAuthorization,
+                onVoteRoomOpen: { activeVoteRoomRoute = VoteRoomRoute(room: $0) }
             )
                 .tabItem {
                     Image(systemName: "calendar")
@@ -173,6 +182,14 @@ struct ContentView: View {
                 googleCalendarAuthFailureMessage = "Google Calendar 인증 코드를 가져오지 못했습니다."
             }
         }
+    }
+
+    private func handleIncomingURL(_ url: URL) {
+        if let route = VoteRoomRoute.from(url: url) {
+            activeVoteRoomRoute = route
+            return
+        }
+        GIDSignIn.sharedInstance.handle(url)
     }
 }
 
