@@ -24,7 +24,9 @@ struct VoteRoomView: View {
 
   init(viewModel: VoteRoomViewModel, onClose: @escaping () -> Void) {
     _viewModel = StateObject(wrappedValue: viewModel)
-    _displayedMonth = State(initialValue: VoteMonth(day: viewModel.room?.candidateStartDay ?? VoteDay(year: 2026, month: 1, day: 1)))
+    _displayedMonth = State(
+      initialValue: VoteMonth(
+        day: viewModel.room?.candidateStartDay ?? VoteDay(year: 2026, month: 1, day: 1)))
     self.onClose = onClose
   }
 
@@ -126,11 +128,14 @@ struct VoteRoomView: View {
           room: room,
           month: displayedMonth,
           selectedDays: [],
-          dateResults: Dictionary(uniqueKeysWithValues: (viewModel.result?.dateResults ?? []).map { ($0.day, $0) }),
+          dateResults: Dictionary(
+            uniqueKeysWithValues: (viewModel.result?.dateResults ?? []).map { ($0.day, $0) }),
           isEditing: false,
           onMonthChange: moveMonth(by:),
           onDayTap: { day in
-            guard let result = viewModel.result?.dateResults.first(where: { $0.day == day }), result.unavailableCount > 0 else { return }
+            guard let result = viewModel.result?.dateResults.first(where: { $0.day == day }),
+              result.unavailableCount > 0
+            else { return }
             resultDayForPopover = result
           }
         )
@@ -157,9 +162,11 @@ struct VoteRoomView: View {
       Text(viewModel.participantFlow == .newParticipant ? "처음 투표하시나요?" : "투표에 참여하기")
         .font(.title2.bold())
         .foregroundStyle(.calioPrimary)
-      Text(viewModel.participantFlow == .newParticipant ? "닉네임과 비밀번호를 등록해주세요." : "기존 참여 정보를 입력해주세요.")
-        .font(.body)
-        .foregroundStyle(.calioTextSecondary)
+      Text(
+        viewModel.participantFlow == .newParticipant ? "닉네임과 비밀번호를 등록해주세요." : "기존 참여 정보를 입력해주세요."
+      )
+      .font(.body)
+      .foregroundStyle(.calioTextSecondary)
 
       VStack(spacing: 12) {
         TextField("닉네임", text: $viewModel.nickname)
@@ -234,9 +241,10 @@ struct VoteRoomView: View {
         }
         .foregroundStyle(.calioPrimary)
         .padding(.horizontal, 20)
-        .frame(height: 76)
+        .frame(height: 68)
         .background(Color.voteAccentSoft, in: RoundedRectangle(cornerRadius: 18))
-        .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.voteAccent.opacity(0.15), lineWidth: 1))
+        .overlay(
+          RoundedRectangle(cornerRadius: 18).stroke(Color.voteAccent.opacity(0.15), lineWidth: 1))
       }
       .buttonStyle(.plain)
       .padding(.horizontal, 36)
@@ -318,7 +326,8 @@ struct VoteRoomView: View {
   private func moveMonth(by value: Int) {
     let calendar = Calendar.voteKorea
     guard
-      let date = calendar.date(from: DateComponents(year: displayedMonth.year, month: displayedMonth.month)),
+      let date = calendar.date(
+        from: DateComponents(year: displayedMonth.year, month: displayedMonth.month)),
       let moved = calendar.date(byAdding: .month, value: value, to: date)
     else { return }
     displayedMonth = VoteMonth(day: VoteDay(date: moved, calendar: calendar))
@@ -342,7 +351,7 @@ private struct VoteRoomCalendarGrid: View {
       HStack {
         monthButton("chevron.left", -1)
         Spacer()
-        Text("\(month.year)년 \(month.month)월")
+        Text(verbatim: "\(month.year)년 \(month.month)월")
           .font(.title3.bold())
           .foregroundStyle(.calioPrimary)
         Spacer()
@@ -363,11 +372,13 @@ private struct VoteRoomCalendarGrid: View {
           }
         }
       }
+      .frame(maxWidth: .infinity)
     }
+    .frame(maxWidth: .infinity)
     .padding(20)
     .background(Color.calioSurface, in: RoundedRectangle(cornerRadius: 26))
     .shadow(color: .black.opacity(0.06), radius: 16, y: 8)
-    .padding(.horizontal, 36)
+    .padding(.horizontal, 28)
     .gesture(
       DragGesture(minimumDistance: 30).onEnded { value in
         guard abs(value.translation.width) > abs(value.translation.height) else { return }
@@ -387,7 +398,9 @@ private struct VoteRoomCalendarGrid: View {
   }
 
   private func monthButton(_ symbol: String, _ direction: Int) -> some View {
-    Button { onMonthChange(direction) } label: {
+    Button {
+      onMonthChange(direction)
+    } label: {
       Image(systemName: symbol)
         .font(.headline.weight(.bold))
         .foregroundStyle(.calioPrimary)
@@ -399,7 +412,9 @@ private struct VoteRoomCalendarGrid: View {
   private func dayButton(_ day: VoteDay) -> some View {
     let isCandidateDay = VoteRoomCalendar.days(in: room).contains(day)
     let result = dateResults[day]
-    return Button { if isCandidateDay { onDayTap(day) } } label: {
+    return Button {
+      if isCandidateDay { onDayTap(day) }
+    } label: {
       ZStack(alignment: .topTrailing) {
         Text("\(day.day)")
           .font(.body.weight(.medium))
@@ -415,7 +430,9 @@ private struct VoteRoomCalendarGrid: View {
       .background(backgroundColor(for: day, result: result), in: RoundedRectangle(cornerRadius: 14))
       .overlay(
         RoundedRectangle(cornerRadius: 14)
-          .stroke(isEditing && selectedDays.contains(day) ? Color.voteAccent : Color.calioDivider.opacity(0.65), lineWidth: 1)
+          .stroke(
+            isEditing && selectedDays.contains(day)
+              ? Color.voteAccent : Color.calioDivider.opacity(0.65), lineWidth: 1)
       )
       .opacity(isCandidateDay ? 1 : 0.34)
     }
