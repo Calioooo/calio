@@ -29,13 +29,13 @@ struct VoteCreationPopoverView: View {
   var body: some View {
     VotePopoverBackdrop {
       ScrollView {
-        VStack(alignment: .leading, spacing: 24) {
+        VStack(alignment: .leading, spacing: 22) {
           header
           nameInput
           candidatePeriod
           creationButton
         }
-        .padding(24)
+        .padding(26)
       }
       .scrollIndicators(.hidden)
       .frame(maxWidth: 560)
@@ -58,7 +58,7 @@ struct VoteCreationPopoverView: View {
           .font(.headline.weight(.semibold))
           .foregroundStyle(.calioTextSecondary)
           .frame(width: 44, height: 44)
-          .background(Color.calioBackground, in: Circle())
+          .background(Color.voteAccentSoft, in: Circle())
       }
       .buttonStyle(.plain)
       .accessibilityLabel("투표 만들기 닫기")
@@ -100,23 +100,26 @@ struct VoteCreationPopoverView: View {
   }
 
   private var periodSummary: some View {
-    HStack(spacing: 10) {
+    HStack(spacing: 6) {
       Image(systemName: "calendar")
-        .foregroundStyle(.calioBrand)
-      VStack(alignment: .leading, spacing: 2) {
-        Text(
-          "\(dayText(viewModel.candidatePeriod.startDay))부터 \(dayText(viewModel.selectedCandidateEndDay))까지"
-        )
-        .font(.subheadline.weight(.semibold))
+        .foregroundStyle(.voteAccent)
+      Text("\(dayText(viewModel.selectedCandidateEndDay))까지")
+        .font(.caption.weight(.semibold))
         .foregroundStyle(.calioPrimary)
-        Text("총 \(viewModel.selectedDayCount)일 · 최대 31일")
-          .font(.caption)
-          .foregroundStyle(.calioTextSecondary)
-      }
+        .lineLimit(1)
+        .minimumScaleFactor(0.8)
+      Divider()
+        .frame(height: 24)
+      Text("오늘부터 \(viewModel.selectedDayCount)일 동안")
+        .font(.caption)
+        .foregroundStyle(.calioTextSecondary)
+        .lineLimit(1)
+        .minimumScaleFactor(0.8)
       Spacer(minLength: 0)
     }
-    .padding(14)
-    .background(Color.calioBackground, in: RoundedRectangle(cornerRadius: 14))
+    .padding(.horizontal, 16)
+    .frame(minHeight: 58)
+    .background(Color.voteAccentSoft, in: RoundedRectangle(cornerRadius: 14))
   }
 
   private var creationButton: some View {
@@ -145,7 +148,7 @@ struct VoteCreationPopoverView: View {
         }
         .foregroundStyle(.white)
         .frame(maxWidth: .infinity, minHeight: 54)
-        .background(Color.calioBrand, in: RoundedRectangle(cornerRadius: 14))
+        .background(VotePrimaryActionStyle.gradient, in: RoundedRectangle(cornerRadius: 14))
       }
       .buttonStyle(.plain)
       .disabled(!viewModel.canCreate)
@@ -174,9 +177,13 @@ private struct VoteMonthCalendarView: View {
       HStack {
         monthButton(symbol: "chevron.left", direction: -1)
         Spacer()
-        Text("\(String(month.year))년 \(month.month)월")
-          .font(.headline.weight(.semibold))
-          .foregroundStyle(.calioPrimary)
+        HStack(spacing: 8) {
+          Text("\(String(month.year))년 \(month.month)월")
+            .font(.headline.weight(.semibold))
+          Image(systemName: "chevron.down")
+            .font(.caption.weight(.bold))
+        }
+        .foregroundStyle(.calioPrimary)
         Spacer()
         monthButton(symbol: "chevron.right", direction: 1)
       }
@@ -234,7 +241,7 @@ private struct VoteMonthCalendarView: View {
         .font(.subheadline.weight(.bold))
         .foregroundStyle(.calioPrimary)
         .frame(width: 38, height: 38)
-        .background(Color.calioBackground, in: Circle())
+        .background(Color.voteAccentSoft, in: Circle())
     }
     .buttonStyle(.plain)
     .accessibilityLabel(direction < 0 ? "이전 달" : "다음 달")
@@ -250,7 +257,7 @@ private struct VoteMonthCalendarView: View {
         .font(.subheadline.weight(isSelected ? .bold : .regular))
         .foregroundStyle(isSelected ? .white : isSelectable ? .calioPrimary : .calioTextSecondary)
         .frame(width: 38, height: 38)
-        .background(isSelected ? Color.calioBrand : .clear, in: Circle())
+        .background(isSelected ? Color.voteAccent : .clear, in: Circle())
         .opacity(isSelectable ? 1 : 0.35)
     }
     .buttonStyle(.plain)
@@ -268,7 +275,9 @@ struct VotePopoverBackdrop<Content: View>: View {
 
   var body: some View {
     ZStack {
-      Color.black.opacity(0.28)
+      Rectangle()
+        .fill(.ultraThinMaterial)
+        .overlay(Color.calioPrimary.opacity(0.18))
         .ignoresSafeArea()
       content
     }
