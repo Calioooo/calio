@@ -53,6 +53,40 @@ struct CalendarTopBarView: View {
   }
 
   private var standardHeader: some View {
+    Group {
+      if hasVoteActions {
+        voteEnabledHeader
+      } else {
+        standardCalendarHeader
+      }
+    }
+  }
+
+  private var voteEnabledHeader: some View {
+    VStack(spacing: 8) {
+      HStack(spacing: 10) {
+        CalendarYearMonthTitleView(
+          referenceDay: referenceDay,
+          onSelectedYearMonth: onSelectedYearMonth
+        )
+        .frame(maxWidth: .infinity, alignment: .leading)
+
+        if showsTodayButton {
+          todayButton
+        }
+
+        googleCalendarButton
+      }
+
+      HStack(spacing: 8) {
+        Spacer(minLength: 0)
+        voteActions
+        compactCreateButton
+      }
+    }
+  }
+
+  private var standardCalendarHeader: some View {
     HStack(spacing: 10) {
       CalendarYearMonthTitleView(
         referenceDay: referenceDay,
@@ -83,21 +117,7 @@ struct CalendarTopBarView: View {
       .accessibilityHint("Google Calendar 인증을 시작합니다")
       .accessibilityIdentifier("calendar_navigation_google_connect")
 
-      if hasVoteActions {
-        voteActions
-      }
-
-      Button(action: onCreateTapped) {
-        Label("일정 추가", systemImage: "plus")
-          .font(.subheadline.weight(.semibold))
-          .foregroundStyle(.white)
-          .padding(.horizontal, 13)
-          .frame(minHeight: 40)
-          .background(RoundedRectangle(cornerRadius: 10).fill(Color.calioBrand))
-      }
-      .buttonStyle(.plain)
-      .accessibilityLabel("일정 추가")
-      .accessibilityIdentifier("calendar_navigation_add_event")
+      standardCreateButton
     }
     .frame(minHeight: 64)
   }
@@ -120,8 +140,10 @@ struct CalendarTopBarView: View {
         googleCalendarButton
         if hasVoteActions {
           voteActions
+          compactCreateButton
+        } else {
+          standardCreateButton
         }
-        createButton
       }
     }
   }
@@ -151,13 +173,28 @@ struct CalendarTopBarView: View {
     .accessibilityIdentifier("calendar_navigation_google_connect")
   }
 
-  private var createButton: some View {
+  private var standardCreateButton: some View {
     Button(action: onCreateTapped) {
       Label("일정 추가", systemImage: "plus")
         .font(.subheadline.weight(.semibold))
         .foregroundStyle(.white)
         .padding(.horizontal, 13)
         .frame(maxWidth: .infinity, minHeight: 40)
+        .background(RoundedRectangle(cornerRadius: 10).fill(Color.calioBrand))
+    }
+    .buttonStyle(.plain)
+    .accessibilityLabel("일정 추가")
+    .accessibilityIdentifier("calendar_navigation_add_event")
+  }
+
+  private var compactCreateButton: some View {
+    Button(action: onCreateTapped) {
+      Label("일정 추가", systemImage: "plus")
+        .font(.caption.weight(.bold))
+        .foregroundStyle(.white)
+        .lineLimit(1)
+        .minimumScaleFactor(0.8)
+        .frame(width: 86, height: 36)
         .background(RoundedRectangle(cornerRadius: 10).fill(Color.calioBrand))
     }
     .buttonStyle(.plain)

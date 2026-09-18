@@ -215,11 +215,19 @@ struct VoteListView: View {
   }
 
   private func candidatePeriodText(for room: VoteRoom) -> String {
-    "후보 기간 · \(dateText(room.candidateStartDay)) - \(dateText(room.candidateEndDay))"
+    "후보 기간 · \(startDateText(room.candidateStartDay)) - \(endDateText(for: room))"
   }
 
-  private func dateText(_ day: VoteDay) -> String {
+  private func startDateText(_ day: VoteDay) -> String {
     "\(day.year). \(String(format: "%02d", day.month)). \(String(format: "%02d", day.day))"
+  }
+
+  private func endDateText(for room: VoteRoom) -> String {
+    let day = room.candidateEndDay
+    if room.candidateStartDay.year == day.year {
+      return "\(String(format: "%02d", day.month)). \(String(format: "%02d", day.day))"
+    }
+    return startDateText(day)
   }
 }
 
