@@ -5,7 +5,7 @@ struct VoteRoomView: View {
   @Environment(\.dismiss) private var dismiss
   @StateObject private var viewModel: VoteRoomViewModel
   @State private var displayedMonth: VoteMonth
-  @State private var resultDayForPopover: VoteDateResult?
+  @State private var resultDayForTooltip: VoteDateResult?
   @State private var showsLeaveConfirmation = false
 
   let onClose: () -> Void
@@ -118,40 +118,45 @@ struct VoteRoomView: View {
   }
 
   private var resultContent: some View {
-    VStack(spacing: 24) {
-      Text("색이 진할수록 참여가 어려운 멤버가 많은 날이에요.")
-        .font(.body)
-        .foregroundStyle(.calioTextSecondary)
-        .multilineTextAlignment(.center)
-        .padding(.horizontal, 24)
+    ZStack {
+      VStack(spacing: 24) {
+        Text("색이 진할수록 참여가 어려운 멤버가 많은 날이에요.")
+          .font(.body)
+          .foregroundStyle(.calioTextSecondary)
+          .multilineTextAlignment(.center)
+          .padding(.horizontal, 24)
 
-      if let room = viewModel.room {
-        VoteRoomCalendarGrid(
-          room: room,
-          month: displayedMonth,
-          selectedDays: [],
-          dateResults: Dictionary(
-            uniqueKeysWithValues: (viewModel.result?.dateResults ?? []).map { ($0.day, $0) }),
-          isEditing: false,
-          onMonthChange: moveMonth(by:),
-          onDayTap: { day in
-            guard let result = viewModel.result?.dateResults.first(where: { $0.day == day }),
-              result.unavailableCount > 0
-            else { return }
-            resultDayForPopover = result
-          }
-        )
-        .popover(item: $resultDayForPopover, arrowEdge: .top) { result in
-          VoteResultNicknamePopover(result: result)
-            .presentationCompactAdaptation(.popover)
+        if let room = viewModel.room {
+          VoteRoomCalendarGrid(
+            room: room,
+            month: displayedMonth,
+            selectedDays: [],
+            dateResults: Dictionary(
+              uniqueKeysWithValues: (viewModel.result?.dateResults ?? []).map { ($0.day, $0) }),
+            isEditing: false,
+            onMonthChange: moveMonth(by:),
+            onDayTap: showResultTooltip(for:)
+          )
         }
+        Spacer(minLength: 0)
+        Button("투표 참여하기") { viewModel.showExistingParticipant() }
+          .buttonStyle(VoteRoomPrimaryButtonStyle())
+          .padding(.horizontal, 36)
+          .padding(.bottom, 28)
+          .accessibilityIdentifier("vote_room_join")
       }
-      Spacer(minLength: 0)
-      Button("투표 참여하기") { viewModel.showExistingParticipant() }
-        .buttonStyle(VoteRoomPrimaryButtonStyle())
+
+      if let result = resultDayForTooltip {
+        Color.black.opacity(0.14)
+          .ignoresSafeArea()
+          .onTapGesture { resultDayForTooltip = nil }
+          .accessibilityHidden(true)
+
+        VoteResultNicknamePopover(result: result) {
+          resultDayForTooltip = nil
+        }
         .padding(.horizontal, 36)
-        .padding(.bottom, 28)
-        .accessibilityIdentifier("vote_room_join")
+      }
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
   }
@@ -341,6 +346,13 @@ struct VoteRoomView: View {
     guard let candidateStartDay = viewModel.room?.candidateStartDay else { return }
     displayedMonth = VoteMonth(day: candidateStartDay)
   }
+
+  private func showResultTooltip(for day: VoteDay) {
+    guard let result = viewModel.result?.dateResults.first(where: { $0.day == day }),
+      result.unavailableCount > 0
+    else { return }
+    resultDayForTooltip = result
+  }
 }
 
 private struct VoteRoomCalendarGrid: View {
@@ -471,12 +483,24 @@ private struct VoteRoomCalendarGrid: View {
 
 private struct VoteResultNicknamePopover: View {
   let result: VoteDateResult
+  let onClose: () -> Void
 
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
-      Text("이 날 참여가 어려운 멤버")
-        .font(.footnote)
+      HStack {
+        Text("이 날 참여가 어려운 멤버")
+          .font(.footnote)
+          .foregroundStyle(.calioTextSecondary)
+        Spacer()
+        Button(action: onClose) {
+          Image(systemName: "xmark")
+            .font(.footnote.weight(.bold))
+            .frame(width: 28, height: 28)
+        }
+        .buttonStyle(.plain)
         .foregroundStyle(.calioTextSecondary)
+        .accessibilityLabel("참여자 목록 닫기")
+      }
       Divider()
       ForEach(result.unavailableNicknames, id: \.self) { nickname in
         Label(nickname, systemImage: "person.circle.fill")
@@ -484,7 +508,10 @@ private struct VoteResultNicknamePopover: View {
       }
     }
     .padding(18)
-    .frame(minWidth: 210)
+    .frame(maxWidth: 320)
+    .background(Color.calioSurface, in: RoundedRectangle(cornerRadius: 18))
+    .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.calioDivider, lineWidth: 1))
+    .shadow(color: .black.opacity(0.14), radius: 18, y: 8)
   }
 }
 
