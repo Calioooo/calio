@@ -24,14 +24,11 @@ public class CompleteTaskUseCase {
 
   @Transactional
   public TaskResponse complete(Long accountId, Long taskId) {
-    Task task = findOwnedTask(accountId, taskId);
+    Task task =
+        taskRepository
+            .findByTaskIdAndAccountId(taskId, accountId)
+            .orElseThrow(() -> new CalioException(ErrorCode.TASK_NOT_FOUND));
     task.changeCompleted(Instant.now(clock).truncatedTo(ChronoUnit.MICROS));
     return TaskResponse.from(task);
-  }
-
-  private Task findOwnedTask(Long accountId, Long taskId) {
-    return taskRepository
-        .findByTaskIdAndAccountId(taskId, accountId)
-        .orElseThrow(() -> new CalioException(ErrorCode.TASK_NOT_FOUND));
   }
 }

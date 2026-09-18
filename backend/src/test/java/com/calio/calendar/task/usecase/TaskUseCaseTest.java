@@ -58,6 +58,21 @@ class TaskUseCaseTest {
   }
 
   @Test
+  @DisplayName("없는 계정으로 Task를 생성하면 ACCOUNT_NOT_FOUND를 반환한다")
+  void givenMissingAccount_whenCreate_thenThrowsAccountNotFound() {
+    // given
+    when(accountRepository.findById(1L)).thenReturn(Optional.empty());
+    CreateTaskUseCase useCase = new CreateTaskUseCase(accountRepository, taskRepository);
+
+    // when, then
+    assertThatThrownBy(() -> useCase.create(1L, "새 할 일"))
+        .isInstanceOfSatisfying(
+            CalioException.class,
+            exception ->
+                assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.ACCOUNT_NOT_FOUND));
+  }
+
+  @Test
   @DisplayName("Task 완료 UseCase는 소유한 Task만 완료 시각과 함께 변경한다")
   void givenOwnedTask_whenComplete_thenChangesAggregateWithClockTime() {
     // given

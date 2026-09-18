@@ -24,7 +24,7 @@ public class CreateTaskUseCase {
   public TaskResponse create(Long accountId, String taskTitle) {
     accountRepository
         .findById(accountId)
-        .orElseThrow(() -> new CalioException(ErrorCode.INTERNAL_SERVER_ERROR));
+        .orElseThrow(() -> new CalioException(ErrorCode.ACCOUNT_NOT_FOUND));
     Task task = taskRepository.save(new Task(taskTitle, accountId));
     return TaskResponse.from(task);
   }
