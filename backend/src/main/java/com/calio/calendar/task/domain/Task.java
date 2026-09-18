@@ -1,15 +1,13 @@
 package com.calio.calendar.task.domain;
 
-import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.common.domain.BaseEntity;
+import com.calio.calendar.common.error.CalioException;
+import com.calio.calendar.common.error.ErrorCode;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.Instant;
 
@@ -17,67 +15,67 @@ import java.time.Instant;
 @Table(name = "tasks")
 public class Task extends BaseEntity {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long taskId;
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long taskId;
 
-    @Column(nullable = false)
-    private String taskTitle;
+  @Column(nullable = false)
+  private String taskTitle;
 
-    @Column(nullable = false)
-    private boolean completed = false;
+  @Column(nullable = false)
+  private boolean completed = false;
 
-    @Column
-    private Instant completedAt;
+  @Column private Instant completedAt;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "account_id", nullable = false)
-    private Account account;
+  @Column(name = "account_id", nullable = false)
+  private Long accountId;
 
-    protected Task() {
+  protected Task() {}
+
+  public Task(String taskTitle, Long accountId) {
+    this.taskTitle = taskTitle;
+    this.completed = false;
+    this.accountId = accountId;
+  }
+
+  public Long getTaskId() {
+    return taskId;
+  }
+
+  public String getTaskTitle() {
+    return taskTitle;
+  }
+
+  public boolean isCompleted() {
+    return completed;
+  }
+
+  public Instant getCompletedAt() {
+    return completedAt;
+  }
+
+  public void updateTitle(String taskTitle) {
+    if (completed) {
+      throw new CalioException(ErrorCode.COMPLETED_TASK_TITLE_UPDATE_NOT_ALLOWED);
+    }
+    this.taskTitle = taskTitle;
+  }
+
+  public void changeCompleted(Instant completedAt) {
+    if (completed) {
+      return;
     }
 
-    public Task(String taskTitle, Account account) {
-        this.taskTitle = taskTitle;
-        this.completed = false;
-        this.account = account;
-    }
+    this.completed = true;
+    this.completedAt = completedAt;
+  }
 
-    public Long getTaskId() {
-        return taskId;
-    }
+  public void changeUncompleted() {
+    this.completed = false;
+    this.completedAt = null;
+  }
 
-    public String getTaskTitle() {
-        return taskTitle;
-    }
-
-    public boolean isCompleted() {
-        return completed;
-    }
-
-    public Instant getCompletedAt() {
-        return completedAt;
-    }
-
-    public void updateTitle(String taskTitle) {
-        this.taskTitle = taskTitle;
-    }
-
-    public void changeCompleted(Instant completedAt) {
-        if (completed) {
-            return;
-        }
-
-        this.completed = true;
-        this.completedAt = completedAt;
-    }
-
-    public void changeUncompleted() {
-        this.completed = false;
-        this.completedAt = null;
-    }
-
-    public Account getAccount() {
-        return account;
-    }
+  public Long getAccountId() {
+    return accountId;
+  }
 }
