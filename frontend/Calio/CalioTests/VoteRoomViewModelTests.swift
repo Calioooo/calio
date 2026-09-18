@@ -168,6 +168,8 @@ private final class VoteRoomRepositoryStub: VoteRepository {
     fatalError()
   }
 
+  func fetchMyVoteRooms() async throws -> [VoteRoomResponseDTO] { fatalError() }
+
   func fetchVoteResult(publicId _: UUID) async throws -> VoteResultResponseDTO {
     fetchResultCount += 1
     if let resultError { throw resultError }

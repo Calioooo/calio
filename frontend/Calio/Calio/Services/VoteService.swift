@@ -14,6 +14,11 @@ struct VoteService {
     return try mapVoteRoom(response)
   }
 
+  func fetchMyCreatedRooms() async throws -> [VoteRoom] {
+    let response = try await perform { try await repository.fetchMyVoteRooms() }
+    return try response.map(mapVoteRoom(_:))
+  }
+
   func fetchResult(publicId: UUID) async throws -> VoteResult {
     let response = try await perform { try await repository.fetchVoteResult(publicId: publicId) }
     return try mapVoteResult(response)
