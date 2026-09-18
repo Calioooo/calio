@@ -15,6 +15,7 @@ struct CalendarTopBarView: View {
   let onTodayTapped: () -> Void
   let onGoogleCalendarConnectTapped: () -> Void
   let onCreateVoteTapped: (() -> Void)?
+  let onMyVotesTapped: (() -> Void)?
   let onCreateTapped: () -> Void
 
   init(
@@ -24,7 +25,8 @@ struct CalendarTopBarView: View {
     onTodayTapped: @escaping () -> Void,
     onGoogleCalendarConnectTapped: @escaping () -> Void,
     onCreateTapped: @escaping () -> Void,
-    onCreateVoteTapped: (() -> Void)? = nil
+    onCreateVoteTapped: (() -> Void)? = nil,
+    onMyVotesTapped: (() -> Void)? = nil
   ) {
     self.referenceDay = referenceDay
     self.showsTodayButton = showsTodayButton
@@ -33,6 +35,7 @@ struct CalendarTopBarView: View {
     self.onGoogleCalendarConnectTapped = onGoogleCalendarConnectTapped
     self.onCreateTapped = onCreateTapped
     self.onCreateVoteTapped = onCreateVoteTapped
+    self.onMyVotesTapped = onMyVotesTapped
   }
 
   var body: some View {
@@ -80,8 +83,8 @@ struct CalendarTopBarView: View {
       .accessibilityHint("Google Calendar 인증을 시작합니다")
       .accessibilityIdentifier("calendar_navigation_google_connect")
 
-      if onCreateVoteTapped != nil {
-        voteButton
+      if hasVoteActions {
+        voteActions
       }
 
       Button(action: onCreateTapped) {
@@ -115,8 +118,8 @@ struct CalendarTopBarView: View {
 
       HStack(spacing: 12) {
         googleCalendarButton
-        if onCreateVoteTapped != nil {
-          voteButton
+        if hasVoteActions {
+          voteActions
         }
         createButton
       }
@@ -162,18 +165,50 @@ struct CalendarTopBarView: View {
     .accessibilityIdentifier("calendar_navigation_add_event")
   }
 
+  private var hasVoteActions: Bool {
+    onCreateVoteTapped != nil || onMyVotesTapped != nil
+  }
+
+  private var voteActions: some View {
+    HStack(spacing: 6) {
+      if onCreateVoteTapped != nil {
+        voteButton
+      }
+
+      if onMyVotesTapped != nil {
+        myVotesButton
+      }
+    }
+  }
+
   private var voteButton: some View {
     Button(action: { onCreateVoteTapped?() }) {
-      Label("투표 만들기", systemImage: "checklist")
-        .font(.subheadline.weight(.semibold))
+      Text("투표 만들기")
+        .font(.caption.weight(.bold))
         .foregroundStyle(.white)
-        .padding(.horizontal, 13)
-        .frame(minHeight: 40)
-        .background(RoundedRectangle(cornerRadius: 10).fill(Color.calioBrand))
+        .lineLimit(1)
+        .minimumScaleFactor(0.85)
+        .frame(width: 86, height: 36)
+        .background(VotePrimaryActionStyle.gradient, in: RoundedRectangle(cornerRadius: 10))
     }
     .buttonStyle(.plain)
     .accessibilityLabel("투표 만들기")
     .accessibilityIdentifier("calendar_navigation_create_vote")
+  }
+
+  private var myVotesButton: some View {
+    Button(action: { onMyVotesTapped?() }) {
+      Text("내가 만든 투표")
+        .font(.caption.weight(.bold))
+        .foregroundStyle(.white)
+        .lineLimit(1)
+        .minimumScaleFactor(0.75)
+        .frame(width: 86, height: 36)
+        .background(VotePrimaryActionStyle.gradient, in: RoundedRectangle(cornerRadius: 10))
+    }
+    .buttonStyle(.plain)
+    .accessibilityLabel("내 투표")
+    .accessibilityIdentifier("calendar_navigation_my_votes")
   }
 }
 
@@ -185,6 +220,7 @@ struct CalendarTopBarView: View {
     onTodayTapped: {},
     onGoogleCalendarConnectTapped: {},
     onCreateTapped: {},
-    onCreateVoteTapped: {}
+    onCreateVoteTapped: {},
+    onMyVotesTapped: {}
   )
 }
