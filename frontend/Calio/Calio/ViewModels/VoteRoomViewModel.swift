@@ -10,7 +10,6 @@ final class VoteRoomViewModel: ObservableObject {
   @Published private(set) var actionFailure: VoteRoomFailure?
   @Published private(set) var isSubmitting = false
   @Published private(set) var isLoadingSchedule = false
-  @Published private(set) var didSave = false
   @Published private(set) var needsScheduleReloadConfirmation = false
   @Published var nickname = ""
   @Published var password = ""
@@ -64,13 +63,11 @@ final class VoteRoomViewModel: ObservableObject {
   func showExistingParticipant() {
     participantFlow = .existingParticipant
     actionFailure = nil
-    didSave = false
   }
 
   func showNewParticipant() {
     participantFlow = .newParticipant
     actionFailure = nil
-    didSave = false
   }
 
   func cancelParticipantFlow() {
@@ -112,7 +109,6 @@ final class VoteRoomViewModel: ObservableObject {
 
   func toggleUnavailableDay(_ day: VoteDay) {
     guard room.map({ VoteRoomCalendar.days(in: $0).contains(day) }) == true else { return }
-    didSave = false
     if draftUnavailableDays.contains(day) {
       draftUnavailableDays.remove(day)
     } else {
@@ -154,8 +150,8 @@ final class VoteRoomViewModel: ObservableObject {
       let unavailableDays = Set(submission.unavailableDays)
       savedUnavailableDays = unavailableDays
       draftUnavailableDays = unavailableDays
-      didSave = true
       await refreshResult(setsLoadingState: false)
+      participantFlow = .result
     } catch is CancellationError {
       return
     } catch let error as VoteServiceError {
@@ -216,7 +212,6 @@ final class VoteRoomViewModel: ObservableObject {
       } else {
         draftUnavailableDays.formUnion(suggestedDays)
       }
-      didSave = false
     } catch {
       actionFailure = .network
     }
