@@ -92,8 +92,9 @@ class RecurrenceEventServiceTest {
   void givenTimedRequest_whenCreate_thenStoresValidatedMasterWithoutMaterializingEvents() {
     // given
     Tag tag = tag();
+    Account account = account();
     List<String> normalized = List.of("RRULE:FREQ=DAILY;COUNT=3");
-    when(accountRepository.findById(1L)).thenReturn(Optional.of(new Account()));
+    when(accountRepository.findById(1L)).thenReturn(Optional.of(account));
     when(tagQueryService.getTagOrDefault(1L, null)).thenReturn(tag);
     when(recurrenceEngine.validate(any(RecurrenceSchedule.class), any())).thenReturn(normalized);
     when(recurrenceEventRepository.save(any(RecurrenceEvent.class)))
@@ -117,6 +118,7 @@ class RecurrenceEventServiceTest {
         .isEqualTo(Instant.parse("2027-01-01T01:00:00Z"));
     assertThat(captor.getValue().getTimeZone()).isEqualTo("Asia/Seoul");
     assertThat(captor.getValue().getRecurrenceRules()).containsExactlyElementsOf(normalized);
+    assertThat(captor.getValue().getAccount()).isSameAs(account);
     verifyNoInteractions(eventCommandService);
     assertThat(response.canUpdateSeries()).isTrue();
   }
