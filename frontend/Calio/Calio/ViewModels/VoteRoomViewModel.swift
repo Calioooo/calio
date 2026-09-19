@@ -7,6 +7,7 @@ final class VoteRoomViewModel: ObservableObject {
   @Published private(set) var participantFlow: VoteParticipantFlow = .result
   @Published private(set) var savedUnavailableDays: Set<VoteDay> = []
   @Published private(set) var draftUnavailableDays: Set<VoteDay> = []
+  @Published private(set) var resultRefreshFailure: VoteRoomFailure?
   @Published private(set) var actionFailure: VoteRoomFailure?
   @Published private(set) var isSubmitting = false
   @Published private(set) var isLoadingSchedule = false
@@ -57,6 +58,7 @@ final class VoteRoomViewModel: ObservableObject {
   func load() async {
     guard loadState != .unavailable else { return }
     loadState = .loading
+    resultRefreshFailure = nil
     await refreshResult(setsLoadingState: true)
   }
 
@@ -177,6 +179,10 @@ final class VoteRoomViewModel: ObservableObject {
     pollingTask = nil
   }
 
+  func refreshResult() async {
+    await refreshResult(setsLoadingState: false)
+  }
+
   deinit {
     pollingTask?.cancel()
   }
@@ -221,16 +227,21 @@ final class VoteRoomViewModel: ObservableObject {
     do {
       result = try await voteService.fetchResult(publicId: publicId)
       loadState = .loaded
+      resultRefreshFailure = nil
     } catch is CancellationError {
       return
     } catch let error as VoteServiceError {
       if setsLoadingState || result == nil {
         handle(error)
+      } else {
+        resultRefreshFailure = failure(for: error)
       }
     } catch {
       if setsLoadingState || result == nil {
         actionFailure = .unexpected
         loadState = .failed(.unexpected)
+      } else {
+        resultRefreshFailure = .unexpected
       }
     }
   }
@@ -245,25 +256,28 @@ final class VoteRoomViewModel: ObservableObject {
       return
     }
 
-    let failure: VoteRoomFailure
-    switch error {
-    case .participantCredentialInvalid:
-      failure = .credentialInvalid
-    case .participantNicknameConflict:
-      failure = .nicknameConflict
-    case .validationFailed:
-      failure = .validation
-    case .network:
-      failure = .network
-    case .voteRoomNotFound, .decoding, .unexpected:
-      failure = .unexpected
-    }
+    let failure = failure(for: error)
     actionFailure = failure
     if error == .participantCredentialInvalid {
       participantFlow = .existingParticipant
     }
     if result == nil {
       loadState = .failed(failure)
+    }
+  }
+
+  private func failure(for error: VoteServiceError) -> VoteRoomFailure {
+    switch error {
+    case .participantCredentialInvalid:
+      return .credentialInvalid
+    case .participantNicknameConflict:
+      return .nicknameConflict
+    case .validationFailed:
+      return .validation
+    case .network:
+      return .network
+    case .voteRoomNotFound, .decoding, .unexpected:
+      return .unexpected
     }
   }
 }
