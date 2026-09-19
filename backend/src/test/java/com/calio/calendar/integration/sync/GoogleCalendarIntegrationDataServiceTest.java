@@ -7,8 +7,8 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.calio.calendar.event.domain.Event;
-import com.calio.calendar.event.service.EventCommandService;
+import com.calio.calendar.singleevent.domain.SingleEvent;
+import com.calio.calendar.singleevent.repository.SingleEventRepository;
 import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrationCommandService;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingCommandService;
@@ -18,6 +18,7 @@ import com.calio.calendar.integration.mapping.service.GoogleCalendarRecurrenceMa
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationLeaseService;
 import com.calio.calendar.recurrence.service.RecurrenceEventCommandService;
+import com.calio.calendar.sharing.event.service.PersonalEventGroupShareCommandService;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
@@ -35,7 +36,9 @@ class GoogleCalendarIntegrationDataServiceTest {
             mock(GoogleCalendarRecurrenceMappingQueryService.class);
     private final GoogleCalendarRecurrenceMappingCommandService recurrenceMappingCommandService =
             mock(GoogleCalendarRecurrenceMappingCommandService.class);
-    private final EventCommandService eventCommandService = mock(EventCommandService.class);
+    private final SingleEventRepository eventRepository = mock(SingleEventRepository.class);
+    private final PersonalEventGroupShareCommandService eventShareCommandService =
+            mock(PersonalEventGroupShareCommandService.class);
     private final RecurrenceEventCommandService recurrenceEventCommandService =
             mock(RecurrenceEventCommandService.class);
     private final GoogleOperationJobService operationJobPersistenceService =
@@ -48,7 +51,7 @@ class GoogleCalendarIntegrationDataServiceTest {
     @DisplayName("FULL SYNC시 각 mapping batch에서 operation lease를 갱신한다")
     void givenUnseenMappings_whenFinalizeFullSync_thenDeletesByBatchAndRenewsLease() {
         // given
-        Event event = mock(Event.class);
+        SingleEvent event = mock(SingleEvent.class);
         when(eventMapping.getId()).thenReturn(10L);
         when(eventMapping.getExternalEventId()).thenReturn("unseen-event");
         when(eventMapping.getEvent()).thenReturn(event);
@@ -68,8 +71,9 @@ class GoogleCalendarIntegrationDataServiceTest {
                 eventMappingCommandService,
                 recurrenceMappingQueryService,
                 recurrenceMappingCommandService,
-                eventCommandService,
                 recurrenceEventCommandService,
+                eventRepository,
+                eventShareCommandService,
                 null,
                 operationLeaseService,
                 operationJobPersistenceService
@@ -90,7 +94,8 @@ class GoogleCalendarIntegrationDataServiceTest {
 
         // then
         verify(eventMappingCommandService).deleteEventMappingsWithIds(List.of(10L));
-        verify(eventCommandService).deleteEventsByIds(List.of(20L));
+        verify(eventShareCommandService).deleteAllForSourceEvents(List.of(20L));
+        verify(eventRepository).deleteAllByIds(List.of(20L));
         verify(eventMappingQueryService, times(2))
                 .listEventMappingBatch(eq(1L), any(Long.class), eq(500));
         verify(integrationCommandService).changeNextSyncToken(1L, "next-token");

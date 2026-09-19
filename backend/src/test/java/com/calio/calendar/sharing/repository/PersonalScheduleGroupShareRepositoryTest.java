@@ -5,8 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
-import com.calio.calendar.event.domain.Event;
-import com.calio.calendar.event.repository.EventRepository;
+import com.calio.calendar.singleevent.domain.SingleEvent;
+import com.calio.calendar.singleevent.repository.SingleEventRepository;
 import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.repository.GroupSpaceRepository;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
@@ -48,7 +48,7 @@ class PersonalScheduleGroupShareRepositoryTest {
 
     @Autowired private PersonalEventGroupShareRepository eventShareRepository;
     @Autowired private PersonalRecurrenceGroupShareRepository recurrenceShareRepository;
-    @Autowired private EventRepository eventRepository;
+    @Autowired private SingleEventRepository eventRepository;
     @Autowired private RecurrenceEventRepository recurrenceEventRepository;
     @Autowired private TagRepository tagRepository;
     @Autowired private GroupSpaceRepository groupSpaceRepository;
@@ -71,8 +71,8 @@ class PersonalScheduleGroupShareRepositoryTest {
     void eventShareKeepsTargetSpecificPublicUuid() {
         Account account = accountRepository.saveAndFlush(new Account());
         Tag tag = tagRepository.saveAndFlush(Tag.personalDefault("기타", "#64748B"));
-        Event event = eventRepository.saveAndFlush(new Event(
-                "일정", null, START_AT, START_AT.plusSeconds(3600), false, "UTC", null, tag, account
+        SingleEvent event = eventRepository.saveAndFlush(new SingleEvent(
+                "일정", null, START_AT, START_AT.plusSeconds(3600), false, "UTC", tag.getId(), account.getId()
         ));
         GroupSpace firstGroup = groupSpaceRepository.saveAndFlush(new GroupSpace(account.getId(), "first", null));
         GroupSpace secondGroup = groupSpaceRepository.saveAndFlush(new GroupSpace(account.getId(), "second", null));
@@ -96,8 +96,8 @@ class PersonalScheduleGroupShareRepositoryTest {
     void eventSharePersistsOnlyOneMappingPerSourceAndGroupSpace() {
         Account account = accountRepository.saveAndFlush(new Account());
         Tag tag = tagRepository.saveAndFlush(Tag.personalDefault("기타", "#64748B"));
-        Event event = eventRepository.saveAndFlush(new Event(
-                "일정", null, START_AT, START_AT.plusSeconds(3600), false, "UTC", null, tag, account
+        SingleEvent event = eventRepository.saveAndFlush(new SingleEvent(
+                "일정", null, START_AT, START_AT.plusSeconds(3600), false, "UTC", tag.getId(), account.getId()
         ));
         GroupSpace groupSpace = groupSpaceRepository.saveAndFlush(new GroupSpace(account.getId(), "group", null));
         eventShareRepository.saveAndFlush(PersonalEventGroupShare.create(event, groupSpace));
@@ -112,8 +112,8 @@ class PersonalScheduleGroupShareRepositoryTest {
     void eventShareInsertIgnoreDoesNotRaiseUniqueConstraintFailure() throws Exception {
         Account account = accountRepository.saveAndFlush(new Account());
         Tag tag = tagRepository.saveAndFlush(Tag.personalDefault("기타", "#64748B"));
-        Event event = eventRepository.saveAndFlush(new Event(
-                "일정", null, START_AT, START_AT.plusSeconds(3600), false, "UTC", null, tag, account
+        SingleEvent event = eventRepository.saveAndFlush(new SingleEvent(
+                "일정", null, START_AT, START_AT.plusSeconds(3600), false, "UTC", tag.getId(), account.getId()
         ));
         GroupSpace groupSpace = groupSpaceRepository.saveAndFlush(new GroupSpace(account.getId(), "group", null));
 

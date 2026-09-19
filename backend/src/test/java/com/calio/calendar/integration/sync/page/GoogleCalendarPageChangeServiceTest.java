@@ -7,8 +7,8 @@ import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
-import com.calio.calendar.event.domain.Event;
-import com.calio.calendar.event.repository.EventRepository;
+import com.calio.calendar.singleevent.domain.SingleEvent;
+import com.calio.calendar.singleevent.repository.SingleEventRepository;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventResponse;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventPage;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventTimeResponse;
@@ -85,7 +85,7 @@ class GoogleCalendarPageChangeServiceTest {
     private RecurrenceEventOverrideRepository recurrenceEventOverrideRepository;
 
     @Autowired
-    private EventRepository eventRepository;
+    private SingleEventRepository eventRepository;
 
     @Autowired
     private AccountRepository accountRepository;
@@ -110,7 +110,7 @@ class GoogleCalendarPageChangeServiceTest {
 
     @Test
     @Transactional
-    @DisplayName("동일한 ExternalId 로 sync 응답이 오면 해당 Event의 데이터를 수정한다")
+    @DisplayName("동일한 ExternalId 로 sync 응답이 오면 해당 SingleEvent의 데이터를 수정한다")
     void givenRepeatedExternalIdentity_whenPersistPages_thenUpsertsAndPreservesLocalFields() {
         // given
         Tag fallbackTag = tagRepository.saveAndFlush(Tag.personalDefault(
@@ -124,7 +124,7 @@ class GoogleCalendarPageChangeServiceTest {
                 "first-run",
                 page(timedItem("external-1", "Initial"), "cursor-1")
         );
-        Event firstImport = eventRepository.findNormalEvents(
+        SingleEvent firstImport = eventRepository.findSingleEvents(
                 account.getId(),
                 Instant.parse("2026-07-01T00:00:00Z"),
                 Instant.parse("2026-07-02T00:00:00Z")
@@ -142,12 +142,12 @@ class GoogleCalendarPageChangeServiceTest {
         );
 
         // then
-        Event updatedImport = eventRepository.findById(internalEventId).orElseThrow();
+        SingleEvent updatedImport = eventRepository.findById(internalEventId).orElseThrow();
         assertThat(updatedImport.getTitle()).isEqualTo("Changed");
         assertThat(updatedImport.isAllDay()).isTrue();
         assertThat(updatedImport.getTimeZone()).isNull();
         assertThat(updatedImport.importantEvent()).isTrue();
-        assertThat(updatedImport.getTag().getId()).isEqualTo(fallbackTag.getId());
+        assertThat(updatedImport.getTagId()).isEqualTo(fallbackTag.getId());
         assertThat(mappingRepository.findEventIdsByIntegrationId(integration.getId()))
                 .containsExactly(internalEventId);
         GoogleCalendarIntegration finalized = integrationRepository.findById(integration.getId())
@@ -157,7 +157,7 @@ class GoogleCalendarPageChangeServiceTest {
 
     @Test
     @Transactional
-    @DisplayName("Event의 timezone이 null이면 page에 설정한 timezone으로 정규화한 schedule과 timezone을 저장한다")
+    @DisplayName("SingleEvent의 timezone이 null이면 page에 설정한 timezone으로 정규화한 schedule과 timezone을 저장한다")
     void givenOffsetlessTimedItemAndPageZone_whenPersistPage_thenStoresCanonicalSchedule() {
         // given
         tagRepository.saveAndFlush(Tag.personalDefault("기타", "#64748B"));
@@ -188,7 +188,7 @@ class GoogleCalendarPageChangeServiceTest {
         );
 
         // then
-        Event imported = eventRepository.findNormalEvents(
+        SingleEvent imported = eventRepository.findSingleEvents(
                 account.getId(),
                 Instant.parse("2026-07-01T00:00:00Z"),
                 Instant.parse("2026-07-01T01:00:00Z")
@@ -286,7 +286,7 @@ class GoogleCalendarPageChangeServiceTest {
     void givenDuplicateExternalEventIds_whenPersistPage_thenRejectsResponse() {
         // given
         tagRepository.saveAndFlush(Tag.personalDefault("기타", "#64748B"));
-        GoogleCalendarEventResponse item = timedItem("external-1", "Event");
+        GoogleCalendarEventResponse item = timedItem("external-1", "SingleEvent");
         GoogleCalendarEventPage page = new GoogleCalendarEventPage(
                 List.of(item, item),
                 null,
@@ -308,7 +308,7 @@ class GoogleCalendarPageChangeServiceTest {
 
     @Test
     @Transactional
-    @DisplayName("Event를 RecurrenceEvent으로 바뀐 기존 Event 데이터는 mapping 데이터를 먼저 삭제한 후, Event를 제거한다")
+    @DisplayName("SingleEvent를 RecurrenceEvent으로 바뀐 기존 SingleEvent 데이터는 mapping 데이터를 먼저 삭제한 후, SingleEvent를 제거한다")
     void givenMappedItemBecomesRecurring_whenPersistPage_thenDeletesStaleProviderData() {
         // given
         tagRepository.saveAndFlush(Tag.personalDefault("기타", "#64748B"));
@@ -341,7 +341,7 @@ class GoogleCalendarPageChangeServiceTest {
 
         // then
         assertThat(mappingRepository.findEventIdsByIntegrationId(integration.getId())).isEmpty();
-        assertThat(eventRepository.findNormalEvents(
+        assertThat(eventRepository.findSingleEvents(
                 account.getId(),
                 Instant.parse("2026-07-01T00:00:00Z"),
                 Instant.parse("2026-07-02T00:00:00Z")
@@ -610,18 +610,17 @@ class GoogleCalendarPageChangeServiceTest {
                 false,
                 "UTC"
         );
-        List<Event> events = new ArrayList<>();
+        List<SingleEvent> events = new ArrayList<>();
         for (int index = 0; index <= 500; index++) {
-            events.add(new Event(
-                    "Event " + index,
+            events.add(new SingleEvent(
+                    "SingleEvent " + index,
                     null,
                     eventSchedule.startAt(),
                     eventSchedule.endAt(),
                     false,
                     "UTC",
-                    null,
-                    defaultTag,
-                    account
+                    defaultTag.getId(),
+                    account.getId()
             ));
         }
         eventRepository.saveAllAndFlush(events);
@@ -713,7 +712,7 @@ class GoogleCalendarPageChangeServiceTest {
                 "first-run",
                 page(allDayItem("external-blank", "  "), "cursor-1")
         );
-        Event imported = eventRepository.findNormalEvents(
+        SingleEvent imported = eventRepository.findSingleEvents(
                 account.getId(),
                 Instant.parse("2026-07-03T00:00:00Z"),
                 Instant.parse("2026-07-05T00:00:00Z")

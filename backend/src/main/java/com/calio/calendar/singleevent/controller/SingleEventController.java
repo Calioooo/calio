@@ -1,11 +1,17 @@
-package com.calio.calendar.event.controller;
+package com.calio.calendar.singleevent.controller;
 
-import com.calio.calendar.event.controller.dto.CreateEventRequest;
-import com.calio.calendar.event.controller.dto.EventResponse;
-import com.calio.calendar.event.controller.dto.UpdateImportantEventRequest;
-import com.calio.calendar.event.controller.dto.UpdateEventRequest;
+import com.calio.calendar.singleevent.controller.dto.CreateSingleEventRequest;
+import com.calio.calendar.singleevent.controller.dto.EventResponse;
+import com.calio.calendar.singleevent.controller.dto.UpdateImportantSingleEventRequest;
+import com.calio.calendar.singleevent.controller.dto.UpdateSingleEventRequest;
 import com.calio.calendar.security.AuthenticatedAccount;
-import com.calio.calendar.event.service.EventService;
+import com.calio.calendar.singleevent.usecase.CreateSingleEventUseCase;
+import com.calio.calendar.singleevent.usecase.DeleteSingleEventUseCase;
+import com.calio.calendar.singleevent.usecase.GetSingleEventUseCase;
+import com.calio.calendar.singleevent.usecase.ListEventsUseCase;
+import com.calio.calendar.singleevent.usecase.UpdateSingleEventUseCase;
+import com.calio.calendar.singleevent.usecase.UpdateImportantSingleEventUseCase;
+import com.calio.calendar.singleevent.service.EventService;
 import com.calio.calendar.sharing.event.controller.dto.CreateEventGroupSharesRequest;
 import com.calio.calendar.sharing.event.controller.dto.CreateEventGroupSharesResponse;
 import com.calio.calendar.sharing.event.service.PersonalEventGroupShareService;
@@ -31,25 +37,40 @@ import org.springframework.web.bind.annotation.RestController;
 @Validated
 @RestController
 @RequestMapping("/api/events")
-public class EventController {
+public class SingleEventController {
 
-    private final EventService eventService;
+    private final CreateSingleEventUseCase createEventUseCase;
+    private final GetSingleEventUseCase getEventUseCase;
+    private final UpdateSingleEventUseCase updateEventUseCase;
+    private final UpdateImportantSingleEventUseCase updateImportantEventUseCase;
+    private final DeleteSingleEventUseCase deleteEventUseCase;
+    private final ListEventsUseCase listEventsUseCase;
     private final PersonalEventGroupShareService eventGroupShareService;
 
-    public EventController(
-            EventService eventService,
+    public SingleEventController(
+            CreateSingleEventUseCase createEventUseCase,
+            GetSingleEventUseCase getEventUseCase,
+            UpdateSingleEventUseCase updateEventUseCase,
+            UpdateImportantSingleEventUseCase updateImportantEventUseCase,
+            DeleteSingleEventUseCase deleteEventUseCase,
+            ListEventsUseCase listEventsUseCase,
             PersonalEventGroupShareService eventGroupShareService
     ) {
-        this.eventService = eventService;
+        this.createEventUseCase = createEventUseCase;
+        this.getEventUseCase = getEventUseCase;
+        this.updateEventUseCase = updateEventUseCase;
+        this.updateImportantEventUseCase = updateImportantEventUseCase;
+        this.deleteEventUseCase = deleteEventUseCase;
+        this.listEventsUseCase = listEventsUseCase;
         this.eventGroupShareService = eventGroupShareService;
     }
 
     @PostMapping
     public ResponseEntity<EventResponse> createEvent(
             @AuthenticationPrincipal AuthenticatedAccount account,
-            @Valid @RequestBody CreateEventRequest request
+            @Valid @RequestBody CreateSingleEventRequest request
     ) {
-        EventResponse response = eventService.createEvent(account.accountId(), request);
+        EventResponse response = createEventUseCase.create(account.accountId(), request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -58,25 +79,25 @@ public class EventController {
             @AuthenticationPrincipal AuthenticatedAccount account,
             @PathVariable("eventId") Long eventId
     ) {
-        return eventService.getEvent(account.accountId(), eventId);
+        return getEventUseCase.get(account.accountId(), eventId);
     }
 
     @PutMapping("/{eventId}")
     public EventResponse updateEvent(
             @PathVariable("eventId") Long eventId,
             @AuthenticationPrincipal AuthenticatedAccount account,
-            @Valid @RequestBody UpdateEventRequest request
+            @Valid @RequestBody UpdateSingleEventRequest request
     ) {
-        return eventService.updateEvent(account.accountId(), eventId, request);
+        return updateEventUseCase.update(account.accountId(), eventId, request);
     }
 
     @PatchMapping("/{eventId}/important-event")
     public EventResponse updateImportantEvent(
             @PathVariable("eventId") Long eventId,
             @AuthenticationPrincipal AuthenticatedAccount account,
-            @Valid @RequestBody UpdateImportantEventRequest request
+            @Valid @RequestBody UpdateImportantSingleEventRequest request
     ) {
-        return eventService.updateImportantEvent(account.accountId(), eventId, request);
+        return updateImportantEventUseCase.update(account.accountId(), eventId, request.importantEvent());
     }
 
     @DeleteMapping("/{eventId}")
@@ -84,7 +105,7 @@ public class EventController {
             @AuthenticationPrincipal AuthenticatedAccount account,
             @PathVariable("eventId") Long eventId
     ) {
-        eventService.deleteEvent(account.accountId(), eventId);
+        deleteEventUseCase.delete(account.accountId(), eventId);
         return ResponseEntity.noContent().build();
     }
 
@@ -103,6 +124,6 @@ public class EventController {
             @RequestParam("from") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
             @RequestParam("to") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to
     ) {
-        return eventService.listEvents(account.accountId(), from, to);
+        return listEventsUseCase.list(account.accountId(), from, to);
     }
 }

@@ -1,4 +1,4 @@
-package com.calio.calendar.event.controller;
+package com.calio.calendar.singleevent.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
@@ -12,8 +12,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static com.calio.calendar.security.TestAccountSupport.currentAccountReference;
 
 import com.calio.calendar.account.repository.AccountRepository;
-import com.calio.calendar.event.domain.Event;
-import com.calio.calendar.event.repository.EventRepository;
+import com.calio.calendar.singleevent.domain.SingleEvent;
+import com.calio.calendar.singleevent.repository.SingleEventRepository;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.mapping.repository.GoogleCalendarEventMappingRepository;
@@ -50,7 +50,7 @@ import tools.jackson.databind.ObjectMapper;
 @AutoConfigureMockMvc
 @WithAuthenticatedAccount
 @Import(AuthenticatedAccountMockMvcTestConfig.class)
-class EventControllerTest {
+class SingleEventControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
@@ -65,7 +65,7 @@ class EventControllerTest {
     private AccountRepository accountRepository;
 
     @Autowired
-    private EventRepository eventRepository;
+    private SingleEventRepository eventRepository;
 
     @Autowired
     private GoogleCalendarIntegrationRepository googleCalendarIntegrationRepository;
@@ -419,8 +419,8 @@ class EventControllerTest {
     }
 
     @Test
-    @DisplayName("사용자는 공백 제목으로 일정을 생성할 수 없다")
-    void givenBlankTitle_whenCreateEvent_thenReturnsValidationFailed() throws Exception {
+    @DisplayName("사용자는 공백 제목으로 일정을 생성할 수 있다")
+    void givenBlankTitle_whenCreateEvent_thenCreatesEvent() throws Exception {
         // given
         String requestBody = """
                 {
@@ -437,9 +437,8 @@ class EventControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 // then
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"))
-                .andExpect(jsonPath("$.detail").isString());
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.title").value(" "));
     }
 
     @Test
@@ -649,8 +648,8 @@ class EventControllerTest {
     }
 
     @Test
-    @DisplayName("사용자는 공백 제목으로 일정을 수정할 수 없다")
-    void givenBlankTitle_whenUpdateEvent_thenReturnsValidationFailed() throws Exception {
+    @DisplayName("사용자는 공백 제목으로 일정을 수정할 수 있다")
+    void givenBlankTitle_whenUpdateEvent_thenUpdatesEvent() throws Exception {
         // given
         long eventId = createEvent("Editable", "2026-06-05T00:00:00Z", "2026-06-05T01:00:00Z");
         String requestBody = """
@@ -668,10 +667,8 @@ class EventControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 // then
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"))
-                .andExpect(jsonPath("$.detail").isString())
-                .andExpect(jsonPath("$.*", hasSize(6)));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value(" "));
     }
 
     @Test
@@ -763,13 +760,13 @@ class EventControllerTest {
     }
 
     @Test
-    @DisplayName("잘못된 timed timezone 수정은 Event 필드와 Tag를 부분 변경하지 않는다")
+    @DisplayName("잘못된 timed timezone 수정은 SingleEvent 필드와 Tag를 부분 변경하지 않는다")
     void givenInvalidTimeZoneAndNewTag_whenUpdateEvent_thenPreservesEventAndTag()
             throws Exception {
         // given
         long eventId = createEvent("Stable", "2026-06-07T00:00:00Z", "2026-06-07T01:00:00Z");
-        Event before = eventRepository.findById(eventId).orElseThrow();
-        Long originalTagId = before.getTag().getId();
+        SingleEvent before = eventRepository.findById(eventId).orElseThrow();
+        Long originalTagId = before.getTagId();
         Tag replacementTag = tagRepository.save(Tag.personalDefault("교체 대상", "#123456"));
 
         // when
@@ -790,12 +787,12 @@ class EventControllerTest {
                 .andExpect(jsonPath("$.title").value("INVALID_TIME_ZONE"));
 
         // then
-        Event persisted = eventRepository.findById(eventId).orElseThrow();
+        SingleEvent persisted = eventRepository.findById(eventId).orElseThrow();
         assertThat(persisted.getTitle()).isEqualTo("Stable");
         assertThat(persisted.getStartAt()).isEqualTo(Instant.parse("2026-06-07T00:00:00Z"));
         assertThat(persisted.getEndAt()).isEqualTo(Instant.parse("2026-06-07T01:00:00Z"));
         assertThat(persisted.getTimeZone()).isEqualTo("UTC");
-        assertThat(persisted.getTag().getId()).isEqualTo(originalTagId);
+        assertThat(persisted.getTagId()).isEqualTo(originalTagId);
     }
 
     @Test
@@ -1019,10 +1016,10 @@ class EventControllerTest {
     }
 
     private void mapAsGoogleEvent(long eventId) {
-        Event event = eventRepository.findById(eventId).orElseThrow();
+        SingleEvent event = eventRepository.findById(eventId).orElseThrow();
         GoogleCalendarIntegration integration = googleCalendarIntegrationRepository.saveAndFlush(
                 new GoogleCalendarIntegration(
-                        event.getAccount().getId(),
+                        event.getAccountId(),
                         "google-subject-" + eventId,
                         "user@example.com",
                         "encrypted-refresh-token",

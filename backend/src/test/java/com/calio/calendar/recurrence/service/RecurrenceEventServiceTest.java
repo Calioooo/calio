@@ -14,8 +14,7 @@ import com.calio.calendar.account.service.AccountQueryService;
 import com.calio.calendar.common.domain.CanonicalSchedule;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
-import com.calio.calendar.event.controller.dto.EventResponse;
-import com.calio.calendar.event.service.EventCommandService;
+import com.calio.calendar.singleevent.controller.dto.EventResponse;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarRecurrenceMappingQueryService;
 import com.calio.calendar.recurrence.controller.dto.CreateRecurrenceEventRequest;
 import com.calio.calendar.recurrence.controller.dto.RecurrenceEventResponse;
@@ -60,9 +59,6 @@ class RecurrenceEventServiceTest {
     private TagQueryService tagQueryService;
 
     @Mock
-    private EventCommandService eventCommandService;
-
-    @Mock
     private Rfc5545RecurrenceEngine recurrenceEngine;
 
     @Mock
@@ -91,7 +87,6 @@ class RecurrenceEventServiceTest {
                 commandService,
                 accountQueryService,
                 tagQueryService,
-                eventCommandService,
                 recurrenceEngine,
                 clock,
                 recurrenceShareCommandService,
@@ -100,7 +95,7 @@ class RecurrenceEventServiceTest {
     }
 
     @Test
-    @DisplayName("반복 일정 생성은 정규화된 RFC line과 canonical schedule만 저장하고 Event row를 만들지 않는다")
+    @DisplayName("반복 일정 생성은 정규화된 RFC line과 canonical schedule만 저장하고 SingleEvent row를 만들지 않는다")
     void givenTimedRequest_whenCreate_thenStoresValidatedMasterWithoutMaterializingEvents() {
         // given
         Tag tag = tag();
@@ -126,7 +121,6 @@ class RecurrenceEventServiceTest {
                 .isEqualTo(Instant.parse("2027-01-01T01:00:00Z"));
         assertThat(captor.getValue().getTimeZone()).isEqualTo("Asia/Seoul");
         assertThat(captor.getValue().getRecurrenceRules()).containsExactlyElementsOf(normalized);
-        verifyNoInteractions(eventCommandService);
         assertThat(response.canUpdateSeries()).isTrue();
     }
 
@@ -178,7 +172,6 @@ class RecurrenceEventServiceTest {
         assertThat(recurrenceEvent.isAllDay()).isTrue();
         assertThat(recurrenceEvent.getTimeZone()).isNull();
         verify(recurrenceEventOverrideRepository, never()).deleteAllByRecurrenceEventIds(any());
-        verify(eventCommandService, never()).deleteEventsByRecurrenceEventIds(any());
     }
 
     @Test
@@ -208,7 +201,7 @@ class RecurrenceEventServiceTest {
     }
 
     @Test
-    @DisplayName("전체 recurrence 삭제는 override와 account legacy Event를 master보다 먼저 제거한다")
+    @DisplayName("전체 recurrence 삭제는 override를 master보다 먼저 제거한다")
     void givenRecurrenceChildren_whenDeleteMaster_thenDeletesChildrenBeforeMaster() {
         // given
         RecurrenceEvent recurrenceEvent = recurrenceEvent();
@@ -222,7 +215,6 @@ class RecurrenceEventServiceTest {
         InOrder deletionOrder = inOrder(
                 recurrenceEventRepository,
                 recurrenceEventOverrideRepository,
-                eventCommandService,
                 recurrenceShareCommandService,
                 recurrenceMappingQueryService
         );
@@ -230,7 +222,6 @@ class RecurrenceEventServiceTest {
         deletionOrder.verify(recurrenceMappingQueryService).hasExternalRecurrenceEventMapping(10L, 1L);
         deletionOrder.verify(recurrenceShareCommandService).deleteAllForSourceRecurrence(10L);
         deletionOrder.verify(recurrenceEventOverrideRepository).deleteAllByRecurrenceEventIds(List.of(10L));
-        deletionOrder.verify(eventCommandService).deleteEventsByRecurrenceEventIds(List.of(10L));
         deletionOrder.verify(recurrenceEventRepository).deleteAllByIds(List.of(10L));
     }
 
@@ -249,7 +240,6 @@ class RecurrenceEventServiceTest {
                 .isEqualTo(ErrorCode.EXTERNAL_EVENT_MUTATION_NOT_SUPPORTED);
 
         verify(recurrenceEventOverrideRepository, never()).deleteAllByRecurrenceEventIds(any());
-        verify(eventCommandService, never()).deleteEventsByRecurrenceEventIds(any());
         verify(recurrenceEventRepository, never()).deleteAllByIds(any());
         verify(recurrenceShareCommandService, never()).deleteAllForSourceRecurrence(any());
     }

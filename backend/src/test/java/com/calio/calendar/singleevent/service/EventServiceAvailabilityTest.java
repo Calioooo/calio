@@ -1,4 +1,4 @@
-package com.calio.calendar.event.service;
+package com.calio.calendar.singleevent.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -6,7 +6,7 @@ import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 
-import com.calio.calendar.event.controller.dto.EventResponse;
+import com.calio.calendar.singleevent.controller.dto.EventResponse;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;

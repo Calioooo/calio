@@ -17,9 +17,10 @@ import com.calio.calendar.aicalendar.service.tool.dto.CalendarAgentToolRequestCo
 import com.calio.calendar.aicalendar.service.tool.dto.CalendarLookupToolRequest;
 import com.calio.calendar.aicalendar.service.tool.dto.CalendarMutationToolRequest;
 import com.calio.calendar.aicalendar.service.tool.dto.FreeTimeSearchToolRequest;
-import com.calio.calendar.event.controller.dto.EventResponse;
-import com.calio.calendar.event.service.EventService;
-import com.calio.calendar.event.service.dto.CalendarFreeTime;
+import com.calio.calendar.singleevent.controller.dto.EventResponse;
+import com.calio.calendar.singleevent.usecase.FindAvailableTimesUseCase;
+import com.calio.calendar.singleevent.usecase.ListEventsUseCase;
+import com.calio.calendar.singleevent.service.dto.CalendarFreeTime;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
@@ -34,7 +35,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class CalendarAgentToolsTest {
 
     @Mock
-    private EventService eventService;
+    private ListEventsUseCase listEventsUseCase;
+
+    @Mock
+    private FindAvailableTimesUseCase findAvailableTimesUseCase;
 
     @Mock
     private CalendarAgentObservationService observationService;
@@ -46,7 +50,7 @@ class CalendarAgentToolsTest {
     @DisplayName("agenda tool은 EventResponse를 그대로 반환한다")
     void givenCalendarEvents_whenLookup_thenReturnsEventResponse() {
         // given
-        when(eventService.listEvents(any(), any(), any())).thenReturn(List.of(timedEvent()));
+        when(listEventsUseCase.list(any(), any(), any())).thenReturn(List.of(timedEvent()));
         CalendarAgentTools tools = tools();
 
         // when
@@ -62,14 +66,14 @@ class CalendarAgentToolsTest {
             assertThat(event.allDay()).isFalse();
             assertThat(event.id()).isEqualTo(1L);
         });
-        verify(eventService).listEvents(any(), any(), any());
+        verify(listEventsUseCase).list(any(), any(), any());
     }
 
     @Test
     @DisplayName("free-time tool은 EventService가 계산한 빈 시간을 반환한다")
     void givenAvailableTimes_whenFindFreeTime_thenReturnsEventServiceResult() {
         // given
-        when(eventService.findAvailableTimes(any(), any(), any(), any(), any(), any(), any()))
+        when(findAvailableTimesUseCase.find(any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(List.of(
                         new CalendarFreeTime(
                                 "2026-07-01T09:00:00Z",
@@ -103,7 +107,7 @@ class CalendarAgentToolsTest {
         assertThat(result.freeTimes().getFirst().allDayNotices()).containsExactly("Holiday");
         assertThat(result.freeTimes().get(1).start()).isEqualTo("2026-07-01T11:00:00Z");
         assertThat(result.freeTimes().get(1).end()).isEqualTo("2026-07-01T12:00:00Z");
-        verify(eventService).findAvailableTimes(any(), any(), any(), any(), any(), any(), any());
+        verify(findAvailableTimesUseCase).find(any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -134,7 +138,7 @@ class CalendarAgentToolsTest {
     }
 
     @Test
-    @DisplayName("mutation apply tool은 변경된 Event 결과를 수집한다")
+    @DisplayName("mutation apply tool은 변경된 SingleEvent 결과를 수집한다")
     void givenConfirmedMutation_whenApply_thenCollectsChangedEvents() {
         // given
         CalendarAgentTools tools = tools();
@@ -176,7 +180,7 @@ class CalendarAgentToolsTest {
                 Instant.parse("2026-07-01T00:00:00Z"),
                 Instant.parse("2026-07-01T00:00:00Z")
         );
-        when(eventService.listEvents(any(), any(), any())).thenReturn(List.of(timedEvent()));
+        when(listEventsUseCase.list(any(), any(), any())).thenReturn(List.of(timedEvent()));
         when(mutationService.apply(any(), any())).thenReturn(List.of(changedEvent));
 
         // when
@@ -191,11 +195,12 @@ class CalendarAgentToolsTest {
     @DisplayName("tool 호출 제한은 다른 요청의 ToolContext와 공유하지 않는다")
     void givenSeparateToolContexts_whenOneRequestExceedsCallLimit_thenAnotherRequestCanCallTool() {
         // given
-        when(eventService.listEvents(any(), any(), any())).thenReturn(List.of(timedEvent()));
+        when(listEventsUseCase.list(any(), any(), any())).thenReturn(List.of(timedEvent()));
         CalendarAIProperties properties = new CalendarAIProperties();
         properties.setMaxToolCalls(1);
         CalendarAgentTools tools = new CalendarAgentTools(
-                eventService,
+                listEventsUseCase,
+                findAvailableTimesUseCase,
                 mutationService,
                 properties,
                 observationService
@@ -214,7 +219,8 @@ class CalendarAgentToolsTest {
 
     private CalendarAgentTools tools() {
         return new CalendarAgentTools(
-                eventService,
+                listEventsUseCase,
+                findAvailableTimesUseCase,
                 mutationService,
                 new CalendarAIProperties(),
                 observationService

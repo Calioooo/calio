@@ -5,8 +5,8 @@ import static org.mockito.Mockito.when;
 
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
-import com.calio.calendar.event.domain.Event;
-import com.calio.calendar.event.repository.EventRepository;
+import com.calio.calendar.singleevent.domain.SingleEvent;
+import com.calio.calendar.singleevent.repository.SingleEventRepository;
 import com.calio.calendar.external.google.GoogleOAuthClient;
 import com.calio.calendar.external.google.dto.GoogleTokenResponse;
 import com.calio.calendar.external.google.dto.GoogleUserInfoResponse;
@@ -65,7 +65,7 @@ class GoogleCalendarConnectionTest {
     private GoogleCalendarEventMappingRepository mappingRepository;
 
     @Autowired
-    private EventRepository eventRepository;
+    private SingleEventRepository eventRepository;
 
     @Autowired
     private GoogleCalendarRecurrenceEventMappingRepository recurrenceMappingRepository;
@@ -96,7 +96,7 @@ class GoogleCalendarConnectionTest {
         GoogleCalendarIntegration integration = integrationRepository.saveAndFlush(
                 integration(account.getId())
         );
-        Event importedEvent = createMappedEvent(account, integration, "external-before-reconnect");
+        SingleEvent importedEvent = createMappedEvent(account, integration, "external-before-reconnect");
         preparePreviousSyncState(integration.getId());
         stubGoogleConnection();
 
@@ -122,7 +122,7 @@ class GoogleCalendarConnectionTest {
         GoogleCalendarIntegration integration = integrationRepository.saveAndFlush(
                 integration(account.getId())
         );
-        Event importedEvent = createMappedEvent(account, integration, "external-before-disconnect");
+        SingleEvent importedEvent = createMappedEvent(account, integration, "external-before-disconnect");
         stubGoogleRevocation();
 
         // when
@@ -210,7 +210,7 @@ class GoogleCalendarConnectionTest {
                 .thenReturn("refresh-token");
     }
 
-    private Event createMappedEvent(
+    private SingleEvent createMappedEvent(
             Account account,
             GoogleCalendarIntegration integration,
             String externalEventId
@@ -218,16 +218,15 @@ class GoogleCalendarConnectionTest {
         Tag fallbackTag = tagRepository.saveAndFlush(
                 Tag.personalDefault("기타", "#64748B")
         );
-        Event event = eventRepository.saveAndFlush(new Event(
+        SingleEvent event = eventRepository.saveAndFlush(new SingleEvent(
                 "Imported",
                 null,
                 Instant.parse("2026-07-01T00:00:00Z"),
                 Instant.parse("2026-07-01T01:00:00Z"),
                 false,
                 "UTC",
-                null,
-                fallbackTag,
-                account
+                fallbackTag.getId(),
+                account.getId()
         ));
         mappingRepository.saveAndFlush(new GoogleCalendarEventMapping(
                 integration,

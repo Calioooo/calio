@@ -1,7 +1,7 @@
 package com.calio.calendar.integration.mapping.domain;
 
 import com.calio.calendar.common.domain.BaseEntity;
-import com.calio.calendar.event.domain.Event;
+import com.calio.calendar.singleevent.domain.SingleEvent;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -44,7 +44,7 @@ public class GoogleCalendarEventMapping extends BaseEntity {
 
     @OneToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "event_id", nullable = false)
-    private Event event;
+    private SingleEvent event;
 
     @Column(name = "calendar_key", nullable = false, length = 32)
     private String calendarKey;
@@ -63,7 +63,7 @@ public class GoogleCalendarEventMapping extends BaseEntity {
 
     public GoogleCalendarEventMapping(
             GoogleCalendarIntegration integration,
-            Event event,
+            SingleEvent event,
             String externalEventId,
             String providerEtag,
             Instant providerUpdatedAt
@@ -88,7 +88,7 @@ public class GoogleCalendarEventMapping extends BaseEntity {
         return integration;
     }
 
-    public Event getEvent() {
+    public SingleEvent getEvent() {
         return event;
     }
 
