@@ -132,6 +132,26 @@ struct VoteServiceTests {
         ))
   }
 
+  @Test func createParticipantMapsRequestAndRegisteredResponse() async throws {
+    let repository = RecordingVoteRepository(
+      participantResponse: VoteParticipantResponseDTO(nickname: "민지", status: .registered)
+    )
+    let service = VoteService(repository: repository)
+
+    let participant = try await service.createParticipant(
+      publicId: publicId,
+      nickname: "민지",
+      password: "secret"
+    )
+
+    #expect(repository.createParticipantPublicId == publicId)
+    #expect(
+      repository.createParticipantRequest
+        == CreateVoteParticipantRequestDTO(nickname: "민지", password: "secret")
+    )
+    #expect(participant == VoteParticipant(nickname: "민지", status: .registered))
+  }
+
   @Test func knownBackendErrorCodeBecomesVoteServiceError() async {
     let repository = RecordingVoteRepository(
       resultError: APIError.backend(
@@ -154,6 +174,28 @@ struct VoteServiceTests {
       #expect(error == .voteRoomNotFound)
     } catch {
       Issue.record("Expected VoteServiceError.voteRoomNotFound, got \(error)")
+    }
+  }
+
+  @Test func knownParticipantAndValidationErrorCodesBecomeVoteServiceErrors() async {
+    let contracts: [(String, VoteServiceError)] = [
+      ("VOTE_PARTICIPANT_NICKNAME_CONFLICT", .participantNicknameConflict),
+      ("VOTE_PARTICIPANT_CREDENTIAL_INVALID", .participantCredentialInvalid),
+      ("VALIDATION_FAILED", .validationFailed),
+    ]
+
+    for (errorCode, expectedError) in contracts {
+      let repository = RecordingVoteRepository(resultError: backendError(errorCode: errorCode))
+      let service = VoteService(repository: repository)
+
+      do {
+        _ = try await service.fetchResult(publicId: publicId)
+        Issue.record("Expected \(expectedError) for \(errorCode)")
+      } catch let error as VoteServiceError {
+        #expect(error == expectedError)
+      } catch {
+        Issue.record("Expected VoteServiceError for \(errorCode), got \(error)")
+      }
     }
   }
 
@@ -189,12 +231,15 @@ struct VoteServiceTests {
 
 private final class RecordingVoteRepository: VoteRepository {
   var createRoomRequest: CreateVoteRoomRequestDTO?
+  var createParticipantPublicId: UUID?
+  var createParticipantRequest: CreateVoteParticipantRequestDTO?
   var lookupRequest: LookupVoteParticipantSelectionRequestDTO?
   var submitRequest: SubmitVoteRequestDTO?
 
   private let createRoomResponse: VoteRoomResponseDTO
   private let resultResponse: VoteResultResponseDTO
   private let selectionResponse: VoteParticipantSelectionResponseDTO
+  private let participantResponse: VoteParticipantResponseDTO
   private let submissionResponse: VoteSubmissionResponseDTO
   private let resultError: Error?
 
@@ -218,6 +263,10 @@ private final class RecordingVoteRepository: VoteRepository {
       status: .registered,
       unavailableDates: []
     ),
+    participantResponse: VoteParticipantResponseDTO = VoteParticipantResponseDTO(
+      nickname: "민지",
+      status: .registered
+    ),
     submissionResponse: VoteSubmissionResponseDTO = VoteSubmissionResponseDTO(
       nickname: "민지",
       status: .submitted,
@@ -228,6 +277,7 @@ private final class RecordingVoteRepository: VoteRepository {
     self.createRoomResponse = createRoomResponse
     self.resultResponse = resultResponse
     self.selectionResponse = selectionResponse
+    self.participantResponse = participantResponse
     self.submissionResponse = submissionResponse
     self.resultError = resultError
   }
@@ -248,7 +298,9 @@ private final class RecordingVoteRepository: VoteRepository {
     publicId: UUID,
     request: CreateVoteParticipantRequestDTO
   ) async throws -> VoteParticipantResponseDTO {
-    VoteParticipantResponseDTO(nickname: request.nickname, status: .registered)
+    createParticipantPublicId = publicId
+    createParticipantRequest = request
+    return participantResponse
   }
 
   func lookupVoteParticipantSelection(
@@ -266,4 +318,17 @@ private final class RecordingVoteRepository: VoteRepository {
     submitRequest = request
     return submissionResponse
   }
+}
+
+private func backendError(errorCode: String) -> APIError {
+  APIError.backend(
+    statusCode: 400,
+    problem: ProblemDetailDTO(
+      type: "about:blank",
+      title: errorCode,
+      status: 400,
+      detail: "Vote request failed.",
+      errorCode: errorCode
+    )
+  )
 }
