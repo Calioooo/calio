@@ -1,7 +1,7 @@
 package com.calio.calendar.holiday.controller;
 
 import com.calio.calendar.holiday.controller.dto.NationalHolidayResponse;
-import com.calio.calendar.holiday.service.NationalHolidayService;
+import com.calio.calendar.holiday.usecase.GetNationalHolidaysUseCase;
 import java.time.LocalDate;
 import java.util.List;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -14,17 +14,16 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/national-holidays")
 public class NationalHolidayController {
 
-    private final NationalHolidayService nationalHolidayService;
+  private final GetNationalHolidaysUseCase getNationalHolidaysUseCase;
 
-    public NationalHolidayController(NationalHolidayService nationalHolidayService) {
-        this.nationalHolidayService = nationalHolidayService;
-    }
+  public NationalHolidayController(GetNationalHolidaysUseCase getNationalHolidaysUseCase) {
+    this.getNationalHolidaysUseCase = getNationalHolidaysUseCase;
+  }
 
-    @GetMapping
-    public List<NationalHolidayResponse> getNationalHolidays(
-            @RequestParam("from") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam("to") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
-    ) {
-        return nationalHolidayService.getNationalHolidays(from, to);
-    }
+  @GetMapping
+  public List<NationalHolidayResponse> getNationalHolidays(
+      @RequestParam("from") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+      @RequestParam("to") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+    return getNationalHolidaysUseCase.get(from, to);
+  }
 }
