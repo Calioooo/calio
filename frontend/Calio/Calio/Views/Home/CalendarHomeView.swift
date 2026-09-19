@@ -112,8 +112,12 @@ struct CalendarHomeView: View {
       )
       .transition(.opacity)
     } else if let createdVoteRoom {
-      VoteSharePopoverView(room: createdVoteRoom, onOpenRoom: openVoteRoom(_:))
-        .transition(.opacity)
+      VoteSharePopoverView(
+        room: createdVoteRoom,
+        onDismiss: dismissVoteSharePopover,
+        onOpenRoom: openVoteRoom
+      )
+      .transition(.opacity)
     }
   }
 
@@ -173,6 +177,10 @@ struct CalendarHomeView: View {
   private func openVoteRoom(_ room: VoteRoom) {
     createdVoteRoom = nil
     onVoteRoomOpen(room)
+  }
+
+  private func dismissVoteSharePopover() {
+    createdVoteRoom = nil
   }
 }
 
