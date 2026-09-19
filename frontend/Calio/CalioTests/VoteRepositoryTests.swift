@@ -66,6 +66,9 @@ struct VoteRepositoryTests {
         request.url?.path == "/api/vote-rooms/9F17BFC0-D2ED-48EA-9253-7A98EBCA4C2F/votes/lookup")
       #expect(request.httpMethod == "POST")
       #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
+      let body = try #require(requestBodyData(from: request))
+      let payload = try #require(JSONSerialization.jsonObject(with: body) as? [String: String])
+      #expect(payload == ["nickname": "민지", "password": "secret"])
       return voteResponse(
         for: request, statusCode: 200,
         body: #"{"nickname":"민지","status":"SUBMITTED","unavailableDates":["2026-09-19"]}"#)
