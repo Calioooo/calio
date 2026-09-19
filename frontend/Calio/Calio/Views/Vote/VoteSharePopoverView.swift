@@ -3,9 +3,20 @@ import UIKit
 
 struct VoteSharePopoverView: View {
   let room: VoteRoom
+  let onDismiss: () -> Void
   let onOpenRoom: (VoteRoom) -> Void
 
   @State private var didCopyLink = false
+
+  init(
+    room: VoteRoom,
+    onDismiss: @escaping () -> Void = {},
+    onOpenRoom: @escaping (VoteRoom) -> Void
+  ) {
+    self.room = room
+    self.onDismiss = onDismiss
+    self.onOpenRoom = onOpenRoom
+  }
 
   var body: some View {
     VotePopoverBackdrop {
@@ -83,7 +94,7 @@ struct VoteSharePopoverView: View {
       .background(Color.calioSurface, in: RoundedRectangle(cornerRadius: 28))
       .overlay(alignment: .topTrailing) {
         Button {
-          onOpenRoom(room)
+          onDismiss()
         } label: {
           Image(systemName: "xmark")
             .font(.headline.weight(.semibold))
@@ -101,8 +112,9 @@ struct VoteSharePopoverView: View {
     .accessibilityIdentifier("vote_share_popover")
   }
 
-  private var publicLink: URL {
+  var publicLink: URL {
     CalioAPIConfig.baseURL
+      .appendingPathComponent("api")
       .appendingPathComponent("vote-rooms")
       .appendingPathComponent(room.publicId.uuidString)
   }
