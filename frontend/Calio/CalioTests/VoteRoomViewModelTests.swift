@@ -63,6 +63,21 @@ struct VoteRoomViewModelTests {
     #expect(viewModel.draftUnavailableDays.isEmpty)
   }
 
+  @Test @MainActor func refreshFailureKeepsExistingResultAndExposesRefreshFailure() async {
+    let repository = VoteRoomRepositoryStub(
+      resultResponse: resultResponse(unavailableCount: 1),
+      subsequentResultError: VoteServiceError.network
+    )
+    let viewModel = VoteRoomViewModel(room: room, voteService: VoteService(repository: repository))
+
+    await viewModel.load()
+    await viewModel.refreshResult()
+
+    #expect(viewModel.loadState == .loaded)
+    #expect(viewModel.result?.dateResults.first?.unavailableCount == 1)
+    #expect(viewModel.resultRefreshFailure == .network)
+  }
+
   @Test @MainActor func credentialFailureDuringSaveReturnsToExistingParticipantFlow() async {
     let repository = VoteRoomRepositoryStub(
       lookupResponse: VoteParticipantSelectionResponseDTO(
@@ -134,6 +149,7 @@ struct VoteRoomViewModelTests {
 private final class VoteRoomRepositoryStub: VoteRepository {
   private let resultResponse: VoteResultResponseDTO
   private let resultError: Error?
+  private let subsequentResultError: Error?
   private let lookupResponse: VoteParticipantSelectionResponseDTO
   private let submitResponse: VoteSubmissionResponseDTO
   private let submitError: Error?
@@ -143,6 +159,7 @@ private final class VoteRoomRepositoryStub: VoteRepository {
   init(
     resultResponse: VoteResultResponseDTO? = nil,
     resultError: Error? = nil,
+    subsequentResultError: Error? = nil,
     lookupResponse: VoteParticipantSelectionResponseDTO = VoteParticipantSelectionResponseDTO(
       nickname: "민지", status: .registered, unavailableDates: []
     ),
@@ -159,6 +176,7 @@ private final class VoteRoomRepositoryStub: VoteRepository {
         dates: [], submittedNicknames: []
       )
     self.resultError = resultError
+    self.subsequentResultError = subsequentResultError
     self.lookupResponse = lookupResponse
     self.submitResponse = submitResponse
     self.submitError = submitError
@@ -173,6 +191,7 @@ private final class VoteRoomRepositoryStub: VoteRepository {
   func fetchVoteResult(publicId _: UUID) async throws -> VoteResultResponseDTO {
     fetchResultCount += 1
     if let resultError { throw resultError }
+    if fetchResultCount > 1, let subsequentResultError { throw subsequentResultError }
     return resultResponse
   }
 

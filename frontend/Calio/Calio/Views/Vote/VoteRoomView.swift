@@ -128,6 +128,14 @@ struct VoteRoomView: View {
         .multilineTextAlignment(.center)
         .padding(.horizontal, 24)
 
+      if viewModel.resultRefreshFailure != nil {
+        Text("최신 결과를 불러오지 못해 이전 결과를 표시하고 있습니다.")
+          .font(.footnote)
+          .foregroundStyle(.calioTextSecondary)
+          .multilineTextAlignment(.center)
+          .padding(.horizontal, 24)
+      }
+
       if let room = viewModel.room {
         VoteRoomCalendarGrid(
           room: room,
@@ -457,6 +465,12 @@ private struct VoteRoomCalendarGrid: View {
     .buttonStyle(.plain)
     .disabled(!isCandidateDay)
     .accessibilityLabel(accessibilityLabel(for: day, result: result))
+    .accessibilityValue(
+      isEditing ? (selectedDays.contains(day) ? "선택됨" : "선택 안 됨") : ""
+    )
+    .accessibilityAddTraits(
+      isEditing && selectedDays.contains(day) ? .isSelected : []
+    )
     .popover(
       item: popoverResult(for: day),
       attachmentAnchor: .rect(.bounds),
