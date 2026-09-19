@@ -1,6 +1,8 @@
 package com.calio.calendar.account.domain;
 
 import com.calio.calendar.common.domain.BaseEntity;
+import com.calio.calendar.common.error.CalioException;
+import com.calio.calendar.common.error.ErrorCode;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -15,64 +17,69 @@ import java.time.Instant;
 
 @Entity
 @Table(
-        name = "account_auth_tokens",
-        uniqueConstraints = {
-                @UniqueConstraint(name = "uk_account_auth_tokens_token_hash", columnNames = "token_hash"),
-                @UniqueConstraint(name = "uk_account_auth_tokens_account_id", columnNames = "account_id")
-        }
-)
+    name = "account_auth_tokens",
+    uniqueConstraints = {
+      @UniqueConstraint(name = "uk_account_auth_tokens_token_hash", columnNames = "token_hash"),
+      @UniqueConstraint(name = "uk_account_auth_tokens_account_id", columnNames = "account_id")
+    })
 public class AccountAuthToken extends BaseEntity {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "account_id", nullable = false)
-    private Account account;
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "account_id", nullable = false)
+  private Account account;
 
-    @Column(name = "token_hash", nullable = false, length = 64)
-    private String tokenHash;
+  @Column(name = "token_hash", nullable = false, length = 64)
+  private String tokenHash;
 
-    @Column(name = "revoked_at")
-    private Instant revokedAt;
+  @Column(name = "revoked_at")
+  private Instant revokedAt;
 
-    @Column(name = "last_used_at")
-    private Instant lastUsedAt;
+  @Column(name = "last_used_at")
+  private Instant lastUsedAt;
 
-    protected AccountAuthToken() {
+  protected AccountAuthToken() {}
+
+  public AccountAuthToken(Account account, String tokenHash) {
+    this.account = account;
+    this.tokenHash = tokenHash;
+  }
+
+  public void markUsedAt(Instant usedAt) {
+    this.lastUsedAt = usedAt;
+  }
+
+  public void authenticate(Instant usedAt) {
+    if (revokedAt != null) {
+      throw new CalioException(ErrorCode.AUTH_TOKEN_REVOKED);
     }
+    markUsedAt(usedAt);
+  }
 
-    public AccountAuthToken(Account account, String tokenHash) {
-        this.account = account;
-        this.tokenHash = tokenHash;
-    }
+  public void revoke(Instant revokedAt) {
+    this.revokedAt = revokedAt;
+  }
 
-    public void markUsedAt(Instant usedAt) {
-        this.lastUsedAt = usedAt;
-    }
+  public Long getId() {
+    return id;
+  }
 
-    public void revoke(Instant revokedAt) {
-        this.revokedAt = revokedAt;
-    }
+  public Long getAccountId() {
+    return account.getId();
+  }
 
-    public Long getId() {
-        return id;
-    }
+  public String getTokenHash() {
+    return tokenHash;
+  }
 
-    public Long getAccountId() {
-        return account.getId();
-    }
+  public Instant getRevokedAt() {
+    return revokedAt;
+  }
 
-    public String getTokenHash() {
-        return tokenHash;
-    }
-
-    public Instant getRevokedAt() {
-        return revokedAt;
-    }
-
-    public Instant getLastUsedAt() {
-        return lastUsedAt;
-    }
+  public Instant getLastUsedAt() {
+    return lastUsedAt;
+  }
 }
