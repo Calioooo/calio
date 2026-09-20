@@ -542,13 +542,17 @@ public class GoogleCalendarRecurrenceJobHandler {
   }
 
   private void markInactiveRecurrenceEventMappingsLocalChanged(GoogleCalendarRecurrenceJob job) {
-    mappingCommandService.markInactiveRecurrenceEventMappingsLocalChanged(
-        job.getIntegrationId(), job.getRecurrenceEventId());
+    mappingQueryService
+        .listInactiveAndUnchangedRecurrenceEventMappings(
+            job.getIntegrationId(), job.getRecurrenceEventId())
+        .forEach(GoogleCalendarRecurrenceEventMapping::markLocalChanged);
   }
 
   private void markInactiveOverrideMappingsLocalChanged(GoogleCalendarRecurrenceJob job) {
-    mappingCommandService.markInactiveOverrideMappingsLocalChanged(
-        job.getIntegrationId(), job.getRecurrenceEventId(), job.getOriginStartAt());
+    mappingQueryService
+        .listInactiveAndUnchangedOverrideMappings(
+            job.getIntegrationId(), job.getRecurrenceEventId(), job.getOriginStartAt())
+        .forEach(GoogleCalendarRecurrenceOverrideMapping::markLocalChanged);
   }
 
   private GoogleRecurrenceJobPayload readRecurrenceSnapshot(GoogleCalendarRecurrenceJob job) {

@@ -4,7 +4,6 @@ import com.calio.calendar.integration.mapping.domain.GoogleCalendarRecurrenceEve
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarRecurrenceOverrideMapping;
 import com.calio.calendar.integration.mapping.repository.GoogleCalendarRecurrenceEventMappingRepository;
 import com.calio.calendar.integration.mapping.repository.GoogleCalendarRecurrenceOverrideMappingRepository;
-import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import org.springframework.stereotype.Service;
@@ -62,18 +61,4 @@ public class GoogleCalendarRecurrenceMappingCommandService {
     recurrenceMappingRepository.flush();
   }
 
-  public void markInactiveRecurrenceEventMappingsLocalChanged(
-      Long integrationId, Long recurrenceEventId) {
-    recurrenceMappingRepository
-        .findAllInactiveAndUnchangedByIntegrationIdAndRecurrenceEventId(
-            integrationId, recurrenceEventId)
-        .forEach(GoogleCalendarRecurrenceEventMapping::markLocalChanged);
-  }
-
-  public void markInactiveOverrideMappingsLocalChanged(
-      Long integrationId, Long recurrenceEventId, Instant originStartAt) {
-    overrideMappingRepository
-        .findAllInactiveAndUnchangedByIdentity(integrationId, recurrenceEventId, originStartAt)
-        .forEach(GoogleCalendarRecurrenceOverrideMapping::markLocalChanged);
-  }
 }

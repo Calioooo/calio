@@ -83,7 +83,7 @@ class GoogleCalendarRecurrenceJobHandlerTest {
 
     handler.execute(job(GoogleCalendarRecurrenceJobKind.RECURRENCE_UPDATE, null), "worker");
 
-    verify(mappingCommands).markInactiveRecurrenceEventMappingsLocalChanged(20L, 40L);
+    verify(mappings).listInactiveAndUnchangedRecurrenceEventMappings(20L, 40L);
     verifyNoInteractions(tokens, client);
     verify(jobs).succeed(50L, 10L, "worker");
   }
@@ -108,7 +108,7 @@ class GoogleCalendarRecurrenceJobHandlerTest {
     handler.execute(job(GoogleCalendarRecurrenceJobKind.RECURRENCE_UPDATE, null), "worker");
 
     assertThat(mapping.getProviderEtag()).isEqualTo("recurrence-event-etag-2");
-    verify(mappingCommands).markInactiveRecurrenceEventMappingsLocalChanged(20L, 40L);
+    verify(mappings).listInactiveAndUnchangedRecurrenceEventMappings(20L, 40L);
     verify(jobs).succeed(50L, 10L, "worker");
   }
 
@@ -210,7 +210,7 @@ class GoogleCalendarRecurrenceJobHandlerTest {
     handler.execute(job(GoogleCalendarRecurrenceJobKind.OVERRIDE_UPSERT, origin()), "worker");
 
     verifyNoInteractions(tokens, client);
-    verify(mappingCommands).markInactiveOverrideMappingsLocalChanged(20L, 40L, origin());
+    verify(mappings).listInactiveAndUnchangedOverrideMappings(20L, 40L, origin());
     verify(jobs).succeed(50L, 10L, "worker");
   }
 
@@ -351,7 +351,7 @@ class GoogleCalendarRecurrenceJobHandlerTest {
     handler.execute(job(GoogleCalendarRecurrenceJobKind.RECURRENCE_DELETE, null), "worker");
 
     verify(mappingCommands).deleteRecurrenceAggregateMappings(recurrenceEventMapping);
-    verify(mappingCommands).markInactiveRecurrenceEventMappingsLocalChanged(20L, 40L);
+    verify(mappings).listInactiveAndUnchangedRecurrenceEventMappings(20L, 40L);
   }
 
   @Test
@@ -359,7 +359,7 @@ class GoogleCalendarRecurrenceJobHandlerTest {
   void deleteWithoutConnectedRecurrenceEventRetainsInactiveIdentity() {
     handler.execute(job(GoogleCalendarRecurrenceJobKind.RECURRENCE_DELETE, null), "worker");
 
-    verify(mappingCommands).markInactiveRecurrenceEventMappingsLocalChanged(20L, 40L);
+    verify(mappings).listInactiveAndUnchangedRecurrenceEventMappings(20L, 40L);
     verify(mappingCommands, never()).deleteRecurrenceAggregateMappings(any());
     verifyNoInteractions(tokens, client);
   }
