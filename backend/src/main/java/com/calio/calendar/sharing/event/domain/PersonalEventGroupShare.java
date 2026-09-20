@@ -1,8 +1,8 @@
 package com.calio.calendar.sharing.event.domain;
 
 import com.calio.calendar.common.domain.BaseEntity;
-import com.calio.calendar.singleevent.domain.SingleEvent;
 import com.calio.calendar.groupspace.domain.GroupSpace;
+import com.calio.calendar.singleevent.domain.SingleEvent;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -19,62 +19,58 @@ import org.hibernate.annotations.JdbcTypeCode;
 
 @Entity
 @Table(
-        name = "personal_event_group_shares",
-        uniqueConstraints = {
-                @UniqueConstraint(
-                        name = "uk_personal_event_group_share",
-                        columnNames = {"event_id", "group_space_id"}
-                ),
-                @UniqueConstraint(
-                        name = "uk_personal_event_group_share_public_id",
-                        columnNames = "public_share_id"
-                )
-        }
-)
+    name = "personal_event_group_shares",
+    uniqueConstraints = {
+      @UniqueConstraint(
+          name = "uk_personal_event_group_share",
+          columnNames = {"event_id", "group_space_id"}),
+      @UniqueConstraint(
+          name = "uk_personal_event_group_share_public_id",
+          columnNames = "public_share_id")
+    })
 public class PersonalEventGroupShare extends BaseEntity {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "event_id", nullable = false)
-    private SingleEvent event;
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "event_id", nullable = false)
+  private SingleEvent event;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "group_space_id", nullable = false)
-    private GroupSpace groupSpace;
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "group_space_id", nullable = false)
+  private GroupSpace groupSpace;
 
-    @JdbcTypeCode(Types.VARCHAR)
-    @Column(name = "public_share_id", nullable = false, updatable = false, length = 36)
-    private UUID publicShareId;
+  @JdbcTypeCode(Types.VARCHAR)
+  @Column(name = "public_share_id", nullable = false, updatable = false, length = 36)
+  private UUID publicShareId;
 
-    protected PersonalEventGroupShare() {
-    }
+  protected PersonalEventGroupShare() {}
 
-    private PersonalEventGroupShare(SingleEvent event, GroupSpace groupSpace, UUID publicShareId) {
-        this.event = event;
-        this.groupSpace = groupSpace;
-        this.publicShareId = publicShareId;
-    }
+  private PersonalEventGroupShare(SingleEvent event, GroupSpace groupSpace, UUID publicShareId) {
+    this.event = event;
+    this.groupSpace = groupSpace;
+    this.publicShareId = publicShareId;
+  }
 
-    public static PersonalEventGroupShare create(SingleEvent event, GroupSpace groupSpace) {
-        return new PersonalEventGroupShare(event, groupSpace, UUID.randomUUID());
-    }
+  public static PersonalEventGroupShare create(SingleEvent event, GroupSpace groupSpace) {
+    return new PersonalEventGroupShare(event, groupSpace, UUID.randomUUID());
+  }
 
-    public Long getId() {
-        return id;
-    }
+  public Long getId() {
+    return id;
+  }
 
-    public SingleEvent getEvent() {
-        return event;
-    }
+  public SingleEvent getEvent() {
+    return event;
+  }
 
-    public GroupSpace getGroupSpace() {
-        return groupSpace;
-    }
+  public GroupSpace getGroupSpace() {
+    return groupSpace;
+  }
 
-    public UUID getPublicShareId() {
-        return publicShareId;
-    }
+  public UUID getPublicShareId() {
+    return publicShareId;
+  }
 }

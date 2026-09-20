@@ -10,53 +10,59 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-public interface PersonalEventGroupShareRepository extends JpaRepository<PersonalEventGroupShare, Long> {
+public interface PersonalEventGroupShareRepository
+    extends JpaRepository<PersonalEventGroupShare, Long> {
 
-    Optional<PersonalEventGroupShare> findByEvent_IdAndGroupSpace_Id(Long eventId, Long groupSpaceId);
+  Optional<PersonalEventGroupShare> findByEvent_IdAndGroupSpace_Id(Long eventId, Long groupSpaceId);
 
-    @EntityGraph(attributePaths = {"event", "groupSpace"})
-    @Query("""
+  @EntityGraph(attributePaths = {"event", "groupSpace"})
+  @Query(
+      """
             select share
             from PersonalEventGroupShare share
             where share.event.id in :eventIds
               and share.groupSpace.id in :groupSpaceIds
             """)
-    List<PersonalEventGroupShare> findAllByEventIdsAndGroupSpaceIds(
-            @Param("eventIds") Collection<Long> eventIds,
-            @Param("groupSpaceIds") Collection<Long> groupSpaceIds
-    );
+  List<PersonalEventGroupShare> findAllByEventIdsAndGroupSpaceIds(
+      @Param("eventIds") Collection<Long> eventIds,
+      @Param("groupSpaceIds") Collection<Long> groupSpaceIds);
 
-    @EntityGraph(attributePaths = {"event", "groupSpace"})
-    @Query("""
+  @EntityGraph(attributePaths = {"event", "groupSpace"})
+  @Query(
+      """
             select share
             from PersonalEventGroupShare share
             where share.groupSpace.id = :groupSpaceId
             """)
-    List<PersonalEventGroupShare> findAllByGroupSpaceId(@Param("groupSpaceId") Long groupSpaceId);
+  List<PersonalEventGroupShare> findAllByGroupSpaceId(@Param("groupSpaceId") Long groupSpaceId);
 
-    @Modifying
-    @Query("""
+  @Modifying
+  @Query(
+      """
             delete from PersonalEventGroupShare share
             where share.event.id = :eventId
             """)
-    void deleteAllByEventId(@Param("eventId") Long eventId);
+  void deleteAllByEventId(@Param("eventId") Long eventId);
 
-    @Modifying
-    @Query("""
+  @Modifying
+  @Query(
+      """
             delete from PersonalEventGroupShare share
             where share.event.id in :eventIds
             """)
-    void deleteAllByEventIds(@Param("eventIds") Collection<Long> eventIds);
+  void deleteAllByEventIds(@Param("eventIds") Collection<Long> eventIds);
 
-    @Modifying
-    @Query("""
+  @Modifying
+  @Query(
+      """
             delete from PersonalEventGroupShare share
             where share.groupSpace.id = :groupSpaceId
             """)
-    void deleteAllByGroupSpaceId(@Param("groupSpaceId") Long groupSpaceId);
+  void deleteAllByGroupSpaceId(@Param("groupSpaceId") Long groupSpaceId);
 
-    @Modifying
-    @Query("""
+  @Modifying
+  @Query(
+      """
             delete from PersonalEventGroupShare share
             where share.groupSpace.id = :groupSpaceId
               and share.event.accountId = (
@@ -65,20 +71,20 @@ public interface PersonalEventGroupShareRepository extends JpaRepository<Persona
                     where member.id = :memberId
               )
             """)
-    void deleteAllByGroupSpaceIdAndMemberId(
-            @Param("groupSpaceId") Long groupSpaceId,
-            @Param("memberId") Long memberId
-    );
+  void deleteAllByGroupSpaceIdAndMemberId(
+      @Param("groupSpaceId") Long groupSpaceId, @Param("memberId") Long memberId);
 
-    @Modifying
-    @Query(value = """
+  @Modifying
+  @Query(
+      value =
+          """
             insert ignore into personal_event_group_shares
                 (event_id, group_space_id, public_share_id, created_at, updated_at)
             values (:eventId, :groupSpaceId, :publicShareId, current_timestamp(6), current_timestamp(6))
-            """, nativeQuery = true)
-    int insertIgnore(
-            @Param("eventId") Long eventId,
-            @Param("groupSpaceId") Long groupSpaceId,
-            @Param("publicShareId") String publicShareId
-    );
+            """,
+      nativeQuery = true)
+  int insertIgnore(
+      @Param("eventId") Long eventId,
+      @Param("groupSpaceId") Long groupSpaceId,
+      @Param("publicShareId") String publicShareId);
 }

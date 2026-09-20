@@ -7,14 +7,13 @@ import jakarta.persistence.Embeddable;
 
 @Embeddable
 public record SingleEventTitle(
-        @Column(name = "title", nullable = false, length = SingleEventTitle.MAX_LENGTH) String value
-) {
+    @Column(name = "title", nullable = false, length = SingleEventTitle.MAX_LENGTH) String value) {
 
-    public static final int MAX_LENGTH = 255;
+  public static final int MAX_LENGTH = 255;
 
-    public SingleEventTitle {
-        if (value == null || value.length() > MAX_LENGTH) {
-            throw new CalioException(ErrorCode.INVALID_EVENT_TITLE);
-        }
+  public SingleEventTitle {
+    if (value == null || value.length() > MAX_LENGTH) {
+      throw new CalioException(ErrorCode.INVALID_EVENT_TITLE);
     }
+  }
 }

@@ -10,33 +10,33 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class PersonalEventGroupShareCommandService {
 
-    private final PersonalEventGroupShareRepository shareRepository;
+  private final PersonalEventGroupShareRepository shareRepository;
 
-    public PersonalEventGroupShareCommandService(PersonalEventGroupShareRepository shareRepository) {
-        this.shareRepository = shareRepository;
-    }
+  public PersonalEventGroupShareCommandService(PersonalEventGroupShareRepository shareRepository) {
+    this.shareRepository = shareRepository;
+  }
 
-    public void deleteAllForSourceEvent(Long eventId) {
-        shareRepository.deleteAllByEventId(eventId);
-    }
+  public void deleteAllForSourceEvent(Long eventId) {
+    shareRepository.deleteAllByEventId(eventId);
+  }
 
-    public void deleteAllForSourceEvents(Collection<Long> eventIds) {
-        shareRepository.deleteAllByEventIds(eventIds);
-    }
+  public void deleteAllForSourceEvents(Collection<Long> eventIds) {
+    shareRepository.deleteAllByEventIds(eventIds);
+  }
 
-    public void deleteAllForGroupSpace(Long groupSpaceId) {
-        shareRepository.deleteAllByGroupSpaceId(groupSpaceId);
-    }
+  public void deleteAllForGroupSpace(Long groupSpaceId) {
+    shareRepository.deleteAllByGroupSpaceId(groupSpaceId);
+  }
 
-    public void deleteAllForMemberInGroupSpace(Long groupSpaceId, Long memberId) {
-        shareRepository.deleteAllByGroupSpaceIdAndMemberId(groupSpaceId, memberId);
-    }
+  public void deleteAllForMemberInGroupSpace(Long groupSpaceId, Long memberId) {
+    shareRepository.deleteAllByGroupSpaceIdAndMemberId(groupSpaceId, memberId);
+  }
 
-    public boolean createIfAbsent(PersonalEventGroupShare share) {
-        return shareRepository.insertIgnore(
-                share.getEvent().getId(),
-                share.getGroupSpace().getId(),
-                share.getPublicShareId().toString()
-        ) == 1;
-    }
+  public boolean createIfAbsent(PersonalEventGroupShare share) {
+    return shareRepository.insertIgnore(
+            share.getEvent().getId(),
+            share.getGroupSpace().getId(),
+            share.getPublicShareId().toString())
+        == 1;
+  }
 }

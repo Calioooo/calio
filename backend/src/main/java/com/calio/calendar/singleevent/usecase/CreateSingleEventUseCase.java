@@ -17,32 +17,34 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class CreateSingleEventUseCase {
 
-    private final AccountRepository accountRepository;
-    private final SingleEventRepository eventRepository;
-    private final TagQueryService tagQueryService;
+  private final AccountRepository accountRepository;
+  private final SingleEventRepository eventRepository;
+  private final TagQueryService tagQueryService;
 
-    public CreateSingleEventUseCase(
-            AccountRepository accountRepository,
-            SingleEventRepository eventRepository,
-            TagQueryService tagQueryService
-    ) {
-        this.accountRepository = accountRepository;
-        this.eventRepository = eventRepository;
-        this.tagQueryService = tagQueryService;
-    }
+  public CreateSingleEventUseCase(
+      AccountRepository accountRepository,
+      SingleEventRepository eventRepository,
+      TagQueryService tagQueryService) {
+    this.accountRepository = accountRepository;
+    this.eventRepository = eventRepository;
+    this.tagQueryService = tagQueryService;
+  }
 
-    @Transactional
-    public EventResponse create(Long accountId, CreateSingleEventRequest request) {
-        accountRepository.findById(accountId)
-                .orElseThrow(() -> new CalioException(ErrorCode.ACCOUNT_NOT_FOUND));
-        Tag tag = tagQueryService.getTagOrDefault(accountId, request.tagId());
-        SingleEvent event = eventRepository.save(new SingleEvent(
+  @Transactional
+  public EventResponse create(Long accountId, CreateSingleEventRequest request) {
+    accountRepository
+        .findById(accountId)
+        .orElseThrow(() -> new CalioException(ErrorCode.ACCOUNT_NOT_FOUND));
+    Tag tag = tagQueryService.getTagOrDefault(accountId, request.tagId());
+    SingleEvent event =
+        eventRepository.save(
+            new SingleEvent(
                 new SingleEventTitle(request.title()),
                 request.description(),
-                new SingleEventSchedule(request.startAt(), request.endAt(), request.allDay(), request.timeZone()),
+                new SingleEventSchedule(
+                    request.startAt(), request.endAt(), request.allDay(), request.timeZone()),
                 tag.getId(),
-                accountId
-        ));
-        return EventResponse.from(event, tag);
-    }
+                accountId));
+    return EventResponse.from(event, tag);
+  }
 }

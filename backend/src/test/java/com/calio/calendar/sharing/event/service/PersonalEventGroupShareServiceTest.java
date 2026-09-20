@@ -10,14 +10,14 @@ import static org.mockito.Mockito.when;
 
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
-import com.calio.calendar.singleevent.domain.SingleEvent;
-import com.calio.calendar.singleevent.repository.SingleEventRepository;
 import com.calio.calendar.groupspace.domain.GroupMember;
 import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.service.GroupMembershipQueryService;
 import com.calio.calendar.sharing.controller.dto.GroupShareTargetStatus;
 import com.calio.calendar.sharing.event.controller.dto.CreateEventGroupSharesRequest;
 import com.calio.calendar.sharing.event.controller.dto.CreateEventGroupSharesResponse;
+import com.calio.calendar.singleevent.domain.SingleEvent;
+import com.calio.calendar.singleevent.repository.SingleEventRepository;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -25,93 +25,98 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 class PersonalEventGroupShareServiceTest {
 
-    private final SingleEventRepository eventRepository = mock(SingleEventRepository.class);
-    private final GroupMembershipQueryService membershipQueryService = mock(GroupMembershipQueryService.class);
-    private final PersonalEventGroupShareQueryService shareQueryService = mock(
-            PersonalEventGroupShareQueryService.class
-    );
-    private final PersonalEventGroupShareCommandService shareCommandService = mock(
-            PersonalEventGroupShareCommandService.class
-    );
-    private final PersonalEventGroupShareService service = new PersonalEventGroupShareService(
-            eventRepository,
-            membershipQueryService,
-            shareQueryService,
-            shareCommandService
-    );
+  private final SingleEventRepository eventRepository = mock(SingleEventRepository.class);
+  private final GroupMembershipQueryService membershipQueryService =
+      mock(GroupMembershipQueryService.class);
+  private final PersonalEventGroupShareQueryService shareQueryService =
+      mock(PersonalEventGroupShareQueryService.class);
+  private final PersonalEventGroupShareCommandService shareCommandService =
+      mock(PersonalEventGroupShareCommandService.class);
+  private final PersonalEventGroupShareService service =
+      new PersonalEventGroupShareService(
+          eventRepository, membershipQueryService, shareQueryService, shareCommandService);
 
-    @Test
-    @DisplayName("유효 대상은 공유하고 비활성 대상은 전체 실패 없이 NOT_ELIGIBLE로 반환한다")
-    void createPartiallySucceedsForActiveMembershipsOnly() {
-        SingleEvent event = event(1L);
-        GroupSpace activeGroup = groupSpace(10L);
-        when(eventRepository.findAllShareableByIdsAndAccountId(List.of(1L), 100L)).thenReturn(List.of(event));
-        when(membershipQueryService.listActiveMemberships(100L, List.of(10L, 20L)))
-                .thenReturn(List.of(member(activeGroup)));
-        when(shareQueryService.listExistingShares(List.of(1L), List.of(10L, 20L))).thenReturn(List.of());
-        when(shareCommandService.createIfAbsent(any())).thenReturn(true);
+  @Test
+  @DisplayName("유효 대상은 공유하고 비활성 대상은 전체 실패 없이 NOT_ELIGIBLE로 반환한다")
+  void createPartiallySucceedsForActiveMembershipsOnly() {
+    SingleEvent event = event(1L);
+    GroupSpace activeGroup = groupSpace(10L);
+    when(eventRepository.findAllShareableByIdsAndAccountId(List.of(1L), 100L))
+        .thenReturn(List.of(event));
+    when(membershipQueryService.listActiveMemberships(100L, List.of(10L, 20L)))
+        .thenReturn(List.of(member(activeGroup)));
+    when(shareQueryService.listExistingShares(List.of(1L), List.of(10L, 20L)))
+        .thenReturn(List.of());
+    when(shareCommandService.createIfAbsent(any())).thenReturn(true);
 
-        CreateEventGroupSharesResponse response = service.create(100L, new CreateEventGroupSharesRequest(
-                List.of(1L, 1L), List.of(10L, 20L, 20L)
-        ));
+    CreateEventGroupSharesResponse response =
+        service.create(
+            100L, new CreateEventGroupSharesRequest(List.of(1L, 1L), List.of(10L, 20L, 20L)));
 
-        assertThat(response.results()).hasSize(1);
-        assertThat(response.results().getFirst().targets())
-                .extracting(target -> target.groupSpaceId() + ":" + target.status())
-                .containsExactly("10:SHARED", "20:NOT_ELIGIBLE");
-        verify(shareCommandService).createIfAbsent(any());
-    }
+    assertThat(response.results()).hasSize(1);
+    assertThat(response.results().getFirst().targets())
+        .extracting(target -> target.groupSpaceId() + ":" + target.status())
+        .containsExactly("10:SHARED", "20:NOT_ELIGIBLE");
+    verify(shareCommandService).createIfAbsent(any());
+  }
 
-    @Test
-    @DisplayName("소유하지 않았거나 없는 일정은 대상 처리 전에 전체 요청을 거절한다")
-    void createRejectsInvalidSourceBeforeTargetProcessing() {
-        SingleEvent ownedEvent = event(1L);
-        when(eventRepository.findAllShareableByIdsAndAccountId(List.of(1L, 2L), 100L)).thenReturn(List.of(ownedEvent));
+  @Test
+  @DisplayName("소유하지 않았거나 없는 일정은 대상 처리 전에 전체 요청을 거절한다")
+  void createRejectsInvalidSourceBeforeTargetProcessing() {
+    SingleEvent ownedEvent = event(1L);
+    when(eventRepository.findAllShareableByIdsAndAccountId(List.of(1L, 2L), 100L))
+        .thenReturn(List.of(ownedEvent));
 
-        assertThatThrownBy(() -> service.create(100L, new CreateEventGroupSharesRequest(
-                List.of(1L, 2L), List.of(10L)
-        ))).isInstanceOfSatisfying(CalioException.class, exception ->
-                assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.EVENT_NOT_FOUND)
-        );
-        verifyNoInteractions(membershipQueryService, shareQueryService, shareCommandService);
-    }
+    assertThatThrownBy(
+            () ->
+                service.create(
+                    100L, new CreateEventGroupSharesRequest(List.of(1L, 2L), List.of(10L))))
+        .isInstanceOfSatisfying(
+            CalioException.class,
+            exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.EVENT_NOT_FOUND));
+    verifyNoInteractions(membershipQueryService, shareQueryService, shareCommandService);
+  }
 
-    @Test
-    @DisplayName("기존 mapping과 동시 중복 insert는 모두 ALREADY_SHARED로 반환한다")
-    void createTreatsExistingAndConcurrentMappingsAsIdempotentSuccess() {
-        SingleEvent event = event(1L);
-        GroupSpace firstGroup = groupSpace(10L);
-        GroupSpace secondGroup = groupSpace(20L);
-        when(eventRepository.findAllShareableByIdsAndAccountId(List.of(1L), 100L)).thenReturn(List.of(event));
-        when(membershipQueryService.listActiveMemberships(100L, List.of(10L, 20L)))
-                .thenReturn(List.of(member(firstGroup), member(secondGroup)));
-        when(shareQueryService.listExistingShares(List.of(1L), List.of(10L, 20L))).thenReturn(List.of(
-                com.calio.calendar.sharing.event.domain.PersonalEventGroupShare.create(event, firstGroup)
-        ));
-        when(shareCommandService.createIfAbsent(any())).thenReturn(false);
+  @Test
+  @DisplayName("기존 mapping과 동시 중복 insert는 모두 ALREADY_SHARED로 반환한다")
+  void createTreatsExistingAndConcurrentMappingsAsIdempotentSuccess() {
+    SingleEvent event = event(1L);
+    GroupSpace firstGroup = groupSpace(10L);
+    GroupSpace secondGroup = groupSpace(20L);
+    when(eventRepository.findAllShareableByIdsAndAccountId(List.of(1L), 100L))
+        .thenReturn(List.of(event));
+    when(membershipQueryService.listActiveMemberships(100L, List.of(10L, 20L)))
+        .thenReturn(List.of(member(firstGroup), member(secondGroup)));
+    when(shareQueryService.listExistingShares(List.of(1L), List.of(10L, 20L)))
+        .thenReturn(
+            List.of(
+                com.calio.calendar.sharing.event.domain.PersonalEventGroupShare.create(
+                    event, firstGroup)));
+    when(shareCommandService.createIfAbsent(any())).thenReturn(false);
 
-        CreateEventGroupSharesResponse response = service.create(100L, new CreateEventGroupSharesRequest(
-                List.of(1L), List.of(10L, 20L)
-        ));
+    CreateEventGroupSharesResponse response =
+        service.create(100L, new CreateEventGroupSharesRequest(List.of(1L), List.of(10L, 20L)));
 
-        assertThat(response.results().getFirst().targets())
-                .extracting(target -> target.status())
-                .containsExactly(GroupShareTargetStatus.ALREADY_SHARED, GroupShareTargetStatus.ALREADY_SHARED);
-    }
+    assertThat(response.results().getFirst().targets())
+        .extracting(target -> target.status())
+        .containsExactly(
+            GroupShareTargetStatus.ALREADY_SHARED, GroupShareTargetStatus.ALREADY_SHARED);
+  }
 
-    private SingleEvent event(Long id) {
-        SingleEvent event = mock(SingleEvent.class);
-        when(event.getId()).thenReturn(id);
-        return event;
-    }
+  private SingleEvent event(Long id) {
+    SingleEvent event = mock(SingleEvent.class);
+    when(event.getId()).thenReturn(id);
+    return event;
+  }
 
-    private GroupSpace groupSpace(Long id) {
-        GroupSpace groupSpace = new GroupSpace(100L, "group", null);
-        ReflectionTestUtils.setField(groupSpace, "id", id);
-        return groupSpace;
-    }
+  private GroupSpace groupSpace(Long id) {
+    GroupSpace groupSpace = new GroupSpace(100L, "group", null);
+    ReflectionTestUtils.setField(groupSpace, "id", id);
+    return groupSpace;
+  }
 
-    private GroupMember member(GroupSpace groupSpace) {
-        return new GroupMember(groupSpace, 100L, "member", java.time.Instant.parse("2026-08-01T00:00:00Z"));
-    }
+  private GroupMember member(GroupSpace groupSpace) {
+    return new GroupMember(
+        groupSpace, 100L, "member", java.time.Instant.parse("2026-08-01T00:00:00Z"));
+  }
 }
