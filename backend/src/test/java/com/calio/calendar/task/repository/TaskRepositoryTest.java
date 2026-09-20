@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
+import com.calio.calendar.common.testsupport.SharedIntegrationDatabase;
 import com.calio.calendar.task.domain.Task;
 import com.calio.calendar.task.domain.TaskTitle;
 import java.time.Instant;
@@ -18,12 +19,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest(
     properties = {
-      "spring.datasource.url=jdbc:h2:mem:calendar-task-repository-test;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE",
+      "spring.datasource.url=jdbc:h2:mem:calendar-shared-integration-test;MODE=MySQL;DB_CLOSE_ON_EXIT=FALSE",
       "spring.datasource.driver-class-name=org.h2.Driver",
       "spring.datasource.username=sa",
       "spring.datasource.password=",
       "spring.jpa.hibernate.ddl-auto=create-drop"
     })
+@SharedIntegrationDatabase
 class TaskRepositoryTest {
 
   @Autowired private TaskRepository taskRepository;
