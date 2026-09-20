@@ -3,6 +3,7 @@ package com.calio.calendar.vote.domain;
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.common.domain.BaseEntity;
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -28,11 +29,8 @@ public class VoteRoom extends BaseEntity {
     @Column(nullable = false)
     private String name;
 
-    @Column(name = "candidate_start_date", nullable = false)
-    private LocalDate candidateStartDate;
-
-    @Column(name = "candidate_end_date", nullable = false)
-    private LocalDate candidateEndDate;
+    @Embedded
+    private VoteCandidateDateRange candidateDateRange;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by_account_id")
@@ -42,17 +40,30 @@ public class VoteRoom extends BaseEntity {
     }
 
     public VoteRoom(UUID publicId, String name, LocalDate candidateStartDate, LocalDate candidateEndDate, Account createdByAccount) {
+        this(
+                publicId,
+                name,
+                VoteCandidateDateRange.of(candidateStartDate, candidateEndDate),
+                createdByAccount
+        );
+    }
+
+    public VoteRoom(
+            UUID publicId,
+            String name,
+            VoteCandidateDateRange candidateDateRange,
+            Account createdByAccount) {
         this.publicId = publicId;
         this.name = name;
-        this.candidateStartDate = candidateStartDate;
-        this.candidateEndDate = candidateEndDate;
+        this.candidateDateRange = candidateDateRange;
         this.createdByAccount = createdByAccount;
     }
 
     public Long getId() { return id; }
     public UUID getPublicId() { return publicId; }
     public String getName() { return name; }
-    public LocalDate getCandidateStartDate() { return candidateStartDate; }
-    public LocalDate getCandidateEndDate() { return candidateEndDate; }
+    public LocalDate getCandidateStartDate() { return candidateDateRange.candidateStartDate(); }
+    public LocalDate getCandidateEndDate() { return candidateDateRange.candidateEndDate(); }
+    public VoteCandidateDateRange getCandidateDateRange() { return candidateDateRange; }
     public Account getCreatedByAccount() { return createdByAccount; }
 }

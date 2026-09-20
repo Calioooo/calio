@@ -6,7 +6,6 @@ import com.calio.calendar.vote.controller.dto.VoteSubmissionResponse;
 import com.calio.calendar.vote.domain.Vote;
 import com.calio.calendar.vote.domain.VoteParticipant;
 import com.calio.calendar.vote.domain.VoteParticipantNickname;
-import com.calio.calendar.vote.domain.VoteRoom;
 import com.calio.calendar.vote.repository.VoteParticipantRepository;
 import com.calio.calendar.vote.repository.VoteRepository;
 import java.time.LocalDate;
@@ -48,7 +47,10 @@ public class SubmitVoteUseCase {
             .findByVoteRoomPublicIdAndNicknameForUpdate(voteRoomPublicId, normalizedNickname.value())
             .orElseThrow(() -> new CalioException(ErrorCode.VOTE_PARTICIPANT_CREDENTIAL_INVALID));
     List<LocalDate> unavailableDates = normalizeDates(requestedDates);
-    requireDatesInCandidateRange(lockedParticipant.getVoteRoom(), unavailableDates);
+    if (unavailableDates.stream()
+        .anyMatch(date -> !lockedParticipant.getVoteRoom().getCandidateDateRange().contains(date))) {
+      throw new CalioException(ErrorCode.VALIDATION_FAILED);
+    }
     voteRepository.deleteAllByVoteParticipantId(lockedParticipant.getId());
     voteRepository.saveAll(
         unavailableDates.stream().map(date -> new Vote(lockedParticipant, date)).toList());
@@ -67,13 +69,4 @@ public class SubmitVoteUseCase {
     return new LinkedHashSet<>(requestedDates).stream().sorted().toList();
   }
 
-  private void requireDatesInCandidateRange(VoteRoom voteRoom, List<LocalDate> unavailableDates) {
-    if (unavailableDates.stream()
-        .anyMatch(
-            date ->
-                date.isBefore(voteRoom.getCandidateStartDate())
-                    || date.isAfter(voteRoom.getCandidateEndDate()))) {
-      throw new CalioException(ErrorCode.VALIDATION_FAILED);
-    }
-  }
 }

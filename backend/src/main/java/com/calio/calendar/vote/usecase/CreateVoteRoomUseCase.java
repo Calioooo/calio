@@ -5,6 +5,7 @@ import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.vote.controller.dto.VoteRoomResponse;
+import com.calio.calendar.vote.domain.VoteCandidateDateRange;
 import com.calio.calendar.vote.domain.VoteRoom;
 import com.calio.calendar.vote.repository.VoteRoomRepository;
 import java.time.Clock;
@@ -18,8 +19,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class CreateVoteRoomUseCase {
 
   private static final ZoneId KOREA_ZONE = ZoneId.of("Asia/Seoul");
-  private static final int MAX_CANDIDATE_DAYS = 31;
-
   private final AccountRepository accountRepository;
   private final VoteRoomRepository voteRoomRepository;
   private final Clock clock;
@@ -34,21 +33,16 @@ public class CreateVoteRoomUseCase {
   @Transactional
   public VoteRoomResponse create(Long accountId, String name, LocalDate candidateEndDate) {
     LocalDate candidateStartDate = LocalDate.now(clock.withZone(KOREA_ZONE));
-    requireCandidateEndDate(candidateStartDate, candidateEndDate);
+    VoteCandidateDateRange candidateDateRange =
+        VoteCandidateDateRange.of(candidateStartDate, candidateEndDate);
     Account account =
         accountRepository
             .findById(accountId)
             .orElseThrow(() -> new CalioException(ErrorCode.ACCOUNT_NOT_FOUND));
     VoteRoom voteRoom =
         voteRoomRepository.save(
-            new VoteRoom(UUID.randomUUID(), name, candidateStartDate, candidateEndDate, account));
+            new VoteRoom(UUID.randomUUID(), name, candidateDateRange, account));
     return VoteRoomResponse.from(voteRoom);
   }
 
-  private void requireCandidateEndDate(LocalDate candidateStartDate, LocalDate candidateEndDate) {
-    if (candidateEndDate.isBefore(candidateStartDate)
-        || candidateEndDate.isAfter(candidateStartDate.plusDays(MAX_CANDIDATE_DAYS - 1))) {
-      throw new CalioException(ErrorCode.VALIDATION_FAILED);
-    }
-  }
 }

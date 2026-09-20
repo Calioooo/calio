@@ -27,7 +27,7 @@ public interface VoteRoomRepository extends JpaRepository<VoteRoom, Long> {
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""
             delete from VoteRoom voteRoom
-            where voteRoom.candidateEndDate < :cutoffDate
+            where voteRoom.candidateDateRange.candidateEndDate < :cutoffDate
             """)
     int deleteExpiredVoteRoomsBefore(@Param("cutoffDate") LocalDate cutoffDate);
 
