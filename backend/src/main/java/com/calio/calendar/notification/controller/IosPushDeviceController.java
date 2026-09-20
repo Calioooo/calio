@@ -1,7 +1,8 @@
 package com.calio.calendar.notification.controller;
 
 import com.calio.calendar.notification.controller.dto.RegisterIosPushDeviceRequest;
-import com.calio.calendar.notification.service.IosPushDeviceService;
+import com.calio.calendar.notification.usecase.DeactivateIosPushDeviceUseCase;
+import com.calio.calendar.notification.usecase.RegisterIosPushDeviceUseCase;
 import com.calio.calendar.security.AuthenticatedAccount;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -17,24 +18,29 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/notification-endpoints/ios")
 public class IosPushDeviceController {
 
-  private final IosPushDeviceService pushDeviceService;
+  private final RegisterIosPushDeviceUseCase registerIosPushDeviceUseCase;
+  private final DeactivateIosPushDeviceUseCase deactivateIosPushDeviceUseCase;
 
-  public IosPushDeviceController(IosPushDeviceService pushDeviceService) {
-    this.pushDeviceService = pushDeviceService;
+  public IosPushDeviceController(
+      RegisterIosPushDeviceUseCase registerIosPushDeviceUseCase,
+      DeactivateIosPushDeviceUseCase deactivateIosPushDeviceUseCase) {
+    this.registerIosPushDeviceUseCase = registerIosPushDeviceUseCase;
+    this.deactivateIosPushDeviceUseCase = deactivateIosPushDeviceUseCase;
   }
 
   @PutMapping
   public ResponseEntity<Void> register(
       @AuthenticationPrincipal AuthenticatedAccount account,
       @Valid @RequestBody RegisterIosPushDeviceRequest request) {
-    pushDeviceService.register(account.accountId(), request.installationId(), request.apnsToken());
+    registerIosPushDeviceUseCase.execute(
+        account.accountId(), request.installationId(), request.apnsToken());
     return ResponseEntity.noContent().build();
   }
 
   @DeleteMapping("/{installationId}")
   public ResponseEntity<Void> deactivate(
       @AuthenticationPrincipal AuthenticatedAccount account, @PathVariable String installationId) {
-    pushDeviceService.deactivate(account.accountId(), installationId);
+    deactivateIosPushDeviceUseCase.execute(account.accountId(), installationId);
     return ResponseEntity.noContent().build();
   }
 }
