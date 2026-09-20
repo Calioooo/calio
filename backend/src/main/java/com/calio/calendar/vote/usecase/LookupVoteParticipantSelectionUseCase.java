@@ -1,9 +1,9 @@
-package com.calio.calendar.vote.service;
+package com.calio.calendar.vote.usecase;
 
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
-import com.calio.calendar.vote.controller.dto.LookupVoteParticipantSelectionRequest;
 import com.calio.calendar.vote.controller.dto.VoteParticipantSelectionResponse;
+import com.calio.calendar.vote.domain.Vote;
 import com.calio.calendar.vote.domain.VoteParticipant;
 import com.calio.calendar.vote.repository.VoteParticipantRepository;
 import com.calio.calendar.vote.repository.VoteRepository;
@@ -18,8 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@Transactional(readOnly = true)
-public class VoteParticipantSelectionLookupService {
+public class LookupVoteParticipantSelectionUseCase {
 
   private static final Pattern NICKNAME_PATTERN = Pattern.compile("^[A-Za-z0-9가-힣]{1,9}$");
 
@@ -28,7 +27,7 @@ public class VoteParticipantSelectionLookupService {
   private final VoteRepository voteRepository;
   private final PasswordEncoder passwordEncoder;
 
-  public VoteParticipantSelectionLookupService(
+  public LookupVoteParticipantSelectionUseCase(
       VoteRoomRepository voteRoomRepository,
       VoteParticipantRepository voteParticipantRepository,
       VoteRepository voteRepository,
@@ -39,41 +38,33 @@ public class VoteParticipantSelectionLookupService {
     this.passwordEncoder = passwordEncoder;
   }
 
-  public VoteParticipantSelectionResponse lookup(
-      UUID voteRoomPublicId, LookupVoteParticipantSelectionRequest request) {
-    requireVoteRoom(voteRoomPublicId);
-    VoteParticipant participant = getParticipant(voteRoomPublicId, request.nickname());
-    requireValidPassword(participant, request.password());
-    return VoteParticipantSelectionResponse.from(participant, getUnavailableDates(participant));
-  }
-
-  private void requireVoteRoom(UUID voteRoomPublicId) {
+  @Transactional(readOnly = true)
+  public VoteParticipantSelectionResponse lookup(UUID voteRoomPublicId, String nickname, String password) {
     voteRoomRepository
         .findByPublicId(voteRoomPublicId)
         .orElseThrow(() -> new CalioException(ErrorCode.VOTE_ROOM_NOT_FOUND));
-  }
-
-  private VoteParticipant getParticipant(UUID voteRoomPublicId, String nickname) {
-    return voteParticipantRepository
-        .findByVoteRoomPublicIdAndNickname(voteRoomPublicId, normalizeNickname(nickname))
-        .orElseThrow(() -> new CalioException(ErrorCode.VOTE_PARTICIPANT_CREDENTIAL_INVALID));
+    VoteParticipant participant =
+        voteParticipantRepository
+            .findByVoteRoomPublicIdAndNickname(voteRoomPublicId, normalizeNickname(nickname))
+            .orElseThrow(() -> new CalioException(ErrorCode.VOTE_PARTICIPANT_CREDENTIAL_INVALID));
+    requireValidPassword(participant, password);
+    return VoteParticipantSelectionResponse.from(participant, getUnavailableDates(participant));
   }
 
   private String normalizeNickname(String nickname) {
     if (nickname == null) {
       throw new CalioException(ErrorCode.VALIDATION_FAILED);
     }
-    String normalized = Normalizer.normalize(nickname, Normalizer.Form.NFC);
-    if (!NICKNAME_PATTERN.matcher(normalized).matches()) {
+    String normalizedNickname = Normalizer.normalize(nickname, Normalizer.Form.NFC);
+    if (!NICKNAME_PATTERN.matcher(normalizedNickname).matches()) {
       throw new CalioException(ErrorCode.VALIDATION_FAILED);
     }
-    return normalized;
+    return normalizedNickname;
   }
 
   private void requireValidPassword(VoteParticipant participant, String password) {
     if (participant.getPasswordHash() != null
-        && (password == null
-            || !passwordEncoder.matches(password, participant.getPasswordHash()))) {
+        && (password == null || !passwordEncoder.matches(password, participant.getPasswordHash()))) {
       throw new CalioException(ErrorCode.VOTE_PARTICIPANT_CREDENTIAL_INVALID);
     }
   }
@@ -83,7 +74,7 @@ public class VoteParticipantSelectionLookupService {
       return List.of();
     }
     return voteRepository.findAllByVoteParticipantId(participant.getId()).stream()
-        .map(vote -> vote.getUnavailableDate())
+        .map(Vote::getUnavailableDate)
         .toList();
   }
 }

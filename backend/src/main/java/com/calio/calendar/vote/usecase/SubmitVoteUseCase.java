@@ -1,0 +1,93 @@
+package com.calio.calendar.vote.usecase;
+
+import com.calio.calendar.common.error.CalioException;
+import com.calio.calendar.common.error.ErrorCode;
+import com.calio.calendar.vote.controller.dto.VoteSubmissionResponse;
+import com.calio.calendar.vote.domain.Vote;
+import com.calio.calendar.vote.domain.VoteParticipant;
+import com.calio.calendar.vote.domain.VoteRoom;
+import com.calio.calendar.vote.repository.VoteParticipantRepository;
+import com.calio.calendar.vote.repository.VoteRepository;
+import java.text.Normalizer;
+import java.time.LocalDate;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.UUID;
+import java.util.regex.Pattern;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class SubmitVoteUseCase {
+
+  private static final Pattern NICKNAME_PATTERN = Pattern.compile("^[A-Za-z0-9가-힣]{1,9}$");
+
+  private final VoteParticipantRepository voteParticipantRepository;
+  private final VoteRepository voteRepository;
+  private final PasswordEncoder passwordEncoder;
+
+  public SubmitVoteUseCase(
+      VoteParticipantRepository voteParticipantRepository,
+      VoteRepository voteRepository,
+      PasswordEncoder passwordEncoder) {
+    this.voteParticipantRepository = voteParticipantRepository;
+    this.voteRepository = voteRepository;
+    this.passwordEncoder = passwordEncoder;
+  }
+
+  @Transactional
+  public VoteSubmissionResponse submit(
+      UUID voteRoomPublicId, String nickname, String password, List<LocalDate> requestedDates) {
+    String normalizedNickname = normalizeNickname(nickname);
+    VoteParticipant participant =
+        voteParticipantRepository
+            .findByVoteRoomPublicIdAndNickname(voteRoomPublicId, normalizedNickname)
+            .orElseThrow(() -> new CalioException(ErrorCode.VOTE_PARTICIPANT_CREDENTIAL_INVALID));
+    requireValidPassword(participant, password);
+
+    VoteParticipant lockedParticipant =
+        voteParticipantRepository
+            .findByVoteRoomPublicIdAndNicknameForUpdate(voteRoomPublicId, normalizedNickname)
+            .orElseThrow(() -> new CalioException(ErrorCode.VOTE_PARTICIPANT_CREDENTIAL_INVALID));
+    List<LocalDate> unavailableDates = normalizeDates(requestedDates);
+    requireDatesInCandidateRange(lockedParticipant.getVoteRoom(), unavailableDates);
+    voteRepository.deleteAllByVoteParticipantId(lockedParticipant.getId());
+    voteRepository.saveAll(
+        unavailableDates.stream().map(date -> new Vote(lockedParticipant, date)).toList());
+    lockedParticipant.submit();
+    return VoteSubmissionResponse.from(lockedParticipant, unavailableDates);
+  }
+
+  private String normalizeNickname(String nickname) {
+    if (nickname == null) {
+      throw new CalioException(ErrorCode.VALIDATION_FAILED);
+    }
+    String normalizedNickname = Normalizer.normalize(nickname, Normalizer.Form.NFC);
+    if (!NICKNAME_PATTERN.matcher(normalizedNickname).matches()) {
+      throw new CalioException(ErrorCode.VALIDATION_FAILED);
+    }
+    return normalizedNickname;
+  }
+
+  private void requireValidPassword(VoteParticipant participant, String password) {
+    if (participant.getPasswordHash() != null
+        && (password == null || !passwordEncoder.matches(password, participant.getPasswordHash()))) {
+      throw new CalioException(ErrorCode.VOTE_PARTICIPANT_CREDENTIAL_INVALID);
+    }
+  }
+
+  private List<LocalDate> normalizeDates(List<LocalDate> requestedDates) {
+    return new LinkedHashSet<>(requestedDates).stream().sorted().toList();
+  }
+
+  private void requireDatesInCandidateRange(VoteRoom voteRoom, List<LocalDate> unavailableDates) {
+    if (unavailableDates.stream()
+        .anyMatch(
+            date ->
+                date.isBefore(voteRoom.getCandidateStartDate())
+                    || date.isAfter(voteRoom.getCandidateEndDate()))) {
+      throw new CalioException(ErrorCode.VALIDATION_FAILED);
+    }
+  }
+}

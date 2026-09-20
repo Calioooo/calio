@@ -1,4 +1,4 @@
-package com.calio.calendar.vote.service;
+package com.calio.calendar.vote.usecase;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -32,7 +32,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 @ExtendWith(MockitoExtension.class)
-class VoteParticipantSelectionLookupServiceTest {
+class LookupVoteParticipantSelectionUseCaseTest {
 
   private static final UUID VOTE_ROOM_PUBLIC_ID =
       UUID.fromString("7ab6b7d8-11cd-4ce2-83e3-b81ad87ea3c9");
@@ -43,14 +43,14 @@ class VoteParticipantSelectionLookupServiceTest {
 
   @Mock private VoteRepository voteRepository;
 
-  private VoteParticipantSelectionLookupService lookupService;
+  private LookupVoteParticipantSelectionUseCase lookupVoteParticipantSelectionUseCase;
   private PasswordEncoder passwordEncoder;
 
   @BeforeEach
   void setUp() {
     passwordEncoder = new BCryptPasswordEncoder();
-    lookupService =
-        new VoteParticipantSelectionLookupService(
+    lookupVoteParticipantSelectionUseCase =
+        new LookupVoteParticipantSelectionUseCase(
             voteRoomRepository, voteParticipantRepository, voteRepository, passwordEncoder);
   }
 
@@ -73,8 +73,7 @@ class VoteParticipantSelectionLookupServiceTest {
 
     // when
     var response =
-        lookupService.lookup(
-            VOTE_ROOM_PUBLIC_ID, new LookupVoteParticipantSelectionRequest("calio", "secret"));
+        lookupVoteParticipantSelectionUseCase.lookup(VOTE_ROOM_PUBLIC_ID, "calio", "secret");
 
     // then
     assertThat(response.nickname()).isEqualTo("calio");
@@ -95,8 +94,7 @@ class VoteParticipantSelectionLookupServiceTest {
 
     // when
     var response =
-        lookupService.lookup(
-            VOTE_ROOM_PUBLIC_ID, new LookupVoteParticipantSelectionRequest("calio", null));
+        lookupVoteParticipantSelectionUseCase.lookup(VOTE_ROOM_PUBLIC_ID, "calio", null);
 
     // then
     assertThat(response.status()).isEqualTo(VoteParticipantStatus.REGISTERED);
@@ -113,8 +111,7 @@ class VoteParticipantSelectionLookupServiceTest {
     // when, then
     assertThatThrownBy(
             () ->
-                lookupService.lookup(
-                    VOTE_ROOM_PUBLIC_ID, new LookupVoteParticipantSelectionRequest("calio", null)))
+                lookupVoteParticipantSelectionUseCase.lookup(VOTE_ROOM_PUBLIC_ID, "calio", null))
         .isInstanceOfSatisfying(
             CalioException.class,
             exception ->

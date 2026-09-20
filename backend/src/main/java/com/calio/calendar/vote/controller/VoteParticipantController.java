@@ -6,8 +6,9 @@ import com.calio.calendar.vote.controller.dto.SubmitVoteRequest;
 import com.calio.calendar.vote.controller.dto.VoteParticipantResponse;
 import com.calio.calendar.vote.controller.dto.VoteParticipantSelectionResponse;
 import com.calio.calendar.vote.controller.dto.VoteSubmissionResponse;
-import com.calio.calendar.vote.service.VoteParticipantSelectionLookupService;
-import com.calio.calendar.vote.service.VoteParticipantService;
+import com.calio.calendar.vote.usecase.CreateVoteParticipantUseCase;
+import com.calio.calendar.vote.usecase.LookupVoteParticipantSelectionUseCase;
+import com.calio.calendar.vote.usecase.SubmitVoteUseCase;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
@@ -23,33 +24,37 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/vote-rooms/{publicId}")
 public class VoteParticipantController {
 
-  private final VoteParticipantService voteParticipantService;
-  private final VoteParticipantSelectionLookupService voteParticipantSelectionLookupService;
+  private final CreateVoteParticipantUseCase createVoteParticipantUseCase;
+  private final SubmitVoteUseCase submitVoteUseCase;
+  private final LookupVoteParticipantSelectionUseCase lookupVoteParticipantSelectionUseCase;
 
   public VoteParticipantController(
-      VoteParticipantService voteParticipantService,
-      VoteParticipantSelectionLookupService voteParticipantSelectionLookupService) {
-    this.voteParticipantService = voteParticipantService;
-    this.voteParticipantSelectionLookupService = voteParticipantSelectionLookupService;
+      CreateVoteParticipantUseCase createVoteParticipantUseCase,
+      SubmitVoteUseCase submitVoteUseCase,
+      LookupVoteParticipantSelectionUseCase lookupVoteParticipantSelectionUseCase) {
+    this.createVoteParticipantUseCase = createVoteParticipantUseCase;
+    this.submitVoteUseCase = submitVoteUseCase;
+    this.lookupVoteParticipantSelectionUseCase = lookupVoteParticipantSelectionUseCase;
   }
 
   @PostMapping("/participants")
   public ResponseEntity<VoteParticipantResponse> create(
       @PathVariable UUID publicId, @Valid @RequestBody CreateVoteParticipantRequest request) {
     return ResponseEntity.status(HttpStatus.CREATED)
-        .body(voteParticipantService.create(publicId, request));
+        .body(createVoteParticipantUseCase.create(publicId, request.nickname(), request.password()));
   }
 
   @PutMapping("/votes")
   public VoteSubmissionResponse submitVotes(
       @PathVariable UUID publicId, @Valid @RequestBody SubmitVoteRequest request) {
-    return voteParticipantService.submitVotes(publicId, request);
+    return submitVoteUseCase.submit(
+        publicId, request.nickname(), request.password(), request.unavailableDates());
   }
 
   @PostMapping("/votes/lookup")
   public VoteParticipantSelectionResponse lookupSelection(
       @PathVariable UUID publicId,
       @Valid @RequestBody LookupVoteParticipantSelectionRequest request) {
-    return voteParticipantSelectionLookupService.lookup(publicId, request);
+    return lookupVoteParticipantSelectionUseCase.lookup(publicId, request.nickname(), request.password());
   }
 }

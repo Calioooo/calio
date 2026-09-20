@@ -6,7 +6,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.calio.calendar.vote.service.VoteRoomCleanupService;
+import com.calio.calendar.vote.usecase.DeleteExpiredVoteRoomsUseCase;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -18,17 +18,17 @@ import org.springframework.scheduling.annotation.Scheduled;
 class VoteRoomCleanupSchedulerTest {
 
     @Mock
-    private VoteRoomCleanupService voteRoomCleanupService;
+    private DeleteExpiredVoteRoomsUseCase deleteExpiredVoteRoomsUseCase;
 
     @Test
     @DisplayName("VoteRoom cleanup scheduler는 만료 VoteRoom 삭제를 service에 위임한다")
     void givenCleanupScheduler_whenDeleteExpiredVoteRooms_thenDelegatesCleanup() {
-        VoteRoomCleanupScheduler scheduler = new VoteRoomCleanupScheduler(voteRoomCleanupService);
-        when(voteRoomCleanupService.deleteExpiredVoteRooms()).thenReturn(3);
+        VoteRoomCleanupScheduler scheduler = new VoteRoomCleanupScheduler(deleteExpiredVoteRoomsUseCase);
+        when(deleteExpiredVoteRoomsUseCase.deleteExpiredVoteRooms()).thenReturn(3);
 
         scheduler.deleteExpiredVoteRooms();
 
-        verify(voteRoomCleanupService).deleteExpiredVoteRooms();
+        verify(deleteExpiredVoteRoomsUseCase).deleteExpiredVoteRooms();
     }
 
     @Test
@@ -46,9 +46,9 @@ class VoteRoomCleanupSchedulerTest {
     @Test
     @DisplayName("VoteRoom cleanup scheduler는 cleanup 실패를 외부로 전파하지 않는다")
     void givenCleanupFailure_whenDeleteExpiredVoteRooms_thenContainsException() {
-        VoteRoomCleanupScheduler scheduler = new VoteRoomCleanupScheduler(voteRoomCleanupService);
+        VoteRoomCleanupScheduler scheduler = new VoteRoomCleanupScheduler(deleteExpiredVoteRoomsUseCase);
         doThrow(new RuntimeException("cleanup failed"))
-                .when(voteRoomCleanupService)
+                .when(deleteExpiredVoteRoomsUseCase)
                 .deleteExpiredVoteRooms();
 
         assertDoesNotThrow(scheduler::deleteExpiredVoteRooms);
