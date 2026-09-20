@@ -48,7 +48,8 @@ public class SubmitVoteUseCase {
             .orElseThrow(() -> new CalioException(ErrorCode.VOTE_PARTICIPANT_CREDENTIAL_INVALID));
     List<LocalDate> unavailableDates = normalizeDates(requestedDates);
     if (unavailableDates.stream()
-        .anyMatch(date -> !lockedParticipant.getVoteRoom().getCandidateDateRange().contains(date))) {
+        .anyMatch(
+            date -> !lockedParticipant.getVoteRoom().getCandidateDateRange().contains(date))) {
       throw new CalioException(ErrorCode.VALIDATION_FAILED);
     }
     voteRepository.deleteAllByVoteParticipantId(lockedParticipant.getId());
@@ -61,5 +62,4 @@ public class SubmitVoteUseCase {
   private List<LocalDate> normalizeDates(List<LocalDate> requestedDates) {
     return new LinkedHashSet<>(requestedDates).stream().sorted().toList();
   }
-
 }

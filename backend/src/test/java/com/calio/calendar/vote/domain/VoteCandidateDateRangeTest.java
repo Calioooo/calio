@@ -30,10 +30,12 @@ class VoteCandidateDateRangeTest {
     assertThatThrownBy(() -> VoteCandidateDateRange.of(START_DATE, START_DATE.minusDays(1)))
         .isInstanceOfSatisfying(
             CalioException.class,
-            exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.VALIDATION_FAILED));
+            exception ->
+                assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.VALIDATION_FAILED));
     assertThatThrownBy(() -> VoteCandidateDateRange.of(START_DATE, START_DATE.plusDays(31)))
         .isInstanceOfSatisfying(
             CalioException.class,
-            exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.VALIDATION_FAILED));
+            exception ->
+                assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.VALIDATION_FAILED));
   }
 }

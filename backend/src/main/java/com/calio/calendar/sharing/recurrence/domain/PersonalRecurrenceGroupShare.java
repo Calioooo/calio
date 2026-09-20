@@ -19,69 +19,60 @@ import org.hibernate.annotations.JdbcTypeCode;
 
 @Entity
 @Table(
-        name = "personal_recurrence_group_shares",
-        uniqueConstraints = {
-                @UniqueConstraint(
-                        name = "uk_personal_recurrence_group_share",
-                        columnNames = {"recurrence_event_id", "group_space_id"}
-                ),
-                @UniqueConstraint(
-                        name = "uk_personal_recurrence_group_share_public_id",
-                        columnNames = "public_share_id"
-                )
-        }
-)
+    name = "personal_recurrence_group_shares",
+    uniqueConstraints = {
+      @UniqueConstraint(
+          name = "uk_personal_recurrence_group_share",
+          columnNames = {"recurrence_event_id", "group_space_id"}),
+      @UniqueConstraint(
+          name = "uk_personal_recurrence_group_share_public_id",
+          columnNames = "public_share_id")
+    })
 public class PersonalRecurrenceGroupShare extends BaseEntity {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "recurrence_event_id", nullable = false)
-    private RecurrenceEvent recurrenceEvent;
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "recurrence_event_id", nullable = false)
+  private RecurrenceEvent recurrenceEvent;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "group_space_id", nullable = false)
-    private GroupSpace groupSpace;
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "group_space_id", nullable = false)
+  private GroupSpace groupSpace;
 
-    @JdbcTypeCode(Types.VARCHAR)
-    @Column(name = "public_share_id", nullable = false, updatable = false, length = 36)
-    private UUID publicShareId;
+  @JdbcTypeCode(Types.VARCHAR)
+  @Column(name = "public_share_id", nullable = false, updatable = false, length = 36)
+  private UUID publicShareId;
 
-    protected PersonalRecurrenceGroupShare() {
-    }
+  protected PersonalRecurrenceGroupShare() {}
 
-    private PersonalRecurrenceGroupShare(
-            RecurrenceEvent recurrenceEvent,
-            GroupSpace groupSpace,
-            UUID publicShareId
-    ) {
-        this.recurrenceEvent = recurrenceEvent;
-        this.groupSpace = groupSpace;
-        this.publicShareId = publicShareId;
-    }
+  private PersonalRecurrenceGroupShare(
+      RecurrenceEvent recurrenceEvent, GroupSpace groupSpace, UUID publicShareId) {
+    this.recurrenceEvent = recurrenceEvent;
+    this.groupSpace = groupSpace;
+    this.publicShareId = publicShareId;
+  }
 
-    public static PersonalRecurrenceGroupShare create(
-            RecurrenceEvent recurrenceEvent,
-            GroupSpace groupSpace
-    ) {
-        return new PersonalRecurrenceGroupShare(recurrenceEvent, groupSpace, UUID.randomUUID());
-    }
+  public static PersonalRecurrenceGroupShare create(
+      RecurrenceEvent recurrenceEvent, GroupSpace groupSpace) {
+    return new PersonalRecurrenceGroupShare(recurrenceEvent, groupSpace, UUID.randomUUID());
+  }
 
-    public Long getId() {
-        return id;
-    }
+  public Long getId() {
+    return id;
+  }
 
-    public RecurrenceEvent getRecurrenceEvent() {
-        return recurrenceEvent;
-    }
+  public RecurrenceEvent getRecurrenceEvent() {
+    return recurrenceEvent;
+  }
 
-    public GroupSpace getGroupSpace() {
-        return groupSpace;
-    }
+  public GroupSpace getGroupSpace() {
+    return groupSpace;
+  }
 
-    public UUID getPublicShareId() {
-        return publicShareId;
-    }
+  public UUID getPublicShareId() {
+    return publicShareId;
+  }
 }

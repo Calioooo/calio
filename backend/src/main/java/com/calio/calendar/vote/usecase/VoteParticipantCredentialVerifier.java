@@ -17,7 +17,8 @@ public class VoteParticipantCredentialVerifier {
 
   public void verify(VoteParticipant participant, String password) {
     if (participant.hasPassword()
-        && (password == null || !passwordEncoder.matches(password, participant.getPasswordHash()))) {
+        && (password == null
+            || !passwordEncoder.matches(password, participant.getPasswordHash()))) {
       throw new CalioException(ErrorCode.VOTE_PARTICIPANT_CREDENTIAL_INVALID);
     }
   }

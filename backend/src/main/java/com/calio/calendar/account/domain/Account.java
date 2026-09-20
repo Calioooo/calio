@@ -11,14 +11,13 @@ import jakarta.persistence.Table;
 @Table(name = "accounts")
 public class Account extends BaseEntity {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
 
-    public Account() {
-    }
+  public Account() {}
 
-    public Long getId() {
-        return id;
-    }
+  public Long getId() {
+    return id;
+  }
 }

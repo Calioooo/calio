@@ -6,11 +6,8 @@ import java.util.List;
 
 public record GroupMemberListResponse(List<GroupMemberProjection> members) {
 
-    public static GroupMemberListResponse from(List<GroupMember> members, GroupSpace groupSpace) {
-        return new GroupMemberListResponse(
-                members.stream()
-                        .map(member -> GroupMemberProjection.from(member, groupSpace))
-                        .toList()
-        );
-    }
+  public static GroupMemberListResponse from(List<GroupMember> members, GroupSpace groupSpace) {
+    return new GroupMemberListResponse(
+        members.stream().map(member -> GroupMemberProjection.from(member, groupSpace)).toList());
+  }
 }

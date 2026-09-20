@@ -10,15 +10,16 @@ import tools.jackson.databind.ObjectMapper;
 
 class GoogleCalendarEventPageTest {
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+  private final ObjectMapper objectMapper = new ObjectMapper();
 
-    @Test
-    @DisplayName("Google page는 일반, recurrence event, recurrence override, cancelled item을 구분한다")
-    void givenProviderItems_whenParse_thenClassifiesItemsWithoutExpandingRecurrence()
-            throws Exception {
-        // when
-        GoogleCalendarEventPage page = objectMapper.readValue(
-                """
+  @Test
+  @DisplayName("Google page는 일반, recurrence event, recurrence override, cancelled item을 구분한다")
+  void givenProviderItems_whenParse_thenClassifiesItemsWithoutExpandingRecurrence()
+      throws Exception {
+    // when
+    GoogleCalendarEventPage page =
+        objectMapper.readValue(
+            """
                         {
                           "nextSyncToken": "next-token",
                           "timeZone": "Asia/Seoul",
@@ -55,27 +56,28 @@ class GoogleCalendarEventPageTest {
                           ]
                         }
                         """,
-                GoogleCalendarEventPage.class
-        );
+            GoogleCalendarEventPage.class);
 
-        // then
-        assertThat(page.items()).hasSize(4);
-        assertThat(page.items().get(0).isRecurring()).isFalse();
-        assertThat(page.items().get(1).isRecurrenceEvent()).isTrue();
-        assertThat(page.items().get(1).isRecurrenceOverride()).isFalse();
-        assertThat(page.items().get(2).isRecurrenceEvent()).isFalse();
-        assertThat(page.items().get(2).isRecurrenceOverride()).isTrue();
-        assertThat(page.items().get(2).originalStartTime().timeZone()).isEqualTo("Asia/Seoul");
-        assertThat(page.items().get(3).isCancelled()).isTrue();
-        assertThat(page.nextSyncToken()).isEqualTo("next-token");
-    }
+    // then
+    assertThat(page.items()).hasSize(4);
+    assertThat(page.items().get(0).isRecurring()).isFalse();
+    assertThat(page.items().get(1).isRecurrenceEvent()).isTrue();
+    assertThat(page.items().get(1).isRecurrenceOverride()).isFalse();
+    assertThat(page.items().get(2).isRecurrenceEvent()).isFalse();
+    assertThat(page.items().get(2).isRecurrenceOverride()).isTrue();
+    assertThat(page.items().get(2).originalStartTime().timeZone()).isEqualTo("Asia/Seoul");
+    assertThat(page.items().get(3).isCancelled()).isTrue();
+    assertThat(page.nextSyncToken()).isEqualTo("next-token");
+  }
 
-    @Test
-    @DisplayName("all-day 시작과 timed 종료가 섞인 Google 일정은 invalid response다")
-    void givenMixedScheduleTypes_whenParse_thenRejectsResponse() {
-        // when, then
-        assertThatThrownBy(() -> objectMapper.readValue(
-                """
+  @Test
+  @DisplayName("all-day 시작과 timed 종료가 섞인 Google 일정은 invalid response다")
+  void givenMixedScheduleTypes_whenParse_thenRejectsResponse() {
+    // when, then
+    assertThatThrownBy(
+            () ->
+                objectMapper.readValue(
+                    """
                         {
                           "nextSyncToken": "next-token",
                           "items": [
@@ -88,32 +90,36 @@ class GoogleCalendarEventPageTest {
                           ]
                         }
                         """,
-                GoogleCalendarEventPage.class
-        )).isInstanceOf(JacksonException.class);
-    }
+                    GoogleCalendarEventPage.class))
+        .isInstanceOf(JacksonException.class);
+  }
 
-    @Test
-    @DisplayName("nextPageToken과 nextSyncToken을 함께 반환한 page는 invalid response다")
-    void givenConflictingPaginationTokens_whenParse_thenRejectsResponse() {
-        // when, then
-        assertThatThrownBy(() -> objectMapper.readValue(
-                """
+  @Test
+  @DisplayName("nextPageToken과 nextSyncToken을 함께 반환한 page는 invalid response다")
+  void givenConflictingPaginationTokens_whenParse_thenRejectsResponse() {
+    // when, then
+    assertThatThrownBy(
+            () ->
+                objectMapper.readValue(
+                    """
                         {
                           "nextPageToken": "page-2",
                           "nextSyncToken": "next-token",
                           "items": []
                         }
                         """,
-                GoogleCalendarEventPage.class
-        )).isInstanceOf(JacksonException.class);
-    }
+                    GoogleCalendarEventPage.class))
+        .isInstanceOf(JacksonException.class);
+  }
 
-    @Test
-    @DisplayName("provider updated 시각이 RFC 3339 형식이 아니면 invalid response다")
-    void givenMalformedUpdatedAt_whenParse_thenRejectsResponse() {
-        // when, then
-        assertThatThrownBy(() -> objectMapper.readValue(
-                """
+  @Test
+  @DisplayName("provider updated 시각이 RFC 3339 형식이 아니면 invalid response다")
+  void givenMalformedUpdatedAt_whenParse_thenRejectsResponse() {
+    // when, then
+    assertThatThrownBy(
+            () ->
+                objectMapper.readValue(
+                    """
                         {
                           "nextSyncToken": "next-token",
                           "items": [
@@ -127,7 +133,7 @@ class GoogleCalendarEventPageTest {
                           ]
                         }
                         """,
-                GoogleCalendarEventPage.class
-        )).isInstanceOf(JacksonException.class);
-    }
+                    GoogleCalendarEventPage.class))
+        .isInstanceOf(JacksonException.class);
+  }
 }

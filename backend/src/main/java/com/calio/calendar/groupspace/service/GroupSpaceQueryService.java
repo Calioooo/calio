@@ -15,38 +15,32 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class GroupSpaceQueryService {
 
-    private final GroupSpaceRepository groupSpaceRepository;
-    private final GroupMemberRepository groupMemberRepository;
+  private final GroupSpaceRepository groupSpaceRepository;
+  private final GroupMemberRepository groupMemberRepository;
 
-    public GroupSpaceQueryService(
-            GroupSpaceRepository groupSpaceRepository,
-            GroupMemberRepository groupMemberRepository
-    ) {
-        this.groupSpaceRepository = groupSpaceRepository;
-        this.groupMemberRepository = groupMemberRepository;
-    }
+  public GroupSpaceQueryService(
+      GroupSpaceRepository groupSpaceRepository, GroupMemberRepository groupMemberRepository) {
+    this.groupSpaceRepository = groupSpaceRepository;
+    this.groupMemberRepository = groupMemberRepository;
+  }
 
-    public GroupSpace getGroupSpace(Long groupSpaceId) {
-        return groupSpaceRepository.findById(groupSpaceId)
-                .orElseThrow(GroupSpaceQueryService::groupSpaceNotFound);
-    }
+  public GroupSpace getGroupSpace(Long groupSpaceId) {
+    return groupSpaceRepository
+        .findById(groupSpaceId)
+        .orElseThrow(GroupSpaceQueryService::groupSpaceNotFound);
+  }
 
-    public List<GroupMember> listActiveMemberships(Long accountId) {
-        return groupMemberRepository
-                .findByAccountIdAndStatusOrderByStatusChangedAtDescGroupSpaceIdDesc(
-                        accountId,
-                        GroupMemberStatus.ACTIVE
-                );
-    }
+  public List<GroupMember> listActiveMemberships(Long accountId) {
+    return groupMemberRepository.findByAccountIdAndStatusOrderByStatusChangedAtDescGroupSpaceIdDesc(
+        accountId, GroupMemberStatus.ACTIVE);
+  }
 
-    public int getActiveMemberCount(Long groupSpaceId) {
-        return groupMemberRepository.countByGroupSpace_IdAndStatus(
-                groupSpaceId,
-                GroupMemberStatus.ACTIVE
-        );
-    }
+  public int getActiveMemberCount(Long groupSpaceId) {
+    return groupMemberRepository.countByGroupSpace_IdAndStatus(
+        groupSpaceId, GroupMemberStatus.ACTIVE);
+  }
 
-    private static CalioException groupSpaceNotFound() {
-        return new CalioException(ErrorCode.GROUP_SPACE_NOT_FOUND);
-    }
+  private static CalioException groupSpaceNotFound() {
+    return new CalioException(ErrorCode.GROUP_SPACE_NOT_FOUND);
+  }
 }

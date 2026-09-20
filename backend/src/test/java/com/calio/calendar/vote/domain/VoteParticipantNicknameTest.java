@@ -28,6 +28,7 @@ class VoteParticipantNicknameTest {
     assertThatThrownBy(() -> VoteParticipantNickname.of("calio-user"))
         .isInstanceOfSatisfying(
             CalioException.class,
-            exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.VALIDATION_FAILED));
+            exception ->
+                assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.VALIDATION_FAILED));
   }
 }

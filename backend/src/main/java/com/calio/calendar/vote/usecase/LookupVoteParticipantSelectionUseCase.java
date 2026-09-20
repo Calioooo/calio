@@ -35,7 +35,8 @@ public class LookupVoteParticipantSelectionUseCase {
   }
 
   @Transactional(readOnly = true)
-  public VoteParticipantSelectionResponse lookup(UUID voteRoomPublicId, String nickname, String password) {
+  public VoteParticipantSelectionResponse lookup(
+      UUID voteRoomPublicId, String nickname, String password) {
     voteRoomRepository
         .findByPublicId(voteRoomPublicId)
         .orElseThrow(() -> new CalioException(ErrorCode.VOTE_ROOM_NOT_FOUND));
@@ -52,7 +53,9 @@ public class LookupVoteParticipantSelectionUseCase {
     if (!participant.hasSubmittedVotes()) {
       return List.of();
     }
-    return voteRepository.findByVoteParticipantIdOrderByUnavailableDateAsc(participant.getId()).stream()
+    return voteRepository
+        .findByVoteParticipantIdOrderByUnavailableDateAsc(participant.getId())
+        .stream()
         .map(Vote::getUnavailableDate)
         .toList();
   }

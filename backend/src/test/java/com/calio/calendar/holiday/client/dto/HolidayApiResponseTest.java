@@ -8,13 +8,14 @@ import tools.jackson.databind.ObjectMapper;
 
 class HolidayApiResponseTest {
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+  private final ObjectMapper objectMapper = new ObjectMapper();
 
-    @Test
-    @DisplayName("배열 형태의 items.item을 HolidayApiItem 목록으로 반환한다")
-    void givenArrayItem_whenParseHolidayApiResponse_thenReadsItems() {
-        // given
-        String json = """
+  @Test
+  @DisplayName("배열 형태의 items.item을 HolidayApiItem 목록으로 반환한다")
+  void givenArrayItem_whenParseHolidayApiResponse_thenReadsItems() {
+    // given
+    String json =
+        """
                 {
                   "response": {
                     "header": {
@@ -42,22 +43,23 @@ class HolidayApiResponseTest {
                 }
                 """;
 
-        // when
-        HolidayApiResponse response = HolidayApiResponse.fromJson(json, objectMapper);
+    // when
+    HolidayApiResponse response = HolidayApiResponse.fromJson(json, objectMapper);
 
-        // then
-        assertThat(response.resultCode()).isEqualTo("00");
-        assertThat(response.items()).hasSize(2);
-        assertThat(response.items().getFirst().localDate()).isEqualTo("20260101");
-        assertThat(response.items().getFirst().dateName()).isEqualTo("신정");
-        assertThat(response.items().getFirst().isHoliday()).isEqualTo("Y");
-    }
+    // then
+    assertThat(response.resultCode()).isEqualTo("00");
+    assertThat(response.items()).hasSize(2);
+    assertThat(response.items().getFirst().localDate()).isEqualTo("20260101");
+    assertThat(response.items().getFirst().dateName()).isEqualTo("신정");
+    assertThat(response.items().getFirst().isHoliday()).isEqualTo("Y");
+  }
 
-    @Test
-    @DisplayName("공휴일 API 응답은 단일 객체 형태의 items.item도 provider item 목록으로 정규화한다")
-    void givenSingleObjectItem_whenParseHolidayApiResponse_thenNormalizesItemList() {
-        // given
-        String json = """
+  @Test
+  @DisplayName("공휴일 API 응답은 단일 객체 형태의 items.item도 provider item 목록으로 정규화한다")
+  void givenSingleObjectItem_whenParseHolidayApiResponse_thenNormalizesItemList() {
+    // given
+    String json =
+        """
                 {
                   "response": {
                     "header": {
@@ -76,15 +78,17 @@ class HolidayApiResponseTest {
                 }
                 """;
 
-        // when
-        HolidayApiResponse response = HolidayApiResponse.fromJson(json, objectMapper);
+    // when
+    HolidayApiResponse response = HolidayApiResponse.fromJson(json, objectMapper);
 
-        // then
-        assertThat(response.items()).singleElement()
-                .satisfies(item -> {
-                    assertThat(item.localDate()).isEqualTo("20261003");
-                    assertThat(item.dateName()).isEqualTo("개천절");
-                    assertThat(item.isHoliday()).isEqualTo("Y");
-                });
-    }
+    // then
+    assertThat(response.items())
+        .singleElement()
+        .satisfies(
+            item -> {
+              assertThat(item.localDate()).isEqualTo("20261003");
+              assertThat(item.dateName()).isEqualTo("개천절");
+              assertThat(item.isHoliday()).isEqualTo("Y");
+            });
+  }
 }

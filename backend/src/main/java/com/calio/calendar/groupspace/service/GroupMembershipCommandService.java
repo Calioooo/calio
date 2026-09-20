@@ -16,70 +16,56 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class GroupMembershipCommandService {
 
-    private final GroupMemberRepository groupMemberRepository;
-    private final GroupSpaceRepository groupSpaceRepository;
+  private final GroupMemberRepository groupMemberRepository;
+  private final GroupSpaceRepository groupSpaceRepository;
 
-    public GroupMembershipCommandService(
-            GroupMemberRepository groupMemberRepository,
-            GroupSpaceRepository groupSpaceRepository
-    ) {
-        this.groupMemberRepository = groupMemberRepository;
-        this.groupSpaceRepository = groupSpaceRepository;
+  public GroupMembershipCommandService(
+      GroupMemberRepository groupMemberRepository, GroupSpaceRepository groupSpaceRepository) {
+    this.groupMemberRepository = groupMemberRepository;
+    this.groupSpaceRepository = groupSpaceRepository;
+  }
+
+  public GroupMember create(GroupSpace groupSpace, Long accountId, String nickname, Instant now) {
+    return groupMemberRepository.saveAndFlush(
+        new GroupMember(groupSpace, accountId, nickname, now));
+  }
+
+  public List<GroupMember> lockMembers(Long groupSpaceId) {
+    return groupMemberRepository.findAllByGroupSpaceIdForUpdateOrderById(groupSpaceId);
+  }
+
+  public GroupMember lockActiveMember(Long groupSpaceId, Long accountId) {
+    GroupMember member =
+        groupMemberRepository
+            .findByGroupSpaceIdAndAccountIdForUpdate(groupSpaceId, accountId)
+            .orElseThrow(GroupMembershipCommandService::groupSpaceNotFound);
+    if (member.getStatus() != GroupMemberStatus.ACTIVE) {
+      throw groupSpaceNotFound();
     }
+    return member;
+  }
 
-    public GroupMember create(
-            GroupSpace groupSpace,
-            Long accountId,
-            String nickname,
-            Instant now
-    ) {
-        return groupMemberRepository.saveAndFlush(
-                new GroupMember(groupSpace, accountId, nickname, now)
-        );
-    }
+  public void changeToActive(GroupMember member, String nickname, Instant now) {
+    member.reactivate(nickname, now);
+    groupMemberRepository.flush();
+  }
 
-    public List<GroupMember> lockMembers(Long groupSpaceId) {
-        return groupMemberRepository.findAllByGroupSpaceIdForUpdateOrderById(groupSpaceId);
-    }
+  public void changeStatus(GroupMember member, GroupMemberStatus status, Instant now) {
+    member.deactivate(status, now);
+    groupMemberRepository.flush();
+  }
 
-    public GroupMember lockActiveMember(Long groupSpaceId, Long accountId) {
-        GroupMember member = groupMemberRepository.findByGroupSpaceIdAndAccountIdForUpdate(
-                        groupSpaceId,
-                        accountId
-                )
-                .orElseThrow(GroupMembershipCommandService::groupSpaceNotFound);
-        if (member.getStatus() != GroupMemberStatus.ACTIVE) {
-            throw groupSpaceNotFound();
-        }
-        return member;
-    }
+  public void changeAnonymous(GroupMember member, boolean isAnonymous) {
+    member.changeAnonymous(isAnonymous);
+    groupMemberRepository.flush();
+  }
 
-    public void changeToActive(GroupMember member, String nickname, Instant now) {
-        member.reactivate(nickname, now);
-        groupMemberRepository.flush();
-    }
+  public void changeOwnership(GroupSpace groupSpace, Long ownerAccountId) {
+    groupSpace.transferOwnershipTo(ownerAccountId);
+    groupSpaceRepository.flush();
+  }
 
-    public void changeStatus(
-            GroupMember member,
-            GroupMemberStatus status,
-            Instant now
-    ) {
-        member.deactivate(status, now);
-        groupMemberRepository.flush();
-    }
-
-    public void changeAnonymous(GroupMember member, boolean isAnonymous) {
-        member.changeAnonymous(isAnonymous);
-        groupMemberRepository.flush();
-    }
-
-    public void changeOwnership(GroupSpace groupSpace, Long ownerAccountId) {
-        groupSpace.transferOwnershipTo(ownerAccountId);
-        groupSpaceRepository.flush();
-    }
-
-    private static CalioException groupSpaceNotFound() {
-        return new CalioException(ErrorCode.GROUP_SPACE_NOT_FOUND);
-    }
-
+  private static CalioException groupSpaceNotFound() {
+    return new CalioException(ErrorCode.GROUP_SPACE_NOT_FOUND);
+  }
 }

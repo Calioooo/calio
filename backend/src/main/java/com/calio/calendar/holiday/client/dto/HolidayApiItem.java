@@ -8,12 +8,9 @@ import tools.jackson.databind.ObjectMapper;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record HolidayApiItem(
-        @JsonProperty("locdate") String localDate,
-        String dateName,
-        String isHoliday
-) {
+    @JsonProperty("locdate") String localDate, String dateName, String isHoliday) {
 
-    static HolidayApiItem from(JsonNode item, ObjectMapper objectMapper) throws JacksonException {
-        return objectMapper.treeToValue(item, HolidayApiItem.class);
-    }
+  static HolidayApiItem from(JsonNode item, ObjectMapper objectMapper) throws JacksonException {
+    return objectMapper.treeToValue(item, HolidayApiItem.class);
+  }
 }

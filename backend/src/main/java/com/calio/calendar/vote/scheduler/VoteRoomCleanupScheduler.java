@@ -9,21 +9,21 @@ import org.springframework.stereotype.Component;
 @Component
 public class VoteRoomCleanupScheduler {
 
-    private static final Logger log = LoggerFactory.getLogger(VoteRoomCleanupScheduler.class);
+  private static final Logger log = LoggerFactory.getLogger(VoteRoomCleanupScheduler.class);
 
-    private final DeleteExpiredVoteRoomsUseCase deleteExpiredVoteRoomsUseCase;
+  private final DeleteExpiredVoteRoomsUseCase deleteExpiredVoteRoomsUseCase;
 
-    public VoteRoomCleanupScheduler(DeleteExpiredVoteRoomsUseCase deleteExpiredVoteRoomsUseCase) {
-        this.deleteExpiredVoteRoomsUseCase = deleteExpiredVoteRoomsUseCase;
+  public VoteRoomCleanupScheduler(DeleteExpiredVoteRoomsUseCase deleteExpiredVoteRoomsUseCase) {
+    this.deleteExpiredVoteRoomsUseCase = deleteExpiredVoteRoomsUseCase;
+  }
+
+  @Scheduled(cron = "0 30 4 * * *", zone = "Asia/Seoul")
+  public void deleteExpiredVoteRooms() {
+    try {
+      int deletedCount = deleteExpiredVoteRoomsUseCase.deleteExpiredVoteRooms();
+      log.info("VoteRoom cleanup finished. deletedCount={}", deletedCount);
+    } catch (Exception exception) {
+      log.error("VoteRoom cleanup failed. message={}", exception.getMessage(), exception);
     }
-
-    @Scheduled(cron = "0 30 4 * * *", zone = "Asia/Seoul")
-    public void deleteExpiredVoteRooms() {
-        try {
-            int deletedCount = deleteExpiredVoteRoomsUseCase.deleteExpiredVoteRooms();
-            log.info("VoteRoom cleanup finished. deletedCount={}", deletedCount);
-        } catch (Exception exception) {
-            log.error("VoteRoom cleanup failed. message={}", exception.getMessage(), exception);
-        }
-    }
+  }
 }

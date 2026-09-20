@@ -6,5 +6,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface AccountAuthTokenRepository extends JpaRepository<AccountAuthToken, Long> {
 
-    Optional<AccountAuthToken> findByTokenHash(String tokenHash);
+  Optional<AccountAuthToken> findByTokenHash(String tokenHash);
 }

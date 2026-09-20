@@ -17,52 +17,50 @@ import jakarta.persistence.Table;
 @Table(name = "ai_calendar_messages")
 public class CalendarConversationMessage extends BaseEntity {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "conversation_id", nullable = false)
-    private CalendarConversation conversation;
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "conversation_id", nullable = false)
+  private CalendarConversation conversation;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "message_role", nullable = false, length = 16)
-    private CalendarConversationMessageRole role;
+  @Enumerated(EnumType.STRING)
+  @Column(name = "message_role", nullable = false, length = 16)
+  private CalendarConversationMessageRole role;
 
-    @Column(name = "message_text", nullable = false, columnDefinition = "TEXT")
-    private String text;
+  @Column(name = "message_text", nullable = false, columnDefinition = "TEXT")
+  private String text;
 
-    @Column(name = "assistant_response_blocks_json", columnDefinition = "TEXT")
-    private String assistantResponseBlocksJson;
+  @Column(name = "assistant_response_blocks_json", columnDefinition = "TEXT")
+  private String assistantResponseBlocksJson;
 
-    protected CalendarConversationMessage() {
-    }
+  protected CalendarConversationMessage() {}
 
-    public CalendarConversationMessage(
-            CalendarConversation conversation,
-            CalendarConversationMessageRole role,
-            String text,
-            String assistantResponseBlocksJson
-    ) {
-        this.conversation = conversation;
-        this.role = role;
-        this.text = text;
-        this.assistantResponseBlocksJson = assistantResponseBlocksJson;
-    }
+  public CalendarConversationMessage(
+      CalendarConversation conversation,
+      CalendarConversationMessageRole role,
+      String text,
+      String assistantResponseBlocksJson) {
+    this.conversation = conversation;
+    this.role = role;
+    this.text = text;
+    this.assistantResponseBlocksJson = assistantResponseBlocksJson;
+  }
 
-    public Long getId() {
-        return id;
-    }
+  public Long getId() {
+    return id;
+  }
 
-    public CalendarConversationMessageRole getRole() {
-        return role;
-    }
+  public CalendarConversationMessageRole getRole() {
+    return role;
+  }
 
-    public String getText() {
-        return text;
-    }
+  public String getText() {
+    return text;
+  }
 
-    public String getAssistantResponseBlocksJson() {
-        return assistantResponseBlocksJson;
-    }
+  public String getAssistantResponseBlocksJson() {
+    return assistantResponseBlocksJson;
+  }
 }

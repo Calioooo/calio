@@ -11,17 +11,17 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class GoogleOperationJobQueryService {
 
-    private final GoogleOperationJobRepository jobRepository;
+  private final GoogleOperationJobRepository jobRepository;
 
-    public GoogleOperationJobQueryService(GoogleOperationJobRepository jobRepository) {
-        this.jobRepository = jobRepository;
-    }
+  public GoogleOperationJobQueryService(GoogleOperationJobRepository jobRepository) {
+    this.jobRepository = jobRepository;
+  }
 
-    public List<Long> listRecoverableAccountIds(Instant now, int limit) {
-        return jobRepository.findRecoverableAccountIds(now, PageRequest.of(0, limit));
-    }
+  public List<Long> listRecoverableAccountIds(Instant now, int limit) {
+    return jobRepository.findRecoverableAccountIds(now, PageRequest.of(0, limit));
+  }
 
-    public List<Long> listExpiredTerminalJobIds(Instant cutoff, int limit) {
-        return jobRepository.findTerminalIdsBefore(cutoff, PageRequest.of(0, limit));
-    }
+  public List<Long> listExpiredTerminalJobIds(Instant cutoff, int limit) {
+    return jobRepository.findTerminalIdsBefore(cutoff, PageRequest.of(0, limit));
+  }
 }

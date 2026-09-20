@@ -47,7 +47,8 @@ public class GetVoteResultUseCase {
                     Collectors.mapping(
                         vote -> vote.getVoteParticipant().getNickname(), Collectors.toList())));
     List<VoteDateResultResponse> dates =
-        voteRoom.getCandidateStartDate()
+        voteRoom
+            .getCandidateStartDate()
             .datesUntil(voteRoom.getCandidateEndDate().plusDays(1))
             .map(
                 date -> {

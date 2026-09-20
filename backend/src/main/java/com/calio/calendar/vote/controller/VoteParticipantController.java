@@ -41,7 +41,8 @@ public class VoteParticipantController {
   public ResponseEntity<VoteParticipantResponse> create(
       @PathVariable UUID publicId, @Valid @RequestBody CreateVoteParticipantRequest request) {
     return ResponseEntity.status(HttpStatus.CREATED)
-        .body(createVoteParticipantUseCase.create(publicId, request.nickname(), request.password()));
+        .body(
+            createVoteParticipantUseCase.create(publicId, request.nickname(), request.password()));
   }
 
   @PutMapping("/votes")
@@ -55,6 +56,7 @@ public class VoteParticipantController {
   public VoteParticipantSelectionResponse lookupSelection(
       @PathVariable UUID publicId,
       @Valid @RequestBody LookupVoteParticipantSelectionRequest request) {
-    return lookupVoteParticipantSelectionUseCase.lookup(publicId, request.nickname(), request.password());
+    return lookupVoteParticipantSelectionUseCase.lookup(
+        publicId, request.nickname(), request.password());
   }
 }

@@ -14,42 +14,41 @@ import org.springframework.security.crypto.keygen.KeyGenerators;
 @Configuration
 public class TokenEncryptionConfig {
 
-    private static final String GOOGLE_TOKEN_BYTES_ENCRYPTOR = "googleTokenBytesEncryptor";
-    private static final String AES_ALGORITHM = "AES";
-    private static final int AES_256_KEY_BYTES = 32;
-    private static final int GCM_NONCE_BYTES = 12;
+  private static final String GOOGLE_TOKEN_BYTES_ENCRYPTOR = "googleTokenBytesEncryptor";
+  private static final String AES_ALGORITHM = "AES";
+  private static final int AES_256_KEY_BYTES = 32;
+  private static final int GCM_NONCE_BYTES = 12;
 
-    @Bean(GOOGLE_TOKEN_BYTES_ENCRYPTOR)
-    public BytesEncryptor googleTokenBytesEncryptor(TokenEncryptionProperties properties) {
-        return new AesBytesEncryptor(
-                new SecretKeySpec(encryptionKey(properties), AES_ALGORITHM),
-                KeyGenerators.secureRandom(GCM_NONCE_BYTES),
-                AesBytesEncryptor.CipherAlgorithm.GCM
-        );
+  @Bean(GOOGLE_TOKEN_BYTES_ENCRYPTOR)
+  public BytesEncryptor googleTokenBytesEncryptor(TokenEncryptionProperties properties) {
+    return new AesBytesEncryptor(
+        new SecretKeySpec(encryptionKey(properties), AES_ALGORITHM),
+        KeyGenerators.secureRandom(GCM_NONCE_BYTES),
+        AesBytesEncryptor.CipherAlgorithm.GCM);
+  }
+
+  private byte[] encryptionKey(TokenEncryptionProperties properties) {
+    if (!properties.hasGoogleRefreshTokenKey()) {
+      throw new CalioException(ErrorCode.GOOGLE_CALENDAR_CONFIGURATION_MISSING);
     }
 
-    private byte[] encryptionKey(TokenEncryptionProperties properties) {
-        if (!properties.hasGoogleRefreshTokenKey()) {
-            throw new CalioException(ErrorCode.GOOGLE_CALENDAR_CONFIGURATION_MISSING);
-        }
+    byte[] key = decodeKey(properties.getGoogleRefreshTokenKey());
+    if (key.length != AES_256_KEY_BYTES) {
+      throw new CalioException(ErrorCode.GOOGLE_CALENDAR_CONFIGURATION_MISSING);
+    }
+    return key;
+  }
 
-        byte[] key = decodeKey(properties.getGoogleRefreshTokenKey());
-        if (key.length != AES_256_KEY_BYTES) {
-            throw new CalioException(ErrorCode.GOOGLE_CALENDAR_CONFIGURATION_MISSING);
-        }
-        return key;
+  private byte[] decodeKey(String keyValue) {
+    byte[] rawKey = keyValue.getBytes(StandardCharsets.UTF_8);
+    if (rawKey.length == AES_256_KEY_BYTES) {
+      return rawKey;
     }
 
-    private byte[] decodeKey(String keyValue) {
-        byte[] rawKey = keyValue.getBytes(StandardCharsets.UTF_8);
-        if (rawKey.length == AES_256_KEY_BYTES) {
-            return rawKey;
-        }
-
-        try {
-            return Base64.getDecoder().decode(keyValue);
-        } catch (IllegalArgumentException exception) {
-            return rawKey;
-        }
+    try {
+      return Base64.getDecoder().decode(keyValue);
+    } catch (IllegalArgumentException exception) {
+      return rawKey;
     }
+  }
 }

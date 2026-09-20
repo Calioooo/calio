@@ -12,59 +12,60 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface GroupCalendarRecurrenceOverrideRepository
-        extends JpaRepository<GroupCalendarRecurrenceOverride, Long> {
+    extends JpaRepository<GroupCalendarRecurrenceOverride, Long> {
 
-    @Modifying
-    @Query("""
+  @Modifying
+  @Query(
+      """
             delete from GroupCalendarRecurrenceOverride recurrenceOverride
             where recurrenceOverride.recurrenceEvent.id = :recurrenceId
             """)
-    void deleteAllByRecurrenceEventId(@Param("recurrenceId") Long recurrenceId);
+  void deleteAllByRecurrenceEventId(@Param("recurrenceId") Long recurrenceId);
 
-    @Modifying
-    @Query("""
+  @Modifying
+  @Query(
+      """
             delete from GroupCalendarRecurrenceOverride recurrenceOverride
             where recurrenceOverride.recurrenceEvent.groupSpace.id = :groupSpaceId
             """)
-    void deleteAllByGroupSpaceId(@Param("groupSpaceId") Long groupSpaceId);
+  void deleteAllByGroupSpaceId(@Param("groupSpaceId") Long groupSpaceId);
 
-    @Modifying
-    @Query("""
+  @Modifying
+  @Query(
+      """
             delete from GroupCalendarRecurrenceOverride recurrenceOverride
             where recurrenceOverride.recurrenceEvent.groupSpace.id = :groupSpaceId
               and recurrenceOverride.recurrenceEvent.createdBy.id = :accountId
             """)
-    void deleteAllByGroupSpaceIdAndCreatedById(
-            @Param("groupSpaceId") Long groupSpaceId,
-            @Param("accountId") Long accountId
-    );
+  void deleteAllByGroupSpaceIdAndCreatedById(
+      @Param("groupSpaceId") Long groupSpaceId, @Param("accountId") Long accountId);
 
-    @EntityGraph(attributePaths = {"recurrenceEvent", "recurrenceEvent.tag"})
-    @Query("""
+  @EntityGraph(attributePaths = {"recurrenceEvent", "recurrenceEvent.tag"})
+  @Query(
+      """
             select recurrenceOverride
             from GroupCalendarRecurrenceOverride recurrenceOverride
             where recurrenceOverride.recurrenceEvent.id = :recurrenceId
               and recurrenceOverride.originStartAt = :originStartAt
             """)
-    Optional<GroupCalendarRecurrenceOverride> findByRecurrenceEvent_IdAndOriginStartAt(
-            @Param("recurrenceId") Long recurrenceId,
-            @Param("originStartAt") Instant originStartAt
-    );
+  Optional<GroupCalendarRecurrenceOverride> findByRecurrenceEvent_IdAndOriginStartAt(
+      @Param("recurrenceId") Long recurrenceId, @Param("originStartAt") Instant originStartAt);
 
-    @EntityGraph(attributePaths = {"recurrenceEvent", "recurrenceEvent.tag"})
-    @Query("""
+  @EntityGraph(attributePaths = {"recurrenceEvent", "recurrenceEvent.tag"})
+  @Query(
+      """
             select recurrenceOverride
             from GroupCalendarRecurrenceOverride recurrenceOverride
             where recurrenceOverride.recurrenceEvent.id = :recurrenceId
               and recurrenceOverride.originStartAt in :originStartAts
             """)
-    List<GroupCalendarRecurrenceOverride> findByRecurrenceEvent_IdAndOriginStartAtIn(
-            @Param("recurrenceId") Long recurrenceId,
-            @Param("originStartAts") Collection<Instant> originStartAts
-    );
+  List<GroupCalendarRecurrenceOverride> findByRecurrenceEvent_IdAndOriginStartAtIn(
+      @Param("recurrenceId") Long recurrenceId,
+      @Param("originStartAts") Collection<Instant> originStartAts);
 
-    @EntityGraph(attributePaths = {"recurrenceEvent", "recurrenceEvent.tag"})
-    @Query("""
+  @EntityGraph(attributePaths = {"recurrenceEvent", "recurrenceEvent.tag"})
+  @Query(
+      """
             select recurrenceOverride
             from GroupCalendarRecurrenceOverride recurrenceOverride
             where recurrenceOverride.recurrenceEvent.groupSpace.id = :groupSpaceId
@@ -72,9 +73,8 @@ public interface GroupCalendarRecurrenceOverrideRepository
               and recurrenceOverride.startAt < :to
               and recurrenceOverride.endAt > :from
             """)
-    List<GroupCalendarRecurrenceOverride> listOverlappingOverrides(
-            @Param("groupSpaceId") Long groupSpaceId,
-            @Param("from") Instant from,
-            @Param("to") Instant to
-    );
+  List<GroupCalendarRecurrenceOverride> listOverlappingOverrides(
+      @Param("groupSpaceId") Long groupSpaceId,
+      @Param("from") Instant from,
+      @Param("to") Instant to);
 }

@@ -8,5 +8,5 @@
 import Foundation
 
 protocol AuthRepository {
-    func issueGuestToken() async throws -> GuestAuthResponseDTO
+  func issueGuestToken() async throws -> GuestAuthResponseDTO
 }

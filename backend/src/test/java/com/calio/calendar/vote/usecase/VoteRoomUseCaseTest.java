@@ -68,7 +68,8 @@ class VoteRoomUseCaseTest {
             () -> createVoteRoomUseCase.create(ACCOUNT_ID, "여행 일정", KOREA_TODAY.minusDays(1)))
         .isInstanceOfSatisfying(
             CalioException.class,
-            exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.VALIDATION_FAILED));
+            exception ->
+                assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.VALIDATION_FAILED));
 
     verify(accountRepository, never()).findById(ACCOUNT_ID);
     verify(voteRoomRepository, never()).save(org.mockito.ArgumentMatchers.any());

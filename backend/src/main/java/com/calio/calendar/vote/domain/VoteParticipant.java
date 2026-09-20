@@ -34,7 +34,9 @@ public class VoteParticipant extends BaseEntity {
   private VoteRoom voteRoom;
 
   @Embedded
-  @AttributeOverride(name = "value", column = @Column(name = "nickname", nullable = false, length = 9))
+  @AttributeOverride(
+      name = "value",
+      column = @Column(name = "nickname", nullable = false, length = 9))
   private VoteParticipantNickname nickname;
 
   @Column(name = "password_hash")
@@ -50,8 +52,7 @@ public class VoteParticipant extends BaseEntity {
     this(voteRoom, VoteParticipantNickname.of(nickname), passwordHash);
   }
 
-  public VoteParticipant(
-      VoteRoom voteRoom, VoteParticipantNickname nickname, String passwordHash) {
+  public VoteParticipant(VoteRoom voteRoom, VoteParticipantNickname nickname, String passwordHash) {
     this.voteRoom = voteRoom;
     this.nickname = nickname;
     this.passwordHash = passwordHash;

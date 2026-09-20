@@ -5,8 +5,4 @@ import jakarta.validation.constraints.NotNull;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record CreateGroupSpaceRequest(
-        @NotNull String name,
-        String emoji,
-        @NotNull String nickname
-) {
-}
+    @NotNull String name, String emoji, @NotNull String nickname) {}

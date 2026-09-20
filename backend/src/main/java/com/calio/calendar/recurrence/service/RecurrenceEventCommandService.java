@@ -1,6 +1,5 @@
 package com.calio.calendar.recurrence.service;
 
-import com.calio.calendar.common.domain.CanonicalSchedule;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceEventRequest;
@@ -21,76 +20,75 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class RecurrenceEventCommandService {
 
-    private final RecurrenceEventRepository recurrenceEventRepository;
-    private final RecurrenceEventOverrideRepository recurrenceEventOverrideRepository;
+  private final RecurrenceEventRepository recurrenceEventRepository;
+  private final RecurrenceEventOverrideRepository recurrenceEventOverrideRepository;
 
-    public RecurrenceEventCommandService(
-            RecurrenceEventRepository recurrenceEventRepository,
-            RecurrenceEventOverrideRepository recurrenceEventOverrideRepository
-    ) {
-        this.recurrenceEventRepository = recurrenceEventRepository;
-        this.recurrenceEventOverrideRepository = recurrenceEventOverrideRepository;
-    }
+  public RecurrenceEventCommandService(
+      RecurrenceEventRepository recurrenceEventRepository,
+      RecurrenceEventOverrideRepository recurrenceEventOverrideRepository) {
+    this.recurrenceEventRepository = recurrenceEventRepository;
+    this.recurrenceEventOverrideRepository = recurrenceEventOverrideRepository;
+  }
 
-    public RecurrenceEvent createRecurrenceEvent(RecurrenceEvent recurrenceEvent) {
-        return recurrenceEventRepository.save(recurrenceEvent);
-    }
+  public RecurrenceEvent createRecurrenceEvent(RecurrenceEvent recurrenceEvent) {
+    return recurrenceEventRepository.save(recurrenceEvent);
+  }
 
-    public RecurrenceEvent lockRecurrenceEvent(Long accountId, Long recurrenceId) {
-        return recurrenceEventRepository.findByIdAndAccountIdForUpdate(recurrenceId, accountId)
-                .orElseThrow(() -> new CalioException(ErrorCode.RECURRENCE_EVENT_NOT_FOUND));
-    }
+  public RecurrenceEvent lockRecurrenceEvent(Long accountId, Long recurrenceId) {
+    return recurrenceEventRepository
+        .findByIdAndAccountIdForUpdate(recurrenceId, accountId)
+        .orElseThrow(() -> new CalioException(ErrorCode.RECURRENCE_EVENT_NOT_FOUND));
+  }
 
-    public void updateRecurrenceEvent(
-            RecurrenceEvent recurrenceEvent,
-            UpdateRecurrenceEventRequest request,
-            RecurrenceSchedule schedule,
-            List<String> recurrenceRules,
-            Tag tag
-    ) {
-        recurrenceEvent.update(request.title(), request.description(), schedule, recurrenceRules, tag);
-        recurrenceEventRepository.flush();
-    }
+  public void updateRecurrenceEvent(
+      RecurrenceEvent recurrenceEvent,
+      UpdateRecurrenceEventRequest request,
+      RecurrenceSchedule schedule,
+      List<String> recurrenceRules,
+      Tag tag) {
+    recurrenceEvent.update(request.title(), request.description(), schedule, recurrenceRules, tag);
+    recurrenceEventRepository.flush();
+  }
 
-    public void deleteRecurrenceEventsByIds(Collection<Long> recurrenceEventIds) {
-        if (recurrenceEventIds.isEmpty()) {
-            return;
-        }
-        recurrenceEventRepository.deleteAllByIds(recurrenceEventIds);
+  public void deleteRecurrenceEventsByIds(Collection<Long> recurrenceEventIds) {
+    if (recurrenceEventIds.isEmpty()) {
+      return;
     }
+    recurrenceEventRepository.deleteAllByIds(recurrenceEventIds);
+  }
 
-    public void deleteRecurrenceOverridesByRecurrenceEventIds(Collection<Long> recurrenceEventIds) {
-        if (!recurrenceEventIds.isEmpty()) {
-            recurrenceEventOverrideRepository.deleteAllByRecurrenceEventIds(recurrenceEventIds);
-        }
+  public void deleteRecurrenceOverridesByRecurrenceEventIds(Collection<Long> recurrenceEventIds) {
+    if (!recurrenceEventIds.isEmpty()) {
+      recurrenceEventOverrideRepository.deleteAllByRecurrenceEventIds(recurrenceEventIds);
     }
+  }
 
-    public void deleteRecurrenceOverridesByIds(Collection<Long> overrideIds) {
-        if (!overrideIds.isEmpty()) {
-            recurrenceEventOverrideRepository.deleteAllByIds(overrideIds);
-        }
+  public void deleteRecurrenceOverridesByIds(Collection<Long> overrideIds) {
+    if (!overrideIds.isEmpty()) {
+      recurrenceEventOverrideRepository.deleteAllByIds(overrideIds);
     }
+  }
 
-    public RecurrenceEventOverride createOrUpdateRecurrenceOverride(RecurrenceEventOverride override) {
-        return recurrenceEventOverrideRepository.saveAndFlush(override);
-    }
+  public RecurrenceEventOverride createOrUpdateRecurrenceOverride(
+      RecurrenceEventOverride override) {
+    return recurrenceEventOverrideRepository.saveAndFlush(override);
+  }
 
-    public void deleteRecurrenceOccurrence(
-            RecurrenceEvent recurrenceEvent,
-            Optional<RecurrenceEventOverride> existingOverride,
-            Instant originStartAt,
-            Instant deletedAt
-    ) {
-        RecurrenceEventOverride override = existingOverride.orElseGet(() ->
-                RecurrenceEventOverride.deleted(recurrenceEvent, originStartAt, deletedAt)
-        );
-        if (existingOverride.isPresent()) {
-            override.markDeleted(deletedAt);
-        }
-        recurrenceEventOverrideRepository.saveAndFlush(override);
+  public void deleteRecurrenceOccurrence(
+      RecurrenceEvent recurrenceEvent,
+      Optional<RecurrenceEventOverride> existingOverride,
+      Instant originStartAt,
+      Instant deletedAt) {
+    RecurrenceEventOverride override =
+        existingOverride.orElseGet(
+            () -> RecurrenceEventOverride.deleted(recurrenceEvent, originStartAt, deletedAt));
+    if (existingOverride.isPresent()) {
+      override.markDeleted(deletedAt);
     }
+    recurrenceEventOverrideRepository.saveAndFlush(override);
+  }
 
-    public void changeTagForRecurrenceEvents(Long accountId, Tag sourceTag, Tag targetTag) {
-        recurrenceEventRepository.reassignAllByTagAndAccountId(sourceTag, targetTag, accountId);
-    }
+  public void changeTagForRecurrenceEvents(Long accountId, Tag sourceTag, Tag targetTag) {
+    recurrenceEventRepository.reassignAllByTagAndAccountId(sourceTag, targetTag, accountId);
+  }
 }

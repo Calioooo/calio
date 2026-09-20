@@ -36,20 +36,16 @@ class GetVoteResultUseCaseTest {
   @BeforeEach
   void setUp() {
     getVoteResultUseCase =
-        new GetVoteResultUseCase(
-            voteRoomRepository, voteParticipantRepository, voteRepository);
+        new GetVoteResultUseCase(voteRoomRepository, voteParticipantRepository, voteRepository);
   }
 
   @Test
   @DisplayName("결과는 후보 기간의 0표 날짜를 보완하고 제출 완료 참여자만 포함한다")
-  void givenPartialSubmittedVotes_whenGetResult_thenCompletesCandidateDatesAndExcludesRegisteredParticipant() {
+  void
+      givenPartialSubmittedVotes_whenGetResult_thenCompletesCandidateDatesAndExcludesRegisteredParticipant() {
     VoteRoom voteRoom =
         new VoteRoom(
-            VOTE_ROOM_PUBLIC_ID,
-            "여행 일정",
-            LocalDate.of(2026, 8, 14),
-            LocalDate.of(2026, 8, 16),
-            1L);
+            VOTE_ROOM_PUBLIC_ID, "여행 일정", LocalDate.of(2026, 8, 14), LocalDate.of(2026, 8, 16), 1L);
     when(voteRoomRepository.findByPublicId(VOTE_ROOM_PUBLIC_ID)).thenReturn(Optional.of(voteRoom));
     VoteParticipant submittedParticipant = new VoteParticipant(voteRoom, "submitted", null);
     submittedParticipant.submit();

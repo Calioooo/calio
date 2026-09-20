@@ -44,7 +44,8 @@ class VoteParticipantCredentialVerifierTest {
 
     credentialVerifier.verify(new VoteParticipant(voteRoom(), "calio", null), null);
 
-    verify(passwordEncoder, never()).matches(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    verify(passwordEncoder, never())
+        .matches(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
   }
 
   @Test
@@ -71,10 +72,6 @@ class VoteParticipantCredentialVerifierTest {
 
   private VoteRoom voteRoom() {
     return new VoteRoom(
-        UUID.randomUUID(),
-        "여행 일정",
-        LocalDate.of(2026, 8, 14),
-        LocalDate.of(2026, 8, 20),
-        1L);
+        UUID.randomUUID(), "여행 일정", LocalDate.of(2026, 8, 14), LocalDate.of(2026, 8, 20), 1L);
   }
 }

@@ -9,17 +9,15 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class GroupCalendarRecurrenceOverrideCommandService {
 
-    private final GroupCalendarRecurrenceOverrideRepository overrideRepository;
+  private final GroupCalendarRecurrenceOverrideRepository overrideRepository;
 
-    public GroupCalendarRecurrenceOverrideCommandService(
-            GroupCalendarRecurrenceOverrideRepository overrideRepository
-    ) {
-        this.overrideRepository = overrideRepository;
-    }
+  public GroupCalendarRecurrenceOverrideCommandService(
+      GroupCalendarRecurrenceOverrideRepository overrideRepository) {
+    this.overrideRepository = overrideRepository;
+  }
 
-    public GroupCalendarRecurrenceOverride createOrUpdateOverride(
-            GroupCalendarRecurrenceOverride override
-    ) {
-        return overrideRepository.saveAndFlush(override);
-    }
+  public GroupCalendarRecurrenceOverride createOrUpdateOverride(
+      GroupCalendarRecurrenceOverride override) {
+    return overrideRepository.saveAndFlush(override);
+  }
 }

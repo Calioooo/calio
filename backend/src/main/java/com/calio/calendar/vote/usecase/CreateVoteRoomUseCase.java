@@ -42,5 +42,4 @@ public class CreateVoteRoomUseCase {
             new VoteRoom(UUID.randomUUID(), name, candidateDateRange, accountId));
     return VoteRoomResponse.from(voteRoom);
   }
-
 }

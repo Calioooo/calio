@@ -94,8 +94,7 @@ class LookupVoteParticipantSelectionUseCaseTest {
         .thenReturn(Optional.of(participant));
 
     // when
-    var response =
-        lookupVoteParticipantSelectionUseCase.lookup(VOTE_ROOM_PUBLIC_ID, "calio", null);
+    var response = lookupVoteParticipantSelectionUseCase.lookup(VOTE_ROOM_PUBLIC_ID, "calio", null);
 
     // then
     assertThat(response.status()).isEqualTo(VoteParticipantStatus.REGISTERED);
@@ -112,8 +111,7 @@ class LookupVoteParticipantSelectionUseCaseTest {
 
     // when, then
     assertThatThrownBy(
-            () ->
-                lookupVoteParticipantSelectionUseCase.lookup(VOTE_ROOM_PUBLIC_ID, "calio", null))
+            () -> lookupVoteParticipantSelectionUseCase.lookup(VOTE_ROOM_PUBLIC_ID, "calio", null))
         .isInstanceOfSatisfying(
             CalioException.class,
             exception ->
@@ -123,10 +121,6 @@ class LookupVoteParticipantSelectionUseCaseTest {
 
   private VoteRoom voteRoom() {
     return new VoteRoom(
-        VOTE_ROOM_PUBLIC_ID,
-        "여행 일정",
-        LocalDate.of(2026, 8, 14),
-        LocalDate.of(2026, 8, 20),
-        1L);
+        VOTE_ROOM_PUBLIC_ID, "여행 일정", LocalDate.of(2026, 8, 14), LocalDate.of(2026, 8, 20), 1L);
   }
 }

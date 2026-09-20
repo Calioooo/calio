@@ -10,49 +10,53 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-public interface PersonalRecurrenceGroupShareRepository extends JpaRepository<PersonalRecurrenceGroupShare, Long> {
+public interface PersonalRecurrenceGroupShareRepository
+    extends JpaRepository<PersonalRecurrenceGroupShare, Long> {
 
-    Optional<PersonalRecurrenceGroupShare> findByRecurrenceEvent_IdAndGroupSpace_Id(
-            Long recurrenceEventId,
-            Long groupSpaceId
-    );
+  Optional<PersonalRecurrenceGroupShare> findByRecurrenceEvent_IdAndGroupSpace_Id(
+      Long recurrenceEventId, Long groupSpaceId);
 
-    @EntityGraph(attributePaths = {"recurrenceEvent", "recurrenceEvent.account", "groupSpace"})
-    @Query("""
+  @EntityGraph(attributePaths = {"recurrenceEvent", "recurrenceEvent.account", "groupSpace"})
+  @Query(
+      """
             select share
             from PersonalRecurrenceGroupShare share
             where share.recurrenceEvent.id in :recurrenceEventIds
               and share.groupSpace.id in :groupSpaceIds
             """)
-    List<PersonalRecurrenceGroupShare> findAllByRecurrenceEventIdsAndGroupSpaceIds(
-            @Param("recurrenceEventIds") Collection<Long> recurrenceEventIds,
-            @Param("groupSpaceIds") Collection<Long> groupSpaceIds
-    );
+  List<PersonalRecurrenceGroupShare> findAllByRecurrenceEventIdsAndGroupSpaceIds(
+      @Param("recurrenceEventIds") Collection<Long> recurrenceEventIds,
+      @Param("groupSpaceIds") Collection<Long> groupSpaceIds);
 
-    @EntityGraph(attributePaths = {"recurrenceEvent", "recurrenceEvent.account", "groupSpace"})
-    @Query("""
+  @EntityGraph(attributePaths = {"recurrenceEvent", "recurrenceEvent.account", "groupSpace"})
+  @Query(
+      """
             select share
             from PersonalRecurrenceGroupShare share
             where share.groupSpace.id = :groupSpaceId
             """)
-    List<PersonalRecurrenceGroupShare> findAllByGroupSpaceId(@Param("groupSpaceId") Long groupSpaceId);
+  List<PersonalRecurrenceGroupShare> findAllByGroupSpaceId(
+      @Param("groupSpaceId") Long groupSpaceId);
 
-    @Modifying
-    @Query("""
+  @Modifying
+  @Query(
+      """
             delete from PersonalRecurrenceGroupShare share
             where share.recurrenceEvent.id = :recurrenceEventId
             """)
-    void deleteAllByRecurrenceEventId(@Param("recurrenceEventId") Long recurrenceEventId);
+  void deleteAllByRecurrenceEventId(@Param("recurrenceEventId") Long recurrenceEventId);
 
-    @Modifying
-    @Query("""
+  @Modifying
+  @Query(
+      """
             delete from PersonalRecurrenceGroupShare share
             where share.groupSpace.id = :groupSpaceId
             """)
-    void deleteAllByGroupSpaceId(@Param("groupSpaceId") Long groupSpaceId);
+  void deleteAllByGroupSpaceId(@Param("groupSpaceId") Long groupSpaceId);
 
-    @Modifying
-    @Query("""
+  @Modifying
+  @Query(
+      """
             delete from PersonalRecurrenceGroupShare share
             where share.groupSpace.id = :groupSpaceId
               and share.recurrenceEvent.account.id = (
@@ -61,20 +65,20 @@ public interface PersonalRecurrenceGroupShareRepository extends JpaRepository<Pe
                     where member.id = :memberId
               )
             """)
-    void deleteAllByGroupSpaceIdAndMemberId(
-            @Param("groupSpaceId") Long groupSpaceId,
-            @Param("memberId") Long memberId
-    );
+  void deleteAllByGroupSpaceIdAndMemberId(
+      @Param("groupSpaceId") Long groupSpaceId, @Param("memberId") Long memberId);
 
-    @Modifying
-    @Query(value = """
+  @Modifying
+  @Query(
+      value =
+          """
             insert ignore into personal_recurrence_group_shares
                 (recurrence_event_id, group_space_id, public_share_id, created_at, updated_at)
             values (:recurrenceEventId, :groupSpaceId, :publicShareId, current_timestamp(6), current_timestamp(6))
-            """, nativeQuery = true)
-    int insertIgnore(
-            @Param("recurrenceEventId") Long recurrenceEventId,
-            @Param("groupSpaceId") Long groupSpaceId,
-            @Param("publicShareId") String publicShareId
-    );
+            """,
+      nativeQuery = true)
+  int insertIgnore(
+      @Param("recurrenceEventId") Long recurrenceEventId,
+      @Param("groupSpaceId") Long groupSpaceId,
+      @Param("publicShareId") String publicShareId);
 }

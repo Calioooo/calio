@@ -36,7 +36,8 @@ public class CreateVoteParticipantUseCase {
   }
 
   @Transactional
-  public VoteParticipant createParticipant(UUID voteRoomPublicId, String nickname, String password) {
+  public VoteParticipant createParticipant(
+      UUID voteRoomPublicId, String nickname, String password) {
     VoteParticipantNickname normalizedNickname = VoteParticipantNickname.of(nickname);
     VoteRoom voteRoom =
         voteRoomRepository
