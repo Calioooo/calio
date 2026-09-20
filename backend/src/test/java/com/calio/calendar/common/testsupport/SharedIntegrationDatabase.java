@@ -9,8 +9,6 @@ import org.springframework.test.context.TestExecutionListeners;
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
 @TestExecutionListeners(
-        listeners = SharedIntegrationDatabaseCleanupListener.class,
-        mergeMode = TestExecutionListeners.MergeMode.MERGE_WITH_DEFAULTS
-)
-public @interface SharedIntegrationDatabase {
-}
+    listeners = SharedIntegrationDatabaseCleanupListener.class,
+    mergeMode = TestExecutionListeners.MergeMode.MERGE_WITH_DEFAULTS)
+public @interface SharedIntegrationDatabase {}
