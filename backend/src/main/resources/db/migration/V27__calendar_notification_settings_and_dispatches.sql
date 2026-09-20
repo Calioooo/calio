@@ -31,3 +31,6 @@ CREATE TABLE notification_dispatches (
     CONSTRAINT uk_notification_dispatches_claim UNIQUE (account_id, notification_type, schedule_key, scheduled_at),
     CONSTRAINT fk_notification_dispatches_account FOREIGN KEY (account_id) REFERENCES accounts (id)
 );
+
+CREATE INDEX idx_notification_dispatches_scheduled_at
+    ON notification_dispatches (scheduled_at);

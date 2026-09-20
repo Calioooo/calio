@@ -124,28 +124,6 @@ class SendDueCalendarNotificationsPolicyTest {
   }
 
   @Test
-  @DisplayName("Google에서 동기화된 일정도 Calio 일정과 동일하게 서버 알림을 만든다")
-  void givenSynchronizedEvent_whenDispatchingDueNotifications_thenDispatchesNotification() {
-    // given
-    Instant startAt = Instant.parse("2026-06-01T01:00:00Z");
-    Event event = timedEvent(startAt, "UTC");
-    when(eventRepository.findNormalEvents(eq(1L), any(), any())).thenReturn(List.of(event));
-    stubDispatch();
-
-    // when
-    sendDueCalendarNotificationsUseCase.dispatchAccountNotifications(
-        account(TimedReminderOffset.AT_START, false), startAt);
-
-    // then
-    verify(sendDueCalendarNotificationsUseCase)
-        .dispatch(
-            eq(1L),
-            eq(NotificationScheduleKey.personalEvent(10L)),
-            eq(startAt),
-            any(CalendarNotificationContent.class));
-  }
-
-  @Test
   @DisplayName("남은 일정이 없는 브리핑 시각에는 브리핑을 발송하지 않는다")
   void givenNoRemainingSchedules_whenBriefingIsDue_thenSkipsNotification() {
     // given

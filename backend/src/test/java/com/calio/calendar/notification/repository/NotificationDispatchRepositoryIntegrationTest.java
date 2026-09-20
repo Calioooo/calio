@@ -9,11 +9,13 @@ import com.calio.calendar.notification.domain.CalendarNotificationType;
 import com.calio.calendar.notification.domain.NotificationDispatch;
 import com.calio.calendar.notification.domain.NotificationScheduleKey;
 import java.time.Instant;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest(
     properties = {
@@ -28,6 +30,11 @@ class NotificationDispatchRepositoryIntegrationTest {
   @Autowired private AccountRepository accountRepository;
 
   @Autowired private NotificationDispatchRepository dispatchRepository;
+
+  @BeforeEach
+  void clearDispatches() {
+    dispatchRepository.deleteAll();
+  }
 
   @Test
   @DisplayName("동일한 계정과 일정 알림 시각으로 생성된 dispatch claim을 조회한다")
@@ -77,5 +84,36 @@ class NotificationDispatchRepositoryIntegrationTest {
                         NotificationScheduleKey.personalEvent(1L),
                         scheduledAt)))
         .isInstanceOf(DataIntegrityViolationException.class);
+  }
+
+  @Test
+  @Transactional
+  @DisplayName("cutoff보다 이전에 예정된 dispatch만 삭제한다")
+  void givenDispatchesAroundCutoff_whenDeleteScheduledBefore_thenDeletesOnlyExpiredDispatches() {
+    // given
+    Account account = accountRepository.saveAndFlush(new Account());
+    Instant cutoff = Instant.parse("2026-09-08T01:00:00Z");
+    NotificationDispatch expired =
+        dispatchRepository.saveAndFlush(
+            new NotificationDispatch(
+                account.getId(),
+                CalendarNotificationType.REMINDER,
+                NotificationScheduleKey.personalEvent(1L),
+                cutoff.minusSeconds(1)));
+    NotificationDispatch retained =
+        dispatchRepository.saveAndFlush(
+            new NotificationDispatch(
+                account.getId(),
+                CalendarNotificationType.REMINDER,
+                NotificationScheduleKey.personalEvent(2L),
+                cutoff));
+
+    // when
+    int deletedCount = dispatchRepository.deleteScheduledBefore(cutoff);
+
+    // then
+    assertThat(deletedCount).isEqualTo(1);
+    assertThat(dispatchRepository.findById(expired.getId())).isEmpty();
+    assertThat(dispatchRepository.findById(retained.getId())).isPresent();
   }
 }
