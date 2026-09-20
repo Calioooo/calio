@@ -8,5 +8,6 @@
 import Foundation
 
 protocol NationalHolidayRepository {
-    func fetchNationalHolidays(from startDay: DayKey, to endDay: DayKey) async throws -> [NationalHolidayResponseDTO]
+  func fetchNationalHolidays(from startDay: DayKey, to endDay: DayKey) async throws
+    -> [NationalHolidayResponseDTO]
 }

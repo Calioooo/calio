@@ -1,7 +1,7 @@
 package com.calio.calendar.security;
 
-import com.calio.calendar.common.error.ErrorProblemDetail;
 import com.calio.calendar.common.error.ErrorCode;
+import com.calio.calendar.common.error.ErrorProblemDetail;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -16,27 +16,27 @@ import tools.jackson.databind.ObjectMapper;
 @Component
 public class AuthenticationErrorResponseWriter {
 
-    private static final Logger log = LoggerFactory.getLogger(AuthenticationErrorResponseWriter.class);
+  private static final Logger log =
+      LoggerFactory.getLogger(AuthenticationErrorResponseWriter.class);
 
-    private final ObjectMapper objectMapper;
+  private final ObjectMapper objectMapper;
 
-    public AuthenticationErrorResponseWriter(ObjectMapper objectMapper) {
-        this.objectMapper = objectMapper;
-    }
+  public AuthenticationErrorResponseWriter(ObjectMapper objectMapper) {
+    this.objectMapper = objectMapper;
+  }
 
-    public void write(HttpServletRequest request, HttpServletResponse response, ErrorCode errorCode)
-            throws IOException {
-        log.warn(
-                "Authentication failed. status={} errorCode={} method={} path={}",
-                errorCode.getStatus().value(),
-                errorCode.name(),
-                request.getMethod(),
-                request.getRequestURI()
-        );
-        response.setStatus(errorCode.getStatus().value());
-        response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
-        ProblemDetail problemDetail = ErrorProblemDetail.from(errorCode, errorCode.getDefaultMessage());
-        problemDetail.setInstance(URI.create(request.getRequestURI()));
-        response.getWriter().write(objectMapper.writeValueAsString(problemDetail));
-    }
+  public void write(HttpServletRequest request, HttpServletResponse response, ErrorCode errorCode)
+      throws IOException {
+    log.warn(
+        "Authentication failed. status={} errorCode={} method={} path={}",
+        errorCode.getStatus().value(),
+        errorCode.name(),
+        request.getMethod(),
+        request.getRequestURI());
+    response.setStatus(errorCode.getStatus().value());
+    response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
+    ProblemDetail problemDetail = ErrorProblemDetail.from(errorCode, errorCode.getDefaultMessage());
+    problemDetail.setInstance(URI.create(request.getRequestURI()));
+    response.getWriter().write(objectMapper.writeValueAsString(problemDetail));
+  }
 }

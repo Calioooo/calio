@@ -8,55 +8,55 @@
 import Foundation
 
 struct DayKey: Hashable, Comparable {
-    let year: Int
-    let month: Int
-    let day: Int
+  let year: Int
+  let month: Int
+  let day: Int
 
-    init(year: Int, month: Int, day: Int) {
-        self.year = year
-        self.month = month
-        self.day = day
-    }
-    
-    init(date: Date, calendar: Calendar = .current) {
-        let components = calendar.dateComponents([.year, .month, .day], from: date)
-        
-        guard
-            let year = components.year,
-            let month = components.month,
-            let day = components.day
-                
-        else {
-            preconditionFailure("Failed to create DayKey from date: \(date)")
-        }
-        
-        self.year = year
-        self.month = month
-        self.day = day
-    }
-    
-    func toDate(calendar: Calendar = .current) -> Date {
-        var components = DateComponents()
-        components.year = year
-        components.month = month
-        components.day = day
-        
-        guard let date = calendar.date(from: components) else {
-            preconditionFailure("Failed to create date from DayKey: \(self)")
-        }
+  init(year: Int, month: Int, day: Int) {
+    self.year = year
+    self.month = month
+    self.day = day
+  }
 
-        return date
+  init(date: Date, calendar: Calendar = .current) {
+    let components = calendar.dateComponents([.year, .month, .day], from: date)
+
+    guard
+      let year = components.year,
+      let month = components.month,
+      let day = components.day
+
+    else {
+      preconditionFailure("Failed to create DayKey from date: \(date)")
     }
 
-    static func < (lhs: DayKey, rhs: DayKey) -> Bool {
-        if lhs.year != rhs.year {
-            return lhs.year < rhs.year
-        }
+    self.year = year
+    self.month = month
+    self.day = day
+  }
 
-        if lhs.month != rhs.month {
-            return lhs.month < rhs.month
-        }
+  func toDate(calendar: Calendar = .current) -> Date {
+    var components = DateComponents()
+    components.year = year
+    components.month = month
+    components.day = day
 
-        return lhs.day < rhs.day
+    guard let date = calendar.date(from: components) else {
+      preconditionFailure("Failed to create date from DayKey: \(self)")
     }
+
+    return date
+  }
+
+  static func < (lhs: DayKey, rhs: DayKey) -> Bool {
+    if lhs.year != rhs.year {
+      return lhs.year < rhs.year
+    }
+
+    if lhs.month != rhs.month {
+      return lhs.month < rhs.month
+    }
+
+    return lhs.day < rhs.day
+  }
 }

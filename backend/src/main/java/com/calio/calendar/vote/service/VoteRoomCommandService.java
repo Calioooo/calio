@@ -9,17 +9,17 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @Transactional
 public class VoteRoomCommandService {
-    private final VoteRoomRepository voteRoomRepository;
+  private final VoteRoomRepository voteRoomRepository;
 
-    public VoteRoomCommandService(VoteRoomRepository voteRoomRepository) {
-        this.voteRoomRepository = voteRoomRepository;
-    }
+  public VoteRoomCommandService(VoteRoomRepository voteRoomRepository) {
+    this.voteRoomRepository = voteRoomRepository;
+  }
 
-    public VoteRoom create(VoteRoom voteRoom) {
-        return voteRoomRepository.save(voteRoom);
-    }
+  public VoteRoom create(VoteRoom voteRoom) {
+    return voteRoomRepository.save(voteRoom);
+  }
 
-    public int deleteExpiredVoteRoomsBefore(LocalDate cutoffDate) {
-        return voteRoomRepository.deleteExpiredVoteRoomsBefore(cutoffDate);
-    }
+  public int deleteExpiredVoteRoomsBefore(LocalDate cutoffDate) {
+    return voteRoomRepository.deleteExpiredVoteRoomsBefore(cutoffDate);
+  }
 }

@@ -12,45 +12,44 @@ import org.springframework.transaction.annotation.Transactional;
 
 class GroupSpaceServiceBoundaryTest {
 
-    @Test
-    @DisplayName("GroupSpace와 GroupMembership QueryService는 읽기 전용 트랜잭션을 사용한다")
-    void queryServicesUseReadOnlyTransactions() {
-        assertThat(List.of(GroupSpaceQueryService.class, GroupMembershipQueryService.class))
-                .allSatisfy(serviceType -> {
-                    Transactional transactional = AnnotatedElementUtils.findMergedAnnotation(
-                            serviceType,
-                            Transactional.class
-                    );
-                    assertThat(transactional).isNotNull();
-                    assertThat(transactional.readOnly()).isTrue();
-                });
-    }
+  @Test
+  @DisplayName("GroupSpace와 GroupMembership QueryService는 읽기 전용 트랜잭션을 사용한다")
+  void queryServicesUseReadOnlyTransactions() {
+    assertThat(List.of(GroupSpaceQueryService.class, GroupMembershipQueryService.class))
+        .allSatisfy(
+            serviceType -> {
+              Transactional transactional =
+                  AnnotatedElementUtils.findMergedAnnotation(serviceType, Transactional.class);
+              assertThat(transactional).isNotNull();
+              assertThat(transactional.readOnly()).isTrue();
+            });
+  }
 
-    @Test
-    @DisplayName("GroupSpace와 GroupMembership CommandService는 쓰기 트랜잭션을 사용한다")
-    void commandServicesUseWriteTransactions() {
-        assertThat(List.of(GroupSpaceCommandService.class, GroupMembershipCommandService.class))
-                .allSatisfy(serviceType -> {
-                    Transactional transactional = AnnotatedElementUtils.findMergedAnnotation(
-                            serviceType,
-                            Transactional.class
-                    );
-                    assertThat(transactional).isNotNull();
-                    assertThat(transactional.readOnly()).isFalse();
-                });
-    }
+  @Test
+  @DisplayName("GroupSpace와 GroupMembership CommandService는 쓰기 트랜잭션을 사용한다")
+  void commandServicesUseWriteTransactions() {
+    assertThat(List.of(GroupSpaceCommandService.class, GroupMembershipCommandService.class))
+        .allSatisfy(
+            serviceType -> {
+              Transactional transactional =
+                  AnnotatedElementUtils.findMergedAnnotation(serviceType, Transactional.class);
+              assertThat(transactional).isNotNull();
+              assertThat(transactional.readOnly()).isFalse();
+            });
+  }
 
-    @Test
-    @DisplayName("QueryService는 잠금 조회를 노출하지 않는다")
-    void queryServicesDoNotExposeLockingQueries() {
-        assertThat(List.of(
+  @Test
+  @DisplayName("QueryService는 잠금 조회를 노출하지 않는다")
+  void queryServicesDoNotExposeLockingQueries() {
+    assertThat(
+            List.of(
                 GroupSpaceQueryService.class,
                 GroupMembershipQueryService.class,
-                GroupInvitationQueryService.class
-        )).allSatisfy(serviceType ->
+                GroupInvitationQueryService.class))
+        .allSatisfy(
+            serviceType ->
                 assertThat(serviceType.getDeclaredMethods())
-                        .extracting(Method::getName)
-                        .noneMatch(name -> name.contains("lock") || name.contains("ForUpdate"))
-        );
-    }
+                    .extracting(Method::getName)
+                    .noneMatch(name -> name.contains("lock") || name.contains("ForUpdate")));
+  }
 }

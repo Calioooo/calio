@@ -8,20 +8,20 @@
 import CoreGraphics
 
 enum CalendarDisplayMode: Equatable {
-    case week
-    case month
+  case week
+  case month
 
-    private static let drawerDragThreshold: CGFloat = 40
+  private static let drawerDragThreshold: CGFloat = 40
 
-    func resolved(afterDragTranslationHeight translationHeight: CGFloat) -> CalendarDisplayMode {
-        if translationHeight > Self.drawerDragThreshold {
-            return .month
-        }
-
-        if translationHeight < -Self.drawerDragThreshold {
-            return .week
-        }
-
-        return self
+  func resolved(afterDragTranslationHeight translationHeight: CGFloat) -> CalendarDisplayMode {
+    if translationHeight > Self.drawerDragThreshold {
+      return .month
     }
+
+    if translationHeight < -Self.drawerDragThreshold {
+      return .week
+    }
+
+    return self
+  }
 }

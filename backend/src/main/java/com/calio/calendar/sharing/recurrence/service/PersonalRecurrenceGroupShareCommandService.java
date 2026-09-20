@@ -9,29 +9,30 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class PersonalRecurrenceGroupShareCommandService {
 
-    private final PersonalRecurrenceGroupShareRepository shareRepository;
+  private final PersonalRecurrenceGroupShareRepository shareRepository;
 
-    public PersonalRecurrenceGroupShareCommandService(PersonalRecurrenceGroupShareRepository shareRepository) {
-        this.shareRepository = shareRepository;
-    }
+  public PersonalRecurrenceGroupShareCommandService(
+      PersonalRecurrenceGroupShareRepository shareRepository) {
+    this.shareRepository = shareRepository;
+  }
 
-    public void deleteAllForSourceRecurrence(Long recurrenceEventId) {
-        shareRepository.deleteAllByRecurrenceEventId(recurrenceEventId);
-    }
+  public void deleteAllForSourceRecurrence(Long recurrenceEventId) {
+    shareRepository.deleteAllByRecurrenceEventId(recurrenceEventId);
+  }
 
-    public void deleteAllForGroupSpace(Long groupSpaceId) {
-        shareRepository.deleteAllByGroupSpaceId(groupSpaceId);
-    }
+  public void deleteAllForGroupSpace(Long groupSpaceId) {
+    shareRepository.deleteAllByGroupSpaceId(groupSpaceId);
+  }
 
-    public void deleteAllForMemberInGroupSpace(Long groupSpaceId, Long memberId) {
-        shareRepository.deleteAllByGroupSpaceIdAndMemberId(groupSpaceId, memberId);
-    }
+  public void deleteAllForMemberInGroupSpace(Long groupSpaceId, Long memberId) {
+    shareRepository.deleteAllByGroupSpaceIdAndMemberId(groupSpaceId, memberId);
+  }
 
-    public boolean createIfAbsent(PersonalRecurrenceGroupShare share) {
-        return shareRepository.insertIgnore(
-                share.getRecurrenceEvent().getId(),
-                share.getGroupSpace().getId(),
-                share.getPublicShareId().toString()
-        ) == 1;
-    }
+  public boolean createIfAbsent(PersonalRecurrenceGroupShare share) {
+    return shareRepository.insertIgnore(
+            share.getRecurrenceEvent().getId(),
+            share.getGroupSpace().getId(),
+            share.getPublicShareId().toString())
+        == 1;
+  }
 }

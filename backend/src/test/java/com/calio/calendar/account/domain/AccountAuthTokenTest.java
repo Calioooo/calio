@@ -30,8 +30,7 @@ class AccountAuthTokenTest {
     account.issueAuthToken("token-hash");
     account.revokeAuthToken(Instant.parse("2026-09-18T00:00:00Z"));
 
-    assertThatThrownBy(
-            () -> account.authenticateAuthToken(Instant.parse("2026-09-19T00:00:00Z")))
+    assertThatThrownBy(() -> account.authenticateAuthToken(Instant.parse("2026-09-19T00:00:00Z")))
         .isInstanceOfSatisfying(
             CalioException.class,
             exception ->

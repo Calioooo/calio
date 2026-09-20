@@ -8,48 +8,50 @@
 import Foundation
 
 protocol AuthTokenProvider {
-    var accessToken: String? { get }
+  var accessToken: String? { get }
 }
 
 protocol AuthTokenStore: AuthTokenProvider {
-    func loadAccessToken() throws -> String?
-    func saveAccessToken(_ accessToken: String) throws
-    func deleteAccessToken() throws
+  func loadAccessToken() throws -> String?
+  func saveAccessToken(_ accessToken: String) throws
+  func deleteAccessToken() throws
 }
 
 struct AuthService {
-    private let repository: AuthRepository
-    private let tokenStore: AuthTokenStore
+  private let repository: AuthRepository
+  private let tokenStore: AuthTokenStore
 
-    init(
-        repository: AuthRepository = URLSessionAuthRepository(),
-        tokenStore: AuthTokenStore = KeychainAuthTokenStore.shared
-    ) {
-        self.repository = repository
-        self.tokenStore = tokenStore
+  init(
+    repository: AuthRepository = URLSessionAuthRepository(),
+    tokenStore: AuthTokenStore = KeychainAuthTokenStore.shared
+  ) {
+    self.repository = repository
+    self.tokenStore = tokenStore
+  }
+
+  func ensureGuestAuthentication() async throws -> String {
+    if let storedToken = try tokenStore.loadAccessToken(),
+      !storedToken.isEmpty
+    {
+      return storedToken
     }
 
-    func ensureGuestAuthentication() async throws -> String {
-        if let storedToken = try tokenStore.loadAccessToken(),
-           !storedToken.isEmpty {
-            return storedToken
-        }
-
-        let response = try await repository.issueGuestToken()
-        guard response.tokenType.caseInsensitiveCompare("Bearer") == .orderedSame,
-              !response.accessToken.isEmpty else {
-            throw AuthServiceError.invalidGuestTokenResponse
-        }
-
-        try tokenStore.saveAccessToken(response.accessToken)
-        return response.accessToken
+    let response = try await repository.issueGuestToken()
+    guard response.tokenType.caseInsensitiveCompare("Bearer") == .orderedSame,
+      !response.accessToken.isEmpty
+    else {
+      throw AuthServiceError.invalidGuestTokenResponse
     }
 
-    func resetAuthentication() throws {
-        try tokenStore.deleteAccessToken()
-    }
+    try tokenStore.saveAccessToken(response.accessToken)
+    return response.accessToken
+  }
+
+  func resetAuthentication() throws {
+    try tokenStore.deleteAccessToken()
+  }
 }
 
 enum AuthServiceError: Error, Equatable {
-    case invalidGuestTokenResponse
+  case invalidGuestTokenResponse
 }

@@ -8,45 +8,45 @@
 import SwiftUI
 
 extension Color {
-    static var calendarHoliday: Color {
-        Color(hex: "#E76F73")
+  static var calendarHoliday: Color {
+    Color(hex: "#E76F73")
+  }
+
+  static var calioImportantStar: Color {
+    Color(hex: "#C99216")
+  }
+
+  init(hex: String) {
+    let sanitizedHex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+
+    var value: UInt64 = 0
+    Scanner(string: sanitizedHex).scanHexInt64(&value)
+
+    let red: Double
+    let green: Double
+    let blue: Double
+    let opacity: Double
+
+    switch sanitizedHex.count {
+    case 6:
+      red = Double((value & 0xFF0000) >> 16) / 255.0
+      green = Double((value & 0x00FF00) >> 8) / 255.0
+      blue = Double(value & 0x0000FF) / 255.0
+      opacity = 1.0
+
+    case 8:
+      red = Double((value & 0xFF00_0000) >> 24) / 255.0
+      green = Double((value & 0x00FF_0000) >> 16) / 255.0
+      blue = Double((value & 0x0000_FF00) >> 8) / 255.0
+      opacity = Double(value & 0x0000_00FF) / 255.0
+
+    default:
+      red = 0.56
+      green = 0.76
+      blue = 0.96
+      opacity = 1.0
     }
 
-    static var calioImportantStar: Color {
-        Color(hex: "#C99216")
-    }
-    
-    init(hex: String) {
-        let sanitizedHex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
-
-        var value: UInt64 = 0
-        Scanner(string: sanitizedHex).scanHexInt64(&value)
-
-        let red: Double
-        let green: Double
-        let blue: Double
-        let opacity: Double
-
-        switch sanitizedHex.count {
-        case 6:
-            red = Double((value & 0xFF0000) >> 16) / 255.0
-            green = Double((value & 0x00FF00) >> 8) / 255.0
-            blue = Double(value & 0x0000FF) / 255.0
-            opacity = 1.0
-
-        case 8:
-            red = Double((value & 0xFF000000) >> 24) / 255.0
-            green = Double((value & 0x00FF0000) >> 16) / 255.0
-            blue = Double((value & 0x0000FF00) >> 8) / 255.0
-            opacity = Double(value & 0x000000FF) / 255.0
-
-        default:
-            red = 0.56
-            green = 0.76
-            blue = 0.96
-            opacity = 1.0
-        }
-
-        self.init(.sRGB, red: red, green: green, blue: blue, opacity: opacity)
-    }
+    self.init(.sRGB, red: red, green: green, blue: blue, opacity: opacity)
+  }
 }

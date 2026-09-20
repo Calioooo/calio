@@ -1,8 +1,8 @@
 package com.calio.calendar.tag.controller;
 
+import com.calio.calendar.security.AuthenticatedAccount;
 import com.calio.calendar.tag.controller.dto.CustomTagRequest;
 import com.calio.calendar.tag.controller.dto.TagResponse;
-import com.calio.calendar.security.AuthenticatedAccount;
 import com.calio.calendar.tag.service.TagService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -20,41 +20,37 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class TagController {
 
-    private final TagService tagService;
+  private final TagService tagService;
 
-    public TagController(TagService tagService) {
-        this.tagService = tagService;
-    }
+  public TagController(TagService tagService) {
+    this.tagService = tagService;
+  }
 
-    @GetMapping("/api/tags")
-    public List<TagResponse> listTags(@AuthenticationPrincipal AuthenticatedAccount account) {
-        return tagService.listTags(account.accountId());
-    }
+  @GetMapping("/api/tags")
+  public List<TagResponse> listTags(@AuthenticationPrincipal AuthenticatedAccount account) {
+    return tagService.listTags(account.accountId());
+  }
 
-    @PostMapping("/api/custom-tags")
-    @ResponseStatus(HttpStatus.CREATED)
-    public TagResponse createCustomTag(
-            @AuthenticationPrincipal AuthenticatedAccount account,
-            @Valid @RequestBody CustomTagRequest request
-    ) {
-        return tagService.createCustomTag(account.accountId(), request);
-    }
+  @PostMapping("/api/custom-tags")
+  @ResponseStatus(HttpStatus.CREATED)
+  public TagResponse createCustomTag(
+      @AuthenticationPrincipal AuthenticatedAccount account,
+      @Valid @RequestBody CustomTagRequest request) {
+    return tagService.createCustomTag(account.accountId(), request);
+  }
 
-    @PutMapping("/api/custom-tags/{tagId}")
-    public TagResponse updateCustomTag(
-            @PathVariable("tagId") Long tagId,
-            @AuthenticationPrincipal AuthenticatedAccount account,
-            @Valid @RequestBody CustomTagRequest request
-    ) {
-        return tagService.updateCustomTag(account.accountId(), tagId, request);
-    }
+  @PutMapping("/api/custom-tags/{tagId}")
+  public TagResponse updateCustomTag(
+      @PathVariable("tagId") Long tagId,
+      @AuthenticationPrincipal AuthenticatedAccount account,
+      @Valid @RequestBody CustomTagRequest request) {
+    return tagService.updateCustomTag(account.accountId(), tagId, request);
+  }
 
-    @DeleteMapping("/api/custom-tags/{tagId}")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deleteCustomTag(
-            @AuthenticationPrincipal AuthenticatedAccount account,
-            @PathVariable("tagId") Long tagId
-    ) {
-        tagService.deleteCustomTag(account.accountId(), tagId);
-    }
+  @DeleteMapping("/api/custom-tags/{tagId}")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  public void deleteCustomTag(
+      @AuthenticationPrincipal AuthenticatedAccount account, @PathVariable("tagId") Long tagId) {
+    tagService.deleteCustomTag(account.accountId(), tagId);
+  }
 }

@@ -6,50 +6,49 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-public record HolidayApiResponse(
-        String resultCode,
-        List<HolidayApiItem> items
-) {
+public record HolidayApiResponse(String resultCode, List<HolidayApiItem> items) {
 
-    public static HolidayApiResponse fromJson(String json, ObjectMapper objectMapper) throws JacksonException {
-        JsonNode root = objectMapper.readTree(json);
-        JsonNode response = root.path("response");
-        String resultCode = textOrNull(response.path("header").get("resultCode"));
-        List<HolidayApiItem> items = itemsFrom(response.path("body").path("items").path("item"), objectMapper);
+  public static HolidayApiResponse fromJson(String json, ObjectMapper objectMapper)
+      throws JacksonException {
+    JsonNode root = objectMapper.readTree(json);
+    JsonNode response = root.path("response");
+    String resultCode = textOrNull(response.path("header").get("resultCode"));
+    List<HolidayApiItem> items =
+        itemsFrom(response.path("body").path("items").path("item"), objectMapper);
 
-        return new HolidayApiResponse(resultCode, items);
+    return new HolidayApiResponse(resultCode, items);
+  }
+
+  public boolean isSuccess() {
+    return "00".equals(resultCode);
+  }
+
+  private static List<HolidayApiItem> itemsFrom(JsonNode itemNode, ObjectMapper objectMapper)
+      throws JacksonException {
+    if (itemNode.isMissingNode() || itemNode.isNull()) {
+      return List.of();
     }
 
-    public boolean isSuccess() {
-        return "00".equals(resultCode);
+    if (itemNode.isArray()) {
+      List<HolidayApiItem> items = new ArrayList<>();
+      for (JsonNode node : itemNode) {
+        items.add(HolidayApiItem.from(node, objectMapper));
+      }
+      return items;
     }
 
-    private static List<HolidayApiItem> itemsFrom(JsonNode itemNode, ObjectMapper objectMapper)
-            throws JacksonException {
-        if (itemNode.isMissingNode() || itemNode.isNull()) {
-            return List.of();
-        }
-
-        if (itemNode.isArray()) {
-            List<HolidayApiItem> items = new ArrayList<>();
-            for (JsonNode node : itemNode) {
-                items.add(HolidayApiItem.from(node, objectMapper));
-            }
-            return items;
-        }
-
-        if (itemNode.isObject()) {
-            return List.of(HolidayApiItem.from(itemNode, objectMapper));
-        }
-
-        return List.of();
+    if (itemNode.isObject()) {
+      return List.of(HolidayApiItem.from(itemNode, objectMapper));
     }
 
-    private static String textOrNull(JsonNode node) {
-        if (node == null || node.isNull()) {
-            return null;
-        }
+    return List.of();
+  }
 
-        return node.asString();
+  private static String textOrNull(JsonNode node) {
+    if (node == null || node.isNull()) {
+      return null;
     }
+
+    return node.asString();
+  }
 }

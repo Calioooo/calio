@@ -10,8 +10,8 @@ import org.springframework.context.annotation.Bean;
 @TestConfiguration
 public class AuthenticatedAccountMockMvcTestConfig {
 
-    @Bean
-    MockMvcBuilderCustomizer authenticatedAccountDefaultRequest() {
-        return builder -> builder.defaultRequest(get("/").with(testSecurityContext()));
-    }
+  @Bean
+  MockMvcBuilderCustomizer authenticatedAccountDefaultRequest() {
+    return builder -> builder.defaultRequest(get("/").with(testSecurityContext()));
+  }
 }

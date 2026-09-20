@@ -13,41 +13,39 @@ import java.time.Instant;
 @Table(name = "accounts")
 public class Account extends BaseEntity {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
 
-    @Embedded
-    private AccountAuthToken authToken;
+  @Embedded private AccountAuthToken authToken;
 
-    public Account() {
-    }
+  public Account() {}
 
-    public Long getId() {
-        return id;
-    }
+  public Long getId() {
+    return id;
+  }
 
-    public void issueAuthToken(String tokenHash) {
-        authToken = AccountAuthToken.issue(tokenHash);
-    }
+  public void issueAuthToken(String tokenHash) {
+    authToken = AccountAuthToken.issue(tokenHash);
+  }
 
-    public void authenticateAuthToken(Instant usedAt) {
-        authToken.authenticate(usedAt);
-    }
+  public void authenticateAuthToken(Instant usedAt) {
+    authToken.authenticate(usedAt);
+  }
 
-    public void revokeAuthToken(Instant revokedAt) {
-        authToken.revoke(revokedAt);
-    }
+  public void revokeAuthToken(Instant revokedAt) {
+    authToken.revoke(revokedAt);
+  }
 
-    public String getAuthTokenHash() {
-        return authToken == null ? null : authToken.getTokenHash();
-    }
+  public String getAuthTokenHash() {
+    return authToken == null ? null : authToken.getTokenHash();
+  }
 
-    public Instant getAuthTokenRevokedAt() {
-        return authToken == null ? null : authToken.getRevokedAt();
-    }
+  public Instant getAuthTokenRevokedAt() {
+    return authToken == null ? null : authToken.getRevokedAt();
+  }
 
-    public Instant getAuthTokenLastUsedAt() {
-        return authToken == null ? null : authToken.getLastUsedAt();
-    }
+  public Instant getAuthTokenLastUsedAt() {
+    return authToken == null ? null : authToken.getLastUsedAt();
+  }
 }

@@ -4,9 +4,7 @@ import java.time.ZoneId;
 import java.util.List;
 
 public record CalendarAssistantRequest(
-        Long accountId,
-        String conversationId,
-        ZoneId timeZone,
-        List<CalendarConversationHistoryMessage> history
-) {
-}
+    Long accountId,
+    String conversationId,
+    ZoneId timeZone,
+    List<CalendarConversationHistoryMessage> history) {}

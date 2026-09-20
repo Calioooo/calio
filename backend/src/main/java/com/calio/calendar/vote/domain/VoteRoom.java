@@ -18,41 +18,62 @@ import java.util.UUID;
 @Table(name = "vote_rooms")
 public class VoteRoom extends BaseEntity {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
 
-    @Column(name = "public_id", nullable = false, unique = true, length = 36)
-    private UUID publicId;
+  @Column(name = "public_id", nullable = false, unique = true, length = 36)
+  private UUID publicId;
 
-    @Column(nullable = false)
-    private String name;
+  @Column(nullable = false)
+  private String name;
 
-    @Column(name = "candidate_start_date", nullable = false)
-    private LocalDate candidateStartDate;
+  @Column(name = "candidate_start_date", nullable = false)
+  private LocalDate candidateStartDate;
 
-    @Column(name = "candidate_end_date", nullable = false)
-    private LocalDate candidateEndDate;
+  @Column(name = "candidate_end_date", nullable = false)
+  private LocalDate candidateEndDate;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "created_by_account_id")
-    private Account createdByAccount;
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "created_by_account_id")
+  private Account createdByAccount;
 
-    protected VoteRoom() {
-    }
+  protected VoteRoom() {}
 
-    public VoteRoom(UUID publicId, String name, LocalDate candidateStartDate, LocalDate candidateEndDate, Account createdByAccount) {
-        this.publicId = publicId;
-        this.name = name;
-        this.candidateStartDate = candidateStartDate;
-        this.candidateEndDate = candidateEndDate;
-        this.createdByAccount = createdByAccount;
-    }
+  public VoteRoom(
+      UUID publicId,
+      String name,
+      LocalDate candidateStartDate,
+      LocalDate candidateEndDate,
+      Account createdByAccount) {
+    this.publicId = publicId;
+    this.name = name;
+    this.candidateStartDate = candidateStartDate;
+    this.candidateEndDate = candidateEndDate;
+    this.createdByAccount = createdByAccount;
+  }
 
-    public Long getId() { return id; }
-    public UUID getPublicId() { return publicId; }
-    public String getName() { return name; }
-    public LocalDate getCandidateStartDate() { return candidateStartDate; }
-    public LocalDate getCandidateEndDate() { return candidateEndDate; }
-    public Account getCreatedByAccount() { return createdByAccount; }
+  public Long getId() {
+    return id;
+  }
+
+  public UUID getPublicId() {
+    return publicId;
+  }
+
+  public String getName() {
+    return name;
+  }
+
+  public LocalDate getCandidateStartDate() {
+    return candidateStartDate;
+  }
+
+  public LocalDate getCandidateEndDate() {
+    return candidateEndDate;
+  }
+
+  public Account getCreatedByAccount() {
+    return createdByAccount;
+  }
 }

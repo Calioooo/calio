@@ -11,29 +11,28 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class GoogleCalendarEventMappingCommandService {
 
-    private final GoogleCalendarEventMappingRepository eventMappingRepository;
+  private final GoogleCalendarEventMappingRepository eventMappingRepository;
 
-    public GoogleCalendarEventMappingCommandService(
-            GoogleCalendarEventMappingRepository eventMappingRepository
-    ) {
-        this.eventMappingRepository = eventMappingRepository;
-    }
+  public GoogleCalendarEventMappingCommandService(
+      GoogleCalendarEventMappingRepository eventMappingRepository) {
+    this.eventMappingRepository = eventMappingRepository;
+  }
 
-    public GoogleCalendarEventMapping createEventMapping(GoogleCalendarEventMapping mapping) {
-        return eventMappingRepository.save(mapping);
-    }
+  public GoogleCalendarEventMapping createEventMapping(GoogleCalendarEventMapping mapping) {
+    return eventMappingRepository.save(mapping);
+  }
 
-    public void deleteEventMapping(GoogleCalendarEventMapping mapping) {
-        eventMappingRepository.delete(mapping);
-        eventMappingRepository.flush();
-    }
+  public void deleteEventMapping(GoogleCalendarEventMapping mapping) {
+    eventMappingRepository.delete(mapping);
+    eventMappingRepository.flush();
+  }
 
-    public void deleteEventMappings(List<GoogleCalendarEventMapping> mappings) {
-        eventMappingRepository.deleteAll(mappings);
-        eventMappingRepository.flush();
-    }
+  public void deleteEventMappings(List<GoogleCalendarEventMapping> mappings) {
+    eventMappingRepository.deleteAll(mappings);
+    eventMappingRepository.flush();
+  }
 
-    public void deleteEventMappingsWithIds(Collection<Long> mappingIds) {
-        eventMappingRepository.deleteAllByIds(mappingIds);
-    }
+  public void deleteEventMappingsWithIds(Collection<Long> mappingIds) {
+    eventMappingRepository.deleteAllByIds(mappingIds);
+  }
 }
