@@ -5,22 +5,19 @@ import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.vote.controller.dto.VoteParticipantSelectionResponse;
 import com.calio.calendar.vote.domain.Vote;
 import com.calio.calendar.vote.domain.VoteParticipant;
+import com.calio.calendar.vote.domain.VoteParticipantNickname;
 import com.calio.calendar.vote.repository.VoteParticipantRepository;
 import com.calio.calendar.vote.repository.VoteRepository;
 import com.calio.calendar.vote.repository.VoteRoomRepository;
-import java.text.Normalizer;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
-import java.util.regex.Pattern;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class LookupVoteParticipantSelectionUseCase {
-
-  private static final Pattern NICKNAME_PATTERN = Pattern.compile("^[A-Za-z0-9가-힣]{1,9}$");
 
   private final VoteRoomRepository voteRoomRepository;
   private final VoteParticipantRepository voteParticipantRepository;
@@ -45,21 +42,10 @@ public class LookupVoteParticipantSelectionUseCase {
         .orElseThrow(() -> new CalioException(ErrorCode.VOTE_ROOM_NOT_FOUND));
     VoteParticipant participant =
         voteParticipantRepository
-            .findByVoteRoomPublicIdAndNickname(voteRoomPublicId, normalizeNickname(nickname))
+            .findByVoteRoomPublicIdAndNickname(voteRoomPublicId, VoteParticipantNickname.of(nickname).value())
             .orElseThrow(() -> new CalioException(ErrorCode.VOTE_PARTICIPANT_CREDENTIAL_INVALID));
     requireValidPassword(participant, password);
     return VoteParticipantSelectionResponse.from(participant, getUnavailableDates(participant));
-  }
-
-  private String normalizeNickname(String nickname) {
-    if (nickname == null) {
-      throw new CalioException(ErrorCode.VALIDATION_FAILED);
-    }
-    String normalizedNickname = Normalizer.normalize(nickname, Normalizer.Form.NFC);
-    if (!NICKNAME_PATTERN.matcher(normalizedNickname).matches()) {
-      throw new CalioException(ErrorCode.VALIDATION_FAILED);
-    }
-    return normalizedNickname;
   }
 
   private void requireValidPassword(VoteParticipant participant, String password) {

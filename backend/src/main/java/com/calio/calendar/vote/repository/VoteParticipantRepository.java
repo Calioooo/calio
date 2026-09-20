@@ -18,7 +18,7 @@ public interface VoteParticipantRepository extends JpaRepository<VoteParticipant
             select participant
             from VoteParticipant participant
             where participant.voteRoom.publicId = :voteRoomPublicId
-              and lower(participant.nickname) = lower(:nickname)
+              and lower(participant.nickname.value) = lower(:nickname)
             """)
     Optional<VoteParticipant> findByVoteRoomPublicIdAndNickname(
             @Param("voteRoomPublicId") UUID voteRoomPublicId,
@@ -31,7 +31,7 @@ public interface VoteParticipantRepository extends JpaRepository<VoteParticipant
             select participant
             from VoteParticipant participant
             where participant.voteRoom.publicId = :voteRoomPublicId
-              and lower(participant.nickname) = lower(:nickname)
+              and lower(participant.nickname.value) = lower(:nickname)
             """)
     Optional<VoteParticipant> findByVoteRoomPublicIdAndNicknameForUpdate(
             @Param("voteRoomPublicId") UUID voteRoomPublicId,
@@ -39,7 +39,7 @@ public interface VoteParticipantRepository extends JpaRepository<VoteParticipant
     );
 
     @Query("""
-            select participant.nickname
+            select participant.nickname.value
             from VoteParticipant participant
             where participant.voteRoom.publicId = :voteRoomPublicId
               and participant.status = com.calio.calendar.vote.domain.VoteParticipantStatus.SUBMITTED

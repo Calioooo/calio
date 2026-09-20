@@ -1,7 +1,9 @@
 package com.calio.calendar.vote.domain;
 
 import com.calio.calendar.common.domain.BaseEntity;
+import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -31,8 +33,9 @@ public class VoteParticipant extends BaseEntity {
   @JoinColumn(name = "vote_room_id", nullable = false)
   private VoteRoom voteRoom;
 
-  @Column(nullable = false, length = 9)
-  private String nickname;
+  @Embedded
+  @AttributeOverride(name = "value", column = @Column(name = "nickname", nullable = false, length = 9))
+  private VoteParticipantNickname nickname;
 
   @Column(name = "password_hash")
   private String passwordHash;
@@ -44,6 +47,11 @@ public class VoteParticipant extends BaseEntity {
   protected VoteParticipant() {}
 
   public VoteParticipant(VoteRoom voteRoom, String nickname, String passwordHash) {
+    this(voteRoom, VoteParticipantNickname.of(nickname), passwordHash);
+  }
+
+  public VoteParticipant(
+      VoteRoom voteRoom, VoteParticipantNickname nickname, String passwordHash) {
     this.voteRoom = voteRoom;
     this.nickname = nickname;
     this.passwordHash = passwordHash;
@@ -59,7 +67,7 @@ public class VoteParticipant extends BaseEntity {
   }
 
   public String getNickname() {
-    return nickname;
+    return nickname.value();
   }
 
   public String getPasswordHash() {
