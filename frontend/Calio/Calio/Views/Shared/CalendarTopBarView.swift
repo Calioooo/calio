@@ -73,6 +73,9 @@ struct CalendarTopBarView: View {
       .layoutPriority(1)
 
       Spacer(minLength: 0)
+      if showsTodayButton {
+        compactTodayButton
+      }
       compactGoogleCalendarButton
       voteActions
       compactCreateButton
@@ -131,12 +134,23 @@ struct CalendarTopBarView: View {
 
       HStack(spacing: 12) {
         googleCalendarButton
-        if hasVoteActions {
-          voteActions
-          compactCreateButton
-        } else {
-          standardCreateButton
-        }
+        standardCreateButton
+      }
+
+      if let onCreateVoteTapped {
+        accessibilityActionButton(
+          title: "투표 만들기",
+          accessibilityIdentifier: "calendar_navigation_create_vote",
+          action: onCreateVoteTapped
+        )
+      }
+
+      if let onMyVotesTapped {
+        accessibilityActionButton(
+          title: "내가 만든 투표",
+          accessibilityIdentifier: "calendar_navigation_my_votes",
+          action: onMyVotesTapped
+        )
       }
     }
   }
@@ -146,7 +160,7 @@ struct CalendarTopBarView: View {
       .font(.subheadline.weight(.semibold))
       .foregroundStyle(.calioPrimary)
       .padding(.horizontal, 12)
-      .frame(minHeight: 40)
+      .frame(minHeight: 44)
       .background(RoundedRectangle(cornerRadius: 10).fill(Color.calioSelection))
       .accessibilityLabel("오늘로 이동")
       .accessibilityIdentifier("calendar_navigation_today")
@@ -157,7 +171,7 @@ struct CalendarTopBarView: View {
       Image(systemName: "calendar.badge.plus")
         .font(.system(size: 17, weight: .semibold))
         .foregroundStyle(.calioTextSecondary)
-        .frame(width: 40, height: 40)
+        .frame(width: 44, height: 44)
         .background(RoundedRectangle(cornerRadius: 10).fill(Color.calioSurface))
     }
     .buttonStyle(.plain)
@@ -180,13 +194,25 @@ struct CalendarTopBarView: View {
     .accessibilityIdentifier("calendar_navigation_google_connect")
   }
 
+  private var compactTodayButton: some View {
+    Button("오늘", action: onTodayTapped)
+      .font(.caption.weight(.semibold))
+      .foregroundStyle(.calioPrimary)
+      .lineLimit(1)
+      .padding(.horizontal, 7)
+      .frame(height: 34)
+      .background(RoundedRectangle(cornerRadius: 9).fill(Color.calioSelection))
+      .accessibilityLabel("오늘로 이동")
+      .accessibilityIdentifier("calendar_navigation_today")
+  }
+
   private var standardCreateButton: some View {
     Button(action: onCreateTapped) {
       Label("일정 추가", systemImage: "plus")
         .font(.subheadline.weight(.semibold))
         .foregroundStyle(.white)
         .padding(.horizontal, 13)
-        .frame(maxWidth: .infinity, minHeight: 40)
+        .frame(maxWidth: .infinity, minHeight: 44)
         .background(RoundedRectangle(cornerRadius: 10).fill(Color.calioBrand))
     }
     .buttonStyle(.plain)
@@ -253,6 +279,26 @@ struct CalendarTopBarView: View {
     .buttonStyle(.plain)
     .accessibilityLabel("내 투표")
     .accessibilityIdentifier("calendar_navigation_my_votes")
+  }
+
+  private func accessibilityActionButton(
+    title: String,
+    accessibilityIdentifier: String,
+    action: @escaping () -> Void
+  ) -> some View {
+    Button(action: action) {
+      Text(title)
+        .font(.body.weight(.bold))
+        .foregroundStyle(.white)
+        .multilineTextAlignment(.center)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, minHeight: 44)
+        .background(VotePrimaryActionStyle.gradient, in: RoundedRectangle(cornerRadius: 12))
+    }
+    .buttonStyle(.plain)
+    .accessibilityLabel(title)
+    .accessibilityIdentifier(accessibilityIdentifier)
   }
 }
 

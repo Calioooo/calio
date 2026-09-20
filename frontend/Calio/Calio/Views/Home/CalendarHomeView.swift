@@ -8,6 +8,11 @@
 import SwiftUI
 
 struct CalendarHomeView: View {
+  private enum VoteListDismissAction {
+    case openRoom(VoteRoom)
+    case createVote
+  }
+
   @StateObject private var viewModel: CalendarHomeViewModel
   @State private var displayMode: CalendarDisplayMode = .week
   @State private var isShowingEventCreationView = false
@@ -15,6 +20,7 @@ struct CalendarHomeView: View {
   @State private var isShowingVoteCreation = false
   @State private var isShowingVoteList = false
   @State private var createdVoteRoom: VoteRoom?
+  @State private var pendingVoteListAction: VoteListDismissAction?
   private let onGoogleCalendarConnectTapped: () -> Void
   private let onVoteRoomOpen: (VoteRoom) -> Void
 
@@ -86,7 +92,10 @@ struct CalendarHomeView: View {
         onCalendarRefreshNeeded: viewModel.refreshAfterAssistantResponse
       )
       .overlay { votePopover }
-      .fullScreenCover(isPresented: $isShowingVoteList) {
+      .fullScreenCover(
+        isPresented: $isShowingVoteList,
+        onDismiss: performPendingVoteListAction
+      ) {
         VoteListView(
           onClose: { isShowingVoteList = false },
           onRoomSelected: openVoteRoomFromList(_:),
@@ -193,15 +202,23 @@ struct CalendarHomeView: View {
   }
 
   private func openVoteRoomFromList(_ room: VoteRoom) {
+    pendingVoteListAction = .openRoom(room)
     isShowingVoteList = false
-    DispatchQueue.main.async {
-      onVoteRoomOpen(room)
-    }
   }
 
   private func startVoteCreationFromList() {
+    pendingVoteListAction = .createVote
     isShowingVoteList = false
-    DispatchQueue.main.async {
+  }
+
+  private func performPendingVoteListAction() {
+    guard let action = pendingVoteListAction else { return }
+    pendingVoteListAction = nil
+
+    switch action {
+    case .openRoom(let room):
+      onVoteRoomOpen(room)
+    case .createVote:
       isShowingVoteCreation = true
     }
   }

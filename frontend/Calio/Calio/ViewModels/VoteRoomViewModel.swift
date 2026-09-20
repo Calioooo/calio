@@ -20,6 +20,7 @@ final class VoteRoomViewModel: ObservableObject {
   private let voteService: VoteService
   private let personalScheduleService: any VotePersonalScheduleProviding
   private var pollingTask: Task<Void, Never>?
+  private var resultRequestGeneration = 0
 
   init(
     room: VoteRoom,
@@ -59,7 +60,7 @@ final class VoteRoomViewModel: ObservableObject {
     guard loadState != .unavailable else { return }
     loadState = .loading
     resultRefreshFailure = nil
-    await refreshResult(setsLoadingState: true)
+    await performResultRefresh()
   }
 
   func showExistingParticipant() {
@@ -152,7 +153,7 @@ final class VoteRoomViewModel: ObservableObject {
       let unavailableDays = Set(submission.unavailableDays)
       savedUnavailableDays = unavailableDays
       draftUnavailableDays = unavailableDays
-      await refreshResult(setsLoadingState: false)
+      await performResultRefresh()
       participantFlow = .result
     } catch is CancellationError {
       return
@@ -169,7 +170,7 @@ final class VoteRoomViewModel: ObservableObject {
       while !Task.isCancelled {
         try? await Task.sleep(nanoseconds: 15_000_000_000)
         guard !Task.isCancelled, let self else { return }
-        await self.refreshResult(setsLoadingState: false)
+        await self.performResultRefresh()
       }
     }
   }
@@ -180,7 +181,7 @@ final class VoteRoomViewModel: ObservableObject {
   }
 
   func refreshResult() async {
-    await refreshResult(setsLoadingState: false)
+    await performResultRefresh()
   }
 
   deinit {
@@ -223,27 +224,51 @@ final class VoteRoomViewModel: ObservableObject {
     }
   }
 
-  private func refreshResult(setsLoadingState: Bool) async {
+  private func performResultRefresh() async {
+    resultRequestGeneration += 1
+    let requestGeneration = resultRequestGeneration
+
     do {
-      result = try await voteService.fetchResult(publicId: publicId)
+      let refreshedResult = try await voteService.fetchResult(publicId: publicId)
+      guard requestGeneration == resultRequestGeneration else { return }
+      result = refreshedResult
       loadState = .loaded
       resultRefreshFailure = nil
     } catch is CancellationError {
       return
     } catch let error as VoteServiceError {
-      if setsLoadingState || result == nil {
-        handle(error)
-      } else {
-        resultRefreshFailure = failure(for: error)
-      }
+      guard requestGeneration == resultRequestGeneration else { return }
+      handleResultRefreshFailure(error)
     } catch {
-      if setsLoadingState || result == nil {
-        actionFailure = .unexpected
-        loadState = .failed(.unexpected)
-      } else {
-        resultRefreshFailure = .unexpected
-      }
+      guard requestGeneration == resultRequestGeneration else { return }
+      handleUnexpectedResultRefreshFailure()
     }
+  }
+
+  private func handleResultRefreshFailure(_ error: VoteServiceError) {
+    if error == .voteRoomNotFound {
+      handle(error)
+      return
+    }
+
+    guard result == nil else {
+      loadState = .loaded
+      resultRefreshFailure = failure(for: error)
+      return
+    }
+
+    handle(error)
+  }
+
+  private func handleUnexpectedResultRefreshFailure() {
+    guard result == nil else {
+      loadState = .loaded
+      resultRefreshFailure = .unexpected
+      return
+    }
+
+    actionFailure = .unexpected
+    loadState = .failed(.unexpected)
   }
 
   private func handle(_ error: VoteServiceError) {

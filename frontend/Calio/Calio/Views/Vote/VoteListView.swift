@@ -116,7 +116,7 @@ struct VoteListView: View {
         Button {
           selectedTab = tab
         } label: {
-          Text("\(tab.title) \(rooms(for: tab).count)")
+          Text(tabTitle(for: tab))
             .font(.headline.weight(.semibold))
             .foregroundStyle(selectedTab == tab ? .voteAccent : .calioTextSecondary)
             .frame(maxWidth: .infinity, minHeight: 54)
@@ -161,31 +161,30 @@ struct VoteListView: View {
         roomCards(rooms)
       }
 
-    case .failed:
-      failedState
+    case .failed(let failure):
+      failedState(failure)
     }
   }
 
   private func roomCards(_ rooms: [VoteRoom]) -> some View {
-    VStack(spacing: 14) {
+    VStack(alignment: .leading, spacing: 14) {
       ForEach(rooms) { room in
         roomButton(room)
       }
-    }
-    .overlay(alignment: .bottomLeading) {
+
       Text("투표를 선택하면 투표방으로 이동합니다.")
         .font(.footnote)
         .foregroundStyle(.calioTextSecondary)
-        .offset(y: 34)
+        .padding(.top, 6)
     }
-    .padding(.bottom, 34)
   }
 
-  private var failedState: some View {
+  private func failedState(_ failure: VoteListFailure) -> some View {
     VStack(spacing: 12) {
-      Text("투표를 불러오지 못했습니다.")
+      Text(failure.message)
         .font(.headline)
         .foregroundStyle(.calioPrimary)
+        .multilineTextAlignment(.center)
       Button("다시 시도") {
         Task { await viewModel.reloadCreatedRooms() }
       }
@@ -196,15 +195,18 @@ struct VoteListView: View {
     .padding(.vertical, 56)
   }
 
-  private func rooms(for tab: Tab) -> [VoteRoom] {
+  private func tabTitle(for tab: Tab) -> String {
+    guard let count = roomCount(for: tab) else { return tab.title }
+    return "\(tab.title) \(count)"
+  }
+
+  private func roomCount(for tab: Tab) -> Int? {
     switch tab {
     case .created:
-      if case .loaded(let rooms) = viewModel.createdRoomState {
-        return rooms
-      }
-      return []
+      guard case .loaded(let rooms) = viewModel.createdRoomState else { return nil }
+      return rooms.count
     case .participated:
-      return []
+      return 0
     }
   }
 

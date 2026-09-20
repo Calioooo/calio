@@ -78,6 +78,68 @@ struct VoteRoomViewModelTests {
     #expect(viewModel.resultRefreshFailure == .network)
   }
 
+  @Test @MainActor func savedVoteShowsStaleResultFailureAndRetryClearsIt() async {
+    let repository = VoteRoomRepositoryStub(
+      resultResponse: resultResponse(unavailableCount: 1),
+      resultErrorsByCall: [2: VoteServiceError.network],
+      lookupResponse: VoteParticipantSelectionResponseDTO(
+        nickname: "민지", status: .registered, unavailableDates: []
+      ),
+      submitResponse: VoteSubmissionResponseDTO(
+        nickname: "민지", status: .submitted, unavailableDates: ["2026-10-16"]
+      )
+    )
+    let viewModel = VoteRoomViewModel(room: room, voteService: VoteService(repository: repository))
+    viewModel.nickname = "민지"
+
+    await viewModel.load()
+    await viewModel.restoreParticipantSelection()
+    viewModel.toggleUnavailableDay(VoteDay(year: 2026, month: 10, day: 16))
+    await viewModel.submitVotes()
+
+    #expect(viewModel.participantFlow == .result)
+    #expect(viewModel.resultRefreshFailure == .network)
+    #expect(viewModel.result?.dateResults.first?.unavailableCount == 1)
+
+    await viewModel.refreshResult()
+
+    #expect(viewModel.resultRefreshFailure == nil)
+    #expect(repository.fetchResultCount == 3)
+  }
+
+  @Test @MainActor func latestStartedResultRequestWinsWhenOlderRequestFinishesLast() async {
+    let repository = OutOfOrderVoteRoomRepositoryStub(
+      olderResponse: resultResponse(unavailableCount: 1),
+      newerResponse: resultResponse(unavailableCount: 2)
+    )
+    let viewModel = VoteRoomViewModel(room: room, voteService: VoteService(repository: repository))
+
+    let olderRequest = Task { await viewModel.refreshResult() }
+    await repository.waitUntilFirstRequestStarts()
+    let newerRequest = Task { await viewModel.refreshResult() }
+    await newerRequest.value
+    await repository.completeFirstRequest()
+    await olderRequest.value
+
+    #expect(viewModel.loadState == .loaded)
+    #expect(viewModel.result?.dateResults.first?.unavailableCount == 2)
+  }
+
+  @Test @MainActor func repeatedLoadFailureRestoresLoadedStateWhenCachedResultExists() async {
+    let repository = VoteRoomRepositoryStub(
+      resultResponse: resultResponse(unavailableCount: 1),
+      subsequentResultError: VoteServiceError.network
+    )
+    let viewModel = VoteRoomViewModel(room: room, voteService: VoteService(repository: repository))
+
+    await viewModel.load()
+    await viewModel.load()
+
+    #expect(viewModel.loadState == .loaded)
+    #expect(viewModel.result?.dateResults.first?.unavailableCount == 1)
+    #expect(viewModel.resultRefreshFailure == .network)
+  }
+
   @Test @MainActor func credentialFailureDuringSaveReturnsToExistingParticipantFlow() async {
     let repository = VoteRoomRepositoryStub(
       lookupResponse: VoteParticipantSelectionResponseDTO(
@@ -150,6 +212,7 @@ private final class VoteRoomRepositoryStub: VoteRepository {
   private let resultResponse: VoteResultResponseDTO
   private let resultError: Error?
   private let subsequentResultError: Error?
+  private let resultErrorsByCall: [Int: Error]
   private let lookupResponse: VoteParticipantSelectionResponseDTO
   private let submitResponse: VoteSubmissionResponseDTO
   private let submitError: Error?
@@ -160,6 +223,7 @@ private final class VoteRoomRepositoryStub: VoteRepository {
     resultResponse: VoteResultResponseDTO? = nil,
     resultError: Error? = nil,
     subsequentResultError: Error? = nil,
+    resultErrorsByCall: [Int: Error] = [:],
     lookupResponse: VoteParticipantSelectionResponseDTO = VoteParticipantSelectionResponseDTO(
       nickname: "민지", status: .registered, unavailableDates: []
     ),
@@ -177,6 +241,7 @@ private final class VoteRoomRepositoryStub: VoteRepository {
       )
     self.resultError = resultError
     self.subsequentResultError = subsequentResultError
+    self.resultErrorsByCall = resultErrorsByCall
     self.lookupResponse = lookupResponse
     self.submitResponse = submitResponse
     self.submitError = submitError
@@ -190,6 +255,7 @@ private final class VoteRoomRepositoryStub: VoteRepository {
 
   func fetchVoteResult(publicId _: UUID) async throws -> VoteResultResponseDTO {
     fetchResultCount += 1
+    if let error = resultErrorsByCall[fetchResultCount] { throw error }
     if let resultError { throw resultError }
     if fetchResultCount > 1, let subsequentResultError { throw subsequentResultError }
     return resultResponse
@@ -214,6 +280,63 @@ private final class VoteRoomRepositoryStub: VoteRepository {
     if let submitError { throw submitError }
     return submitResponse
   }
+}
+
+private actor OutOfOrderVoteRoomRepositoryStub: VoteRepository {
+  private let olderResponse: VoteResultResponseDTO
+  private let newerResponse: VoteResultResponseDTO
+  private var fetchResultCount = 0
+  private var firstRequestContinuation: CheckedContinuation<VoteResultResponseDTO, Never>?
+  private var firstRequestStartedContinuation: CheckedContinuation<Void, Never>?
+
+  init(olderResponse: VoteResultResponseDTO, newerResponse: VoteResultResponseDTO) {
+    self.olderResponse = olderResponse
+    self.newerResponse = newerResponse
+  }
+
+  func waitUntilFirstRequestStarts() async {
+    guard fetchResultCount == 0 else { return }
+    await withCheckedContinuation { continuation in
+      firstRequestStartedContinuation = continuation
+    }
+  }
+
+  func completeFirstRequest() {
+    firstRequestContinuation?.resume(returning: olderResponse)
+    firstRequestContinuation = nil
+  }
+
+  func createVoteRoom(_: CreateVoteRoomRequestDTO) async throws -> VoteRoomResponseDTO {
+    fatalError()
+  }
+
+  func fetchMyVoteRooms() async throws -> [VoteRoomResponseDTO] { fatalError() }
+
+  func fetchVoteResult(publicId _: UUID) async throws -> VoteResultResponseDTO {
+    fetchResultCount += 1
+    guard fetchResultCount == 1 else { return newerResponse }
+
+    firstRequestStartedContinuation?.resume()
+    firstRequestStartedContinuation = nil
+    return await withCheckedContinuation { continuation in
+      firstRequestContinuation = continuation
+    }
+  }
+
+  func createVoteParticipant(
+    publicId _: UUID,
+    request _: CreateVoteParticipantRequestDTO
+  ) async throws -> VoteParticipantResponseDTO { fatalError() }
+
+  func lookupVoteParticipantSelection(
+    publicId _: UUID,
+    request _: LookupVoteParticipantSelectionRequestDTO
+  ) async throws -> VoteParticipantSelectionResponseDTO { fatalError() }
+
+  func submitVotes(
+    publicId _: UUID,
+    request _: SubmitVoteRequestDTO
+  ) async throws -> VoteSubmissionResponseDTO { fatalError() }
 }
 
 private struct VotePersonalScheduleStub: VotePersonalScheduleProviding {

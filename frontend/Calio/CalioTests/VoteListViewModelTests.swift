@@ -36,13 +36,25 @@ struct VoteListViewModelTests {
     )
   }
 
-  @Test @MainActor func loadingFailureShowsFailureState() async {
-    let service = VoteService(repository: VoteListRepositoryStub(error: VoteServiceError.network))
-    let viewModel = VoteListViewModel(voteService: service)
+  @Test @MainActor func loadingFailurePreservesItsListSpecificReason() async {
+    let expectations: [(VoteServiceError, VoteListFailure)] = [
+      (.network, .network),
+      (.decoding, .decoding),
+      (.voteRoomNotFound, .backend),
+      (.participantNicknameConflict, .backend),
+      (.participantCredentialInvalid, .backend),
+      (.validationFailed, .backend),
+      (.unexpected, .unexpected),
+    ]
 
-    await viewModel.loadCreatedRoomsIfNeeded()
+    for (serviceError, expectedFailure) in expectations {
+      let service = VoteService(repository: VoteListRepositoryStub(error: serviceError))
+      let viewModel = VoteListViewModel(voteService: service)
 
-    #expect(viewModel.createdRoomState == .failed)
+      await viewModel.loadCreatedRoomsIfNeeded()
+
+      #expect(viewModel.createdRoomState == .failed(expectedFailure))
+    }
   }
 }
 
