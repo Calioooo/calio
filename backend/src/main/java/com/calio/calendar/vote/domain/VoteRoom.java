@@ -28,7 +28,7 @@ public class VoteRoom extends BaseEntity {
     @Embedded
     private VoteCandidateDateRange candidateDateRange;
 
-    @Column(name = "created_by_account_id", nullable = false)
+    @Column(name = "created_by_account_id")
     private Long createdByAccountId;
 
     protected VoteRoom() {
