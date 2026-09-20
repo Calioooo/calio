@@ -3,7 +3,6 @@ package com.calio.calendar.vote.usecase;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
-import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.vote.controller.dto.VoteResultResponse;
 import com.calio.calendar.vote.domain.Vote;
 import com.calio.calendar.vote.domain.VoteParticipant;
@@ -50,7 +49,7 @@ class GetVoteResultUseCaseTest {
             "여행 일정",
             LocalDate.of(2026, 8, 14),
             LocalDate.of(2026, 8, 16),
-            new Account());
+            1L);
     when(voteRoomRepository.findByPublicId(VOTE_ROOM_PUBLIC_ID)).thenReturn(Optional.of(voteRoom));
     VoteParticipant submittedParticipant = new VoteParticipant(voteRoom, "submitted", null);
     submittedParticipant.submit();

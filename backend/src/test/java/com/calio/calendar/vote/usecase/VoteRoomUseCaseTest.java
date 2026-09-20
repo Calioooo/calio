@@ -58,7 +58,7 @@ class VoteRoomUseCaseTest {
     assertThat(voteRoom.getPublicId()).isNotNull();
     assertThat(voteRoom.getCandidateStartDate()).isEqualTo(KOREA_TODAY);
     assertThat(voteRoom.getCandidateEndDate()).isEqualTo(KOREA_TODAY.plusDays(30));
-    assertThat(voteRoom.getCreatedByAccount()).isSameAs(account);
+    assertThat(voteRoom.getCreatedByAccountId()).isEqualTo(ACCOUNT_ID);
   }
 
   @Test

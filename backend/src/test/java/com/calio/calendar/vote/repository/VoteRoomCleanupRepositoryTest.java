@@ -59,6 +59,6 @@ class VoteRoomCleanupRepositoryTest {
 
   private VoteRoom voteRoom(String name, LocalDate candidateEndDate) {
     return new VoteRoom(
-        UUID.randomUUID(), name, candidateEndDate.minusDays(6), candidateEndDate, account);
+        UUID.randomUUID(), name, candidateEndDate.minusDays(6), candidateEndDate, account.getId());
   }
 }

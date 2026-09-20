@@ -7,7 +7,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.vote.controller.dto.LookupVoteParticipantSelectionRequest;
@@ -125,6 +124,6 @@ class LookupVoteParticipantSelectionUseCaseTest {
         "여행 일정",
         LocalDate.of(2026, 8, 14),
         LocalDate.of(2026, 8, 20),
-        new Account());
+        1L);
   }
 }

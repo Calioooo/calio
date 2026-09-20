@@ -1,6 +1,5 @@
 package com.calio.calendar.vote.usecase;
 
-import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
@@ -35,13 +34,12 @@ public class CreateVoteRoomUseCase {
     LocalDate candidateStartDate = LocalDate.now(clock.withZone(KOREA_ZONE));
     VoteCandidateDateRange candidateDateRange =
         VoteCandidateDateRange.of(candidateStartDate, candidateEndDate);
-    Account account =
-        accountRepository
-            .findById(accountId)
-            .orElseThrow(() -> new CalioException(ErrorCode.ACCOUNT_NOT_FOUND));
+    accountRepository
+        .findById(accountId)
+        .orElseThrow(() -> new CalioException(ErrorCode.ACCOUNT_NOT_FOUND));
     VoteRoom voteRoom =
         voteRoomRepository.save(
-            new VoteRoom(UUID.randomUUID(), name, candidateDateRange, account));
+            new VoteRoom(UUID.randomUUID(), name, candidateDateRange, accountId));
     return VoteRoomResponse.from(voteRoom);
   }
 

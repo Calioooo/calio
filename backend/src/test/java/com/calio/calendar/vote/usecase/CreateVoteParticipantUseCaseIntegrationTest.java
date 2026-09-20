@@ -63,7 +63,7 @@ class CreateVoteParticipantUseCaseIntegrationTest {
                 "여행 일정",
                 LocalDate.of(2026, 8, 14),
                 LocalDate.of(2026, 8, 20),
-                account));
+                account.getId()));
   }
 
   @Test

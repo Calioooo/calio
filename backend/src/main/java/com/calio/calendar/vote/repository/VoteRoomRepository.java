@@ -14,7 +14,7 @@ import org.springframework.data.repository.query.Param;
 
 public interface VoteRoomRepository extends JpaRepository<VoteRoom, Long> {
 
-    @Query("select voteRoom from VoteRoom voteRoom where voteRoom.createdByAccount.id = :accountId order by voteRoom.id desc")
+    @Query("select voteRoom from VoteRoom voteRoom where voteRoom.createdByAccountId = :accountId order by voteRoom.id desc")
     List<VoteRoom> findAllByCreatedByAccountId(@Param("accountId") Long accountId);
 
     @Query("""
