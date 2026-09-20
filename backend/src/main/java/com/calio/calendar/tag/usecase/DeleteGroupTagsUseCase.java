@@ -13,6 +13,6 @@ public class DeleteGroupTagsUseCase {
   }
 
   public void deleteAll(Long groupSpaceId) {
-    tagRepository.deleteAll(tagRepository.findByGroupSpace_Id(groupSpaceId));
+    tagRepository.deleteAll(tagRepository.findByGroupSpaceId(groupSpaceId));
   }
 }

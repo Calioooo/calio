@@ -2,14 +2,11 @@ package com.calio.calendar.tag.usecase;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.tag.domain.Tag;
-import com.calio.calendar.tag.domain.TagType;
 import com.calio.calendar.tag.repository.TagRepository;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
@@ -31,14 +28,12 @@ class TagLookupTest {
   void givenExistingTagId_whenResolveTag_thenReturnsTag() {
     // given
     Tag defaultTag = Tag.personalDefault("업무", "#2563eb");
-    Tag customTag = Tag.personalCustom(mock(Account.class), "사용자", "#8b5cf6");
-    when(tagRepository.findByIdAndTagTypeAndAccountIsNullAndGroupSpaceIsNull(
-            1L, TagType.PERSONAL_DEFAULT))
+    Tag customTag = Tag.personalCustom(1L, "사용자", "#8b5cf6");
+    when(tagRepository.findPersonalDefaultTagById(1L))
         .thenReturn(Optional.of(defaultTag));
-    when(tagRepository.findByIdAndTagTypeAndAccountIsNullAndGroupSpaceIsNull(
-            2L, TagType.PERSONAL_DEFAULT))
+    when(tagRepository.findPersonalDefaultTagById(2L))
         .thenReturn(Optional.empty());
-    when(tagRepository.findByIdAndTagTypeAndAccount_Id(2L, TagType.CUSTOM, 1L))
+    when(tagRepository.findPersonalCustomTagById(1L, 2L))
         .thenReturn(Optional.of(customTag));
 
     // when
@@ -56,10 +51,9 @@ class TagLookupTest {
   @DisplayName("올바르지 않은 tagId는 TAG_NOT_FOUND 예외를 반환한다")
   void givenMissingTagId_whenResolveTag_thenThrowsTagNotFound() {
     // given
-    when(tagRepository.findByIdAndTagTypeAndAccountIsNullAndGroupSpaceIsNull(
-            1L, TagType.PERSONAL_DEFAULT))
+    when(tagRepository.findPersonalDefaultTagById(1L))
         .thenReturn(Optional.empty());
-    when(tagRepository.findByIdAndTagTypeAndAccount_Id(1L, TagType.CUSTOM, 1L))
+    when(tagRepository.findPersonalCustomTagById(1L, 1L))
         .thenReturn(Optional.empty());
 
     // when, then
@@ -74,8 +68,7 @@ class TagLookupTest {
   void givenNullTagId_whenResolveDefaultTag_thenReturnsFallbackTag() {
     // given
     Tag fallbackTag = Tag.personalDefault("기타", "#64748B");
-    when(tagRepository.findFirstByTagTypeAndTitleAndAccountIsNullAndGroupSpaceIsNullOrderByIdAsc(
-            TagType.PERSONAL_DEFAULT, "기타"))
+    when(tagRepository.findFirstPersonalDefaultTagByTitle("기타"))
         .thenReturn(Optional.of(fallbackTag));
 
     // when
@@ -89,8 +82,7 @@ class TagLookupTest {
   @DisplayName("fallback PERSONAL_DEFAULT 기타 태그가 없으면 DEFAULT_TAG_NOT_FOUND로 실패한다")
   void givenMissingFallbackTag_whenResolveDefaultTag_thenThrowsDefaultTagNotFound() {
     // given
-    when(tagRepository.findFirstByTagTypeAndTitleAndAccountIsNullAndGroupSpaceIsNullOrderByIdAsc(
-            TagType.PERSONAL_DEFAULT, "기타"))
+    when(tagRepository.findFirstPersonalDefaultTagByTitle("기타"))
         .thenReturn(Optional.empty());
 
     // when, then

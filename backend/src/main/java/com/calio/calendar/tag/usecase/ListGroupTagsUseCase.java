@@ -22,7 +22,7 @@ public class ListGroupTagsUseCase {
   @Transactional(readOnly = true)
   public List<TagResponse> list(Long accountId, Long groupSpaceId) {
     groupMembershipQueryService.getActiveMembership(groupSpaceId, accountId);
-    return tagRepository.findByGroupSpace_IdOrderByIdAsc(groupSpaceId).stream()
+    return tagRepository.findByGroupSpaceIdOrderByIdAsc(groupSpaceId).stream()
         .map(TagResponse::from)
         .toList();
   }

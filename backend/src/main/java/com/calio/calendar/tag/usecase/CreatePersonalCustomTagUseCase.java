@@ -23,10 +23,9 @@ public class CreatePersonalCustomTagUseCase {
 
   @Transactional
   public TagResponse create(Long accountId, String title, String colorCode) {
-    return accountRepository
-        .findById(accountId)
-        .map(account -> tagRepository.save(Tag.personalCustom(account, title, colorCode)))
-        .map(TagResponse::from)
-        .orElseThrow(() -> new CalioException(ErrorCode.INTERNAL_SERVER_ERROR));
+    if (!accountRepository.existsById(accountId)) {
+      throw new CalioException(ErrorCode.INTERNAL_SERVER_ERROR);
+    }
+    return TagResponse.from(tagRepository.save(Tag.personalCustom(accountId, title, colorCode)));
   }
 }

@@ -24,34 +24,33 @@ public class TagLookup {
 
   public Tag getPersonalTag(Long accountId, Long tagId) {
     return tagRepository
-        .findByIdAndTagTypeAndAccountIsNullAndGroupSpaceIsNull(tagId, TagType.PERSONAL_DEFAULT)
-        .or(() -> tagRepository.findByIdAndTagTypeAndAccount_Id(tagId, TagType.CUSTOM, accountId))
+        .findPersonalDefaultTagById(tagId)
+        .or(() -> tagRepository.findPersonalCustomTagById(accountId, tagId))
         .orElseThrow(() -> new CalioException(ErrorCode.TAG_NOT_FOUND));
   }
 
   public Tag getPersonalCustomTag(Long accountId, Long tagId) {
     return tagRepository
-        .findByIdAndTagTypeAndAccount_Id(tagId, TagType.CUSTOM, accountId)
+        .findPersonalCustomTagById(accountId, tagId)
         .orElseThrow(() -> new CalioException(ErrorCode.TAG_NOT_FOUND));
   }
 
   public Tag getPersonalFallbackTag() {
     return tagRepository
-        .findFirstByTagTypeAndTitleAndAccountIsNullAndGroupSpaceIsNullOrderByIdAsc(
-            TagType.PERSONAL_DEFAULT, FALLBACK_TAG_TITLE)
+        .findFirstPersonalDefaultTagByTitle(FALLBACK_TAG_TITLE)
         .orElseThrow(() -> new CalioException(ErrorCode.DEFAULT_TAG_NOT_FOUND));
   }
 
   public Tag getGroupCustomTag(Long groupSpaceId, Long tagId) {
     return tagRepository
-        .findByIdAndGroupSpace_Id(tagId, groupSpaceId)
+        .findByIdAndGroupSpaceId(tagId, groupSpaceId)
         .filter(tag -> tag.getTagType() == TagType.CUSTOM)
         .orElseThrow(() -> new CalioException(ErrorCode.GROUP_TAG_NOT_FOUND));
   }
 
   public Tag getGroupDefaultTag(Long groupSpaceId) {
     return tagRepository
-        .findByTagTypeAndGroupSpace_Id(TagType.GROUP_DEFAULT, groupSpaceId)
+        .findByTagTypeAndGroupSpaceId(TagType.GROUP_DEFAULT, groupSpaceId)
         .orElseThrow(() -> new CalioException(ErrorCode.GROUP_DEFAULT_TAG_NOT_FOUND));
   }
 
@@ -60,7 +59,7 @@ public class TagLookup {
       return getGroupDefaultTag(groupSpaceId);
     }
     return tagRepository
-        .findByIdAndGroupSpace_Id(tagId, groupSpaceId)
+        .findByIdAndGroupSpaceId(tagId, groupSpaceId)
         .orElseThrow(() -> new CalioException(ErrorCode.GROUP_TAG_NOT_FOUND));
   }
 }

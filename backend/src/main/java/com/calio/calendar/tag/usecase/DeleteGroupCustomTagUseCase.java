@@ -35,12 +35,12 @@ public class DeleteGroupCustomTagUseCase {
     groupMembershipQueryService.getActiveMembership(groupSpaceId, accountId);
     Tag tag =
         tagRepository
-            .findByIdAndGroupSpace_Id(tagId, groupSpaceId)
+            .findByIdAndGroupSpaceId(tagId, groupSpaceId)
             .filter(candidate -> candidate.getTagType() == TagType.CUSTOM)
             .orElseThrow(() -> new CalioException(ErrorCode.GROUP_TAG_NOT_FOUND));
     Tag fallbackTag =
         tagRepository
-            .findByTagTypeAndGroupSpace_Id(TagType.GROUP_DEFAULT, groupSpaceId)
+            .findByTagTypeAndGroupSpaceId(TagType.GROUP_DEFAULT, groupSpaceId)
             .orElseThrow(() -> new CalioException(ErrorCode.GROUP_DEFAULT_TAG_NOT_FOUND));
     groupCalendarEventCommandService.changeTagForEvents(tag, fallbackTag);
     groupCalendarRecurrenceCommandService.changeTagForRecurrenceEvents(tag, fallbackTag);

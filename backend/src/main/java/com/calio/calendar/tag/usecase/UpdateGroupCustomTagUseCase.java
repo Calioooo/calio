@@ -28,11 +28,10 @@ public class UpdateGroupCustomTagUseCase {
     groupMembershipQueryService.getActiveMembership(groupSpaceId, accountId);
     Tag tag =
         tagRepository
-            .findByIdAndGroupSpace_Id(tagId, groupSpaceId)
+            .findByIdAndGroupSpaceId(tagId, groupSpaceId)
             .filter(candidate -> candidate.getTagType() == TagType.CUSTOM)
             .orElseThrow(() -> new CalioException(ErrorCode.GROUP_TAG_NOT_FOUND));
-    if (tagRepository.existsByTagTypeAndTitleAndGroupSpace_IdAndIdNot(
-        TagType.CUSTOM, title, groupSpaceId, tagId)) {
+    if (tagRepository.existsOtherGroupCustomTagByTitle(title, groupSpaceId, tagId)) {
       throw new CalioException(ErrorCode.VALIDATION_FAILED);
     }
     tag.update(title, colorCode);

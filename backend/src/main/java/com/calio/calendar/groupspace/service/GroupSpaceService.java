@@ -77,7 +77,7 @@ public class GroupSpaceService {
         Instant now = clock.instant();
 
         GroupSpace groupSpace = commandService.create(accountId, name, emoji);
-        createGroupDefaultTagUseCase.create(groupSpace);
+        createGroupDefaultTagUseCase.create(groupSpace.getId());
         GroupMember membership = commandService.createOwnerMembership(
                 groupSpace,
                 accountId,

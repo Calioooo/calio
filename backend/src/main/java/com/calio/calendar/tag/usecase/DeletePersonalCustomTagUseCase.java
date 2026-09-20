@@ -5,7 +5,6 @@ import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.event.service.EventCommandService;
 import com.calio.calendar.recurrence.service.RecurrenceEventCommandService;
 import com.calio.calendar.tag.domain.Tag;
-import com.calio.calendar.tag.domain.TagType;
 import com.calio.calendar.tag.repository.TagRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,12 +29,11 @@ public class DeletePersonalCustomTagUseCase {
   public void delete(Long accountId, Long tagId) {
     Tag tag =
         tagRepository
-            .findByIdAndTagTypeAndAccount_Id(tagId, TagType.CUSTOM, accountId)
+            .findPersonalCustomTagById(accountId, tagId)
             .orElseThrow(() -> new CalioException(ErrorCode.TAG_NOT_FOUND));
     Tag fallbackTag =
         tagRepository
-            .findFirstByTagTypeAndTitleAndAccountIsNullAndGroupSpaceIsNullOrderByIdAsc(
-                TagType.PERSONAL_DEFAULT, "기타")
+            .findFirstPersonalDefaultTagByTitle("기타")
             .orElseThrow(() -> new CalioException(ErrorCode.DEFAULT_TAG_NOT_FOUND));
     eventCommandService.changeTagForTargetEvents(accountId, tag, fallbackTag);
     recurrenceEventCommandService.changeTagForRecurrenceEvents(accountId, tag, fallbackTag);
