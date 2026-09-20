@@ -66,7 +66,7 @@ class LookupVoteParticipantSelectionUseCaseTest {
     when(voteRoomRepository.findByPublicId(VOTE_ROOM_PUBLIC_ID)).thenReturn(Optional.of(voteRoom));
     when(voteParticipantRepository.findByVoteRoomPublicIdAndNickname(VOTE_ROOM_PUBLIC_ID, "calio"))
         .thenReturn(Optional.of(participant));
-    when(voteRepository.findAllByVoteParticipantIdOrderByUnavailableDateAsc(participant.getId()))
+    when(voteRepository.findByVoteParticipantIdOrderByUnavailableDateAsc(participant.getId()))
         .thenReturn(
             List.of(
                 new Vote(participant, LocalDate.of(2026, 8, 15)),
@@ -101,7 +101,7 @@ class LookupVoteParticipantSelectionUseCaseTest {
     assertThat(response.status()).isEqualTo(VoteParticipantStatus.REGISTERED);
     assertThat(response.unavailableDates()).isEmpty();
     verify(voteRepository, never())
-        .findAllByVoteParticipantIdOrderByUnavailableDateAsc(participant.getId());
+        .findByVoteParticipantIdOrderByUnavailableDateAsc(participant.getId());
   }
 
   @Test

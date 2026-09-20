@@ -14,7 +14,7 @@ import org.springframework.data.repository.query.Param;
 
 public interface VoteRoomRepository extends JpaRepository<VoteRoom, Long> {
 
-    List<VoteRoom> findAllByCreatedByAccountIdOrderByIdDesc(Long accountId);
+    List<VoteRoom> findByCreatedByAccountIdOrderByIdDesc(Long accountId);
 
     Optional<VoteRoom> findByPublicId(UUID publicId);
 
@@ -26,10 +26,5 @@ public interface VoteRoomRepository extends JpaRepository<VoteRoom, Long> {
     int deleteExpiredVoteRoomsBefore(@Param("cutoffDate") LocalDate cutoffDate);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("""
-            select voteRoom
-            from VoteRoom voteRoom
-            where voteRoom.publicId = :publicId
-            """)
-    Optional<VoteRoom> findByPublicIdForUpdate(@Param("publicId") UUID publicId);
+    Optional<VoteRoom> findForUpdateByPublicId(UUID publicId);
 }

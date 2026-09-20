@@ -52,7 +52,7 @@ public class LookupVoteParticipantSelectionUseCase {
     if (!participant.hasSubmittedVotes()) {
       return List.of();
     }
-    return voteRepository.findAllByVoteParticipantIdOrderByUnavailableDateAsc(participant.getId()).stream()
+    return voteRepository.findByVoteParticipantIdOrderByUnavailableDateAsc(participant.getId()).stream()
         .map(Vote::getUnavailableDate)
         .toList();
   }

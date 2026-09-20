@@ -63,7 +63,7 @@ class VoteParticipantUseCaseTest {
   @DisplayName("새 참여자는 VoteRoom에 연결된 REGISTERED 상태로 생성된다")
   void givenAvailableNicknameWithoutPassword_whenCreate_thenCreatesRegisteredParticipant() {
     VoteRoom voteRoom = voteRoom();
-    when(voteRoomRepository.findByPublicIdForUpdate(VOTE_ROOM_PUBLIC_ID))
+    when(voteRoomRepository.findForUpdateByPublicId(VOTE_ROOM_PUBLIC_ID))
         .thenReturn(Optional.of(voteRoom));
     when(voteParticipantRepository.findByVoteRoomPublicIdAndNickname(VOTE_ROOM_PUBLIC_ID, "calio"))
         .thenReturn(Optional.empty());
@@ -86,7 +86,7 @@ class VoteParticipantUseCaseTest {
   @DisplayName("비밀번호가 있는 새 참여자는 원문 대신 BCrypt 해시를 저장한다")
   void givenAvailableNicknameWithPassword_whenCreate_thenStoresPasswordHashOnly() {
     VoteRoom voteRoom = voteRoom();
-    when(voteRoomRepository.findByPublicIdForUpdate(VOTE_ROOM_PUBLIC_ID))
+    when(voteRoomRepository.findForUpdateByPublicId(VOTE_ROOM_PUBLIC_ID))
         .thenReturn(Optional.of(voteRoom));
     when(voteParticipantRepository.findByVoteRoomPublicIdAndNickname(VOTE_ROOM_PUBLIC_ID, "calio"))
         .thenReturn(Optional.empty());
@@ -107,7 +107,7 @@ class VoteParticipantUseCaseTest {
     VoteRoom voteRoom = voteRoom();
     String normalizedNickname = "캘리오";
     String decomposedNickname = Normalizer.normalize(normalizedNickname, Normalizer.Form.NFD);
-    when(voteRoomRepository.findByPublicIdForUpdate(VOTE_ROOM_PUBLIC_ID))
+    when(voteRoomRepository.findForUpdateByPublicId(VOTE_ROOM_PUBLIC_ID))
         .thenReturn(Optional.of(voteRoom));
     when(voteParticipantRepository.findByVoteRoomPublicIdAndNickname(
             VOTE_ROOM_PUBLIC_ID, normalizedNickname))
@@ -127,7 +127,7 @@ class VoteParticipantUseCaseTest {
   @DisplayName("같은 VoteRoom의 닉네임은 대소문자와 무관하게 중복 생성할 수 없다")
   void givenDuplicateNickname_whenCreate_thenRejectsBeforeSaving() {
     VoteRoom voteRoom = voteRoom();
-    when(voteRoomRepository.findByPublicIdForUpdate(VOTE_ROOM_PUBLIC_ID))
+    when(voteRoomRepository.findForUpdateByPublicId(VOTE_ROOM_PUBLIC_ID))
         .thenReturn(Optional.of(voteRoom));
     when(voteParticipantRepository.findByVoteRoomPublicIdAndNickname(VOTE_ROOM_PUBLIC_ID, "Calio"))
         .thenReturn(Optional.of(new VoteParticipant(voteRoom, "calio", null)));
@@ -159,7 +159,7 @@ class VoteParticipantUseCaseTest {
   @Test
   @DisplayName("존재하지 않는 공개 VoteRoom에는 참여자를 생성할 수 없다")
   void givenMissingVoteRoom_whenCreate_thenRejectsBeforeNicknameLookup() {
-    when(voteRoomRepository.findByPublicIdForUpdate(VOTE_ROOM_PUBLIC_ID)).thenReturn(Optional.empty());
+    when(voteRoomRepository.findForUpdateByPublicId(VOTE_ROOM_PUBLIC_ID)).thenReturn(Optional.empty());
 
     assertThatThrownBy(
             () -> createVoteParticipantUseCase.createParticipant(VOTE_ROOM_PUBLIC_ID, "calio", null))

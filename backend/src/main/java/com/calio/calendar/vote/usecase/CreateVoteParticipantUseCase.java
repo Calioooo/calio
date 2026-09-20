@@ -40,7 +40,7 @@ public class CreateVoteParticipantUseCase {
     VoteParticipantNickname normalizedNickname = VoteParticipantNickname.of(nickname);
     VoteRoom voteRoom =
         voteRoomRepository
-            .findByPublicIdForUpdate(voteRoomPublicId)
+            .findForUpdateByPublicId(voteRoomPublicId)
             .orElseThrow(() -> new CalioException(ErrorCode.VOTE_ROOM_NOT_FOUND));
     if (voteParticipantRepository
         .findByVoteRoomPublicIdAndNickname(voteRoomPublicId, normalizedNickname.value())

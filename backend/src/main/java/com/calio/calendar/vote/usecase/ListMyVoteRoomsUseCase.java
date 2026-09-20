@@ -17,7 +17,7 @@ public class ListMyVoteRoomsUseCase {
 
   @Transactional(readOnly = true)
   public List<VoteRoomResponse> list(Long accountId) {
-    return voteRoomRepository.findAllByCreatedByAccountIdOrderByIdDesc(accountId).stream()
+    return voteRoomRepository.findByCreatedByAccountIdOrderByIdDesc(accountId).stream()
         .map(VoteRoomResponse::from)
         .toList();
   }

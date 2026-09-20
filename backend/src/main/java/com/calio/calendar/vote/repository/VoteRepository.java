@@ -11,7 +11,7 @@ import org.springframework.data.repository.query.Param;
 
 public interface VoteRepository extends JpaRepository<Vote, Long> {
 
-    List<Vote> findAllByVoteParticipantIdOrderByUnavailableDateAsc(Long voteParticipantId);
+    List<Vote> findByVoteParticipantIdOrderByUnavailableDateAsc(Long voteParticipantId);
 
     @EntityGraph(attributePaths = {"voteParticipant", "voteParticipant.voteRoom"})
     @Query("""
