@@ -12,7 +12,6 @@ import com.calio.calendar.vote.repository.VoteRoomRepository;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,17 +21,17 @@ public class LookupVoteParticipantSelectionUseCase {
   private final VoteRoomRepository voteRoomRepository;
   private final VoteParticipantRepository voteParticipantRepository;
   private final VoteRepository voteRepository;
-  private final PasswordEncoder passwordEncoder;
+  private final VoteParticipantCredentialVerifier credentialVerifier;
 
   public LookupVoteParticipantSelectionUseCase(
       VoteRoomRepository voteRoomRepository,
       VoteParticipantRepository voteParticipantRepository,
       VoteRepository voteRepository,
-      PasswordEncoder passwordEncoder) {
+      VoteParticipantCredentialVerifier credentialVerifier) {
     this.voteRoomRepository = voteRoomRepository;
     this.voteParticipantRepository = voteParticipantRepository;
     this.voteRepository = voteRepository;
-    this.passwordEncoder = passwordEncoder;
+    this.credentialVerifier = credentialVerifier;
   }
 
   @Transactional(readOnly = true)
@@ -44,15 +43,8 @@ public class LookupVoteParticipantSelectionUseCase {
         voteParticipantRepository
             .findByVoteRoomPublicIdAndNickname(voteRoomPublicId, VoteParticipantNickname.of(nickname).value())
             .orElseThrow(() -> new CalioException(ErrorCode.VOTE_PARTICIPANT_CREDENTIAL_INVALID));
-    requireValidPassword(participant, password);
+    credentialVerifier.verify(participant, password);
     return VoteParticipantSelectionResponse.from(participant, getUnavailableDates(participant));
-  }
-
-  private void requireValidPassword(VoteParticipant participant, String password) {
-    if (participant.getPasswordHash() != null
-        && (password == null || !passwordEncoder.matches(password, participant.getPasswordHash()))) {
-      throw new CalioException(ErrorCode.VOTE_PARTICIPANT_CREDENTIAL_INVALID);
-    }
   }
 
   private List<LocalDate> getUnavailableDates(VoteParticipant participant) {

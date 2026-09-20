@@ -12,7 +12,6 @@ import java.time.LocalDate;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.UUID;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,15 +20,15 @@ public class SubmitVoteUseCase {
 
   private final VoteParticipantRepository voteParticipantRepository;
   private final VoteRepository voteRepository;
-  private final PasswordEncoder passwordEncoder;
+  private final VoteParticipantCredentialVerifier credentialVerifier;
 
   public SubmitVoteUseCase(
       VoteParticipantRepository voteParticipantRepository,
       VoteRepository voteRepository,
-      PasswordEncoder passwordEncoder) {
+      VoteParticipantCredentialVerifier credentialVerifier) {
     this.voteParticipantRepository = voteParticipantRepository;
     this.voteRepository = voteRepository;
-    this.passwordEncoder = passwordEncoder;
+    this.credentialVerifier = credentialVerifier;
   }
 
   @Transactional
@@ -40,7 +39,7 @@ public class SubmitVoteUseCase {
         voteParticipantRepository
             .findByVoteRoomPublicIdAndNickname(voteRoomPublicId, normalizedNickname.value())
             .orElseThrow(() -> new CalioException(ErrorCode.VOTE_PARTICIPANT_CREDENTIAL_INVALID));
-    requireValidPassword(participant, password);
+    credentialVerifier.verify(participant, password);
 
     VoteParticipant lockedParticipant =
         voteParticipantRepository
@@ -56,13 +55,6 @@ public class SubmitVoteUseCase {
         unavailableDates.stream().map(date -> new Vote(lockedParticipant, date)).toList());
     lockedParticipant.submit();
     return VoteSubmissionResponse.from(lockedParticipant, unavailableDates);
-  }
-
-  private void requireValidPassword(VoteParticipant participant, String password) {
-    if (participant.getPasswordHash() != null
-        && (password == null || !passwordEncoder.matches(password, participant.getPasswordHash()))) {
-      throw new CalioException(ErrorCode.VOTE_PARTICIPANT_CREDENTIAL_INVALID);
-    }
   }
 
   private List<LocalDate> normalizeDates(List<LocalDate> requestedDates) {

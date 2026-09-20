@@ -9,7 +9,6 @@ import static org.mockito.Mockito.when;
 
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
-import com.calio.calendar.vote.controller.dto.LookupVoteParticipantSelectionRequest;
 import com.calio.calendar.vote.domain.Vote;
 import com.calio.calendar.vote.domain.VoteParticipant;
 import com.calio.calendar.vote.domain.VoteParticipantStatus;
@@ -50,7 +49,10 @@ class LookupVoteParticipantSelectionUseCaseTest {
     passwordEncoder = new BCryptPasswordEncoder();
     lookupVoteParticipantSelectionUseCase =
         new LookupVoteParticipantSelectionUseCase(
-            voteRoomRepository, voteParticipantRepository, voteRepository, passwordEncoder);
+            voteRoomRepository,
+            voteParticipantRepository,
+            voteRepository,
+            new VoteParticipantCredentialVerifier(passwordEncoder));
   }
 
   @Test

@@ -82,6 +82,10 @@ public class VoteParticipant extends BaseEntity {
     return status == VoteParticipantStatus.SUBMITTED;
   }
 
+  public boolean hasPassword() {
+    return passwordHash != null;
+  }
+
   public void submit() {
     this.status = VoteParticipantStatus.SUBMITTED;
   }

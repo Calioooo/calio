@@ -43,17 +43,20 @@ class VoteParticipantUseCaseTest {
   @Mock private VoteRepository voteRepository;
 
   private PasswordEncoder passwordEncoder;
+  private VoteParticipantCredentialVerifier credentialVerifier;
   private CreateVoteParticipantUseCase createVoteParticipantUseCase;
   private SubmitVoteUseCase submitVoteUseCase;
 
   @BeforeEach
   void setUp() {
     passwordEncoder = org.mockito.Mockito.spy(new BCryptPasswordEncoder());
+    credentialVerifier =
+        org.mockito.Mockito.spy(new VoteParticipantCredentialVerifier(passwordEncoder));
     createVoteParticipantUseCase =
         new CreateVoteParticipantUseCase(
             voteRoomRepository, voteParticipantRepository, passwordEncoder);
     submitVoteUseCase =
-        new SubmitVoteUseCase(voteParticipantRepository, voteRepository, passwordEncoder);
+        new SubmitVoteUseCase(voteParticipantRepository, voteRepository, credentialVerifier);
   }
 
   @Test
@@ -207,10 +210,10 @@ class VoteParticipantUseCaseTest {
     submitVoteUseCase.submit(
         VOTE_ROOM_PUBLIC_ID, "calio", "secret", List.of(LocalDate.of(2026, 8, 15)));
 
-    InOrder inOrder = inOrder(voteParticipantRepository, passwordEncoder, voteRepository);
+    InOrder inOrder = inOrder(voteParticipantRepository, credentialVerifier, voteRepository);
     inOrder.verify(voteParticipantRepository)
         .findByVoteRoomPublicIdAndNickname(VOTE_ROOM_PUBLIC_ID, "calio");
-    inOrder.verify(passwordEncoder).matches("secret", participant.getPasswordHash());
+    inOrder.verify(credentialVerifier).verify(participant, "secret");
     inOrder.verify(voteParticipantRepository)
         .findByVoteRoomPublicIdAndNicknameForUpdate(VOTE_ROOM_PUBLIC_ID, "calio");
     inOrder.verify(voteRepository).deleteAllByVoteParticipantId(participant.getId());
