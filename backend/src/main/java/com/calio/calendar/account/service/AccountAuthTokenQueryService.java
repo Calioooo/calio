@@ -11,14 +11,15 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class AccountAuthTokenQueryService {
 
-    private final AccountAuthTokenRepository authTokenRepository;
+  private final AccountAuthTokenRepository authTokenRepository;
 
-    public AccountAuthTokenQueryService(AccountAuthTokenRepository authTokenRepository) {
-        this.authTokenRepository = authTokenRepository;
-    }
+  public AccountAuthTokenQueryService(AccountAuthTokenRepository authTokenRepository) {
+    this.authTokenRepository = authTokenRepository;
+  }
 
-    public AccountAuthToken getAuthToken(String tokenHash) {
-        return authTokenRepository.findByTokenHash(tokenHash)
-                .orElseThrow(() -> new CalioException(ErrorCode.AUTH_TOKEN_INVALID));
-    }
+  public AccountAuthToken getAuthToken(String tokenHash) {
+    return authTokenRepository
+        .findByTokenHash(tokenHash)
+        .orElseThrow(() -> new CalioException(ErrorCode.AUTH_TOKEN_INVALID));
+  }
 }

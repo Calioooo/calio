@@ -2,16 +2,16 @@ package com.calio.calendar.groupinvitation.service;
 
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
+import com.calio.calendar.groupinvitation.config.GroupInvitationProperties;
 import com.calio.calendar.groupinvitation.controller.dto.GroupInvitationListResponse;
 import com.calio.calendar.groupinvitation.controller.dto.GroupInvitationSummaryResponse;
 import com.calio.calendar.groupinvitation.controller.dto.IssueGroupInvitationResponse;
 import com.calio.calendar.groupinvitation.controller.dto.PreviewGroupInvitationRequest;
 import com.calio.calendar.groupinvitation.controller.dto.PreviewGroupInvitationResponse;
-import com.calio.calendar.groupinvitation.config.GroupInvitationProperties;
 import com.calio.calendar.groupinvitation.domain.GroupInvitation;
 import com.calio.calendar.groupinvitation.service.dto.InvitationCredentialPair;
-import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.domain.GroupMember;
+import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.service.GroupMembershipCommandService;
 import com.calio.calendar.groupspace.service.GroupMembershipQueryService;
 import com.calio.calendar.groupspace.service.GroupSpaceCommandService;
@@ -33,145 +33,121 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Service
 public class GroupInvitationService {
 
-    private static final Logger log = LoggerFactory.getLogger(GroupInvitationService.class);
-    private static final int MAX_ISSUE_ATTEMPTS = 3;
-    private final InvitationCredentialService credentialService;
-    private final GroupInvitationQueryService queryService;
-    private final GroupInvitationCommandService commandService;
-    private final GroupSpaceCommandService groupSpaceCommandService;
-    private final GroupMembershipCommandService membershipCommandService;
-    private final GroupMembershipQueryService membershipQueryService;
-    private final GroupSpaceQueryService groupSpaceQueryService;
-    private final TransactionTemplate issueTransaction;
-    private final Clock clock;
-    private final GroupInvitationProperties properties;
+  private static final Logger log = LoggerFactory.getLogger(GroupInvitationService.class);
+  private static final int MAX_ISSUE_ATTEMPTS = 3;
+  private final InvitationCredentialService credentialService;
+  private final GroupInvitationQueryService queryService;
+  private final GroupInvitationCommandService commandService;
+  private final GroupSpaceCommandService groupSpaceCommandService;
+  private final GroupMembershipCommandService membershipCommandService;
+  private final GroupMembershipQueryService membershipQueryService;
+  private final GroupSpaceQueryService groupSpaceQueryService;
+  private final TransactionTemplate issueTransaction;
+  private final Clock clock;
+  private final GroupInvitationProperties properties;
 
-    public GroupInvitationService(
-            InvitationCredentialService credentialService,
-            GroupInvitationQueryService queryService,
-            GroupInvitationCommandService commandService,
-            GroupSpaceCommandService groupSpaceCommandService,
-            GroupMembershipCommandService membershipCommandService,
-            GroupMembershipQueryService membershipQueryService,
-            GroupSpaceQueryService groupSpaceQueryService,
-            PlatformTransactionManager transactionManager,
-            Clock clock,
-            GroupInvitationProperties properties
-    ) {
-        this.credentialService = credentialService;
-        this.queryService = queryService;
-        this.commandService = commandService;
-        this.groupSpaceCommandService = groupSpaceCommandService;
-        this.membershipCommandService = membershipCommandService;
-        this.membershipQueryService = membershipQueryService;
-        this.groupSpaceQueryService = groupSpaceQueryService;
-        this.clock = clock;
-        this.properties = properties;
-        this.issueTransaction = new TransactionTemplate(transactionManager);
-        this.issueTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+  public GroupInvitationService(
+      InvitationCredentialService credentialService,
+      GroupInvitationQueryService queryService,
+      GroupInvitationCommandService commandService,
+      GroupSpaceCommandService groupSpaceCommandService,
+      GroupMembershipCommandService membershipCommandService,
+      GroupMembershipQueryService membershipQueryService,
+      GroupSpaceQueryService groupSpaceQueryService,
+      PlatformTransactionManager transactionManager,
+      Clock clock,
+      GroupInvitationProperties properties) {
+    this.credentialService = credentialService;
+    this.queryService = queryService;
+    this.commandService = commandService;
+    this.groupSpaceCommandService = groupSpaceCommandService;
+    this.membershipCommandService = membershipCommandService;
+    this.membershipQueryService = membershipQueryService;
+    this.groupSpaceQueryService = groupSpaceQueryService;
+    this.clock = clock;
+    this.properties = properties;
+    this.issueTransaction = new TransactionTemplate(transactionManager);
+    this.issueTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+  }
+
+  @Transactional(readOnly = true)
+  public GroupInvitationListResponse list(Long accountId, Long groupSpaceId) {
+    GroupMember member = membershipQueryService.getActiveMembership(groupSpaceId, accountId);
+    var invitations =
+        queryService.list(groupSpaceId, member.getId()).stream()
+            .map(GroupInvitationSummaryResponse::from)
+            .toList();
+    return new GroupInvitationListResponse(invitations);
+  }
+
+  @Transactional(readOnly = true)
+  public PreviewGroupInvitationResponse preview(PreviewGroupInvitationRequest request) {
+    byte[] credentialHash =
+        credentialService.hashValidated(request.credentialType(), request.credential());
+    GroupInvitation invitation =
+        queryService.getInvitationByCredentialHash(request.credentialType(), credentialHash);
+    if (invitation.isExpiredAt(clock.instant())) {
+      throw new CalioException(ErrorCode.GROUP_INVITATION_EXPIRED);
     }
 
-    @Transactional(readOnly = true)
-    public GroupInvitationListResponse list(Long accountId, Long groupSpaceId) {
-        GroupMember member = membershipQueryService.getActiveMembership(groupSpaceId, accountId);
-        var invitations = queryService.list(groupSpaceId, member.getId())
-                .stream()
-                .map(GroupInvitationSummaryResponse::from)
-                .toList();
-        return new GroupInvitationListResponse(invitations);
-    }
+    GroupSpace groupSpace = groupSpaceQueryService.getGroupSpace(invitation.getGroupSpaceId());
+    int activeMemberCount = groupSpaceQueryService.getActiveMemberCount(groupSpace.getId());
+    return PreviewGroupInvitationResponse.from(
+        groupSpace, activeMemberCount, invitation.getExpiresAt());
+  }
 
-    @Transactional(readOnly = true)
-    public PreviewGroupInvitationResponse preview(PreviewGroupInvitationRequest request) {
-        byte[] credentialHash = credentialService.hashValidated(
-                request.credentialType(),
-                request.credential()
-        );
-        GroupInvitation invitation = queryService.getInvitationByCredentialHash(
-                request.credentialType(),
-                credentialHash
-        );
-        if (invitation.isExpiredAt(clock.instant())) {
-            throw new CalioException(ErrorCode.GROUP_INVITATION_EXPIRED);
+  @Transactional
+  public void revoke(Long accountId, Long groupSpaceId, Long invitationId) {
+    groupSpaceCommandService.lockGroupSpace(groupSpaceId);
+    GroupMember member = membershipCommandService.lockActiveMember(groupSpaceId, accountId);
+    GroupInvitation invitation =
+        commandService
+            .lockRevocableInvitationIfExists(
+                groupSpaceId, invitationId, member.getId(), clock.instant())
+            .orElseThrow(GroupInvitationService::invitationNotFound);
+    commandService.delete(invitation);
+  }
+
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public int deleteExpiredBatch(Instant cutoff) {
+    List<GroupInvitation> invitations =
+        queryService.listExpiredBefore(cutoff, PageRequest.of(0, properties.getCleanupBatchSize()));
+    return commandService.delete(invitations);
+  }
+
+  public IssueGroupInvitationResponse issue(Long accountId, Long groupSpaceId) {
+    for (int attempt = 0; attempt < MAX_ISSUE_ATTEMPTS; attempt++) {
+      InvitationCredentialPair credentials = credentialService.generatePair();
+      try {
+        return issueTransaction.execute(status -> issueOnce(accountId, groupSpaceId, credentials));
+      } catch (CalioException exception) {
+        if (exception.getErrorCode() != ErrorCode.GROUP_INVITATION_CREDENTIAL_COLLISION) {
+          throw exception;
         }
-
-        GroupSpace groupSpace = groupSpaceQueryService.getGroupSpace(invitation.getGroupSpaceId());
-        int activeMemberCount = groupSpaceQueryService.getActiveMemberCount(groupSpace.getId());
-        return PreviewGroupInvitationResponse.from(
-                groupSpace,
-                activeMemberCount,
-                invitation.getExpiresAt()
-        );
+        // A credential collision attempt is fully rolled back by TransactionTemplate.
+      } catch (DataIntegrityViolationException exception) {
+        throw new CalioException(ErrorCode.GROUP_INVITATION_ISSUE_FAILED, exception);
+      }
     }
 
-    @Transactional
-    public void revoke(Long accountId, Long groupSpaceId, Long invitationId) {
-        groupSpaceCommandService.lockGroupSpace(groupSpaceId);
-        GroupMember member = membershipCommandService.lockActiveMember(groupSpaceId, accountId);
-        GroupInvitation invitation = commandService.lockRevocableInvitationIfExists(
-                        groupSpaceId,
-                        invitationId,
-                        member.getId(),
-                        clock.instant()
-                )
-                .orElseThrow(GroupInvitationService::invitationNotFound);
-        commandService.delete(invitation);
-    }
+    log.error(
+        "Group invitation generation failed. errorCode={}",
+        ErrorCode.GROUP_INVITATION_GENERATION_FAILED.name());
+    throw new CalioException(ErrorCode.GROUP_INVITATION_GENERATION_FAILED);
+  }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public int deleteExpiredBatch(Instant cutoff) {
-        List<GroupInvitation> invitations = queryService.listExpiredBefore(
-                cutoff,
-                PageRequest.of(0, properties.getCleanupBatchSize())
-        );
-        return commandService.delete(invitations);
-    }
+  private IssueGroupInvitationResponse issueOnce(
+      Long accountId, Long groupSpaceId, InvitationCredentialPair credentials) {
+    groupSpaceCommandService.lockGroupSpace(groupSpaceId);
+    GroupMember issuer = membershipCommandService.lockActiveMember(groupSpaceId, accountId);
+    Instant expiresAt = clock.instant().plus(properties.getTtl());
+    GroupInvitation invitation =
+        commandService.create(groupSpaceId, issuer.getId(), credentials, expiresAt);
+    return IssueGroupInvitationResponse.from(
+        invitation, credentialService.inviteUrl(credentials.linkToken()), credentials.inviteCode());
+  }
 
-    public IssueGroupInvitationResponse issue(Long accountId, Long groupSpaceId) {
-        for (int attempt = 0; attempt < MAX_ISSUE_ATTEMPTS; attempt++) {
-            InvitationCredentialPair credentials = credentialService.generatePair();
-            try {
-                return issueTransaction.execute(
-                        status -> issueOnce(accountId, groupSpaceId, credentials)
-                );
-            } catch (CalioException exception) {
-                if (exception.getErrorCode() != ErrorCode.GROUP_INVITATION_CREDENTIAL_COLLISION) {
-                    throw exception;
-                }
-                // A credential collision attempt is fully rolled back by TransactionTemplate.
-            } catch (DataIntegrityViolationException exception) {
-                throw new CalioException(ErrorCode.GROUP_INVITATION_ISSUE_FAILED, exception);
-            }
-        }
-
-        log.error("Group invitation generation failed. errorCode={}",
-                ErrorCode.GROUP_INVITATION_GENERATION_FAILED.name());
-        throw new CalioException(ErrorCode.GROUP_INVITATION_GENERATION_FAILED);
-    }
-
-    private IssueGroupInvitationResponse issueOnce(
-            Long accountId,
-            Long groupSpaceId,
-            InvitationCredentialPair credentials
-    ) {
-        groupSpaceCommandService.lockGroupSpace(groupSpaceId);
-        GroupMember issuer = membershipCommandService.lockActiveMember(groupSpaceId, accountId);
-        Instant expiresAt = clock.instant().plus(properties.getTtl());
-        GroupInvitation invitation = commandService.create(
-                groupSpaceId,
-                issuer.getId(),
-                credentials,
-                expiresAt
-        );
-        return IssueGroupInvitationResponse.from(
-                invitation,
-                credentialService.inviteUrl(credentials.linkToken()),
-                credentials.inviteCode()
-        );
-    }
-
-    private static CalioException invitationNotFound() {
-        return new CalioException(ErrorCode.GROUP_INVITATION_NOT_FOUND);
-    }
-
+  private static CalioException invitationNotFound() {
+    return new CalioException(ErrorCode.GROUP_INVITATION_NOT_FOUND);
+  }
 }

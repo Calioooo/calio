@@ -10,8 +10,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @SpringBootApplication
 public class CalioApplication {
 
-    public static void main(String[] args) {
-        SpringApplication.run(CalioApplication.class, args);
-    }
-
+  public static void main(String[] args) {
+    SpringApplication.run(CalioApplication.class, args);
+  }
 }

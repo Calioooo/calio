@@ -11,13 +11,14 @@ import tools.jackson.databind.ObjectMapper;
 
 class GoogleUserInfoResponseTest {
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+  private final ObjectMapper objectMapper = new ObjectMapper();
 
-    @Test
-    @DisplayName("Google UserInfo response는 sub와 email을 account identity로 반환한다")
-    void givenValidUserInfoResponse_whenParse_thenReturnsIdentity() throws Exception {
-        // given
-        String json = """
+  @Test
+  @DisplayName("Google UserInfo response는 sub와 email을 account identity로 반환한다")
+  void givenValidUserInfoResponse_whenParse_thenReturnsIdentity() throws Exception {
+    // given
+    String json =
+        """
                 {
                   "sub": "google-subject",
                   "email": "user@example.com",
@@ -25,22 +26,20 @@ class GoogleUserInfoResponseTest {
                 }
                 """;
 
-        // when
-        GoogleUserInfoResponse response = objectMapper.readValue(
-                json,
-                GoogleUserInfoResponse.class
-        );
+    // when
+    GoogleUserInfoResponse response = objectMapper.readValue(json, GoogleUserInfoResponse.class);
 
-        // then
-        assertThat(response.subject()).isEqualTo("google-subject");
-        assertThat(response.email()).isEqualTo("user@example.com");
-    }
+    // then
+    assertThat(response.subject()).isEqualTo("google-subject");
+    assertThat(response.email()).isEqualTo("user@example.com");
+  }
 
-    @Test
-    @DisplayName("Google UserInfo response의 email_verified가 false이면 invalid user info로 거부한다")
-    void givenUnverifiedEmail_whenParse_thenThrowsInvalidUserInfo() {
-        // given
-        String json = """
+  @Test
+  @DisplayName("Google UserInfo response의 email_verified가 false이면 invalid user info로 거부한다")
+  void givenUnverifiedEmail_whenParse_thenThrowsInvalidUserInfo() {
+    // given
+    String json =
+        """
                 {
                   "sub": "google-subject",
                   "email": "user@example.com",
@@ -48,18 +47,19 @@ class GoogleUserInfoResponseTest {
                 }
                 """;
 
-        // when, then
-        assertThatThrownBy(() -> objectMapper.readValue(json, GoogleUserInfoResponse.class))
-                .satisfies(exception ->
-                        assertErrorCode(exception, ErrorCode.GOOGLE_USER_INFO_INVALID));
-    }
+    // when, then
+    assertThatThrownBy(() -> objectMapper.readValue(json, GoogleUserInfoResponse.class))
+        .satisfies(exception -> assertErrorCode(exception, ErrorCode.GOOGLE_USER_INFO_INVALID));
+  }
 
-    private void assertErrorCode(Throwable throwable, ErrorCode errorCode) {
-        Throwable cause = throwable;
-        while (cause != null && !(cause instanceof CalioException)) {
-            cause = cause.getCause();
-        }
-        assertThat(cause).isInstanceOfSatisfying(CalioException.class, exception ->
-                assertThat(exception.getErrorCode()).isEqualTo(errorCode));
+  private void assertErrorCode(Throwable throwable, ErrorCode errorCode) {
+    Throwable cause = throwable;
+    while (cause != null && !(cause instanceof CalioException)) {
+      cause = cause.getCause();
     }
+    assertThat(cause)
+        .isInstanceOfSatisfying(
+            CalioException.class,
+            exception -> assertThat(exception.getErrorCode()).isEqualTo(errorCode));
+  }
 }

@@ -6,22 +6,20 @@ import com.calio.calendar.groupspace.domain.GroupSpace;
 import java.time.Instant;
 
 public record GroupMembershipResponse(
-        String nickname,
-        GroupMemberRole role,
-        boolean isAnonymous,
-        Instant createdAt,
-        Instant updatedAt,
-        Instant statusChangedAt
-) {
+    String nickname,
+    GroupMemberRole role,
+    boolean isAnonymous,
+    Instant createdAt,
+    Instant updatedAt,
+    Instant statusChangedAt) {
 
-    public static GroupMembershipResponse from(GroupMember member, GroupSpace groupSpace) {
-        return new GroupMembershipResponse(
-                member.getNickname(),
-                member.roleIn(groupSpace),
-                member.isAnonymous(),
-                member.getCreatedAt(),
-                member.getUpdatedAt(),
-                member.getStatusChangedAt()
-        );
-    }
+  public static GroupMembershipResponse from(GroupMember member, GroupSpace groupSpace) {
+    return new GroupMembershipResponse(
+        member.getNickname(),
+        member.roleIn(groupSpace),
+        member.isAnonymous(),
+        member.getCreatedAt(),
+        member.getUpdatedAt(),
+        member.getStatusChangedAt());
+  }
 }

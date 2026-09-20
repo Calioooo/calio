@@ -15,44 +15,38 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class CalendarConversationCommandService {
 
-    private final AccountRepository accountRepository;
-    private final CalendarConversationRepository conversationRepository;
-    private final CalendarConversationMessageRepository messageRepository;
+  private final AccountRepository accountRepository;
+  private final CalendarConversationRepository conversationRepository;
+  private final CalendarConversationMessageRepository messageRepository;
 
-    public CalendarConversationCommandService(
-            AccountRepository accountRepository,
-            CalendarConversationRepository conversationRepository,
-            CalendarConversationMessageRepository messageRepository
-    ) {
-        this.accountRepository = accountRepository;
-        this.conversationRepository = conversationRepository;
-        this.messageRepository = messageRepository;
-    }
+  public CalendarConversationCommandService(
+      AccountRepository accountRepository,
+      CalendarConversationRepository conversationRepository,
+      CalendarConversationMessageRepository messageRepository) {
+    this.accountRepository = accountRepository;
+    this.conversationRepository = conversationRepository;
+    this.messageRepository = messageRepository;
+  }
 
-    public CalendarConversation createConversation(Long accountId, Instant createdAt) {
-        Account account = accountRepository.getReferenceById(accountId);
-        return conversationRepository.save(new CalendarConversation(account, createdAt));
-    }
+  public CalendarConversation createConversation(Long accountId, Instant createdAt) {
+    Account account = accountRepository.getReferenceById(accountId);
+    return conversationRepository.save(new CalendarConversation(account, createdAt));
+  }
 
-    public void recordMessage(
-            Long conversationId,
-            CalendarConversationMessageRole role,
-            String message,
-            String assistantResponseBlocksJson,
-            Instant recordedAt
-    ) {
-        CalendarConversation conversation = conversationRepository.getReferenceById(conversationId);
-        messageRepository.save(new CalendarConversationMessage(
-                conversation,
-                role,
-                message,
-                assistantResponseBlocksJson
-        ));
-        conversation.touch(recordedAt);
-    }
+  public void recordMessage(
+      Long conversationId,
+      CalendarConversationMessageRole role,
+      String message,
+      String assistantResponseBlocksJson,
+      Instant recordedAt) {
+    CalendarConversation conversation = conversationRepository.getReferenceById(conversationId);
+    messageRepository.save(
+        new CalendarConversationMessage(conversation, role, message, assistantResponseBlocksJson));
+    conversation.touch(recordedAt);
+  }
 
-    public int deleteInactiveConversations(Instant cutoff) {
-        messageRepository.deleteByConversationInactiveBefore(cutoff);
-        return conversationRepository.deleteInactiveBefore(cutoff);
-    }
+  public int deleteInactiveConversations(Instant cutoff) {
+    messageRepository.deleteByConversationInactiveBefore(cutoff);
+    return conversationRepository.deleteInactiveBefore(cutoff);
+  }
 }

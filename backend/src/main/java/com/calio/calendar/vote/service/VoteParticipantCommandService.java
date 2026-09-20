@@ -14,31 +14,28 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class VoteParticipantCommandService {
 
-    private final VoteParticipantRepository voteParticipantRepository;
-    private final VoteRoomRepository voteRoomRepository;
+  private final VoteParticipantRepository voteParticipantRepository;
+  private final VoteRoomRepository voteRoomRepository;
 
-    public VoteParticipantCommandService(
-            VoteParticipantRepository voteParticipantRepository,
-            VoteRoomRepository voteRoomRepository
-    ) {
-        this.voteParticipantRepository = voteParticipantRepository;
-        this.voteRoomRepository = voteRoomRepository;
-    }
+  public VoteParticipantCommandService(
+      VoteParticipantRepository voteParticipantRepository, VoteRoomRepository voteRoomRepository) {
+    this.voteParticipantRepository = voteParticipantRepository;
+    this.voteRoomRepository = voteRoomRepository;
+  }
 
-    public VoteRoom getVoteRoomForParticipantCreation(UUID voteRoomPublicId) {
-        return voteRoomRepository.findByPublicIdForUpdate(voteRoomPublicId)
-                .orElseThrow(() -> new CalioException(ErrorCode.VOTE_ROOM_NOT_FOUND));
-    }
+  public VoteRoom getVoteRoomForParticipantCreation(UUID voteRoomPublicId) {
+    return voteRoomRepository
+        .findByPublicIdForUpdate(voteRoomPublicId)
+        .orElseThrow(() -> new CalioException(ErrorCode.VOTE_ROOM_NOT_FOUND));
+  }
 
-    public VoteParticipant getParticipantForVoteSubmission(UUID voteRoomPublicId, String nickname) {
-        return voteParticipantRepository.findByVoteRoomPublicIdAndNicknameForUpdate(
-                        voteRoomPublicId,
-                        nickname
-                )
-                .orElseThrow(() -> new CalioException(ErrorCode.VOTE_PARTICIPANT_CREDENTIAL_INVALID));
-    }
+  public VoteParticipant getParticipantForVoteSubmission(UUID voteRoomPublicId, String nickname) {
+    return voteParticipantRepository
+        .findByVoteRoomPublicIdAndNicknameForUpdate(voteRoomPublicId, nickname)
+        .orElseThrow(() -> new CalioException(ErrorCode.VOTE_PARTICIPANT_CREDENTIAL_INVALID));
+  }
 
-    public VoteParticipant create(VoteParticipant participant) {
-        return voteParticipantRepository.save(participant);
-    }
+  public VoteParticipant create(VoteParticipant participant) {
+    return voteParticipantRepository.save(participant);
+  }
 }

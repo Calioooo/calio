@@ -1,101 +1,102 @@
-import Testing
 import Foundation
 import SwiftUI
+import Testing
+
 @testable import Calio
 
 func requestBodyData(from request: URLRequest) -> Data? {
-    if let httpBody = request.httpBody {
-        return httpBody
+  if let httpBody = request.httpBody {
+    return httpBody
+  }
+
+  guard let stream = request.httpBodyStream else {
+    return nil
+  }
+
+  stream.open()
+  defer {
+    stream.close()
+  }
+
+  var data = Data()
+  var buffer = [UInt8](repeating: 0, count: 1024)
+
+  while stream.hasBytesAvailable {
+    let count = stream.read(&buffer, maxLength: buffer.count)
+
+    guard count > 0 else {
+      break
     }
 
-    guard let stream = request.httpBodyStream else {
-        return nil
-    }
+    data.append(buffer, count: count)
+  }
 
-    stream.open()
-    defer {
-        stream.close()
-    }
-
-    var data = Data()
-    var buffer = [UInt8](repeating: 0, count: 1024)
-
-    while stream.hasBytesAvailable {
-        let count = stream.read(&buffer, maxLength: buffer.count)
-
-        guard count > 0 else {
-            break
-        }
-
-        data.append(buffer, count: count)
-    }
-
-    return data
+  return data
 }
 
 final class MockURLProtocol: URLProtocol {
-    static var requestHandler: ((URLRequest) throws -> (HTTPURLResponse, Data))?
+  static var requestHandler: ((URLRequest) throws -> (HTTPURLResponse, Data))?
 
-    override class func canInit(with request: URLRequest) -> Bool {
-        true
+  override class func canInit(with request: URLRequest) -> Bool {
+    true
+  }
+
+  override class func canonicalRequest(for request: URLRequest) -> URLRequest {
+    request
+  }
+
+  override func startLoading() {
+    guard let handler = MockURLProtocol.requestHandler else {
+      return
     }
 
-    override class func canonicalRequest(for request: URLRequest) -> URLRequest {
-        request
+    do {
+      let (response, data) = try handler(request)
+      client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+      client?.urlProtocol(self, didLoad: data)
+      client?.urlProtocolDidFinishLoading(self)
+    } catch {
+      client?.urlProtocol(self, didFailWithError: error)
     }
+  }
 
-    override func startLoading() {
-        guard let handler = MockURLProtocol.requestHandler else {
-            return
-        }
-
-        do {
-            let (response, data) = try handler(request)
-            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-            client?.urlProtocol(self, didLoad: data)
-            client?.urlProtocolDidFinishLoading(self)
-        } catch {
-            client?.urlProtocol(self, didFailWithError: error)
-        }
-    }
-
-    override func stopLoading() {}
+  override func stopLoading() {}
 }
 
 struct StaticAuthTokenProvider: AuthTokenProvider {
-    let accessToken: String?
+  let accessToken: String?
 }
 
 final class InMemoryAuthTokenStore: AuthTokenStore {
-    private var storedAccessToken: String?
+  private var storedAccessToken: String?
 
-    var accessToken: String? {
-        storedAccessToken
-    }
+  var accessToken: String? {
+    storedAccessToken
+  }
 
-    func loadAccessToken() throws -> String? {
-        storedAccessToken
-    }
+  func loadAccessToken() throws -> String? {
+    storedAccessToken
+  }
 
-    func saveAccessToken(_ accessToken: String) throws {
-        storedAccessToken = accessToken
-    }
+  func saveAccessToken(_ accessToken: String) throws {
+    storedAccessToken = accessToken
+  }
 
-    func deleteAccessToken() throws {
-        storedAccessToken = nil
-    }
+  func deleteAccessToken() throws {
+    storedAccessToken = nil
+  }
 }
 
 final class RecordingAuthRepository: AuthRepository {
-    private let response: GuestAuthResponseDTO
-    private(set) var issueGuestTokenCallCount = 0
+  private let response: GuestAuthResponseDTO
+  private(set) var issueGuestTokenCallCount = 0
 
-    init(response: GuestAuthResponseDTO) {
-        self.response = response
-    }
+  init(response: GuestAuthResponseDTO) {
+    self.response = response
+  }
 
-    func issueGuestToken() async throws -> GuestAuthResponseDTO {
-        issueGuestTokenCallCount += 1
-        return response
-    }
+  func issueGuestToken() async throws -> GuestAuthResponseDTO {
+    issueGuestTokenCallCount += 1
+    return response
+  }
 }

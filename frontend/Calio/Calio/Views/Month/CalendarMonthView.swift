@@ -8,202 +8,208 @@
 import SwiftUI
 
 struct CalendarMonthView: View {
-    private let calendar = Calendar.current
-    private let columnCount = 7
-    private let rowCount = 6
-    private let maxVisibleEventDotCount = 3
-    
-    let items: [CalendarDayItem]
-    let referenceDay: DayKey
-    let onSelectedDay: (DayKey) -> Void
-    let onMonthChanged: (Int) -> Void
+  private let calendar = Calendar.current
+  private let columnCount = 7
+  private let rowCount = 6
+  private let maxVisibleEventDotCount = 3
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
-                ForEach(CalendarWeekday.allCases) { weekday in
-                    Text(weekday.shortKoreanText)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity)
-                }
+  let items: [CalendarDayItem]
+  let referenceDay: DayKey
+  let onSelectedDay: (DayKey) -> Void
+  let onMonthChanged: (Int) -> Void
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      HStack(spacing: 8) {
+        ForEach(CalendarWeekday.allCases) { weekday in
+          Text(weekday.shortKoreanText)
+            .font(.system(size: 13, weight: .medium))
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity)
+        }
+      }
+
+      monthGrid
+    }
+    .padding(.horizontal, 20)
+    .padding(.top, 4)
+    .padding(.bottom, 18)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    .accessibilityIdentifier("calendar_header_month")
+    .gesture(
+      DragGesture(minimumDistance: 20)
+        .onEnded { value in
+          let horizontal = value.translation.width
+          let vertical = value.translation.height
+
+          guard abs(horizontal) > abs(vertical) else { return }
+
+          if horizontal < -40 {
+            onMonthChanged(1)
+          } else if horizontal > 40 {
+            onMonthChanged(-1)
+          }
+        }
+    )
+  }
+
+  private var monthGrid: some View {
+    GeometryReader { geometry in
+      let cellWidth = geometry.size.width / CGFloat(columnCount)
+      let cellHeight = geometry.size.height / CGFloat(rowCount)
+
+      LazyVGrid(
+        columns: Array(
+          repeating: GridItem(.flexible(), spacing: 0),
+          count: columnCount
+        ),
+        spacing: 0
+      ) {
+        ForEach(monthGridDays, id: \.self) { day in
+          monthCell(for: day)
+            .frame(width: cellWidth, height: cellHeight)
+        }
+      }
+      .id(monthIdentifier)
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+  }
+
+  private func monthCell(for day: DayKey) -> some View {
+    let item = itemsByDay[day]
+    let isReferenceDay = day == referenceDay
+    let isCurrentMonth = day.month == referenceDay.month && day.year == referenceDay.year
+    let aggregateDotColors = aggregateDotColors(for: item)
+    let hiddenItemCount = max((item?.calendarItemCount ?? 0) - maxVisibleEventDotCount, 0)
+
+    return Button {
+      onSelectedDay(day)
+    } label: {
+      VStack(spacing: 0) {
+        Text("\(day.day)")
+          .font(.system(size: 17, weight: isReferenceDay ? .semibold : .regular))
+          .foregroundStyle(dayTextColor(for: item, isCurrentMonth: isCurrentMonth))
+          .frame(width: 28, height: 28)
+          .background {
+            if item?.isToday == true {
+              Circle()
+                .fill(Color(red: 0.56, green: 0.76, blue: 0.96))
             }
+          }
 
-            monthGrid
+        HStack(spacing: 2) {
+          ForEach(
+            Array(aggregateDotColors.prefix(maxVisibleEventDotCount).enumerated()), id: \.offset
+          ) { _, color in
+            Circle()
+              .fill(color)
+              .frame(width: 7, height: 7)
+          }
+
+          if hiddenItemCount > 0 {
+            Text("+\(hiddenItemCount)")
+              .font(.system(size: 10, weight: .medium))
+              .foregroundStyle(.secondary)
+          }
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 4)
-        .padding(.bottom, 18)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .accessibilityIdentifier("calendar_header_month")
-        .gesture(
-              DragGesture(minimumDistance: 20)
-                  .onEnded { value in
-                      let horizontal = value.translation.width
-                      let vertical = value.translation.height
-
-                      guard abs(horizontal) > abs(vertical) else { return }
-
-                      if horizontal < -40 {
-                          onMonthChanged(1)
-                      } else if horizontal > 40 {
-                          onMonthChanged(-1)
-                      }
-                  }
-          )
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+      }
+      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+      .contentShape(Rectangle())
     }
-
-    private var monthGrid: some View {
-        GeometryReader { geometry in
-            let cellWidth = geometry.size.width / CGFloat(columnCount)
-            let cellHeight = geometry.size.height / CGFloat(rowCount)
-            
-            LazyVGrid(
-                columns: Array(
-                    repeating: GridItem(.flexible(), spacing: 0),
-                    count: columnCount
-                ),
-                spacing: 0
-            ) {
-                ForEach(monthGridDays, id: \.self) { day in
-                    monthCell(for: day)
-                        .frame(width: cellWidth, height: cellHeight)
-                }
-            }
-            .id(monthIdentifier)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .buttonStyle(.plain)
+    .background {
+      if isReferenceDay {
+        Rectangle()
+          .fill(Color(red: 0.56, green: 0.76, blue: 0.96).opacity(0.18))
+      }
     }
-    
-    private func monthCell(for day: DayKey) -> some View {
-        let item = itemsByDay[day]
-        let isReferenceDay = day == referenceDay
-        let isCurrentMonth = day.month == referenceDay.month && day.year == referenceDay.year
-        let aggregateDotColors = aggregateDotColors(for: item)
-        let hiddenItemCount = max((item?.calendarItemCount ?? 0) - maxVisibleEventDotCount, 0)
-        
-        return Button {
-            onSelectedDay(day)
-        } label: {
-            VStack(spacing: 0) {
-                Text("\(day.day)")
-                    .font(.system(size: 17, weight: isReferenceDay ? .semibold : .regular))
-                    .foregroundStyle(dayTextColor(for: item, isCurrentMonth: isCurrentMonth))
-                    .frame(width: 28, height: 28)
-                    .background {
-                        if item?.isToday == true {
-                            Circle()
-                                .fill(Color(red: 0.56, green: 0.76, blue: 0.96))
-                        }
-                    }
-                
-                HStack(spacing: 2) {
-                    ForEach(Array(aggregateDotColors.prefix(maxVisibleEventDotCount).enumerated()), id: \.offset) { _, color in
-                        Circle()
-                            .fill(color)
-                            .frame(width: 7, height: 7)
-                    }
-                    
-                    if hiddenItemCount > 0 {
-                        Text("+\(hiddenItemCount)")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .background {
-            if isReferenceDay {
-                Rectangle()
-                    .fill(Color(red: 0.56, green: 0.76, blue: 0.96).opacity(0.18))
-            }
-        }
+  }
+
+  private func aggregateDotColors(for item: CalendarDayItem?) -> [Color] {
+    guard let item else {
+      return []
     }
 
-    private func aggregateDotColors(for item: CalendarDayItem?) -> [Color] {
-        guard let item else {
-            return []
-        }
+    return Array(repeating: Color.calendarHoliday, count: item.holidays.count)
+      + item.events.map { Color(hex: $0.tag.colorCode) }
+  }
 
-        return Array(repeating: Color.calendarHoliday, count: item.holidays.count)
-            + item.events.map { Color(hex: $0.tag.colorCode) }
-    }
-    
-    private var itemsByDay: [DayKey: CalendarDayItem] {
-        Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })
-    }
-    
-    private var monthGridDays: [DayKey] {
-        let referenceDate = referenceDay.toDate(calendar: calendar)
-        let monthComponents = calendar.dateComponents([.year, .month], from: referenceDate)
-        
-        guard let firstDayOfMonth = calendar.date(from: monthComponents) else {
-            return []
-        }
-        
-        let firstWeekdayIndex = calendar.component(.weekday, from: firstDayOfMonth) - 1
-        
-        guard let gridStartDate = calendar.date(
-            byAdding: .day,
-            value: firstWeekdayIndex * -1,
-            to: firstDayOfMonth
-        ) else {
-            return []
-        }
-        
-        return (0..<(columnCount * rowCount)).compactMap { offset in
-            guard let date = calendar.date(
-                byAdding: .day,
-                value: offset,
-                to: gridStartDate
-            ) else {
-                return nil
-            }
-            
-            return DayKey(date: date, calendar: calendar)
-        }
-    }
-    
-    private var monthIdentifier: String {
-        "\(referenceDay.year)-\(referenceDay.month)"
-    }
-    
-    private func dayTextColor(
-        for item: CalendarDayItem?,
-        isCurrentMonth: Bool
-    ) -> Color {
-        if item?.isToday == true {
-            return .white
-        }
-        
-        guard isCurrentMonth else {
-            return .secondary.opacity(0.55)
-        }
+  private var itemsByDay: [DayKey: CalendarDayItem] {
+    Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })
+  }
 
-        if item?.hasHoliday == true {
-            return Color.calendarHoliday
-        }
-        
-        switch item?.weekday {
-        case .sunday:
-            return .red
-        case .saturday:
-            return .blue
-        default:
-            return .primary
-        }
+  private var monthGridDays: [DayKey] {
+    let referenceDate = referenceDay.toDate(calendar: calendar)
+    let monthComponents = calendar.dateComponents([.year, .month], from: referenceDate)
+
+    guard let firstDayOfMonth = calendar.date(from: monthComponents) else {
+      return []
     }
+
+    let firstWeekdayIndex = calendar.component(.weekday, from: firstDayOfMonth) - 1
+
+    guard
+      let gridStartDate = calendar.date(
+        byAdding: .day,
+        value: firstWeekdayIndex * -1,
+        to: firstDayOfMonth
+      )
+    else {
+      return []
+    }
+
+    return (0..<(columnCount * rowCount)).compactMap { offset in
+      guard
+        let date = calendar.date(
+          byAdding: .day,
+          value: offset,
+          to: gridStartDate
+        )
+      else {
+        return nil
+      }
+
+      return DayKey(date: date, calendar: calendar)
+    }
+  }
+
+  private var monthIdentifier: String {
+    "\(referenceDay.year)-\(referenceDay.month)"
+  }
+
+  private func dayTextColor(
+    for item: CalendarDayItem?,
+    isCurrentMonth: Bool
+  ) -> Color {
+    if item?.isToday == true {
+      return .white
+    }
+
+    guard isCurrentMonth else {
+      return .secondary.opacity(0.55)
+    }
+
+    if item?.hasHoliday == true {
+      return Color.calendarHoliday
+    }
+
+    switch item?.weekday {
+    case .sunday:
+      return .red
+    case .saturday:
+      return .blue
+    default:
+      return .primary
+    }
+  }
 }
 
 #Preview {
-    CalendarMonthView(
-        items: [],
-        referenceDay: DayKey(date: Date()),
-        onSelectedDay: { _ in },
-        onMonthChanged: { _ in }
-    )
+  CalendarMonthView(
+    items: [],
+    referenceDay: DayKey(date: Date()),
+    onSelectedDay: { _ in },
+    onMonthChanged: { _ in }
+  )
 }
