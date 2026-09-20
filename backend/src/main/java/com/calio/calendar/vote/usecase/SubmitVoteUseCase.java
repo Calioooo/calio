@@ -43,7 +43,8 @@ public class SubmitVoteUseCase {
 
     VoteParticipant lockedParticipant =
         voteParticipantRepository
-            .findByVoteRoomPublicIdAndNicknameForUpdate(voteRoomPublicId, normalizedNickname.value())
+            .findByVoteRoomPublicIdAndNicknameForUpdate(
+                voteRoomPublicId, normalizedNickname.value())
             .orElseThrow(() -> new CalioException(ErrorCode.VOTE_PARTICIPANT_CREDENTIAL_INVALID));
     List<LocalDate> unavailableDates = normalizeDates(requestedDates);
     if (unavailableDates.stream()

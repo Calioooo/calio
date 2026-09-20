@@ -41,7 +41,8 @@ public class LookupVoteParticipantSelectionUseCase {
         .orElseThrow(() -> new CalioException(ErrorCode.VOTE_ROOM_NOT_FOUND));
     VoteParticipant participant =
         voteParticipantRepository
-            .findByVoteRoomPublicIdAndNickname(voteRoomPublicId, VoteParticipantNickname.of(nickname).value())
+            .findByVoteRoomPublicIdAndNickname(
+                voteRoomPublicId, VoteParticipantNickname.of(nickname).value())
             .orElseThrow(() -> new CalioException(ErrorCode.VOTE_PARTICIPANT_CREDENTIAL_INVALID));
     credentialVerifier.verify(participant, password);
     return VoteParticipantSelectionResponse.from(participant, getUnavailableDates(participant));
@@ -51,7 +52,7 @@ public class LookupVoteParticipantSelectionUseCase {
     if (!participant.hasSubmittedVotes()) {
       return List.of();
     }
-    return voteRepository.findAllByVoteParticipantId(participant.getId()).stream()
+    return voteRepository.findAllByVoteParticipantIdOrderByUnavailableDateAsc(participant.getId()).stream()
         .map(Vote::getUnavailableDate)
         .toList();
   }

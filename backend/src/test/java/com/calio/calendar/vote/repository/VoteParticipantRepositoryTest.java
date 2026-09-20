@@ -144,7 +144,7 @@ class VoteParticipantRepositoryTest {
             new Vote(participant, LocalDate.of(2026, 8, 15))));
 
     // when, then
-    assertThat(voteRepository.findAllByVoteParticipantId(participant.getId()))
+    assertThat(voteRepository.findAllByVoteParticipantIdOrderByUnavailableDateAsc(participant.getId()))
         .extracting(Vote::getUnavailableDate)
         .containsExactly(LocalDate.of(2026, 8, 15), LocalDate.of(2026, 8, 20));
   }
