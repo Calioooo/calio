@@ -24,7 +24,7 @@ import com.calio.calendar.integration.sync.page.dto.GoogleCalendarPageRecordCach
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.service.RecurrenceEventQueryService;
 import com.calio.calendar.tag.domain.Tag;
-import com.calio.calendar.tag.usecase.TagLookup;
+import com.calio.calendar.tag.repository.TagRepository;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -38,12 +38,14 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class GoogleCalendarPageChangeService {
 
+    private static final String FALLBACK_TAG_TITLE = "기타";
+
     private final GoogleCalendarIntegrationQueryService integrationQueryService;
     private final GoogleCalendarEventMappingQueryService eventMappingQueryService;
     private final GoogleCalendarEventChangeService eventChangeService;
     private final GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService;
     private final AccountQueryService accountQueryService;
-    private final TagLookup tagLookup;
+    private final TagRepository tagRepository;
     private final RecurrenceEventQueryService recurrenceEventQueryService;
     private final GoogleCalendarRecurrenceChangeService recurrenceChangeService;
 
@@ -53,7 +55,7 @@ public class GoogleCalendarPageChangeService {
             GoogleCalendarEventChangeService eventChangeService,
             GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService,
             AccountQueryService accountQueryService,
-            TagLookup tagLookup,
+            TagRepository tagRepository,
             RecurrenceEventQueryService recurrenceEventQueryService,
             GoogleCalendarRecurrenceChangeService recurrenceChangeService
     ) {
@@ -62,7 +64,7 @@ public class GoogleCalendarPageChangeService {
         this.eventChangeService = eventChangeService;
         this.recurrenceMappingQueryService = recurrenceMappingQueryService;
         this.accountQueryService = accountQueryService;
-        this.tagLookup = tagLookup;
+        this.tagRepository = tagRepository;
         this.recurrenceEventQueryService = recurrenceEventQueryService;
         this.recurrenceChangeService = recurrenceChangeService;
     }
@@ -86,7 +88,8 @@ public class GoogleCalendarPageChangeService {
                 loadPageRecordCache(integration.getId(), items);
 
         Account account = accountQueryService.getAccount(accountId);
-        Tag defaultTag = tagLookup.getPersonalTagOrDefault(accountId, null);
+        Tag defaultTag = tagRepository.findFirstPersonalDefaultTagByTitle(FALLBACK_TAG_TITLE)
+                .orElseThrow(() -> new CalioException(ErrorCode.DEFAULT_TAG_NOT_FOUND));
 
         for (NormalizedItem item : items) {
             switch (item) {

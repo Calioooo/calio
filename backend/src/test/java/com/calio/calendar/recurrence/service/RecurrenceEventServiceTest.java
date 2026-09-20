@@ -28,7 +28,7 @@ import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepositor
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.domain.TagType;
-import com.calio.calendar.tag.usecase.TagLookup;
+import com.calio.calendar.tag.repository.TagRepository;
 import com.calio.calendar.sharing.recurrence.service.PersonalRecurrenceGroupShareCommandService;
 import java.time.Clock;
 import java.time.Instant;
@@ -57,7 +57,7 @@ class RecurrenceEventServiceTest {
     private AccountQueryService accountQueryService;
 
     @Mock
-    private TagLookup tagLookup;
+    private TagRepository tagRepository;
 
     @Mock
     private EventCommandService eventCommandService;
@@ -90,7 +90,7 @@ class RecurrenceEventServiceTest {
                 queryService,
                 commandService,
                 accountQueryService,
-                tagLookup,
+                tagRepository,
                 eventCommandService,
                 recurrenceEngine,
                 clock,
@@ -105,7 +105,8 @@ class RecurrenceEventServiceTest {
         // given
         Tag tag = tag();
         List<String> normalized = List.of("RRULE:FREQ=DAILY;COUNT=3");
-        when(tagLookup.getPersonalTagOrDefault(1L, null)).thenReturn(tag);
+        when(tagRepository.findFirstPersonalDefaultTagByTitle("기타"))
+                .thenReturn(Optional.of(tag));
         when(recurrenceEngine.validate(any(RecurrenceSchedule.class), any())).thenReturn(normalized);
         when(recurrenceEventRepository.save(any(RecurrenceEvent.class))).thenAnswer(invocation -> {
             RecurrenceEvent recurrenceEvent = invocation.getArgument(0);
@@ -157,7 +158,8 @@ class RecurrenceEventServiceTest {
         List<String> normalized = List.of("RRULE:FREQ=WEEKLY;COUNT=2");
         when(recurrenceEventRepository.findByIdAndAccountIdForUpdate(10L, 1L))
                 .thenReturn(Optional.of(recurrenceEvent));
-        when(tagLookup.getPersonalTagOrDefault(1L, null)).thenReturn(tag);
+        when(tagRepository.findFirstPersonalDefaultTagByTitle("기타"))
+                .thenReturn(Optional.of(tag));
         when(recurrenceEngine.validate(any(RecurrenceSchedule.class), any())).thenReturn(normalized);
         UpdateRecurrenceEventRequest request = new UpdateRecurrenceEventRequest(
                 "Updated",

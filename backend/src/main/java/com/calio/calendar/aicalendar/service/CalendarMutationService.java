@@ -22,10 +22,12 @@ import com.calio.calendar.singleevent.usecase.DeleteSingleEventUseCase;
 import com.calio.calendar.singleevent.usecase.GetSingleEventUseCase;
 import com.calio.calendar.singleevent.usecase.UpdateSingleEventUseCase;
 import com.calio.calendar.tag.controller.dto.TagResponse;
-import com.calio.calendar.tag.service.TagService;
+import com.calio.calendar.tag.domain.Tag;
+import com.calio.calendar.tag.repository.TagRepository;
 import java.time.Instant;
 import java.util.List;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class CalendarMutationService {
@@ -35,7 +37,7 @@ public class CalendarMutationService {
   private final UpdateSingleEventUseCase updateEventUseCase;
   private final DeleteSingleEventUseCase deleteEventUseCase;
   private final RecurrenceEventService recurrenceEventService;
-  private final TagService tagService;
+  private final TagRepository tagRepository;
   private final CalendarAiMutationPolicy aiMutationPolicy;
 
   public CalendarMutationService(
@@ -44,17 +46,18 @@ public class CalendarMutationService {
       UpdateSingleEventUseCase updateEventUseCase,
       DeleteSingleEventUseCase deleteEventUseCase,
       RecurrenceEventService recurrenceEventService,
-      TagService tagService,
+      TagRepository tagRepository,
       CalendarAiMutationPolicy aiMutationPolicy) {
     this.createEventUseCase = createEventUseCase;
     this.getEventUseCase = getEventUseCase;
     this.updateEventUseCase = updateEventUseCase;
     this.deleteEventUseCase = deleteEventUseCase;
     this.recurrenceEventService = recurrenceEventService;
-    this.tagService = tagService;
+    this.tagRepository = tagRepository;
     this.aiMutationPolicy = aiMutationPolicy;
   }
 
+  @Transactional(readOnly = true)
   public CalendarMutationPreview preview(Long accountId, CalendarMutationToolRequest request) {
     return switch (requireOperation(request)) {
       case CREATE_EVENT -> previewEventCreation(accountId, request);
@@ -458,7 +461,19 @@ public class CalendarMutationService {
   }
 
   private TagResponse tagResponse(Long accountId, Long tagId) {
-    return TagResponse.from(tagService.getTagOrDefault(accountId, tagId));
+    return TagResponse.from(getPersonalTagOrDefault(accountId, tagId));
+  }
+
+  private Tag getPersonalTagOrDefault(Long accountId, Long tagId) {
+    if (tagId == null) {
+      return tagRepository
+          .findPersonalFallbackTag()
+          .orElseThrow(() -> new CalioException(ErrorCode.DEFAULT_TAG_NOT_FOUND));
+    }
+    return tagRepository
+        .findPersonalDefaultTagById(tagId)
+        .or(() -> tagRepository.findPersonalCustomTagById(accountId, tagId))
+        .orElseThrow(() -> new CalioException(ErrorCode.TAG_NOT_FOUND));
   }
 
   private Long requireEventId(CalendarMutationToolRequest request) {

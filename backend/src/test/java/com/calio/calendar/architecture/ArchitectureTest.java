@@ -172,6 +172,19 @@ class ArchitectureTest {
   }
 
   @Test
+  @DisplayName("기존 Service는 UseCase를 직접 호출하지 않는다")
+  void servicesDoNotDependOnUseCases() {
+    noClasses()
+        .that()
+        .resideInAPackage("..service..")
+        .should()
+        .dependOnClassesThat()
+        .resideInAPackage(USE_CASE_PACKAGE)
+        .allowEmptyShould(true)
+        .check(productionClasses);
+  }
+
+  @Test
   @DisplayName("Domain은 Repository에 직접 의존하지 않는다")
   void domainDoesNotDependOnRepositories() {
     noClasses()

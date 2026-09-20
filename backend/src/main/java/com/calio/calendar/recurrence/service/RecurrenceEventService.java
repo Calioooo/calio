@@ -17,7 +17,7 @@ import com.calio.calendar.recurrence.domain.RecurrenceOccurrence;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.event.service.EventCommandService;
-import com.calio.calendar.tag.usecase.TagLookup;
+import com.calio.calendar.tag.repository.TagRepository;
 import com.calio.calendar.sharing.recurrence.service.PersonalRecurrenceGroupShareCommandService;
 import java.time.Clock;
 import java.time.Instant;
@@ -30,10 +30,12 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class RecurrenceEventService {
 
+    private static final String FALLBACK_TAG_TITLE = "기타";
+
     private final RecurrenceEventQueryService recurrenceEventQueryService;
     private final RecurrenceEventCommandService recurrenceEventCommandService;
     private final AccountQueryService accountQueryService;
-    private final TagLookup tagLookup;
+    private final TagRepository tagRepository;
     private final EventCommandService eventCommandService;
     private final Rfc5545RecurrenceEngine recurrenceEngine;
     private final Clock clock;
@@ -44,7 +46,7 @@ public class RecurrenceEventService {
             RecurrenceEventQueryService recurrenceEventQueryService,
             RecurrenceEventCommandService recurrenceEventCommandService,
             AccountQueryService accountQueryService,
-            TagLookup tagLookup,
+            TagRepository tagRepository,
             EventCommandService eventCommandService,
             Rfc5545RecurrenceEngine recurrenceEngine,
             Clock clock,
@@ -54,7 +56,7 @@ public class RecurrenceEventService {
         this.recurrenceEventQueryService = recurrenceEventQueryService;
         this.recurrenceEventCommandService = recurrenceEventCommandService;
         this.accountQueryService = accountQueryService;
-        this.tagLookup = tagLookup;
+        this.tagRepository = tagRepository;
         this.eventCommandService = eventCommandService;
         this.recurrenceEngine = recurrenceEngine;
         this.clock = clock;
@@ -67,7 +69,7 @@ public class RecurrenceEventService {
         RecurrenceSchedule schedule = createSchedule(request);
         List<String> recurrenceRules = recurrenceEngine.validate(schedule, request.recurrence());
         Account account = accountQueryService.getAccount(accountId);
-        Tag tag = tagLookup.getPersonalTagOrDefault(accountId, request.tagId());
+        Tag tag = getPersonalTagOrDefault(accountId, request.tagId());
         RecurrenceEvent recurrenceEvent = recurrenceEventCommandService.createRecurrenceEvent(new RecurrenceEvent(
                 request.title(),
                 request.description(),
@@ -113,7 +115,7 @@ public class RecurrenceEventService {
         rejectExternalSeriesMutation(accountId, recurrenceId);
         RecurrenceSchedule schedule = createSchedule(request);
         List<String> recurrenceRules = recurrenceEngine.validate(schedule, request.recurrence());
-        Tag tag = tagLookup.getPersonalTagOrDefault(accountId, request.tagId());
+        Tag tag = getPersonalTagOrDefault(accountId, request.tagId());
         recurrenceEventCommandService.updateRecurrenceEvent(
                 recurrenceEvent,
                 request,
@@ -245,5 +247,15 @@ public class RecurrenceEventService {
         if (recurrenceMappingQueryService.hasExternalRecurrenceEventMapping(recurrenceId, accountId)) {
             throw new CalioException(ErrorCode.EXTERNAL_EVENT_MUTATION_NOT_SUPPORTED);
         }
+    }
+
+    private Tag getPersonalTagOrDefault(Long accountId, Long tagId) {
+        if (tagId == null) {
+            return tagRepository.findFirstPersonalDefaultTagByTitle(FALLBACK_TAG_TITLE)
+                    .orElseThrow(() -> new CalioException(ErrorCode.DEFAULT_TAG_NOT_FOUND));
+        }
+        return tagRepository.findPersonalDefaultTagById(tagId)
+                .or(() -> tagRepository.findPersonalCustomTagById(accountId, tagId))
+                .orElseThrow(() -> new CalioException(ErrorCode.TAG_NOT_FOUND));
     }
 }

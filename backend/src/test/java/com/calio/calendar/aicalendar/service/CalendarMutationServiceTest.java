@@ -25,9 +25,10 @@ import com.calio.calendar.singleevent.usecase.DeleteSingleEventUseCase;
 import com.calio.calendar.singleevent.usecase.GetSingleEventUseCase;
 import com.calio.calendar.singleevent.usecase.UpdateSingleEventUseCase;
 import com.calio.calendar.tag.domain.Tag;
-import com.calio.calendar.tag.service.TagService;
+import com.calio.calendar.tag.repository.TagRepository;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -48,7 +49,7 @@ class CalendarMutationServiceTest {
 
   @Mock private RecurrenceEventService recurrenceEventService;
 
-  @Mock private TagService tagService;
+  @Mock private TagRepository tagRepository;
 
   @Mock private CalendarAiMutationPolicy aiMutationPolicy;
 
@@ -58,7 +59,8 @@ class CalendarMutationServiceTest {
     // given
     EventResponse existingEvent = event("기존 회의", Instant.parse("2026-08-21T05:00:00Z"));
     when(getEventUseCase.get(1L, 10L)).thenReturn(existingEvent);
-    when(tagService.getTagOrDefault(1L, 1L)).thenReturn(Tag.personalDefault("업무", "#64748B"));
+    when(tagRepository.findPersonalDefaultTagById(1L))
+        .thenReturn(Optional.of(Tag.personalDefault("업무", "#64748B")));
 
     // when
     var preview = service().preview(1L, updateRequest());
@@ -97,7 +99,8 @@ class CalendarMutationServiceTest {
   @DisplayName("일정 생성 Preview는 생성하지 않고 생성될 일정을 반환한다")
   void givenEventCreation_whenPreview_thenReturnsAfterWithoutCreatingEvent() {
     // given
-    when(tagService.getTagOrDefault(1L, 1L)).thenReturn(Tag.personalDefault("업무", "#64748B"));
+    when(tagRepository.findPersonalDefaultTagById(1L))
+        .thenReturn(Optional.of(Tag.personalDefault("업무", "#64748B")));
 
     // when
     var preview = service().preview(1L, createRequest());
@@ -449,7 +452,7 @@ class CalendarMutationServiceTest {
         updateEventUseCase,
         deleteEventUseCase,
         recurrenceEventService,
-        tagService,
+        tagRepository,
         aiMutationPolicy);
   }
 

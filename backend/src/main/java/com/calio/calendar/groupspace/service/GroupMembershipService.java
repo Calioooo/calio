@@ -2,6 +2,8 @@ package com.calio.calendar.groupspace.service;
 
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
+import com.calio.calendar.groupcalendar.event.service.GroupCalendarEventCommandService;
+import com.calio.calendar.groupcalendar.recurrence.service.GroupCalendarRecurrenceCommandService;
 import com.calio.calendar.groupinvitation.domain.GroupInvitation;
 import com.calio.calendar.groupinvitation.domain.InvitationCredentialType;
 import com.calio.calendar.groupinvitation.service.GroupInvitationCommandService;
@@ -18,9 +20,7 @@ import com.calio.calendar.groupspace.domain.GroupMember;
 import com.calio.calendar.groupspace.domain.GroupMemberStatus;
 import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.domain.GroupSpaceFields;
-import com.calio.calendar.groupcalendar.event.service.GroupCalendarEventCommandService;
-import com.calio.calendar.groupcalendar.recurrence.service.GroupCalendarRecurrenceCommandService;
-import com.calio.calendar.tag.usecase.DeleteGroupTagsUseCase;
+import com.calio.calendar.tag.repository.TagRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -32,316 +32,279 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class GroupMembershipService {
 
-    private final GroupMembershipQueryService queryService;
-    private final GroupMembershipCommandService commandService;
-    private final GroupSpaceCommandService groupSpaceCommandService;
-    private final GroupSpaceQueryService groupSpaceQueryService;
-    private final GroupInvitationQueryService invitationQueryService;
-    private final GroupInvitationCommandService invitationCommandService;
-    private final InvitationCredentialService credentialService;
-    private final GroupScheduleShareCleanupPort groupScheduleShareCleanupPort;
-    private final GroupCalendarEventCommandService groupCalendarEventCommandService;
-    private final GroupCalendarRecurrenceCommandService groupCalendarRecurrenceCommandService;
-    private final DeleteGroupTagsUseCase deleteGroupTagsUseCase;
-    private final Clock clock;
+  private final GroupMembershipQueryService queryService;
+  private final GroupMembershipCommandService commandService;
+  private final GroupSpaceCommandService groupSpaceCommandService;
+  private final GroupSpaceQueryService groupSpaceQueryService;
+  private final GroupInvitationQueryService invitationQueryService;
+  private final GroupInvitationCommandService invitationCommandService;
+  private final InvitationCredentialService credentialService;
+  private final GroupScheduleShareCleanupPort groupScheduleShareCleanupPort;
+  private final GroupCalendarEventCommandService groupCalendarEventCommandService;
+  private final GroupCalendarRecurrenceCommandService groupCalendarRecurrenceCommandService;
+  private final TagRepository tagRepository;
+  private final Clock clock;
 
-    public GroupMembershipService(
-            GroupMembershipQueryService queryService,
-            GroupMembershipCommandService commandService,
-            GroupSpaceCommandService groupSpaceCommandService,
-            GroupSpaceQueryService groupSpaceQueryService,
-            GroupInvitationQueryService invitationQueryService,
-            GroupInvitationCommandService invitationCommandService,
-            InvitationCredentialService credentialService,
-            GroupScheduleShareCleanupPort groupScheduleShareCleanupPort,
-            GroupCalendarEventCommandService groupCalendarEventCommandService,
-            GroupCalendarRecurrenceCommandService groupCalendarRecurrenceCommandService,
-            DeleteGroupTagsUseCase deleteGroupTagsUseCase,
-            Clock clock
-    ) {
-        this.queryService = queryService;
-        this.commandService = commandService;
-        this.groupSpaceCommandService = groupSpaceCommandService;
-        this.groupSpaceQueryService = groupSpaceQueryService;
-        this.invitationQueryService = invitationQueryService;
-        this.invitationCommandService = invitationCommandService;
-        this.credentialService = credentialService;
-        this.groupScheduleShareCleanupPort = groupScheduleShareCleanupPort;
-        this.groupCalendarEventCommandService = groupCalendarEventCommandService;
-        this.groupCalendarRecurrenceCommandService = groupCalendarRecurrenceCommandService;
-        this.deleteGroupTagsUseCase = deleteGroupTagsUseCase;
-        this.clock = clock;
+  public GroupMembershipService(
+      GroupMembershipQueryService queryService,
+      GroupMembershipCommandService commandService,
+      GroupSpaceCommandService groupSpaceCommandService,
+      GroupSpaceQueryService groupSpaceQueryService,
+      GroupInvitationQueryService invitationQueryService,
+      GroupInvitationCommandService invitationCommandService,
+      InvitationCredentialService credentialService,
+      GroupScheduleShareCleanupPort groupScheduleShareCleanupPort,
+      GroupCalendarEventCommandService groupCalendarEventCommandService,
+      GroupCalendarRecurrenceCommandService groupCalendarRecurrenceCommandService,
+      TagRepository tagRepository,
+      Clock clock) {
+    this.queryService = queryService;
+    this.commandService = commandService;
+    this.groupSpaceCommandService = groupSpaceCommandService;
+    this.groupSpaceQueryService = groupSpaceQueryService;
+    this.invitationQueryService = invitationQueryService;
+    this.invitationCommandService = invitationCommandService;
+    this.credentialService = credentialService;
+    this.groupScheduleShareCleanupPort = groupScheduleShareCleanupPort;
+    this.groupCalendarEventCommandService = groupCalendarEventCommandService;
+    this.groupCalendarRecurrenceCommandService = groupCalendarRecurrenceCommandService;
+    this.tagRepository = tagRepository;
+    this.clock = clock;
+  }
+
+  @Transactional
+  public AcceptGroupInvitationResponse accept(
+      Long accountId, AcceptGroupInvitationRequest request) {
+    byte[] credentialHash = credentialHash(request);
+    GroupInvitation locatedInvitation = locateInvitation(request.credentialType(), credentialHash);
+    GroupSpace groupSpace =
+        groupSpaceCommandService.lockGroupSpace(locatedInvitation.getGroupSpaceId());
+    List<GroupMember> lockedMembers = commandService.lockMembers(groupSpace.getId());
+    GroupInvitation invitation =
+        invitationCommandService.lockInvitation(
+            locatedInvitation.getId(),
+            invitationCredentialType(request.credentialType()),
+            credentialHash);
+    Instant now = clock.instant();
+    validateInvitation(invitation, lockedMembers, now);
+
+    GroupMember membership = findMembership(lockedMembers, accountId);
+    String nickname = GroupSpaceFields.normalizeNickname(request.nickname());
+    if (membership == null) {
+      requireAvailableNickname(groupSpace.getId(), nickname, null);
+      membership = createMembership(groupSpace, accountId, nickname, now);
+      return AcceptGroupInvitationResponse.from(
+          GroupJoinResult.JOINED, groupSpace, membership, activeCount(lockedMembers) + 1);
+    }
+    if (membership.getStatus() == GroupMemberStatus.ACTIVE) {
+      return AcceptGroupInvitationResponse.from(
+          GroupJoinResult.ALREADY_MEMBER, groupSpace, membership, activeCount(lockedMembers));
+    }
+    requireFreshInvitation(invitation, membership);
+    requireAvailableNickname(groupSpace.getId(), nickname, membership.getId());
+    commandService.changeToActive(membership, nickname, now);
+    return AcceptGroupInvitationResponse.from(
+        GroupJoinResult.REJOINED, groupSpace, membership, activeCount(lockedMembers) + 1);
+  }
+
+  @Transactional(readOnly = true)
+  public GroupMemberListResponse listActiveMembers(Long accountId, Long groupSpaceId) {
+    GroupSpace groupSpace = groupSpaceQueryService.getGroupSpace(groupSpaceId);
+    requireActiveMembership(groupSpaceId, accountId);
+    List<GroupMember> activeMembers =
+        queryService.listActiveMembers(groupSpaceId).stream()
+            .sorted(memberOrder(groupSpace))
+            .toList();
+    return GroupMemberListResponse.from(activeMembers, groupSpace);
+  }
+
+  @Transactional
+  public GroupMembershipResponse changeAnonymousSharing(
+      Long accountId, Long groupSpaceId, boolean isAnonymous) {
+    GroupMember member = commandService.lockActiveMember(groupSpaceId, accountId);
+    commandService.changeAnonymous(member, isAnonymous);
+    return GroupMembershipResponse.from(member, member.getGroupSpace());
+  }
+
+  @Transactional
+  public TransferGroupOwnerResponse transferOwnership(
+      Long accountId, Long groupSpaceId, Long targetMemberId) {
+    GroupSpace groupSpace = groupSpaceCommandService.lockGroupSpace(groupSpaceId);
+    List<GroupMember> lockedMembers = commandService.lockMembers(groupSpaceId);
+    GroupMember actor = requireActiveMembership(lockedMembers, accountId);
+    requireOwner(groupSpace, actor);
+    GroupMember target =
+        findActiveMember(lockedMembers, targetMemberId)
+            .orElseThrow(() -> new CalioException(ErrorCode.GROUP_MEMBER_NOT_FOUND));
+    if (target.getId().equals(actor.getId())) {
+      throw new CalioException(ErrorCode.GROUP_OWNER_TRANSFER_INVALID);
     }
 
-    @Transactional
-    public AcceptGroupInvitationResponse accept(Long accountId, AcceptGroupInvitationRequest request) {
-        byte[] credentialHash = credentialHash(request);
-        GroupInvitation locatedInvitation = locateInvitation(request.credentialType(), credentialHash);
-        GroupSpace groupSpace = groupSpaceCommandService.lockGroupSpace(
-                locatedInvitation.getGroupSpaceId()
-        );
-        List<GroupMember> lockedMembers = commandService.lockMembers(groupSpace.getId());
-        GroupInvitation invitation = invitationCommandService.lockInvitation(
-                locatedInvitation.getId(),
-                invitationCredentialType(request.credentialType()),
-                credentialHash
-        );
-        Instant now = clock.instant();
-        validateInvitation(invitation, lockedMembers, now);
+    commandService.changeOwnership(groupSpace, target.getAccountId());
+    return TransferGroupOwnerResponse.from(groupSpace, actor, target);
+  }
 
-        GroupMember membership = findMembership(lockedMembers, accountId);
-        String nickname = GroupSpaceFields.normalizeNickname(request.nickname());
-        if (membership == null) {
-            requireAvailableNickname(groupSpace.getId(), nickname, null);
-            membership = createMembership(groupSpace, accountId, nickname, now);
-            return AcceptGroupInvitationResponse.from(
-                    GroupJoinResult.JOINED,
-                    groupSpace,
-                    membership,
-                    activeCount(lockedMembers) + 1
-            );
-        }
-        if (membership.getStatus() == GroupMemberStatus.ACTIVE) {
-            return AcceptGroupInvitationResponse.from(
-                    GroupJoinResult.ALREADY_MEMBER,
-                    groupSpace,
-                    membership,
-                    activeCount(lockedMembers)
-            );
-        }
-        requireFreshInvitation(invitation, membership);
-        requireAvailableNickname(groupSpace.getId(), nickname, membership.getId());
-        commandService.changeToActive(membership, nickname, now);
-        return AcceptGroupInvitationResponse.from(
-                GroupJoinResult.REJOINED,
-                groupSpace,
-                membership,
-                activeCount(lockedMembers) + 1
-        );
+  @Transactional
+  public void leave(Long accountId, Long groupSpaceId) {
+    GroupSpace groupSpace = groupSpaceCommandService.lockGroupSpace(groupSpaceId);
+    List<GroupMember> lockedMembers = commandService.lockMembers(groupSpaceId);
+    GroupMember actor = requireActiveMembership(lockedMembers, accountId);
+    Instant now = clock.instant();
+    if (actor.roleIn(groupSpace).isOwner() && activeCount(lockedMembers) > 1) {
+      throw new CalioException(ErrorCode.GROUP_OWNER_TRANSFER_REQUIRED);
     }
-
-    @Transactional(readOnly = true)
-    public GroupMemberListResponse listActiveMembers(Long accountId, Long groupSpaceId) {
-        GroupSpace groupSpace = groupSpaceQueryService.getGroupSpace(groupSpaceId);
-        requireActiveMembership(groupSpaceId, accountId);
-        List<GroupMember> activeMembers = queryService.listActiveMembers(groupSpaceId)
-                .stream()
-                .sorted(memberOrder(groupSpace))
-                .toList();
-        return GroupMemberListResponse.from(activeMembers, groupSpace);
+    if (actor.roleIn(groupSpace).isOwner()) {
+      deleteSoleOwnerGroup(groupSpace);
+      return;
     }
+    deactivateMember(groupSpaceId, actor, GroupMemberStatus.LEFT, now);
+  }
 
-    @Transactional
-    public GroupMembershipResponse changeAnonymousSharing(
-            Long accountId,
-            Long groupSpaceId,
-            boolean isAnonymous
-    ) {
-        GroupMember member = commandService.lockActiveMember(groupSpaceId, accountId);
-        commandService.changeAnonymous(member, isAnonymous);
-        return GroupMembershipResponse.from(member, member.getGroupSpace());
+  @Transactional
+  public void kick(Long accountId, Long groupSpaceId, Long targetMemberId) {
+    GroupSpace groupSpace = groupSpaceCommandService.lockGroupSpace(groupSpaceId);
+    List<GroupMember> lockedMembers = commandService.lockMembers(groupSpaceId);
+    GroupMember actor = requireActiveMembership(lockedMembers, accountId);
+    Instant now = clock.instant();
+    requireOwner(groupSpace, actor);
+    GroupMember target =
+        findActiveMember(lockedMembers, targetMemberId)
+            .orElseThrow(() -> new CalioException(ErrorCode.GROUP_MEMBER_NOT_FOUND));
+    if (target.roleIn(groupSpace).isOwner()) {
+      throw new CalioException(ErrorCode.GROUP_OWNER_CANNOT_BE_REMOVED);
     }
+    deactivateMember(groupSpaceId, target, GroupMemberStatus.REMOVED, now);
+  }
 
-    @Transactional
-    public TransferGroupOwnerResponse transferOwnership(
-            Long accountId,
-            Long groupSpaceId,
-            Long targetMemberId
-    ) {
-        GroupSpace groupSpace = groupSpaceCommandService.lockGroupSpace(groupSpaceId);
-        List<GroupMember> lockedMembers = commandService.lockMembers(groupSpaceId);
-        GroupMember actor = requireActiveMembership(lockedMembers, accountId);
-        requireOwner(groupSpace, actor);
-        GroupMember target = findActiveMember(lockedMembers, targetMemberId)
-                .orElseThrow(() -> new CalioException(ErrorCode.GROUP_MEMBER_NOT_FOUND));
-        if (target.getId().equals(actor.getId())) {
-            throw new CalioException(ErrorCode.GROUP_OWNER_TRANSFER_INVALID);
-        }
+  private byte[] credentialHash(AcceptGroupInvitationRequest request) {
+    return credentialService.hashValidated(
+        invitationCredentialType(request.credentialType()), request.credential());
+  }
 
-        commandService.changeOwnership(groupSpace, target.getAccountId());
-        return TransferGroupOwnerResponse.from(groupSpace, actor, target);
+  private InvitationCredentialType invitationCredentialType(
+      GroupInvitationAcceptCredentialType credentialType) {
+    return switch (credentialType) {
+      case LINK_TOKEN -> InvitationCredentialType.LINK_TOKEN;
+      case INVITE_CODE -> InvitationCredentialType.CODE;
+    };
+  }
+
+  private GroupInvitation locateInvitation(
+      GroupInvitationAcceptCredentialType credentialType, byte[] credentialHash) {
+    return invitationQueryService.getInvitationByCredentialHash(
+        invitationCredentialType(credentialType), credentialHash);
+  }
+
+  private void validateInvitation(
+      GroupInvitation invitation, List<GroupMember> lockedMembers, Instant now) {
+    if (invitation.isExpiredAt(now)) {
+      throw new CalioException(ErrorCode.GROUP_INVITATION_EXPIRED);
     }
-
-    @Transactional
-    public void leave(Long accountId, Long groupSpaceId) {
-        GroupSpace groupSpace = groupSpaceCommandService.lockGroupSpace(groupSpaceId);
-        List<GroupMember> lockedMembers = commandService.lockMembers(groupSpaceId);
-        GroupMember actor = requireActiveMembership(lockedMembers, accountId);
-        Instant now = clock.instant();
-        if (actor.roleIn(groupSpace).isOwner() && activeCount(lockedMembers) > 1) {
-            throw new CalioException(ErrorCode.GROUP_OWNER_TRANSFER_REQUIRED);
-        }
-        if (actor.roleIn(groupSpace).isOwner()) {
-            deleteSoleOwnerGroup(groupSpace);
-            return;
-        }
-        deactivateMember(groupSpaceId, actor, GroupMemberStatus.LEFT, now);
+    boolean issuerIsActive =
+        lockedMembers.stream()
+            .anyMatch(
+                member ->
+                    member.getId().equals(invitation.getCreatedByMemberId())
+                        && member.getStatus() == GroupMemberStatus.ACTIVE);
+    if (!issuerIsActive) {
+      throw invitationNotFound();
     }
+  }
 
-    @Transactional
-    public void kick(Long accountId, Long groupSpaceId, Long targetMemberId) {
-        GroupSpace groupSpace = groupSpaceCommandService.lockGroupSpace(groupSpaceId);
-        List<GroupMember> lockedMembers = commandService.lockMembers(groupSpaceId);
-        GroupMember actor = requireActiveMembership(lockedMembers, accountId);
-        Instant now = clock.instant();
-        requireOwner(groupSpace, actor);
-        GroupMember target = findActiveMember(lockedMembers, targetMemberId)
-                .orElseThrow(() -> new CalioException(ErrorCode.GROUP_MEMBER_NOT_FOUND));
-        if (target.roleIn(groupSpace).isOwner()) {
-            throw new CalioException(ErrorCode.GROUP_OWNER_CANNOT_BE_REMOVED);
-        }
-        deactivateMember(groupSpaceId, target, GroupMemberStatus.REMOVED, now);
-    }
+  private GroupMember createMembership(
+      GroupSpace groupSpace, Long accountId, String nickname, Instant now) {
+    return commandService.create(groupSpace, accountId, nickname, now);
+  }
 
-    private byte[] credentialHash(AcceptGroupInvitationRequest request) {
-        return credentialService.hashValidated(
-                invitationCredentialType(request.credentialType()),
-                request.credential()
-        );
+  private void requireFreshInvitation(GroupInvitation invitation, GroupMember membership) {
+    if (!normalize(invitation.getCreatedAt()).isAfter(membership.getStatusChangedAt())) {
+      throw new CalioException(ErrorCode.GROUP_MEMBER_REJOIN_INVITATION_REQUIRED);
     }
+  }
 
-    private InvitationCredentialType invitationCredentialType(
-            GroupInvitationAcceptCredentialType credentialType
-    ) {
-        return switch (credentialType) {
-            case LINK_TOKEN -> InvitationCredentialType.LINK_TOKEN;
-            case INVITE_CODE -> InvitationCredentialType.CODE;
-        };
+  private void requireAvailableNickname(Long groupSpaceId, String nickname, Long excludedMemberId) {
+    if (queryService.hasActiveNicknameConflict(groupSpaceId, nickname, excludedMemberId)) {
+      throw new CalioException(ErrorCode.GROUP_MEMBER_NICKNAME_CONFLICT);
     }
+  }
 
-    private GroupInvitation locateInvitation(
-            GroupInvitationAcceptCredentialType credentialType,
-            byte[] credentialHash
-    ) {
-        return invitationQueryService.getInvitationByCredentialHash(
-                invitationCredentialType(credentialType),
-                credentialHash
-        );
-    }
+  private void deactivateMember(
+      Long groupSpaceId, GroupMember member, GroupMemberStatus inactiveStatus, Instant now) {
+    groupScheduleShareCleanupPort.cleanupMemberShares(groupSpaceId, member.getId());
+    groupCalendarEventCommandService.deleteAllByGroupSpaceIdAndCreatedById(
+        groupSpaceId, member.getAccountId());
+    groupCalendarRecurrenceCommandService.deleteAllCreatedByMember(
+        groupSpaceId, member.getAccountId());
+    deleteIssuerInvitations(member.getId());
+    commandService.changeStatus(member, inactiveStatus, now);
+  }
 
-    private void validateInvitation(
-            GroupInvitation invitation,
-            List<GroupMember> lockedMembers,
-            Instant now
-    ) {
-        if (invitation.isExpiredAt(now)) {
-            throw new CalioException(ErrorCode.GROUP_INVITATION_EXPIRED);
-        }
-        boolean issuerIsActive = lockedMembers.stream().anyMatch(member ->
-                member.getId().equals(invitation.getCreatedByMemberId())
-                        && member.getStatus() == GroupMemberStatus.ACTIVE
-        );
-        if (!issuerIsActive) {
-            throw invitationNotFound();
-        }
-    }
+  private void deleteSoleOwnerGroup(GroupSpace groupSpace) {
+    groupScheduleShareCleanupPort.cleanupGroupShares(groupSpace.getId());
+    groupCalendarEventCommandService.deleteAllByGroupSpaceId(groupSpace.getId());
+    groupCalendarRecurrenceCommandService.deleteAllInGroupSpace(groupSpace.getId());
+    invitationCommandService.deleteAllByGroupSpaceId(groupSpace.getId());
+    tagRepository.deleteAll(tagRepository.findByGroupSpaceId(groupSpace.getId()));
+    groupSpaceCommandService.delete(groupSpace);
+  }
 
-    private GroupMember createMembership(
-            GroupSpace groupSpace,
-            Long accountId,
-            String nickname,
-            Instant now
-    ) {
-        return commandService.create(groupSpace, accountId, nickname, now);
-    }
+  private void deleteIssuerInvitations(Long memberId) {
+    invitationCommandService.deleteAllByCreatedByMemberId(memberId);
+  }
 
-    private void requireFreshInvitation(GroupInvitation invitation, GroupMember membership) {
-        if (!normalize(invitation.getCreatedAt()).isAfter(membership.getStatusChangedAt())) {
-            throw new CalioException(ErrorCode.GROUP_MEMBER_REJOIN_INVITATION_REQUIRED);
-        }
-    }
+  private GroupMember requireActiveMembership(Long groupSpaceId, Long accountId) {
+    return queryService.getActiveMembership(groupSpaceId, accountId);
+  }
 
-    private void requireAvailableNickname(Long groupSpaceId, String nickname, Long excludedMemberId) {
-        if (queryService.hasActiveNicknameConflict(groupSpaceId, nickname, excludedMemberId)) {
-            throw new CalioException(ErrorCode.GROUP_MEMBER_NICKNAME_CONFLICT);
-        }
+  private GroupMember requireActiveMembership(List<GroupMember> members, Long accountId) {
+    GroupMember member = findMembership(members, accountId);
+    if (member == null || member.getStatus() != GroupMemberStatus.ACTIVE) {
+      throw groupSpaceNotFound();
     }
+    return member;
+  }
 
-    private void deactivateMember(
-            Long groupSpaceId,
-            GroupMember member,
-            GroupMemberStatus inactiveStatus,
-            Instant now
-    ) {
-        groupScheduleShareCleanupPort.cleanupMemberShares(groupSpaceId, member.getId());
-        groupCalendarEventCommandService.deleteAllByGroupSpaceIdAndCreatedById(
-                groupSpaceId,
-                member.getAccountId()
-        );
-        groupCalendarRecurrenceCommandService.deleteAllCreatedByMember(
-                groupSpaceId,
-                member.getAccountId()
-        );
-        deleteIssuerInvitations(member.getId());
-        commandService.changeStatus(member, inactiveStatus, now);
-    }
+  private GroupMember findMembership(List<GroupMember> members, Long accountId) {
+    return members.stream()
+        .filter(member -> member.getAccountId().equals(accountId))
+        .findFirst()
+        .orElse(null);
+  }
 
-    private void deleteSoleOwnerGroup(GroupSpace groupSpace) {
-        groupScheduleShareCleanupPort.cleanupGroupShares(groupSpace.getId());
-        groupCalendarEventCommandService.deleteAllByGroupSpaceId(groupSpace.getId());
-        groupCalendarRecurrenceCommandService.deleteAllInGroupSpace(groupSpace.getId());
-        invitationCommandService.deleteAllByGroupSpaceId(groupSpace.getId());
-        deleteGroupTagsUseCase.deleteAll(groupSpace.getId());
-        groupSpaceCommandService.delete(groupSpace);
-    }
+  private java.util.Optional<GroupMember> findActiveMember(
+      List<GroupMember> members, Long memberId) {
+    return members.stream()
+        .filter(member -> member.getId().equals(memberId))
+        .filter(member -> member.getStatus() == GroupMemberStatus.ACTIVE)
+        .findFirst();
+  }
 
-    private void deleteIssuerInvitations(Long memberId) {
-        invitationCommandService.deleteAllByCreatedByMemberId(memberId);
-    }
+  private Comparator<GroupMember> memberOrder(GroupSpace groupSpace) {
+    return Comparator.comparing((GroupMember member) -> !member.roleIn(groupSpace).isOwner())
+        .thenComparing(GroupMember::getStatusChangedAt)
+        .thenComparing(GroupMember::getId);
+  }
 
-    private GroupMember requireActiveMembership(Long groupSpaceId, Long accountId) {
-        return queryService.getActiveMembership(groupSpaceId, accountId);
-    }
+  private int activeCount(List<GroupMember> members) {
+    return (int)
+        members.stream().filter(member -> member.getStatus() == GroupMemberStatus.ACTIVE).count();
+  }
 
-    private GroupMember requireActiveMembership(List<GroupMember> members, Long accountId) {
-        GroupMember member = findMembership(members, accountId);
-        if (member == null || member.getStatus() != GroupMemberStatus.ACTIVE) {
-            throw groupSpaceNotFound();
-        }
-        return member;
+  private void requireOwner(GroupSpace groupSpace, GroupMember member) {
+    if (!member.roleIn(groupSpace).isOwner()) {
+      throw new CalioException(ErrorCode.GROUP_OWNER_REQUIRED);
     }
+  }
 
-    private GroupMember findMembership(List<GroupMember> members, Long accountId) {
-        return members.stream()
-                .filter(member -> member.getAccountId().equals(accountId))
-                .findFirst()
-                .orElse(null);
-    }
+  private static Instant normalize(Instant instant) {
+    return instant.truncatedTo(ChronoUnit.MICROS);
+  }
 
-    private java.util.Optional<GroupMember> findActiveMember(List<GroupMember> members, Long memberId) {
-        return members.stream()
-                .filter(member -> member.getId().equals(memberId))
-                .filter(member -> member.getStatus() == GroupMemberStatus.ACTIVE)
-                .findFirst();
-    }
+  private static CalioException groupSpaceNotFound() {
+    return new CalioException(ErrorCode.GROUP_SPACE_NOT_FOUND);
+  }
 
-    private Comparator<GroupMember> memberOrder(GroupSpace groupSpace) {
-        return Comparator.comparing((GroupMember member) -> !member.roleIn(groupSpace).isOwner())
-                .thenComparing(GroupMember::getStatusChangedAt)
-                .thenComparing(GroupMember::getId);
-    }
-
-    private int activeCount(List<GroupMember> members) {
-        return (int) members.stream()
-                .filter(member -> member.getStatus() == GroupMemberStatus.ACTIVE)
-                .count();
-    }
-
-    private void requireOwner(GroupSpace groupSpace, GroupMember member) {
-        if (!member.roleIn(groupSpace).isOwner()) {
-            throw new CalioException(ErrorCode.GROUP_OWNER_REQUIRED);
-        }
-    }
-
-    private static Instant normalize(Instant instant) {
-        return instant.truncatedTo(ChronoUnit.MICROS);
-    }
-
-    private static CalioException groupSpaceNotFound() {
-        return new CalioException(ErrorCode.GROUP_SPACE_NOT_FOUND);
-    }
-
-    private static CalioException invitationNotFound() {
-        return new CalioException(ErrorCode.GROUP_INVITATION_NOT_FOUND);
-    }
+  private static CalioException invitationNotFound() {
+    return new CalioException(ErrorCode.GROUP_INVITATION_NOT_FOUND);
+  }
 }
