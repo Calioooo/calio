@@ -128,12 +128,21 @@ struct VoteRoomView: View {
         .multilineTextAlignment(.center)
         .padding(.horizontal, 24)
 
-      if viewModel.resultRefreshFailure != nil {
-        Text("최신 결과를 불러오지 못해 이전 결과를 표시하고 있습니다.")
-          .font(.footnote)
-          .foregroundStyle(.calioTextSecondary)
-          .multilineTextAlignment(.center)
-          .padding(.horizontal, 24)
+      if let failure = viewModel.resultRefreshFailure {
+        VStack(spacing: 8) {
+          Text("최신 결과를 불러오지 못해 이전 결과를 표시하고 있습니다.")
+            .font(.footnote)
+            .foregroundStyle(.calioTextSecondary)
+            .multilineTextAlignment(.center)
+          Button("결과 다시 불러오기") {
+            Task { await viewModel.refreshResult() }
+          }
+          .font(.footnote.weight(.semibold))
+          .foregroundStyle(.voteAccent)
+          .accessibilityHint(failure.message)
+          .accessibilityIdentifier("vote_room_retry_result")
+        }
+        .padding(.horizontal, 24)
       }
 
       if let room = viewModel.room {
