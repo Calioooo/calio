@@ -4,8 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.calio.calendar.account.domain.Account;
-import com.calio.calendar.account.domain.AccountAuthToken;
-import com.calio.calendar.account.repository.AccountAuthTokenRepository;
 import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.auth.service.AccessTokenEncoder;
 import com.calio.calendar.common.error.CalioException;
@@ -36,11 +34,8 @@ class AuthenticateAccountTokenUseCaseTest {
 
   @Autowired private AccountRepository accountRepository;
 
-  @Autowired private AccountAuthTokenRepository accountAuthTokenRepository;
-
   @BeforeEach
   void setUp() {
-    accountAuthTokenRepository.deleteAll();
     accountRepository.deleteAll();
   }
 
@@ -49,21 +44,20 @@ class AuthenticateAccountTokenUseCaseTest {
   void givenValidToken_whenAuthenticate_thenReturnsAccountIdOnlyPrincipalAndUpdatesLastUsedAt() {
     // given
     String rawToken = "valid-token";
-    Account account = accountRepository.saveAndFlush(new Account());
-    AccountAuthToken authToken =
-        accountAuthTokenRepository.saveAndFlush(
-            new AccountAuthToken(account, accessTokenEncoder.hash(rawToken)));
+    Account account = new Account();
+    account.issueAuthToken(accessTokenEncoder.hash(rawToken));
+    account = accountRepository.saveAndFlush(account);
     Instant beforeAuthentication = Instant.now();
 
     // when
     AuthenticatedAccount principal = authenticateAccountTokenUseCase.authenticate(rawToken);
 
     // then
-    AccountAuthToken updatedToken =
-        accountAuthTokenRepository.findById(authToken.getId()).orElseThrow();
+    Account updatedAccount = accountRepository.findById(account.getId()).orElseThrow();
     assertThat(principal.accountId()).isEqualTo(account.getId());
-    assertThat(updatedToken.getLastUsedAt()).isNotNull();
-    assertThat(updatedToken.getLastUsedAt()).isAfterOrEqualTo(beforeAuthentication.minusSeconds(1));
+    assertThat(updatedAccount.getAuthTokenLastUsedAt()).isNotNull();
+    assertThat(updatedAccount.getAuthTokenLastUsedAt())
+        .isAfterOrEqualTo(beforeAuthentication.minusSeconds(1));
   }
 
   @Test
@@ -81,10 +75,10 @@ class AuthenticateAccountTokenUseCaseTest {
   void givenRevokedToken_whenAuthenticate_thenThrowsRevokedToken() {
     // given
     String rawToken = "revoked-token";
-    Account account = accountRepository.saveAndFlush(new Account());
-    AccountAuthToken authToken = new AccountAuthToken(account, accessTokenEncoder.hash(rawToken));
-    authToken.revoke(Instant.parse("2026-07-10T00:00:00Z"));
-    accountAuthTokenRepository.saveAndFlush(authToken);
+    Account account = new Account();
+    account.issueAuthToken(accessTokenEncoder.hash(rawToken));
+    account.revokeAuthToken(Instant.parse("2026-07-10T00:00:00Z"));
+    accountRepository.saveAndFlush(account);
 
     // when, then
     assertThatThrownBy(() -> authenticateAccountTokenUseCase.authenticate(rawToken))

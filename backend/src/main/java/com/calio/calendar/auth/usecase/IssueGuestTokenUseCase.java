@@ -1,8 +1,6 @@
 package com.calio.calendar.auth.usecase;
 
 import com.calio.calendar.account.domain.Account;
-import com.calio.calendar.account.domain.AccountAuthToken;
-import com.calio.calendar.account.repository.AccountAuthTokenRepository;
 import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.auth.controller.dto.GuestAuthResponse;
 import com.calio.calendar.auth.service.AccessTokenEncoder;
@@ -13,24 +11,21 @@ import org.springframework.transaction.annotation.Transactional;
 public class IssueGuestTokenUseCase {
 
   private final AccountRepository accountRepository;
-  private final AccountAuthTokenRepository accountAuthTokenRepository;
   private final AccessTokenEncoder accessTokenEncoder;
 
   public IssueGuestTokenUseCase(
-      AccountRepository accountRepository,
-      AccountAuthTokenRepository accountAuthTokenRepository,
-      AccessTokenEncoder accessTokenEncoder) {
+      AccountRepository accountRepository, AccessTokenEncoder accessTokenEncoder) {
     this.accountRepository = accountRepository;
-    this.accountAuthTokenRepository = accountAuthTokenRepository;
     this.accessTokenEncoder = accessTokenEncoder;
   }
 
   @Transactional
   public GuestAuthResponse issue() {
-    Account account = accountRepository.save(new Account());
     String rawToken = accessTokenEncoder.generateRawToken();
     String tokenHash = accessTokenEncoder.hash(rawToken);
-    accountAuthTokenRepository.save(new AccountAuthToken(account, tokenHash));
+    Account account = new Account();
+    account.issueAuthToken(tokenHash);
+    accountRepository.save(account);
     return GuestAuthResponse.bearer(rawToken);
   }
 }

@@ -14,25 +14,28 @@ class AccountAuthTokenTest {
   @Test
   @DisplayName("활성 인증 토큰은 인증 시 마지막 사용 시각을 변경한다")
   void givenActiveToken_whenAuthenticate_thenUpdatesLastUsedAt() {
-    AccountAuthToken authToken = new AccountAuthToken(new Account(), "token-hash");
+    Account account = new Account();
+    account.issueAuthToken("token-hash");
     Instant usedAt = Instant.parse("2026-09-19T00:00:00Z");
 
-    authToken.authenticate(usedAt);
+    account.authenticateAuthToken(usedAt);
 
-    assertThat(authToken.getLastUsedAt()).isEqualTo(usedAt);
+    assertThat(account.getAuthTokenLastUsedAt()).isEqualTo(usedAt);
   }
 
   @Test
   @DisplayName("폐기된 인증 토큰은 사용할 수 없고 마지막 사용 시각도 변경되지 않는다")
   void givenRevokedToken_whenAuthenticate_thenRejectsWithoutUpdatingLastUsedAt() {
-    AccountAuthToken authToken = new AccountAuthToken(new Account(), "token-hash");
-    authToken.revoke(Instant.parse("2026-09-18T00:00:00Z"));
+    Account account = new Account();
+    account.issueAuthToken("token-hash");
+    account.revokeAuthToken(Instant.parse("2026-09-18T00:00:00Z"));
 
-    assertThatThrownBy(() -> authToken.authenticate(Instant.parse("2026-09-19T00:00:00Z")))
+    assertThatThrownBy(
+            () -> account.authenticateAuthToken(Instant.parse("2026-09-19T00:00:00Z")))
         .isInstanceOfSatisfying(
             CalioException.class,
             exception ->
                 assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.AUTH_TOKEN_REVOKED));
-    assertThat(authToken.getLastUsedAt()).isNull();
+    assertThat(account.getAuthTokenLastUsedAt()).isNull();
   }
 }
