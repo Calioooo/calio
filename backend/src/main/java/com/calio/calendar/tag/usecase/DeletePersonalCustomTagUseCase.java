@@ -33,7 +33,7 @@ public class DeletePersonalCustomTagUseCase {
             .orElseThrow(() -> new CalioException(ErrorCode.TAG_NOT_FOUND));
     Tag fallbackTag =
         tagRepository
-            .findFirstPersonalDefaultTagByTitle("기타")
+            .findPersonalFallbackTag()
             .orElseThrow(() -> new CalioException(ErrorCode.DEFAULT_TAG_NOT_FOUND));
     eventCommandService.changeTagForTargetEvents(accountId, tag, fallbackTag);
     recurrenceEventCommandService.changeTagForRecurrenceEvents(accountId, tag, fallbackTag);

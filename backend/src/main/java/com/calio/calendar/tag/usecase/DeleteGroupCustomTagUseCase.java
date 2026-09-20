@@ -40,7 +40,7 @@ public class DeleteGroupCustomTagUseCase {
             .orElseThrow(() -> new CalioException(ErrorCode.GROUP_TAG_NOT_FOUND));
     Tag fallbackTag =
         tagRepository
-            .findByTagTypeAndGroupSpaceId(TagType.GROUP_DEFAULT, groupSpaceId)
+            .findGroupFallbackTag(groupSpaceId)
             .orElseThrow(() -> new CalioException(ErrorCode.GROUP_DEFAULT_TAG_NOT_FOUND));
     groupCalendarEventCommandService.changeTagForEvents(tag, fallbackTag);
     groupCalendarRecurrenceCommandService.changeTagForRecurrenceEvents(tag, fallbackTag);

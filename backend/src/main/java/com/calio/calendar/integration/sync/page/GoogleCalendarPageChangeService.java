@@ -38,8 +38,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class GoogleCalendarPageChangeService {
 
-    private static final String FALLBACK_TAG_TITLE = "기타";
-
     private final GoogleCalendarIntegrationQueryService integrationQueryService;
     private final GoogleCalendarEventMappingQueryService eventMappingQueryService;
     private final GoogleCalendarEventChangeService eventChangeService;
@@ -88,7 +86,7 @@ public class GoogleCalendarPageChangeService {
                 loadPageRecordCache(integration.getId(), items);
 
         Account account = accountQueryService.getAccount(accountId);
-        Tag defaultTag = tagRepository.findFirstPersonalDefaultTagByTitle(FALLBACK_TAG_TITLE)
+        Tag defaultTag = tagRepository.findPersonalFallbackTag()
                 .orElseThrow(() -> new CalioException(ErrorCode.DEFAULT_TAG_NOT_FOUND));
 
         for (NormalizedItem item : items) {

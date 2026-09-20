@@ -18,7 +18,6 @@ import com.calio.calendar.groupspace.service.GroupSpaceCommandService;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
 import com.calio.calendar.recurrence.service.Rfc5545RecurrenceEngine;
 import com.calio.calendar.tag.domain.Tag;
-import com.calio.calendar.tag.domain.TagType;
 import com.calio.calendar.tag.repository.TagRepository;
 import java.time.Clock;
 import java.time.Instant;
@@ -215,7 +214,7 @@ public class GroupCalendarRecurrenceService {
 
     private Tag getGroupTagOrDefault(Long groupSpaceId, Long tagId) {
         if (tagId == null) {
-            return tagRepository.findByTagTypeAndGroupSpaceId(TagType.GROUP_DEFAULT, groupSpaceId)
+            return tagRepository.findGroupFallbackTag(groupSpaceId)
                     .orElseThrow(() -> new CalioException(ErrorCode.GROUP_DEFAULT_TAG_NOT_FOUND));
         }
         return tagRepository.findByIdAndGroupSpaceId(tagId, groupSpaceId)

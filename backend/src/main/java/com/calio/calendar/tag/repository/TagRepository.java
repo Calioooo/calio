@@ -1,7 +1,6 @@
 package com.calio.calendar.tag.repository;
 
 import com.calio.calendar.tag.domain.Tag;
-import com.calio.calendar.tag.domain.TagType;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -44,18 +43,21 @@ public interface TagRepository extends JpaRepository<Tag, Long> {
 
     @Query("""
             select tag from Tag tag
-            where tag.tagType = 'PERSONAL_DEFAULT' and tag.title.value = :title
+            where tag.tagType = 'PERSONAL_DEFAULT' and tag.fallback = true
                 and tag.accountId is null and tag.groupSpaceId is null
-            order by tag.id
-            limit 1
             """)
-    Optional<Tag> findFirstPersonalDefaultTagByTitle(@Param("title") String title);
+    Optional<Tag> findPersonalFallbackTag();
 
     List<Tag> findByGroupSpaceIdOrderByIdAsc(Long groupSpaceId);
 
     Optional<Tag> findByIdAndGroupSpaceId(Long tagId, Long groupSpaceId);
 
-    Optional<Tag> findByTagTypeAndGroupSpaceId(TagType tagType, Long groupSpaceId);
+    @Query("""
+            select tag from Tag tag
+            where tag.tagType = 'GROUP_DEFAULT' and tag.fallback = true
+                and tag.accountId is null and tag.groupSpaceId = :groupSpaceId
+            """)
+    Optional<Tag> findGroupFallbackTag(@Param("groupSpaceId") Long groupSpaceId);
 
     @Query("""
             select count(tag) > 0 from Tag tag

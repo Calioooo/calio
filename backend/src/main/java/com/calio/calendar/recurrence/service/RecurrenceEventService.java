@@ -30,8 +30,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class RecurrenceEventService {
 
-    private static final String FALLBACK_TAG_TITLE = "기타";
-
     private final RecurrenceEventQueryService recurrenceEventQueryService;
     private final RecurrenceEventCommandService recurrenceEventCommandService;
     private final AccountQueryService accountQueryService;
@@ -251,7 +249,7 @@ public class RecurrenceEventService {
 
     private Tag getPersonalTagOrDefault(Long accountId, Long tagId) {
         if (tagId == null) {
-            return tagRepository.findFirstPersonalDefaultTagByTitle(FALLBACK_TAG_TITLE)
+            return tagRepository.findPersonalFallbackTag()
                     .orElseThrow(() -> new CalioException(ErrorCode.DEFAULT_TAG_NOT_FOUND));
         }
         return tagRepository.findPersonalDefaultTagById(tagId)

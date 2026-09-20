@@ -105,7 +105,7 @@ class RecurrenceEventServiceTest {
         // given
         Tag tag = tag();
         List<String> normalized = List.of("RRULE:FREQ=DAILY;COUNT=3");
-        when(tagRepository.findFirstPersonalDefaultTagByTitle("기타"))
+        when(tagRepository.findPersonalFallbackTag())
                 .thenReturn(Optional.of(tag));
         when(recurrenceEngine.validate(any(RecurrenceSchedule.class), any())).thenReturn(normalized);
         when(recurrenceEventRepository.save(any(RecurrenceEvent.class))).thenAnswer(invocation -> {
@@ -158,7 +158,7 @@ class RecurrenceEventServiceTest {
         List<String> normalized = List.of("RRULE:FREQ=WEEKLY;COUNT=2");
         when(recurrenceEventRepository.findByIdAndAccountIdForUpdate(10L, 1L))
                 .thenReturn(Optional.of(recurrenceEvent));
-        when(tagRepository.findFirstPersonalDefaultTagByTitle("기타"))
+        when(tagRepository.findPersonalFallbackTag())
                 .thenReturn(Optional.of(tag));
         when(recurrenceEngine.validate(any(RecurrenceSchedule.class), any())).thenReturn(normalized);
         UpdateRecurrenceEventRequest request = new UpdateRecurrenceEventRequest(
@@ -505,7 +505,7 @@ class RecurrenceEventServiceTest {
     }
 
     private Tag tag() {
-        return Tag.personalDefault("기타", "#64748B");
+        return Tag.personalFallback("기타", "#64748B");
     }
 
     private Account account() {

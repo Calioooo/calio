@@ -83,8 +83,8 @@ class RecurrenceEventControllerTest {
     @BeforeEach
     void setUpDefaultTag() {
         accountId = currentAccountReference().getId();
-        tagRepository.findFirstPersonalDefaultTagByTitle("기타")
-                .orElseGet(() -> tagRepository.save(Tag.personalDefault("기타", "#64748B")));
+        tagRepository.findPersonalFallbackTag()
+                .orElseGet(() -> tagRepository.save(Tag.personalFallback("기타", "#64748B")));
     }
 
     @Test
@@ -682,7 +682,7 @@ class RecurrenceEventControllerTest {
         // given
         Account otherAccount = accountRepository.save(new Account());
         Tag defaultTag = tagRepository
-                .findFirstPersonalDefaultTagByTitle("기타")
+                .findPersonalFallbackTag()
                 .orElseThrow();
         RecurrenceEvent otherMaster = recurrenceEventRepository.save(new RecurrenceEvent(
                 "Other",

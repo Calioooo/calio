@@ -48,7 +48,7 @@ class TagControllerTest {
     void givenPersonalDefaultAndCustomTags_whenListTags_thenReturnsAllTags() throws Exception {
         // given
         tagRepository.save(Tag.personalDefault("업무", "#2563eb"));
-        tagRepository.save(Tag.personalDefault("기타", "#64748b"));
+        tagRepository.save(Tag.personalFallback("기타", "#64748b"));
         tagRepository.save(Tag.personalCustom(currentAccountId(), "사용자", "#111111"));
 
         // when

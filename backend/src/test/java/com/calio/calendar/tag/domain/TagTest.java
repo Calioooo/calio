@@ -15,7 +15,8 @@ class TagTest {
     void factoriesCreateTagsInTheirOwnershipScopes() {
         Long groupSpaceId = 2L;
 
-        Tag personalDefault = Tag.personalDefault("기타", "#64748B");
+        Tag personalDefault = Tag.personalDefault("업무", "#3B82F6");
+        Tag personalFallback = Tag.personalFallback("분류 없음", "#64748B");
         Tag personalCustom = Tag.personalCustom(1L, "개인", "#64748B");
         Tag groupDefault = Tag.groupDefault(groupSpaceId);
         Tag groupCustom = Tag.groupCustom(groupSpaceId, "업무", "#64748B");
@@ -23,12 +24,17 @@ class TagTest {
         assertThat(personalDefault.getTagType()).isEqualTo(TagType.PERSONAL_DEFAULT);
         assertThat(personalDefault.getAccountId()).isNull();
         assertThat(personalDefault.getGroupSpaceId()).isNull();
+        assertThat(personalDefault.isFallback()).isFalse();
+        assertThat(personalFallback.isFallback()).isTrue();
         assertThat(personalCustom.getAccountId()).isEqualTo(1L);
         assertThat(personalCustom.getGroupSpaceId()).isNull();
+        assertThat(personalCustom.isFallback()).isFalse();
         assertThat(groupDefault.getTagType()).isEqualTo(TagType.GROUP_DEFAULT);
         assertThat(groupDefault.getTitle()).isEqualTo("기타");
+        assertThat(groupDefault.isFallback()).isTrue();
         assertThat(groupCustom.getAccountId()).isNull();
         assertThat(groupCustom.getGroupSpaceId()).isEqualTo(groupSpaceId);
+        assertThat(groupCustom.isFallback()).isFalse();
     }
 
     @Test
@@ -49,7 +55,7 @@ class TagTest {
     @DisplayName("PERSONAL_DEFAULT 태그는 entity 내부에서도 수정할 수 없다")
     void givenPersonalDefaultTag_whenUpdate_thenThrowsValidationFailed() {
         // given
-        Tag tag = Tag.personalDefault("기타", "#64748B");
+        Tag tag = Tag.personalFallback("기타", "#64748B");
 
         // when, then
         assertThatThrownBy(() -> tag.update("변경", "#000000"))
@@ -64,7 +70,7 @@ class TagTest {
         Tag tag = Tag.personalDefault("😀".repeat(20), "#64748B");
 
         assertThat(tag.getTitle()).isEqualTo("😀".repeat(20));
-        assertThatThrownBy(() -> Tag.personalDefault("가".repeat(21), "#64748B"))
+        assertThatThrownBy(() -> Tag.personalDefault("😀".repeat(21), "#64748B"))
                 .isInstanceOfSatisfying(CalioException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.VALIDATION_FAILED)
                 );

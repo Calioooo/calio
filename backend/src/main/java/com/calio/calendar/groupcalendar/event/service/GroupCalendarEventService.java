@@ -13,7 +13,6 @@ import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.service.GroupMembershipQueryService;
 import com.calio.calendar.groupspace.service.GroupSpaceCommandService;
 import com.calio.calendar.tag.domain.Tag;
-import com.calio.calendar.tag.domain.TagType;
 import com.calio.calendar.tag.repository.TagRepository;
 import java.time.Instant;
 import java.util.List;
@@ -141,7 +140,7 @@ public class GroupCalendarEventService {
 
     private Tag getTag(Long groupSpaceId, Long tagId) {
         if (tagId == null) {
-            return tagRepository.findByTagTypeAndGroupSpaceId(TagType.GROUP_DEFAULT, groupSpaceId)
+            return tagRepository.findGroupFallbackTag(groupSpaceId)
                     .orElseThrow(() -> new CalioException(ErrorCode.GROUP_DEFAULT_TAG_NOT_FOUND));
         }
         return tagRepository.findByIdAndGroupSpaceId(tagId, groupSpaceId)
