@@ -8,65 +8,65 @@
 import Foundation
 
 enum CalendarEventFormRules {
-    static func canSave(title: String, startAt: Date, endAt: Date) -> Bool {
-        canSave(
-            title: title,
-            startAt: startAt,
-            endAt: endAt,
-            isRecurrenceEnabled: false,
-            recurrenceStartDate: startAt,
-            recurrenceEndDate: startAt,
-            recurrenceStartTime: startAt,
-            recurrenceEndTime: endAt
-        )
+  static func canSave(title: String, startAt: Date, endAt: Date) -> Bool {
+    canSave(
+      title: title,
+      startAt: startAt,
+      endAt: endAt,
+      isRecurrenceEnabled: false,
+      recurrenceStartDate: startAt,
+      recurrenceEndDate: startAt,
+      recurrenceStartTime: startAt,
+      recurrenceEndTime: endAt
+    )
+  }
+
+  static func canSave(
+    title: String,
+    startAt: Date,
+    endAt: Date,
+    isRecurrenceEnabled: Bool,
+    recurrenceStartDate: Date,
+    recurrenceEndDate: Date?,
+    recurrenceStartTime: Date,
+    recurrenceEndTime: Date,
+    isAllDay: Bool = false
+  ) -> Bool {
+    guard !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+      return false
     }
 
-    static func canSave(
-        title: String,
-        startAt: Date,
-        endAt: Date,
-        isRecurrenceEnabled: Bool,
-        recurrenceStartDate: Date,
-        recurrenceEndDate: Date?,
-        recurrenceStartTime: Date,
-        recurrenceEndTime: Date,
-        isAllDay: Bool = false
-    ) -> Bool {
-        guard !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            return false
-        }
-
-        guard isRecurrenceEnabled else {
-            return endAt > startAt
-        }
-
-        return recurrenceEndDate.map { !isUTCDate($0, before: recurrenceStartDate) } ?? true
-            && (isAllDay || isUTCTime(recurrenceStartTime, before: recurrenceEndTime))
+    guard isRecurrenceEnabled else {
+      return endAt > startAt
     }
 
-    private static func isUTCDate(_ candidate: Date, before startAt: Date) -> Bool {
-        DayKey(date: candidate, calendar: utcCalendar) < DayKey(date: startAt, calendar: utcCalendar)
-    }
+    return recurrenceEndDate.map { !isUTCDate($0, before: recurrenceStartDate) } ?? true
+      && (isAllDay || isUTCTime(recurrenceStartTime, before: recurrenceEndTime))
+  }
 
-    private static func isUTCTime(_ startTime: Date, before endTime: Date) -> Bool {
-        let calendar = utcCalendar
-        let startComponents = calendar.dateComponents([.hour, .minute, .second], from: startTime)
-        let endComponents = calendar.dateComponents([.hour, .minute, .second], from: endTime)
-        let startSecond = totalSeconds(from: startComponents)
-        let endSecond = totalSeconds(from: endComponents)
+  private static func isUTCDate(_ candidate: Date, before startAt: Date) -> Bool {
+    DayKey(date: candidate, calendar: utcCalendar) < DayKey(date: startAt, calendar: utcCalendar)
+  }
 
-        return startSecond < endSecond
-    }
+  private static func isUTCTime(_ startTime: Date, before endTime: Date) -> Bool {
+    let calendar = utcCalendar
+    let startComponents = calendar.dateComponents([.hour, .minute, .second], from: startTime)
+    let endComponents = calendar.dateComponents([.hour, .minute, .second], from: endTime)
+    let startSecond = totalSeconds(from: startComponents)
+    let endSecond = totalSeconds(from: endComponents)
 
-    private static func totalSeconds(from components: DateComponents) -> Int {
-        ((components.hour ?? 0) * 3600)
-            + ((components.minute ?? 0) * 60)
-            + (components.second ?? 0)
-    }
+    return startSecond < endSecond
+  }
 
-    private static var utcCalendar: Calendar {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
-        return calendar
-    }
+  private static func totalSeconds(from components: DateComponents) -> Int {
+    ((components.hour ?? 0) * 3600)
+      + ((components.minute ?? 0) * 60)
+      + (components.second ?? 0)
+  }
+
+  private static var utcCalendar: Calendar {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+    return calendar
+  }
 }

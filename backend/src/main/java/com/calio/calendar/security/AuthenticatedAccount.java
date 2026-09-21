@@ -1,4 +1,3 @@
 package com.calio.calendar.security;
 
-public record AuthenticatedAccount(Long accountId) {
-}
+public record AuthenticatedAccount(Long accountId) {}

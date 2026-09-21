@@ -24,58 +24,53 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/group-spaces/{groupSpaceId}/events")
 public class GroupCalendarEventController {
 
-    private final GroupCalendarEventService groupCalendarEventService;
+  private final GroupCalendarEventService groupCalendarEventService;
 
-    public GroupCalendarEventController(GroupCalendarEventService groupCalendarEventService) {
-        this.groupCalendarEventService = groupCalendarEventService;
-    }
+  public GroupCalendarEventController(GroupCalendarEventService groupCalendarEventService) {
+    this.groupCalendarEventService = groupCalendarEventService;
+  }
 
-    @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    public GroupCalendarEventResponse create(
-            @AuthenticationPrincipal AuthenticatedAccount account,
-            @PathVariable Long groupSpaceId,
-            @Valid @RequestBody GroupCalendarEventRequest request
-    ) {
-        return groupCalendarEventService.create(account.accountId(), groupSpaceId, request);
-    }
+  @PostMapping
+  @ResponseStatus(HttpStatus.CREATED)
+  public GroupCalendarEventResponse create(
+      @AuthenticationPrincipal AuthenticatedAccount account,
+      @PathVariable Long groupSpaceId,
+      @Valid @RequestBody GroupCalendarEventRequest request) {
+    return groupCalendarEventService.create(account.accountId(), groupSpaceId, request);
+  }
 
-    @GetMapping
-    public List<GroupCalendarEventResponse> list(
-            @AuthenticationPrincipal AuthenticatedAccount account,
-            @PathVariable Long groupSpaceId,
-            @RequestParam Instant from,
-            @RequestParam Instant to
-    ) {
-        return groupCalendarEventService.list(account.accountId(), groupSpaceId, from, to);
-    }
+  @GetMapping
+  public List<GroupCalendarEventResponse> list(
+      @AuthenticationPrincipal AuthenticatedAccount account,
+      @PathVariable Long groupSpaceId,
+      @RequestParam Instant from,
+      @RequestParam Instant to) {
+    return groupCalendarEventService.list(account.accountId(), groupSpaceId, from, to);
+  }
 
-    @GetMapping("/{eventId}")
-    public GroupCalendarEventResponse get(
-            @AuthenticationPrincipal AuthenticatedAccount account,
-            @PathVariable Long groupSpaceId,
-            @PathVariable Long eventId
-    ) {
-        return groupCalendarEventService.get(account.accountId(), groupSpaceId, eventId);
-    }
+  @GetMapping("/{eventId}")
+  public GroupCalendarEventResponse get(
+      @AuthenticationPrincipal AuthenticatedAccount account,
+      @PathVariable Long groupSpaceId,
+      @PathVariable Long eventId) {
+    return groupCalendarEventService.get(account.accountId(), groupSpaceId, eventId);
+  }
 
-    @PatchMapping("/{eventId}")
-    public GroupCalendarEventResponse update(
-            @AuthenticationPrincipal AuthenticatedAccount account,
-            @PathVariable Long groupSpaceId,
-            @PathVariable Long eventId,
-            @Valid @RequestBody GroupCalendarEventRequest request
-    ) {
-        return groupCalendarEventService.update(account.accountId(), groupSpaceId, eventId, request);
-    }
+  @PatchMapping("/{eventId}")
+  public GroupCalendarEventResponse update(
+      @AuthenticationPrincipal AuthenticatedAccount account,
+      @PathVariable Long groupSpaceId,
+      @PathVariable Long eventId,
+      @Valid @RequestBody GroupCalendarEventRequest request) {
+    return groupCalendarEventService.update(account.accountId(), groupSpaceId, eventId, request);
+  }
 
-    @DeleteMapping("/{eventId}")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(
-            @AuthenticationPrincipal AuthenticatedAccount account,
-            @PathVariable Long groupSpaceId,
-            @PathVariable Long eventId
-    ) {
-        groupCalendarEventService.delete(account.accountId(), groupSpaceId, eventId);
-    }
+  @DeleteMapping("/{eventId}")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  public void delete(
+      @AuthenticationPrincipal AuthenticatedAccount account,
+      @PathVariable Long groupSpaceId,
+      @PathVariable Long eventId) {
+    groupCalendarEventService.delete(account.accountId(), groupSpaceId, eventId);
+  }
 }

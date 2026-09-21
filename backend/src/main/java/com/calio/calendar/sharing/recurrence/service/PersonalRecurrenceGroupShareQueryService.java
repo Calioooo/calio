@@ -11,19 +11,16 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class PersonalRecurrenceGroupShareQueryService {
 
-    private final PersonalRecurrenceGroupShareRepository shareRepository;
+  private final PersonalRecurrenceGroupShareRepository shareRepository;
 
-    public PersonalRecurrenceGroupShareQueryService(PersonalRecurrenceGroupShareRepository shareRepository) {
-        this.shareRepository = shareRepository;
-    }
+  public PersonalRecurrenceGroupShareQueryService(
+      PersonalRecurrenceGroupShareRepository shareRepository) {
+    this.shareRepository = shareRepository;
+  }
 
-    public List<PersonalRecurrenceGroupShare> listExistingShares(
-            Collection<Long> recurrenceEventIds,
-            Collection<Long> groupSpaceIds
-    ) {
-        return shareRepository.findAllByRecurrenceEventIdsAndGroupSpaceIds(
-                recurrenceEventIds,
-                groupSpaceIds
-        );
-    }
+  public List<PersonalRecurrenceGroupShare> listExistingShares(
+      Collection<Long> recurrenceEventIds, Collection<Long> groupSpaceIds) {
+    return shareRepository.findAllByRecurrenceEventIdsAndGroupSpaceIds(
+        recurrenceEventIds, groupSpaceIds);
+  }
 }

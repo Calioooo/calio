@@ -7,8 +7,8 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class GroupInvitationConfig {
 
-    @Bean
-    public SecureRandom groupInvitationSecureRandom() {
-        return new SecureRandom();
-    }
+  @Bean
+  public SecureRandom groupInvitationSecureRandom() {
+    return new SecureRandom();
+  }
 }

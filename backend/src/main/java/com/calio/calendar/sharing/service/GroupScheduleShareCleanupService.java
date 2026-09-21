@@ -10,28 +10,27 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class GroupScheduleShareCleanupService implements GroupScheduleShareCleanupPort {
 
-    private final PersonalEventGroupShareCommandService eventShareCommandService;
-    private final PersonalRecurrenceGroupShareCommandService recurrenceShareCommandService;
+  private final PersonalEventGroupShareCommandService eventShareCommandService;
+  private final PersonalRecurrenceGroupShareCommandService recurrenceShareCommandService;
 
-    public GroupScheduleShareCleanupService(
-            PersonalEventGroupShareCommandService eventShareCommandService,
-            PersonalRecurrenceGroupShareCommandService recurrenceShareCommandService
-    ) {
-        this.eventShareCommandService = eventShareCommandService;
-        this.recurrenceShareCommandService = recurrenceShareCommandService;
-    }
+  public GroupScheduleShareCleanupService(
+      PersonalEventGroupShareCommandService eventShareCommandService,
+      PersonalRecurrenceGroupShareCommandService recurrenceShareCommandService) {
+    this.eventShareCommandService = eventShareCommandService;
+    this.recurrenceShareCommandService = recurrenceShareCommandService;
+  }
 
-    @Override
-    @Transactional(propagation = Propagation.MANDATORY)
-    public void cleanupMemberShares(Long groupSpaceId, Long memberId) {
-        eventShareCommandService.deleteAllForMemberInGroupSpace(groupSpaceId, memberId);
-        recurrenceShareCommandService.deleteAllForMemberInGroupSpace(groupSpaceId, memberId);
-    }
+  @Override
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void cleanupMemberShares(Long groupSpaceId, Long memberId) {
+    eventShareCommandService.deleteAllForMemberInGroupSpace(groupSpaceId, memberId);
+    recurrenceShareCommandService.deleteAllForMemberInGroupSpace(groupSpaceId, memberId);
+  }
 
-    @Override
-    @Transactional(propagation = Propagation.MANDATORY)
-    public void cleanupGroupShares(Long groupSpaceId) {
-        eventShareCommandService.deleteAllForGroupSpace(groupSpaceId);
-        recurrenceShareCommandService.deleteAllForGroupSpace(groupSpaceId);
-    }
+  @Override
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void cleanupGroupShares(Long groupSpaceId) {
+    eventShareCommandService.deleteAllForGroupSpace(groupSpaceId);
+    recurrenceShareCommandService.deleteAllForGroupSpace(groupSpaceId);
+  }
 }

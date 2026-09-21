@@ -281,8 +281,12 @@ struct CalendarAssistantConversationView: View {
     return details.isEmpty ? "빈 시간 결과" : "빈 시간 결과. \(details)"
   }
 
-  private func mutationPreviewAccessibilityLabel(_ preview: CalendarAssistantMutationPreview) -> String {
-    var details = ["\(mutationTypeLabel(preview.type)) 일정 변경 제안", mutationScopeLabel(preview.scope)]
+  private func mutationPreviewAccessibilityLabel(_ preview: CalendarAssistantMutationPreview)
+    -> String
+  {
+    var details = [
+      "\(mutationTypeLabel(preview.type)) 일정 변경 제안", mutationScopeLabel(preview.scope),
+    ]
     if let before = preview.before {
       details.append(mutationEventAccessibilityLabel(before, label: "변경 전"))
     }
@@ -290,13 +294,17 @@ struct CalendarAssistantConversationView: View {
       details.append(mutationEventAccessibilityLabel(after, label: "변경 후"))
     }
     if let before = preview.recurrenceBefore, let after = preview.recurrenceAfter {
-      details.append("반복 규칙 변경 전 \(before.joined(separator: ", ")), 변경 후 \(after.joined(separator: ", "))")
+      details.append(
+        "반복 규칙 변경 전 \(before.joined(separator: ", ")), 변경 후 \(after.joined(separator: ", "))")
     }
     return details.joined(separator: ". ")
   }
 
-  private func mutationEventAccessibilityLabel(_ event: CalendarAssistantMutationEvent, label: String) -> String {
-    let dateTime = event.allDay
+  private func mutationEventAccessibilityLabel(
+    _ event: CalendarAssistantMutationEvent, label: String
+  ) -> String {
+    let dateTime =
+      event.allDay
       ? "종일"
       : CalendarEventDisplayText.compactDateTimeRange(startAt: event.startAt, endAt: event.endAt)
     return "\(label) \(event.title), \(dateTime), 태그 \(event.tag.title)"

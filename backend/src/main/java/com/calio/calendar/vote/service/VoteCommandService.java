@@ -11,15 +11,15 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class VoteCommandService {
 
-    private final VoteRepository voteRepository;
+  private final VoteRepository voteRepository;
 
-    public VoteCommandService(VoteRepository voteRepository) {
-        this.voteRepository = voteRepository;
-    }
+  public VoteCommandService(VoteRepository voteRepository) {
+    this.voteRepository = voteRepository;
+  }
 
-    public void replaceVotes(VoteParticipant participant, List<Vote> votes) {
-        voteRepository.deleteAllByVoteParticipantId(participant.getId());
-        voteRepository.saveAll(votes);
-        participant.submit();
-    }
+  public void replaceVotes(VoteParticipant participant, List<Vote> votes) {
+    voteRepository.deleteAllByVoteParticipantId(participant.getId());
+    voteRepository.saveAll(votes);
+    participant.submit();
+  }
 }

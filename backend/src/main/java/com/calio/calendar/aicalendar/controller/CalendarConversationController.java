@@ -19,32 +19,26 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/ai/calendar/conversations")
 public class CalendarConversationController {
 
-    private final CalendarConversationService conversationService;
+  private final CalendarConversationService conversationService;
 
-    public CalendarConversationController(CalendarConversationService conversationService) {
-        this.conversationService = conversationService;
-    }
+  public CalendarConversationController(CalendarConversationService conversationService) {
+    this.conversationService = conversationService;
+  }
 
-    @PostMapping
-    public ResponseEntity<CreateCalendarConversationResponse> createConversation(
-            @AuthenticationPrincipal AuthenticatedAccount account
-    ) {
-        String conversationId = conversationService.createConversation(account.accountId());
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(new CreateCalendarConversationResponse(conversationId));
-    }
+  @PostMapping
+  public ResponseEntity<CreateCalendarConversationResponse> createConversation(
+      @AuthenticationPrincipal AuthenticatedAccount account) {
+    String conversationId = conversationService.createConversation(account.accountId());
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(new CreateCalendarConversationResponse(conversationId));
+  }
 
-    @PostMapping("/{conversationId}/messages")
-    public SendCalendarConversationMessageResponse sendMessage(
-            @AuthenticationPrincipal AuthenticatedAccount account,
-            @PathVariable String conversationId,
-            @Valid @RequestBody SendCalendarConversationMessageRequest request
-    ) {
-        return conversationService.sendMessage(
-                account.accountId(),
-                conversationId,
-                request.message(),
-                request.timeZone()
-        );
-    }
+  @PostMapping("/{conversationId}/messages")
+  public SendCalendarConversationMessageResponse sendMessage(
+      @AuthenticationPrincipal AuthenticatedAccount account,
+      @PathVariable String conversationId,
+      @Valid @RequestBody SendCalendarConversationMessageRequest request) {
+    return conversationService.sendMessage(
+        account.accountId(), conversationId, request.message(), request.timeZone());
+  }
 }

@@ -15,42 +15,40 @@ import java.time.LocalDate;
 
 @Entity
 @Table(
-        name = "votes",
-        uniqueConstraints = @UniqueConstraint(
-                name = "uk_vote_participant_unavailable_date",
-                columnNames = {"vote_participant_id", "unavailable_date"}
-        )
-)
+    name = "votes",
+    uniqueConstraints =
+        @UniqueConstraint(
+            name = "uk_vote_participant_unavailable_date",
+            columnNames = {"vote_participant_id", "unavailable_date"}))
 public class Vote extends BaseEntity {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "vote_participant_id", nullable = false)
-    private VoteParticipant voteParticipant;
+  @ManyToOne(fetch = FetchType.LAZY, optional = false)
+  @JoinColumn(name = "vote_participant_id", nullable = false)
+  private VoteParticipant voteParticipant;
 
-    @Column(name = "unavailable_date", nullable = false)
-    private LocalDate unavailableDate;
+  @Column(name = "unavailable_date", nullable = false)
+  private LocalDate unavailableDate;
 
-    protected Vote() {
-    }
+  protected Vote() {}
 
-    public Vote(VoteParticipant voteParticipant, LocalDate unavailableDate) {
-        this.voteParticipant = voteParticipant;
-        this.unavailableDate = unavailableDate;
-    }
+  public Vote(VoteParticipant voteParticipant, LocalDate unavailableDate) {
+    this.voteParticipant = voteParticipant;
+    this.unavailableDate = unavailableDate;
+  }
 
-    public Long getId() {
-        return id;
-    }
+  public Long getId() {
+    return id;
+  }
 
-    public VoteParticipant getVoteParticipant() {
-        return voteParticipant;
-    }
+  public VoteParticipant getVoteParticipant() {
+    return voteParticipant;
+  }
 
-    public LocalDate getUnavailableDate() {
-        return unavailableDate;
-    }
+  public LocalDate getUnavailableDate() {
+    return unavailableDate;
+  }
 }

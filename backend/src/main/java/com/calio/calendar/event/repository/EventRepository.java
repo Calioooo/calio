@@ -15,43 +15,41 @@ import org.springframework.data.repository.query.Param;
 
 public interface EventRepository extends JpaRepository<Event, Long> {
 
-    Optional<Event> findByIdAndAccount_Id(Long id, Long accountId);
+  Optional<Event> findByIdAndAccount_Id(Long id, Long accountId);
 
-    @Query("""
+  @Query(
+      """
             select event
             from Event event
             where event.id in :eventIds
               and event.account.id = :accountId
               and event.recurrenceId is null
             """)
-    List<Event> findAllShareableByIdsAndAccountId(
-            @Param("eventIds") List<Long> eventIds,
-            @Param("accountId") Long accountId
-    );
+  List<Event> findAllShareableByIdsAndAccountId(
+      @Param("eventIds") List<Long> eventIds, @Param("accountId") Long accountId);
 
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("""
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query(
+      """
             select event
             from Event event
             where event.id = :eventId
               and event.account.id = :accountId
             """)
-    Optional<Event> findByIdAndAccountIdForUpdate(
-            @Param("eventId") Long eventId,
-            @Param("accountId") Long accountId
-    );
+  Optional<Event> findByIdAndAccountIdForUpdate(
+      @Param("eventId") Long eventId, @Param("accountId") Long accountId);
 
-    @Modifying(flushAutomatically = true)
-    @Query("delete from Event event where event.id in :eventIds")
-    int deleteAllByIds(@Param("eventIds") List<Long> eventIds);
+  @Modifying(flushAutomatically = true)
+  @Query("delete from Event event where event.id in :eventIds")
+  int deleteAllByIds(@Param("eventIds") List<Long> eventIds);
 
-    @Modifying(flushAutomatically = true)
-    @Query("delete from Event event where event.recurrenceId in :recurrenceEventIds")
-    int deleteAllByRecurrenceEventIds(
-            @Param("recurrenceEventIds") Collection<Long> recurrenceEventIds
-    );
+  @Modifying(flushAutomatically = true)
+  @Query("delete from Event event where event.recurrenceId in :recurrenceEventIds")
+  int deleteAllByRecurrenceEventIds(
+      @Param("recurrenceEventIds") Collection<Long> recurrenceEventIds);
 
-    @Query("""
+  @Query(
+      """
             select event
             from Event event
             where event.account.id = :accountId
@@ -60,23 +58,20 @@ public interface EventRepository extends JpaRepository<Event, Long> {
               and event.endAt > :from
             order by event.startAt asc
             """)
-    List<Event> findNormalEvents(
-            @Param("accountId") Long accountId,
-            @Param("from") Instant from,
-            @Param("to") Instant to
-    );
+  List<Event> findNormalEvents(
+      @Param("accountId") Long accountId, @Param("from") Instant from, @Param("to") Instant to);
 
-    List<Event> findByRecurrenceIdAndAccount_IdOrderByStartAtAsc(Long recurrenceId, Long accountId);
+  List<Event> findByRecurrenceIdAndAccount_IdOrderByStartAtAsc(Long recurrenceId, Long accountId);
 
-    @Modifying(flushAutomatically = true)
-    @Query("""
+  @Modifying(flushAutomatically = true)
+  @Query(
+      """
             update Event event
             set event.tag = :fallbackTag
             where event.tag = :sourceTag and event.account.id = :accountId
             """)
-    int reassignAllByTagAndAccountId(
-            @Param("sourceTag") Tag sourceTag,
-            @Param("fallbackTag") Tag fallbackTag,
-            @Param("accountId") Long accountId
-    );
+  int reassignAllByTagAndAccountId(
+      @Param("sourceTag") Tag sourceTag,
+      @Param("fallbackTag") Tag fallbackTag,
+      @Param("accountId") Long accountId);
 }

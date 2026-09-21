@@ -5,6 +5,4 @@ import jakarta.validation.constraints.NotBlank;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GoogleCalendarConnectRequest(
-        @NotBlank(message = "Google authorization code is required.") String authorizationCode
-) {
-}
+    @NotBlank(message = "Google authorization code is required.") String authorizationCode) {}

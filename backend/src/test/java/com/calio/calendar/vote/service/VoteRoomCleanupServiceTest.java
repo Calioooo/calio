@@ -16,22 +16,19 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class VoteRoomCleanupServiceTest {
 
-    @Mock
-    private VoteRoomCommandService voteRoomCommandService;
+  @Mock private VoteRoomCommandService voteRoomCommandService;
 
-    @Test
-    @DisplayName("VoteRoom 정리는 KST 현재 날짜를 기준으로 90일 보존 경계를 계산한다")
-    void givenFixedClock_whenDeleteExpiredVoteRooms_thenDelegatesWithKoreaRetentionCutoff() {
-        Clock clock = Clock.fixed(Instant.parse("2026-08-29T15:30:00Z"), ZoneId.of("UTC"));
-        VoteRoomCleanupService voteRoomCleanupService = new VoteRoomCleanupService(
-                voteRoomCommandService,
-                clock
-        );
-        LocalDate cutoffDate = LocalDate.of(2026, 6, 1);
-        when(voteRoomCommandService.deleteExpiredVoteRoomsBefore(cutoffDate)).thenReturn(1);
+  @Test
+  @DisplayName("VoteRoom 정리는 KST 현재 날짜를 기준으로 90일 보존 경계를 계산한다")
+  void givenFixedClock_whenDeleteExpiredVoteRooms_thenDelegatesWithKoreaRetentionCutoff() {
+    Clock clock = Clock.fixed(Instant.parse("2026-08-29T15:30:00Z"), ZoneId.of("UTC"));
+    VoteRoomCleanupService voteRoomCleanupService =
+        new VoteRoomCleanupService(voteRoomCommandService, clock);
+    LocalDate cutoffDate = LocalDate.of(2026, 6, 1);
+    when(voteRoomCommandService.deleteExpiredVoteRoomsBefore(cutoffDate)).thenReturn(1);
 
-        voteRoomCleanupService.deleteExpiredVoteRooms();
+    voteRoomCleanupService.deleteExpiredVoteRooms();
 
-        verify(voteRoomCommandService).deleteExpiredVoteRoomsBefore(cutoffDate);
-    }
+    verify(voteRoomCommandService).deleteExpiredVoteRoomsBefore(cutoffDate);
+  }
 }

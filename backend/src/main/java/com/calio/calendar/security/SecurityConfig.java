@@ -67,6 +67,8 @@ public class SecurityConfig {
                     .authenticated()
                     .requestMatchers(HttpMethod.POST, "/api/vote-rooms/*/participants")
                     .permitAll()
+                    .requestMatchers(HttpMethod.POST, "/api/vote-rooms/*/votes/lookup")
+                    .permitAll()
                     .requestMatchers(HttpMethod.PUT, "/api/vote-rooms/*/votes")
                     .permitAll()
                     .requestMatchers(

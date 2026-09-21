@@ -23,99 +23,102 @@ import jakarta.persistence.Table;
 @Table(name = "tags")
 public class Tag extends BaseEntity {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private TagType tagType;
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false)
+  private TagType tagType;
 
-    @Column(nullable = false)
-    private String title;
+  @Column(nullable = false)
+  private String title;
 
-    @Embedded
-    @AttributeOverride(name = "value", column = @Column(name = "color_code", nullable = false, length = 7))
-    private ColorCode colorCode;
+  @Embedded
+  @AttributeOverride(
+      name = "value",
+      column = @Column(name = "color_code", nullable = false, length = 7))
+  private ColorCode colorCode;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "account_id")
-    private Account account;
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "account_id")
+  private Account account;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "group_space_id")
-    private GroupSpace groupSpace;
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "group_space_id")
+  private GroupSpace groupSpace;
 
-    protected Tag() {
+  protected Tag() {}
+
+  public static Tag personalDefault(String title, String colorCode) {
+    return new Tag(TagType.PERSONAL_DEFAULT, title, colorCode, null, null);
+  }
+
+  public static Tag personalCustom(Account account, String title, String colorCode) {
+    return new Tag(TagType.CUSTOM, title, colorCode, account, null);
+  }
+
+  public static Tag groupDefault(GroupSpace groupSpace) {
+    return new Tag(TagType.GROUP_DEFAULT, "기타", "#64748B", null, groupSpace);
+  }
+
+  public static Tag groupCustom(GroupSpace groupSpace, String title, String colorCode) {
+    return new Tag(TagType.CUSTOM, title, colorCode, null, groupSpace);
+  }
+
+  private Tag(
+      TagType tagType, String title, String colorCode, Account account, GroupSpace groupSpace) {
+    validateOwnership(tagType, account, groupSpace);
+    this.tagType = tagType;
+    this.title = title;
+    this.colorCode = new ColorCode(colorCode);
+    this.account = account;
+    this.groupSpace = groupSpace;
+  }
+
+  public void update(String title, String colorCode) {
+    if (tagType != TagType.CUSTOM) {
+      throw new CalioException(ErrorCode.VALIDATION_FAILED);
     }
 
-    public static Tag personalDefault(String title, String colorCode) {
-        return new Tag(TagType.PERSONAL_DEFAULT, title, colorCode, null, null);
-    }
+    this.title = title;
+    this.colorCode = new ColorCode(colorCode);
+  }
 
-    public static Tag personalCustom(Account account, String title, String colorCode) {
-        return new Tag(TagType.CUSTOM, title, colorCode, account, null);
-    }
+  public Long getId() {
+    return id;
+  }
 
-    public static Tag groupDefault(GroupSpace groupSpace) {
-        return new Tag(TagType.GROUP_DEFAULT, "기타", "#64748B", null, groupSpace);
-    }
+  public TagType getTagType() {
+    return tagType;
+  }
 
-    public static Tag groupCustom(GroupSpace groupSpace, String title, String colorCode) {
-        return new Tag(TagType.CUSTOM, title, colorCode, null, groupSpace);
-    }
+  public String getTitle() {
+    return title;
+  }
 
-    private Tag(TagType tagType, String title, String colorCode, Account account, GroupSpace groupSpace) {
-        validateOwnership(tagType, account, groupSpace);
-        this.tagType = tagType;
-        this.title = title;
-        this.colorCode = new ColorCode(colorCode);
-        this.account = account;
-        this.groupSpace = groupSpace;
-    }
+  public String getColorCode() {
+    return colorCode.getValue();
+  }
 
-    public void update(String title, String colorCode) {
-        if (tagType != TagType.CUSTOM) {
-            throw new CalioException(ErrorCode.VALIDATION_FAILED);
-        }
+  public Account getAccount() {
+    return account;
+  }
 
-        this.title = title;
-        this.colorCode = new ColorCode(colorCode);
-    }
+  public GroupSpace getGroupSpace() {
+    return groupSpace;
+  }
 
-    public Long getId() {
-        return id;
+  private void validateOwnership(TagType tagType, Account account, GroupSpace groupSpace) {
+    boolean isPersonalDefault =
+        tagType == TagType.PERSONAL_DEFAULT && account == null && groupSpace == null;
+    boolean isPersonalCustom = tagType == TagType.CUSTOM && account != null && groupSpace == null;
+    boolean isGroupTag =
+        (tagType == TagType.GROUP_DEFAULT || tagType == TagType.CUSTOM)
+            && account == null
+            && groupSpace != null;
+    if (!isPersonalDefault && !isPersonalCustom && !isGroupTag) {
+      throw new CalioException(ErrorCode.VALIDATION_FAILED);
     }
-
-    public TagType getTagType() {
-        return tagType;
-    }
-
-    public String getTitle() {
-        return title;
-    }
-
-    public String getColorCode() {
-        return colorCode.getValue();
-    }
-
-    public Account getAccount() {
-        return account;
-    }
-
-    public GroupSpace getGroupSpace() {
-        return groupSpace;
-    }
-
-    private void validateOwnership(TagType tagType, Account account, GroupSpace groupSpace) {
-        boolean isPersonalDefault = tagType == TagType.PERSONAL_DEFAULT
-                && account == null
-                && groupSpace == null;
-        boolean isPersonalCustom = tagType == TagType.CUSTOM && account != null && groupSpace == null;
-        boolean isGroupTag = (tagType == TagType.GROUP_DEFAULT || tagType == TagType.CUSTOM)
-                && account == null && groupSpace != null;
-        if (!isPersonalDefault && !isPersonalCustom && !isGroupTag) {
-            throw new CalioException(ErrorCode.VALIDATION_FAILED);
-        }
-    }
+  }
 }

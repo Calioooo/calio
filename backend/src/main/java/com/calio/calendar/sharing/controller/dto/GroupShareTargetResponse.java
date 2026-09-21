@@ -1,4 +1,3 @@
 package com.calio.calendar.sharing.controller.dto;
 
-public record GroupShareTargetResponse(Long groupSpaceId, GroupShareTargetStatus status) {
-}
+public record GroupShareTargetResponse(Long groupSpaceId, GroupShareTargetStatus status) {}
