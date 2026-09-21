@@ -409,8 +409,7 @@ public class GoogleCalendarRecurrenceJobHandler {
       GoogleCalendarRecurrenceJob job, String workerToken) {
     transactionTemplate.executeWithoutResult(
         status -> {
-          mappingCommandService.markInactiveRecurrenceEventMappingsDeletePending(
-              job.getIntegrationId(), job.getRecurrenceEventId());
+          markInactiveRecurrenceEventMappingsDeletePending(job);
           jobService.succeed(job.getId(), job.getAccountId(), workerToken);
         });
   }
@@ -576,25 +575,36 @@ public class GoogleCalendarRecurrenceJobHandler {
   }
 
   private void markInactiveRecurrenceEventMappingsLocalChanged(GoogleCalendarRecurrenceJob job) {
-    mappingCommandService.markInactiveRecurrenceEventMappingsLocalChanged(
-        job.getIntegrationId(), job.getRecurrenceEventId());
+    mappingQueryService
+        .listInactiveAndUnchangedRecurrenceEventMappings(
+            job.getIntegrationId(), job.getRecurrenceEventId())
+        .forEach(GoogleCalendarRecurrenceEventMapping::markLocalChanged);
   }
 
   private void markInactiveRecurrenceEventMappingsDeletePending(GoogleCalendarRecurrenceJob job) {
-    mappingCommandService.markInactiveRecurrenceEventMappingsDeletePending(
-        job.getIntegrationId(), job.getRecurrenceEventId());
+    mappingQueryService
+        .listInactiveAndUnchangedRecurrenceEventMappings(
+            job.getIntegrationId(), job.getRecurrenceEventId())
+        .forEach(
+            mapping -> {
+              mapping.markLocalChanged();
+              mapping.markProviderDeletePending();
+            });
   }
 
   private void markInactiveOverrideMappingsLocalChanged(GoogleCalendarRecurrenceJob job) {
-    mappingCommandService.markInactiveOverrideMappingsLocalChanged(
-        job.getIntegrationId(), job.getRecurrenceEventId(), job.getOriginStartAt());
+    mappingQueryService
+        .listInactiveAndUnchangedOverrideMappings(
+            job.getIntegrationId(), job.getRecurrenceEventId(), job.getOriginStartAt())
+        .forEach(GoogleCalendarRecurrenceOverrideMapping::markLocalChanged);
   }
 
   private GoogleRecurrenceJobPayload readRecurrenceSnapshot(GoogleCalendarRecurrenceJob job) {
     return job.getTargetPayload();
   }
 
-  private GoogleRecurrenceOverrideJobPayload recurrenceOverridePayload(GoogleCalendarRecurrenceJob job) {
+  private GoogleRecurrenceOverrideJobPayload recurrenceOverridePayload(
+      GoogleCalendarRecurrenceJob job) {
     GoogleRecurrenceJobPayload payload = job.getTargetPayload();
     return new GoogleRecurrenceOverrideJobPayload(
         payload.title(),

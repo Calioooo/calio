@@ -43,6 +43,13 @@ public class GoogleCalendarRecurrenceMappingQueryService {
     return recurrenceMappingRepository.findById(mappingId);
   }
 
+  public List<GoogleCalendarRecurrenceEventMapping>
+      listInactiveAndUnchangedRecurrenceEventMappings(Long integrationId, Long recurrenceEventId) {
+    return recurrenceMappingRepository
+        .findAllInactiveAndUnchangedByIntegrationIdAndRecurrenceEventId(
+            integrationId, recurrenceEventId);
+  }
+
   public List<Long> listRecurrenceEventIdsWithMappings(Collection<Long> recurrenceEventIds) {
     if (recurrenceEventIds.isEmpty()) {
       return List.of();
@@ -54,6 +61,13 @@ public class GoogleCalendarRecurrenceMappingQueryService {
       Long recurrenceEventMappingId, Instant originStartAt) {
     return overrideMappingRepository.findByRecurrenceEventMappingIdAndOriginStartAt(
         recurrenceEventMappingId, originStartAt);
+  }
+
+  public List<GoogleCalendarRecurrenceOverrideMapping>
+      listInactiveAndUnchangedOverrideMappings(
+          Long integrationId, Long recurrenceEventId, Instant originStartAt) {
+    return overrideMappingRepository.findAllInactiveAndUnchangedByIdentity(
+        integrationId, recurrenceEventId, originStartAt);
   }
 
   public List<GoogleCalendarRecurrenceOverrideMapping> listOverrideMappingsByRecurrenceEventIds(

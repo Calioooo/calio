@@ -1,7 +1,6 @@
 package com.calio.calendar.integration.sync;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
@@ -10,8 +9,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import com.calio.calendar.common.error.CalioException;
-import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.external.google.GoogleCalendarEventVersionConflictException;
 import com.calio.calendar.external.google.GoogleCalendarEventsClient;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventResponse;
@@ -83,7 +80,7 @@ class GoogleCalendarRecurrenceJobHandlerTest {
 
     handler.execute(job(GoogleCalendarRecurrenceJobKind.RECURRENCE_UPDATE, null), "worker");
 
-    verify(mappingCommands).markInactiveRecurrenceEventMappingsLocalChanged(20L, 40L);
+    verify(mappings).listInactiveAndUnchangedRecurrenceEventMappings(20L, 40L);
     verifyNoInteractions(tokens, client);
     verify(jobs).succeed(50L, 10L, "worker");
   }
@@ -108,7 +105,7 @@ class GoogleCalendarRecurrenceJobHandlerTest {
     handler.execute(job(GoogleCalendarRecurrenceJobKind.RECURRENCE_UPDATE, null), "worker");
 
     assertThat(mapping.getProviderEtag()).isEqualTo("recurrence-event-etag-2");
-    verify(mappingCommands).markInactiveRecurrenceEventMappingsLocalChanged(20L, 40L);
+    verify(mappings).listInactiveAndUnchangedRecurrenceEventMappings(20L, 40L);
     verify(jobs).succeed(50L, 10L, "worker");
   }
 
@@ -210,7 +207,7 @@ class GoogleCalendarRecurrenceJobHandlerTest {
     handler.execute(job(GoogleCalendarRecurrenceJobKind.OVERRIDE_UPSERT, origin()), "worker");
 
     verifyNoInteractions(tokens, client);
-    verify(mappingCommands).markInactiveOverrideMappingsLocalChanged(20L, 40L, origin());
+    verify(mappings).listInactiveAndUnchangedOverrideMappings(20L, 40L, origin());
     verify(jobs).succeed(50L, 10L, "worker");
   }
 
@@ -351,15 +348,21 @@ class GoogleCalendarRecurrenceJobHandlerTest {
     handler.execute(job(GoogleCalendarRecurrenceJobKind.RECURRENCE_DELETE, null), "worker");
 
     verify(mappingCommands).deleteRecurrenceAggregateMappings(recurrenceEventMapping);
-    verify(mappingCommands).markInactiveRecurrenceEventMappingsDeletePending(20L, 40L);
+    verify(mappings).listInactiveAndUnchangedRecurrenceEventMappings(20L, 40L);
   }
 
   @Test
   @DisplayName("CONNECTED recurrence-event가 없는 DELETE는 inactive identity를 삭제 대기로 남긴다")
   void deleteWithoutConnectedRecurrenceEventRetainsInactiveIdentity() {
+    GoogleCalendarRecurrenceEventMapping inactiveMapping = recurrenceEventMapping(connection(31L));
+    when(mappings.listInactiveAndUnchangedRecurrenceEventMappings(20L, 40L))
+        .thenReturn(List.of(inactiveMapping));
+
     handler.execute(job(GoogleCalendarRecurrenceJobKind.RECURRENCE_DELETE, null), "worker");
 
-    verify(mappingCommands).markInactiveRecurrenceEventMappingsDeletePending(20L, 40L);
+    assertThat(inactiveMapping.isLocalChanged()).isTrue();
+    assertThat(inactiveMapping.isProviderDeletePending()).isTrue();
+    verify(mappings).listInactiveAndUnchangedRecurrenceEventMappings(20L, 40L);
     verify(mappingCommands, never()).deleteRecurrenceAggregateMappings(any());
     verifyNoInteractions(tokens, client);
   }
