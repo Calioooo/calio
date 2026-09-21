@@ -1,8 +1,8 @@
 package com.calio.calendar.tag.controller;
 
+import com.calio.calendar.security.AuthenticatedAccount;
 import com.calio.calendar.tag.controller.dto.CustomTagRequest;
 import com.calio.calendar.tag.controller.dto.TagResponse;
-import com.calio.calendar.security.AuthenticatedAccount;
 import com.calio.calendar.tag.usecase.CreatePersonalCustomTagUseCase;
 import com.calio.calendar.tag.usecase.DeletePersonalCustomTagUseCase;
 import com.calio.calendar.tag.usecase.ListPersonalTagsUseCase;
@@ -23,52 +23,49 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class TagController {
 
-    private final ListPersonalTagsUseCase listPersonalTagsUseCase;
-    private final CreatePersonalCustomTagUseCase createPersonalCustomTagUseCase;
-    private final UpdatePersonalCustomTagUseCase updatePersonalCustomTagUseCase;
-    private final DeletePersonalCustomTagUseCase deletePersonalCustomTagUseCase;
+  private final ListPersonalTagsUseCase listPersonalTagsUseCase;
+  private final CreatePersonalCustomTagUseCase createPersonalCustomTagUseCase;
+  private final UpdatePersonalCustomTagUseCase updatePersonalCustomTagUseCase;
+  private final DeletePersonalCustomTagUseCase deletePersonalCustomTagUseCase;
 
-    public TagController(
-            ListPersonalTagsUseCase listPersonalTagsUseCase,
-            CreatePersonalCustomTagUseCase createPersonalCustomTagUseCase,
-            UpdatePersonalCustomTagUseCase updatePersonalCustomTagUseCase,
-            DeletePersonalCustomTagUseCase deletePersonalCustomTagUseCase
-    ) {
-        this.listPersonalTagsUseCase = listPersonalTagsUseCase;
-        this.createPersonalCustomTagUseCase = createPersonalCustomTagUseCase;
-        this.updatePersonalCustomTagUseCase = updatePersonalCustomTagUseCase;
-        this.deletePersonalCustomTagUseCase = deletePersonalCustomTagUseCase;
-    }
+  public TagController(
+      ListPersonalTagsUseCase listPersonalTagsUseCase,
+      CreatePersonalCustomTagUseCase createPersonalCustomTagUseCase,
+      UpdatePersonalCustomTagUseCase updatePersonalCustomTagUseCase,
+      DeletePersonalCustomTagUseCase deletePersonalCustomTagUseCase) {
+    this.listPersonalTagsUseCase = listPersonalTagsUseCase;
+    this.createPersonalCustomTagUseCase = createPersonalCustomTagUseCase;
+    this.updatePersonalCustomTagUseCase = updatePersonalCustomTagUseCase;
+    this.deletePersonalCustomTagUseCase = deletePersonalCustomTagUseCase;
+  }
 
-    @GetMapping("/api/tags")
-    public List<TagResponse> listTags(@AuthenticationPrincipal AuthenticatedAccount account) {
-        return listPersonalTagsUseCase.list(account.accountId());
-    }
+  @GetMapping("/api/tags")
+  public List<TagResponse> listTags(@AuthenticationPrincipal AuthenticatedAccount account) {
+    return listPersonalTagsUseCase.list(account.accountId());
+  }
 
-    @PostMapping("/api/custom-tags")
-    @ResponseStatus(HttpStatus.CREATED)
-    public TagResponse createCustomTag(
-            @AuthenticationPrincipal AuthenticatedAccount account,
-            @Valid @RequestBody CustomTagRequest request
-    ) {
-        return createPersonalCustomTagUseCase.create(account.accountId(), request.title(), request.colorCode());
-    }
+  @PostMapping("/api/custom-tags")
+  @ResponseStatus(HttpStatus.CREATED)
+  public TagResponse createCustomTag(
+      @AuthenticationPrincipal AuthenticatedAccount account,
+      @Valid @RequestBody CustomTagRequest request) {
+    return createPersonalCustomTagUseCase.create(
+        account.accountId(), request.title(), request.colorCode());
+  }
 
-    @PutMapping("/api/custom-tags/{tagId}")
-    public TagResponse updateCustomTag(
-            @PathVariable("tagId") Long tagId,
-            @AuthenticationPrincipal AuthenticatedAccount account,
-            @Valid @RequestBody CustomTagRequest request
-    ) {
-        return updatePersonalCustomTagUseCase.update(account.accountId(), tagId, request.title(), request.colorCode());
-    }
+  @PutMapping("/api/custom-tags/{tagId}")
+  public TagResponse updateCustomTag(
+      @PathVariable("tagId") Long tagId,
+      @AuthenticationPrincipal AuthenticatedAccount account,
+      @Valid @RequestBody CustomTagRequest request) {
+    return updatePersonalCustomTagUseCase.update(
+        account.accountId(), tagId, request.title(), request.colorCode());
+  }
 
-    @DeleteMapping("/api/custom-tags/{tagId}")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deleteCustomTag(
-            @AuthenticationPrincipal AuthenticatedAccount account,
-            @PathVariable("tagId") Long tagId
-    ) {
-        deletePersonalCustomTagUseCase.delete(account.accountId(), tagId);
-    }
+  @DeleteMapping("/api/custom-tags/{tagId}")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  public void deleteCustomTag(
+      @AuthenticationPrincipal AuthenticatedAccount account, @PathVariable("tagId") Long tagId) {
+    deletePersonalCustomTagUseCase.delete(account.accountId(), tagId);
+  }
 }

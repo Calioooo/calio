@@ -1,6 +1,6 @@
 package com.calio.calendar.groupspace.service;
 
-import com.calio.calendar.account.service.AccountQueryService;
+import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.groupcalendar.event.service.GroupCalendarEventCommandService;
@@ -29,7 +29,7 @@ public class GroupSpaceService {
   private final GroupSpaceQueryService queryService;
   private final GroupMembershipQueryService membershipQueryService;
   private final GroupMembershipCommandService membershipCommandService;
-  private final AccountQueryService accountQueryService;
+  private final AccountRepository accountRepository;
   private final GroupSpaceCommandService commandService;
   private final GroupInvitationCommandService invitationCommandService;
   private final GroupScheduleShareCleanupPort groupScheduleShareCleanupPort;
@@ -43,7 +43,7 @@ public class GroupSpaceService {
       GroupSpaceQueryService queryService,
       GroupMembershipQueryService membershipQueryService,
       GroupMembershipCommandService membershipCommandService,
-      AccountQueryService accountQueryService,
+      AccountRepository accountRepository,
       GroupSpaceCommandService commandService,
       GroupInvitationCommandService invitationCommandService,
       GroupScheduleShareCleanupPort groupScheduleShareCleanupPort,
@@ -54,7 +54,7 @@ public class GroupSpaceService {
     this.queryService = queryService;
     this.membershipQueryService = membershipQueryService;
     this.membershipCommandService = membershipCommandService;
-    this.accountQueryService = accountQueryService;
+    this.accountRepository = accountRepository;
     this.commandService = commandService;
     this.invitationCommandService = invitationCommandService;
     this.groupScheduleShareCleanupPort = groupScheduleShareCleanupPort;
@@ -121,7 +121,7 @@ public class GroupSpaceService {
   }
 
   private void ensureAccountExists(Long accountId) {
-    if (!accountQueryService.hasAccount(accountId)) {
+    if (!accountRepository.existsById(accountId)) {
       throw new CalioException(ErrorCode.INTERNAL_SERVER_ERROR);
     }
   }

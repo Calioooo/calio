@@ -7,16 +7,17 @@ import jakarta.persistence.Embeddable;
 @Embeddable
 public record TagTitle(String value) {
 
-    public static final int MAX_TAG_TITLE_LENGTH = 20;
+  public static final int MAX_TAG_TITLE_LENGTH = 20;
 
-    public TagTitle {
-        validate(value);
-    }
+  public TagTitle {
+    validate(value);
+  }
 
-    private static void validate(String value) {
-        if (value == null || value.isBlank()
-                || value.codePointCount(0, value.length()) > MAX_TAG_TITLE_LENGTH) {
-            throw new CalioException(ErrorCode.VALIDATION_FAILED);
-        }
+  private static void validate(String value) {
+    if (value == null
+        || value.isBlank()
+        || value.codePointCount(0, value.length()) > MAX_TAG_TITLE_LENGTH) {
+      throw new CalioException(ErrorCode.VALIDATION_FAILED);
     }
+  }
 }

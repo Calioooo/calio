@@ -24,7 +24,6 @@ import com.calio.calendar.security.WithAuthenticatedAccount;
 import com.calio.calendar.singleevent.domain.SingleEvent;
 import com.calio.calendar.singleevent.repository.SingleEventRepository;
 import com.calio.calendar.tag.domain.Tag;
-import com.calio.calendar.tag.domain.TagType;
 import com.calio.calendar.tag.repository.TagRepository;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -74,9 +73,8 @@ class SingleEventControllerTest {
   @BeforeEach
   void setUpDefaultTag() {
     tagRepository
-        .findFirstByTagTypeAndTitleAndAccountIsNullAndGroupSpaceIsNullOrderByIdAsc(
-            TagType.PERSONAL_DEFAULT, "기타")
-        .orElseGet(() -> tagRepository.save(Tag.personalDefault("기타", "#64748B")));
+        .findPersonalFallbackTag()
+        .orElseGet(() -> tagRepository.save(Tag.personalFallback("기타", "#64748B")));
   }
 
   @Test
@@ -304,7 +302,7 @@ class SingleEventControllerTest {
   void givenCustomTagId_whenCreateEvent_thenStoresSelectedTag() throws Exception {
     // given
     Tag customTag =
-        tagRepository.save(Tag.personalCustom(currentAccountReference(), "사용자", "#111111"));
+        tagRepository.save(Tag.personalCustom(currentAccountReference().getId(), "사용자", "#111111"));
 
     // when
     mockMvc
@@ -384,7 +382,8 @@ class SingleEventControllerTest {
   void givenCustomTagId_whenUpdateEvent_thenStoresSelectedTag() throws Exception {
     // given
     Tag customTag =
-        tagRepository.save(Tag.personalCustom(currentAccountReference(), "수정 사용자", "#8b5cf6"));
+        tagRepository.save(
+            Tag.personalCustom(currentAccountReference().getId(), "수정 사용자", "#8b5cf6"));
     long eventId =
         createEvent("Custom update target", "2026-06-19T00:00:00Z", "2026-06-19T01:00:00Z");
 
@@ -442,7 +441,8 @@ class SingleEventControllerTest {
   void givenOtherAccountCustomTagId_whenCreateEvent_thenReturnsTagNotFound() throws Exception {
     // given
     Account otherAccount = accountRepository.saveAndFlush(new Account());
-    Tag otherAccountTag = tagRepository.save(Tag.personalCustom(otherAccount, "다른 계정", "#111111"));
+    Tag otherAccountTag =
+        tagRepository.save(Tag.personalCustom(otherAccount.getId(), "다른 계정", "#111111"));
 
     // when
     mockMvc
