@@ -20,6 +20,17 @@ WHERE job_kind IN ('CREATE', 'UPDATE', 'DELETE')
 ALTER TABLE google_operation_jobs
     MODIFY COLUMN job_scope VARCHAR(64) NOT NULL;
 
+ALTER TABLE google_operation_jobs
+    MODIFY COLUMN active_periodic_sync_account_id BIGINT GENERATED ALWAYS AS (
+        CASE
+            WHEN job_scope = 'SYNC'
+                AND job_trigger = 'PERIODIC'
+                AND job_state IN ('PENDING', 'PROCESSING')
+            THEN account_id
+            ELSE NULL
+        END
+    );
+
 DROP INDEX idx_google_operation_jobs_pending_scope ON google_operation_jobs;
 
 ALTER TABLE google_operation_jobs
@@ -30,6 +41,9 @@ ALTER TABLE google_operation_jobs
 
 ALTER TABLE google_operation_jobs
     RENAME COLUMN job_kind TO event_operation_kind;
+
+ALTER TABLE google_operation_jobs
+    MODIFY COLUMN event_operation_kind VARCHAR(64) NULL;
 
 UPDATE google_operation_jobs
 SET event_operation_kind = NULL

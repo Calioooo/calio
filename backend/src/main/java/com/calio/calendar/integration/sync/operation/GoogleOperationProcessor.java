@@ -3,7 +3,7 @@ package com.calio.calendar.integration.sync.operation;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.external.google.GoogleCalendarInvalidGrantException;
-import com.calio.calendar.integration.connection.service.GoogleCalendarConnectionCommandService;
+import com.calio.calendar.integration.connection.service.GoogleCalendarConnectionFailureService;
 import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrationQueryService;
 import com.calio.calendar.integration.sync.GoogleCalendarEventJobService;
 import com.calio.calendar.integration.sync.GoogleCalendarRecurrenceJobHandler;
@@ -27,7 +27,7 @@ public class GoogleOperationProcessor {
   private final GoogleCalendarEventJobService eventJobService;
   private final GoogleCalendarRecurrenceJobHandler recurrenceJobHandler;
   private final GoogleOperationFailureClassifier failureClassifier;
-  private final GoogleCalendarConnectionCommandService connectionCommandService;
+  private final GoogleCalendarConnectionFailureService connectionFailureService;
   private final GoogleCalendarIntegrationQueryService integrationQueryService;
   private final Clock clock;
 
@@ -38,7 +38,7 @@ public class GoogleOperationProcessor {
       GoogleCalendarEventJobService eventJobService,
       GoogleCalendarRecurrenceJobHandler recurrenceJobHandler,
       GoogleOperationFailureClassifier failureClassifier,
-      GoogleCalendarConnectionCommandService connectionCommandService,
+      GoogleCalendarConnectionFailureService connectionFailureService,
       GoogleCalendarIntegrationQueryService integrationQueryService,
       Clock clock) {
     this.jobService = jobService;
@@ -47,7 +47,7 @@ public class GoogleOperationProcessor {
     this.eventJobService = eventJobService;
     this.recurrenceJobHandler = recurrenceJobHandler;
     this.failureClassifier = failureClassifier;
-    this.connectionCommandService = connectionCommandService;
+    this.connectionFailureService = connectionFailureService;
     this.integrationQueryService = integrationQueryService;
     this.clock = clock;
   }
@@ -129,7 +129,7 @@ public class GoogleOperationProcessor {
     if (!requiresIntegrationPause(failure)) {
       return mapExecutionResult(failureDecision);
     }
-    connectionCommandService.markConnectedConnectionSyncError(
+    connectionFailureService.pauseForReconnect(
         job.getAccountId(),
         ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED.name(),
         Instant.now(clock));
