@@ -31,8 +31,26 @@ public class GoogleCalendarConnectionCommandService {
         accountId, GoogleCalendarConnectionState.CONNECTED);
   }
 
-  public Optional<GoogleCalendarConnection> tryLockConnection(Long accountId) {
-    return connectionRepository.findWithIntegrationByAccountIdForUpdate(accountId);
+  public Optional<GoogleCalendarConnection> tryLockConnection(
+      Long integrationId, String googleSubject) {
+    return connectionRepository.findWithIntegrationByIntegrationIdAndGoogleSubjectForUpdate(
+        integrationId, googleSubject);
+  }
+
+  public Optional<GoogleCalendarConnection> tryLockConnectionByIntegrationAndState(
+      Long integrationId, GoogleCalendarConnectionState state) {
+    return connectionRepository.findWithIntegrationByIntegrationIdAndStateForUpdate(
+        integrationId, state);
+  }
+
+  public Optional<GoogleCalendarConnection> tryLockDisconnectableConnectionByIntegration(
+      Long integrationId) {
+    return tryLockConnectionByIntegrationAndState(
+            integrationId, GoogleCalendarConnectionState.CONNECTED)
+        .or(
+            () ->
+                connectionRepository.findFirstByIntegration_IdAndStateOrderBySyncErrorAtDescIdDesc(
+                    integrationId, GoogleCalendarConnectionState.SYNC_ERROR));
   }
 
   public GoogleCalendarConnection lockConnectedConnectionById(Long connectionId) {
@@ -97,12 +115,9 @@ public class GoogleCalendarConnectionCommandService {
     connectionRepository.saveAndFlush(connection);
   }
 
-  public void markConnectedConnectionSyncError(Long accountId, String reason, Instant occurredAt) {
-    tryLockConnectedConnection(accountId)
-        .ifPresent(
-            connection -> {
-              connection.markSyncError(reason, occurredAt);
-              connectionRepository.saveAndFlush(connection);
-            });
+  public void markSyncError(
+      GoogleCalendarConnection connection, String reason, Instant occurredAt) {
+    connection.markSyncError(reason, occurredAt);
+    connectionRepository.saveAndFlush(connection);
   }
 }

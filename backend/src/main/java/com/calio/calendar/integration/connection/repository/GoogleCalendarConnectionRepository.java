@@ -20,12 +20,35 @@ public interface GoogleCalendarConnectionRepository
       """
             select connection
             from GoogleCalendarConnection connection
+            where connection.integration.id = :integrationId
+            order by connection.id
+            """)
+  List<GoogleCalendarConnection> findAllWithIntegrationByIntegrationId(
+      @Param("integrationId") Long integrationId);
+
+  @EntityGraph(attributePaths = "integration")
+  @Query(
+      """
+            select connection
+            from GoogleCalendarConnection connection
             join connection.integration integration
             where integration.accountId = :accountId
               and connection.state = :state
             """)
   Optional<GoogleCalendarConnection> findWithIntegrationByAccountIdAndState(
       @Param("accountId") Long accountId, @Param("state") GoogleCalendarConnectionState state);
+
+  @EntityGraph(attributePaths = "integration")
+  @Query(
+      """
+            select connection
+            from GoogleCalendarConnection connection
+            where connection.integration.id = :integrationId
+              and connection.state = :state
+            """)
+  Optional<GoogleCalendarConnection> findWithIntegrationByIntegrationIdAndState(
+      @Param("integrationId") Long integrationId,
+      @Param("state") GoogleCalendarConnectionState state);
 
   @EntityGraph(attributePaths = "integration")
   @Query(
@@ -45,9 +68,10 @@ public interface GoogleCalendarConnectionRepository
             from GoogleCalendarConnection connection
             join connection.integration integration
             where integration.accountId = :accountId
+              and connection.state = :state
             """)
-  Optional<GoogleCalendarConnection> findWithIntegrationByAccountIdForUpdate(
-      @Param("accountId") Long accountId);
+  Optional<GoogleCalendarConnection> findWithIntegrationByAccountIdAndStateForUpdate(
+      @Param("accountId") Long accountId, @Param("state") GoogleCalendarConnectionState state);
 
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @EntityGraph(attributePaths = "integration")
@@ -55,12 +79,29 @@ public interface GoogleCalendarConnectionRepository
       """
             select connection
             from GoogleCalendarConnection connection
-            join connection.integration integration
-            where integration.accountId = :accountId
+            where connection.integration.id = :integrationId
+              and connection.googleSubject = :googleSubject
+            """)
+  Optional<GoogleCalendarConnection> findWithIntegrationByIntegrationIdAndGoogleSubjectForUpdate(
+      @Param("integrationId") Long integrationId, @Param("googleSubject") String googleSubject);
+
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @EntityGraph(attributePaths = "integration")
+  @Query(
+      """
+            select connection
+            from GoogleCalendarConnection connection
+            where connection.integration.id = :integrationId
               and connection.state = :state
             """)
-  Optional<GoogleCalendarConnection> findWithIntegrationByAccountIdAndStateForUpdate(
-      @Param("accountId") Long accountId, @Param("state") GoogleCalendarConnectionState state);
+  Optional<GoogleCalendarConnection> findWithIntegrationByIntegrationIdAndStateForUpdate(
+      @Param("integrationId") Long integrationId,
+      @Param("state") GoogleCalendarConnectionState state);
+
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @EntityGraph(attributePaths = "integration")
+  Optional<GoogleCalendarConnection> findFirstByIntegration_IdAndStateOrderBySyncErrorAtDescIdDesc(
+      Long integrationId, GoogleCalendarConnectionState state);
 
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @EntityGraph(attributePaths = "integration")

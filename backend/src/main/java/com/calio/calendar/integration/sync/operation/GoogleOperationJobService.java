@@ -134,6 +134,12 @@ public class GoogleOperationJobService {
   }
 
   @Transactional
+  public void completeWithConflict(Long jobId, Long accountId, String workerToken) {
+    recordSyncConflict(jobId, accountId, workerToken);
+    completeSyncRun(jobId, accountId, workerToken);
+  }
+
+  @Transactional
   public void skipConflictedScope(Long jobId, Long accountId, String workerToken) {
     jobCommandService.skipConflictedScope(jobId, workerToken);
     log.info(
