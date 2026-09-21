@@ -25,10 +25,6 @@ public class GoogleCalendarEventMappingQueryService {
         integrationId, eventId);
   }
 
-  public boolean hasExternalEventMapping(Long eventId, Long accountId) {
-    return eventMappingRepository.existsByEventIdAndAccountId(eventId, accountId);
-  }
-
   public List<GoogleCalendarEventMapping> listEventMappings(
       Long connectionId, String calendarKey, Collection<String> externalEventIds) {
     return eventMappingRepository.findAllByExternalIdentity(

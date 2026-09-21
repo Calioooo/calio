@@ -8,7 +8,7 @@
 import Foundation
 
 enum CalendarEventFormRules {
-  static let eventTitleMaxLength = 255
+  static let eventTitleMaxLength = 80
 
   static func canSave(title: String, startAt: Date, endAt: Date) -> Bool {
     canSave(

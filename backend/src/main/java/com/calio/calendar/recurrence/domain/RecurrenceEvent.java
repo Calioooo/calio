@@ -2,6 +2,7 @@ package com.calio.calendar.recurrence.domain;
 
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.common.domain.BaseEntity;
+import com.calio.calendar.common.domain.CalendarEventTitle;
 import com.calio.calendar.tag.domain.Tag;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
@@ -54,7 +55,7 @@ public class RecurrenceEvent extends BaseEntity {
       List<String> recurrenceRules,
       Tag tag,
       Account account) {
-    this.title = title;
+    this.title = CalendarEventTitle.requireValid(title);
     this.description = description;
     replaceSchedule(schedule, recurrenceRules);
     this.tag = tag;
@@ -67,7 +68,7 @@ public class RecurrenceEvent extends BaseEntity {
       RecurrenceSchedule schedule,
       List<String> recurrenceRules,
       Tag tag) {
-    this.title = title;
+    this.title = CalendarEventTitle.requireValid(title);
     this.description = description;
     replaceSchedule(schedule, recurrenceRules);
     this.tag = tag;
@@ -75,7 +76,7 @@ public class RecurrenceEvent extends BaseEntity {
 
   public void updateProviderContent(
       String title, String description, RecurrenceSchedule schedule, List<String> recurrenceRules) {
-    this.title = title;
+    this.title = CalendarEventTitle.requireValid(title);
     this.description = description;
     replaceSchedule(schedule, recurrenceRules);
   }

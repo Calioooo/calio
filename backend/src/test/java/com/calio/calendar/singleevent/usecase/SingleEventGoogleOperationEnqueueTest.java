@@ -8,7 +8,6 @@ import static org.mockito.Mockito.when;
 
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
-import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingQueryService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobEnqueueService;
 import com.calio.calendar.sharing.event.service.PersonalEventGroupShareCommandService;
 import com.calio.calendar.singleevent.controller.dto.CreateSingleEventRequest;
@@ -34,8 +33,6 @@ class SingleEventGoogleOperationEnqueueTest {
   private final SingleEventRepository eventRepository =
       org.mockito.Mockito.mock(SingleEventRepository.class);
   private final TagQueryService tagQueryService = org.mockito.Mockito.mock(TagQueryService.class);
-  private final GoogleCalendarEventMappingQueryService mappingQueryService =
-      org.mockito.Mockito.mock(GoogleCalendarEventMappingQueryService.class);
   private final PersonalEventGroupShareCommandService shareCommandService =
       org.mockito.Mockito.mock(PersonalEventGroupShareCommandService.class);
   private final GoogleOperationJobEnqueueService jobEnqueueService =
@@ -71,8 +68,7 @@ class SingleEventGoogleOperationEnqueueTest {
         .thenReturn(Optional.of(event));
     when(tagQueryService.getTagOrDefault(ACCOUNT_ID, null)).thenReturn(tag);
 
-    new UpdateSingleEventUseCase(
-            eventRepository, mappingQueryService, tagQueryService, jobEnqueueService)
+    new UpdateSingleEventUseCase(eventRepository, tagQueryService, jobEnqueueService)
         .update(ACCOUNT_ID, EVENT_ID, updateRequest());
 
     InOrder ordered = inOrder(eventRepository, jobEnqueueService);
@@ -87,8 +83,7 @@ class SingleEventGoogleOperationEnqueueTest {
     when(eventRepository.findByIdAndAccountIdForUpdate(EVENT_ID, ACCOUNT_ID))
         .thenReturn(Optional.of(event));
 
-    new DeleteSingleEventUseCase(
-            eventRepository, mappingQueryService, shareCommandService, jobEnqueueService)
+    new DeleteSingleEventUseCase(eventRepository, shareCommandService, jobEnqueueService)
         .delete(ACCOUNT_ID, EVENT_ID);
 
     InOrder ordered = inOrder(shareCommandService, eventRepository, jobEnqueueService);

@@ -42,13 +42,13 @@ struct EventCreationTests {
     #expect(CalendarEventFormRules.canSave(title: "   ", startAt: startAt, endAt: endAt))
     #expect(
       !CalendarEventFormRules.canSave(
-        title: String(repeating: "a", count: 256), startAt: startAt, endAt: endAt))
+        title: String(repeating: "a", count: 81), startAt: startAt, endAt: endAt))
     #expect(
       CalendarEventFormRules.canSave(
-        title: String(repeating: "😀", count: 127), startAt: startAt, endAt: endAt))
+        title: String(repeating: "😀", count: 40), startAt: startAt, endAt: endAt))
     #expect(
       !CalendarEventFormRules.canSave(
-        title: String(repeating: "😀", count: 128), startAt: startAt, endAt: endAt))
+        title: String(repeating: "😀", count: 41), startAt: startAt, endAt: endAt))
     #expect(!CalendarEventFormRules.canSave(title: "회의", startAt: startAt, endAt: startAt))
     #expect(
       !CalendarEventFormRules.canSave(

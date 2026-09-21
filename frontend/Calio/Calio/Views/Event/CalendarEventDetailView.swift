@@ -125,7 +125,7 @@ struct CalendarEventDetailView: View {
           Button("이 일정만 수정") {
             startEditingRecurrenceOccurrence()
           }
-          if canUpdateSeries {
+          if canEditSeries {
             Button("전체 반복 일정 수정") {
               startEditingRecurrenceSeries()
             }
@@ -152,10 +152,8 @@ struct CalendarEventDetailView: View {
           Button("이 일정만 삭제", role: .destructive) {
             deleteRecurrenceOccurrence()
           }
-          if canUpdateSeries {
-            Button("전체 반복 일정 삭제", role: .destructive) {
-              deleteRecurrenceSeries()
-            }
+          Button("전체 반복 일정 삭제", role: .destructive) {
+            deleteRecurrenceSeries()
           }
           Button("취소", role: .cancel) {}
         } message: {
@@ -509,16 +507,16 @@ struct CalendarEventDetailView: View {
     formMode = .editRecurrenceOccurrence
   }
 
-  private var canUpdateSeries: Bool {
-    recurrenceDetails?.canUpdateSeries == true && recurrenceDetails?.isRuleEditable == true
+  private var canEditSeries: Bool {
+    recurrenceDetails?.isRuleEditable == true
   }
 
   private var recurrenceEditScopeGuidance: String {
-    Self.recurrenceEditScopeGuidance(canUpdateSeries: canUpdateSeries)
+    Self.recurrenceEditScopeGuidance(canEditSeries: canEditSeries)
   }
 
   private var recurrenceDeleteScopeGuidance: String {
-    Self.recurrenceDeleteScopeGuidance(canUpdateSeries: canUpdateSeries)
+    Self.recurrenceDeleteScopeGuidance()
   }
 
   private enum RecurrenceAction {
@@ -566,7 +564,6 @@ struct CalendarEventDetailView: View {
 
   private func startEditingRecurrenceSeries() {
     guard let details = recurrenceDetails,
-      details.canUpdateSeries,
       details.isRuleEditable
     else {
       seriesMutationMessage = "이 반복 일정은 전체 수정할 수 없습니다."
@@ -746,16 +743,14 @@ struct CalendarEventDetailView: View {
     event.isRepeated && event.recurrenceId != nil
   }
 
-  nonisolated static func recurrenceEditScopeGuidance(canUpdateSeries: Bool) -> String {
-    canUpdateSeries
+  nonisolated static func recurrenceEditScopeGuidance(canEditSeries: Bool) -> String {
+    canEditSeries
       ? "이 일정만 수정은 선택한 날짜에, 전체 반복 일정 수정은 시리즈 전체에 적용됩니다."
       : "이 반복 일정은 전체 수정이 불가능해 선택한 날짜만 수정할 수 있습니다."
   }
 
-  nonisolated static func recurrenceDeleteScopeGuidance(canUpdateSeries: Bool) -> String {
-    canUpdateSeries
-      ? "이 일정만 삭제는 선택한 날짜에, 전체 반복 일정 삭제는 시리즈 전체에 적용됩니다."
-      : "이 반복 일정은 전체 삭제가 불가능해 선택한 날짜만 삭제할 수 있습니다."
+  nonisolated static func recurrenceDeleteScopeGuidance() -> String {
+    "이 일정만 삭제는 선택한 날짜에, 전체 반복 일정 삭제는 시리즈 전체에 적용됩니다."
   }
 }
 

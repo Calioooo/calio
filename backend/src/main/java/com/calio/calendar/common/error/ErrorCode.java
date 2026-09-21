@@ -8,7 +8,7 @@ public enum ErrorCode {
   AUTH_TOKEN_REVOKED(HttpStatus.UNAUTHORIZED, "Authentication token is revoked."),
   ACCOUNT_NOT_FOUND(HttpStatus.NOT_FOUND, "Account not found."),
   EVENT_NOT_FOUND(HttpStatus.NOT_FOUND, "Event not found."),
-  INVALID_EVENT_TITLE(HttpStatus.BAD_REQUEST, "Event title must be at most 255 characters."),
+  INVALID_EVENT_TITLE(HttpStatus.BAD_REQUEST, "Event title must be at most 80 characters."),
   RECURRENCE_EVENT_NOT_FOUND(HttpStatus.NOT_FOUND, "Recurrence event not found."),
   RECURRENCE_OCCURRENCE_NOT_FOUND(HttpStatus.NOT_FOUND, "Recurrence occurrence not found."),
   VOTE_ROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "Vote room not found."),

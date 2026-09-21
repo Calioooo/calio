@@ -2,6 +2,7 @@ package com.calio.calendar.groupcalendar.event.domain;
 
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.common.domain.BaseEntity;
+import com.calio.calendar.common.domain.CalendarEventTitle;
 import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.tag.domain.Tag;
 import jakarta.persistence.Column;
@@ -77,7 +78,7 @@ public class GroupCalendarEvent extends BaseEntity {
       boolean allDay,
       String timeZone,
       Tag tag) {
-    this.title = title;
+    this.title = CalendarEventTitle.requireValid(title);
     this.description = description;
     this.startAt = startAt;
     this.endAt = endAt;

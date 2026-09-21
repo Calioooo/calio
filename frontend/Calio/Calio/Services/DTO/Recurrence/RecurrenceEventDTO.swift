@@ -53,7 +53,6 @@ struct CreateRecurrenceEventRequestDTO: Encodable, Equatable {
   }
   var recurrenceFrequency: RecurrenceFrequency { Self.legacyFrequency(in: recurrence) ?? .daily }
 }
-
 struct UpdateRecurrenceEventRequestDTO: Encodable, Equatable {
   let title: String
   let description: String?
@@ -108,7 +107,6 @@ struct UpdateRecurrenceEventRequestDTO: Encodable, Equatable {
     CreateRecurrenceEventRequestDTO.legacyFrequency(in: recurrence) ?? .daily
   }
 }
-
 struct UpdateRecurrenceOccurrenceRequestDTO: Encodable, Equatable {
   let originStartAt: Date
   let title: String
@@ -137,7 +135,6 @@ struct UpdateRecurrenceOccurrenceRequestDTO: Encodable, Equatable {
       allDay: false, timeZone: "UTC")
   }
 }
-
 struct RecurrenceEventResponseDTO: Decodable, Equatable {
   let recurrenceId: Int64
   let title: String
@@ -150,7 +147,6 @@ struct RecurrenceEventResponseDTO: Decodable, Equatable {
   let tag: TagResponseDTO
   let createdAt: Date
   let updatedAt: Date
-  let canUpdateSeries: Bool
 
   init(
     recurrenceId: Int64,
@@ -163,8 +159,7 @@ struct RecurrenceEventResponseDTO: Decodable, Equatable {
     recurrence: [String],
     tag: TagResponseDTO,
     createdAt: Date,
-    updatedAt: Date,
-    canUpdateSeries: Bool
+    updatedAt: Date
   ) {
     self.recurrenceId = recurrenceId
     self.title = title
@@ -177,7 +172,6 @@ struct RecurrenceEventResponseDTO: Decodable, Equatable {
     self.tag = tag
     self.createdAt = createdAt
     self.updatedAt = updatedAt
-    self.canUpdateSeries = canUpdateSeries
   }
 
   init(
@@ -202,12 +196,10 @@ struct RecurrenceEventResponseDTO: Decodable, Equatable {
       ],
       tag: tag,
       createdAt: Date(timeIntervalSince1970: 0),
-      updatedAt: Date(timeIntervalSince1970: 0),
-      canUpdateSeries: true
+      updatedAt: Date(timeIntervalSince1970: 0)
     )
   }
 }
-
 extension CreateRecurrenceEventRequestDTO {
   fileprivate static func legacyDate(_ date: String, _ time: String) -> Date {
     let formatter = DateFormatter()

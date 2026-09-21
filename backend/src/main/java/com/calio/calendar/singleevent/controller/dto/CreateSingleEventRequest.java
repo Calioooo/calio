@@ -7,7 +7,7 @@ import java.time.Instant;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record CreateSingleEventRequest(
-    @NotNull(message = "이벤트 제목은 필수입니다.") @Size(max = 255, message = "이벤트 제목은 255자 이하여야 합니다.")
+    @NotNull(message = "이벤트 제목은 필수입니다.") @Size(max = 80, message = "이벤트 제목은 80자 이하여야 합니다.")
         String title,
     String description,
     @NotNull(message = "이벤트 시작 시각은 필수입니다.") Instant startAt,

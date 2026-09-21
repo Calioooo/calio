@@ -319,7 +319,6 @@ struct EventService {
       recurrenceFrequency: editableRule?.frequency ?? .daily,
       isAllDay: dto.allDay,
       timeZone: dto.timeZone,
-      canUpdateSeries: dto.canUpdateSeries,
       isRuleEditable: editableRule != nil,
       tagId: dto.tag.id
     )
@@ -431,7 +430,6 @@ struct EventService {
     }
   }
 }
-
 enum EventServiceError: Error, Equatable {
   case eventNotFound
   case recurrenceEventNotFound

@@ -952,8 +952,8 @@ class SingleEventControllerTest {
   }
 
   @Test
-  @DisplayName("Google mapping 일정은 모든 변경 요청을 차단한다")
-  void givenGoogleMappedEvent_whenMutate_thenAppliesExternalMutationPolicy() throws Exception {
+  @DisplayName("Google mapping 일정도 수정, 중요 표시 변경 및 삭제할 수 있다")
+  void givenGoogleMappedEvent_whenMutate_thenAllowsLocalMutation() throws Exception {
     // given
     long eventId = createEvent("Google import", "2026-06-21T00:00:00Z", "2026-06-21T01:00:00Z");
     mapAsGoogleEvent(eventId);
@@ -973,17 +973,14 @@ class SingleEventControllerTest {
                                   "timeZone": "UTC"
                                 }
                                 """))
-        .andExpect(status().isConflict())
-        .andExpect(jsonPath("$.title").value("EXTERNAL_EVENT_MUTATION_NOT_SUPPORTED"));
-
-    mockMvc
-        .perform(delete("/api/events/{eventId}", eventId))
-        .andExpect(status().isConflict())
-        .andExpect(jsonPath("$.title").value("EXTERNAL_EVENT_MUTATION_NOT_SUPPORTED"));
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.title").value("Blocked update"));
 
     updateImportantEventResult(eventId, true)
-        .andExpect(status().isConflict())
-        .andExpect(jsonPath("$.title").value("EXTERNAL_EVENT_MUTATION_NOT_SUPPORTED"));
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.importantEvent").value(true));
+
+    mockMvc.perform(delete("/api/events/{eventId}", eventId)).andExpect(status().isNoContent());
   }
 
   @Test

@@ -3,6 +3,7 @@ package com.calio.calendar.singleevent.usecase;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.calio.calendar.singleevent.controller.dto.EventResponse;
+import com.calio.calendar.singleevent.service.dto.CalendarFreeTime;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -12,9 +13,7 @@ import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-class CalendarAvailabilityCalculatorTest {
-
-  private final CalendarAvailabilityCalculator calculator = new CalendarAvailabilityCalculator();
+class FindAvailableTimesUseCaseTest {
 
   @Test
   @DisplayName("시간 일정은 빈 시간을 차단하고 종일 일정은 안내에 포함한다")
@@ -22,8 +21,8 @@ class CalendarAvailabilityCalculatorTest {
       givenTimedAndAllDayEvents_whenFindAvailableTimes_thenReturnsAvailableTimesWithAllDayNotice() {
     List<EventResponse> availableEvents = List.of(timedEvent(), allDayEvent());
 
-    List<com.calio.calendar.singleevent.service.dto.CalendarFreeTime> availableTimes =
-        calculator.find(
+    List<CalendarFreeTime> availableTimes =
+        FindAvailableTimesUseCase.calculateAvailableTimes(
             availableEvents,
             LocalDate.parse("2026-07-01"),
             LocalDate.parse("2026-07-01"),

@@ -2,6 +2,7 @@ package com.calio.calendar.groupcalendar.recurrence.domain;
 
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.common.domain.BaseEntity;
+import com.calio.calendar.common.domain.CalendarEventTitle;
 import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.recurrence.domain.RecurrenceRuleJsonConverter;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
@@ -82,7 +83,7 @@ public class GroupCalendarRecurrenceEvent extends BaseEntity {
       Tag tag,
       RecurrenceSchedule schedule,
       List<String> recurrenceRules) {
-    this.title = title;
+    this.title = CalendarEventTitle.requireValid(title);
     this.description = description;
     this.tag = tag;
     this.allDay = schedule.allDay();

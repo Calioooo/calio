@@ -87,7 +87,7 @@ struct RecurrenceTests {
     #expect(object["recurrenceFrequency"] == nil)
   }
 
-  @Test func recurrenceEventResponseDTODecodingRejectsMissingSeriesMutationPermission() throws {
+  @Test func recurrenceEventResponseDTODecodingDoesNotRequireSeriesMutationPermission() throws {
     let response = """
       {
         "recurrenceId": 1,
@@ -104,11 +104,7 @@ struct RecurrenceTests {
       }
       """.data(using: .utf8)!
 
-    do {
-      _ = try APIJSONCoding.makeDecoder().decode(RecurrenceEventResponseDTO.self, from: response)
-      Issue.record("Expected missing canUpdateSeries to fail decoding")
-    } catch is DecodingError {
-    }
+    _ = try APIJSONCoding.makeDecoder().decode(RecurrenceEventResponseDTO.self, from: response)
   }
 
   @Test func recurrenceRuleKeepsOnlyBoundedSimpleRulesEditable() async throws {
@@ -231,8 +227,7 @@ struct RecurrenceTests {
       recurrence: ["RRULE:FREQ=MONTHLY"],
       tag: TagResponseDTO(id: 0, title: "기타", colorCode: "#64748B", tagType: .defaultTag),
       createdAt: startAt,
-      updatedAt: startAt,
-      canUpdateSeries: true
+      updatedAt: startAt
     )
     let repository = RecordingEventRepository(fetchRecurrenceResponse: response)
     let service = EventService(repository: repository)
@@ -240,7 +235,6 @@ struct RecurrenceTests {
     let details = try await service.fetchRecurrenceEvent(recurrenceId: 12)
 
     #expect(details.isRuleEditable)
-    #expect(details.canUpdateSeries)
     #expect(details.recurrenceEndDate == nil)
   }
 
@@ -270,8 +264,7 @@ struct RecurrenceTests {
       recurrence: ["RRULE:FREQ=DAILY;UNTIL=20260630T131500Z"],
       tag: TagResponseDTO(id: 0, title: "기타", colorCode: "#64748B", tagType: .defaultTag),
       createdAt: startAt,
-      updatedAt: startAt,
-      canUpdateSeries: true
+      updatedAt: startAt
     )
     let service = EventService(
       repository: RecordingEventRepository(fetchRecurrenceResponse: response),
@@ -308,8 +301,7 @@ struct RecurrenceTests {
       recurrence: ["RRULE:FREQ=DAILY"],
       tag: TagResponseDTO(id: 0, title: "기타", colorCode: "#64748B", tagType: .defaultTag),
       createdAt: startAt,
-      updatedAt: startAt,
-      canUpdateSeries: true
+      updatedAt: startAt
     )
     let service = EventService(
       repository: RecordingEventRepository(fetchRecurrenceResponse: response))
@@ -322,7 +314,7 @@ struct RecurrenceTests {
     }
   }
 
-  @Test func eventServiceKeepsComplexOrExternallyManagedSeriesUnavailableForWholeSeriesEditing()
+  @Test func eventServiceKeepsComplexSeriesUnavailableForWholeSeriesEditing()
     async throws
   {
     let startAt = Date(timeIntervalSince1970: 1_788_480_000)
@@ -337,34 +329,13 @@ struct RecurrenceTests {
       recurrence: ["RRULE:FREQ=WEEKLY;BYDAY=MO"],
       tag: TagResponseDTO(id: 0, title: "기타", colorCode: "#64748B", tagType: .defaultTag),
       createdAt: startAt,
-      updatedAt: startAt,
-      canUpdateSeries: true
-    )
-    let externallyManagedResponse = RecurrenceEventResponseDTO(
-      recurrenceId: 13,
-      title: "외부 반복",
-      description: nil,
-      allDay: false,
-      firstOccurrenceStartAt: startAt,
-      firstOccurrenceEndAt: startAt.addingTimeInterval(3600),
-      timeZone: "UTC",
-      recurrence: ["RRULE:FREQ=WEEKLY"],
-      tag: TagResponseDTO(id: 0, title: "기타", colorCode: "#64748B", tagType: .defaultTag),
-      createdAt: startAt,
-      updatedAt: startAt,
-      canUpdateSeries: false
+      updatedAt: startAt
     )
 
     let complexDetails = try await EventService(
       repository: RecordingEventRepository(fetchRecurrenceResponse: complexResponse)
     ).fetchRecurrenceEvent(recurrenceId: 12)
-    let externallyManagedDetails = try await EventService(
-      repository: RecordingEventRepository(fetchRecurrenceResponse: externallyManagedResponse)
-    ).fetchRecurrenceEvent(recurrenceId: 13)
-
     #expect(!complexDetails.isRuleEditable)
-    #expect(externallyManagedDetails.isRuleEditable)
-    #expect(!externallyManagedDetails.canUpdateSeries)
   }
 
   @Test func recurrenceScheduleUsesSeriesZoneForDstAndInclusiveUntil() throws {

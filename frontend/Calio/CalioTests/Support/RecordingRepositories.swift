@@ -121,7 +121,6 @@ final class RecordingNationalHolidayRepository: NationalHolidayRepository {
     let continuation: CheckedContinuation<Bool, Never>
   }
 }
-
 final class RecordingTagRepository: TagRepository {
   private let fetchResponse: [TagResponseDTO]
   private let createResponse: TagResponseDTO
@@ -186,7 +185,6 @@ final class RecordingTagRepository: TagRepository {
     }
   }
 }
-
 final class RecordingEventRepository: EventRepository {
   private struct SuspendedEventRequest {
     let startDate: Date
@@ -271,8 +269,7 @@ final class RecordingEventRepository: EventRepository {
       firstOccurrenceEndAt: Date(timeIntervalSince1970: 3600),
       timeZone: "UTC", recurrence: ["RRULE:FREQ=DAILY;UNTIL=19700101T000000Z"],
       tag: .init(id: 0, title: "기타", colorCode: "#64748B", tagType: .defaultTag),
-      createdAt: Date(timeIntervalSince1970: 0), updatedAt: Date(timeIntervalSince1970: 0),
-      canUpdateSeries: true
+      createdAt: Date(timeIntervalSince1970: 0), updatedAt: Date(timeIntervalSince1970: 0)
     ),
     recurrenceCreateError: Error? = nil,
     fetchRecurrenceResponse: RecurrenceEventResponseDTO = RecurrenceEventResponseDTO(
@@ -282,8 +279,7 @@ final class RecordingEventRepository: EventRepository {
       firstOccurrenceEndAt: Date(timeIntervalSince1970: 3600),
       timeZone: "UTC", recurrence: ["RRULE:FREQ=DAILY;UNTIL=19700101T000000Z"],
       tag: .init(id: 0, title: "기타", colorCode: "#64748B", tagType: .defaultTag),
-      createdAt: Date(timeIntervalSince1970: 0), updatedAt: Date(timeIntervalSince1970: 0),
-      canUpdateSeries: true
+      createdAt: Date(timeIntervalSince1970: 0), updatedAt: Date(timeIntervalSince1970: 0)
     ),
     fetchRecurrenceError: Error? = nil,
     updateRecurrenceResponse: RecurrenceEventResponseDTO = RecurrenceEventResponseDTO(
@@ -293,8 +289,7 @@ final class RecordingEventRepository: EventRepository {
       firstOccurrenceEndAt: Date(timeIntervalSince1970: 3600),
       timeZone: "UTC", recurrence: ["RRULE:FREQ=DAILY;UNTIL=19700101T000000Z"],
       tag: .init(id: 0, title: "기타", colorCode: "#64748B", tagType: .defaultTag),
-      createdAt: Date(timeIntervalSince1970: 0), updatedAt: Date(timeIntervalSince1970: 0),
-      canUpdateSeries: true
+      createdAt: Date(timeIntervalSince1970: 0), updatedAt: Date(timeIntervalSince1970: 0)
     ),
     updateRecurrenceError: Error? = nil,
     updateRecurrenceOccurrenceResponse: EventResponseDTO = EventResponseDTO(

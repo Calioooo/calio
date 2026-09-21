@@ -15,16 +15,6 @@ public interface GoogleCalendarEventMappingRepository
 
   @Query(
       """
-            select (count(mapping) > 0)
-            from GoogleCalendarEventMapping mapping
-            where mapping.eventId = :eventId
-              and mapping.connection.integration.accountId = :accountId
-            """)
-  boolean existsByEventIdAndAccountId(
-      @Param("eventId") Long eventId, @Param("accountId") Long accountId);
-
-  @Query(
-      """
             select mapping
             from GoogleCalendarEventMapping mapping
             where mapping.connection.id = :connectionId

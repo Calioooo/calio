@@ -31,7 +31,6 @@ struct EventCreateInput: Equatable {
     self.tagId = tagId
   }
 }
-
 struct EventUpdateInput: Equatable {
   let title: String
   let description: String
@@ -59,7 +58,6 @@ struct EventUpdateInput: Equatable {
     self.tagId = tagId
   }
 }
-
 struct RecurrenceEventCreateInput: Equatable {
   let title: String
   let description: String
@@ -93,7 +91,6 @@ struct RecurrenceEventCreateInput: Equatable {
     self.tagId = tagId
   }
 }
-
 struct RecurrenceEventDetails: Equatable {
   let recurrenceId: Int64
   let title: String
@@ -105,7 +102,6 @@ struct RecurrenceEventDetails: Equatable {
   let recurrenceFrequency: RecurrenceFrequency
   let isAllDay: Bool
   let timeZone: String?
-  let canUpdateSeries: Bool
   let isRuleEditable: Bool
   let tagId: Int64?
 
@@ -120,7 +116,6 @@ struct RecurrenceEventDetails: Equatable {
     recurrenceFrequency: RecurrenceFrequency,
     isAllDay: Bool = false,
     timeZone: String? = nil,
-    canUpdateSeries: Bool = false,
     isRuleEditable: Bool = false,
     tagId: Int64? = nil
   ) {
@@ -134,12 +129,10 @@ struct RecurrenceEventDetails: Equatable {
     self.recurrenceFrequency = recurrenceFrequency
     self.isAllDay = isAllDay
     self.timeZone = timeZone
-    self.canUpdateSeries = canUpdateSeries
     self.isRuleEditable = isRuleEditable
     self.tagId = tagId
   }
 }
-
 struct RecurrenceEventSeriesEditInput: Equatable {
   let title: String
   let description: String
@@ -176,7 +169,6 @@ struct RecurrenceEventSeriesEditInput: Equatable {
     self.tagId = tagId
   }
 }
-
 struct RecurrenceEventUpdateInput: Equatable {
   let title: String
   let description: String
@@ -213,7 +205,6 @@ struct RecurrenceEventUpdateInput: Equatable {
     self.tagId = tagId
   }
 }
-
 struct RecurrenceOccurrenceUpdateInput: Equatable {
   let title: String
   let description: String
@@ -238,7 +229,6 @@ struct RecurrenceOccurrenceUpdateInput: Equatable {
     self.timeZone = timeZone
   }
 }
-
 enum CalendarEventCreationSubmitInput: Equatable {
   case single(EventCreateInput)
   case recurring(RecurrenceEventCreateInput)

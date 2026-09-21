@@ -2,7 +2,6 @@ package com.calio.calendar.singleevent.usecase;
 
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
-import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingQueryService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobEnqueueService;
 import com.calio.calendar.singleevent.controller.dto.EventResponse;
 import com.calio.calendar.singleevent.controller.dto.UpdateSingleEventRequest;
@@ -19,17 +18,14 @@ import org.springframework.transaction.annotation.Transactional;
 public class UpdateSingleEventUseCase {
 
   private final SingleEventRepository eventRepository;
-  private final GoogleCalendarEventMappingQueryService eventMappingQueryService;
   private final TagQueryService tagQueryService;
   private final GoogleOperationJobEnqueueService jobEnqueueService;
 
   public UpdateSingleEventUseCase(
       SingleEventRepository eventRepository,
-      GoogleCalendarEventMappingQueryService eventMappingQueryService,
       TagQueryService tagQueryService,
       GoogleOperationJobEnqueueService jobEnqueueService) {
     this.eventRepository = eventRepository;
-    this.eventMappingQueryService = eventMappingQueryService;
     this.tagQueryService = tagQueryService;
     this.jobEnqueueService = jobEnqueueService;
   }
@@ -40,7 +36,6 @@ public class UpdateSingleEventUseCase {
         eventRepository
             .findByIdAndAccountIdForUpdate(eventId, accountId)
             .orElseThrow(() -> new CalioException(ErrorCode.EVENT_NOT_FOUND));
-    rejectExternalMutation(accountId, eventId);
     Tag tag = tagQueryService.getTagOrDefault(accountId, request.tagId());
     event.replace(
         new SingleEventTitle(request.title()),
@@ -51,11 +46,5 @@ public class UpdateSingleEventUseCase {
     eventRepository.flush();
     jobEnqueueService.enqueueEventUpdated(accountId, event);
     return EventResponse.from(event, tag);
-  }
-
-  private void rejectExternalMutation(Long accountId, Long eventId) {
-    if (eventMappingQueryService.hasExternalEventMapping(eventId, accountId)) {
-      throw new CalioException(ErrorCode.EXTERNAL_EVENT_MUTATION_NOT_SUPPORTED);
-    }
   }
 }

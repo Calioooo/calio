@@ -14,7 +14,6 @@ import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.common.domain.CanonicalSchedule;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
-import com.calio.calendar.integration.mapping.service.GoogleCalendarRecurrenceMappingQueryService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobEnqueueService;
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarRecurrenceJobKind;
 import com.calio.calendar.recurrence.controller.dto.CreateRecurrenceEventRequest;
@@ -61,8 +60,6 @@ class RecurrenceEventServiceTest {
 
   @Mock private PersonalRecurrenceGroupShareCommandService recurrenceShareCommandService;
 
-  @Mock private GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService;
-
   @Mock private GoogleOperationJobEnqueueService jobEnqueueService;
 
   private RecurrenceEventService recurrenceEventService;
@@ -84,7 +81,6 @@ class RecurrenceEventServiceTest {
             recurrenceEngine,
             clock,
             recurrenceShareCommandService,
-            recurrenceMappingQueryService,
             jobEnqueueService);
   }
 
@@ -118,7 +114,7 @@ class RecurrenceEventServiceTest {
         .isEqualTo(Instant.parse("2027-01-01T01:00:00Z"));
     assertThat(captor.getValue().getTimeZone()).isEqualTo("Asia/Seoul");
     assertThat(captor.getValue().getRecurrenceRules()).containsExactlyElementsOf(normalized);
-    assertThat(response.canUpdateSeries()).isTrue();
+    assertThat(response.recurrenceId()).isEqualTo(10L);
     verify(jobEnqueueService)
         .enqueueRecurrence(
             eq(1L), eq(10L), eq(GoogleCalendarRecurrenceJobKind.RECURRENCE_CREATE), any());
@@ -178,36 +174,6 @@ class RecurrenceEventServiceTest {
   }
 
   @Test
-  @DisplayName("외부 반복 일정의 전체 수정은 정책 오류로 거절하고 master를 보존한다")
-  void givenExternalRecurrence_whenUpdateSeries_thenRejectsMutation() {
-    RecurrenceEvent recurrenceEvent = recurrenceEvent();
-    when(recurrenceEventRepository.findByIdAndAccountIdForUpdate(10L, 1L))
-        .thenReturn(Optional.of(recurrenceEvent));
-    when(recurrenceMappingQueryService.hasExternalRecurrenceEventMapping(10L, 1L)).thenReturn(true);
-
-    assertThatThrownBy(
-            () ->
-                recurrenceEventService.updateRecurrenceEvent(
-                    1L,
-                    10L,
-                    new UpdateRecurrenceEventRequest(
-                        "Updated",
-                        null,
-                        false,
-                        Instant.parse("2027-01-02T00:00:00Z"),
-                        Instant.parse("2027-01-02T01:00:00Z"),
-                        "Asia/Seoul",
-                        List.of("RRULE:FREQ=DAILY;COUNT=2"),
-                        null)))
-        .isInstanceOf(CalioException.class)
-        .extracting(exception -> ((CalioException) exception).getErrorCode())
-        .isEqualTo(ErrorCode.EXTERNAL_EVENT_MUTATION_NOT_SUPPORTED);
-
-    assertThat(recurrenceEvent.getTitle()).isEqualTo("Rule");
-    verify(recurrenceEngine, never()).validate(any(), any());
-  }
-
-  @Test
   @DisplayName("전체 recurrence 삭제는 override를 master보다 먼저 제거한다")
   void givenRecurrenceChildren_whenDeleteMaster_thenDeletesChildrenBeforeMaster() {
     // given
@@ -223,34 +189,14 @@ class RecurrenceEventServiceTest {
         inOrder(
             recurrenceEventRepository,
             recurrenceEventOverrideRepository,
-            recurrenceShareCommandService,
-            recurrenceMappingQueryService);
+            recurrenceShareCommandService);
     deletionOrder.verify(recurrenceEventRepository).findByIdAndAccountIdForUpdate(10L, 1L);
-    deletionOrder.verify(recurrenceMappingQueryService).hasExternalRecurrenceEventMapping(10L, 1L);
     deletionOrder.verify(recurrenceShareCommandService).deleteAllForSourceRecurrence(10L);
     deletionOrder
         .verify(recurrenceEventOverrideRepository)
         .deleteAllByRecurrenceEventIds(List.of(10L));
     deletionOrder.verify(recurrenceEventRepository).deleteAllByIds(List.of(10L));
     verify(jobEnqueueService).enqueueRecurrenceDeleted(1L, 10L);
-  }
-
-  @Test
-  @DisplayName("외부 반복 일정의 전체 삭제는 정책 오류로 거절하고 child를 보존한다")
-  void givenExternalRecurrence_whenDeleteSeries_thenRejectsMutation() {
-    RecurrenceEvent recurrenceEvent = recurrenceEvent();
-    when(recurrenceEventRepository.findByIdAndAccountIdForUpdate(10L, 1L))
-        .thenReturn(Optional.of(recurrenceEvent));
-    when(recurrenceMappingQueryService.hasExternalRecurrenceEventMapping(10L, 1L)).thenReturn(true);
-
-    assertThatThrownBy(() -> recurrenceEventService.deleteRecurrenceEvent(1L, 10L))
-        .isInstanceOf(CalioException.class)
-        .extracting(exception -> ((CalioException) exception).getErrorCode())
-        .isEqualTo(ErrorCode.EXTERNAL_EVENT_MUTATION_NOT_SUPPORTED);
-
-    verify(recurrenceEventOverrideRepository, never()).deleteAllByRecurrenceEventIds(any());
-    verify(recurrenceEventRepository, never()).deleteAllByIds(any());
-    verify(recurrenceShareCommandService, never()).deleteAllForSourceRecurrence(any());
   }
 
   @Test

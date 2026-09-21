@@ -16,16 +16,6 @@ public interface GoogleCalendarRecurrenceEventMappingRepository
 
   @Query(
       """
-            select (count(mapping) > 0)
-            from GoogleCalendarRecurrenceEventMapping mapping
-            where mapping.recurrenceEventId = :recurrenceEventId
-              and mapping.connection.integration.accountId = :accountId
-            """)
-  boolean existsByRecurrenceEventIdAndAccountId(
-      @Param("recurrenceEventId") Long recurrenceEventId, @Param("accountId") Long accountId);
-
-  @Query(
-      """
             select distinct mapping.recurrenceEventId
             from GoogleCalendarRecurrenceEventMapping mapping
             where mapping.recurrenceEventId in :recurrenceEventIds

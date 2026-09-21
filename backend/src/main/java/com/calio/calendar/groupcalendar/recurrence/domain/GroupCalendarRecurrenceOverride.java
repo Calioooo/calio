@@ -1,6 +1,7 @@
 package com.calio.calendar.groupcalendar.recurrence.domain;
 
 import com.calio.calendar.common.domain.BaseEntity;
+import com.calio.calendar.common.domain.CalendarEventTitle;
 import com.calio.calendar.common.domain.CanonicalSchedule;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -84,7 +85,7 @@ public class GroupCalendarRecurrenceOverride extends BaseEntity {
   }
 
   public void activate(String title, String description, CanonicalSchedule schedule) {
-    this.title = title;
+    this.title = CalendarEventTitle.requireValid(title);
     this.description = description;
     this.startAt = schedule.startAt();
     this.endAt = schedule.endAt();

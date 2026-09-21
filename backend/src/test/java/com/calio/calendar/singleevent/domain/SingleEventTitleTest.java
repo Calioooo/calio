@@ -23,7 +23,7 @@ class SingleEventTitleTest {
   }
 
   @Test
-  @DisplayName("일정 제목은 255자를 초과할 수 없다")
+  @DisplayName("일정 제목은 80자를 초과할 수 없다")
   void givenOverlengthTitle_whenCreate_thenRejectsTitle() {
     assertThatThrownBy(() -> new SingleEventTitle("a".repeat(SingleEventTitle.MAX_LENGTH + 1)))
         .isInstanceOf(CalioException.class)

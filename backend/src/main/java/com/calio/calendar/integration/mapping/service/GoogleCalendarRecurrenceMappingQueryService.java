@@ -38,11 +38,6 @@ public class GoogleCalendarRecurrenceMappingQueryService {
         connectionId, recurrenceEventId);
   }
 
-  public boolean hasExternalRecurrenceEventMapping(Long recurrenceEventId, Long accountId) {
-    return recurrenceMappingRepository.existsByRecurrenceEventIdAndAccountId(
-        recurrenceEventId, accountId);
-  }
-
   public Optional<GoogleCalendarRecurrenceEventMapping> getRecurrenceEventMappingIfExists(
       Long mappingId) {
     return recurrenceMappingRepository.findById(mappingId);

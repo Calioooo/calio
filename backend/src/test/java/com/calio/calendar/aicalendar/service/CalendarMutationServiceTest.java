@@ -383,8 +383,7 @@ class CalendarMutationServiceTest {
             List.of("RRULE:FREQ=WEEKLY;BYDAY=FR"),
             null,
             Instant.parse("2026-08-01T00:00:00Z"),
-            Instant.parse("2026-08-01T00:00:00Z"),
-            true);
+            Instant.parse("2026-08-01T00:00:00Z"));
     when(recurrenceEventService.getRecurrenceEvent(1L, 20L)).thenReturn(existingSeries);
     CalendarMutationToolRequest request =
         new CalendarMutationToolRequest(
@@ -579,8 +578,7 @@ class CalendarMutationServiceTest {
         List.of("RRULE:FREQ=WEEKLY;BYDAY=FR"),
         null,
         Instant.parse("2026-08-01T00:00:00Z"),
-        Instant.parse("2026-08-01T00:00:00Z"),
-        true);
+        Instant.parse("2026-08-01T00:00:00Z"));
   }
 
   private EventResponse event(String title, Instant startAt) {
