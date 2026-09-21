@@ -269,7 +269,7 @@ public class GoogleCalendarRecurrenceChangeService {
     }
     if (operationJobQueryService.hasPendingOutboundJob(
         recurrenceEventMapping.getConnection().getAccountId(),
-        recurrenceEventMapping.getConnection().getId(),
+        recurrenceEventMapping.getConnection().getIntegration().getId(),
         scope)) {
       mapping.markConflicted();
       recordSyncConflict(mapping, ownership);

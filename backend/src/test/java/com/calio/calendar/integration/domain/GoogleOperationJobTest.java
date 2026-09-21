@@ -9,6 +9,7 @@ import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarSyncJo
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJob;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobTrigger;
+import com.calio.calendar.integration.sync.operation.dto.GoogleEventJobPayload;
 import java.time.Instant;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -58,7 +59,7 @@ class GoogleOperationJobTest {
     assertThatThrownBy(
             () ->
                 GoogleCalendarEventJob.create(
-                    "operation-id", 1L, 2L, 3L, null, 4L, null, "{}", NOW))
+                    "operation-id", 1L, 2L, 3L, null, 4L, null, null, NOW))
         .isInstanceOf(IllegalArgumentException.class);
   }
 
@@ -75,7 +76,7 @@ class GoogleOperationJobTest {
                     GoogleCalendarEventJobKind.UPDATE,
                     null,
                     null,
-                    "{}",
+                    eventPayload(),
                     NOW))
         .isInstanceOf(IllegalArgumentException.class);
   }
@@ -93,7 +94,7 @@ class GoogleOperationJobTest {
                     GoogleCalendarEventJobKind.UPDATE,
                     4L,
                     null,
-                    "",
+                    null,
                     NOW))
         .isInstanceOf(IllegalArgumentException.class);
   }
@@ -111,7 +112,7 @@ class GoogleOperationJobTest {
                     GoogleCalendarEventJobKind.CREATE,
                     4L,
                     null,
-                    "{}",
+                    eventPayload(),
                     NOW))
         .isInstanceOf(IllegalArgumentException.class);
   }
@@ -119,5 +120,10 @@ class GoogleOperationJobTest {
   private GoogleOperationJob syncJob(Instant runnableAt) {
     return GoogleCalendarSyncJob.create(
         "operation-id", 1L, 2L, 3L, GoogleOperationJobTrigger.MANUAL, runnableAt);
+  }
+
+  private GoogleEventJobPayload eventPayload() {
+    return new GoogleEventJobPayload(
+        "title", null, NOW, NOW.plusSeconds(3_600), false, "UTC");
   }
 }

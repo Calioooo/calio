@@ -180,6 +180,77 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
   }
 
   @Test
+  @Transactional
+  @DisplayName("localChanged가 없는 inactive recurrence mapping만 local branch 대상으로 조회한다")
+  void inactiveUnchangedMappingsAreSelectedForLocalBranch() {
+    RecurrenceFixture fixture = recurrenceFixture();
+    GoogleCalendarRecurrenceEventMapping inactiveRecurrenceEventMapping =
+        eventMappingRepository.saveAndFlush(
+            eventMapping(fixture, fixture.recurrenceEvent(), "inactive-recurrence-event"));
+    RecurrenceEventOverride recurrenceOverride =
+        recurrenceOverride(fixture.recurrenceEvent(), "2026-07-21T00:00:00Z");
+    GoogleCalendarRecurrenceOverrideMapping inactiveOverride =
+        overrideMappingRepository.saveAndFlush(
+            overrideMapping(
+                inactiveRecurrenceEventMapping, recurrenceOverride, "inactive-override"));
+    fixture.connection().disconnect(Instant.parse("2026-07-02T00:00:00Z"));
+    connectionRepository.saveAndFlush(fixture.connection());
+
+    GoogleCalendarConnection activeConnection =
+        connectionRepository.saveAndFlush(
+            new GoogleCalendarConnection(
+                fixture.connection().getIntegration(),
+                "active-subject",
+                "active@example.com",
+                "active-refresh",
+                "active-access",
+                Instant.parse("2026-07-02T02:00:00Z"),
+                Instant.parse("2026-07-02T01:00:00Z")));
+    GoogleCalendarRecurrenceEventMapping activeRecurrenceEventMapping =
+        eventMappingRepository.saveAndFlush(
+            new GoogleCalendarRecurrenceEventMapping(
+                activeConnection,
+                fixture.recurrenceEvent().getId(),
+                "active-recurrence-event",
+                "active-etag"));
+    overrideMappingRepository.saveAndFlush(
+        new GoogleCalendarRecurrenceOverrideMapping(
+            activeRecurrenceEventMapping,
+            recurrenceOverride.getOriginStartAt(),
+            "active-override",
+            "active-etag"));
+
+    assertThat(
+            eventMappingRepository.findAllInactiveAndUnchangedByIntegrationIdAndRecurrenceEventId(
+                fixture.connection().getIntegration().getId(), fixture.recurrenceEvent().getId()))
+        .extracting(GoogleCalendarRecurrenceEventMapping::getId)
+        .containsExactly(inactiveRecurrenceEventMapping.getId());
+    assertThat(
+            overrideMappingRepository.findAllInactiveAndUnchangedByIdentity(
+                fixture.connection().getIntegration().getId(),
+                fixture.recurrenceEvent().getId(),
+                recurrenceOverride.getOriginStartAt()))
+        .extracting(GoogleCalendarRecurrenceOverrideMapping::getId)
+        .containsExactly(inactiveOverride.getId());
+
+    inactiveRecurrenceEventMapping.markLocalChanged();
+    inactiveOverride.markLocalChanged();
+    eventMappingRepository.flush();
+    overrideMappingRepository.flush();
+
+    assertThat(
+            eventMappingRepository.findAllInactiveAndUnchangedByIntegrationIdAndRecurrenceEventId(
+                fixture.connection().getIntegration().getId(), fixture.recurrenceEvent().getId()))
+        .isEmpty();
+    assertThat(
+            overrideMappingRepository.findAllInactiveAndUnchangedByIdentity(
+                fixture.connection().getIntegration().getId(),
+                fixture.recurrenceEvent().getId(),
+                recurrenceOverride.getOriginStartAt()))
+        .isEmpty();
+  }
+
+  @Test
   @DisplayName("동일 parent와 external ID의 recurrence override mapping 중복을 거부한다")
   void givenDuplicateRecurrenceOverrideProviderIdentity_whenSave_thenRejectsDuplicate() {
     // given
