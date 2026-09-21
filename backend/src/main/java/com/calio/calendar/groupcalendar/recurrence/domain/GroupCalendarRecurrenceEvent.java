@@ -2,13 +2,14 @@ package com.calio.calendar.groupcalendar.recurrence.domain;
 
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.common.domain.BaseEntity;
-import com.calio.calendar.common.domain.CalendarEventTitle;
 import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.recurrence.domain.RecurrenceRuleJsonConverter;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
 import com.calio.calendar.tag.domain.Tag;
+import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -40,8 +41,15 @@ public class GroupCalendarRecurrenceEvent extends BaseEntity {
   @JoinColumn(name = "tag_id", nullable = false)
   private Tag tag;
 
-  @Column(name = "recurrence_title", nullable = false)
-  private String title;
+  @Embedded
+  @AttributeOverride(
+      name = "value",
+      column =
+          @Column(
+              name = "recurrence_title",
+              nullable = false,
+              length = GroupCalendarRecurrenceEventTitle.MAX_LENGTH))
+  private GroupCalendarRecurrenceEventTitle title;
 
   @Column(name = "recurrence_description")
   private String description;
@@ -83,7 +91,7 @@ public class GroupCalendarRecurrenceEvent extends BaseEntity {
       Tag tag,
       RecurrenceSchedule schedule,
       List<String> recurrenceRules) {
-    this.title = CalendarEventTitle.requireValid(title);
+    this.title = new GroupCalendarRecurrenceEventTitle(title);
     this.description = description;
     this.tag = tag;
     this.allDay = schedule.allDay();
@@ -110,7 +118,7 @@ public class GroupCalendarRecurrenceEvent extends BaseEntity {
   }
 
   public String getTitle() {
-    return title;
+    return title.value();
   }
 
   public String getDescription() {

@@ -2,8 +2,8 @@ package com.calio.calendar.recurrence.domain;
 
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.common.domain.BaseEntity;
-import com.calio.calendar.common.domain.CalendarEventTitle;
 import com.calio.calendar.tag.domain.Tag;
+import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
 import jakarta.persistence.Embedded;
@@ -26,8 +26,15 @@ public class RecurrenceEvent extends BaseEntity {
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
 
-  @Column(name = "recurrence_title", nullable = false)
-  private String title;
+  @Embedded
+  @AttributeOverride(
+      name = "value",
+      column =
+          @Column(
+              name = "recurrence_title",
+              nullable = false,
+              length = RecurrenceEventTitle.MAX_LENGTH))
+  private RecurrenceEventTitle title;
 
   @Column(name = "recurrence_description")
   private String description;
@@ -55,7 +62,7 @@ public class RecurrenceEvent extends BaseEntity {
       List<String> recurrenceRules,
       Tag tag,
       Account account) {
-    this.title = CalendarEventTitle.requireValid(title);
+    this.title = new RecurrenceEventTitle(title);
     this.description = description;
     replaceSchedule(schedule, recurrenceRules);
     this.tag = tag;
@@ -68,7 +75,7 @@ public class RecurrenceEvent extends BaseEntity {
       RecurrenceSchedule schedule,
       List<String> recurrenceRules,
       Tag tag) {
-    this.title = CalendarEventTitle.requireValid(title);
+    this.title = new RecurrenceEventTitle(title);
     this.description = description;
     replaceSchedule(schedule, recurrenceRules);
     this.tag = tag;
@@ -76,7 +83,7 @@ public class RecurrenceEvent extends BaseEntity {
 
   public void updateProviderContent(
       String title, String description, RecurrenceSchedule schedule, List<String> recurrenceRules) {
-    this.title = CalendarEventTitle.requireValid(title);
+    this.title = new RecurrenceEventTitle(title);
     this.description = description;
     replaceSchedule(schedule, recurrenceRules);
   }
@@ -91,7 +98,7 @@ public class RecurrenceEvent extends BaseEntity {
   }
 
   public String getTitle() {
-    return title;
+    return title.value();
   }
 
   public String getDescription() {

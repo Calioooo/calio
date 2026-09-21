@@ -2,10 +2,11 @@ package com.calio.calendar.groupcalendar.event.domain;
 
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.common.domain.BaseEntity;
-import com.calio.calendar.common.domain.CalendarEventTitle;
 import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.tag.domain.Tag;
+import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -36,8 +37,12 @@ public class GroupCalendarEvent extends BaseEntity {
   @JoinColumn(name = "tag_id", nullable = false)
   private Tag tag;
 
-  @Column(nullable = false)
-  private String title;
+  @Embedded
+  @AttributeOverride(
+      name = "value",
+      column =
+          @Column(name = "title", nullable = false, length = GroupCalendarEventTitle.MAX_LENGTH))
+  private GroupCalendarEventTitle title;
 
   @Column(columnDefinition = "TEXT")
   private String description;
@@ -78,7 +83,7 @@ public class GroupCalendarEvent extends BaseEntity {
       boolean allDay,
       String timeZone,
       Tag tag) {
-    this.title = CalendarEventTitle.requireValid(title);
+    this.title = new GroupCalendarEventTitle(title);
     this.description = description;
     this.startAt = startAt;
     this.endAt = endAt;
@@ -104,7 +109,7 @@ public class GroupCalendarEvent extends BaseEntity {
   }
 
   public String getTitle() {
-    return title;
+    return title.value();
   }
 
   public String getDescription() {
