@@ -6,8 +6,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.calio.calendar.account.domain.AccountAuthToken;
-import com.calio.calendar.account.repository.AccountAuthTokenRepository;
+import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.auth.service.AccessTokenEncoder;
 import com.calio.calendar.common.testsupport.SharedIntegrationDatabase;
@@ -42,11 +41,8 @@ class AuthControllerTest {
 
   @Autowired private AccountRepository accountRepository;
 
-  @Autowired private AccountAuthTokenRepository accountAuthTokenRepository;
-
   @BeforeEach
   void setUp() {
-    accountAuthTokenRepository.deleteAll();
     accountRepository.deleteAll();
   }
 
@@ -67,14 +63,13 @@ class AuthControllerTest {
 
     JsonNode response = objectMapper.readTree(result.getResponse().getContentAsString());
     String rawToken = response.get("accessToken").asString();
-    AccountAuthToken persistedToken = accountAuthTokenRepository.findAll().getFirst();
+    Account persistedAccount = accountRepository.findAll().getFirst();
 
     assertThat(rawToken).isNotBlank();
     assertThat(rawToken.length()).isGreaterThanOrEqualTo(43);
     assertThat(rawToken).matches("[A-Za-z0-9_-]+");
     assertThat(accountRepository.count()).isEqualTo(1);
-    assertThat(accountAuthTokenRepository.count()).isEqualTo(1);
-    assertThat(persistedToken.getTokenHash()).isEqualTo(accessTokenEncoder.hash(rawToken));
-    assertThat(persistedToken.getTokenHash()).isNotEqualTo(rawToken);
+    assertThat(persistedAccount.getAuthTokenHash()).isEqualTo(accessTokenEncoder.hash(rawToken));
+    assertThat(persistedAccount.getAuthTokenHash()).isNotEqualTo(rawToken);
   }
 }

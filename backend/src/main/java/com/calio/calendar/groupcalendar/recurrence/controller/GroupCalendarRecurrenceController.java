@@ -1,9 +1,9 @@
 package com.calio.calendar.groupcalendar.recurrence.controller;
 
+import com.calio.calendar.groupcalendar.controller.dto.GroupCalendarItemResponse;
+import com.calio.calendar.groupcalendar.recurrence.controller.dto.GroupCalendarRecurrenceOccurrenceRequest;
 import com.calio.calendar.groupcalendar.recurrence.controller.dto.GroupCalendarRecurrenceRequest;
 import com.calio.calendar.groupcalendar.recurrence.controller.dto.GroupCalendarRecurrenceResponse;
-import com.calio.calendar.groupcalendar.recurrence.controller.dto.GroupCalendarRecurrenceOccurrenceRequest;
-import com.calio.calendar.groupcalendar.controller.dto.GroupCalendarItemResponse;
 import com.calio.calendar.groupcalendar.recurrence.service.GroupCalendarRecurrenceService;
 import com.calio.calendar.security.AuthenticatedAccount;
 import jakarta.validation.Valid;
@@ -12,8 +12,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -26,69 +26,65 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/group-spaces/{groupSpaceId}/recurrence-events")
 public class GroupCalendarRecurrenceController {
 
-    private final GroupCalendarRecurrenceService recurrenceService;
+  private final GroupCalendarRecurrenceService recurrenceService;
 
-    public GroupCalendarRecurrenceController(GroupCalendarRecurrenceService recurrenceService) {
-        this.recurrenceService = recurrenceService;
-    }
+  public GroupCalendarRecurrenceController(GroupCalendarRecurrenceService recurrenceService) {
+    this.recurrenceService = recurrenceService;
+  }
 
-    @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    public GroupCalendarRecurrenceResponse create(
-            @AuthenticationPrincipal AuthenticatedAccount account,
-            @PathVariable Long groupSpaceId,
-            @Valid @RequestBody GroupCalendarRecurrenceRequest request
-    ) {
-        return recurrenceService.create(account.accountId(), groupSpaceId, request);
-    }
+  @PostMapping
+  @ResponseStatus(HttpStatus.CREATED)
+  public GroupCalendarRecurrenceResponse create(
+      @AuthenticationPrincipal AuthenticatedAccount account,
+      @PathVariable Long groupSpaceId,
+      @Valid @RequestBody GroupCalendarRecurrenceRequest request) {
+    return recurrenceService.create(account.accountId(), groupSpaceId, request);
+  }
 
-    @GetMapping("/{recurrenceId}")
-    public GroupCalendarRecurrenceResponse get(
-            @AuthenticationPrincipal AuthenticatedAccount account,
-            @PathVariable Long groupSpaceId,
-            @PathVariable Long recurrenceId
-    ) {
-        return recurrenceService.get(account.accountId(), groupSpaceId, recurrenceId);
-    }
+  @GetMapping("/{recurrenceId}")
+  public GroupCalendarRecurrenceResponse get(
+      @AuthenticationPrincipal AuthenticatedAccount account,
+      @PathVariable Long groupSpaceId,
+      @PathVariable Long recurrenceId) {
+    return recurrenceService.get(account.accountId(), groupSpaceId, recurrenceId);
+  }
 
-    @PutMapping("/{recurrenceId}")
-    public GroupCalendarRecurrenceResponse update(
-            @AuthenticationPrincipal AuthenticatedAccount account,
-            @PathVariable Long groupSpaceId,
-            @PathVariable Long recurrenceId,
-            @Valid @RequestBody GroupCalendarRecurrenceRequest request
-    ) {
-        return recurrenceService.update(account.accountId(), groupSpaceId, recurrenceId, request);
-    }
+  @PutMapping("/{recurrenceId}")
+  public GroupCalendarRecurrenceResponse update(
+      @AuthenticationPrincipal AuthenticatedAccount account,
+      @PathVariable Long groupSpaceId,
+      @PathVariable Long recurrenceId,
+      @Valid @RequestBody GroupCalendarRecurrenceRequest request) {
+    return recurrenceService.update(account.accountId(), groupSpaceId, recurrenceId, request);
+  }
 
-    @DeleteMapping("/{recurrenceId}")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(
-            @AuthenticationPrincipal AuthenticatedAccount account,
-            @PathVariable Long groupSpaceId,
-            @PathVariable Long recurrenceId
-    ) {
-        recurrenceService.delete(account.accountId(), groupSpaceId, recurrenceId);
-    }
+  @DeleteMapping("/{recurrenceId}")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  public void delete(
+      @AuthenticationPrincipal AuthenticatedAccount account,
+      @PathVariable Long groupSpaceId,
+      @PathVariable Long recurrenceId) {
+    recurrenceService.delete(account.accountId(), groupSpaceId, recurrenceId);
+  }
 
-    @PatchMapping("/{recurrenceId}/occurrences")
-    public GroupCalendarItemResponse updateOccurrence(
-            @AuthenticationPrincipal AuthenticatedAccount account,
-            @PathVariable Long groupSpaceId,
-            @PathVariable Long recurrenceId,
-            @Valid @RequestBody GroupCalendarRecurrenceOccurrenceRequest request
-    ) {
-        return recurrenceService.updateOccurrence(account.accountId(), groupSpaceId, recurrenceId, request);
-    }
+  @PatchMapping("/{recurrenceId}/occurrences")
+  public GroupCalendarItemResponse updateOccurrence(
+      @AuthenticationPrincipal AuthenticatedAccount account,
+      @PathVariable Long groupSpaceId,
+      @PathVariable Long recurrenceId,
+      @Valid @RequestBody GroupCalendarRecurrenceOccurrenceRequest request) {
+    return recurrenceService.updateOccurrence(
+        account.accountId(), groupSpaceId, recurrenceId, request);
+  }
 
-    @DeleteMapping("/{recurrenceId}/occurrences")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deleteOccurrence(
-            @AuthenticationPrincipal AuthenticatedAccount account,
-            @PathVariable Long groupSpaceId,
-            @PathVariable Long recurrenceId,
-            @RequestParam Instant originStartAt
-    ) {
-        recurrenceService.deleteOccurrence(account.accountId(), groupSpaceId, recurrenceId, originStartAt);
-    }
+  @DeleteMapping("/{recurrenceId}/occurrences")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  public void deleteOccurrence(
+      @AuthenticationPrincipal AuthenticatedAccount account,
+      @PathVariable Long groupSpaceId,
+      @PathVariable Long recurrenceId,
+      @RequestParam Instant originStartAt) {
+    recurrenceService.deleteOccurrence(
+        account.accountId(), groupSpaceId, recurrenceId, originStartAt);
+  }
 }

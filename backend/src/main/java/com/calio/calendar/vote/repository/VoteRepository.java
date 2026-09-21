@@ -4,34 +4,29 @@ import com.calio.calendar.vote.domain.Vote;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.EntityGraph;
-import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface VoteRepository extends JpaRepository<Vote, Long> {
 
-    @Query("""
+  List<Vote> findByVoteParticipantIdOrderByUnavailableDateAsc(Long voteParticipantId);
+
+  @EntityGraph(attributePaths = "voteParticipant")
+  @Query(
+      """
             select vote
             from Vote vote
-            where vote.voteParticipant.id = :voteParticipantId
+            join vote.voteParticipant participant
+            join VoteRoom voteRoom on participant.voteRoomId = voteRoom.id
+            where voteRoom.publicId = :voteRoomPublicId
+              and participant.status = com.calio.calendar.vote.domain.VoteParticipantStatus.SUBMITTED
             order by vote.unavailableDate
             """)
-    List<Vote> findAllByVoteParticipantId(@Param("voteParticipantId") Long voteParticipantId);
+  List<Vote> findAllSubmittedByVoteRoomPublicId(@Param("voteRoomPublicId") UUID voteRoomPublicId);
 
-    @EntityGraph(attributePaths = {"voteParticipant", "voteParticipant.voteRoom"})
-    @Query("""
-            select vote
-            from Vote vote
-            where vote.voteParticipant.voteRoom.publicId = :voteRoomPublicId
-              and vote.voteParticipant.status = com.calio.calendar.vote.domain.VoteParticipantStatus.SUBMITTED
-            order by vote.unavailableDate
-            """)
-    List<Vote> findAllSubmittedByVoteRoomPublicId(
-            @Param("voteRoomPublicId") UUID voteRoomPublicId
-    );
-
-    @Modifying(flushAutomatically = true)
-    @Query("delete from Vote vote where vote.voteParticipant.id = :voteParticipantId")
-    int deleteAllByVoteParticipantId(@Param("voteParticipantId") Long voteParticipantId);
+  @Modifying(flushAutomatically = true)
+  @Query("delete from Vote vote where vote.voteParticipant.id = :voteParticipantId")
+  int deleteAllByVoteParticipantId(@Param("voteParticipantId") Long voteParticipantId);
 }

@@ -50,6 +50,8 @@ class CalendarMutationServiceTest {
 
   @Mock private TagService tagService;
 
+  @Mock private CalendarAiMutationPolicy aiMutationPolicy;
+
   @Test
   @DisplayName("일정 수정 Preview는 기존 일정을 조회하지만 실제 수정은 실행하지 않는다")
   void givenEventUpdate_whenPreview_thenReturnsBeforeAndAfterWithoutChangingEvent() {
@@ -448,7 +450,8 @@ class CalendarMutationServiceTest {
         updateEventUseCase,
         deleteEventUseCase,
         recurrenceEventService,
-        tagService);
+        tagService,
+        aiMutationPolicy);
   }
 
   private CalendarMutationToolRequest updateRequest() {

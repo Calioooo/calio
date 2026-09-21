@@ -12,50 +12,49 @@ import jakarta.persistence.Table;
 @Table(name = "group_spaces")
 public class GroupSpace extends BaseEntity {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
 
-    @Column(name = "owner_account_id", nullable = false)
-    private Long ownerAccountId;
+  @Column(name = "owner_account_id", nullable = false)
+  private Long ownerAccountId;
 
-    @Column(nullable = false, length = 30)
-    private String name;
+  @Column(nullable = false, length = 30)
+  private String name;
 
-    @Column(length = 64)
-    private String emoji;
+  @Column(length = 64)
+  private String emoji;
 
-    protected GroupSpace() {
-    }
+  protected GroupSpace() {}
 
-    public GroupSpace(Long ownerAccountId, String name, String emoji) {
-        this.ownerAccountId = ownerAccountId;
-        this.name = name;
-        this.emoji = emoji;
-    }
+  public GroupSpace(Long ownerAccountId, String name, String emoji) {
+    this.ownerAccountId = ownerAccountId;
+    this.name = name;
+    this.emoji = emoji;
+  }
 
-    public Long getId() {
-        return id;
-    }
+  public Long getId() {
+    return id;
+  }
 
-    public Long getOwnerAccountId() {
-        return ownerAccountId;
-    }
+  public Long getOwnerAccountId() {
+    return ownerAccountId;
+  }
 
-    public String getName() {
-        return name;
-    }
+  public String getName() {
+    return name;
+  }
 
-    public String getEmoji() {
-        return emoji;
-    }
+  public String getEmoji() {
+    return emoji;
+  }
 
-    public void update(String name, String emoji) {
-        this.name = name;
-        this.emoji = emoji;
-    }
+  public void update(String name, String emoji) {
+    this.name = name;
+    this.emoji = emoji;
+  }
 
-    public void transferOwnershipTo(Long accountId) {
-        this.ownerAccountId = accountId;
-    }
+  public void transferOwnershipTo(Long accountId) {
+    this.ownerAccountId = accountId;
+  }
 }

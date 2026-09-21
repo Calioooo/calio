@@ -182,7 +182,11 @@ class VoteRoomControllerTest {
 
   private VoteRoom voteRoom(String name, Account account) {
     return new VoteRoom(
-        UUID.randomUUID(), name, CANDIDATE_START_DATE, CANDIDATE_START_DATE.plusDays(6), account);
+        UUID.randomUUID(),
+        name,
+        CANDIDATE_START_DATE,
+        CANDIDATE_START_DATE.plusDays(6),
+        account.getId());
   }
 
   @TestConfiguration

@@ -7,18 +7,11 @@ import java.util.List;
 
 public interface Rfc5545RecurrenceEngine {
 
-    List<String> validate(RecurrenceSchedule schedule, List<String> recurrenceRules);
+  List<String> validate(RecurrenceSchedule schedule, List<String> recurrenceRules);
 
-    List<RecurrenceOccurrence> expand(
-            RecurrenceSchedule schedule,
-            List<String> recurrenceRules,
-            Instant from,
-            Instant to
-    );
+  List<RecurrenceOccurrence> expand(
+      RecurrenceSchedule schedule, List<String> recurrenceRules, Instant from, Instant to);
 
-    boolean containsOrigin(
-            RecurrenceSchedule schedule,
-            List<String> recurrenceRules,
-            Instant originStartAt
-    );
+  boolean containsOrigin(
+      RecurrenceSchedule schedule, List<String> recurrenceRules, Instant originStartAt);
 }

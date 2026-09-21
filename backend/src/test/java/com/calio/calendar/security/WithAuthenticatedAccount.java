@@ -6,5 +6,4 @@ import org.springframework.security.test.context.support.WithSecurityContext;
 
 @Retention(RetentionPolicy.RUNTIME)
 @WithSecurityContext(factory = WithAuthenticatedAccountSecurityContextFactory.class)
-public @interface WithAuthenticatedAccount {
-}
+public @interface WithAuthenticatedAccount {}

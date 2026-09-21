@@ -6,19 +6,18 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 public final class TestAccountSupport {
 
-    private TestAccountSupport() {
-    }
+  private TestAccountSupport() {}
 
-    public static Account currentAccountReference() {
-        Account account = new Account();
-        ReflectionTestUtils.setField(account, "id", currentAccountId());
-        return account;
-    }
+  public static Account currentAccountReference() {
+    Account account = new Account();
+    ReflectionTestUtils.setField(account, "id", currentAccountId());
+    return account;
+  }
 
-    public static Long currentAccountId() {
-        AuthenticatedAccount principal = (AuthenticatedAccount) SecurityContextHolder.getContext()
-                .getAuthentication()
-                .getPrincipal();
-        return principal.accountId();
-    }
+  public static Long currentAccountId() {
+    AuthenticatedAccount principal =
+        (AuthenticatedAccount)
+            SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+    return principal.accountId();
+  }
 }

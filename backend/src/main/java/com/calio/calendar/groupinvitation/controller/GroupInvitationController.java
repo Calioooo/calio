@@ -20,41 +20,37 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/group-spaces/{groupSpaceId}/invitations")
 public class GroupInvitationController {
 
-    private final GroupInvitationService groupInvitationService;
+  private final GroupInvitationService groupInvitationService;
 
-    public GroupInvitationController(GroupInvitationService groupInvitationService) {
-        this.groupInvitationService = groupInvitationService;
-    }
+  public GroupInvitationController(GroupInvitationService groupInvitationService) {
+    this.groupInvitationService = groupInvitationService;
+  }
 
-    @PostMapping
-    public ResponseEntity<IssueGroupInvitationResponse> issue(
-            @AuthenticationPrincipal AuthenticatedAccount account,
-            @PathVariable("groupSpaceId") Long groupSpaceId
-    ) {
-        IssueGroupInvitationResponse response =
-                groupInvitationService.issue(account.accountId(), groupSpaceId);
-        URI location = URI.create(
-                "/api/group-spaces/%d/invitations/%d"
-                        .formatted(groupSpaceId, response.invitationId())
-        );
-        return ResponseEntity.created(location).body(response);
-    }
+  @PostMapping
+  public ResponseEntity<IssueGroupInvitationResponse> issue(
+      @AuthenticationPrincipal AuthenticatedAccount account,
+      @PathVariable("groupSpaceId") Long groupSpaceId) {
+    IssueGroupInvitationResponse response =
+        groupInvitationService.issue(account.accountId(), groupSpaceId);
+    URI location =
+        URI.create(
+            "/api/group-spaces/%d/invitations/%d".formatted(groupSpaceId, response.invitationId()));
+    return ResponseEntity.created(location).body(response);
+  }
 
-    @GetMapping
-    public GroupInvitationListResponse list(
-            @AuthenticationPrincipal AuthenticatedAccount account,
-            @PathVariable("groupSpaceId") Long groupSpaceId
-    ) {
-        return groupInvitationService.list(account.accountId(), groupSpaceId);
-    }
+  @GetMapping
+  public GroupInvitationListResponse list(
+      @AuthenticationPrincipal AuthenticatedAccount account,
+      @PathVariable("groupSpaceId") Long groupSpaceId) {
+    return groupInvitationService.list(account.accountId(), groupSpaceId);
+  }
 
-    @DeleteMapping("/{invitationId}")
-    public ResponseEntity<Void> revoke(
-            @AuthenticationPrincipal AuthenticatedAccount account,
-            @PathVariable("groupSpaceId") Long groupSpaceId,
-            @PathVariable("invitationId") Long invitationId
-    ) {
-        groupInvitationService.revoke(account.accountId(), groupSpaceId, invitationId);
-        return ResponseEntity.noContent().build();
-    }
+  @DeleteMapping("/{invitationId}")
+  public ResponseEntity<Void> revoke(
+      @AuthenticationPrincipal AuthenticatedAccount account,
+      @PathVariable("groupSpaceId") Long groupSpaceId,
+      @PathVariable("invitationId") Long invitationId) {
+    groupInvitationService.revoke(account.accountId(), groupSpaceId, invitationId);
+    return ResponseEntity.noContent().build();
+  }
 }

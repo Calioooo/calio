@@ -8,5 +8,5 @@
 import Foundation
 
 enum CalioAPIConfig {
-    static let baseURL = URL(string: "https://calio.patchlane.cloud")!
+  static let baseURL = URL(string: "https://calio.patchlane.cloud")!
 }

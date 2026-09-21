@@ -61,7 +61,7 @@ class VoteParticipantControllerTest {
                 "여행",
                 LocalDate.of(2026, 8, 14),
                 LocalDate.of(2026, 8, 20),
-                account));
+                account.getId()));
   }
 
   @Test
@@ -104,7 +104,8 @@ class VoteParticipantControllerTest {
   @DisplayName("없는 참여자와 틀린 비밀번호는 같은 공개 자격증명 오류를 반환한다")
   void invalidCredentialUsesSameResponse() throws Exception {
     participantRepository.saveAndFlush(
-        new VoteParticipant(voteRoom, "calio", new BCryptPasswordEncoder().encode("secret")));
+        new VoteParticipant(
+            voteRoom.getId(), "calio", new BCryptPasswordEncoder().encode("secret")));
     String wrongPassword =
         "{\"nickname\":\"calio\",\"password\":\"wrong\",\"unavailableDates\":[]}";
     String missingName = "{\"nickname\":\"other\",\"password\":\"secret\",\"unavailableDates\":[]}";
@@ -124,7 +125,8 @@ class VoteParticipantControllerTest {
   void publicLookupRestoresSubmittedParticipantSelection() throws Exception {
     VoteParticipant participant =
         participantRepository.saveAndFlush(
-            new VoteParticipant(voteRoom, "calio", new BCryptPasswordEncoder().encode("secret")));
+            new VoteParticipant(
+                voteRoom.getId(), "calio", new BCryptPasswordEncoder().encode("secret")));
     participant.submit();
     participantRepository.saveAndFlush(participant);
     voteRepository.saveAllAndFlush(
@@ -150,7 +152,7 @@ class VoteParticipantControllerTest {
   @Test
   @DisplayName("선택 복원은 REGISTERED 참여자에게 빈 날짜 목록을 반환한다")
   void lookupReturnsEmptyDatesForRegisteredParticipant() throws Exception {
-    participantRepository.saveAndFlush(new VoteParticipant(voteRoom, "calio", null));
+    participantRepository.saveAndFlush(new VoteParticipant(voteRoom.getId(), "calio", null));
 
     mockMvc
         .perform(
@@ -166,7 +168,8 @@ class VoteParticipantControllerTest {
   @DisplayName("선택 복원의 잘못된 자격증명은 참여자 존재 여부와 무관하게 401을 반환한다")
   void lookupInvalidCredentialUsesSameResponse() throws Exception {
     participantRepository.saveAndFlush(
-        new VoteParticipant(voteRoom, "calio", new BCryptPasswordEncoder().encode("secret")));
+        new VoteParticipant(
+            voteRoom.getId(), "calio", new BCryptPasswordEncoder().encode("secret")));
     String wrongPassword = "{\"nickname\":\"calio\",\"password\":\"wrong\"}";
     String missingName = "{\"nickname\":\"other\",\"password\":\"secret\"}";
 

@@ -20,105 +20,91 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+  private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
-    @ExceptionHandler(CalioException.class)
-    public ResponseEntity<ProblemDetail> handleCalioException(
-            CalioException exception,
-            HttpServletRequest request
-    ) {
-        ErrorCode errorCode = exception.getErrorCode();
-        logCalioException(errorCode, exception, request);
-        return toResponse(errorCode, exception.getMessage());
+  @ExceptionHandler(CalioException.class)
+  public ResponseEntity<ProblemDetail> handleCalioException(
+      CalioException exception, HttpServletRequest request) {
+    ErrorCode errorCode = exception.getErrorCode();
+    logCalioException(errorCode, exception, request);
+    return toResponse(errorCode, exception.getMessage());
+  }
+
+  @ExceptionHandler({
+    MethodArgumentNotValidException.class,
+    ConstraintViolationException.class,
+    MissingServletRequestParameterException.class,
+    MethodArgumentTypeMismatchException.class,
+    HttpMessageNotReadableException.class
+  })
+  public ResponseEntity<ProblemDetail> handleValidationException(
+      Exception exception, HttpServletRequest request) {
+    ErrorCode errorCode = ErrorCode.VALIDATION_FAILED;
+    log.debug(
+        "API validation failed. errorCode={} accountId={} method={} path={}",
+        errorCode.name(),
+        currentAccountId(),
+        request.getMethod(),
+        request.getRequestURI());
+    return toResponse(errorCode, errorCode.getDefaultMessage());
+  }
+
+  @ExceptionHandler(Exception.class)
+  public ResponseEntity<ProblemDetail> handleUnexpectedException(
+      Exception exception, HttpServletRequest request) {
+    ErrorCode errorCode = ErrorCode.INTERNAL_SERVER_ERROR;
+    log.error(
+        "Unhandled API exception. status={} errorCode={} accountId={} method={} path={}",
+        errorCode.getStatus().value(),
+        errorCode.name(),
+        currentAccountId(),
+        request.getMethod(),
+        request.getRequestURI(),
+        exception);
+    return toResponse(errorCode, errorCode.getDefaultMessage());
+  }
+
+  private ResponseEntity<ProblemDetail> toResponse(ErrorCode errorCode, String detail) {
+    return ResponseEntity.status(errorCode.getStatus())
+        .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+        .body(ErrorProblemDetail.from(errorCode, detail));
+  }
+
+  private void logCalioException(
+      ErrorCode errorCode, CalioException exception, HttpServletRequest request) {
+    if (errorCode.getStatus().is5xxServerError()) {
+      log.error(
+          "API error. status={} errorCode={} accountId={} method={} path={}",
+          errorCode.getStatus().value(),
+          errorCode.name(),
+          currentAccountId(),
+          request.getMethod(),
+          request.getRequestURI(),
+          exception);
+      return;
     }
 
-    @ExceptionHandler({
-            MethodArgumentNotValidException.class,
-            ConstraintViolationException.class,
-            MissingServletRequestParameterException.class,
-            MethodArgumentTypeMismatchException.class,
-            HttpMessageNotReadableException.class
-    })
-    public ResponseEntity<ProblemDetail> handleValidationException(
-            Exception exception,
-            HttpServletRequest request
-    ) {
-        ErrorCode errorCode = ErrorCode.VALIDATION_FAILED;
-        log.debug(
-                "API validation failed. errorCode={} accountId={} method={} path={}",
-                errorCode.name(),
-                currentAccountId(),
-                request.getMethod(),
-                request.getRequestURI()
-        );
-        return toResponse(errorCode, errorCode.getDefaultMessage());
+    log.warn(
+        "API error. status={} errorCode={} accountId={} method={} path={} message={}",
+        errorCode.getStatus().value(),
+        errorCode.name(),
+        currentAccountId(),
+        request.getMethod(),
+        request.getRequestURI(),
+        exception.getMessage());
+  }
+
+  private Long currentAccountId() {
+    Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+    if (authentication == null) {
+      return null;
     }
 
-    @ExceptionHandler(Exception.class)
-    public ResponseEntity<ProblemDetail> handleUnexpectedException(
-            Exception exception,
-            HttpServletRequest request
-    ) {
-        ErrorCode errorCode = ErrorCode.INTERNAL_SERVER_ERROR;
-        log.error(
-                "Unhandled API exception. status={} errorCode={} accountId={} method={} path={}",
-                errorCode.getStatus().value(),
-                errorCode.name(),
-                currentAccountId(),
-                request.getMethod(),
-                request.getRequestURI(),
-                exception
-        );
-        return toResponse(errorCode, errorCode.getDefaultMessage());
+    Object principal = authentication.getPrincipal();
+    if (principal instanceof AuthenticatedAccount(Long accountId)) {
+      return accountId;
     }
 
-    private ResponseEntity<ProblemDetail> toResponse(ErrorCode errorCode, String detail) {
-        return ResponseEntity
-                .status(errorCode.getStatus())
-                .contentType(MediaType.APPLICATION_PROBLEM_JSON)
-                .body(ErrorProblemDetail.from(errorCode, detail));
-    }
-
-    private void logCalioException(
-            ErrorCode errorCode,
-            CalioException exception,
-            HttpServletRequest request
-    ) {
-        if (errorCode.getStatus().is5xxServerError()) {
-            log.error(
-                    "API error. status={} errorCode={} accountId={} method={} path={}",
-                    errorCode.getStatus().value(),
-                    errorCode.name(),
-                    currentAccountId(),
-                    request.getMethod(),
-                    request.getRequestURI(),
-                    exception
-            );
-            return;
-        }
-
-        log.warn(
-                "API error. status={} errorCode={} accountId={} method={} path={} message={}",
-                errorCode.getStatus().value(),
-                errorCode.name(),
-                currentAccountId(),
-                request.getMethod(),
-                request.getRequestURI(),
-                exception.getMessage()
-        );
-    }
-
-    private Long currentAccountId() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null) {
-            return null;
-        }
-
-        Object principal = authentication.getPrincipal();
-        if (principal instanceof AuthenticatedAccount(Long accountId)) {
-            return accountId;
-        }
-
-        return null;
-    }
+    return null;
+  }
 }

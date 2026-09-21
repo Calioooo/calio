@@ -3,17 +3,20 @@ package com.calio.calendar.recurrence.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.calio.calendar.account.domain.Account;
-import com.calio.calendar.account.service.AccountQueryService;
+import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.common.domain.CanonicalSchedule;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarRecurrenceMappingQueryService;
+import com.calio.calendar.integration.sync.operation.GoogleOperationJobEnqueueService;
+import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarRecurrenceJobKind;
 import com.calio.calendar.recurrence.controller.dto.CreateRecurrenceEventRequest;
 import com.calio.calendar.recurrence.controller.dto.RecurrenceEventResponse;
 import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceEventRequest;
@@ -48,7 +51,7 @@ class RecurrenceEventServiceTest {
 
   @Mock private RecurrenceEventOverrideRepository recurrenceEventOverrideRepository;
 
-  @Mock private AccountQueryService accountQueryService;
+  @Mock private AccountRepository accountRepository;
 
   @Mock private TagQueryService tagQueryService;
 
@@ -59,6 +62,8 @@ class RecurrenceEventServiceTest {
   @Mock private PersonalRecurrenceGroupShareCommandService recurrenceShareCommandService;
 
   @Mock private GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService;
+
+  @Mock private GoogleOperationJobEnqueueService jobEnqueueService;
 
   private RecurrenceEventService recurrenceEventService;
 
@@ -74,12 +79,13 @@ class RecurrenceEventServiceTest {
         new RecurrenceEventService(
             queryService,
             commandService,
-            accountQueryService,
+            accountRepository,
             tagQueryService,
             recurrenceEngine,
             clock,
             recurrenceShareCommandService,
-            recurrenceMappingQueryService);
+            recurrenceMappingQueryService,
+            jobEnqueueService);
   }
 
   @Test
@@ -89,6 +95,7 @@ class RecurrenceEventServiceTest {
     Tag tag = tag();
     List<String> normalized = List.of("RRULE:FREQ=DAILY;COUNT=3");
     when(tagQueryService.getTagOrDefault(1L, null)).thenReturn(tag);
+    when(accountRepository.findById(1L)).thenReturn(Optional.of(account()));
     when(recurrenceEngine.validate(any(RecurrenceSchedule.class), any())).thenReturn(normalized);
     when(recurrenceEventRepository.save(any(RecurrenceEvent.class)))
         .thenAnswer(
@@ -112,6 +119,9 @@ class RecurrenceEventServiceTest {
     assertThat(captor.getValue().getTimeZone()).isEqualTo("Asia/Seoul");
     assertThat(captor.getValue().getRecurrenceRules()).containsExactlyElementsOf(normalized);
     assertThat(response.canUpdateSeries()).isTrue();
+    verify(jobEnqueueService)
+        .enqueueRecurrence(
+            eq(1L), eq(10L), eq(GoogleCalendarRecurrenceJobKind.RECURRENCE_CREATE), any());
   }
 
   @Test
@@ -162,6 +172,9 @@ class RecurrenceEventServiceTest {
     assertThat(recurrenceEvent.isAllDay()).isTrue();
     assertThat(recurrenceEvent.getTimeZone()).isNull();
     verify(recurrenceEventOverrideRepository, never()).deleteAllByRecurrenceEventIds(any());
+    verify(jobEnqueueService)
+        .enqueueRecurrence(
+            eq(1L), eq(10L), eq(GoogleCalendarRecurrenceJobKind.RECURRENCE_UPDATE), any());
   }
 
   @Test
@@ -219,6 +232,7 @@ class RecurrenceEventServiceTest {
         .verify(recurrenceEventOverrideRepository)
         .deleteAllByRecurrenceEventIds(List.of(10L));
     deletionOrder.verify(recurrenceEventRepository).deleteAllByIds(List.of(10L));
+    verify(jobEnqueueService).enqueueRecurrenceDeleted(1L, 10L);
   }
 
   @Test
@@ -276,6 +290,7 @@ class RecurrenceEventServiceTest {
     assertThat(response.title()).isEqualTo("Final title");
     assertThat(response.description()).isNull();
     assertThat(response.originStartAt()).isEqualTo(originStartAt);
+    verify(jobEnqueueService).enqueueRecurrenceOverride(eq(1L), eq(10L), eq(originStartAt), any());
   }
 
   @Test
@@ -402,6 +417,7 @@ class RecurrenceEventServiceTest {
     assertThat(existingOverride.getOriginStartAt()).isEqualTo(originStartAt);
     assertThat(existingOverride.isDeleted()).isTrue();
     assertThat(existingOverride.getDeletedAt()).isEqualTo(deletedAt);
+    verify(jobEnqueueService).enqueueRecurrenceOverrideDeleted(1L, 10L, originStartAt);
   }
 
   @Test

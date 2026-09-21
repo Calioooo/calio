@@ -27,7 +27,8 @@ struct CalendarAssistantConversationTests {
       ]
       """.utf8)
 
-    let blocks = try APIJSONCoding.makeDecoder().decode([CalendarAssistantBlockDTO].self, from: data)
+    let blocks = try APIJSONCoding.makeDecoder().decode(
+      [CalendarAssistantBlockDTO].self, from: data)
 
     #expect(blocks.count == 3)
     guard case .freeTimes(let first) = blocks[0] else {

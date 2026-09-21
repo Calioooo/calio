@@ -13,39 +13,41 @@ import org.springframework.stereotype.Service;
 @Service
 public class CalendarAssistantRequestClassifier {
 
-    private final ObjectProvider<ChatModel> chatModelProvider;
-    private final Resource systemPrompt;
+  private final ObjectProvider<ChatModel> chatModelProvider;
+  private final Resource systemPrompt;
 
-    public CalendarAssistantRequestClassifier(
-            ObjectProvider<ChatModel> chatModelProvider,
-            @Value("classpath:prompts/calendar-assistant-request-classifier-system.st") Resource systemPrompt
-    ) {
-        this.chatModelProvider = chatModelProvider;
-        this.systemPrompt = systemPrompt;
-    }
+  public CalendarAssistantRequestClassifier(
+      ObjectProvider<ChatModel> chatModelProvider,
+      @Value("classpath:prompts/calendar-assistant-request-classifier-system.st")
+          Resource systemPrompt) {
+    this.chatModelProvider = chatModelProvider;
+    this.systemPrompt = systemPrompt;
+  }
 
-    public CalendarAssistantRequestClassification classify(String message) {
-        ChatModel chatModel = chatModelProvider.getIfAvailable();
-        if (chatModel == null) {
-            throw providerUnavailable(null);
-        }
-        try {
-            String response = ChatClient.create(chatModel)
-                    .prompt()
-                    .system(system -> system.text(systemPrompt))
-                    .user(message)
-                    .call()
-                    .content();
-            if (response == null || response.isBlank()) {
-                throw new IllegalStateException("AI calendar request classifier returned an empty response.");
-            }
-            return CalendarAssistantRequestClassification.valueOf(response.trim());
-        } catch (RuntimeException exception) {
-            throw providerUnavailable(exception);
-        }
+  public CalendarAssistantRequestClassification classify(String message) {
+    ChatModel chatModel = chatModelProvider.getIfAvailable();
+    if (chatModel == null) {
+      throw providerUnavailable(null);
     }
+    try {
+      String response =
+          ChatClient.create(chatModel)
+              .prompt()
+              .system(system -> system.text(systemPrompt))
+              .user(message)
+              .call()
+              .content();
+      if (response == null || response.isBlank()) {
+        throw new IllegalStateException(
+            "AI calendar request classifier returned an empty response.");
+      }
+      return CalendarAssistantRequestClassification.valueOf(response.trim());
+    } catch (RuntimeException exception) {
+      throw providerUnavailable(exception);
+    }
+  }
 
-    private CalioException providerUnavailable(Throwable cause) {
-        return new CalioException(ErrorCode.AI_CALENDAR_PROVIDER_UNAVAILABLE, cause);
-    }
+  private CalioException providerUnavailable(Throwable cause) {
+    return new CalioException(ErrorCode.AI_CALENDAR_PROVIDER_UNAVAILABLE, cause);
+  }
 }

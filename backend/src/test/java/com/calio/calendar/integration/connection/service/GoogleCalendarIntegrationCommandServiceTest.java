@@ -1,46 +1,44 @@
 package com.calio.calendar.integration.connection.service;
 
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.mock;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.calio.calendar.common.error.CalioException;
-import com.calio.calendar.common.error.ErrorCode;
+import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.connection.repository.GoogleCalendarIntegrationRepository;
+import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentMatchers;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
+@ExtendWith(MockitoExtension.class)
 class GoogleCalendarIntegrationCommandServiceTest {
+  @Mock private GoogleCalendarIntegrationRepository integrationRepository;
+  @InjectMocks private GoogleCalendarIntegrationCommandService commandService;
 
-    private final GoogleCalendarIntegrationRepository integrationRepository =
-            mock(GoogleCalendarIntegrationRepository.class);
-    private final GoogleCalendarIntegrationCommandService commandService =
-            new GoogleCalendarIntegrationCommandService(integrationRepository);
+  @Test
+  @DisplayName("Account Integration은 Account ID만으로 생성한다")
+  void givenAccount_whenCreateIntegration_thenPersistsAccountAggregate() {
+    GoogleCalendarIntegration integration = new GoogleCalendarIntegration(1L);
+    when(integrationRepository.saveAndFlush(ArgumentMatchers.any())).thenReturn(integration);
 
-    @Test
-    @DisplayName("동기화 cursor 저장은 Integration Repository에 전달한다")
-    void givenNextSyncToken_whenSaving_thenUpdatesIntegrationCursor() {
-        // given
-        when(integrationRepository.updateNextSyncToken(1L, "next-token")).thenReturn(1);
+    GoogleCalendarIntegration saved = commandService.createIntegration(1L);
 
-        // when
-        commandService.changeNextSyncToken(1L, "next-token");
+    assertThat(saved).isSameAs(integration);
+    verify(integrationRepository)
+        .saveAndFlush(ArgumentMatchers.any(GoogleCalendarIntegration.class));
+  }
 
-        // then
-        verify(integrationRepository).updateNextSyncToken(1L, "next-token");
-    }
+  @Test
+  @DisplayName("Integration lock 조회는 Account별 aggregate를 반환한다")
+  void givenExistingIntegration_whenFindForUpdate_thenReturnsIt() {
+    GoogleCalendarIntegration integration = new GoogleCalendarIntegration(1L);
+    when(integrationRepository.findByAccountIdForUpdate(1L)).thenReturn(Optional.of(integration));
 
-    @Test
-    @DisplayName("동기화 cursor를 저장하지 못하면 sync conflict 예외를 반환한다")
-    void givenMissingIntegration_whenSavingCursor_thenThrowsSyncConflict() {
-        // given
-        when(integrationRepository.updateNextSyncToken(1L, "next-token")).thenReturn(0);
-
-        // when, then
-        assertThatThrownBy(() -> commandService.changeNextSyncToken(1L, "next-token"))
-                .isInstanceOfSatisfying(CalioException.class, exception ->
-                        org.assertj.core.api.Assertions.assertThat(exception.getErrorCode())
-                                .isEqualTo(ErrorCode.GOOGLE_CALENDAR_SYNC_CONFLICT));
-    }
+    assertThat(commandService.tryLockIntegration(1L)).containsSame(integration);
+  }
 }

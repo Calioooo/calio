@@ -79,6 +79,8 @@ public enum ErrorCode {
   GOOGLE_CALENDAR_NOT_CONNECTED(HttpStatus.CONFLICT, "Google Calendar is not connected."),
   GOOGLE_CALENDAR_RECONNECT_REQUIRED(
       HttpStatus.CONFLICT, "Google Calendar reconnection is required."),
+  GOOGLE_CALENDAR_REQUEST_INVALID(
+      HttpStatus.INTERNAL_SERVER_ERROR, "Google Calendar request is invalid."),
   GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID(
       HttpStatus.BAD_GATEWAY, "Google Calendar event response is invalid."),
   GOOGLE_CALENDAR_SYNC_FAILED(HttpStatus.BAD_GATEWAY, "Google Calendar sync failed."),
@@ -90,6 +92,9 @@ public enum ErrorCode {
   AI_CALENDAR_CONVERSATION_NOT_FOUND(HttpStatus.NOT_FOUND, "AI calendar conversation not found."),
   AI_CALENDAR_PROVIDER_UNAVAILABLE(
       HttpStatus.SERVICE_UNAVAILABLE, "AI calendar provider is temporarily unavailable."),
+
+  NOTIFICATION_ENDPOINT_TOKEN_CONFLICT(
+      HttpStatus.CONFLICT, "Notification endpoint token is already being registered."),
 
   HOLIDAY_API_CONFIGURATION_MISSING(
       HttpStatus.INTERNAL_SERVER_ERROR, "Holiday API configuration is missing."),

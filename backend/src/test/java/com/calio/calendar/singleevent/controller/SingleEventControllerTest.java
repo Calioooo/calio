@@ -13,7 +13,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
+import com.calio.calendar.integration.connection.domain.GoogleCalendarConnection;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
+import com.calio.calendar.integration.connection.repository.GoogleCalendarConnectionRepository;
 import com.calio.calendar.integration.connection.repository.GoogleCalendarIntegrationRepository;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.mapping.repository.GoogleCalendarEventMappingRepository;
@@ -64,6 +66,8 @@ class SingleEventControllerTest {
   @Autowired private SingleEventRepository eventRepository;
 
   @Autowired private GoogleCalendarIntegrationRepository googleCalendarIntegrationRepository;
+
+  @Autowired private GoogleCalendarConnectionRepository googleCalendarConnectionRepository;
 
   @Autowired private GoogleCalendarEventMappingRepository googleCalendarEventMappingRepository;
 
@@ -1116,8 +1120,11 @@ class SingleEventControllerTest {
     SingleEvent event = eventRepository.findById(eventId).orElseThrow();
     GoogleCalendarIntegration integration =
         googleCalendarIntegrationRepository.saveAndFlush(
-            new GoogleCalendarIntegration(
-                event.getAccountId(),
+            new GoogleCalendarIntegration(event.getAccountId()));
+    GoogleCalendarConnection connection =
+        googleCalendarConnectionRepository.saveAndFlush(
+            new GoogleCalendarConnection(
+                integration,
                 "google-subject-" + eventId,
                 "user@example.com",
                 "encrypted-refresh-token",
@@ -1125,7 +1132,7 @@ class SingleEventControllerTest {
                 Instant.parse("2026-06-21T02:00:00Z"),
                 Instant.parse("2026-06-21T00:00:00Z")));
     googleCalendarEventMappingRepository.saveAndFlush(
-        new GoogleCalendarEventMapping(integration, event, "external-" + eventId, null, null));
+        new GoogleCalendarEventMapping(connection, event.getId(), "external-" + eventId, "etag"));
   }
 
   private JsonNode readResponse(MvcResult result) throws Exception {
