@@ -10,17 +10,16 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface CalendarConversationMessageRepository
-        extends JpaRepository<CalendarConversationMessage, Long> {
+    extends JpaRepository<CalendarConversationMessage, Long> {
 
-    List<CalendarConversationMessage> findByConversation_IdOrderByCreatedAtDescIdDesc(
-            Long conversationId,
-            Pageable pageable
-    );
+  List<CalendarConversationMessage> findByConversation_IdOrderByCreatedAtDescIdDesc(
+      Long conversationId, Pageable pageable);
 
-    @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query("""
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      """
             delete from CalendarConversationMessage message
             where message.conversation.lastActivityAt <= :cutoff
             """)
-    int deleteByConversationInactiveBefore(@Param("cutoff") Instant cutoff);
+  int deleteByConversationInactiveBefore(@Param("cutoff") Instant cutoff);
 }

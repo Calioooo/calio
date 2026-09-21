@@ -10,7 +10,7 @@ import org.springframework.data.repository.query.Param;
 
 public interface GroupSpaceRepository extends JpaRepository<GroupSpace, Long> {
 
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select groupSpace from GroupSpace groupSpace where groupSpace.id = :groupSpaceId")
-    Optional<GroupSpace> findByIdForUpdate(@Param("groupSpaceId") Long groupSpaceId);
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("select groupSpace from GroupSpace groupSpace where groupSpace.id = :groupSpaceId")
+  Optional<GroupSpace> findByIdForUpdate(@Param("groupSpaceId") Long groupSpaceId);
 }

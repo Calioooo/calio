@@ -1,7 +1,7 @@
 package com.calio.calendar.integration.sync.page;
 
 import com.calio.calendar.account.domain.Account;
-import com.calio.calendar.account.service.AccountQueryService;
+import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarConnection;
@@ -43,7 +43,7 @@ public class GoogleCalendarPageChangeService {
   private final GoogleCalendarEventMappingQueryService eventMappingQueryService;
   private final GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService;
   private final GoogleCalendarEventChangeService eventChangeService;
-  private final AccountQueryService accountQueryService;
+  private final AccountRepository accountRepository;
   private final TagQueryService tagQueryService;
   private final RecurrenceEventQueryService recurrenceEventQueryService;
   private final GoogleCalendarRecurrenceChangeService recurrenceChangeService;
@@ -54,7 +54,7 @@ public class GoogleCalendarPageChangeService {
       GoogleCalendarEventMappingQueryService eventMappingQueryService,
       GoogleCalendarEventChangeService eventChangeService,
       GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService,
-      AccountQueryService accountQueryService,
+      AccountRepository accountRepository,
       TagQueryService tagQueryService,
       RecurrenceEventQueryService recurrenceEventQueryService,
       GoogleCalendarRecurrenceChangeService recurrenceChangeService,
@@ -63,7 +63,7 @@ public class GoogleCalendarPageChangeService {
     this.eventMappingQueryService = eventMappingQueryService;
     this.eventChangeService = eventChangeService;
     this.recurrenceMappingQueryService = recurrenceMappingQueryService;
-    this.accountQueryService = accountQueryService;
+    this.accountRepository = accountRepository;
     this.tagQueryService = tagQueryService;
     this.recurrenceEventQueryService = recurrenceEventQueryService;
     this.recurrenceChangeService = recurrenceChangeService;
@@ -89,7 +89,7 @@ public class GoogleCalendarPageChangeService {
       List<NormalizedItem> items) {
     GoogleCalendarPageRecordCache cache = loadPageRecordCache(connection.getId(), items);
 
-    Account account = accountQueryService.getAccount(accountId);
+    Account account = getAccount(accountId);
     Tag defaultTag = tagQueryService.getTagOrDefault(accountId, null);
 
     for (NormalizedItem item : items) {
@@ -115,6 +115,12 @@ public class GoogleCalendarPageChangeService {
             recurrenceChangeService.applyRecurrenceEventOverride(override, cache, ownership);
       }
     }
+  }
+
+  private Account getAccount(Long accountId) {
+    return accountRepository
+        .findById(accountId)
+        .orElseThrow(() -> new CalioException(ErrorCode.INTERNAL_SERVER_ERROR));
   }
 
   private boolean removeRecurrenceEventWithSameExternalId(

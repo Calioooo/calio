@@ -1,5 +1,6 @@
 package com.calio.calendar.integration.sync.operation.domain;
 
+import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceJobPayload;
 import jakarta.persistence.Column;
 import jakarta.persistence.DiscriminatorValue;
 import jakarta.persistence.Embedded;
@@ -7,7 +8,6 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import java.time.Instant;
-import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceJobPayload;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 

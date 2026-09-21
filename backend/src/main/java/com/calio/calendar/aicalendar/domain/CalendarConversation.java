@@ -18,46 +18,45 @@ import java.util.UUID;
 @Table(name = "ai_calendar_conversations")
 public class CalendarConversation extends BaseEntity {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
 
-    @Column(name = "conversation_id", nullable = false, updatable = false, length = 36)
-    private String conversationId;
+  @Column(name = "conversation_id", nullable = false, updatable = false, length = 36)
+  private String conversationId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "account_id", nullable = false)
-    private Account account;
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "account_id", nullable = false)
+  private Account account;
 
-    @Column(name = "last_activity_at", nullable = false)
-    private Instant lastActivityAt;
+  @Column(name = "last_activity_at", nullable = false)
+  private Instant lastActivityAt;
 
-    protected CalendarConversation() {
-    }
+  protected CalendarConversation() {}
 
-    public CalendarConversation(Account account, Instant createdAt) {
-        this.conversationId = UUID.randomUUID().toString();
-        this.account = account;
-        this.lastActivityAt = createdAt;
-    }
+  public CalendarConversation(Account account, Instant createdAt) {
+    this.conversationId = UUID.randomUUID().toString();
+    this.account = account;
+    this.lastActivityAt = createdAt;
+  }
 
-    public Long getId() {
-        return id;
-    }
+  public Long getId() {
+    return id;
+  }
 
-    public String getConversationId() {
-        return conversationId;
-    }
+  public String getConversationId() {
+    return conversationId;
+  }
 
-    public Long getAccountId() {
-        return account.getId();
-    }
+  public Long getAccountId() {
+    return account.getId();
+  }
 
-    public Instant getLastActivityAt() {
-        return lastActivityAt;
-    }
+  public Instant getLastActivityAt() {
+    return lastActivityAt;
+  }
 
-    public void touch(Instant activityAt) {
-        this.lastActivityAt = activityAt;
-    }
+  public void touch(Instant activityAt) {
+    this.lastActivityAt = activityAt;
+  }
 }

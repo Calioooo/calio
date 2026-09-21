@@ -13,18 +13,20 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class GroupCalendarRecurrenceQueryService {
 
-    private final GroupCalendarRecurrenceEventRepository recurrenceRepository;
+  private final GroupCalendarRecurrenceEventRepository recurrenceRepository;
 
-    public GroupCalendarRecurrenceQueryService(GroupCalendarRecurrenceEventRepository recurrenceRepository) {
-        this.recurrenceRepository = recurrenceRepository;
-    }
+  public GroupCalendarRecurrenceQueryService(
+      GroupCalendarRecurrenceEventRepository recurrenceRepository) {
+    this.recurrenceRepository = recurrenceRepository;
+  }
 
-    public GroupCalendarRecurrenceEvent getRecurrenceEvent(Long groupSpaceId, Long recurrenceId) {
-        return recurrenceRepository.findByIdAndGroupSpace_Id(recurrenceId, groupSpaceId)
-                .orElseThrow(() -> new CalioException(ErrorCode.GROUP_RECURRENCE_EVENT_NOT_FOUND));
-    }
+  public GroupCalendarRecurrenceEvent getRecurrenceEvent(Long groupSpaceId, Long recurrenceId) {
+    return recurrenceRepository
+        .findByIdAndGroupSpace_Id(recurrenceId, groupSpaceId)
+        .orElseThrow(() -> new CalioException(ErrorCode.GROUP_RECURRENCE_EVENT_NOT_FOUND));
+  }
 
-    public List<GroupCalendarRecurrenceEvent> listExpansionCandidates(Long groupSpaceId, Instant to) {
-        return recurrenceRepository.findByGroupSpaceIdAndFirstOccurrenceStartAtBefore(groupSpaceId, to);
-    }
+  public List<GroupCalendarRecurrenceEvent> listExpansionCandidates(Long groupSpaceId, Instant to) {
+    return recurrenceRepository.findByGroupSpaceIdAndFirstOccurrenceStartAtBefore(groupSpaceId, to);
+  }
 }

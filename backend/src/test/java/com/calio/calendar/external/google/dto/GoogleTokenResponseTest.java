@@ -11,13 +11,14 @@ import tools.jackson.databind.ObjectMapper;
 
 class GoogleTokenResponseTest {
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+  private final ObjectMapper objectMapper = new ObjectMapper();
 
-    @Test
-    @DisplayName("Google token response는 access token, refresh token, 양수 expires_in을 요구한다")
-    void givenValidTokenResponse_whenParse_thenReturnsRequiredValues() throws Exception {
-        // given
-        String json = """
+  @Test
+  @DisplayName("Google token response는 access token, refresh token, 양수 expires_in을 요구한다")
+  void givenValidTokenResponse_whenParse_thenReturnsRequiredValues() throws Exception {
+    // given
+    String json =
+        """
                 {
                   "access_token": "access-token",
                   "refresh_token": "refresh-token",
@@ -26,20 +27,21 @@ class GoogleTokenResponseTest {
                 }
                 """;
 
-        // when
-        GoogleTokenResponse response = objectMapper.readValue(json, GoogleTokenResponse.class);
+    // when
+    GoogleTokenResponse response = objectMapper.readValue(json, GoogleTokenResponse.class);
 
-        // then
-        assertThat(response.accessToken()).isEqualTo("access-token");
-        assertThat(response.refreshToken()).isEqualTo("refresh-token");
-        assertThat(response.expiresIn()).isEqualTo(3600);
-    }
+    // then
+    assertThat(response.accessToken()).isEqualTo("access-token");
+    assertThat(response.refreshToken()).isEqualTo("refresh-token");
+    assertThat(response.expiresIn()).isEqualTo(3600);
+  }
 
-    @Test
-    @DisplayName("Google token response의 token_type이 Bearer가 아니면 invalid response로 거부한다")
-    void givenUnsupportedTokenType_whenParse_thenThrowsInvalidTokenResponse() {
-        // given
-        String json = """
+  @Test
+  @DisplayName("Google token response의 token_type이 Bearer가 아니면 invalid response로 거부한다")
+  void givenUnsupportedTokenType_whenParse_thenThrowsInvalidTokenResponse() {
+    // given
+    String json =
+        """
                 {
                   "access_token": "access-token",
                   "refresh_token": "refresh-token",
@@ -48,18 +50,20 @@ class GoogleTokenResponseTest {
                 }
                 """;
 
-        // when, then
-        assertThatThrownBy(() -> objectMapper.readValue(json, GoogleTokenResponse.class))
-                .satisfies(exception ->
-                        assertErrorCode(exception, ErrorCode.GOOGLE_TOKEN_RESPONSE_INVALID));
-    }
+    // when, then
+    assertThatThrownBy(() -> objectMapper.readValue(json, GoogleTokenResponse.class))
+        .satisfies(
+            exception -> assertErrorCode(exception, ErrorCode.GOOGLE_TOKEN_RESPONSE_INVALID));
+  }
 
-    private void assertErrorCode(Throwable throwable, ErrorCode errorCode) {
-        Throwable cause = throwable;
-        while (cause != null && !(cause instanceof CalioException)) {
-            cause = cause.getCause();
-        }
-        assertThat(cause).isInstanceOfSatisfying(CalioException.class, exception ->
-                assertThat(exception.getErrorCode()).isEqualTo(errorCode));
+  private void assertErrorCode(Throwable throwable, ErrorCode errorCode) {
+    Throwable cause = throwable;
+    while (cause != null && !(cause instanceof CalioException)) {
+      cause = cause.getCause();
     }
+    assertThat(cause)
+        .isInstanceOfSatisfying(
+            CalioException.class,
+            exception -> assertThat(exception.getErrorCode()).isEqualTo(errorCode));
+  }
 }

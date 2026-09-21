@@ -12,7 +12,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import com.calio.calendar.account.service.AccountCommandService;
+import com.calio.calendar.account.domain.Account;
+import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.external.google.GoogleOAuthClient;
@@ -31,6 +32,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Optional;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -48,7 +50,7 @@ class GoogleCalendarConnectionServiceTest {
   private final TokenEncryptor encryptor =
       new TokenEncryptor(
           new TokenEncryptionConfig().googleTokenBytesEncryptor(encryptionProperties()));
-  private final AccountCommandService accountCommandService = mock(AccountCommandService.class);
+  private final AccountRepository accountRepository = mock(AccountRepository.class);
   private final GoogleCalendarIntegrationCommandService integrationCommandService =
       mock(GoogleCalendarIntegrationCommandService.class);
   private final GoogleCalendarConnectionQueryService connectionQueryService =
@@ -61,6 +63,11 @@ class GoogleCalendarConnectionServiceTest {
       mock(GoogleOperationJobCommandService.class);
   private final GoogleOperationJobEnqueueService enqueueService =
       mock(GoogleOperationJobEnqueueService.class);
+
+  @BeforeEach
+  void setUp() {
+    when(accountRepository.findByIdForUpdate(ACCOUNT_ID)).thenReturn(Optional.of(new Account()));
+  }
 
   @Test
   @DisplayName("첫 연결은 Account Integration을 만들고 Google Connection에 credential을 저장한다")
@@ -137,9 +144,8 @@ class GoogleCalendarConnectionServiceTest {
 
     // then
     assertThat(response.connected()).isTrue();
-    var callOrder =
-        inOrder(accountCommandService, connectionCommandService, integrationCommandService);
-    callOrder.verify(accountCommandService).lockAccount(ACCOUNT_ID);
+    var callOrder = inOrder(accountRepository, connectionCommandService, integrationCommandService);
+    callOrder.verify(accountRepository).findByIdForUpdate(ACCOUNT_ID);
     callOrder.verify(integrationCommandService).tryLockIntegration(ACCOUNT_ID);
     verify(connectionCommandService)
         .createConnection(
@@ -341,7 +347,7 @@ class GoogleCalendarConnectionServiceTest {
         properties,
         oauthClient,
         encryptor,
-        accountCommandService,
+        accountRepository,
         integrationCommandService,
         connectionQueryService,
         connectionCommandService,

@@ -11,17 +11,18 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-public interface RecurrenceEventOverrideRepository extends JpaRepository<RecurrenceEventOverride, Long> {
+public interface RecurrenceEventOverrideRepository
+    extends JpaRepository<RecurrenceEventOverride, Long> {
 
-    Optional<RecurrenceEventOverride> findByRecurrenceEvent_IdAndOriginStartAt(Long recurrenceId, Instant originStartAt);
+  Optional<RecurrenceEventOverride> findByRecurrenceEvent_IdAndOriginStartAt(
+      Long recurrenceId, Instant originStartAt);
 
-    List<RecurrenceEventOverride> findByRecurrenceEvent_IdAndOriginStartAtIn(
-            Long recurrenceId,
-            Collection<Instant> originStartAt
-    );
+  List<RecurrenceEventOverride> findByRecurrenceEvent_IdAndOriginStartAtIn(
+      Long recurrenceId, Collection<Instant> originStartAt);
 
-    @EntityGraph(attributePaths = {"recurrenceEvent", "recurrenceEvent.tag"})
-    @Query("""
+  @EntityGraph(attributePaths = {"recurrenceEvent", "recurrenceEvent.tag"})
+  @Query(
+      """
             select recurrenceOverride
             from RecurrenceEventOverride recurrenceOverride
             where recurrenceOverride.recurrenceEvent.account.id = :accountId
@@ -29,27 +30,25 @@ public interface RecurrenceEventOverrideRepository extends JpaRepository<Recurre
               and recurrenceOverride.overrideStartAt < :to
               and recurrenceOverride.overrideEndAt > :from
             """)
-    List<RecurrenceEventOverride> findActiveOverlappingOverrides(
-            @Param("accountId") Long accountId,
-            @Param("from") Instant from,
-            @Param("to") Instant to
-    );
+  List<RecurrenceEventOverride> findActiveOverlappingOverrides(
+      @Param("accountId") Long accountId, @Param("from") Instant from, @Param("to") Instant to);
 
-    void deleteAllByRecurrenceEvent_Id(Long recurrenceId);
+  void deleteAllByRecurrenceEvent_Id(Long recurrenceId);
 
-    @Modifying(flushAutomatically = true)
-    @Query("""
+  @Modifying(flushAutomatically = true)
+  @Query(
+      """
             delete from RecurrenceEventOverride recurrenceOverride
             where recurrenceOverride.overrideId in :overrideIds
             """)
-    int deleteAllByIds(@Param("overrideIds") Collection<Long> overrideIds);
+  int deleteAllByIds(@Param("overrideIds") Collection<Long> overrideIds);
 
-    @Modifying(flushAutomatically = true)
-    @Query("""
+  @Modifying(flushAutomatically = true)
+  @Query(
+      """
             delete from RecurrenceEventOverride recurrenceOverride
             where recurrenceOverride.recurrenceEvent.id in :recurrenceEventIds
             """)
-    int deleteAllByRecurrenceEventIds(
-            @Param("recurrenceEventIds") Collection<Long> recurrenceEventIds
-    );
+  int deleteAllByRecurrenceEventIds(
+      @Param("recurrenceEventIds") Collection<Long> recurrenceEventIds);
 }

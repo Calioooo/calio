@@ -123,7 +123,6 @@ class GoogleOperationJobTest {
   }
 
   private GoogleEventJobPayload eventPayload() {
-    return new GoogleEventJobPayload(
-        "title", null, NOW, NOW.plusSeconds(3_600), false, "UTC");
+    return new GoogleEventJobPayload("title", null, NOW, NOW.plusSeconds(3_600), false, "UTC");
   }
 }

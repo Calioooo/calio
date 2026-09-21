@@ -13,6 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
+import com.calio.calendar.common.testsupport.SharedIntegrationDatabase;
 import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.event.repository.EventRepository;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarConnection;
@@ -44,7 +45,7 @@ import tools.jackson.databind.ObjectMapper;
 
 @SpringBootTest(
     properties = {
-      "spring.datasource.url=jdbc:h2:mem:calendar-test;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE",
+      "spring.datasource.url=jdbc:h2:mem:calendar-shared-auth-controller-test;MODE=MySQL;DB_CLOSE_ON_EXIT=FALSE",
       "spring.datasource.driver-class-name=org.h2.Driver",
       "spring.datasource.username=sa",
       "spring.datasource.password=",
@@ -53,6 +54,7 @@ import tools.jackson.databind.ObjectMapper;
 @AutoConfigureMockMvc
 @WithAuthenticatedAccount
 @Import(AuthenticatedAccountMockMvcTestConfig.class)
+@SharedIntegrationDatabase
 class EventControllerTest {
 
   @Autowired private MockMvc mockMvc;

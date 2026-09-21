@@ -1,6 +1,6 @@
 package com.calio.calendar.integration.connection.service;
 
-import com.calio.calendar.account.service.AccountCommandService;
+import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.external.google.GoogleOAuthClient;
@@ -26,7 +26,7 @@ public class GoogleCalendarConnectionService {
   private final GoogleOAuthProperties properties;
   private final GoogleOAuthClient oauthClient;
   private final TokenEncryptor encryptor;
-  private final AccountCommandService accountCommandService;
+  private final AccountRepository accountRepository;
   private final GoogleCalendarIntegrationCommandService integrationCommandService;
   private final GoogleCalendarConnectionQueryService connectionQueryService;
   private final GoogleCalendarConnectionCommandService connectionCommandService;
@@ -41,7 +41,7 @@ public class GoogleCalendarConnectionService {
       GoogleOAuthProperties properties,
       GoogleOAuthClient oauthClient,
       TokenEncryptor encryptor,
-      AccountCommandService accountCommandService,
+      AccountRepository accountRepository,
       GoogleCalendarIntegrationCommandService integrationCommandService,
       GoogleCalendarConnectionQueryService connectionQueryService,
       GoogleCalendarConnectionCommandService connectionCommandService,
@@ -53,7 +53,7 @@ public class GoogleCalendarConnectionService {
     this.properties = properties;
     this.oauthClient = oauthClient;
     this.encryptor = encryptor;
-    this.accountCommandService = accountCommandService;
+    this.accountRepository = accountRepository;
     this.integrationCommandService = integrationCommandService;
     this.connectionQueryService = connectionQueryService;
     this.connectionCommandService = connectionCommandService;
@@ -119,7 +119,7 @@ public class GoogleCalendarConnectionService {
       Instant connectedAt) {
     return registrationTransaction.execute(
         status -> {
-          accountCommandService.lockAccount(accountId);
+          lockAccount(accountId);
           GoogleCalendarConnection connection =
               registerInTransaction(accountId, user, token, expiresAt, connectedAt);
           enqueueService.enqueueManualSync(accountId);
@@ -167,5 +167,11 @@ public class GoogleCalendarConnectionService {
         encryptor.encryptAccessToken(token.accessToken()),
         expiresAt,
         connectedAt);
+  }
+
+  private void lockAccount(Long accountId) {
+    accountRepository
+        .findByIdForUpdate(accountId)
+        .orElseThrow(() -> new CalioException(ErrorCode.INTERNAL_SERVER_ERROR));
   }
 }

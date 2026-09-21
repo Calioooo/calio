@@ -10,7 +10,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.calio.calendar.account.domain.Account;
-import com.calio.calendar.account.service.AccountQueryService;
+import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.common.domain.CanonicalSchedule;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
@@ -53,7 +53,7 @@ class RecurrenceEventServiceTest {
 
   @Mock private RecurrenceEventOverrideRepository recurrenceEventOverrideRepository;
 
-  @Mock private AccountQueryService accountQueryService;
+  @Mock private AccountRepository accountRepository;
 
   @Mock private TagQueryService tagQueryService;
 
@@ -81,7 +81,7 @@ class RecurrenceEventServiceTest {
         new RecurrenceEventService(
             queryService,
             commandService,
-            accountQueryService,
+            accountRepository,
             tagQueryService,
             eventCommandService,
             recurrenceEngine,
@@ -95,7 +95,9 @@ class RecurrenceEventServiceTest {
   void givenTimedRequest_whenCreate_thenStoresValidatedMasterWithoutMaterializingEvents() {
     // given
     Tag tag = tag();
+    Account account = account();
     List<String> normalized = List.of("RRULE:FREQ=DAILY;COUNT=3");
+    when(accountRepository.findById(1L)).thenReturn(Optional.of(account));
     when(tagQueryService.getTagOrDefault(1L, null)).thenReturn(tag);
     when(recurrenceEngine.validate(any(RecurrenceSchedule.class), any())).thenReturn(normalized);
     when(recurrenceEventRepository.save(any(RecurrenceEvent.class)))
@@ -119,6 +121,7 @@ class RecurrenceEventServiceTest {
         .isEqualTo(Instant.parse("2027-01-01T01:00:00Z"));
     assertThat(captor.getValue().getTimeZone()).isEqualTo("Asia/Seoul");
     assertThat(captor.getValue().getRecurrenceRules()).containsExactlyElementsOf(normalized);
+    assertThat(captor.getValue().getAccount()).isSameAs(account);
     verify(jobEnqueueService)
         .enqueueRecurrence(
             1L,

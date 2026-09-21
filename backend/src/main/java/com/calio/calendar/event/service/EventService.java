@@ -1,7 +1,7 @@
 package com.calio.calendar.event.service;
 
 import com.calio.calendar.account.domain.Account;
-import com.calio.calendar.account.service.AccountQueryService;
+import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.common.domain.CanonicalSchedule;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
@@ -49,7 +49,7 @@ public class EventService {
   private final EventQueryService eventQueryService;
   private final EventCommandService eventCommandService;
   private final GoogleOperationJobEnqueueService jobEnqueueService;
-  private final AccountQueryService accountQueryService;
+  private final AccountRepository accountRepository;
   private final TagQueryService tagQueryService;
   private final RecurrenceEventQueryService recurrenceEventQueryService;
   private final Rfc5545RecurrenceEngine recurrenceEngine;
@@ -59,7 +59,7 @@ public class EventService {
       EventQueryService eventQueryService,
       EventCommandService eventCommandService,
       GoogleOperationJobEnqueueService jobEnqueueService,
-      AccountQueryService accountQueryService,
+      AccountRepository accountRepository,
       TagQueryService tagQueryService,
       RecurrenceEventQueryService recurrenceEventQueryService,
       Rfc5545RecurrenceEngine recurrenceEngine,
@@ -67,7 +67,7 @@ public class EventService {
     this.eventQueryService = eventQueryService;
     this.eventCommandService = eventCommandService;
     this.jobEnqueueService = jobEnqueueService;
-    this.accountQueryService = accountQueryService;
+    this.accountRepository = accountRepository;
     this.tagQueryService = tagQueryService;
     this.recurrenceEventQueryService = recurrenceEventQueryService;
     this.recurrenceEngine = recurrenceEngine;
@@ -78,11 +78,17 @@ public class EventService {
   public EventResponse createEvent(Long accountId, CreateEventRequest request) {
     CanonicalSchedule.event(
         request.startAt(), request.endAt(), request.allDay(), request.timeZone());
-    Account account = accountQueryService.getAccount(accountId);
+    Account account = getAccount(accountId);
     Tag tag = tagQueryService.getTagOrDefault(accountId, request.tagId());
     Event event = eventCommandService.createEvent(request.toEntity(tag, account));
     jobEnqueueService.enqueueEventCreated(accountId, event);
     return EventResponse.from(event);
+  }
+
+  private Account getAccount(Long accountId) {
+    return accountRepository
+        .findById(accountId)
+        .orElseThrow(() -> new CalioException(ErrorCode.INTERNAL_SERVER_ERROR));
   }
 
   public EventResponse getEvent(Long accountId, Long eventId) {

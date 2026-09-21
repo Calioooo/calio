@@ -2,10 +2,10 @@ package com.calio.calendar.event.controller;
 
 import com.calio.calendar.event.controller.dto.CreateEventRequest;
 import com.calio.calendar.event.controller.dto.EventResponse;
-import com.calio.calendar.event.controller.dto.UpdateImportantEventRequest;
 import com.calio.calendar.event.controller.dto.UpdateEventRequest;
-import com.calio.calendar.security.AuthenticatedAccount;
+import com.calio.calendar.event.controller.dto.UpdateImportantEventRequest;
 import com.calio.calendar.event.service.EventService;
+import com.calio.calendar.security.AuthenticatedAccount;
 import com.calio.calendar.sharing.event.controller.dto.CreateEventGroupSharesRequest;
 import com.calio.calendar.sharing.event.controller.dto.CreateEventGroupSharesResponse;
 import com.calio.calendar.sharing.event.service.PersonalEventGroupShareService;
@@ -33,76 +33,67 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/events")
 public class EventController {
 
-    private final EventService eventService;
-    private final PersonalEventGroupShareService eventGroupShareService;
+  private final EventService eventService;
+  private final PersonalEventGroupShareService eventGroupShareService;
 
-    public EventController(
-            EventService eventService,
-            PersonalEventGroupShareService eventGroupShareService
-    ) {
-        this.eventService = eventService;
-        this.eventGroupShareService = eventGroupShareService;
-    }
+  public EventController(
+      EventService eventService, PersonalEventGroupShareService eventGroupShareService) {
+    this.eventService = eventService;
+    this.eventGroupShareService = eventGroupShareService;
+  }
 
-    @PostMapping
-    public ResponseEntity<EventResponse> createEvent(
-            @AuthenticationPrincipal AuthenticatedAccount account,
-            @Valid @RequestBody CreateEventRequest request
-    ) {
-        EventResponse response = eventService.createEvent(account.accountId(), request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
-    }
+  @PostMapping
+  public ResponseEntity<EventResponse> createEvent(
+      @AuthenticationPrincipal AuthenticatedAccount account,
+      @Valid @RequestBody CreateEventRequest request) {
+    EventResponse response = eventService.createEvent(account.accountId(), request);
+    return ResponseEntity.status(HttpStatus.CREATED).body(response);
+  }
 
-    @GetMapping("/{eventId}")
-    public EventResponse getEvent(
-            @AuthenticationPrincipal AuthenticatedAccount account,
-            @PathVariable("eventId") Long eventId
-    ) {
-        return eventService.getEvent(account.accountId(), eventId);
-    }
+  @GetMapping("/{eventId}")
+  public EventResponse getEvent(
+      @AuthenticationPrincipal AuthenticatedAccount account,
+      @PathVariable("eventId") Long eventId) {
+    return eventService.getEvent(account.accountId(), eventId);
+  }
 
-    @PutMapping("/{eventId}")
-    public EventResponse updateEvent(
-            @PathVariable("eventId") Long eventId,
-            @AuthenticationPrincipal AuthenticatedAccount account,
-            @Valid @RequestBody UpdateEventRequest request
-    ) {
-        return eventService.updateEvent(account.accountId(), eventId, request);
-    }
+  @PutMapping("/{eventId}")
+  public EventResponse updateEvent(
+      @PathVariable("eventId") Long eventId,
+      @AuthenticationPrincipal AuthenticatedAccount account,
+      @Valid @RequestBody UpdateEventRequest request) {
+    return eventService.updateEvent(account.accountId(), eventId, request);
+  }
 
-    @PatchMapping("/{eventId}/important-event")
-    public EventResponse updateImportantEvent(
-            @PathVariable("eventId") Long eventId,
-            @AuthenticationPrincipal AuthenticatedAccount account,
-            @Valid @RequestBody UpdateImportantEventRequest request
-    ) {
-        return eventService.updateImportantEvent(account.accountId(), eventId, request);
-    }
+  @PatchMapping("/{eventId}/important-event")
+  public EventResponse updateImportantEvent(
+      @PathVariable("eventId") Long eventId,
+      @AuthenticationPrincipal AuthenticatedAccount account,
+      @Valid @RequestBody UpdateImportantEventRequest request) {
+    return eventService.updateImportantEvent(account.accountId(), eventId, request);
+  }
 
-    @DeleteMapping("/{eventId}")
-    public ResponseEntity<Void> deleteEvent(
-            @AuthenticationPrincipal AuthenticatedAccount account,
-            @PathVariable("eventId") Long eventId
-    ) {
-        eventService.deleteEvent(account.accountId(), eventId);
-        return ResponseEntity.noContent().build();
-    }
+  @DeleteMapping("/{eventId}")
+  public ResponseEntity<Void> deleteEvent(
+      @AuthenticationPrincipal AuthenticatedAccount account,
+      @PathVariable("eventId") Long eventId) {
+    eventService.deleteEvent(account.accountId(), eventId);
+    return ResponseEntity.noContent().build();
+  }
 
-    @PostMapping("/group-shares")
-    public ResponseEntity<CreateEventGroupSharesResponse> createGroupShares(
-            @AuthenticationPrincipal AuthenticatedAccount account,
-            @Valid @RequestBody CreateEventGroupSharesRequest request
-    ) {
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(eventGroupShareService.create(account.accountId(), request));
-    }
+  @PostMapping("/group-shares")
+  public ResponseEntity<CreateEventGroupSharesResponse> createGroupShares(
+      @AuthenticationPrincipal AuthenticatedAccount account,
+      @Valid @RequestBody CreateEventGroupSharesRequest request) {
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(eventGroupShareService.create(account.accountId(), request));
+  }
 
-    @GetMapping
-    public List<EventResponse> listEvents(
-            @AuthenticationPrincipal AuthenticatedAccount account,
-            @RequestParam("from") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
-            @RequestParam("to") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to
-    ) {
-        return eventService.listEvents(account.accountId(), from, to);
-    }
+  @GetMapping
+  public List<EventResponse> listEvents(
+      @AuthenticationPrincipal AuthenticatedAccount account,
+      @RequestParam("from") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
+      @RequestParam("to") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to) {
+    return eventService.listEvents(account.accountId(), from, to);
+  }
 }

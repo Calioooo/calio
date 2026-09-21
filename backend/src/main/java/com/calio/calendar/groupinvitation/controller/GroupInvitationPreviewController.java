@@ -15,18 +15,17 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/group-invitations")
 public class GroupInvitationPreviewController {
 
-    private final GroupInvitationService groupInvitationService;
+  private final GroupInvitationService groupInvitationService;
 
-    public GroupInvitationPreviewController(GroupInvitationService groupInvitationService) {
-        this.groupInvitationService = groupInvitationService;
-    }
+  public GroupInvitationPreviewController(GroupInvitationService groupInvitationService) {
+    this.groupInvitationService = groupInvitationService;
+  }
 
-    @PostMapping("/preview")
-    public ResponseEntity<PreviewGroupInvitationResponse> preview(
-            @Valid @RequestBody PreviewGroupInvitationRequest request
-    ) {
-        return ResponseEntity.ok()
-                .cacheControl(CacheControl.noStore())
-                .body(groupInvitationService.preview(request));
-    }
+  @PostMapping("/preview")
+  public ResponseEntity<PreviewGroupInvitationResponse> preview(
+      @Valid @RequestBody PreviewGroupInvitationRequest request) {
+    return ResponseEntity.ok()
+        .cacheControl(CacheControl.noStore())
+        .body(groupInvitationService.preview(request));
+  }
 }

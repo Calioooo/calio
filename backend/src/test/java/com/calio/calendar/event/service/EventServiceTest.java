@@ -13,7 +13,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.calio.calendar.account.domain.Account;
-import com.calio.calendar.account.service.AccountQueryService;
+import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.common.domain.CanonicalSchedule;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
@@ -54,7 +54,7 @@ class EventServiceTest {
 
   @Mock private EventCommandService eventCommandService;
 
-  @Mock private AccountQueryService accountQueryService;
+  @Mock private AccountRepository accountRepository;
 
   @Mock private TagQueryService tagQueryService;
 
@@ -87,7 +87,7 @@ class EventServiceTest {
             false,
             "Asia/Seoul",
             20L);
-    when(accountQueryService.getAccount(1L)).thenReturn(account);
+    when(accountRepository.findById(1L)).thenReturn(java.util.Optional.of(account));
     when(tagQueryService.getTagOrDefault(1L, 20L)).thenReturn(tag);
     when(eventCommandService.createEvent(any(Event.class)))
         .thenAnswer(
@@ -328,7 +328,7 @@ class EventServiceTest {
         queryService,
         eventCommandService,
         jobEnqueueService,
-        accountQueryService,
+        accountRepository,
         tagQueryService,
         recurrenceQueryService,
         recurrenceEngine,

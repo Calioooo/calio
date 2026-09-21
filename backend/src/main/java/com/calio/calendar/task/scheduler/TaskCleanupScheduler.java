@@ -1,6 +1,6 @@
 package com.calio.calendar.task.scheduler;
 
-import com.calio.calendar.task.service.TaskService;
+import com.calio.calendar.task.usecase.DeleteCompletedTasksUseCase;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -14,32 +14,32 @@ import org.springframework.stereotype.Component;
 @Component
 public class TaskCleanupScheduler {
 
-    static final ZoneId KOREA_ZONE = ZoneId.of("Asia/Seoul");
+  static final ZoneId KOREA_ZONE = ZoneId.of("Asia/Seoul");
 
-    private static final Logger log = LoggerFactory.getLogger(TaskCleanupScheduler.class);
-    private static final int COMPLETED_TASK_RETENTION_DAYS = 30;
+  private static final Logger log = LoggerFactory.getLogger(TaskCleanupScheduler.class);
+  private static final int COMPLETED_TASK_RETENTION_DAYS = 30;
 
-    private final TaskService taskService;
-    private final Clock clock;
+  private final DeleteCompletedTasksUseCase deleteCompletedTasksUseCase;
+  private final Clock clock;
 
-    @Autowired
-    public TaskCleanupScheduler(TaskService taskService) {
-        this(taskService, Clock.system(KOREA_ZONE));
+  @Autowired
+  public TaskCleanupScheduler(DeleteCompletedTasksUseCase deleteCompletedTasksUseCase) {
+    this(deleteCompletedTasksUseCase, Clock.system(KOREA_ZONE));
+  }
+
+  TaskCleanupScheduler(DeleteCompletedTasksUseCase deleteCompletedTasksUseCase, Clock clock) {
+    this.deleteCompletedTasksUseCase = deleteCompletedTasksUseCase;
+    this.clock = clock;
+  }
+
+  @Scheduled(cron = "0 30 4 * * *", zone = "Asia/Seoul")
+  public void deleteOldCompletedTasks() {
+    try {
+      Instant cutoff = Instant.now(clock).minus(COMPLETED_TASK_RETENTION_DAYS, ChronoUnit.DAYS);
+      int deletedCount = deleteCompletedTasksUseCase.deleteBefore(cutoff);
+      log.info("Completed task cleanup finished. cutoff={} deletedCount={}", cutoff, deletedCount);
+    } catch (Exception exception) {
+      log.error("Completed task cleanup failed. message={}", exception.getMessage(), exception);
     }
-
-    TaskCleanupScheduler(TaskService taskService, Clock clock) {
-        this.taskService = taskService;
-        this.clock = clock;
-    }
-
-    @Scheduled(cron = "0 30 4 * * *", zone = "Asia/Seoul")
-    public void deleteOldCompletedTasks() {
-        try {
-            Instant cutoff = Instant.now(clock).minus(COMPLETED_TASK_RETENTION_DAYS, ChronoUnit.DAYS);
-            int deletedCount = taskService.deleteCompletedTasksBefore(cutoff);
-            log.info("Completed task cleanup finished. cutoff={} deletedCount={}", cutoff, deletedCount);
-        } catch (Exception exception) {
-            log.error("Completed task cleanup failed. message={}", exception.getMessage(), exception);
-        }
-    }
+  }
 }
