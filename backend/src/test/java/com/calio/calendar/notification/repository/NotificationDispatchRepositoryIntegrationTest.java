@@ -7,6 +7,7 @@ import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.notification.domain.CalendarNotificationType;
 import com.calio.calendar.notification.domain.NotificationDispatch;
+import com.calio.calendar.notification.domain.NotificationDispatchState;
 import com.calio.calendar.notification.domain.NotificationScheduleKey;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,7 +45,7 @@ class NotificationDispatchRepositoryIntegrationTest {
     Instant scheduledAt = Instant.parse("2026-09-08T00:00:00Z");
     NotificationScheduleKey scheduleKey = NotificationScheduleKey.personalEvent(1L);
     dispatchRepository.saveAndFlush(
-        new NotificationDispatch(
+        NotificationDispatch.completed(
             account.getId(), CalendarNotificationType.REMINDER, scheduleKey, scheduledAt));
 
     // when & then
@@ -68,7 +69,7 @@ class NotificationDispatchRepositoryIntegrationTest {
     Account account = accountRepository.saveAndFlush(new Account());
     Instant scheduledAt = Instant.parse("2026-09-08T00:00:00Z");
     dispatchRepository.saveAndFlush(
-        new NotificationDispatch(
+        NotificationDispatch.completed(
             account.getId(),
             CalendarNotificationType.REMINDER,
             NotificationScheduleKey.personalEvent(1L),
@@ -78,7 +79,7 @@ class NotificationDispatchRepositoryIntegrationTest {
     assertThatThrownBy(
             () ->
                 dispatchRepository.saveAndFlush(
-                    new NotificationDispatch(
+                    NotificationDispatch.completed(
                         account.getId(),
                         CalendarNotificationType.REMINDER,
                         NotificationScheduleKey.personalEvent(1L),
@@ -95,14 +96,14 @@ class NotificationDispatchRepositoryIntegrationTest {
     Instant cutoff = Instant.parse("2026-09-08T01:00:00Z");
     NotificationDispatch expired =
         dispatchRepository.saveAndFlush(
-            new NotificationDispatch(
+            NotificationDispatch.completed(
                 account.getId(),
                 CalendarNotificationType.REMINDER,
                 NotificationScheduleKey.personalEvent(1L),
                 cutoff.minusSeconds(1)));
     NotificationDispatch retained =
         dispatchRepository.saveAndFlush(
-            new NotificationDispatch(
+            NotificationDispatch.completed(
                 account.getId(),
                 CalendarNotificationType.REMINDER,
                 NotificationScheduleKey.personalEvent(2L),
@@ -115,5 +116,69 @@ class NotificationDispatchRepositoryIntegrationTest {
     assertThat(deletedCount).isEqualTo(1);
     assertThat(dispatchRepository.findById(expired.getId())).isEmpty();
     assertThat(dispatchRepository.findById(retained.getId())).isPresent();
+  }
+
+  @Test
+  @DisplayName("만료된 processing lease는 새 worker가 획득하고 실패 후 예약 시각부터 재시도한다")
+  void givenExpiredProcessingLease_whenRetrying_thenTransfersOwnershipAndHonorsRunnableAt() {
+    // given
+    Account account = accountRepository.saveAndFlush(new Account());
+    Instant now = Instant.parse("2026-09-08T00:00:00Z");
+    NotificationDispatch dispatch =
+        dispatchRepository.saveAndFlush(
+            NotificationDispatch.claimed(
+                account.getId(),
+                CalendarNotificationType.REMINDER,
+                NotificationScheduleKey.personalEvent(1L),
+                now,
+                "expired-owner",
+                now.minusSeconds(1)));
+
+    // when
+    int acquired =
+        dispatchRepository.tryAcquire(
+            dispatch.getId(),
+            "new-owner",
+            now,
+            now.plusSeconds(60),
+            NotificationDispatchState.PROCESSING,
+            NotificationDispatchState.RETRYABLE);
+    int markedRetryable =
+        dispatchRepository.markRetryable(
+            dispatch.getId(),
+            "new-owner",
+            now.plusSeconds(60),
+            NotificationDispatchState.PROCESSING,
+            NotificationDispatchState.RETRYABLE);
+    int acquiredTooEarly =
+        dispatchRepository.tryAcquire(
+            dispatch.getId(),
+            "early-owner",
+            now.plusSeconds(59),
+            now.plusSeconds(120),
+            NotificationDispatchState.PROCESSING,
+            NotificationDispatchState.RETRYABLE);
+    int acquiredWhenDue =
+        dispatchRepository.tryAcquire(
+            dispatch.getId(),
+            "retry-owner",
+            now.plusSeconds(60),
+            now.plusSeconds(120),
+            NotificationDispatchState.PROCESSING,
+            NotificationDispatchState.RETRYABLE);
+
+    // then
+    assertThat(acquired).isEqualTo(1);
+    assertThat(markedRetryable).isEqualTo(1);
+    assertThat(acquiredTooEarly).isZero();
+    assertThat(acquiredWhenDue).isEqualTo(1);
+    assertThat(dispatchRepository.findById(dispatch.getId()))
+        .get()
+        .satisfies(
+            retried -> {
+              assertThat(retried.getState()).isEqualTo(NotificationDispatchState.PROCESSING);
+              assertThat(retried.getOwnerToken()).isEqualTo("retry-owner");
+              assertThat(retried.getRetryCount()).isEqualTo(1);
+            });
   }
 }

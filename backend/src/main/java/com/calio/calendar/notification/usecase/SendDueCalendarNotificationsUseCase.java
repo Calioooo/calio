@@ -24,6 +24,7 @@ import com.calio.calendar.notification.domain.CalendarNotificationContent;
 import com.calio.calendar.notification.domain.CalendarNotificationType;
 import com.calio.calendar.notification.domain.IosPushDevice;
 import com.calio.calendar.notification.domain.NotificationDispatch;
+import com.calio.calendar.notification.domain.NotificationDispatchState;
 import com.calio.calendar.notification.domain.NotificationScheduleKey;
 import com.calio.calendar.notification.repository.IosPushDeviceRepository;
 import com.calio.calendar.notification.repository.NotificationDispatchRepository;
@@ -44,6 +45,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -53,6 +55,8 @@ import org.springframework.stereotype.Service;
 public class SendDueCalendarNotificationsUseCase {
 
   private static final ZoneId POLICY_ZONE = ZoneId.of("Asia/Seoul");
+  private static final Duration DISPATCH_LEASE_DURATION = Duration.ofMinutes(1);
+  private static final Duration DISPATCH_RETRY_DELAY = Duration.ofMinutes(1);
   private static final Logger log =
       LoggerFactory.getLogger(SendDueCalendarNotificationsUseCase.class);
 
@@ -133,12 +137,25 @@ public class SendDueCalendarNotificationsUseCase {
       NotificationScheduleKey scheduleKey,
       Instant scheduledAt,
       CalendarNotificationContent content) {
-    createClaim(accountId, content.type(), scheduleKey, scheduledAt)
-        .ifPresent(
-            dispatch ->
-                pushDeviceRepository
-                    .findByAccountIdAndActiveTrueAndApnsTokenIsNotNull(accountId)
-                    .forEach(pushDevice -> sendToPushDevice(dispatch, content, pushDevice)));
+    Optional<DispatchAttempt> claimedAttempt =
+        claimDispatch(accountId, content.type(), scheduleKey, scheduledAt);
+    if (claimedAttempt.isEmpty()) {
+      return;
+    }
+
+    DispatchAttempt attempt = claimedAttempt.get();
+    try {
+      boolean retryRequired = false;
+      for (IosPushDevice pushDevice :
+          pushDeviceRepository.findByAccountIdAndActiveTrueAndApnsTokenIsNotNull(accountId)) {
+        ApnsSendResultType resultType = sendToPushDevice(attempt, content, pushDevice);
+        retryRequired = retryRequired || isRetryable(resultType);
+      }
+      finishDispatchAttempt(attempt, retryRequired);
+    } catch (RuntimeException exception) {
+      markDispatchRetryable(attempt);
+      throw exception;
+    }
   }
 
   private List<NotificationSchedule> listPersonalSchedules(
@@ -342,27 +359,43 @@ public class SendDueCalendarNotificationsUseCase {
         .count();
   }
 
-  private Optional<NotificationDispatch> createClaim(
+  private Optional<DispatchAttempt> claimDispatch(
       Long accountId,
       CalendarNotificationType type,
       NotificationScheduleKey scheduleKey,
       Instant scheduledAt) {
+    Instant now = clock.instant();
+    String ownerToken = UUID.randomUUID().toString();
+    Instant leaseExpiresAt = now.plus(DISPATCH_LEASE_DURATION);
     try {
-      return Optional.of(
+      NotificationDispatch dispatch =
           dispatchRepository.saveAndFlush(
-              new NotificationDispatch(accountId, type, scheduleKey, scheduledAt)));
+              NotificationDispatch.claimed(
+                  accountId, type, scheduleKey, scheduledAt, ownerToken, leaseExpiresAt));
+      return Optional.of(new DispatchAttempt(dispatch.getId(), scheduledAt, ownerToken));
     } catch (DataIntegrityViolationException exception) {
-      if (dispatchRepository.hasDispatchClaim(accountId, type, scheduleKey, scheduledAt)) {
+      Optional<NotificationDispatch> existingClaim =
+          dispatchRepository.findDispatchClaim(accountId, type, scheduleKey, scheduledAt);
+      if (existingClaim.isEmpty()) {
+        throw exception;
+      }
+      NotificationDispatch dispatch = existingClaim.get();
+      if (dispatchRepository.tryAcquire(
+              dispatch.getId(),
+              ownerToken,
+              now,
+              leaseExpiresAt,
+              NotificationDispatchState.PROCESSING,
+              NotificationDispatchState.RETRYABLE)
+          != 1) {
         return Optional.empty();
       }
-      throw exception;
+      return Optional.of(new DispatchAttempt(dispatch.getId(), scheduledAt, ownerToken));
     }
   }
 
-  private void sendToPushDevice(
-      NotificationDispatch dispatch,
-      CalendarNotificationContent content,
-      IosPushDevice pushDevice) {
+  private ApnsSendResultType sendToPushDevice(
+      DispatchAttempt dispatch, CalendarNotificationContent content, IosPushDevice pushDevice) {
     String token = pushDevice.getApnsToken();
     ApnsSendResult result =
         apnsClient.send(
@@ -373,32 +406,60 @@ public class SendDueCalendarNotificationsUseCase {
                 Map.of(
                     "notificationType", content.type().name(),
                     "targetDate", content.targetDate().toString()),
-                dispatch.getScheduledAt().plus(Duration.ofMinutes(5))));
+                dispatch.scheduledAt().plus(Duration.ofMinutes(5))));
     logFailedDispatch(dispatch, pushDevice, result);
     if (result.type() == ApnsSendResultType.INVALID_ENDPOINT) {
       deactivateInvalidPushDevice(pushDevice.getId(), token);
     }
+    return result.type();
   }
 
   private void deactivateInvalidPushDevice(Long pushDeviceId, String token) {
-    pushDeviceRepository
-        .findById(pushDeviceId)
-        .filter(pushDevice -> token.equals(pushDevice.getApnsToken()))
-        .ifPresent(
-            pushDevice -> {
-              pushDevice.deactivate(clock.instant());
-              pushDeviceRepository.saveAndFlush(pushDevice);
-            });
+    pushDeviceRepository.deactivateIfTokenMatches(pushDeviceId, token, clock.instant());
+  }
+
+  private boolean isRetryable(ApnsSendResultType resultType) {
+    return resultType == ApnsSendResultType.TRANSIENT_FAILURE
+        || resultType == ApnsSendResultType.CONFIGURATION_FAILURE;
+  }
+
+  private void finishDispatchAttempt(DispatchAttempt attempt, boolean retryRequired) {
+    if (retryRequired) {
+      markDispatchRetryable(attempt);
+      return;
+    }
+    int updated =
+        dispatchRepository.markCompleted(
+            attempt.id(),
+            attempt.ownerToken(),
+            NotificationDispatchState.PROCESSING,
+            NotificationDispatchState.COMPLETED);
+    if (updated != 1) {
+      log.warn("Notification dispatch completion ownership was lost. dispatchId={}", attempt.id());
+    }
+  }
+
+  private void markDispatchRetryable(DispatchAttempt attempt) {
+    int updated =
+        dispatchRepository.markRetryable(
+            attempt.id(),
+            attempt.ownerToken(),
+            clock.instant().plus(DISPATCH_RETRY_DELAY),
+            NotificationDispatchState.PROCESSING,
+            NotificationDispatchState.RETRYABLE);
+    if (updated != 1) {
+      log.warn("Notification dispatch retry ownership was lost. dispatchId={}", attempt.id());
+    }
   }
 
   private void logFailedDispatch(
-      NotificationDispatch dispatch, IosPushDevice pushDevice, ApnsSendResult result) {
+      DispatchAttempt dispatch, IosPushDevice pushDevice, ApnsSendResult result) {
     if (result.type() == ApnsSendResultType.ACCEPTED) {
       return;
     }
     log.warn(
         "APNs notification dispatch failed. notificationDispatchId={} iosPushDeviceId={} resultType={} providerRequestId={} reason={}",
-        dispatch.getId(),
+        dispatch.id(),
         pushDevice.getId(),
         result.type(),
         result.requestId(),
@@ -411,6 +472,8 @@ public class SendDueCalendarNotificationsUseCase {
       return !instant.isBefore(from) && !instant.isAfter(to);
     }
   }
+
+  private record DispatchAttempt(Long id, Instant scheduledAt, String ownerToken) {}
 
   private record NotificationSchedule(
       NotificationScheduleKey scheduleKey,
