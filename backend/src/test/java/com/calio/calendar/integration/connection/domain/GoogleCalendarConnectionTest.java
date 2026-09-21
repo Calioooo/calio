@@ -11,16 +11,19 @@ class GoogleCalendarConnectionTest {
   private static final Instant CONNECTED_AT = Instant.parse("2026-08-28T00:00:00Z");
 
   @Test
-  @DisplayName("Connection의 sync error는 credential을 유지하면서 provider 실행만 중단한다")
-  void givenConnectedConnection_whenMarkSyncError_thenPreservesCredentialsAndPausesConnection() {
+  @DisplayName("Connection의 sync error는 credential과 cursor를 제거하고 오류 정보만 보존한다")
+  void givenConnectedConnection_whenMarkSyncError_thenClearsCredentialsAndKeepsFailure() {
     GoogleCalendarConnection connection = connection();
+    connection.replaceNextSyncToken("sync-token");
 
     connection.markSyncError("ACCOUNT_WIDE_INVARIANT_VIOLATION", CONNECTED_AT.plusSeconds(10));
 
     assertThat(connection.getState()).isEqualTo(GoogleCalendarConnectionState.SYNC_ERROR);
     assertThat(connection.isConnected()).isFalse();
-    assertThat(connection.getEncryptedRefreshToken()).isEqualTo("encrypted-refresh-token");
-    assertThat(connection.getEncryptedAccessToken()).isEqualTo("encrypted-access-token");
+    assertThat(connection.getEncryptedRefreshToken()).isNull();
+    assertThat(connection.getEncryptedAccessToken()).isNull();
+    assertThat(connection.getAccessTokenExpiresAt()).isNull();
+    assertThat(connection.getNextSyncToken()).isNull();
     assertThat(connection.getSyncErrorReason()).isEqualTo("ACCOUNT_WIDE_INVARIANT_VIOLATION");
   }
 

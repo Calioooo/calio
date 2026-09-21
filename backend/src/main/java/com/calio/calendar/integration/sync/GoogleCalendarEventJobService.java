@@ -3,6 +3,7 @@ package com.calio.calendar.integration.sync;
 import com.calio.calendar.external.google.GoogleCalendarEventVersionConflictException;
 import com.calio.calendar.external.google.GoogleCalendarEventsClient;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventResponse;
+import com.calio.calendar.external.google.dto.GoogleCalendarEventWriteRequest;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarConnection;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarConnectionState;
 import com.calio.calendar.integration.connection.service.GoogleCalendarAccessTokenService;
@@ -19,8 +20,6 @@ import java.util.Map;
 import java.util.Objects;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
-import tools.jackson.core.JacksonException;
-import tools.jackson.databind.ObjectMapper;
 
 @Service
 public class GoogleCalendarEventJobService {
@@ -30,7 +29,6 @@ public class GoogleCalendarEventJobService {
   private final GoogleCalendarEventMappingCommandService mappingCommandService;
   private final GoogleCalendarAccessTokenService accessTokenService;
   private final GoogleCalendarEventsClient eventsClient;
-  private final ObjectMapper objectMapper;
   private final GoogleOperationJobService jobService;
   private final TransactionTemplate transactionTemplate;
 
@@ -40,7 +38,6 @@ public class GoogleCalendarEventJobService {
       GoogleCalendarEventMappingCommandService mappingCommandService,
       GoogleCalendarAccessTokenService accessTokenService,
       GoogleCalendarEventsClient eventsClient,
-      ObjectMapper objectMapper,
       GoogleOperationJobService jobService,
       TransactionTemplate transactionTemplate) {
     this.connectionQueryService = connectionQueryService;
@@ -48,7 +45,6 @@ public class GoogleCalendarEventJobService {
     this.mappingCommandService = mappingCommandService;
     this.accessTokenService = accessTokenService;
     this.eventsClient = eventsClient;
-    this.objectMapper = objectMapper;
     this.jobService = jobService;
     this.transactionTemplate = transactionTemplate;
   }
@@ -64,7 +60,7 @@ public class GoogleCalendarEventJobService {
   }
 
   private void createEvent(GoogleCalendarEventJob job, String workerToken) {
-    GoogleEventJobPayload eventSnapshot = readEventSnapshot(job);
+    GoogleEventJobPayload eventSnapshot = job.getTargetPayload();
     List<EventMappingSnapshot> mappings = loadMappingSnapshots(job);
     Long targetConnectionId =
         transactionTemplate.execute(status -> findCreationTarget(job, mappings));
@@ -79,7 +75,7 @@ public class GoogleCalendarEventJobService {
   }
 
   private void updateEvent(GoogleCalendarEventJob job, String workerToken) {
-    GoogleEventJobPayload eventSnapshot = readEventSnapshot(job);
+    GoogleEventJobPayload eventSnapshot = job.getTargetPayload();
     List<EventMappingSnapshot> mappings = loadMappingSnapshots(job);
     List<MappingExecutionResult> mappingResults = patchMappedEvents(eventSnapshot, mappings);
     transactionTemplate.executeWithoutResult(
@@ -142,8 +138,11 @@ public class GoogleCalendarEventJobService {
     GoogleCalendarEventResponse updatedEvent;
     try {
       updatedEvent =
-          eventsClient.patchEvent(
-              accessToken, mapping.externalEventId(), mapping.providerEtag(), eventSnapshot);
+          eventsClient.patch(
+              accessToken,
+              mapping.externalEventId(),
+              mapping.providerEtag(),
+              GoogleCalendarEventWriteRequest.forEventUpdate(eventSnapshot));
     } catch (GoogleCalendarEventVersionConflictException exception) {
       return MappingExecutionResult.conflictDetected(mapping.mappingId());
     }
@@ -164,7 +163,7 @@ public class GoogleCalendarEventJobService {
     }
     String accessToken = accessTokenService.getAccessToken(mapping.connectionId());
     try {
-      eventsClient.deleteEvent(accessToken, mapping.externalEventId(), mapping.providerEtag());
+      eventsClient.delete(accessToken, mapping.externalEventId(), mapping.providerEtag());
     } catch (GoogleCalendarEventVersionConflictException exception) {
       return MappingExecutionResult.conflictDetected(mapping.mappingId());
     }
@@ -174,7 +173,10 @@ public class GoogleCalendarEventJobService {
   private GoogleCalendarEventResponse insertEvent(
       GoogleCalendarEventJob job, GoogleEventJobPayload eventSnapshot, Long targetConnectionId) {
     String accessToken = accessTokenService.getAccessToken(targetConnectionId);
-    return eventsClient.insertEvent(accessToken, job.getProviderIdentity(), eventSnapshot);
+
+    GoogleCalendarEventWriteRequest request =
+        GoogleCalendarEventWriteRequest.forEventCreate(eventSnapshot, job.getProviderIdentity());
+    return eventsClient.post(accessToken, request);
   }
 
   private void completeCreate(
@@ -233,8 +235,7 @@ public class GoogleCalendarEventJobService {
       return true;
     }
     if (outcome == MappingOutcome.CONFLICT_DETECTED) {
-      jobService.recordSyncConflict(job.getId(), job.getAccountId(), workerToken);
-      jobService.completeSyncRun(job.getId(), job.getAccountId(), workerToken);
+      jobService.completeWithConflict(job.getId(), job.getAccountId(), workerToken);
       return true;
     }
     return false;
@@ -311,14 +312,6 @@ public class GoogleCalendarEventJobService {
     return mappingResults.stream()
         .map(MappingExecutionResult::outcome)
         .reduce(MappingOutcome.APPLIED, MappingOutcome::merge);
-  }
-
-  private GoogleEventJobPayload readEventSnapshot(GoogleCalendarEventJob job) {
-    try {
-      return objectMapper.readValue(job.getTargetPayload(), GoogleEventJobPayload.class);
-    } catch (JacksonException exception) {
-      throw new IllegalArgumentException("Google Event job payload cannot be decoded", exception);
-    }
   }
 
   private record EventMappingSnapshot(

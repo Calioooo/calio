@@ -99,9 +99,10 @@ ALTER TABLE google_calendar_connections
                 AND sync_error_at IS NULL)
             OR
             (connection_state = 'SYNC_ERROR'
-                AND encrypted_refresh_token IS NOT NULL
-                AND encrypted_access_token IS NOT NULL
-                AND access_token_expires_at IS NOT NULL
+                AND encrypted_refresh_token IS NULL
+                AND encrypted_access_token IS NULL
+                AND access_token_expires_at IS NULL
+                AND next_sync_token IS NULL
                 AND disconnected_at IS NULL
                 AND sync_error_reason IS NOT NULL
                 AND sync_error_at IS NOT NULL)

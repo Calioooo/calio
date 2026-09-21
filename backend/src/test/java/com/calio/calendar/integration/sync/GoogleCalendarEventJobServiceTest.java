@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 import com.calio.calendar.external.google.GoogleCalendarEventVersionConflictException;
 import com.calio.calendar.external.google.GoogleCalendarEventsClient;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventResponse;
+import com.calio.calendar.external.google.dto.GoogleCalendarEventWriteRequest;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarConnection;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.connection.service.GoogleCalendarAccessTokenService;
@@ -84,7 +85,6 @@ class GoogleCalendarEventJobServiceTest {
             mappingCommandService,
             accessTokenService,
             eventsClient,
-            objectMapper,
             jobService,
             jobTransaction);
   }
@@ -129,13 +129,12 @@ class GoogleCalendarEventJobServiceTest {
     // then
     assertThat(mapping.isConflicted()).isTrue();
     verify(eventsClient, never())
-        .patchEvent(
+        .patch(
             org.mockito.ArgumentMatchers.anyString(),
             org.mockito.ArgumentMatchers.anyString(),
             org.mockito.ArgumentMatchers.anyString(),
             org.mockito.ArgumentMatchers.any());
-    verify(jobService).recordSyncConflict(50L, 10L, "worker");
-    verify(jobService).completeSyncRun(50L, 10L, "worker");
+    verify(jobService).completeWithConflict(50L, 10L, "worker");
   }
 
   @Test
@@ -157,13 +156,12 @@ class GoogleCalendarEventJobServiceTest {
 
     // then
     verify(eventsClient, never())
-        .insertEvent(
+        .post(
             org.mockito.ArgumentMatchers.anyString(),
-            org.mockito.ArgumentMatchers.anyString(),
-            org.mockito.ArgumentMatchers.any());
+            org.mockito.ArgumentMatchers.any(GoogleCalendarEventWriteRequest.class));
     verify(mappingCommandService, never())
         .createEventMapping(org.mockito.ArgumentMatchers.any(GoogleCalendarEventMapping.class));
-    verify(jobService).completeSyncRun(50L, 10L, "worker");
+    verify(jobService).completeWithConflict(50L, 10L, "worker");
   }
 
   @Test
@@ -179,7 +177,7 @@ class GoogleCalendarEventJobServiceTest {
     when(objectMapper.readValue("payload", GoogleEventJobPayload.class)).thenReturn(payload());
     when(eventsClient.getEvent("token", "external-1"))
         .thenReturn(Optional.of(providerEvent("etag-1")));
-    when(eventsClient.patchEvent(
+    when(eventsClient.patch(
             org.mockito.ArgumentMatchers.eq("token"),
             org.mockito.ArgumentMatchers.eq("external-1"),
             org.mockito.ArgumentMatchers.eq("etag-1"),
@@ -191,8 +189,7 @@ class GoogleCalendarEventJobServiceTest {
 
     // then
     assertThat(mapping.isConflicted()).isTrue();
-    verify(jobService).recordSyncConflict(50L, 10L, "worker");
-    verify(jobService).completeSyncRun(50L, 10L, "worker");
+    verify(jobService).completeWithConflict(50L, 10L, "worker");
   }
 
   @Test
@@ -210,7 +207,7 @@ class GoogleCalendarEventJobServiceTest {
     service.execute(job, "worker");
 
     // then
-    verify(eventsClient).deleteEvent("token", "external-1", "etag-1");
+    verify(eventsClient).delete("token", "external-1", "etag-1");
     verifyNoInteractions(objectMapper);
     verify(mappingCommandService).deleteEventMappings(List.of(mapping));
     verify(jobService).succeed(50L, 10L, "worker");
@@ -226,7 +223,7 @@ class GoogleCalendarEventJobServiceTest {
     GoogleCalendarEventJob job = job(GoogleCalendarEventJobKind.DELETE);
     when(mappingQueryService.listEventMappingsForEvent(20L, 40L)).thenReturn(List.of(mapping));
     when(accessTokenService.getAccessToken(30L)).thenReturn("token");
-    when(eventsClient.deleteEvent("token", "external-1", "etag-1"))
+    when(eventsClient.delete("token", "external-1", "etag-1"))
         .thenThrow(new GoogleCalendarEventVersionConflictException(new RuntimeException()));
 
     // when
@@ -235,8 +232,7 @@ class GoogleCalendarEventJobServiceTest {
     // then
     assertThat(mapping.isConflicted()).isTrue();
     verify(mappingCommandService, never()).deleteEventMappings(any());
-    verify(jobService).recordSyncConflict(50L, 10L, "worker");
-    verify(jobService).completeSyncRun(50L, 10L, "worker");
+    verify(jobService).completeWithConflict(50L, 10L, "worker");
   }
 
   @Test
@@ -249,10 +245,9 @@ class GoogleCalendarEventJobServiceTest {
     when(connectionQueryService.listConnections(20L)).thenReturn(List.of(connection));
     when(accessTokenService.getAccessToken(30L)).thenReturn("token");
     when(objectMapper.readValue("payload", GoogleEventJobPayload.class)).thenReturn(payload());
-    when(eventsClient.insertEvent(
+    when(eventsClient.post(
             org.mockito.ArgumentMatchers.eq("token"),
-            org.mockito.ArgumentMatchers.anyString(),
-            org.mockito.ArgumentMatchers.any()))
+            org.mockito.ArgumentMatchers.any(GoogleCalendarEventWriteRequest.class)))
         .thenAnswer(
             invocation -> {
               assertThat(transactionActive).isFalse();
@@ -265,13 +260,10 @@ class GoogleCalendarEventJobServiceTest {
     // then
     ArgumentCaptor<GoogleCalendarEventMapping> mappingCaptor =
         ArgumentCaptor.forClass(GoogleCalendarEventMapping.class);
-    ArgumentCaptor<String> providerIdentityCaptor = ArgumentCaptor.forClass(String.class);
-    verify(eventsClient)
-        .insertEvent(
-            org.mockito.ArgumentMatchers.eq("token"),
-            providerIdentityCaptor.capture(),
-            org.mockito.ArgumentMatchers.any());
-    assertThat(providerIdentityCaptor.getValue())
+    ArgumentCaptor<GoogleCalendarEventWriteRequest> requestCaptor =
+        ArgumentCaptor.forClass(GoogleCalendarEventWriteRequest.class);
+    verify(eventsClient).post(org.mockito.ArgumentMatchers.eq("token"), requestCaptor.capture());
+    assertThat(requestCaptor.getValue().id())
         .isEqualTo(providerIdentity(GoogleCalendarEventJobKind.CREATE));
     verify(mappingCommandService).createEventMapping(mappingCaptor.capture());
     assertThat(mappingCaptor.getValue().getEventId()).isEqualTo(40L);
@@ -289,7 +281,7 @@ class GoogleCalendarEventJobServiceTest {
             kind,
             40L,
             providerIdentity(kind),
-            "payload",
+            kind == GoogleCalendarEventJobKind.DELETE ? null : payload(),
             Instant.parse("2026-09-03T00:00:00Z"));
     ReflectionTestUtils.setField(job, "id", 50L);
     return job;
