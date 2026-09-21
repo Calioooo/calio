@@ -16,14 +16,15 @@ public interface GoogleOperationJobRepository extends JpaRepository<GoogleOperat
       value =
           """
             SELECT * FROM google_operation_jobs job
-            WHERE job.account_id = :accountId
+            WHERE job.integration_id = :integrationId
               AND job.job_state IN ('PENDING', 'PROCESSING')
-            ORDER BY job.account_sequence
+            ORDER BY job.integration_sequence
             LIMIT 1
             FOR UPDATE
             """,
       nativeQuery = true)
-  Optional<GoogleOperationJob> findAccountHeadForUpdate(@Param("accountId") Long accountId);
+  Optional<GoogleOperationJob> findIntegrationHeadForUpdate(
+      @Param("integrationId") Long integrationId);
 
   @Modifying(flushAutomatically = true, clearAutomatically = true)
   @Query(
@@ -152,9 +153,9 @@ public interface GoogleOperationJobRepository extends JpaRepository<GoogleOperat
                     and job.runnableAt <= :now)
                    or job.state = com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState.PROCESSING)
               and exists (
-                  select 1 from GoogleCalendarIntegration integration
-                  where integration.id = job.integrationId
-                    and integration.state = com.calio.calendar.integration.connection.domain.GoogleCalendarIntegrationState.CONNECTED
+                  select 1 from GoogleCalendarConnection connection
+                  where connection.integration.id = job.integrationId
+                    and connection.state = com.calio.calendar.integration.connection.domain.GoogleCalendarConnectionState.CONNECTED
               )
             order by job.accountId
             """)
@@ -173,49 +174,55 @@ public interface GoogleOperationJobRepository extends JpaRepository<GoogleOperat
   @Query(
       """
             select (count(job) > 0)
-            from GoogleOperationJob job
+            from GoogleCalendarEventJob job
             where job.accountId = :accountId
               and job.integrationId = :integrationId
-              and job.kind <> 'SYNC'
-              and job.effectiveResourceScope = :scope
-              and job.effectiveResourceKey = :key
+              and job.eventId = :eventId
               and job.state in (
                   com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState.PENDING,
                   com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState.PROCESSING
               )
             """)
-  boolean existsPendingOutboundJob(
+  boolean existsPendingEventJob(
       @Param("accountId") Long accountId,
       @Param("integrationId") Long integrationId,
-      @Param("scope") String scope,
-      @Param("key") String key);
+      @Param("eventId") Long eventId);
 
   @Query(
       """
             select (count(job) > 0)
-            from GoogleOperationJob job
+            from GoogleCalendarRecurrenceJob job
             where job.accountId = :accountId
               and job.integrationId = :integrationId
-              and job.kind <> 'SYNC'
+              and job.target.recurrenceEventId = :recurrenceEventId
               and job.state in (
                   com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState.PENDING,
                   com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState.PROCESSING
               )
-              and (
-                  (job.effectiveResourceScope = :recurrenceEventScope
-                   and job.effectiveResourceKey = :recurrenceEventKey)
-                  or
-                  (job.effectiveResourceScope = :recurrenceOverrideScope
-                   and job.effectiveResourceKey like concat(:overrideKeyPrefix, '%'))
-              )
             """)
-  boolean existsPendingOutboundJobForRecurrenceAggregate(
+  boolean existsPendingRecurrenceAggregateJob(
       @Param("accountId") Long accountId,
       @Param("integrationId") Long integrationId,
-      @Param("recurrenceEventScope") String recurrenceEventScope,
-      @Param("recurrenceEventKey") String recurrenceEventKey,
-      @Param("recurrenceOverrideScope") String recurrenceOverrideScope,
-      @Param("overrideKeyPrefix") String overrideKeyPrefix);
+      @Param("recurrenceEventId") Long recurrenceEventId);
+
+  @Query(
+      """
+            select (count(job) > 0)
+            from GoogleCalendarRecurrenceJob job
+            where job.accountId = :accountId
+              and job.integrationId = :integrationId
+              and job.target.recurrenceEventId = :recurrenceEventId
+              and job.target.originStartAt = :originStartAt
+              and job.state in (
+                  com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState.PENDING,
+                  com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState.PROCESSING
+              )
+            """)
+  boolean existsPendingRecurrenceOverrideJob(
+      @Param("accountId") Long accountId,
+      @Param("integrationId") Long integrationId,
+      @Param("recurrenceEventId") Long recurrenceEventId,
+      @Param("originStartAt") Instant originStartAt);
 
   @Modifying(flushAutomatically = true, clearAutomatically = true)
   @Query("delete from GoogleOperationJob job where job.integrationId = :integrationId")

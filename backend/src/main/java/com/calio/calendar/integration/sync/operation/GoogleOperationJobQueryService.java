@@ -1,7 +1,6 @@
 package com.calio.calendar.integration.sync.operation;
 
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEffectiveScope;
-import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEffectiveScopeType;
 import com.calio.calendar.integration.sync.operation.repository.GoogleOperationJobRepository;
 import java.time.Instant;
 import java.util.List;
@@ -29,16 +28,15 @@ public class GoogleOperationJobQueryService {
 
   public boolean hasPendingOutboundJob(
       Long accountId, Long integrationId, GoogleCalendarEffectiveScope scope) {
-    if (scope.isRecurrenceEventAggregate()) {
-      return jobRepository.existsPendingOutboundJobForRecurrenceAggregate(
-          accountId,
-          integrationId,
-          GoogleCalendarEffectiveScopeType.RECURRENCE_EVENT.getStoredValue(),
-          scope.storedKey(),
-          GoogleCalendarEffectiveScopeType.RECURRENCE_OVERRIDE.getStoredValue(),
-          scope.childOverrideKeyPrefix());
-    }
-    return jobRepository.existsPendingOutboundJob(
-        accountId, integrationId, scope.storedScope(), scope.storedKey());
+    return switch (scope.type()) {
+      case EVENT ->
+          jobRepository.existsPendingEventJob(accountId, integrationId, scope.canonicalId());
+      case RECURRENCE_EVENT ->
+          jobRepository.existsPendingRecurrenceAggregateJob(
+              accountId, integrationId, scope.canonicalId());
+      case RECURRENCE_OVERRIDE ->
+          jobRepository.existsPendingRecurrenceOverrideJob(
+              accountId, integrationId, scope.canonicalId(), scope.originStartAt());
+    };
   }
 }

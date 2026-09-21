@@ -18,8 +18,8 @@ public class GoogleOperationJobCommandService {
     this.jobRepository = jobRepository;
   }
 
-  public Optional<GoogleOperationJob> tryLockNextOperationJob(Long accountId) {
-    return jobRepository.findAccountHeadForUpdate(accountId);
+  public Optional<GoogleOperationJob> tryLockNextOperationJob(Long integrationId) {
+    return jobRepository.findIntegrationHeadForUpdate(integrationId);
   }
 
   public GoogleOperationJob enqueueOperationJob(GoogleOperationJob job) {

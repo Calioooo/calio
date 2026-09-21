@@ -37,6 +37,14 @@ public final class GoogleCalendarEffectiveScope {
     return type;
   }
 
+  public Long canonicalId() {
+    return canonicalId;
+  }
+
+  public Instant originStartAt() {
+    return originStartAt;
+  }
+
   public boolean isRecurrenceEventAggregate() {
     return type == GoogleCalendarEffectiveScopeType.RECURRENCE_EVENT;
   }

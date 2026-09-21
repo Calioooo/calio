@@ -1,7 +1,7 @@
 package com.calio.calendar.integration.mapping.domain;
 
 import com.calio.calendar.common.domain.BaseEntity;
-import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
+import com.calio.calendar.integration.connection.domain.GoogleCalendarConnection;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
@@ -12,7 +12,6 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 
@@ -22,10 +21,10 @@ import jakarta.persistence.UniqueConstraint;
     uniqueConstraints = {
       @UniqueConstraint(
           name = "uk_google_calendar_recurrence_event_external",
-          columnNames = {"integration_id", "calendar_key", "external_event_id"}),
+          columnNames = {"connection_id", "calendar_key", "external_event_id"}),
       @UniqueConstraint(
-          name = "uk_google_calendar_recurrence_event_canonical",
-          columnNames = "recurrence_event_id")
+          name = "uk_google_calendar_recurrence_event_connection_canonical",
+          columnNames = {"connection_id", "recurrence_event_id"})
     })
 public class GoogleCalendarRecurrenceEventMapping extends BaseEntity {
 
@@ -36,12 +35,11 @@ public class GoogleCalendarRecurrenceEventMapping extends BaseEntity {
   private Long id;
 
   @ManyToOne(fetch = FetchType.LAZY, optional = false)
-  @JoinColumn(name = "integration_id", nullable = false)
-  private GoogleCalendarIntegration integration;
+  @JoinColumn(name = "connection_id", nullable = false)
+  private GoogleCalendarConnection connection;
 
-  @OneToOne(fetch = FetchType.LAZY, optional = false)
-  @JoinColumn(name = "recurrence_event_id", nullable = false)
-  private RecurrenceEvent recurrenceEvent;
+  @Column(name = "recurrence_event_id", nullable = false, updatable = false)
+  private Long recurrenceEventId;
 
   @Column(name = "calendar_key", nullable = false, length = 32)
   private String calendarKey;
@@ -51,15 +49,21 @@ public class GoogleCalendarRecurrenceEventMapping extends BaseEntity {
 
   @Embedded private GoogleCalendarMappingSyncState syncState;
 
+  @Column(name = "local_changed", nullable = false)
+  private boolean localChanged;
+
+  @Column(name = "provider_delete_pending", nullable = false)
+  private boolean providerDeletePending;
+
   protected GoogleCalendarRecurrenceEventMapping() {}
 
   public GoogleCalendarRecurrenceEventMapping(
-      GoogleCalendarIntegration integration,
-      RecurrenceEvent recurrenceEvent,
+      GoogleCalendarConnection connection,
+      Long recurrenceEventId,
       String externalEventId,
       String providerEtag) {
-    this.integration = integration;
-    this.recurrenceEvent = recurrenceEvent;
+    this.connection = connection;
+    this.recurrenceEventId = recurrenceEventId;
     this.calendarKey = PRIMARY_CALENDAR_KEY;
     this.externalEventId = externalEventId;
     this.syncState = GoogleCalendarMappingSyncState.active(providerEtag);
@@ -69,12 +73,12 @@ public class GoogleCalendarRecurrenceEventMapping extends BaseEntity {
     return id;
   }
 
-  public GoogleCalendarIntegration getIntegration() {
-    return integration;
+  public GoogleCalendarConnection getConnection() {
+    return connection;
   }
 
-  public RecurrenceEvent getRecurrenceEvent() {
-    return recurrenceEvent;
+  public Long getRecurrenceEventId() {
+    return recurrenceEventId;
   }
 
   public String getExternalEventId() {
@@ -87,6 +91,30 @@ public class GoogleCalendarRecurrenceEventMapping extends BaseEntity {
 
   public void markConflicted() {
     syncState.markConflicted();
+  }
+
+  public GoogleCalendarRecurrenceEventMapping(
+      GoogleCalendarConnection connection,
+      RecurrenceEvent recurrenceEvent,
+      String externalEventId,
+      String providerEtag) {
+    this(connection, recurrenceEvent.getId(), externalEventId, providerEtag);
+  }
+
+  public void markLocalChanged() {
+    localChanged = true;
+  }
+
+  public boolean isLocalChanged() {
+    return localChanged;
+  }
+
+  public void markProviderDeletePending() {
+    providerDeletePending = true;
+  }
+
+  public boolean isProviderDeletePending() {
+    return providerDeletePending;
   }
 
   public boolean isConflicted() {

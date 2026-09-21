@@ -13,53 +13,63 @@ import org.springframework.data.repository.query.Param;
 public interface GoogleCalendarEventMappingRepository
     extends JpaRepository<GoogleCalendarEventMapping, Long> {
 
-  @EntityGraph(attributePaths = "event")
   @Query(
       """
             select mapping
             from GoogleCalendarEventMapping mapping
-            where mapping.integration.id = :integrationId
+            where mapping.connection.id = :connectionId
               and mapping.calendarKey = :calendarKey
               and mapping.externalEventId in :externalEventIds
             """)
-  List<GoogleCalendarEventMapping> findAllWithEventByExternalIdentity(
-      @Param("integrationId") Long integrationId,
+  List<GoogleCalendarEventMapping> findAllByExternalIdentity(
+      @Param("connectionId") Long connectionId,
       @Param("calendarKey") String calendarKey,
       @Param("externalEventIds") Collection<String> externalEventIds);
 
-  boolean existsByEvent_IdAndIntegration_AccountId(Long eventId, Long accountId);
+  @EntityGraph(attributePaths = {"connection", "connection.integration"})
+  @Query(
+      """
+            select mapping from GoogleCalendarEventMapping mapping
+            where mapping.connection.integration.id = :integrationId
+              and mapping.eventId = :eventId
+            """)
+  List<GoogleCalendarEventMapping> findAllWithConnectionAndIntegrationByIntegrationIdAndEventId(
+      @Param("integrationId") Long integrationId, @Param("eventId") Long eventId);
 
   @Query(
       """
-            select mapping.event.id
+            select mapping.eventId
             from GoogleCalendarEventMapping mapping
-            where mapping.integration.id = :integrationId
+            where mapping.connection.id = :connectionId
             """)
-  List<Long> findEventIdsByIntegrationId(@Param("integrationId") Long integrationId);
+  List<Long> findEventIdsByConnectionId(@Param("connectionId") Long connectionId);
 
-  @EntityGraph(attributePaths = "event")
+  @Query(
+      """
+            select distinct mapping.eventId
+            from GoogleCalendarEventMapping mapping
+            where mapping.eventId in :eventIds
+            """)
+  List<Long> findDistinctEventIdsByEventIdIn(@Param("eventIds") Collection<Long> eventIds);
+
   @Query(
       """
             select mapping
             from GoogleCalendarEventMapping mapping
-            where mapping.integration.id = :integrationId
+            where mapping.connection.id = :connectionId
             """)
-  List<GoogleCalendarEventMapping> findAllWithEventByIntegrationId(
-      @Param("integrationId") Long integrationId);
+  List<GoogleCalendarEventMapping> findAllByConnectionId(@Param("connectionId") Long connectionId);
 
-  @EntityGraph(attributePaths = "event")
   @Query(
       """
             select mapping
             from GoogleCalendarEventMapping mapping
-            where mapping.integration.id = :integrationId
+            where mapping.connection.id = :connectionId
               and mapping.id > :afterId
             order by mapping.id
             """)
-  List<GoogleCalendarEventMapping> findNextBatchWithEventByIntegrationId(
-      @Param("integrationId") Long integrationId,
-      @Param("afterId") Long afterId,
-      Pageable pageable);
+  List<GoogleCalendarEventMapping> findNextBatchByConnectionId(
+      @Param("connectionId") Long connectionId, @Param("afterId") Long afterId, Pageable pageable);
 
   @Modifying(flushAutomatically = true)
   @Query("delete from GoogleCalendarEventMapping mapping where mapping.id in :mappingIds")
