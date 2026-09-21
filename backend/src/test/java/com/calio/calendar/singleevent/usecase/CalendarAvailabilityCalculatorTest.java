@@ -1,10 +1,6 @@
-package com.calio.calendar.singleevent.service;
+package com.calio.calendar.singleevent.usecase;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.CALLS_REAL_METHODS;
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.mock;
 
 import com.calio.calendar.singleevent.controller.dto.EventResponse;
 import java.time.Duration;
@@ -16,22 +12,19 @@ import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-class EventServiceAvailabilityTest {
+class CalendarAvailabilityCalculatorTest {
+
+  private final CalendarAvailabilityCalculator calculator = new CalendarAvailabilityCalculator();
 
   @Test
-  @DisplayName("timed event는 빈 시간을 차단하고 all-day event는 안내로 포함한다")
+  @DisplayName("시간 일정은 빈 시간을 차단하고 종일 일정은 안내에 포함한다")
   void
       givenTimedAndAllDayEvents_whenFindAvailableTimes_thenReturnsAvailableTimesWithAllDayNotice() {
-    // given
-    EventService eventService = mock(EventService.class, CALLS_REAL_METHODS);
-    doReturn(List.of(timedEvent(), allDayEvent()))
-        .when(eventService)
-        .listEvents(any(), any(), any());
+    List<EventResponse> availableEvents = List.of(timedEvent(), allDayEvent());
 
-    // when
-    var availableTimes =
-        eventService.findAvailableTimes(
-            1L,
+    List<com.calio.calendar.singleevent.service.dto.CalendarFreeTime> availableTimes =
+        calculator.find(
+            availableEvents,
             LocalDate.parse("2026-07-01"),
             LocalDate.parse("2026-07-01"),
             ZoneId.of("UTC"),
@@ -39,7 +32,6 @@ class EventServiceAvailabilityTest {
             LocalTime.parse("12:00"),
             Duration.ofHours(1));
 
-    // then
     assertThat(availableTimes).hasSize(2);
     assertThat(availableTimes.getFirst().start()).isEqualTo("2026-07-01T09:00:00Z");
     assertThat(availableTimes.getFirst().end()).isEqualTo("2026-07-01T10:00:00Z");

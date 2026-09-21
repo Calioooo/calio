@@ -68,8 +68,8 @@ class CalendarAgentToolsTest {
   }
 
   @Test
-  @DisplayName("free-time tool은 EventService가 계산한 빈 시간을 반환한다")
-  void givenAvailableTimes_whenFindFreeTime_thenReturnsEventServiceResult() {
+  @DisplayName("free-time tool은 사용 가능한 빈 시간을 반환한다")
+  void givenAvailableTimes_whenFindFreeTime_thenReturnsFreeTimes() {
     // given
     when(findAvailableTimesUseCase.find(any(), any(), any(), any(), any(), any(), any()))
         .thenReturn(
