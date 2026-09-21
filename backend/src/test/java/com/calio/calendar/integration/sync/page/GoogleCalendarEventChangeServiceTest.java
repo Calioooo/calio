@@ -9,11 +9,13 @@ import static org.mockito.Mockito.when;
 
 import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.event.service.EventCommandService;
+import com.calio.calendar.event.service.EventQueryService;
 import com.calio.calendar.external.google.service.dto.NormalizedEventSchedule;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarConnection;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingCommandService;
+import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingQueryService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobQueryService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobService;
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEffectiveScope;
@@ -21,6 +23,8 @@ import com.calio.calendar.integration.sync.page.dto.GoogleCalendarNormalizedPage
 import com.calio.calendar.integration.sync.page.dto.GoogleCalendarPageRecordCache;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -28,7 +32,10 @@ class GoogleCalendarEventChangeServiceTest {
 
   private final GoogleCalendarEventMappingCommandService eventMappingCommandService =
       mock(GoogleCalendarEventMappingCommandService.class);
+  private final GoogleCalendarEventMappingQueryService eventMappingQueryService =
+      mock(GoogleCalendarEventMappingQueryService.class);
   private final EventCommandService eventCommandService = mock(EventCommandService.class);
+  private final EventQueryService eventQueryService = mock(EventQueryService.class);
   private final GoogleOperationJobQueryService operationJobQueryService =
       mock(GoogleOperationJobQueryService.class);
   private final GoogleOperationJobService operationJobService =
@@ -36,7 +43,9 @@ class GoogleCalendarEventChangeServiceTest {
   private final GoogleCalendarEventChangeService service =
       new GoogleCalendarEventChangeService(
           eventMappingCommandService,
+          eventMappingQueryService,
           eventCommandService,
+          eventQueryService,
           operationJobQueryService,
           operationJobService);
 
@@ -54,7 +63,7 @@ class GoogleCalendarEventChangeServiceTest {
     when(connection.getIntegration()).thenReturn(integration);
     when(event.getId()).thenReturn(30L);
     GoogleCalendarEventMapping mapping =
-        new GoogleCalendarEventMapping(connection, event, "provider-event-id", "etag-before");
+        new GoogleCalendarEventMapping(connection, 30L, "provider-event-id", "etag-before");
     GoogleCalendarPageRecordCache cache =
         new GoogleCalendarPageRecordCache(
             new HashMap<>(java.util.Map.of("provider-event-id", mapping)),
@@ -91,5 +100,92 @@ class GoogleCalendarEventChangeServiceTest {
             eq(false),
             eq("UTC"));
     verify(operationJobService).recordSyncConflict(40L, 10L, "worker-token");
+  }
+
+  @Test
+  @DisplayName("삭제된 Event의 Google 변경은 local Event를 재생성하거나 mapping을 갱신하지 않는다")
+  void givenMissingEventWithoutPendingJob_whenApplyUpsert_thenIgnoresProviderChange() {
+    // given
+    GoogleCalendarIntegration integration = mock(GoogleCalendarIntegration.class);
+    GoogleCalendarConnection connection = mock(GoogleCalendarConnection.class);
+    when(integration.getAccountId()).thenReturn(10L);
+    when(integration.getId()).thenReturn(21L);
+    when(connection.getAccountId()).thenReturn(10L);
+    when(connection.getIntegration()).thenReturn(integration);
+    GoogleCalendarEventMapping mapping =
+        new GoogleCalendarEventMapping(connection, 30L, "provider-event-id", "etag-before");
+    GoogleCalendarPageRecordCache cache =
+        new GoogleCalendarPageRecordCache(
+            new HashMap<>(java.util.Map.of("provider-event-id", mapping)),
+            new HashMap<>(),
+            new HashMap<>(),
+            new HashMap<>());
+    EventUpsert upsert =
+        new EventUpsert(
+            "provider-event-id",
+            "etag-after",
+            "Changed by Google",
+            null,
+            new NormalizedEventSchedule(
+                Instant.parse("2026-08-15T00:00:00Z"),
+                Instant.parse("2026-08-15T01:00:00Z"),
+                false,
+                "UTC"));
+    when(operationJobQueryService.hasPendingOutboundJob(
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any()))
+        .thenReturn(false);
+    when(eventQueryService.getEventIfExists(10L, 30L)).thenReturn(Optional.empty());
+
+    // when
+    service.applyUpsert(
+        connection,
+        upsert,
+        cache,
+        null,
+        null,
+        new GoogleCalendarPageOwnership(40L, "worker-token"));
+
+    // then
+    assertThat(mapping.getProviderEtag()).isEqualTo("etag-before");
+    verify(eventCommandService, never()).createEvent(org.mockito.ArgumentMatchers.any());
+    verify(eventCommandService, never())
+        .updateEvent(
+            org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+  }
+
+  @Test
+  @DisplayName("Google cancellation 후 다른 connection mapping이 남아 있으면 Event를 유지한다")
+  void givenAnotherConnectionMapping_whenApplyCancellation_thenKeepsEvent() {
+    // given
+    GoogleCalendarIntegration integration = mock(GoogleCalendarIntegration.class);
+    GoogleCalendarConnection connection = mock(GoogleCalendarConnection.class);
+    when(integration.getId()).thenReturn(21L);
+    when(connection.getAccountId()).thenReturn(10L);
+    when(connection.getIntegration()).thenReturn(integration);
+    GoogleCalendarEventMapping mapping =
+        new GoogleCalendarEventMapping(connection, 30L, "provider-event-id", "etag");
+    GoogleCalendarPageRecordCache cache =
+        new GoogleCalendarPageRecordCache(
+            new HashMap<>(java.util.Map.of("provider-event-id", mapping)),
+            new HashMap<>(),
+            new HashMap<>(),
+            new HashMap<>());
+    when(operationJobQueryService.hasPendingOutboundJob(
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any()))
+        .thenReturn(false);
+    when(eventMappingQueryService.listEventIdsWithMappings(List.of(30L))).thenReturn(List.of(30L));
+
+    // when
+    service.applyCancellation(
+        "provider-event-id", cache, new GoogleCalendarPageOwnership(40L, "worker-token"));
+
+    // then
+    verify(eventMappingCommandService).deleteEventMapping(mapping);
+    verify(eventCommandService, never()).deleteEvent(org.mockito.ArgumentMatchers.any());
   }
 }

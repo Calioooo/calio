@@ -32,6 +32,12 @@ public class GoogleCalendarConnectionQueryService {
         accountId, GoogleCalendarConnectionState.CONNECTED);
   }
 
+  public Optional<GoogleCalendarConnection> getConnectedConnectionByIntegrationIdIfExists(
+      Long integrationId) {
+    return connectionRepository.findWithIntegrationByIntegrationIdAndState(
+        integrationId, GoogleCalendarConnectionState.CONNECTED);
+  }
+
   public GoogleCalendarConnection getConnectedConnectionById(Long connectionId) {
     return connectionRepository
         .findWithIntegrationById(connectionId)
@@ -39,8 +45,16 @@ public class GoogleCalendarConnectionQueryService {
         .orElseThrow(() -> new CalioException(ErrorCode.GOOGLE_CALENDAR_NOT_CONNECTED));
   }
 
+  public Optional<GoogleCalendarConnection> getConnectionIfExists(Long connectionId) {
+    return connectionRepository.findWithIntegrationById(connectionId);
+  }
+
   public List<Long> listConnectedAccountIds(Long afterAccountId, int limit) {
     return connectionRepository.findAccountIdsByStateAfter(
         afterAccountId, GoogleCalendarConnectionState.CONNECTED, PageRequest.of(0, limit));
+  }
+
+  public List<GoogleCalendarConnection> listConnections(Long integrationId) {
+    return connectionRepository.findAllWithIntegrationByIntegrationId(integrationId);
   }
 }
