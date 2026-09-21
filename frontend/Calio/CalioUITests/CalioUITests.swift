@@ -22,13 +22,28 @@ final class CalioUITests: XCTestCase {
   }
 
   @MainActor
-  func testExample() throws {
-    // UI tests must launch the application that they test.
+  func testVoteEnabledHeaderKeepsTodayAndScalableActionsAtAccessibilitySize() throws {
     let app = XCUIApplication()
+    app.launchArguments.append("--ui-testing-calendar-top-bar")
     app.launch()
 
-    // Use XCTAssert and related functions to verify that the test produces the
-    // expected results.
+    let actionIdentifiers = [
+      "calendar_navigation_today",
+      "calendar_navigation_google_connect",
+      "calendar_navigation_add_event",
+      "calendar_navigation_create_vote",
+      "calendar_navigation_my_votes",
+    ]
+
+    for identifier in actionIdentifiers {
+      let button = app.buttons[identifier]
+      XCTAssertTrue(button.waitForExistence(timeout: 3), "\(identifier) 버튼이 표시되어야 합니다.")
+      XCTAssertGreaterThanOrEqual(
+        button.frame.height,
+        44,
+        "\(identifier) 버튼은 최소 44pt 터치 영역을 제공해야 합니다."
+      )
+    }
   }
 
 }
