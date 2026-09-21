@@ -1,7 +1,7 @@
 package com.calio.calendar.vote.service;
 
 import com.calio.calendar.account.domain.Account;
-import com.calio.calendar.account.service.AccountQueryService;
+import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.vote.controller.dto.CreateVoteRoomRequest;
@@ -22,17 +22,17 @@ public class VoteRoomService {
   private static final int MAX_CANDIDATE_DAYS = 31;
   private final VoteRoomQueryService voteRoomQueryService;
   private final VoteRoomCommandService voteRoomCommandService;
-  private final AccountQueryService accountQueryService;
+  private final AccountRepository accountRepository;
   private final Clock clock;
 
   public VoteRoomService(
       VoteRoomQueryService voteRoomQueryService,
       VoteRoomCommandService voteRoomCommandService,
-      AccountQueryService accountQueryService,
+      AccountRepository accountRepository,
       Clock clock) {
     this.voteRoomQueryService = voteRoomQueryService;
     this.voteRoomCommandService = voteRoomCommandService;
-    this.accountQueryService = accountQueryService;
+    this.accountRepository = accountRepository;
     this.clock = clock;
   }
 
@@ -43,7 +43,10 @@ public class VoteRoomService {
         || request.candidateEndDate().isAfter(start.plusDays(MAX_CANDIDATE_DAYS - 1))) {
       throw new CalioException(ErrorCode.VALIDATION_FAILED);
     }
-    Account account = accountQueryService.getAccount(accountId);
+    Account account =
+        accountRepository
+            .findById(accountId)
+            .orElseThrow(() -> new CalioException(ErrorCode.INTERNAL_SERVER_ERROR));
     VoteRoom voteRoom =
         voteRoomCommandService.create(
             new VoteRoom(

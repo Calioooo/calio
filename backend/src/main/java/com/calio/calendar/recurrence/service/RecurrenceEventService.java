@@ -1,7 +1,7 @@
 package com.calio.calendar.recurrence.service;
 
 import com.calio.calendar.account.domain.Account;
-import com.calio.calendar.account.service.AccountQueryService;
+import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.common.domain.CanonicalSchedule;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
@@ -32,7 +32,7 @@ public class RecurrenceEventService {
 
   private final RecurrenceEventQueryService recurrenceEventQueryService;
   private final RecurrenceEventCommandService recurrenceEventCommandService;
-  private final AccountQueryService accountQueryService;
+  private final AccountRepository accountRepository;
   private final TagQueryService tagQueryService;
   private final EventCommandService eventCommandService;
   private final Rfc5545RecurrenceEngine recurrenceEngine;
@@ -43,7 +43,7 @@ public class RecurrenceEventService {
   public RecurrenceEventService(
       RecurrenceEventQueryService recurrenceEventQueryService,
       RecurrenceEventCommandService recurrenceEventCommandService,
-      AccountQueryService accountQueryService,
+      AccountRepository accountRepository,
       TagQueryService tagQueryService,
       EventCommandService eventCommandService,
       Rfc5545RecurrenceEngine recurrenceEngine,
@@ -52,7 +52,7 @@ public class RecurrenceEventService {
       GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService) {
     this.recurrenceEventQueryService = recurrenceEventQueryService;
     this.recurrenceEventCommandService = recurrenceEventCommandService;
-    this.accountQueryService = accountQueryService;
+    this.accountRepository = accountRepository;
     this.tagQueryService = tagQueryService;
     this.eventCommandService = eventCommandService;
     this.recurrenceEngine = recurrenceEngine;
@@ -66,13 +66,19 @@ public class RecurrenceEventService {
       Long accountId, CreateRecurrenceEventRequest request) {
     RecurrenceSchedule schedule = createSchedule(request);
     List<String> recurrenceRules = recurrenceEngine.validate(schedule, request.recurrence());
-    Account account = accountQueryService.getAccount(accountId);
+    Account account = getAccount(accountId);
     Tag tag = tagQueryService.getTagOrDefault(accountId, request.tagId());
     RecurrenceEvent recurrenceEvent =
         recurrenceEventCommandService.createRecurrenceEvent(
             new RecurrenceEvent(
                 request.title(), request.description(), schedule, recurrenceRules, tag, account));
     return toResponseWithSeriesUpdatePermission(recurrenceEvent, accountId);
+  }
+
+  private Account getAccount(Long accountId) {
+    return accountRepository
+        .findById(accountId)
+        .orElseThrow(() -> new CalioException(ErrorCode.INTERNAL_SERVER_ERROR));
   }
 
   public RecurrenceEventResponse getRecurrenceEvent(Long accountId, Long recurrenceId) {

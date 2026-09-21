@@ -1,7 +1,7 @@
 package com.calio.calendar.groupcalendar.recurrence.service;
 
 import com.calio.calendar.account.domain.Account;
-import com.calio.calendar.account.service.AccountQueryService;
+import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.common.domain.CanonicalSchedule;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
@@ -32,7 +32,7 @@ public class GroupCalendarRecurrenceService {
 
   private final GroupSpaceCommandService groupSpaceCommandService;
   private final GroupMembershipQueryService membershipQueryService;
-  private final AccountQueryService accountQueryService;
+  private final AccountRepository accountRepository;
   private final TagQueryService tagQueryService;
   private final GroupCalendarRecurrenceQueryService recurrenceQueryService;
   private final GroupCalendarRecurrenceCommandService recurrenceCommandService;
@@ -44,7 +44,7 @@ public class GroupCalendarRecurrenceService {
   public GroupCalendarRecurrenceService(
       GroupSpaceCommandService groupSpaceCommandService,
       GroupMembershipQueryService membershipQueryService,
-      AccountQueryService accountQueryService,
+      AccountRepository accountRepository,
       TagQueryService tagQueryService,
       GroupCalendarRecurrenceQueryService recurrenceQueryService,
       GroupCalendarRecurrenceCommandService recurrenceCommandService,
@@ -54,7 +54,7 @@ public class GroupCalendarRecurrenceService {
       Clock clock) {
     this.groupSpaceCommandService = groupSpaceCommandService;
     this.membershipQueryService = membershipQueryService;
-    this.accountQueryService = accountQueryService;
+    this.accountRepository = accountRepository;
     this.tagQueryService = tagQueryService;
     this.recurrenceQueryService = recurrenceQueryService;
     this.recurrenceCommandService = recurrenceCommandService;
@@ -72,7 +72,7 @@ public class GroupCalendarRecurrenceService {
 
     RecurrenceSchedule schedule = createSchedule(request);
     List<String> recurrenceRules = recurrenceEngine.validate(schedule, request.recurrence());
-    Account account = accountQueryService.getAccount(accountId);
+    Account account = getAccount(accountId);
     Tag tag = tagQueryService.getGroupTagOrDefault(groupSpaceId, request.tagId());
     GroupCalendarRecurrenceEvent event =
         new GroupCalendarRecurrenceEvent(
@@ -86,6 +86,12 @@ public class GroupCalendarRecurrenceService {
 
     return GroupCalendarRecurrenceResponse.from(
         recurrenceCommandService.createRecurrenceEvent(event));
+  }
+
+  private Account getAccount(Long accountId) {
+    return accountRepository
+        .findById(accountId)
+        .orElseThrow(() -> new CalioException(ErrorCode.INTERNAL_SERVER_ERROR));
   }
 
   public GroupCalendarRecurrenceResponse get(Long accountId, Long groupSpaceId, Long recurrenceId) {

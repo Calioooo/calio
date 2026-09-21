@@ -1,7 +1,7 @@
 package com.calio.calendar.groupcalendar.event.service;
 
 import com.calio.calendar.account.domain.Account;
-import com.calio.calendar.account.service.AccountQueryService;
+import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.common.domain.CanonicalSchedule;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
@@ -25,7 +25,7 @@ public class GroupCalendarEventService {
 
   private final GroupSpaceCommandService groupSpaceCommandService;
   private final GroupMembershipQueryService membershipQueryService;
-  private final AccountQueryService accountQueryService;
+  private final AccountRepository accountRepository;
   private final TagQueryService tagQueryService;
   private final GroupCalendarEventQueryService eventQueryService;
   private final GroupCalendarEventCommandService eventCommandService;
@@ -33,13 +33,13 @@ public class GroupCalendarEventService {
   public GroupCalendarEventService(
       GroupSpaceCommandService groupSpaceCommandService,
       GroupMembershipQueryService membershipQueryService,
-      AccountQueryService accountQueryService,
+      AccountRepository accountRepository,
       TagQueryService tagQueryService,
       GroupCalendarEventQueryService eventQueryService,
       GroupCalendarEventCommandService eventCommandService) {
     this.groupSpaceCommandService = groupSpaceCommandService;
     this.membershipQueryService = membershipQueryService;
-    this.accountQueryService = accountQueryService;
+    this.accountRepository = accountRepository;
     this.tagQueryService = tagQueryService;
     this.eventQueryService = eventQueryService;
     this.eventCommandService = eventCommandService;
@@ -54,7 +54,7 @@ public class GroupCalendarEventService {
     CanonicalSchedule schedule =
         CanonicalSchedule.event(
             request.startAt(), request.endAt(), request.allDay(), request.timeZone());
-    Account account = accountQueryService.getAccount(accountId);
+    Account account = getAccount(accountId);
     Tag tag = getTag(groupSpaceId, request.tagId());
     GroupCalendarEvent event =
         new GroupCalendarEvent(
@@ -69,6 +69,12 @@ public class GroupCalendarEventService {
             schedule.timeZone());
 
     return GroupCalendarEventResponse.from(eventCommandService.createEvent(event));
+  }
+
+  private Account getAccount(Long accountId) {
+    return accountRepository
+        .findById(accountId)
+        .orElseThrow(() -> new CalioException(ErrorCode.INTERNAL_SERVER_ERROR));
   }
 
   public GroupCalendarEventResponse get(Long accountId, Long groupSpaceId, Long eventId) {

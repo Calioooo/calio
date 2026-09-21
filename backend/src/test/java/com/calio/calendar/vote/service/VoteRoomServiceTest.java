@@ -8,7 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.calio.calendar.account.domain.Account;
-import com.calio.calendar.account.service.AccountQueryService;
+import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.vote.controller.dto.CreateVoteRoomRequest;
@@ -17,6 +17,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -33,7 +34,7 @@ class VoteRoomServiceTest {
 
   @Mock private VoteRoomQueryService voteRoomQueryService;
   @Mock private VoteRoomCommandService voteRoomCommandService;
-  @Mock private AccountQueryService accountQueryService;
+  @Mock private AccountRepository accountRepository;
 
   private VoteRoomService voteRoomService;
 
@@ -41,15 +42,14 @@ class VoteRoomServiceTest {
   void setUp() {
     Clock clock = Clock.fixed(Instant.parse("2026-08-13T15:00:00Z"), ZoneOffset.UTC);
     voteRoomService =
-        new VoteRoomService(
-            voteRoomQueryService, voteRoomCommandService, accountQueryService, clock);
+        new VoteRoomService(voteRoomQueryService, voteRoomCommandService, accountRepository, clock);
   }
 
   @Test
   @DisplayName("VoteRoom 생성은 KST 오늘을 시작일로 하고 포함 31일 후보 기간을 허용한다")
   void givenMaximumCandidatePeriod_whenCreate_thenCreatesPublicVoteRoomForAuthenticatedAccount() {
     Account account = new Account();
-    when(accountQueryService.getAccount(ACCOUNT_ID)).thenReturn(account);
+    when(accountRepository.findById(ACCOUNT_ID)).thenReturn(Optional.of(account));
     when(voteRoomCommandService.create(any(VoteRoom.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -77,7 +77,7 @@ class VoteRoomServiceTest {
             exception ->
                 assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.VALIDATION_FAILED));
 
-    verify(accountQueryService, never()).getAccount(ACCOUNT_ID);
+    verify(accountRepository, never()).findById(ACCOUNT_ID);
     verify(voteRoomCommandService, never()).create(any());
   }
 
@@ -93,7 +93,7 @@ class VoteRoomServiceTest {
             exception ->
                 assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.VALIDATION_FAILED));
 
-    verify(accountQueryService, never()).getAccount(ACCOUNT_ID);
+    verify(accountRepository, never()).findById(ACCOUNT_ID);
     verify(voteRoomCommandService, never()).create(any());
   }
 }

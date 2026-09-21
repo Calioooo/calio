@@ -7,6 +7,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.time.Instant;
 import java.util.Objects;
 
 @Entity
@@ -20,6 +21,8 @@ public class Account extends BaseEntity {
   @Embedded
   private AccountNotificationSettings notificationSettings = AccountNotificationSettings.defaults();
 
+  @Embedded private AccountAuthToken authToken;
+
   public Account() {}
 
   public Long getId() {
@@ -32,5 +35,29 @@ public class Account extends BaseEntity {
 
   public void changeNotificationSettings(AccountNotificationSettings notificationSettings) {
     this.notificationSettings = Objects.requireNonNull(notificationSettings);
+  }
+
+  public void issueAuthToken(String tokenHash) {
+    authToken = AccountAuthToken.issue(tokenHash);
+  }
+
+  public void authenticateAuthToken(Instant usedAt) {
+    authToken.authenticate(usedAt);
+  }
+
+  public void revokeAuthToken(Instant revokedAt) {
+    authToken.revoke(revokedAt);
+  }
+
+  public String getAuthTokenHash() {
+    return authToken == null ? null : authToken.getTokenHash();
+  }
+
+  public Instant getAuthTokenRevokedAt() {
+    return authToken == null ? null : authToken.getRevokedAt();
+  }
+
+  public Instant getAuthTokenLastUsedAt() {
+    return authToken == null ? null : authToken.getLastUsedAt();
   }
 }
