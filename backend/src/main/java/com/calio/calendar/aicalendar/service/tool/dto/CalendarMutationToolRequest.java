@@ -8,7 +8,7 @@ import org.springframework.ai.tool.annotation.ToolParam;
 public record CalendarMutationToolRequest(
     @ToolParam(
             description =
-                "Mutation operation. Choose CREATE_EVENT, UPDATE_EVENT, or DELETE_EVENT for a normal event. Choose UPDATE_RECURRENCE_OCCURRENCE or DELETE_RECURRENCE_OCCURRENCE for one occurrence, and UPDATE_RECURRENCE_SERIES or DELETE_RECURRENCE_SERIES for the entire recurrence series.",
+                "Mutation operation. Choose CREATE_EVENT for a normal event or CREATE_RECURRENCE_EVENT for a supported recurrence series. Choose UPDATE_EVENT or DELETE_EVENT for a normal event. Choose UPDATE_RECURRENCE_OCCURRENCE or DELETE_RECURRENCE_OCCURRENCE for one occurrence, and UPDATE_RECURRENCE_SERIES or DELETE_RECURRENCE_SERIES for the entire recurrence series.",
             required = true)
         CalendarMutationOperation operation,
     @ToolParam(
@@ -28,7 +28,7 @@ public record CalendarMutationToolRequest(
         Instant originStartAt,
     @ToolParam(
             description =
-                "Event title. Required for CREATE_EVENT; optional replacement title for updates.",
+                "Event title. Required for CREATE_EVENT and CREATE_RECURRENCE_EVENT; optional replacement title for updates.",
             required = false)
         String title,
     @ToolParam(
@@ -38,17 +38,17 @@ public record CalendarMutationToolRequest(
         String description,
     @ToolParam(
             description =
-                "UTC start instant. Required for CREATE_EVENT; optional replacement start for updates.",
+                "UTC start instant. Required for CREATE_EVENT and CREATE_RECURRENCE_EVENT; optional replacement start for updates.",
             required = false)
         Instant startAt,
     @ToolParam(
             description =
-                "UTC end instant. Required for CREATE_EVENT; optional replacement end for updates. When only a timed event start changes, preserve its existing duration by supplying the corresponding end.",
+                "UTC end instant. Required for CREATE_EVENT and CREATE_RECURRENCE_EVENT; optional replacement end for updates. When only a timed event start changes, preserve its existing duration by supplying the corresponding end.",
             required = false)
         Instant endAt,
     @ToolParam(
             description =
-                "Whether the event is all-day. Required for CREATE_EVENT; optional replacement value for updates.",
+                "Whether the event is all-day. Required for CREATE_EVENT and CREATE_RECURRENCE_EVENT; optional replacement value for updates.",
             required = false)
         Boolean allDay,
     @ToolParam(
@@ -63,6 +63,6 @@ public record CalendarMutationToolRequest(
         Long tagId,
     @ToolParam(
             description =
-                "RFC 5545 recurrence rules. Required only when replacing recurrence rules for UPDATE_RECURRENCE_SERIES; omit to preserve existing rules.",
+                "RFC 5545 recurrence rules. Required for CREATE_RECURRENCE_EVENT and when replacing recurrence rules for UPDATE_RECURRENCE_SERIES. AI recurrence creation allows exactly one RRULE with DAILY, WEEKLY, MONTHLY, or YEARLY FREQ and an optional UNTIL no later than December 31 of the current year plus 100 years.",
             required = false)
         List<String> recurrenceRules) {}

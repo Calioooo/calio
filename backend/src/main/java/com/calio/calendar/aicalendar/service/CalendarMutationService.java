@@ -12,9 +12,11 @@ import com.calio.calendar.event.controller.dto.CreateEventRequest;
 import com.calio.calendar.event.controller.dto.EventResponse;
 import com.calio.calendar.event.controller.dto.UpdateEventRequest;
 import com.calio.calendar.event.service.EventService;
+import com.calio.calendar.recurrence.controller.dto.CreateRecurrenceEventRequest;
 import com.calio.calendar.recurrence.controller.dto.RecurrenceEventResponse;
 import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceEventRequest;
 import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceOccurrenceRequest;
+import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
 import com.calio.calendar.recurrence.service.RecurrenceEventService;
 import com.calio.calendar.tag.controller.dto.TagResponse;
 import com.calio.calendar.tag.service.TagService;
@@ -28,19 +30,23 @@ public class CalendarMutationService {
   private final EventService eventService;
   private final RecurrenceEventService recurrenceEventService;
   private final TagService tagService;
+  private final CalendarAiMutationPolicy aiMutationPolicy;
 
   public CalendarMutationService(
       EventService eventService,
       RecurrenceEventService recurrenceEventService,
-      TagService tagService) {
+      TagService tagService,
+      CalendarAiMutationPolicy aiMutationPolicy) {
     this.eventService = eventService;
     this.recurrenceEventService = recurrenceEventService;
     this.tagService = tagService;
+    this.aiMutationPolicy = aiMutationPolicy;
   }
 
   public CalendarMutationPreview preview(Long accountId, CalendarMutationToolRequest request) {
     return switch (requireOperation(request)) {
       case CREATE_EVENT -> previewEventCreation(accountId, request);
+      case CREATE_RECURRENCE_EVENT -> previewRecurrenceCreation(accountId, request);
       case UPDATE_EVENT -> previewEventUpdate(accountId, request);
       case DELETE_EVENT -> previewEventDeletion(accountId, request);
       case UPDATE_RECURRENCE_OCCURRENCE -> previewOccurrenceUpdate(accountId, request);
@@ -54,6 +60,11 @@ public class CalendarMutationService {
     return switch (requireOperation(request)) {
       case CREATE_EVENT ->
           List.of(eventService.createEvent(accountId, createEventRequest(request)));
+      case CREATE_RECURRENCE_EVENT ->
+          List.of(
+              eventForSeries(
+                  recurrenceEventService.createRecurrenceEvent(
+                      accountId, createRecurrenceEventRequest(request))));
       case UPDATE_EVENT -> applyEventUpdate(accountId, request);
       case DELETE_EVENT -> deleteEvent(accountId, request);
       case UPDATE_RECURRENCE_OCCURRENCE -> applyOccurrenceUpdate(accountId, request);
@@ -71,6 +82,17 @@ public class CalendarMutationService {
         CalendarMutationScope.EVENT,
         null,
         eventForCreation(accountId, eventRequest));
+  }
+
+  private CalendarMutationPreview previewRecurrenceCreation(
+      Long accountId, CalendarMutationToolRequest request) {
+    CreateRecurrenceEventRequest recurrenceRequest = createRecurrenceEventRequest(request);
+    return new CalendarMutationPreview(
+        CalendarMutationType.CREATE,
+        CalendarMutationScope.ENTIRE_SERIES,
+        null,
+        eventForRecurrenceCreation(accountId, recurrenceRequest),
+        new CalendarMutationRecurrencePreview(List.of(), recurrenceRequest.recurrence()));
   }
 
   private CalendarMutationPreview previewEventUpdate(
@@ -104,7 +126,7 @@ public class CalendarMutationService {
   private CalendarMutationPreview previewOccurrenceUpdate(
       Long accountId, CalendarMutationToolRequest request) {
     EventResponse before = getOccurrence(accountId, request);
-    rejectOccurrenceTagChange(request, before);
+    aiMutationPolicy.validateOccurrenceTagChange(request.tagId(), tagIdOf(before));
     UpdateRecurrenceOccurrenceRequest occurrenceRequest = updateOccurrenceRequest(request, before);
     return new CalendarMutationPreview(
         CalendarMutationType.UPDATE,
@@ -149,7 +171,7 @@ public class CalendarMutationService {
   private List<EventResponse> applyOccurrenceUpdate(
       Long accountId, CalendarMutationToolRequest request) {
     EventResponse before = getOccurrence(accountId, request);
-    rejectOccurrenceTagChange(request, before);
+    aiMutationPolicy.validateOccurrenceTagChange(request.tagId(), tagIdOf(before));
     return List.of(
         recurrenceEventService.updateRecurrenceOccurrence(
             accountId, requireRecurrenceId(request), updateOccurrenceRequest(request, before)));
@@ -196,6 +218,34 @@ public class CalendarMutationService {
         requireAllDay(request),
         request.timeZone(),
         request.tagId());
+  }
+
+  private CreateRecurrenceEventRequest createRecurrenceEventRequest(
+      CalendarMutationToolRequest request) {
+    RecurrenceSchedule schedule =
+        RecurrenceSchedule.create(
+            requireAllDay(request),
+            requireStartAt(request),
+            requireEndAt(request),
+            request.timeZone());
+    List<String> recurrenceRules = requireRecurrenceRulesForCreation(request);
+    aiMutationPolicy.validateCreateRecurrence(recurrenceRules, schedule);
+    return new CreateRecurrenceEventRequest(
+        requireTitle(request),
+        request.description(),
+        schedule.allDay(),
+        schedule.firstOccurrenceStartAt(),
+        schedule.firstOccurrenceEndAt(),
+        schedule.timeZone(),
+        recurrenceRules,
+        request.tagId());
+  }
+
+  private List<String> requireRecurrenceRulesForCreation(CalendarMutationToolRequest request) {
+    if (request.recurrenceRules() == null || request.recurrenceRules().isEmpty()) {
+      throw new CalioException(ErrorCode.VALIDATION_FAILED);
+    }
+    return request.recurrenceRules();
   }
 
   private UpdateEventRequest updateEventRequest(
@@ -249,6 +299,25 @@ public class CalendarMutationService {
         false,
         tagResponse(accountId, request.tagId()),
         null,
+        null,
+        null);
+  }
+
+  private EventResponse eventForRecurrenceCreation(
+      Long accountId, CreateRecurrenceEventRequest request) {
+    return new EventResponse(
+        null,
+        request.title(),
+        request.description(),
+        request.firstOccurrenceStartAt(),
+        request.firstOccurrenceEndAt(),
+        request.allDay(),
+        request.timeZone(),
+        false,
+        null,
+        true,
+        tagResponse(accountId, request.tagId()),
+        request.firstOccurrenceStartAt(),
         null,
         null);
   }
@@ -349,15 +418,11 @@ public class CalendarMutationService {
     if (request.tagId() != null) {
       return request.tagId();
     }
-    return before.tag() == null ? null : before.tag().id();
+    return tagIdOf(before);
   }
 
-  private void rejectOccurrenceTagChange(
-      CalendarMutationToolRequest request, EventResponse before) {
-    Long existingTagId = before.tag() == null ? null : before.tag().id();
-    if (request.tagId() != null && !request.tagId().equals(existingTagId)) {
-      throw new CalioException(ErrorCode.RECURRENCE_OCCURRENCE_TAG_CHANGE_NOT_SUPPORTED);
-    }
+  private Long tagIdOf(EventResponse event) {
+    return event.tag() == null ? null : event.tag().id();
   }
 
   private List<String> recurrenceRulesOrExisting(
