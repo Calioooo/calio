@@ -110,6 +110,20 @@ class VoteRoomUseCaseTest {
   }
 
   @Test
+  @DisplayName("후보 시작일과 종료일이 같으면 VoteRoom을 생성하지 않는다")
+  void givenCandidateStartDateEqualToEndDate_whenCreate_thenRejectsBeforeAccountLookup() {
+    assertThatThrownBy(
+            () -> createVoteRoomUseCase.create(ACCOUNT_ID, "여행 일정", KOREA_TODAY, KOREA_TODAY))
+        .isInstanceOfSatisfying(
+            CalioException.class,
+            exception ->
+                assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.VALIDATION_FAILED));
+
+    verify(accountRepository, never()).findById(ACCOUNT_ID);
+    verify(voteRoomRepository, never()).save(org.mockito.ArgumentMatchers.any());
+  }
+
+  @Test
   @DisplayName("후보 종료일이 시작일보다 이르면 VoteRoom을 생성하지 않는다")
   void givenCandidateEndDateBeforeStartDate_whenCreate_thenRejectsBeforeAccountLookup() {
     assertThatThrownBy(

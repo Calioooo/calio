@@ -25,8 +25,13 @@ class VoteCandidateDateRangeTest {
   }
 
   @Test
-  @DisplayName("후보 종료일이 시작일보다 빠르거나 31일을 초과하면 생성할 수 없다")
+  @DisplayName("후보 종료일이 시작일과 같거나 빠르거나 31일을 초과하면 생성할 수 없다")
   void givenInvalidRange_whenCreate_thenRejects() {
+    assertThatThrownBy(() -> VoteCandidateDateRange.of(START_DATE, START_DATE))
+        .isInstanceOfSatisfying(
+            CalioException.class,
+            exception ->
+                assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.VALIDATION_FAILED));
     assertThatThrownBy(() -> VoteCandidateDateRange.of(START_DATE, START_DATE.minusDays(1)))
         .isInstanceOfSatisfying(
             CalioException.class,
