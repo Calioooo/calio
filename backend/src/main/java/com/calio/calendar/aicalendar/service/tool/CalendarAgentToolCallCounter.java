@@ -4,9 +4,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class CalendarAgentToolCallCounter {
 
-    private final AtomicInteger callCount = new AtomicInteger();
+  private final AtomicInteger callCount = new AtomicInteger();
 
-    public boolean incrementWithin(int maximumCalls) {
-        return callCount.incrementAndGet() <= maximumCalls;
-    }
+  public boolean incrementWithin(int maximumCalls) {
+    return callCount.incrementAndGet() <= maximumCalls;
+  }
 }

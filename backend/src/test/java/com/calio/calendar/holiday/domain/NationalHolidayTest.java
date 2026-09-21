@@ -10,31 +10,32 @@ import org.junit.jupiter.api.Test;
 
 class NationalHolidayTest {
 
-    @Test
-    @DisplayName("NationalHoliday는 provider의 dateKind, seq, isHoliday를 저장 필드로 갖지 않는다")
-    void givenNationalHolidayEntity_whenReadDeclaredFields_thenDoesNotPersistProviderMetadata() {
-        // when
-        String[] fieldNames = Arrays.stream(NationalHoliday.class.getDeclaredFields())
-                .map(Field::getName)
-                .toArray(String[]::new);
+  @Test
+  @DisplayName("NationalHoliday는 provider의 dateKind, seq, isHoliday를 저장 필드로 갖지 않는다")
+  void givenNationalHolidayEntity_whenReadDeclaredFields_thenDoesNotPersistProviderMetadata() {
+    // when
+    String[] fieldNames =
+        Arrays.stream(NationalHoliday.class.getDeclaredFields())
+            .map(Field::getName)
+            .toArray(String[]::new);
 
-        // then
-        assertThat(fieldNames)
-                .contains("nationalHolidayId", "holidayDate", "holidayTitle")
-                .doesNotContain("dateKind", "seq", "isHoliday");
-    }
+    // then
+    assertThat(fieldNames)
+        .contains("nationalHolidayId", "holidayDate", "holidayTitle")
+        .doesNotContain("dateKind", "seq", "isHoliday");
+  }
 
-    @Test
-    @DisplayName("NationalHoliday는 holidayDate와 holidayTitle을 canonical 저장 값으로 가진다")
-    void givenHolidayDateAndTitle_whenCreateNationalHoliday_thenStoresCanonicalFields() {
-        // given
-        LocalDate holidayDate = LocalDate.parse("2026-10-03");
+  @Test
+  @DisplayName("NationalHoliday는 holidayDate와 holidayTitle을 canonical 저장 값으로 가진다")
+  void givenHolidayDateAndTitle_whenCreateNationalHoliday_thenStoresCanonicalFields() {
+    // given
+    LocalDate holidayDate = LocalDate.parse("2026-10-03");
 
-        // when
-        NationalHoliday nationalHoliday = new NationalHoliday(holidayDate, "개천절");
+    // when
+    NationalHoliday nationalHoliday = new NationalHoliday(holidayDate, "개천절");
 
-        // then
-        assertThat(nationalHoliday.getHolidayDate()).isEqualTo(holidayDate);
-        assertThat(nationalHoliday.getHolidayTitle()).isEqualTo("개천절");
-    }
+    // then
+    assertThat(nationalHoliday.getHolidayDate()).isEqualTo(holidayDate);
+    assertThat(nationalHoliday.getHolidayTitle()).isEqualTo("개천절");
+  }
 }

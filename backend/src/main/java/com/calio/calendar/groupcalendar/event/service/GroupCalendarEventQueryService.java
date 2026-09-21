@@ -13,19 +13,22 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class GroupCalendarEventQueryService {
 
-    private final GroupCalendarEventRepository eventRepository;
+  private final GroupCalendarEventRepository eventRepository;
 
-    public GroupCalendarEventQueryService(GroupCalendarEventRepository eventRepository) {
-        this.eventRepository = eventRepository;
-    }
+  public GroupCalendarEventQueryService(GroupCalendarEventRepository eventRepository) {
+    this.eventRepository = eventRepository;
+  }
 
-    public GroupCalendarEvent getEvent(Long groupSpaceId, Long eventId) {
-        return eventRepository.findByIdAndGroupSpace_Id(eventId, groupSpaceId)
-                .orElseThrow(() -> new CalioException(ErrorCode.GROUP_EVENT_NOT_FOUND));
-    }
+  public GroupCalendarEvent getEvent(Long groupSpaceId, Long eventId) {
+    return eventRepository
+        .findByIdAndGroupSpace_Id(eventId, groupSpaceId)
+        .orElseThrow(() -> new CalioException(ErrorCode.GROUP_EVENT_NOT_FOUND));
+  }
 
-    public List<GroupCalendarEvent> listOverlappingEvents(Long groupSpaceId, Instant from, Instant to) {
-        return eventRepository
-                .findByGroupSpace_IdAndStartAtLessThanAndEndAtGreaterThanOrderByStartAtAsc(groupSpaceId, to, from);
-    }
+  public List<GroupCalendarEvent> listOverlappingEvents(
+      Long groupSpaceId, Instant from, Instant to) {
+    return eventRepository
+        .findByGroupSpace_IdAndStartAtLessThanAndEndAtGreaterThanOrderByStartAtAsc(
+            groupSpaceId, to, from);
+  }
 }

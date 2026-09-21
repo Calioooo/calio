@@ -13,7 +13,6 @@ import com.calio.calendar.event.controller.dto.UpdateEventRequest;
 import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.event.repository.EventRepository;
 import com.calio.calendar.tag.domain.Tag;
-import com.calio.calendar.tag.domain.TagType;
 import java.time.Instant;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
@@ -29,153 +28,144 @@ import org.springframework.transaction.annotation.Transactional;
 @ExtendWith(MockitoExtension.class)
 class EventCommandServiceTest {
 
-    @Mock
-    private EventRepository eventRepository;
+  @Mock private EventRepository eventRepository;
 
-    @InjectMocks
-    private EventCommandService eventCommandService;
+  @InjectMocks private EventCommandService eventCommandService;
 
-    @Test
-    @DisplayName("CommandService의 모든 상태 변경은 트랜잭션 경계 안에서 실행한다")
-    void commandServiceUsesTransactionBoundary() {
-        // when
-        Transactional transactional = AnnotatedElementUtils.findMergedAnnotation(
-                EventCommandService.class,
-                Transactional.class
-        );
+  @Test
+  @DisplayName("CommandService의 모든 상태 변경은 트랜잭션 경계 안에서 실행한다")
+  void commandServiceUsesTransactionBoundary() {
+    // when
+    Transactional transactional =
+        AnnotatedElementUtils.findMergedAnnotation(EventCommandService.class, Transactional.class);
 
-        // then
-        assertThat(transactional).isNotNull();
-        assertThat(transactional.readOnly()).isFalse();
-    }
+    // then
+    assertThat(transactional).isNotNull();
+    assertThat(transactional.readOnly()).isFalse();
+  }
 
-    @Test
-    @DisplayName("일정 생성은 전달받은 Event를 저장하고 저장 결과를 반환한다")
-    void givenEvent_whenCreateEvent_thenReturnsSavedEvent() {
-        // given
-        Event event = event();
-        when(eventRepository.save(event)).thenReturn(event);
+  @Test
+  @DisplayName("일정 생성은 전달받은 Event를 저장하고 저장 결과를 반환한다")
+  void givenEvent_whenCreateEvent_thenReturnsSavedEvent() {
+    // given
+    Event event = event();
+    when(eventRepository.save(event)).thenReturn(event);
 
-        // when
-        Event savedEvent = eventCommandService.createEvent(event);
+    // when
+    Event savedEvent = eventCommandService.createEvent(event);
 
-        // then
-        verify(eventRepository).save(event);
-        assertThat(savedEvent).isSameAs(event);
-    }
+    // then
+    verify(eventRepository).save(event);
+    assertThat(savedEvent).isSameAs(event);
+  }
 
-    @Test
-    @DisplayName("일정 잠금 조회는 계정과 일정 ID를 repository에 정확히 전달한다")
-    void givenOwnedEvent_whenFindForUpdate_thenReturnsLockedEvent() {
-        // given
-        Event event = event();
-        when(eventRepository.findByIdAndAccountIdForUpdate(10L, 1L))
-                .thenReturn(Optional.of(event));
+  @Test
+  @DisplayName("일정 잠금 조회는 계정과 일정 ID를 repository에 정확히 전달한다")
+  void givenOwnedEvent_whenFindForUpdate_thenReturnsLockedEvent() {
+    // given
+    Event event = event();
+    when(eventRepository.findByIdAndAccountIdForUpdate(10L, 1L)).thenReturn(Optional.of(event));
 
-        // when
-        Event result = eventCommandService.lockEvent(1L, 10L);
+    // when
+    Event result = eventCommandService.lockEvent(1L, 10L);
 
-        // then
-        assertThat(result).isSameAs(event);
-        verify(eventRepository).findByIdAndAccountIdForUpdate(10L, 1L);
-    }
+    // then
+    assertThat(result).isSameAs(event);
+    verify(eventRepository).findByIdAndAccountIdForUpdate(10L, 1L);
+  }
 
-    @Test
-    @DisplayName("잠금 조회할 계정 소유 일정이 없으면 EVENT_NOT_FOUND를 반환한다")
-    void givenMissingOwnedEvent_whenFindForUpdate_thenThrowsEventNotFound() {
-        // given
-        when(eventRepository.findByIdAndAccountIdForUpdate(10L, 1L))
-                .thenReturn(Optional.empty());
+  @Test
+  @DisplayName("잠금 조회할 계정 소유 일정이 없으면 EVENT_NOT_FOUND를 반환한다")
+  void givenMissingOwnedEvent_whenFindForUpdate_thenThrowsEventNotFound() {
+    // given
+    when(eventRepository.findByIdAndAccountIdForUpdate(10L, 1L)).thenReturn(Optional.empty());
 
-        // when, then
-        assertThatThrownBy(() -> eventCommandService.lockEvent(1L, 10L))
-                .isInstanceOfSatisfying(CalioException.class, exception ->
-                        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.EVENT_NOT_FOUND)
-                );
-    }
+    // when, then
+    assertThatThrownBy(() -> eventCommandService.lockEvent(1L, 10L))
+        .isInstanceOfSatisfying(
+            CalioException.class,
+            exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.EVENT_NOT_FOUND));
+  }
 
-    @Test
-    @DisplayName("일정 수정은 canonical schedule과 태그로 상태를 교체하고 flush한다")
-    void givenCanonicalUpdate_whenUpdateEvent_thenReplacesStateAndFlushes() {
-        // given
-        Event event = event();
-        Tag updatedTag = Tag.personalCustom(account(), "업무", "#112233");
-        UpdateEventRequest request = new UpdateEventRequest(
-                "Updated",
-                null,
-                Instant.parse("2027-01-02T00:00:00Z"),
-                Instant.parse("2027-01-03T00:00:00Z"),
-                true,
-                null,
-                30L
-        );
-        CanonicalSchedule schedule = CanonicalSchedule.event(
-                request.startAt(),
-                request.endAt(),
-                request.allDay(),
-                request.timeZone()
-        );
+  @Test
+  @DisplayName("일정 수정은 canonical schedule과 태그로 상태를 교체하고 flush한다")
+  void givenCanonicalUpdate_whenUpdateEvent_thenReplacesStateAndFlushes() {
+    // given
+    Event event = event();
+    Tag updatedTag = Tag.personalCustom(account(), "업무", "#112233");
+    UpdateEventRequest request =
+        new UpdateEventRequest(
+            "Updated",
+            null,
+            Instant.parse("2027-01-02T00:00:00Z"),
+            Instant.parse("2027-01-03T00:00:00Z"),
+            true,
+            null,
+            30L);
+    CanonicalSchedule schedule =
+        CanonicalSchedule.event(
+            request.startAt(), request.endAt(), request.allDay(), request.timeZone());
 
-        // when
-        eventCommandService.updateEvent(event, request, schedule, updatedTag);
+    // when
+    eventCommandService.updateEvent(event, request, schedule, updatedTag);
 
-        // then
-        assertThat(event.getTitle()).isEqualTo("Updated");
-        assertThat(event.getDescription()).isNull();
-        assertThat(event.getStartAt()).isEqualTo(request.startAt());
-        assertThat(event.getEndAt()).isEqualTo(request.endAt());
-        assertThat(event.isAllDay()).isTrue();
-        assertThat(event.getTimeZone()).isNull();
-        assertThat(event.getTag()).isSameAs(updatedTag);
-        verify(eventRepository).flush();
-    }
+    // then
+    assertThat(event.getTitle()).isEqualTo("Updated");
+    assertThat(event.getDescription()).isNull();
+    assertThat(event.getStartAt()).isEqualTo(request.startAt());
+    assertThat(event.getEndAt()).isEqualTo(request.endAt());
+    assertThat(event.isAllDay()).isTrue();
+    assertThat(event.getTimeZone()).isNull();
+    assertThat(event.getTag()).isSameAs(updatedTag);
+    verify(eventRepository).flush();
+  }
 
-    @Test
-    @DisplayName("중요 일정 변경은 Event 상태를 교체하고 flush한다")
-    void givenImportantState_whenUpdateImportantEvent_thenChangesStateAndFlushes() {
-        // given
-        Event event = event();
+  @Test
+  @DisplayName("중요 일정 변경은 Event 상태를 교체하고 flush한다")
+  void givenImportantState_whenUpdateImportantEvent_thenChangesStateAndFlushes() {
+    // given
+    Event event = event();
 
-        // when
-        eventCommandService.updateImportantEvent(event, true);
+    // when
+    eventCommandService.updateImportantEvent(event, true);
 
-        // then
-        assertThat(event.importantEvent()).isTrue();
-        verify(eventRepository).flush();
-    }
+    // then
+    assertThat(event.importantEvent()).isTrue();
+    verify(eventRepository).flush();
+  }
 
-    @Test
-    @DisplayName("일정 삭제는 조회된 정확한 Event를 repository에 전달한다")
-    void givenEvent_whenDeleteEvent_thenDeletesExactEvent() {
-        // given
-        Event event = event();
+  @Test
+  @DisplayName("일정 삭제는 조회된 정확한 Event를 repository에 전달한다")
+  void givenEvent_whenDeleteEvent_thenDeletesExactEvent() {
+    // given
+    Event event = event();
 
-        // when
-        eventCommandService.deleteEvent(event);
+    // when
+    eventCommandService.deleteEvent(event);
 
-        // then
-        verify(eventRepository).delete(event);
-    }
+    // then
+    verify(eventRepository).delete(event);
+  }
 
-    private Event event() {
-        Event event = new Event(
-                "Original",
-                "memo",
-                Instant.parse("2027-01-01T00:00:00Z"),
-                Instant.parse("2027-01-01T01:00:00Z"),
-                false,
-                "UTC",
-                null,
-                Tag.personalDefault("기타", "#64748B"),
-                account()
-        );
-        ReflectionTestUtils.setField(event, "id", 10L);
-        return event;
-    }
+  private Event event() {
+    Event event =
+        new Event(
+            "Original",
+            "memo",
+            Instant.parse("2027-01-01T00:00:00Z"),
+            Instant.parse("2027-01-01T01:00:00Z"),
+            false,
+            "UTC",
+            null,
+            Tag.personalDefault("기타", "#64748B"),
+            account());
+    ReflectionTestUtils.setField(event, "id", 10L);
+    return event;
+  }
 
-    private Account account() {
-        Account account = new Account();
-        ReflectionTestUtils.setField(account, "id", 1L);
-        return account;
-    }
+  private Account account() {
+    Account account = new Account();
+    ReflectionTestUtils.setField(account, "id", 1L);
+    return account;
+  }
 }

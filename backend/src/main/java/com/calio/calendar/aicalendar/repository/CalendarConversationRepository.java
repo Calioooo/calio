@@ -10,9 +10,11 @@ import org.springframework.data.repository.query.Param;
 
 public interface CalendarConversationRepository extends JpaRepository<CalendarConversation, Long> {
 
-    Optional<CalendarConversation> findByConversationIdAndAccount_Id(String conversationId, Long accountId);
+  Optional<CalendarConversation> findByConversationIdAndAccount_Id(
+      String conversationId, Long accountId);
 
-    @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query("delete from CalendarConversation conversation where conversation.lastActivityAt <= :cutoff")
-    int deleteInactiveBefore(@Param("cutoff") Instant cutoff);
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      "delete from CalendarConversation conversation where conversation.lastActivityAt <= :cutoff")
+  int deleteInactiveBefore(@Param("cutoff") Instant cutoff);
 }

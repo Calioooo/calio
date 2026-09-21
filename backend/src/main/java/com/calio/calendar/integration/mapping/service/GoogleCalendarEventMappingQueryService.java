@@ -12,43 +12,30 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class GoogleCalendarEventMappingQueryService {
 
-    private final GoogleCalendarEventMappingRepository eventMappingRepository;
+  private final GoogleCalendarEventMappingRepository eventMappingRepository;
 
-    public GoogleCalendarEventMappingQueryService(
-            GoogleCalendarEventMappingRepository eventMappingRepository
-    ) {
-        this.eventMappingRepository = eventMappingRepository;
-    }
+  public GoogleCalendarEventMappingQueryService(
+      GoogleCalendarEventMappingRepository eventMappingRepository) {
+    this.eventMappingRepository = eventMappingRepository;
+  }
 
-    public boolean hasExternalEventMapping(Long eventId, Long accountId) {
-        return eventMappingRepository.existsByEvent_IdAndIntegration_AccountId(eventId, accountId);
-    }
+  public boolean hasExternalEventMapping(Long eventId, Long accountId) {
+    return eventMappingRepository.existsByEvent_IdAndIntegration_AccountId(eventId, accountId);
+  }
 
-    public List<GoogleCalendarEventMapping> listEventMappings(
-            Long integrationId,
-            String calendarKey,
-            Collection<String> externalEventIds
-    ) {
-        return eventMappingRepository.findAllWithEventByExternalIdentity(
-                integrationId,
-                calendarKey,
-                externalEventIds
-        );
-    }
+  public List<GoogleCalendarEventMapping> listEventMappings(
+      Long integrationId, String calendarKey, Collection<String> externalEventIds) {
+    return eventMappingRepository.findAllWithEventByExternalIdentity(
+        integrationId, calendarKey, externalEventIds);
+  }
 
-    public List<GoogleCalendarEventMapping> listEventMappings(Long integrationId) {
-        return eventMappingRepository.findAllWithEventByIntegrationId(integrationId);
-    }
+  public List<GoogleCalendarEventMapping> listEventMappings(Long integrationId) {
+    return eventMappingRepository.findAllWithEventByIntegrationId(integrationId);
+  }
 
-    public List<GoogleCalendarEventMapping> listEventMappingBatch(
-            Long integrationId,
-            Long afterId,
-            int limit
-    ) {
-        return eventMappingRepository.findNextBatchWithEventByIntegrationId(
-                integrationId,
-                afterId,
-                PageRequest.of(0, limit)
-        );
-    }
+  public List<GoogleCalendarEventMapping> listEventMappingBatch(
+      Long integrationId, Long afterId, int limit) {
+    return eventMappingRepository.findNextBatchWithEventByIntegrationId(
+        integrationId, afterId, PageRequest.of(0, limit));
+  }
 }

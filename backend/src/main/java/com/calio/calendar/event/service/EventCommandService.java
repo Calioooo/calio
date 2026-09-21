@@ -15,56 +15,57 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class EventCommandService {
 
-    private final EventRepository eventRepository;
+  private final EventRepository eventRepository;
 
-    public EventCommandService(EventRepository eventRepository) {
-        this.eventRepository = eventRepository;
-    }
+  public EventCommandService(EventRepository eventRepository) {
+    this.eventRepository = eventRepository;
+  }
 
-    public Event createEvent(Event event) {
-        return eventRepository.save(event);
-    }
+  public Event createEvent(Event event) {
+    return eventRepository.save(event);
+  }
 
-    public Event lockEvent(Long accountId, Long eventId) {
-        return eventRepository.findByIdAndAccountIdForUpdate(eventId, accountId)
-                .orElseThrow(() -> new CalioException(ErrorCode.EVENT_NOT_FOUND));
-    }
+  public Event lockEvent(Long accountId, Long eventId) {
+    return eventRepository
+        .findByIdAndAccountIdForUpdate(eventId, accountId)
+        .orElseThrow(() -> new CalioException(ErrorCode.EVENT_NOT_FOUND));
+  }
 
-    public void updateEvent(Event event, UpdateEventRequest request, CanonicalSchedule schedule, Tag tag) {
-        event.replace(
-                request.title(),
-                request.description(),
-                schedule.startAt(),
-                schedule.endAt(),
-                schedule.allDay(),
-                schedule.timeZone(),
-                tag
-        );
-        eventRepository.flush();
-    }
+  public void updateEvent(
+      Event event, UpdateEventRequest request, CanonicalSchedule schedule, Tag tag) {
+    event.replace(
+        request.title(),
+        request.description(),
+        schedule.startAt(),
+        schedule.endAt(),
+        schedule.allDay(),
+        schedule.timeZone(),
+        tag);
+    eventRepository.flush();
+  }
 
-    public void updateImportantEvent(Event event, boolean importantEvent) {
-        event.changeImportantEvent(importantEvent);
-        eventRepository.flush();
-    }
+  public void updateImportantEvent(Event event, boolean importantEvent) {
+    event.changeImportantEvent(importantEvent);
+    eventRepository.flush();
+  }
 
-    public void deleteEvent(Event event) {
-        eventRepository.delete(event);
-    }
+  public void deleteEvent(Event event) {
+    eventRepository.delete(event);
+  }
 
-    public void deleteEventsByIds(Collection<Long> eventIds) {
-        if (!eventIds.isEmpty()) {
-            eventRepository.deleteAllByIds(eventIds.stream().toList());
-        }
+  public void deleteEventsByIds(Collection<Long> eventIds) {
+    if (!eventIds.isEmpty()) {
+      eventRepository.deleteAllByIds(eventIds.stream().toList());
     }
+  }
 
-    public void deleteEventsByRecurrenceEventIds(Collection<Long> recurrenceEventIds) {
-        if (!recurrenceEventIds.isEmpty()) {
-            eventRepository.deleteAllByRecurrenceEventIds(recurrenceEventIds);
-        }
+  public void deleteEventsByRecurrenceEventIds(Collection<Long> recurrenceEventIds) {
+    if (!recurrenceEventIds.isEmpty()) {
+      eventRepository.deleteAllByRecurrenceEventIds(recurrenceEventIds);
     }
+  }
 
-    public void changeTagForTargetEvents(Long accountId, Tag sourceTag, Tag targetTag) {
-        eventRepository.reassignAllByTagAndAccountId(sourceTag, targetTag, accountId);
-    }
+  public void changeTagForTargetEvents(Long accountId, Tag sourceTag, Tag targetTag) {
+    eventRepository.reassignAllByTagAndAccountId(sourceTag, targetTag, accountId);
+  }
 }

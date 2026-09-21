@@ -26,12 +26,19 @@ jobs:
           filters: |
             backend:
               - 'backend/**'
+              - '.github/workflows/backend-ci.yml'
             infrastructure:
               - 'infra/compose/**'
             ios:
               - 'frontend/**'
               - '*.xcodeproj/**'
               - '*.xcworkspace/**'
+              - '.github/workflows/ios-ci.yml'
+            shared:
+              - 'scripts/**'
+              - '.codex/hooks.json'
+              - '.gitattributes'
+              - '.github/workflows/pr-check.yml'
 
   backend:
     needs: changes

@@ -13,33 +13,26 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class GroupCalendarRecurrenceOverrideQueryService {
 
-    private final GroupCalendarRecurrenceOverrideRepository overrideRepository;
+  private final GroupCalendarRecurrenceOverrideRepository overrideRepository;
 
-    public GroupCalendarRecurrenceOverrideQueryService(
-            GroupCalendarRecurrenceOverrideRepository overrideRepository
-    ) {
-        this.overrideRepository = overrideRepository;
-    }
+  public GroupCalendarRecurrenceOverrideQueryService(
+      GroupCalendarRecurrenceOverrideRepository overrideRepository) {
+    this.overrideRepository = overrideRepository;
+  }
 
-    public Optional<GroupCalendarRecurrenceOverride> getOverrideIfExists(
-            Long recurrenceId,
-            Instant originStartAt
-    ) {
-        return overrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(recurrenceId, originStartAt);
-    }
+  public Optional<GroupCalendarRecurrenceOverride> getOverrideIfExists(
+      Long recurrenceId, Instant originStartAt) {
+    return overrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(recurrenceId, originStartAt);
+  }
 
-    public List<GroupCalendarRecurrenceOverride> listOverrides(
-            Long recurrenceId,
-            Collection<Instant> originStartAts
-    ) {
-        return overrideRepository.findByRecurrenceEvent_IdAndOriginStartAtIn(recurrenceId, originStartAts);
-    }
+  public List<GroupCalendarRecurrenceOverride> listOverrides(
+      Long recurrenceId, Collection<Instant> originStartAts) {
+    return overrideRepository.findByRecurrenceEvent_IdAndOriginStartAtIn(
+        recurrenceId, originStartAts);
+  }
 
-    public List<GroupCalendarRecurrenceOverride> listMovedInOverrides(
-            Long groupSpaceId,
-            Instant from,
-            Instant to
-    ) {
-        return overrideRepository.listOverlappingOverrides(groupSpaceId, from, to);
-    }
+  public List<GroupCalendarRecurrenceOverride> listMovedInOverrides(
+      Long groupSpaceId, Instant from, Instant to) {
+    return overrideRepository.listOverlappingOverrides(groupSpaceId, from, to);
+  }
 }

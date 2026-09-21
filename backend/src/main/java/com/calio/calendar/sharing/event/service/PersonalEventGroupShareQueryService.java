@@ -11,16 +11,14 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class PersonalEventGroupShareQueryService {
 
-    private final PersonalEventGroupShareRepository shareRepository;
+  private final PersonalEventGroupShareRepository shareRepository;
 
-    public PersonalEventGroupShareQueryService(PersonalEventGroupShareRepository shareRepository) {
-        this.shareRepository = shareRepository;
-    }
+  public PersonalEventGroupShareQueryService(PersonalEventGroupShareRepository shareRepository) {
+    this.shareRepository = shareRepository;
+  }
 
-    public List<PersonalEventGroupShare> listExistingShares(
-            Collection<Long> eventIds,
-            Collection<Long> groupSpaceIds
-    ) {
-        return shareRepository.findAllByEventIdsAndGroupSpaceIds(eventIds, groupSpaceIds);
-    }
+  public List<PersonalEventGroupShare> listExistingShares(
+      Collection<Long> eventIds, Collection<Long> groupSpaceIds) {
+    return shareRepository.findAllByEventIdsAndGroupSpaceIds(eventIds, groupSpaceIds);
+  }
 }

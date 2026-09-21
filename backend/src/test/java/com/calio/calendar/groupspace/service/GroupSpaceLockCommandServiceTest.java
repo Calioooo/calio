@@ -24,75 +24,68 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class GroupSpaceLockCommandServiceTest {
 
-    @Mock
-    private GroupSpaceRepository groupSpaceRepository;
+  @Mock private GroupSpaceRepository groupSpaceRepository;
 
-    @Mock
-    private GroupMemberRepository groupMemberRepository;
+  @Mock private GroupMemberRepository groupMemberRepository;
 
-    private GroupSpaceCommandService groupSpaceCommandService;
-    private GroupMembershipCommandService membershipCommandService;
+  private GroupSpaceCommandService groupSpaceCommandService;
+  private GroupMembershipCommandService membershipCommandService;
 
-    @BeforeEach
-    void setUp() {
-        groupSpaceCommandService = new GroupSpaceCommandService(
-                groupSpaceRepository,
-                groupMemberRepository
-        );
-        membershipCommandService = new GroupMembershipCommandService(
-                groupMemberRepository,
-                groupSpaceRepository
-        );
-    }
+  @BeforeEach
+  void setUp() {
+    groupSpaceCommandService =
+        new GroupSpaceCommandService(groupSpaceRepository, groupMemberRepository);
+    membershipCommandService =
+        new GroupMembershipCommandService(groupMemberRepository, groupSpaceRepository);
+  }
 
-    @Test
-    @DisplayName("GroupSpace command 잠금 조회는 ID를 repository에 그대로 위임한다")
-    void groupSpaceCommandLockDelegatesGroupSpaceId() {
-        GroupSpace groupSpace = org.mockito.Mockito.mock(GroupSpace.class);
-        when(groupSpaceRepository.findByIdForUpdate(20L)).thenReturn(Optional.of(groupSpace));
+  @Test
+  @DisplayName("GroupSpace command 잠금 조회는 ID를 repository에 그대로 위임한다")
+  void groupSpaceCommandLockDelegatesGroupSpaceId() {
+    GroupSpace groupSpace = org.mockito.Mockito.mock(GroupSpace.class);
+    when(groupSpaceRepository.findByIdForUpdate(20L)).thenReturn(Optional.of(groupSpace));
 
-        GroupSpace result = groupSpaceCommandService.lockGroupSpace(20L);
+    GroupSpace result = groupSpaceCommandService.lockGroupSpace(20L);
 
-        assertThat(result).isSameAs(groupSpace);
-        verify(groupSpaceRepository).findByIdForUpdate(20L);
-    }
+    assertThat(result).isSameAs(groupSpace);
+    verify(groupSpaceRepository).findByIdForUpdate(20L);
+  }
 
-    @Test
-    @DisplayName("GroupMembership command 잠금 조회는 그룹의 멤버 목록을 그대로 반환한다")
-    void membershipCommandLockMembersReturnsRepositoryResult() {
-        List<GroupMember> members = List.of(org.mockito.Mockito.mock(GroupMember.class));
-        when(groupMemberRepository.findAllByGroupSpaceIdForUpdateOrderById(20L))
-                .thenReturn(members);
+  @Test
+  @DisplayName("GroupMembership command 잠금 조회는 그룹의 멤버 목록을 그대로 반환한다")
+  void membershipCommandLockMembersReturnsRepositoryResult() {
+    List<GroupMember> members = List.of(org.mockito.Mockito.mock(GroupMember.class));
+    when(groupMemberRepository.findAllByGroupSpaceIdForUpdateOrderById(20L)).thenReturn(members);
 
-        List<GroupMember> result = membershipCommandService.lockMembers(20L);
+    List<GroupMember> result = membershipCommandService.lockMembers(20L);
 
-        assertThat(result).isSameAs(members);
-        verify(groupMemberRepository).findAllByGroupSpaceIdForUpdateOrderById(20L);
-    }
+    assertThat(result).isSameAs(members);
+    verify(groupMemberRepository).findAllByGroupSpaceIdForUpdateOrderById(20L);
+  }
 
-    @Test
-    @DisplayName("GroupMembership command는 잠긴 ACTIVE 멤버를 반환한다")
-    void membershipCommandLocksActiveMember() {
-        GroupMember member = org.mockito.Mockito.mock(GroupMember.class);
-        when(member.getStatus()).thenReturn(GroupMemberStatus.ACTIVE);
-        when(groupMemberRepository.findByGroupSpaceIdAndAccountIdForUpdate(20L, 10L))
-                .thenReturn(Optional.of(member));
+  @Test
+  @DisplayName("GroupMembership command는 잠긴 ACTIVE 멤버를 반환한다")
+  void membershipCommandLocksActiveMember() {
+    GroupMember member = org.mockito.Mockito.mock(GroupMember.class);
+    when(member.getStatus()).thenReturn(GroupMemberStatus.ACTIVE);
+    when(groupMemberRepository.findByGroupSpaceIdAndAccountIdForUpdate(20L, 10L))
+        .thenReturn(Optional.of(member));
 
-        GroupMember result = membershipCommandService.lockActiveMember(20L, 10L);
+    GroupMember result = membershipCommandService.lockActiveMember(20L, 10L);
 
-        assertThat(result).isSameAs(member);
-        verify(groupMemberRepository).findByGroupSpaceIdAndAccountIdForUpdate(20L, 10L);
-    }
+    assertThat(result).isSameAs(member);
+    verify(groupMemberRepository).findByGroupSpaceIdAndAccountIdForUpdate(20L, 10L);
+  }
 
-    @Test
-    @DisplayName("그룹 잠금 조회가 실패하면 GROUP_SPACE_NOT_FOUND를 반환한다")
-    void groupLockMapsMissingGroupToGroupSpaceNotFound() {
-        when(groupSpaceRepository.findByIdForUpdate(20L)).thenReturn(Optional.empty());
+  @Test
+  @DisplayName("그룹 잠금 조회가 실패하면 GROUP_SPACE_NOT_FOUND를 반환한다")
+  void groupLockMapsMissingGroupToGroupSpaceNotFound() {
+    when(groupSpaceRepository.findByIdForUpdate(20L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> groupSpaceCommandService.lockGroupSpace(20L))
-                .isInstanceOfSatisfying(CalioException.class, exception ->
-                        assertThat(exception.getErrorCode())
-                                .isEqualTo(ErrorCode.GROUP_SPACE_NOT_FOUND)
-                );
-    }
+    assertThatThrownBy(() -> groupSpaceCommandService.lockGroupSpace(20L))
+        .isInstanceOfSatisfying(
+            CalioException.class,
+            exception ->
+                assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.GROUP_SPACE_NOT_FOUND));
+  }
 }
