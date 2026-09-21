@@ -5,7 +5,6 @@ import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.vote.controller.dto.VoteSubmissionResponse;
 import com.calio.calendar.vote.domain.Vote;
 import com.calio.calendar.vote.domain.VoteParticipant;
-import com.calio.calendar.vote.domain.VoteParticipantNickname;
 import com.calio.calendar.vote.domain.VoteRoom;
 import com.calio.calendar.vote.domain.VoteUnavailableDates;
 import com.calio.calendar.vote.repository.VoteParticipantRepository;
@@ -18,51 +17,40 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-public class SubmitVoteUseCase {
+public class SubmitMyVoteUseCase {
 
   private final VoteParticipantRepository voteParticipantRepository;
   private final VoteRepository voteRepository;
   private final VoteRoomRepository voteRoomRepository;
-  private final VoteParticipantCredentialVerifier credentialVerifier;
 
-  public SubmitVoteUseCase(
+  public SubmitMyVoteUseCase(
       VoteParticipantRepository voteParticipantRepository,
       VoteRepository voteRepository,
-      VoteRoomRepository voteRoomRepository,
-      VoteParticipantCredentialVerifier credentialVerifier) {
+      VoteRoomRepository voteRoomRepository) {
     this.voteParticipantRepository = voteParticipantRepository;
     this.voteRepository = voteRepository;
     this.voteRoomRepository = voteRoomRepository;
-    this.credentialVerifier = credentialVerifier;
   }
 
   @Transactional
   public VoteSubmissionResponse submit(
-      UUID voteRoomPublicId, String nickname, String password, List<LocalDate> requestedDates) {
-    VoteParticipantNickname normalizedNickname = VoteParticipantNickname.of(nickname);
+      UUID voteRoomPublicId, Long accountId, List<LocalDate> requestedDates) {
     VoteParticipant participant =
         voteParticipantRepository
-            .findByVoteRoomPublicIdAndNickname(voteRoomPublicId, normalizedNickname.value())
-            .orElseThrow(() -> new CalioException(ErrorCode.VOTE_PARTICIPANT_CREDENTIAL_INVALID));
-    credentialVerifier.verify(participant, password);
-
-    VoteParticipant lockedParticipant =
-        voteParticipantRepository
-            .findByVoteRoomPublicIdAndNicknameForUpdate(
-                voteRoomPublicId, normalizedNickname.value())
+            .findByVoteRoomPublicIdAndAccountIdForUpdate(voteRoomPublicId, accountId)
             .orElseThrow(() -> new CalioException(ErrorCode.VOTE_PARTICIPANT_CREDENTIAL_INVALID));
     VoteRoom voteRoom =
         voteRoomRepository
-            .findById(lockedParticipant.getVoteRoomId())
+            .findById(participant.getVoteRoomId())
             .orElseThrow(() -> new CalioException(ErrorCode.VOTE_ROOM_NOT_FOUND));
     VoteUnavailableDates unavailableDates = VoteUnavailableDates.of(requestedDates);
     if (unavailableDates.hasDateOutside(voteRoom.getCandidateDateRange())) {
       throw new CalioException(ErrorCode.VALIDATION_FAILED);
     }
-    voteRepository.deleteAllByVoteParticipantId(lockedParticipant.getId());
+    voteRepository.deleteAllByVoteParticipantId(participant.getId());
     voteRepository.saveAll(
-        unavailableDates.values().stream().map(date -> new Vote(lockedParticipant, date)).toList());
-    lockedParticipant.submit();
-    return VoteSubmissionResponse.from(lockedParticipant, unavailableDates.values());
+        unavailableDates.values().stream().map(date -> new Vote(participant, date)).toList());
+    participant.submit();
+    return VoteSubmissionResponse.from(participant, unavailableDates.values());
   }
 }

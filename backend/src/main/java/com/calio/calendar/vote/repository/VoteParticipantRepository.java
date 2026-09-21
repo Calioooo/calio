@@ -41,6 +41,18 @@ public interface VoteParticipantRepository extends JpaRepository<VoteParticipant
             from VoteParticipant participant
             join VoteRoom voteRoom on participant.voteRoomId = voteRoom.id
             where voteRoom.publicId = :voteRoomPublicId
+              and participant.accountId = :accountId
+            """)
+  Optional<VoteParticipant> findByVoteRoomPublicIdAndAccountIdForUpdate(
+      @Param("voteRoomPublicId") UUID voteRoomPublicId, @Param("accountId") Long accountId);
+
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query(
+      """
+            select participant
+            from VoteParticipant participant
+            join VoteRoom voteRoom on participant.voteRoomId = voteRoom.id
+            where voteRoom.publicId = :voteRoomPublicId
               and lower(participant.nickname.value) = lower(:nickname)
             """)
   Optional<VoteParticipant> findByVoteRoomPublicIdAndNicknameForUpdate(
