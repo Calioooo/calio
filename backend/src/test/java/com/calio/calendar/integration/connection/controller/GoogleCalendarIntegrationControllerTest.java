@@ -21,6 +21,7 @@ import com.calio.calendar.integration.connection.repository.GoogleCalendarConnec
 import com.calio.calendar.integration.connection.repository.GoogleCalendarIntegrationRepository;
 import com.calio.calendar.integration.sync.GoogleCalendarSyncMode;
 import com.calio.calendar.integration.sync.operation.GoogleOperationWorker;
+import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarSyncJob;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJob;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobTrigger;
@@ -180,16 +181,17 @@ class GoogleCalendarIntegrationControllerTest {
     assertThat(jobs).hasSize(2);
     GoogleOperationJob job =
         jobs.stream()
-            .filter(candidate -> candidate.getAccountSequence() == 2L)
+            .filter(candidate -> candidate.getIntegrationSequence() == 2L)
             .findFirst()
             .orElseThrow();
     assertThat(job.getOperationId()).isNotBlank();
     assertThat(connection.getIntegration().getId()).isEqualTo(integration.getId());
-    assertThat(job.getConnectionId()).isEqualTo(connection.getId());
+    assertThat(job.getIntegrationId()).isEqualTo(integration.getId());
     assertThat(job.getAccountId()).isEqualTo(integration.getAccountId());
-    assertThat(job.getAccountSequence()).isEqualTo(2L);
-    assertThat(job.getKind()).isEqualTo(GoogleOperationJob.SYNC_KIND);
-    assertThat(job.getTrigger()).isEqualTo(GoogleOperationJobTrigger.MANUAL);
+    assertThat(job.getIntegrationSequence()).isEqualTo(2L);
+    assertThat(job).isInstanceOf(GoogleCalendarSyncJob.class);
+    GoogleCalendarSyncJob syncJob = (GoogleCalendarSyncJob) job;
+    assertThat(syncJob.getTrigger()).isEqualTo(GoogleOperationJobTrigger.MANUAL);
     assertThat(job.getState()).isEqualTo(GoogleOperationJobState.PENDING);
     assertThat(job.getRunnableAt()).isNotNull();
     assertThat(job.getRetryCount()).isZero();

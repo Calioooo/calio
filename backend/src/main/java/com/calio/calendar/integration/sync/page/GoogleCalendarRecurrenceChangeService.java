@@ -25,6 +25,7 @@ import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
 import com.calio.calendar.recurrence.service.RecurrenceEventCommandService;
+import com.calio.calendar.recurrence.service.RecurrenceEventQueryService;
 import com.calio.calendar.tag.domain.Tag;
 import java.util.List;
 import java.util.Set;
@@ -37,6 +38,7 @@ public class GoogleCalendarRecurrenceChangeService {
   private final GoogleCalendarRecurrenceMappingCommandService recurrenceMappingCommandService;
   private final EventCommandService eventCommandService;
   private final RecurrenceEventCommandService recurrenceEventCommandService;
+  private final RecurrenceEventQueryService recurrenceEventQueryService;
   private final GoogleOperationJobQueryService operationJobQueryService;
   private final GoogleOperationJobService operationJobService;
 
@@ -45,12 +47,14 @@ public class GoogleCalendarRecurrenceChangeService {
       GoogleCalendarRecurrenceMappingCommandService recurrenceMappingCommandService,
       EventCommandService eventCommandService,
       RecurrenceEventCommandService recurrenceEventCommandService,
+      RecurrenceEventQueryService recurrenceEventQueryService,
       GoogleOperationJobQueryService operationJobQueryService,
       GoogleOperationJobService operationJobService) {
     this.recurrenceMappingQueryService = recurrenceMappingQueryService;
     this.recurrenceMappingCommandService = recurrenceMappingCommandService;
     this.eventCommandService = eventCommandService;
     this.recurrenceEventCommandService = recurrenceEventCommandService;
+    this.recurrenceEventQueryService = recurrenceEventQueryService;
     this.operationJobQueryService = operationJobQueryService;
     this.operationJobService = operationJobService;
   }
@@ -81,7 +85,7 @@ public class GoogleCalendarRecurrenceChangeService {
     GoogleCalendarRecurrenceEventMapping mapping =
         recurrenceMappingCommandService.createRecurrenceEventMapping(
             new GoogleCalendarRecurrenceEventMapping(
-                connection, recurrenceEvent, item.externalEventId(), item.providerEtag()));
+                connection, recurrenceEvent.getId(), item.externalEventId(), item.providerEtag()));
     cache.recurrenceEventMappings().put(item.externalEventId(), mapping);
   }
 
@@ -94,18 +98,20 @@ public class GoogleCalendarRecurrenceChangeService {
       return;
     }
     GoogleCalendarEffectiveScope scope =
-        GoogleCalendarEffectiveScope.recurrenceEvent(mapping.getRecurrenceEvent().getId());
+        GoogleCalendarEffectiveScope.recurrenceEvent(mapping.getRecurrenceEventId());
     if (mapping.getProviderEtag().equals(item.providerEtag())) {
       return;
     }
     if (operationJobQueryService.hasPendingOutboundJob(
-        mapping.getConnection().getAccountId(), mapping.getConnection().getId(), scope)) {
+        mapping.getConnection().getAccountId(),
+        mapping.getConnection().getIntegration().getId(),
+        scope)) {
       mapping.markConflicted();
       recordSyncConflict(mapping, ownership);
       return;
     }
-    mapping
-        .getRecurrenceEvent()
+    recurrenceEventQueryService
+        .getRecurrenceEvent(mapping.getRecurrenceEventId())
         .updateProviderContent(item.title(), item.description(), schedule, item.recurrenceRules());
     mapping.updateProviderEtag(item.providerEtag());
   }
@@ -123,11 +129,10 @@ public class GoogleCalendarRecurrenceChangeService {
       return;
     }
     GoogleCalendarEffectiveScope scope =
-        GoogleCalendarEffectiveScope.recurrenceEvent(
-            recurrenceEventMapping.getRecurrenceEvent().getId());
+        GoogleCalendarEffectiveScope.recurrenceEvent(recurrenceEventMapping.getRecurrenceEventId());
     if (operationJobQueryService.hasPendingOutboundJob(
         recurrenceEventMapping.getConnection().getAccountId(),
-        recurrenceEventMapping.getConnection().getId(),
+        recurrenceEventMapping.getConnection().getIntegration().getId(),
         scope)) {
       recurrenceEventMapping.markConflicted();
       recordSyncConflict(recurrenceEventMapping, ownership);
@@ -149,7 +154,7 @@ public class GoogleCalendarRecurrenceChangeService {
                 entry
                     .getKey()
                     .recurrenceEventId()
-                    .equals(recurrenceEventMapping.getRecurrenceEvent().getId()));
+                    .equals(recurrenceEventMapping.getRecurrenceEventId()));
   }
 
   public void applyRecurrenceEventOverride(
@@ -193,14 +198,14 @@ public class GoogleCalendarRecurrenceChangeService {
             recurrenceEventMapping.getId(), item.externalEventId());
     RecurrenceEventOverrideKey recurrenceEventOverrideKey =
         new RecurrenceEventOverrideKey(
-            recurrenceEventMapping.getRecurrenceEvent().getId(), item.originStartAt());
+            recurrenceEventMapping.getRecurrenceEventId(), item.originStartAt());
     GoogleCalendarRecurrenceOverrideMapping googleOverrideMapping =
         cache.googleOverrideMappings().get(googleOverrideKey);
     RecurrenceEventOverride recurrenceEventOverride =
         cache.recurrenceEventOverrides().get(recurrenceEventOverrideKey);
     if (googleOverrideMapping != null) {
       validateMappedRecurrenceOverrideKey(googleOverrideMapping, recurrenceEventOverrideKey);
-      recurrenceEventOverride = googleOverrideMapping.getRecurrenceEventOverride();
+      recurrenceEventOverride = recurrenceOverride(googleOverrideMapping);
     }
     throwIfOverrideMappedToDifferentGoogleEvent(
         googleOverrideMapping, recurrenceEventOverride, item, cache);
@@ -221,7 +226,10 @@ public class GoogleCalendarRecurrenceChangeService {
       return existingOverride.recurrenceEventOverride();
     }
     RecurrenceEventOverride recurrenceEventOverride =
-        createRecurrenceEventOverride(recurrenceEventMapping.getRecurrenceEvent(), item);
+        createRecurrenceEventOverride(
+            recurrenceEventQueryService.getRecurrenceEvent(
+                recurrenceEventMapping.getRecurrenceEventId()),
+            item);
     recurrenceEventCommandService.createOrUpdateRecurrenceOverride(recurrenceEventOverride);
     cache
         .recurrenceEventOverrides()
@@ -239,7 +247,7 @@ public class GoogleCalendarRecurrenceChangeService {
         recurrenceMappingCommandService.createOverrideMapping(
             new GoogleCalendarRecurrenceOverrideMapping(
                 recurrenceEventMapping,
-                recurrenceEventOverride,
+                recurrenceEventOverride.getOriginStartAt(),
                 item.externalEventId(),
                 item.providerEtag()));
     cache.googleOverrideMappings().put(existingOverride.googleOverrideKey(), googleOverrideMapping);
@@ -255,19 +263,19 @@ public class GoogleCalendarRecurrenceChangeService {
     }
     GoogleCalendarEffectiveScope scope =
         GoogleCalendarEffectiveScope.recurrenceOverride(
-            recurrenceEventMapping.getRecurrenceEvent().getId(), item.originStartAt());
+            recurrenceEventMapping.getRecurrenceEventId(), item.originStartAt());
     if (mapping.getProviderEtag().equals(item.providerEtag())) {
       return;
     }
     if (operationJobQueryService.hasPendingOutboundJob(
         recurrenceEventMapping.getConnection().getAccountId(),
-        recurrenceEventMapping.getConnection().getId(),
+        recurrenceEventMapping.getConnection().getIntegration().getId(),
         scope)) {
       mapping.markConflicted();
       recordSyncConflict(mapping, ownership);
       return;
     }
-    updateRecurrenceEventOverride(mapping.getRecurrenceEventOverride(), item);
+    updateRecurrenceEventOverride(recurrenceOverride(mapping), item);
     mapping.updateProviderEtag(item.providerEtag());
   }
 
@@ -278,7 +286,12 @@ public class GoogleCalendarRecurrenceChangeService {
       recurrenceMappingCommandService.deleteOverrideMappings(overrideMappings);
     }
     recurrenceMappingCommandService.deleteRecurrenceEventMapping(recurrenceEventMapping);
-    Long recurrenceEventId = recurrenceEventMapping.getRecurrenceEvent().getId();
+    Long recurrenceEventId = recurrenceEventMapping.getRecurrenceEventId();
+    if (!recurrenceMappingQueryService
+        .listRecurrenceEventIdsWithMappings(List.of(recurrenceEventId))
+        .isEmpty()) {
+      return;
+    }
     recurrenceEventCommandService.deleteRecurrenceOverridesByRecurrenceEventIds(
         List.of(recurrenceEventId));
     eventCommandService.deleteEventsByRecurrenceEventIds(List.of(recurrenceEventId));
@@ -289,7 +302,7 @@ public class GoogleCalendarRecurrenceChangeService {
       GoogleCalendarRecurrenceOverrideMapping googleOverrideMapping,
       RecurrenceEventOverrideKey expectedOverrideKey) {
     RecurrenceEventOverride mappedRecurrenceEventOverride =
-        googleOverrideMapping.getRecurrenceEventOverride();
+        recurrenceOverride(googleOverrideMapping);
     RecurrenceEventOverrideKey mappedOverrideKey =
         new RecurrenceEventOverrideKey(
             mappedRecurrenceEventOverride.getRecurrenceId(),
@@ -314,9 +327,12 @@ public class GoogleCalendarRecurrenceChangeService {
             .anyMatch(
                 mapping ->
                     mapping
-                            .getRecurrenceEventOverride()
-                            .getOverrideId()
-                            .equals(recurrenceEventOverride.getOverrideId())
+                            .getRecurrenceEventMapping()
+                            .getRecurrenceEventId()
+                            .equals(recurrenceEventOverride.getRecurrenceId())
+                        && mapping
+                            .getOriginStartAt()
+                            .equals(recurrenceEventOverride.getOriginStartAt())
                         && !mapping.getExternalEventId().equals(item.externalEventId()));
     if (mappedToDifferentGoogleEvent) {
       throw new CalioException(ErrorCode.GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID);
@@ -354,6 +370,14 @@ public class GoogleCalendarRecurrenceChangeService {
       GoogleCalendarRecurrenceEventMapping mapping, GoogleCalendarPageOwnership ownership) {
     operationJobService.recordSyncConflict(
         ownership.jobId(), mapping.getConnection().getAccountId(), ownership.workerToken());
+  }
+
+  private RecurrenceEventOverride recurrenceOverride(
+      GoogleCalendarRecurrenceOverrideMapping mapping) {
+    return recurrenceEventQueryService
+        .getOverrideIfExists(
+            mapping.getRecurrenceEventMapping().getRecurrenceEventId(), mapping.getOriginStartAt())
+        .orElseThrow(() -> new CalioException(ErrorCode.GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID));
   }
 
   private void recordSyncConflict(

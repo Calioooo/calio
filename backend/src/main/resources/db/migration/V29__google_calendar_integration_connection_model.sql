@@ -4,6 +4,9 @@ ALTER TABLE google_calendar_connections
     RENAME COLUMN integration_state TO connection_state;
 
 ALTER TABLE google_calendar_connections
+    DROP FOREIGN KEY fk_google_calendar_integrations_account;
+
+ALTER TABLE google_calendar_connections
     DROP INDEX uk_google_calendar_integration_account_id;
 
 CREATE TABLE google_calendar_integrations (
@@ -33,6 +36,9 @@ SET connection.integration_id = (
 
 ALTER TABLE google_calendar_connections
     MODIFY COLUMN integration_id BIGINT NOT NULL;
+
+ALTER TABLE google_calendar_connections
+    DROP COLUMN account_id;
 
 ALTER TABLE google_calendar_connections
     ADD COLUMN active_connection_marker TINYINT

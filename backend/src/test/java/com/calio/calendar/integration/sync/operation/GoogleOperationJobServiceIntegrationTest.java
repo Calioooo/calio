@@ -9,11 +9,16 @@ import com.calio.calendar.integration.connection.domain.GoogleCalendarConnection
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.connection.repository.GoogleCalendarConnectionRepository;
 import com.calio.calendar.integration.connection.repository.GoogleCalendarIntegrationRepository;
+import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarRecurrenceJob;
+import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarRecurrenceJobKind;
+import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarSyncJob;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJob;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobTrigger;
 import com.calio.calendar.integration.sync.operation.repository.GoogleOperationJobRepository;
+import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceJobPayload;
 import java.time.Instant;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,6 +49,50 @@ class GoogleOperationJobServiceIntegrationTest {
   @Autowired private AccountRepository accountRepository;
 
   @Test
+  @DisplayName("recurrence discriminator는 concrete subtype과 exact origin payload를 다시 hydrate한다")
+  void recurrenceJobRoundTripsAsConcreteSubtype() {
+    Account account = accountRepository.saveAndFlush(new Account());
+    GoogleCalendarConnection connection = connection(account.getId());
+    Instant origin = Instant.parse("2026-09-04T00:00:00Z");
+    GoogleCalendarRecurrenceJob saved =
+        jobRepository.saveAndFlush(
+            GoogleCalendarRecurrenceJob.create(
+                "recurrence-operation",
+                connection.getIntegration().getId(),
+                account.getId(),
+                connection.getIntegration().allocateGoogleOperationSequence(),
+                GoogleCalendarRecurrenceJobKind.OVERRIDE_UPSERT,
+                40L,
+                origin,
+                new GoogleRecurrenceJobPayload(
+                    "moved",
+                    null,
+                    Instant.parse("2026-09-04T00:00:00Z"),
+                    Instant.parse("2026-09-04T01:00:00Z"),
+                    false,
+                    "UTC",
+                    List.of()),
+                null,
+                Instant.now()));
+    org.springframework.test.context.transaction.TestTransaction.flagForCommit();
+    org.springframework.test.context.transaction.TestTransaction.end();
+    org.springframework.test.context.transaction.TestTransaction.start();
+
+    GoogleOperationJob loaded = jobRepository.findById(saved.getId()).orElseThrow();
+
+    assertThat(loaded)
+        .isInstanceOfSatisfying(
+            GoogleCalendarRecurrenceJob.class,
+            recurrence -> {
+              assertThat(recurrence.getKind())
+                  .isEqualTo(GoogleCalendarRecurrenceJobKind.OVERRIDE_UPSERT);
+              assertThat(recurrence.getRecurrenceEventId()).isEqualTo(40L);
+              assertThat(recurrence.getOriginStartAt()).isEqualTo(origin);
+              assertThat(recurrence.getTargetPayload().title()).isEqualTo("moved");
+            });
+  }
+
+  @Test
   @DisplayName("앞선 Job의 실행 시각이 남아 있으면 뒤의 실행 가능한 Job을 먼저 실행하지 않는다")
   void givenEarlierJobScheduledForLater_whenLaterJobIsRunnable_thenDoesNotRunLaterJob() {
     // given
@@ -51,7 +100,8 @@ class GoogleOperationJobServiceIntegrationTest {
     assertThat(leaseService.acquire(fixture.accountId(), "worker-a")).isTrue();
 
     // when
-    GoogleOperationJob claimed = jobService.claimNextJob(fixture.accountId(), "worker-a");
+    GoogleOperationJob claimed =
+        jobService.claimNextJob(fixture.accountId(), fixture.integrationId(), "worker-a");
 
     // then
     assertThat(claimed).isNull();
@@ -73,9 +123,11 @@ class GoogleOperationJobServiceIntegrationTest {
     assertThat(leaseService.acquire(fixture.accountId(), "worker-a")).isTrue();
 
     // when
-    GoogleOperationJob first = jobService.claimNextJob(fixture.accountId(), "worker-a");
+    GoogleOperationJob first =
+        jobService.claimNextJob(fixture.accountId(), fixture.integrationId(), "worker-a");
     jobService.succeed(first.getId(), fixture.accountId(), "worker-a");
-    GoogleOperationJob second = jobService.claimNextJob(fixture.accountId(), "worker-a");
+    GoogleOperationJob second =
+        jobService.claimNextJob(fixture.accountId(), fixture.integrationId(), "worker-a");
 
     // then
     assertThat(first.getId()).isEqualTo(fixture.firstJobId());
@@ -91,7 +143,8 @@ class GoogleOperationJobServiceIntegrationTest {
     // given
     JobFixture fixture = jobs(Instant.now().minusSeconds(60));
     assertThat(leaseService.acquire(fixture.accountId(), "worker-a")).isTrue();
-    GoogleOperationJob claimed = jobService.claimNextJob(fixture.accountId(), "worker-a");
+    GoogleOperationJob claimed =
+        jobService.claimNextJob(fixture.accountId(), fixture.integrationId(), "worker-a");
     Instant beforeRetry = Instant.now();
 
     // when
@@ -116,7 +169,8 @@ class GoogleOperationJobServiceIntegrationTest {
     // given
     JobFixture fixture = jobs(Instant.now().minusSeconds(60));
     assertThat(leaseService.acquire(fixture.accountId(), "worker-a")).isTrue();
-    GoogleOperationJob claimed = jobService.claimNextJob(fixture.accountId(), "worker-a");
+    GoogleOperationJob claimed =
+        jobService.claimNextJob(fixture.accountId(), fixture.integrationId(), "worker-a");
 
     // when, then
     assertThatThrownBy(() -> jobService.retry(claimed, "worker-b", "TRANSIENT_FAILURE"))
@@ -143,7 +197,8 @@ class GoogleOperationJobServiceIntegrationTest {
     // given
     JobFixture fixture = jobs(Instant.now().minusSeconds(60));
     assertThat(leaseService.acquire(fixture.accountId(), "worker-a")).isTrue();
-    GoogleOperationJob claimed = jobService.claimNextJob(fixture.accountId(), "worker-a");
+    GoogleOperationJob claimed =
+        jobService.claimNextJob(fixture.accountId(), fixture.integrationId(), "worker-a");
     leaseService.extend(claimed.getId(), fixture.accountId(), "worker-a");
     leaseService.release(fixture.accountId(), "worker-a");
 
@@ -158,7 +213,8 @@ class GoogleOperationJobServiceIntegrationTest {
     // given
     JobFixture fixture = jobs(Instant.now().minusSeconds(60));
     assertThat(leaseService.acquire(fixture.accountId(), "worker-a")).isTrue();
-    GoogleOperationJob claimed = jobService.claimNextJob(fixture.accountId(), "worker-a");
+    GoogleOperationJob claimed =
+        jobService.claimNextJob(fixture.accountId(), fixture.integrationId(), "worker-a");
 
     // when
     jobService.terminate(claimed.getId(), fixture.accountId(), "worker-a", "PERMANENT_FAILURE");
@@ -182,11 +238,11 @@ class GoogleOperationJobServiceIntegrationTest {
     for (int index = 0; index < runnableTimes.length; index++) {
       GoogleOperationJob job =
           jobRepository.saveAndFlush(
-              GoogleOperationJob.sync(
+              GoogleCalendarSyncJob.create(
                   "operation-" + index,
-                  connection.getId(),
+                  connection.getIntegration().getId(),
                   account.getId(),
-                  connection.allocateGoogleOperationSequence(),
+                  connection.getIntegration().allocateGoogleOperationSequence(),
                   GoogleOperationJobTrigger.MANUAL,
                   runnableTimes[index]));
       if (index == 0) {
@@ -195,7 +251,8 @@ class GoogleOperationJobServiceIntegrationTest {
         secondJobId = job.getId();
       }
     }
-    return new JobFixture(account.getId(), firstJobId, secondJobId);
+    return new JobFixture(
+        account.getId(), connection.getIntegration().getId(), firstJobId, secondJobId);
   }
 
   private GoogleCalendarConnection connection(Long accountId) {
@@ -212,5 +269,6 @@ class GoogleOperationJobServiceIntegrationTest {
             Instant.now()));
   }
 
-  private record JobFixture(Long accountId, Long firstJobId, Long secondJobId) {}
+  private record JobFixture(
+      Long accountId, Long integrationId, Long firstJobId, Long secondJobId) {}
 }

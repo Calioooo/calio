@@ -3,9 +3,9 @@ package com.calio.calendar.integration.connection.service;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarConnection;
+import com.calio.calendar.integration.connection.domain.GoogleCalendarConnectionState;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.connection.repository.GoogleCalendarConnectionRepository;
-import com.calio.calendar.integration.sync.operation.GoogleOperationOwnershipLostException;
 import java.time.Instant;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
@@ -21,16 +21,36 @@ public class GoogleCalendarConnectionCommandService {
 
   public GoogleCalendarConnection lockConnectedConnection(Long accountId) {
     return connectionRepository
-        .findConnectedByAccountIdForUpdate(accountId)
+        .findWithIntegrationByAccountIdAndStateForUpdate(
+            accountId, GoogleCalendarConnectionState.CONNECTED)
         .orElseThrow(() -> new CalioException(ErrorCode.GOOGLE_CALENDAR_NOT_CONNECTED));
   }
 
   public Optional<GoogleCalendarConnection> tryLockConnectedConnection(Long accountId) {
-    return connectionRepository.findConnectedByAccountIdForUpdate(accountId);
+    return connectionRepository.findWithIntegrationByAccountIdAndStateForUpdate(
+        accountId, GoogleCalendarConnectionState.CONNECTED);
   }
 
-  public Optional<GoogleCalendarConnection> tryLockConnection(Long accountId) {
-    return connectionRepository.findSingleConnectionByAccountIdForUpdate(accountId);
+  public Optional<GoogleCalendarConnection> tryLockConnection(
+      Long integrationId, String googleSubject) {
+    return connectionRepository.findWithIntegrationByIntegrationIdAndGoogleSubjectForUpdate(
+        integrationId, googleSubject);
+  }
+
+  public Optional<GoogleCalendarConnection> tryLockConnectionByIntegrationAndState(
+      Long integrationId, GoogleCalendarConnectionState state) {
+    return connectionRepository.findWithIntegrationByIntegrationIdAndStateForUpdate(
+        integrationId, state);
+  }
+
+  public Optional<GoogleCalendarConnection> tryLockDisconnectableConnectionByIntegration(
+      Long integrationId) {
+    return tryLockConnectionByIntegrationAndState(
+            integrationId, GoogleCalendarConnectionState.CONNECTED)
+        .or(
+            () ->
+                connectionRepository.findFirstByIntegration_IdAndStateOrderBySyncErrorAtDescIdDesc(
+                    integrationId, GoogleCalendarConnectionState.SYNC_ERROR));
   }
 
   public GoogleCalendarConnection lockConnectedConnectionById(Long connectionId) {
@@ -40,7 +60,7 @@ public class GoogleCalendarConnectionCommandService {
 
   public Optional<GoogleCalendarConnection> tryLockConnectedConnectionById(Long connectionId) {
     return connectionRepository
-        .findByIdForUpdate(connectionId)
+        .findWithIntegrationByIdForUpdate(connectionId)
         .filter(GoogleCalendarConnection::isConnected);
   }
 
@@ -95,31 +115,9 @@ public class GoogleCalendarConnectionCommandService {
     connectionRepository.saveAndFlush(connection);
   }
 
-  public void markConnectedConnectionSyncError(Long accountId, String reason, Instant occurredAt) {
-    tryLockConnectedConnection(accountId)
-        .ifPresent(
-            connection -> {
-              connection.markSyncError(reason, occurredAt);
-              connectionRepository.saveAndFlush(connection);
-            });
-  }
-
-  public long allocateOperationSequence(GoogleCalendarConnection connection) {
-    return connection.allocateGoogleOperationSequence();
-  }
-
-  public boolean acquireOperationLease(Long accountId, String ownerToken, long seconds) {
-    return connectionRepository.acquireGoogleOperationLease(accountId, ownerToken, seconds) == 1;
-  }
-
-  public void extendOperationLease(Long jobId, Long accountId, String ownerToken, long seconds) {
-    if (connectionRepository.renewOwnedGoogleOperationLease(jobId, accountId, ownerToken, seconds)
-        != 1) {
-      throw new GoogleOperationOwnershipLostException();
-    }
-  }
-
-  public boolean releaseOperationLease(Long accountId, String ownerToken) {
-    return connectionRepository.releaseGoogleOperationLease(accountId, ownerToken) == 1;
+  public void markSyncError(
+      GoogleCalendarConnection connection, String reason, Instant occurredAt) {
+    connection.markSyncError(reason, occurredAt);
+    connectionRepository.saveAndFlush(connection);
   }
 }

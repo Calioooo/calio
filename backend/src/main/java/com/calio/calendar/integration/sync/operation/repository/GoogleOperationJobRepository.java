@@ -16,14 +16,15 @@ public interface GoogleOperationJobRepository extends JpaRepository<GoogleOperat
       value =
           """
             SELECT * FROM google_operation_jobs job
-            WHERE job.account_id = :accountId
+            WHERE job.integration_id = :integrationId
               AND job.job_state IN ('PENDING', 'PROCESSING')
-            ORDER BY job.account_sequence
+            ORDER BY job.integration_sequence
             LIMIT 1
             FOR UPDATE
             """,
       nativeQuery = true)
-  Optional<GoogleOperationJob> findAccountHeadForUpdate(@Param("accountId") Long accountId);
+  Optional<GoogleOperationJob> findIntegrationHeadForUpdate(
+      @Param("integrationId") Long integrationId);
 
   @Modifying(flushAutomatically = true, clearAutomatically = true)
   @Query(
@@ -36,10 +37,10 @@ public interface GoogleOperationJobRepository extends JpaRepository<GoogleOperat
             WHERE id = :jobId AND job_state = 'PROCESSING'
               AND owner_token = :owner
               AND EXISTS (
-                  SELECT 1 FROM google_calendar_connections connection
-                  WHERE connection.id = google_operation_jobs.connection_id
-                    AND connection.google_operation_lease_owner = :owner
-                    AND connection.google_operation_lease_expires_at >= CURRENT_TIMESTAMP
+                  SELECT 1 FROM google_calendar_integrations integration
+                  WHERE integration.id = google_operation_jobs.integration_id
+                    AND integration.google_operation_lease_owner = :owner
+                    AND integration.google_operation_lease_expires_at >= CURRENT_TIMESTAMP
               )
             """,
       nativeQuery = true)
@@ -60,10 +61,10 @@ public interface GoogleOperationJobRepository extends JpaRepository<GoogleOperat
             WHERE id = :jobId AND job_state = 'PROCESSING'
               AND owner_token = :owner
               AND EXISTS (
-                  SELECT 1 FROM google_calendar_connections connection
-                  WHERE connection.id = google_operation_jobs.connection_id
-                    AND connection.google_operation_lease_owner = :owner
-                    AND connection.google_operation_lease_expires_at >= CURRENT_TIMESTAMP
+                  SELECT 1 FROM google_calendar_integrations integration
+                  WHERE integration.id = google_operation_jobs.integration_id
+                    AND integration.google_operation_lease_owner = :owner
+                    AND integration.google_operation_lease_expires_at >= CURRENT_TIMESTAMP
               )
             """,
       nativeQuery = true)
@@ -78,10 +79,10 @@ public interface GoogleOperationJobRepository extends JpaRepository<GoogleOperat
             WHERE id = :jobId AND job_state = 'PROCESSING'
               AND owner_token = :owner
               AND EXISTS (
-                  SELECT 1 FROM google_calendar_connections connection
-                  WHERE connection.id = google_operation_jobs.connection_id
-                    AND connection.google_operation_lease_owner = :owner
-                    AND connection.google_operation_lease_expires_at >= CURRENT_TIMESTAMP
+                  SELECT 1 FROM google_calendar_integrations integration
+                  WHERE integration.id = google_operation_jobs.integration_id
+                    AND integration.google_operation_lease_owner = :owner
+                    AND integration.google_operation_lease_expires_at >= CURRENT_TIMESTAMP
               )
             """,
       nativeQuery = true)
@@ -96,10 +97,10 @@ public interface GoogleOperationJobRepository extends JpaRepository<GoogleOperat
             WHERE id = :jobId AND job_state = 'PROCESSING'
               AND owner_token = :owner
               AND EXISTS (
-                  SELECT 1 FROM google_calendar_connections connection
-                  WHERE connection.id = google_operation_jobs.connection_id
-                    AND connection.google_operation_lease_owner = :owner
-                    AND connection.google_operation_lease_expires_at >= CURRENT_TIMESTAMP
+                  SELECT 1 FROM google_calendar_integrations integration
+                  WHERE integration.id = google_operation_jobs.integration_id
+                    AND integration.google_operation_lease_owner = :owner
+                    AND integration.google_operation_lease_expires_at >= CURRENT_TIMESTAMP
               )
             """,
       nativeQuery = true)
@@ -116,10 +117,10 @@ public interface GoogleOperationJobRepository extends JpaRepository<GoogleOperat
             WHERE id = :jobId AND job_state = 'PROCESSING'
               AND owner_token = :owner AND conflict_detected = TRUE
               AND EXISTS (
-                  SELECT 1 FROM google_calendar_connections connection
-                  WHERE connection.id = google_operation_jobs.connection_id
-                    AND connection.google_operation_lease_owner = :owner
-                    AND connection.google_operation_lease_expires_at >= CURRENT_TIMESTAMP
+                  SELECT 1 FROM google_calendar_integrations integration
+                  WHERE integration.id = google_operation_jobs.integration_id
+                    AND integration.google_operation_lease_owner = :owner
+                    AND integration.google_operation_lease_expires_at >= CURRENT_TIMESTAMP
               )
             """,
       nativeQuery = true)
@@ -136,10 +137,10 @@ public interface GoogleOperationJobRepository extends JpaRepository<GoogleOperat
             WHERE id = :jobId AND job_state = 'PROCESSING'
               AND owner_token = :owner
               AND EXISTS (
-                  SELECT 1 FROM google_calendar_connections connection
-                  WHERE connection.id = google_operation_jobs.connection_id
-                    AND connection.google_operation_lease_owner = :owner
-                    AND connection.google_operation_lease_expires_at >= CURRENT_TIMESTAMP
+                  SELECT 1 FROM google_calendar_integrations integration
+                  WHERE integration.id = google_operation_jobs.integration_id
+                    AND integration.google_operation_lease_owner = :owner
+                    AND integration.google_operation_lease_expires_at >= CURRENT_TIMESTAMP
               )
             """,
       nativeQuery = true)
@@ -153,7 +154,7 @@ public interface GoogleOperationJobRepository extends JpaRepository<GoogleOperat
                    or job.state = com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState.PROCESSING)
               and exists (
                   select 1 from GoogleCalendarConnection connection
-                  where connection.id = job.connectionId
+                  where connection.integration.id = job.integrationId
                     and connection.state = com.calio.calendar.integration.connection.domain.GoogleCalendarConnectionState.CONNECTED
               )
             order by job.accountId
@@ -173,51 +174,57 @@ public interface GoogleOperationJobRepository extends JpaRepository<GoogleOperat
   @Query(
       """
             select (count(job) > 0)
-            from GoogleOperationJob job
+            from GoogleCalendarEventJob job
             where job.accountId = :accountId
-              and job.connectionId = :connectionId
-              and job.kind <> 'SYNC'
-              and job.effectiveResourceScope = :scope
-              and job.effectiveResourceKey = :key
+              and job.integrationId = :integrationId
+              and job.eventId = :eventId
               and job.state in (
                   com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState.PENDING,
                   com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState.PROCESSING
               )
             """)
-  boolean existsPendingOutboundJob(
+  boolean existsPendingEventJob(
       @Param("accountId") Long accountId,
-      @Param("connectionId") Long connectionId,
-      @Param("scope") String scope,
-      @Param("key") String key);
+      @Param("integrationId") Long integrationId,
+      @Param("eventId") Long eventId);
 
   @Query(
       """
             select (count(job) > 0)
-            from GoogleOperationJob job
+            from GoogleCalendarRecurrenceJob job
             where job.accountId = :accountId
-              and job.connectionId = :connectionId
-              and job.kind <> 'SYNC'
+              and job.integrationId = :integrationId
+              and job.target.recurrenceEventId = :recurrenceEventId
               and job.state in (
                   com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState.PENDING,
                   com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState.PROCESSING
               )
-              and (
-                  (job.effectiveResourceScope = :recurrenceEventScope
-                   and job.effectiveResourceKey = :recurrenceEventKey)
-                  or
-                  (job.effectiveResourceScope = :recurrenceOverrideScope
-                   and job.effectiveResourceKey like concat(:overrideKeyPrefix, '%'))
+            """)
+  boolean existsPendingRecurrenceAggregateJob(
+      @Param("accountId") Long accountId,
+      @Param("integrationId") Long integrationId,
+      @Param("recurrenceEventId") Long recurrenceEventId);
+
+  @Query(
+      """
+            select (count(job) > 0)
+            from GoogleCalendarRecurrenceJob job
+            where job.accountId = :accountId
+              and job.integrationId = :integrationId
+              and job.target.recurrenceEventId = :recurrenceEventId
+              and job.target.originStartAt = :originStartAt
+              and job.state in (
+                  com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState.PENDING,
+                  com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState.PROCESSING
               )
             """)
-  boolean existsPendingOutboundJobForRecurrenceAggregate(
+  boolean existsPendingRecurrenceOverrideJob(
       @Param("accountId") Long accountId,
-      @Param("connectionId") Long connectionId,
-      @Param("recurrenceEventScope") String recurrenceEventScope,
-      @Param("recurrenceEventKey") String recurrenceEventKey,
-      @Param("recurrenceOverrideScope") String recurrenceOverrideScope,
-      @Param("overrideKeyPrefix") String overrideKeyPrefix);
+      @Param("integrationId") Long integrationId,
+      @Param("recurrenceEventId") Long recurrenceEventId,
+      @Param("originStartAt") Instant originStartAt);
 
   @Modifying(flushAutomatically = true, clearAutomatically = true)
-  @Query("delete from GoogleOperationJob job where job.connectionId = :connectionId")
-  int deleteByConnectionId(@Param("connectionId") Long connectionId);
+  @Query("delete from GoogleOperationJob job where job.integrationId = :integrationId")
+  int deleteByIntegrationId(@Param("integrationId") Long integrationId);
 }

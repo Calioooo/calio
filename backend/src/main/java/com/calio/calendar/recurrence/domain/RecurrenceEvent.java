@@ -5,6 +5,7 @@ import com.calio.calendar.common.domain.BaseEntity;
 import com.calio.calendar.tag.domain.Tag;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -20,127 +21,107 @@ import java.util.List;
 @Table(name = "recurrence_events")
 public class RecurrenceEvent extends BaseEntity {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
 
-    @Column(name = "recurrence_title", nullable = false)
-    private String title;
+  @Column(name = "recurrence_title", nullable = false)
+  private String title;
 
-    @Column(name = "recurrence_description")
-    private String description;
+  @Column(name = "recurrence_description")
+  private String description;
 
-    @Column(name = "all_day", nullable = false)
-    private boolean allDay;
+  @Embedded private RecurrenceSchedule schedule;
 
-    @Column(name = "time_zone")
-    private String timeZone;
+  @Column(name = "recurrence_rule", nullable = false, columnDefinition = "TEXT")
+  @Convert(converter = RecurrenceRuleJsonConverter.class)
+  private List<String> recurrenceRules = List.of();
 
-    @Column(name = "first_occurrence_start_at", nullable = false)
-    private Instant firstOccurrenceStartAt;
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "account_id", nullable = false)
+  private Account account;
 
-    @Column(name = "first_occurrence_end_at", nullable = false)
-    private Instant firstOccurrenceEndAt;
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "tag_id", nullable = false)
+  private Tag tag;
 
-    @Column(name = "recurrence_rule", nullable = false, columnDefinition = "TEXT")
-    @Convert(converter = RecurrenceRuleJsonConverter.class)
-    private List<String> recurrenceRules = List.of();
+  protected RecurrenceEvent() {}
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "account_id", nullable = false)
-    private Account account;
+  public RecurrenceEvent(
+      String title,
+      String description,
+      RecurrenceSchedule schedule,
+      List<String> recurrenceRules,
+      Tag tag,
+      Account account) {
+    this.title = title;
+    this.description = description;
+    replaceSchedule(schedule, recurrenceRules);
+    this.tag = tag;
+    this.account = account;
+  }
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "tag_id", nullable = false)
-    private Tag tag;
+  public void update(
+      String title,
+      String description,
+      RecurrenceSchedule schedule,
+      List<String> recurrenceRules,
+      Tag tag) {
+    this.title = title;
+    this.description = description;
+    replaceSchedule(schedule, recurrenceRules);
+    this.tag = tag;
+  }
 
-    protected RecurrenceEvent() {
-    }
+  public void updateProviderContent(
+      String title, String description, RecurrenceSchedule schedule, List<String> recurrenceRules) {
+    this.title = title;
+    this.description = description;
+    replaceSchedule(schedule, recurrenceRules);
+  }
 
-    public RecurrenceEvent(
-            String title,
-            String description,
-            RecurrenceSchedule schedule,
-            List<String> recurrenceRules,
-            Tag tag,
-            Account account
-    ) {
-        this.title = title;
-        this.description = description;
-        replaceSchedule(schedule, recurrenceRules);
-        this.tag = tag;
-        this.account = account;
-    }
+  private void replaceSchedule(RecurrenceSchedule schedule, List<String> recurrenceRules) {
+    this.schedule = schedule;
+    this.recurrenceRules = List.copyOf(recurrenceRules);
+  }
 
-    public void update(
-            String title,
-            String description,
-            RecurrenceSchedule schedule,
-            List<String> recurrenceRules,
-            Tag tag
-    ) {
-        this.title = title;
-        this.description = description;
-        replaceSchedule(schedule, recurrenceRules);
-        this.tag = tag;
-    }
+  public Long getId() {
+    return id;
+  }
 
-    public void updateProviderContent(
-            String title,
-            String description,
-            RecurrenceSchedule schedule,
-            List<String> recurrenceRules
-    ) {
-        this.title = title;
-        this.description = description;
-        replaceSchedule(schedule, recurrenceRules);
-    }
+  public String getTitle() {
+    return title;
+  }
 
-    private void replaceSchedule(RecurrenceSchedule schedule, List<String> recurrenceRules) {
-        this.allDay = schedule.allDay();
-        this.timeZone = schedule.timeZone();
-        this.firstOccurrenceStartAt = schedule.firstOccurrenceStartAt();
-        this.firstOccurrenceEndAt = schedule.firstOccurrenceEndAt();
-        this.recurrenceRules = List.copyOf(recurrenceRules);
-    }
+  public String getDescription() {
+    return description;
+  }
 
-    public Long getId() {
-        return id;
-    }
+  public boolean isAllDay() {
+    return schedule.allDay();
+  }
 
-    public String getTitle() {
-        return title;
-    }
+  public String getTimeZone() {
+    return schedule.timeZone();
+  }
 
-    public String getDescription() {
-        return description;
-    }
+  public Instant getFirstOccurrenceStartAt() {
+    return schedule.firstOccurrenceStartAt();
+  }
 
-    public boolean isAllDay() {
-        return allDay;
-    }
+  public Instant getFirstOccurrenceEndAt() {
+    return schedule.firstOccurrenceEndAt();
+  }
 
-    public String getTimeZone() {
-        return timeZone;
-    }
+  public List<String> getRecurrenceRules() {
+    return recurrenceRules;
+  }
 
-    public Instant getFirstOccurrenceStartAt() {
-        return firstOccurrenceStartAt;
-    }
+  public Tag getTag() {
+    return tag;
+  }
 
-    public Instant getFirstOccurrenceEndAt() {
-        return firstOccurrenceEndAt;
-    }
-
-    public List<String> getRecurrenceRules() {
-        return recurrenceRules;
-    }
-
-    public Tag getTag() {
-        return tag;
-    }
-
-    public Account getAccount() {
-        return account;
-    }
+  public Account getAccount() {
+    return account;
+  }
 }

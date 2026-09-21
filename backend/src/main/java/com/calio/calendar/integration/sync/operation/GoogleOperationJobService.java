@@ -34,8 +34,8 @@ public class GoogleOperationJobService {
   }
 
   @Transactional
-  public GoogleOperationJob claimNextJob(Long accountId, String workerToken) {
-    GoogleOperationJob head = jobCommandService.tryLockNextOperationJob(accountId).orElse(null);
+  public GoogleOperationJob claimNextJob(Long accountId, Long integrationId, String workerToken) {
+    GoogleOperationJob head = jobCommandService.tryLockNextOperationJob(integrationId).orElse(null);
     if (head == null) {
       log.debug("Google operation head not found. accountId={} state=EMPTY", accountId);
       return null;
@@ -131,6 +131,12 @@ public class GoogleOperationJobService {
   public void recordSyncConflict(Long jobId, Long accountId, String workerToken) {
     jobCommandService.markConflictDetected(jobId, workerToken);
     log.info("Google sync conflict detected. accountId={} jobId={}", accountId, jobId);
+  }
+
+  @Transactional
+  public void completeWithConflict(Long jobId, Long accountId, String workerToken) {
+    recordSyncConflict(jobId, accountId, workerToken);
+    completeSyncRun(jobId, accountId, workerToken);
   }
 
   @Transactional

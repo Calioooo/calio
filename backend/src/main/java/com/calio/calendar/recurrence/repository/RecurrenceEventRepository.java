@@ -16,45 +16,43 @@ import org.springframework.data.repository.query.Param;
 
 public interface RecurrenceEventRepository extends JpaRepository<RecurrenceEvent, Long> {
 
-    Optional<RecurrenceEvent> findByIdAndAccount_Id(Long id, Long accountId);
+  Optional<RecurrenceEvent> findByIdAndAccount_Id(Long id, Long accountId);
 
-    @EntityGraph(attributePaths = "tag")
-    @Query("""
+  @EntityGraph(attributePaths = "tag")
+  @Query(
+      """
             select recurrenceEvent
             from RecurrenceEvent recurrenceEvent
             where recurrenceEvent.account.id = :accountId
-              and recurrenceEvent.firstOccurrenceStartAt < :to
+              and recurrenceEvent.schedule.firstOccurrenceStartAt < :to
             """)
-    List<RecurrenceEvent> findExpansionCandidatesStartedBefore(
-            @Param("accountId") Long accountId,
-            @Param("to") Instant to
-    );
+  List<RecurrenceEvent> findExpansionCandidatesStartedBefore(
+      @Param("accountId") Long accountId, @Param("to") Instant to);
 
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("""
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query(
+      """
             select recurrenceEvent
             from RecurrenceEvent recurrenceEvent
             where recurrenceEvent.id = :recurrenceId
               and recurrenceEvent.account.id = :accountId
             """)
-    Optional<RecurrenceEvent> findByIdAndAccountIdForUpdate(
-            @Param("recurrenceId") Long recurrenceId,
-            @Param("accountId") Long accountId
-    );
+  Optional<RecurrenceEvent> findByIdAndAccountIdForUpdate(
+      @Param("recurrenceId") Long recurrenceId, @Param("accountId") Long accountId);
 
-    @Modifying(flushAutomatically = true)
-    @Query("""
+  @Modifying(flushAutomatically = true)
+  @Query(
+      """
             update RecurrenceEvent recurrenceEvent
             set recurrenceEvent.tag = :fallbackTag
             where recurrenceEvent.tag = :sourceTag and recurrenceEvent.account.id = :accountId
             """)
-    int reassignAllByTagAndAccountId(
-            @Param("sourceTag") Tag sourceTag,
-            @Param("fallbackTag") Tag fallbackTag,
-            @Param("accountId") Long accountId
-    );
+  int reassignAllByTagAndAccountId(
+      @Param("sourceTag") Tag sourceTag,
+      @Param("fallbackTag") Tag fallbackTag,
+      @Param("accountId") Long accountId);
 
-    @Modifying(flushAutomatically = true)
-    @Query("delete from RecurrenceEvent recurrenceEvent where recurrenceEvent.id in :ids")
-    int deleteAllByIds(@Param("ids") Collection<Long> ids);
+  @Modifying(flushAutomatically = true)
+  @Query("delete from RecurrenceEvent recurrenceEvent where recurrenceEvent.id in :ids")
+  int deleteAllByIds(@Param("ids") Collection<Long> ids);
 }

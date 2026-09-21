@@ -375,6 +375,27 @@ class GoogleCalendarSyncMigrationTest {
       statement.executeUpdate(
           """
                     UPDATE google_calendar_integrations
+                    SET integration_state = 'SYNC_ERROR',
+                        encrypted_refresh_token = NULL,
+                        encrypted_access_token = NULL,
+                        access_token_expires_at = NULL,
+                        next_sync_token = NULL,
+                        sync_error_reason = 'GOOGLE_CALENDAR_RECONNECT_REQUIRED',
+                        sync_error_at = CURRENT_TIMESTAMP
+                    WHERE id = 900
+                    """);
+      assertThatThrownBy(
+              () ->
+                  statement.executeUpdate(
+                      """
+                    UPDATE google_calendar_integrations
+                    SET encrypted_refresh_token = 'retained-refresh-token'
+                    WHERE id = 900
+                    """))
+          .isInstanceOf(SQLException.class);
+      statement.executeUpdate(
+          """
+                    UPDATE google_calendar_integrations
                     SET integration_state = 'DISCONNECTED',
                         encrypted_refresh_token = NULL,
                         encrypted_access_token = NULL,
@@ -382,7 +403,9 @@ class GoogleCalendarSyncMigrationTest {
                         next_sync_token = NULL,
                         google_operation_lease_owner = NULL,
                         google_operation_lease_expires_at = NULL,
-                        disconnected_at = CURRENT_TIMESTAMP
+                        disconnected_at = CURRENT_TIMESTAMP,
+                        sync_error_reason = NULL,
+                        sync_error_at = NULL
                     WHERE id = 900
                     """);
     }
@@ -405,7 +428,8 @@ class GoogleCalendarSyncMigrationTest {
       assertThat(columnNames(connection, "GOOGLE_CALENDAR_INTEGRATIONS"))
           .containsExactlyInAnyOrder("ID", "ACCOUNT_ID", "CREATED_AT", "UPDATED_AT");
       assertThat(columnNames(connection, "GOOGLE_CALENDAR_CONNECTIONS"))
-          .contains("INTEGRATION_ID", "CONNECTION_STATE", "GOOGLE_SUBJECT", "NEXT_SYNC_TOKEN");
+          .contains("INTEGRATION_ID", "CONNECTION_STATE", "GOOGLE_SUBJECT", "NEXT_SYNC_TOKEN")
+          .doesNotContain("ACCOUNT_ID");
       assertThat(
               singleString(
                   connection,
@@ -476,6 +500,118 @@ class GoogleCalendarSyncMigrationTest {
                     WHERE id = 900
                     """))
           .isEqualTo("900");
+    }
+  }
+
+  @Test
+  @DisplayName("V30은 기존 Connection runtime을 Integration으로 보존해 옮긴다")
+  void givenV29ConnectionRuntime_whenMigrateToV30_thenMovesRuntimeToIntegration() throws Exception {
+    String url = "jdbc:h2:mem:google-integration-job-runtime;MODE=MySQL;DB_CLOSE_DELAY=-1";
+    migrateTo(url, MigrationVersion.fromVersion("16"));
+    insertV16IntegrationRuntime(url);
+    migrateTo(url, MigrationVersion.fromVersion("29"));
+
+    migrateTo(url, MigrationVersion.fromVersion("30"));
+
+    try (Connection connection = DriverManager.getConnection(url, "sa", "");
+        Statement statement = connection.createStatement()) {
+      assertThat(columnNames(connection, "GOOGLE_CALENDAR_INTEGRATIONS"))
+          .contains(
+              "NEXT_GOOGLE_OPERATION_SEQUENCE",
+              "GOOGLE_OPERATION_LEASE_OWNER",
+              "GOOGLE_OPERATION_LEASE_EXPIRES_AT");
+      assertThat(columnNames(connection, "GOOGLE_CALENDAR_CONNECTIONS"))
+          .doesNotContain(
+              "NEXT_GOOGLE_OPERATION_SEQUENCE",
+              "GOOGLE_OPERATION_LEASE_OWNER",
+              "GOOGLE_OPERATION_LEASE_EXPIRES_AT");
+      assertThat(columnNames(connection, "GOOGLE_OPERATION_JOBS"))
+          .contains("INTEGRATION_ID", "INTEGRATION_SEQUENCE")
+          .doesNotContain("CONNECTION_ID", "ACCOUNT_SEQUENCE");
+      assertThat(
+              singleString(
+                  connection,
+                  """
+                    SELECT next_google_operation_sequence
+                    FROM google_calendar_integrations
+                    WHERE account_id = 901
+                    """))
+          .isEqualTo("29");
+      assertThat(
+              singleString(
+                  connection,
+                  """
+                    SELECT google_operation_lease_owner
+                    FROM google_calendar_integrations
+                    WHERE account_id = 901
+                    """))
+          .isEqualTo("worker-token");
+      assertThat(
+              singleString(
+                  connection,
+                  """
+                    SELECT google_operation_lease_expires_at
+                    FROM google_calendar_integrations
+                    WHERE account_id = 901
+                    """))
+          .startsWith("2026-09-01 01:00:00");
+      statement.executeUpdate(
+          """
+                    UPDATE google_calendar_connections
+                    SET connection_state = 'SYNC_ERROR',
+                        encrypted_refresh_token = NULL,
+                        encrypted_access_token = NULL,
+                        access_token_expires_at = NULL,
+                        next_sync_token = NULL,
+                        sync_error_reason = 'GOOGLE_CALENDAR_RECONNECT_REQUIRED',
+                        sync_error_at = CURRENT_TIMESTAMP
+                    WHERE id = 902
+                    """);
+      assertThatThrownBy(
+              () ->
+                  statement.executeUpdate(
+                      """
+                    UPDATE google_calendar_connections
+                    SET encrypted_refresh_token = 'retained-refresh-token'
+                    WHERE id = 902
+                    """))
+          .isInstanceOf(SQLException.class);
+    }
+  }
+
+  @Test
+  @DisplayName("V31은 event operation kind를 nullable로 바꾸고 주기 동기화 제약을 scope 기준으로 유지한다")
+  void givenEmptyDatabase_whenMigrateToV31_thenKeepsActivePeriodicSyncConstraintByScope()
+      throws Exception {
+    String url = "jdbc:h2:mem:google-typed-operation-jobs;MODE=MySQL;DB_CLOSE_DELAY=-1";
+
+    migrateTo(url, MigrationVersion.fromVersion("31"));
+
+    try (Connection connection = DriverManager.getConnection(url, "sa", "")) {
+      assertThat(isNullable(connection, "GOOGLE_OPERATION_JOBS", "EVENT_OPERATION_KIND")).isTrue();
+      assertThat(
+              generationExpression(
+                  connection, "GOOGLE_OPERATION_JOBS", "ACTIVE_PERIODIC_SYNC_ACCOUNT_ID"))
+          .contains("JOB_SCOPE", "JOB_TRIGGER", "JOB_STATE")
+          .doesNotContain("EVENT_OPERATION_KIND");
+      assertThat(indexNames(connection, "GOOGLE_OPERATION_JOBS"))
+          .anyMatch(name -> name.startsWith("UK_GOOGLE_OPERATION_JOBS_ACTIVE_PERIODIC_SYNC"));
+    }
+  }
+
+  @Test
+  @DisplayName("V32는 mapping event ID 조회를 위한 non-unique index를 유지한다")
+  void givenV31Schema_whenMigrateToV32_thenAddsEventIdLookupIndex() throws Exception {
+    // given
+    String url = "jdbc:h2:mem:google-event-mapping-event-id-index;MODE=MySQL;DB_CLOSE_DELAY=-1";
+
+    // when
+    migrateTo(url, MigrationVersion.fromVersion("32"));
+
+    // then
+    try (Connection connection = DriverManager.getConnection(url, "sa", "")) {
+      assertThat(indexNames(connection, "GOOGLE_CALENDAR_EVENT_MAPPINGS"))
+          .contains("IDX_GOOGLE_CALENDAR_MAPPING_EVENT_ID");
     }
   }
 
@@ -621,6 +757,34 @@ class GoogleCalendarSyncMigrationTest {
     }
   }
 
+  private void insertV16IntegrationRuntime(String url) throws Exception {
+    try (Connection connection = DriverManager.getConnection(url, "sa", "");
+        Statement statement = connection.createStatement()) {
+      statement.executeUpdate(
+          """
+                    INSERT INTO accounts (id, created_at, updated_at)
+                    VALUES (901, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))
+                    """);
+      statement.executeUpdate(
+          """
+                    INSERT INTO google_calendar_integrations (
+                        id, account_id, google_subject, google_email,
+                        encrypted_refresh_token, encrypted_access_token, access_token_expires_at,
+                        connected_at, next_sync_token, next_google_operation_sequence,
+                        google_operation_lease_owner, google_operation_lease_expires_at,
+                        created_at, updated_at
+                    )
+                    VALUES (
+                        902, 901, 'subject-901', 'user-901@example.com',
+                        'encrypted-refresh', 'encrypted-access', '2026-09-01 01:00:00',
+                        '2026-09-01 00:00:00', 'cursor-901', 29,
+                        'worker-token', '2026-09-01 01:00:00',
+                        CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+                    )
+                    """);
+    }
+  }
+
   private void insertGoogleProviderAndRecurrenceData(String url) throws Exception {
     try (Connection connection = DriverManager.getConnection(url, "sa", "");
         Statement statement = connection.createStatement()) {
@@ -711,6 +875,19 @@ class GoogleCalendarSyncMigrationTest {
       assertThat(resultSet.next()).isTrue();
       return resultSet.getString(1);
     }
+  }
+
+  private String generationExpression(Connection connection, String tableName, String columnName)
+      throws Exception {
+    return singleString(
+        connection,
+        """
+        SELECT generation_expression
+        FROM information_schema.columns
+        WHERE table_name = '%s'
+          AND column_name = '%s'
+        """
+            .formatted(tableName, columnName));
   }
 
   private Set<String> indexNames(Connection connection, String tableName) throws Exception {
