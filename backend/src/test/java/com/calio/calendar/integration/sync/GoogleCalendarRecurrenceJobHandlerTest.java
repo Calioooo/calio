@@ -1,7 +1,6 @@
 package com.calio.calendar.integration.sync;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
@@ -10,8 +9,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import com.calio.calendar.common.error.CalioException;
-import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.external.google.GoogleCalendarEventVersionConflictException;
 import com.calio.calendar.external.google.GoogleCalendarEventsClient;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventResponse;
@@ -355,10 +352,16 @@ class GoogleCalendarRecurrenceJobHandlerTest {
   }
 
   @Test
-  @DisplayName("CONNECTED recurrence-event가 없는 DELETE는 inactive identity만 localChanged로 남긴다")
+  @DisplayName("CONNECTED recurrence-event가 없는 DELETE는 inactive identity를 삭제 대기로 남긴다")
   void deleteWithoutConnectedRecurrenceEventRetainsInactiveIdentity() {
+    GoogleCalendarRecurrenceEventMapping inactiveMapping = recurrenceEventMapping(connection(31L));
+    when(mappings.listInactiveAndUnchangedRecurrenceEventMappings(20L, 40L))
+        .thenReturn(List.of(inactiveMapping));
+
     handler.execute(job(GoogleCalendarRecurrenceJobKind.RECURRENCE_DELETE, null), "worker");
 
+    assertThat(inactiveMapping.isLocalChanged()).isTrue();
+    assertThat(inactiveMapping.isProviderDeletePending()).isTrue();
     verify(mappings).listInactiveAndUnchangedRecurrenceEventMappings(20L, 40L);
     verify(mappingCommands, never()).deleteRecurrenceAggregateMappings(any());
     verifyNoInteractions(tokens, client);

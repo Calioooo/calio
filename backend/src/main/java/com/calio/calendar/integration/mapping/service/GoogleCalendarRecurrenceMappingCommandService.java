@@ -60,5 +60,4 @@ public class GoogleCalendarRecurrenceMappingCommandService {
     recurrenceMappingRepository.delete(mapping);
     recurrenceMappingRepository.flush();
   }
-
 }

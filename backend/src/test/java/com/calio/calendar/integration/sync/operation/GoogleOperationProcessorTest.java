@@ -16,7 +16,7 @@ import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.external.google.GoogleCalendarInvalidGrantException;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
-import com.calio.calendar.integration.connection.service.GoogleCalendarConnectionCommandService;
+import com.calio.calendar.integration.connection.service.GoogleCalendarConnectionFailureService;
 import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrationQueryService;
 import com.calio.calendar.integration.sync.GoogleCalendarEventJobService;
 import com.calio.calendar.integration.sync.GoogleCalendarRecurrenceJobHandler;
@@ -45,7 +45,7 @@ class GoogleOperationProcessorTest {
   private GoogleCalendarEventJobService eventJobService;
   private GoogleCalendarRecurrenceJobHandler recurrenceJobHandler;
   private GoogleOperationFailureClassifier failureClassifier;
-  private GoogleCalendarConnectionCommandService connectionCommandService;
+  private GoogleCalendarConnectionFailureService connectionFailureService;
   private GoogleCalendarIntegrationQueryService integrationQueryService;
   private GoogleOperationProcessor processor;
 
@@ -57,7 +57,7 @@ class GoogleOperationProcessorTest {
     eventJobService = mock(GoogleCalendarEventJobService.class);
     recurrenceJobHandler = mock(GoogleCalendarRecurrenceJobHandler.class);
     failureClassifier = mock(GoogleOperationFailureClassifier.class);
-    connectionCommandService = mock(GoogleCalendarConnectionCommandService.class);
+    connectionFailureService = mock(GoogleCalendarConnectionFailureService.class);
     integrationQueryService = mock(GoogleCalendarIntegrationQueryService.class);
     GoogleCalendarIntegration integration = mock(GoogleCalendarIntegration.class);
     when(integration.getId()).thenReturn(20L);
@@ -70,7 +70,7 @@ class GoogleOperationProcessorTest {
             eventJobService,
             recurrenceJobHandler,
             failureClassifier,
-            connectionCommandService,
+            connectionFailureService,
             integrationQueryService,
             Clock.systemUTC());
   }
@@ -180,8 +180,8 @@ class GoogleOperationProcessorTest {
 
     verify(jobPersistenceService)
         .terminate(eq(1L), eq(10L), anyString(), eq("GOOGLE_CALENDAR_RECONNECT_REQUIRED"));
-    verify(connectionCommandService)
-        .markConnectedConnectionSyncError(eq(10L), eq("GOOGLE_CALENDAR_RECONNECT_REQUIRED"), any());
+    verify(connectionFailureService)
+        .pauseForReconnect(eq(10L), eq("GOOGLE_CALENDAR_RECONNECT_REQUIRED"), any());
     verify(jobPersistenceService, times(1)).claimNextJob(eq(10L), eq(20L), anyString());
   }
 
@@ -201,7 +201,7 @@ class GoogleOperationProcessorTest {
 
     verifyNoInteractions(failureClassifier);
     verify(jobPersistenceService, never()).terminate(eq(1L), eq(10L), anyString(), anyString());
-    verifyNoInteractions(connectionCommandService);
+    verifyNoInteractions(connectionFailureService);
     verify(jobPersistenceService, times(1)).claimNextJob(eq(10L), eq(20L), anyString());
   }
 

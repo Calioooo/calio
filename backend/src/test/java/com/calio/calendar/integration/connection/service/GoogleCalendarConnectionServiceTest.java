@@ -55,6 +55,8 @@ class GoogleCalendarConnectionServiceTest {
       mock(GoogleCalendarConnectionQueryService.class);
   private final GoogleCalendarConnectionCommandService connectionCommandService =
       mock(GoogleCalendarConnectionCommandService.class);
+  private final GoogleCalendarTokenRevocationService tokenRevocationService =
+      new GoogleCalendarTokenRevocationService(oauthClient, encryptor);
   private final GoogleOperationJobCommandService jobCommandService =
       mock(GoogleOperationJobCommandService.class);
   private final GoogleOperationJobEnqueueService enqueueService =
@@ -307,8 +309,8 @@ class GoogleCalendarConnectionServiceTest {
   }
 
   @Test
-  @DisplayName("sync error Connection도 해제하면 Job과 credential을 정리한다")
-  void givenSyncErrorConnection_whenDisconnect_thenCleansConnectionBeforeRevokingToken() {
+  @DisplayName("credential이 이미 제거된 sync error Connection도 명시적으로 해제한다")
+  void givenSyncErrorConnection_whenDisconnect_thenTransitionsWithoutRevokingAgain() {
     GoogleCalendarIntegration integration = integration();
     GoogleCalendarConnection connection = connection(integration);
     connection.markSyncError("GOOGLE_CALENDAR_RECONNECT_REQUIRED", NOW.minusSeconds(60));
@@ -321,7 +323,7 @@ class GoogleCalendarConnectionServiceTest {
 
     verify(jobCommandService).deleteJobsForIntegration(integration.getId());
     verify(connectionCommandService).disconnect(connection, NOW);
-    verify(oauthClient).revokeToken("refresh-token");
+    verifyNoInteractions(oauthClient);
   }
 
   @Test
@@ -343,6 +345,7 @@ class GoogleCalendarConnectionServiceTest {
         integrationCommandService,
         connectionQueryService,
         connectionCommandService,
+        tokenRevocationService,
         jobCommandService,
         enqueueService,
         new NoOpTransactionManager(),

@@ -23,9 +23,6 @@ public interface GoogleCalendarRecurrenceEventMappingRepository
   List<Long> findRecurrenceEventIdsWithMappings(
       @Param("recurrenceEventIds") Collection<Long> recurrenceEventIds);
 
-  boolean existsByRecurrenceEventIdAndConnection_Integration_AccountId(
-      Long recurrenceEventId, Long accountId);
-
   Optional<GoogleCalendarRecurrenceEventMapping>
       findByConnection_IdAndCalendarKeyAndExternalEventId(
           Long connectionId, String calendarKey, String externalEventId);
