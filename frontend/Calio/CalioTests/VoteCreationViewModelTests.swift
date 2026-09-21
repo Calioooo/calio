@@ -69,6 +69,8 @@ private final class VoteCreationRepositoryStub: VoteRepository {
     )
   }
 
+  func fetchMyVoteRooms() async throws -> [VoteRoomResponseDTO] { fatalError() }
+
   func fetchVoteResult(publicId: UUID) async throws -> VoteResultResponseDTO { fatalError() }
 
   func createVoteParticipant(
