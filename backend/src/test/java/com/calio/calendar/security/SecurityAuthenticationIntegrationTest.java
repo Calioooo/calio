@@ -7,8 +7,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.calio.calendar.account.domain.Account;
-import com.calio.calendar.account.domain.AccountAuthToken;
-import com.calio.calendar.account.repository.AccountAuthTokenRepository;
 import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.auth.service.AccessTokenEncoder;
 import com.calio.calendar.task.repository.TaskRepository;
@@ -46,14 +44,11 @@ class SecurityAuthenticationIntegrationTest {
 
   @Autowired private AccountRepository accountRepository;
 
-  @Autowired private AccountAuthTokenRepository accountAuthTokenRepository;
-
   @Autowired private TaskRepository taskRepository;
 
   @BeforeEach
   void setUp() {
     taskRepository.deleteAll();
-    accountAuthTokenRepository.deleteAll();
     accountRepository.deleteAll();
   }
 
@@ -83,10 +78,10 @@ class SecurityAuthenticationIntegrationTest {
           throws Exception {
     // given
     String rawToken = "revoked-token";
-    Account account = accountRepository.saveAndFlush(new Account());
-    AccountAuthToken authToken = new AccountAuthToken(account, accessTokenEncoder.hash(rawToken));
-    authToken.revoke(Instant.parse("2026-07-10T00:00:00Z"));
-    accountAuthTokenRepository.saveAndFlush(authToken);
+    Account account = new Account();
+    account.issueAuthToken(accessTokenEncoder.hash(rawToken));
+    account.revokeAuthToken(Instant.parse("2026-07-10T00:00:00Z"));
+    accountRepository.saveAndFlush(account);
 
     // when
     mockMvc
@@ -109,9 +104,9 @@ class SecurityAuthenticationIntegrationTest {
           throws Exception {
     // given
     String rawToken = "valid-token";
-    Account account = accountRepository.saveAndFlush(new Account());
-    accountAuthTokenRepository.saveAndFlush(
-        new AccountAuthToken(account, accessTokenEncoder.hash(rawToken)));
+    Account account = new Account();
+    account.issueAuthToken(accessTokenEncoder.hash(rawToken));
+    account = accountRepository.saveAndFlush(account);
 
     // when
     mockMvc

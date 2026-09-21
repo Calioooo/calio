@@ -1,6 +1,7 @@
 package com.calio.calendar.event.controller.dto;
 
 import com.calio.calendar.event.domain.Event;
+import com.calio.calendar.recurrence.domain.PersonalRecurrenceOccurrence;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceOccurrence;
@@ -75,6 +76,25 @@ public record EventResponse(
         true,
         TagResponse.from(recurrenceEvent.getTag()),
         override.getOriginStartAt(),
+        recurrenceEvent.getCreatedAt(),
+        recurrenceEvent.getUpdatedAt());
+  }
+
+  public static EventResponse recurrenceOccurrence(PersonalRecurrenceOccurrence occurrence) {
+    RecurrenceEvent recurrenceEvent = occurrence.recurrenceEvent();
+    return new EventResponse(
+        null,
+        occurrence.title(),
+        occurrence.description(),
+        occurrence.startAt(),
+        occurrence.endAt(),
+        occurrence.allDay(),
+        occurrence.timeZone(),
+        false,
+        recurrenceEvent.getId(),
+        true,
+        TagResponse.from(recurrenceEvent.getTag()),
+        occurrence.originStartAt(),
         recurrenceEvent.getCreatedAt(),
         recurrenceEvent.getUpdatedAt());
   }

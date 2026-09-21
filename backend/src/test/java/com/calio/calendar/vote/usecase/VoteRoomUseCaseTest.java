@@ -74,4 +74,18 @@ class VoteRoomUseCaseTest {
     verify(accountRepository, never()).findById(ACCOUNT_ID);
     verify(voteRoomRepository, never()).save(org.mockito.ArgumentMatchers.any());
   }
+
+  @Test
+  @DisplayName("후보 기간이 포함 31일을 초과하면 VoteRoom을 생성하지 않는다")
+  void givenCandidatePeriodOverThirtyOneDays_whenCreate_thenRejectsBeforeAccountLookup() {
+    assertThatThrownBy(
+            () -> createVoteRoomUseCase.create(ACCOUNT_ID, "여행 일정", KOREA_TODAY.plusDays(31)))
+        .isInstanceOfSatisfying(
+            CalioException.class,
+            exception ->
+                assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.VALIDATION_FAILED));
+
+    verify(accountRepository, never()).findById(ACCOUNT_ID);
+    verify(voteRoomRepository, never()).save(org.mockito.ArgumentMatchers.any());
+  }
 }

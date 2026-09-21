@@ -13,8 +13,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.calio.calendar.account.domain.Account;
-import com.calio.calendar.account.domain.AccountAuthToken;
-import com.calio.calendar.account.repository.AccountAuthTokenRepository;
 import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.auth.service.AccessTokenEncoder;
 import com.calio.calendar.groupinvitation.domain.GroupInvitation;
@@ -87,8 +85,6 @@ class GroupInvitationControllerTest {
 
   @Autowired private AccountRepository accountRepository;
 
-  @Autowired private AccountAuthTokenRepository accountAuthTokenRepository;
-
   @Autowired private AccessTokenEncoder accessTokenEncoder;
 
   @Autowired private InvitationCredentialService credentialService;
@@ -99,7 +95,6 @@ class GroupInvitationControllerTest {
 
   @BeforeEach
   void setUp() {
-    accountAuthTokenRepository.deleteAll();
     invitationRepository.deleteAll();
     memberRepository.deleteAll();
     tagRepository.deleteAll();
@@ -225,10 +220,10 @@ class GroupInvitationControllerTest {
   void previewRejectsRevokedAuthenticationToken() throws Exception {
     // given
     String rawToken = "revoked-preview-token";
-    Account account = accountRepository.saveAndFlush(new Account());
-    AccountAuthToken authToken = new AccountAuthToken(account, accessTokenEncoder.hash(rawToken));
-    authToken.revoke(NOW.minusSeconds(1));
-    accountAuthTokenRepository.saveAndFlush(authToken);
+    Account account = new Account();
+    account.issueAuthToken(accessTokenEncoder.hash(rawToken));
+    account.revokeAuthToken(NOW.minusSeconds(1));
+    accountRepository.saveAndFlush(account);
 
     // when, then
     mockMvc

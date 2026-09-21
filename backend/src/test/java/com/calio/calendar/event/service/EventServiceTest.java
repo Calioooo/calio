@@ -14,7 +14,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.calio.calendar.account.domain.Account;
-import com.calio.calendar.account.service.AccountQueryService;
+import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.common.domain.CanonicalSchedule;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
@@ -31,6 +31,7 @@ import com.calio.calendar.recurrence.domain.RecurrenceOccurrence;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
 import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
+import com.calio.calendar.recurrence.service.PersonalRecurrenceOccurrenceResolver;
 import com.calio.calendar.recurrence.service.RecurrenceEventQueryService;
 import com.calio.calendar.recurrence.service.Rfc5545RecurrenceEngine;
 import com.calio.calendar.sharing.event.service.PersonalEventGroupShareCommandService;
@@ -39,6 +40,7 @@ import com.calio.calendar.tag.service.TagQueryService;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -56,7 +58,7 @@ class EventServiceTest {
 
   @Mock private EventCommandService eventCommandService;
 
-  @Mock private AccountQueryService accountQueryService;
+  @Mock private AccountRepository accountRepository;
 
   @Mock private TagQueryService tagQueryService;
 
@@ -89,7 +91,7 @@ class EventServiceTest {
             false,
             "Asia/Seoul",
             20L);
-    when(accountQueryService.getAccount(1L)).thenReturn(account);
+    when(accountRepository.findById(1L)).thenReturn(Optional.of(account));
     when(tagQueryService.getTagOrDefault(1L, 20L)).thenReturn(tag);
     when(eventCommandService.createEvent(any(Event.class)))
         .thenAnswer(
@@ -396,10 +398,10 @@ class EventServiceTest {
         queryService,
         eventCommandService,
         eventMappingQueryService,
-        accountQueryService,
+        accountRepository,
         tagQueryService,
         recurrenceQueryService,
-        recurrenceEngine,
+        new PersonalRecurrenceOccurrenceResolver(recurrenceEngine),
         eventShareCommandService);
   }
 
