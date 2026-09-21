@@ -34,8 +34,8 @@ public class GoogleOperationJobService {
   }
 
   @Transactional
-  public GoogleOperationJob claimNextJob(Long accountId, String workerToken) {
-    GoogleOperationJob head = jobCommandService.tryLockNextOperationJob(accountId).orElse(null);
+  public GoogleOperationJob claimNextJob(Long accountId, Long integrationId, String workerToken) {
+    GoogleOperationJob head = jobCommandService.tryLockNextOperationJob(integrationId).orElse(null);
     if (head == null) {
       log.debug("Google operation head not found. accountId={} state=EMPTY", accountId);
       return null;
@@ -112,6 +112,38 @@ public class GoogleOperationJobService {
     }
     log.info(
         "Google operation job deleted after success. accountId={} jobId={} state=PROCESSING transition=DELETE",
+        accountId,
+        jobId);
+  }
+
+  @Transactional
+  public void completeSyncRun(Long jobId, Long accountId, String workerToken) {
+    try {
+      jobCommandService.completeSyncOperationJob(jobId, workerToken);
+    } catch (GoogleOperationOwnershipLostException exception) {
+      log.warn("Google sync final transition rejected. accountId={} jobId={}", accountId, jobId);
+      throw exception;
+    }
+    log.info("Google sync run completed. accountId={} jobId={}", accountId, jobId);
+  }
+
+  @Transactional
+  public void recordSyncConflict(Long jobId, Long accountId, String workerToken) {
+    jobCommandService.markConflictDetected(jobId, workerToken);
+    log.info("Google sync conflict detected. accountId={} jobId={}", accountId, jobId);
+  }
+
+  @Transactional
+  public void completeWithConflict(Long jobId, Long accountId, String workerToken) {
+    recordSyncConflict(jobId, accountId, workerToken);
+    completeSyncRun(jobId, accountId, workerToken);
+  }
+
+  @Transactional
+  public void skipConflictedScope(Long jobId, Long accountId, String workerToken) {
+    jobCommandService.skipConflictedScope(jobId, workerToken);
+    log.info(
+        "Google operation skipped because mapping scope is conflicted. accountId={} jobId={}",
         accountId,
         jobId);
   }

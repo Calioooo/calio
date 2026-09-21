@@ -19,23 +19,32 @@ public class GoogleCalendarEventMappingQueryService {
     this.eventMappingRepository = eventMappingRepository;
   }
 
-  public boolean hasExternalEventMapping(Long eventId, Long accountId) {
-    return eventMappingRepository.existsByEvent_IdAndIntegration_AccountId(eventId, accountId);
+  public List<GoogleCalendarEventMapping> listEventMappingsForEvent(
+      Long integrationId, Long eventId) {
+    return eventMappingRepository.findAllWithConnectionAndIntegrationByIntegrationIdAndEventId(
+        integrationId, eventId);
   }
 
   public List<GoogleCalendarEventMapping> listEventMappings(
-      Long integrationId, String calendarKey, Collection<String> externalEventIds) {
-    return eventMappingRepository.findAllWithEventByExternalIdentity(
-        integrationId, calendarKey, externalEventIds);
+      Long connectionId, String calendarKey, Collection<String> externalEventIds) {
+    return eventMappingRepository.findAllByExternalIdentity(
+        connectionId, calendarKey, externalEventIds);
   }
 
-  public List<GoogleCalendarEventMapping> listEventMappings(Long integrationId) {
-    return eventMappingRepository.findAllWithEventByIntegrationId(integrationId);
+  public List<GoogleCalendarEventMapping> listEventMappings(Long connectionId) {
+    return eventMappingRepository.findAllByConnectionId(connectionId);
+  }
+
+  public List<Long> listEventIdsWithMappings(Collection<Long> eventIds) {
+    if (eventIds.isEmpty()) {
+      return List.of();
+    }
+    return eventMappingRepository.findDistinctEventIdsByEventIdIn(eventIds);
   }
 
   public List<GoogleCalendarEventMapping> listEventMappingBatch(
-      Long integrationId, Long afterId, int limit) {
-    return eventMappingRepository.findNextBatchWithEventByIntegrationId(
-        integrationId, afterId, PageRequest.of(0, limit));
+      Long connectionId, Long afterId, int limit) {
+    return eventMappingRepository.findNextBatchByConnectionId(
+        connectionId, afterId, PageRequest.of(0, limit));
   }
 }

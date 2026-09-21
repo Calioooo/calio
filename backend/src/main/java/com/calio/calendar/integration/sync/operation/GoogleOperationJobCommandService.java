@@ -18,8 +18,8 @@ public class GoogleOperationJobCommandService {
     this.jobRepository = jobRepository;
   }
 
-  public Optional<GoogleOperationJob> tryLockNextOperationJob(Long accountId) {
-    return jobRepository.findAccountHeadForUpdate(accountId);
+  public Optional<GoogleOperationJob> tryLockNextOperationJob(Long integrationId) {
+    return jobRepository.findIntegrationHeadForUpdate(integrationId);
   }
 
   public GoogleOperationJob enqueueOperationJob(GoogleOperationJob job) {
@@ -45,6 +45,26 @@ public class GoogleOperationJobCommandService {
 
   public void completeOperationJob(Long jobId, String ownerToken) {
     if (jobRepository.deleteOwnedSuccessful(jobId, ownerToken) != 1) {
+      throw new GoogleOperationOwnershipLostException();
+    }
+  }
+
+  public void markConflictDetected(Long jobId, String ownerToken) {
+    if (jobRepository.markConflictDetected(jobId, ownerToken) != 1) {
+      throw new GoogleOperationOwnershipLostException();
+    }
+  }
+
+  /** Completes a sync by retaining conflict diagnostics or deleting an ordinary successful job. */
+  public void completeSyncOperationJob(Long jobId, String ownerToken) {
+    if (jobRepository.terminateOwnedConflictDetected(jobId, ownerToken) == 1) {
+      return;
+    }
+    completeOperationJob(jobId, ownerToken);
+  }
+
+  public void skipConflictedScope(Long jobId, String ownerToken) {
+    if (jobRepository.skipOwnedConflictedScope(jobId, ownerToken) != 1) {
       throw new GoogleOperationOwnershipLostException();
     }
   }

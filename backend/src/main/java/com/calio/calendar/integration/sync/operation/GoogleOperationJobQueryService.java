@@ -1,5 +1,6 @@
 package com.calio.calendar.integration.sync.operation;
 
+import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEffectiveScope;
 import com.calio.calendar.integration.sync.operation.repository.GoogleOperationJobRepository;
 import java.time.Instant;
 import java.util.List;
@@ -23,5 +24,19 @@ public class GoogleOperationJobQueryService {
 
   public List<Long> listExpiredTerminalJobIds(Instant cutoff, int limit) {
     return jobRepository.findTerminalIdsBefore(cutoff, PageRequest.of(0, limit));
+  }
+
+  public boolean hasPendingOutboundJob(
+      Long accountId, Long integrationId, GoogleCalendarEffectiveScope scope) {
+    return switch (scope.type()) {
+      case EVENT ->
+          jobRepository.existsPendingEventJob(accountId, integrationId, scope.canonicalId());
+      case RECURRENCE_EVENT ->
+          jobRepository.existsPendingRecurrenceAggregateJob(
+              accountId, integrationId, scope.canonicalId());
+      case RECURRENCE_OVERRIDE ->
+          jobRepository.existsPendingRecurrenceOverrideJob(
+              accountId, integrationId, scope.canonicalId(), scope.originStartAt());
+    };
   }
 }

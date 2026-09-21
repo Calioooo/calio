@@ -24,7 +24,7 @@ public interface RecurrenceEventRepository extends JpaRepository<RecurrenceEvent
             select recurrenceEvent
             from RecurrenceEvent recurrenceEvent
             where recurrenceEvent.account.id = :accountId
-              and recurrenceEvent.firstOccurrenceStartAt < :to
+              and recurrenceEvent.schedule.firstOccurrenceStartAt < :to
             """)
   List<RecurrenceEvent> findExpansionCandidatesStartedBefore(
       @Param("accountId") Long accountId, @Param("to") Instant to);

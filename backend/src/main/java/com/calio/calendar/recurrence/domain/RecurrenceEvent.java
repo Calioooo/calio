@@ -5,6 +5,7 @@ import com.calio.calendar.common.domain.BaseEntity;
 import com.calio.calendar.tag.domain.Tag;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -30,17 +31,7 @@ public class RecurrenceEvent extends BaseEntity {
   @Column(name = "recurrence_description")
   private String description;
 
-  @Column(name = "all_day", nullable = false)
-  private boolean allDay;
-
-  @Column(name = "time_zone")
-  private String timeZone;
-
-  @Column(name = "first_occurrence_start_at", nullable = false)
-  private Instant firstOccurrenceStartAt;
-
-  @Column(name = "first_occurrence_end_at", nullable = false)
-  private Instant firstOccurrenceEndAt;
+  @Embedded private RecurrenceSchedule schedule;
 
   @Column(name = "recurrence_rule", nullable = false, columnDefinition = "TEXT")
   @Convert(converter = RecurrenceRuleJsonConverter.class)
@@ -90,10 +81,7 @@ public class RecurrenceEvent extends BaseEntity {
   }
 
   private void replaceSchedule(RecurrenceSchedule schedule, List<String> recurrenceRules) {
-    this.allDay = schedule.allDay();
-    this.timeZone = schedule.timeZone();
-    this.firstOccurrenceStartAt = schedule.firstOccurrenceStartAt();
-    this.firstOccurrenceEndAt = schedule.firstOccurrenceEndAt();
+    this.schedule = schedule;
     this.recurrenceRules = List.copyOf(recurrenceRules);
   }
 
@@ -110,19 +98,19 @@ public class RecurrenceEvent extends BaseEntity {
   }
 
   public boolean isAllDay() {
-    return allDay;
+    return schedule.allDay();
   }
 
   public String getTimeZone() {
-    return timeZone;
+    return schedule.timeZone();
   }
 
   public Instant getFirstOccurrenceStartAt() {
-    return firstOccurrenceStartAt;
+    return schedule.firstOccurrenceStartAt();
   }
 
   public Instant getFirstOccurrenceEndAt() {
-    return firstOccurrenceEndAt;
+    return schedule.firstOccurrenceEndAt();
   }
 
   public List<String> getRecurrenceRules() {

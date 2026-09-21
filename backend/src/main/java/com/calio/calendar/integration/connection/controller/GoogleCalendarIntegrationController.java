@@ -1,7 +1,7 @@
 package com.calio.calendar.integration.connection.controller;
 
 import com.calio.calendar.integration.connection.controller.dto.GoogleCalendarConnectRequest;
-import com.calio.calendar.integration.connection.controller.dto.GoogleCalendarIntegrationResponse;
+import com.calio.calendar.integration.connection.controller.dto.GoogleCalendarConnectionResponse;
 import com.calio.calendar.integration.connection.service.GoogleCalendarConnectionService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobEnqueueService;
 import com.calio.calendar.security.AuthenticatedAccount;
@@ -32,7 +32,7 @@ public class GoogleCalendarIntegrationController {
   }
 
   @PostMapping
-  public GoogleCalendarIntegrationResponse connect(
+  public GoogleCalendarConnectionResponse connect(
       @AuthenticationPrincipal AuthenticatedAccount account,
       @Valid @RequestBody GoogleCalendarConnectRequest request) {
     return googleCalendarConnectionService.connect(
@@ -40,7 +40,7 @@ public class GoogleCalendarIntegrationController {
   }
 
   @GetMapping
-  public GoogleCalendarIntegrationResponse getConnectionStatus(
+  public GoogleCalendarConnectionResponse getConnectionStatus(
       @AuthenticationPrincipal AuthenticatedAccount account) {
     return googleCalendarConnectionService.getConnectionStatus(account.accountId());
   }

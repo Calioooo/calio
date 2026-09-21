@@ -78,6 +78,8 @@ public enum ErrorCode {
   GOOGLE_CALENDAR_NOT_CONNECTED(HttpStatus.CONFLICT, "Google Calendar is not connected."),
   GOOGLE_CALENDAR_RECONNECT_REQUIRED(
       HttpStatus.CONFLICT, "Google Calendar reconnection is required."),
+  GOOGLE_CALENDAR_REQUEST_INVALID(
+      HttpStatus.INTERNAL_SERVER_ERROR, "Google Calendar request is invalid."),
   GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID(
       HttpStatus.BAD_GATEWAY, "Google Calendar event response is invalid."),
   GOOGLE_CALENDAR_SYNC_FAILED(HttpStatus.BAD_GATEWAY, "Google Calendar sync failed."),

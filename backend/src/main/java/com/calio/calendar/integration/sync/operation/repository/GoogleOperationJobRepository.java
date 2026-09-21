@@ -16,14 +16,15 @@ public interface GoogleOperationJobRepository extends JpaRepository<GoogleOperat
       value =
           """
             SELECT * FROM google_operation_jobs job
-            WHERE job.account_id = :accountId
+            WHERE job.integration_id = :integrationId
               AND job.job_state IN ('PENDING', 'PROCESSING')
-            ORDER BY job.account_sequence
+            ORDER BY job.integration_sequence
             LIMIT 1
             FOR UPDATE
             """,
       nativeQuery = true)
-  Optional<GoogleOperationJob> findAccountHeadForUpdate(@Param("accountId") Long accountId);
+  Optional<GoogleOperationJob> findIntegrationHeadForUpdate(
+      @Param("integrationId") Long integrationId);
 
   @Modifying(flushAutomatically = true, clearAutomatically = true)
   @Query(
@@ -87,12 +88,75 @@ public interface GoogleOperationJobRepository extends JpaRepository<GoogleOperat
       nativeQuery = true)
   int deleteOwnedSuccessful(@Param("jobId") Long jobId, @Param("owner") String owner);
 
+  @Modifying(flushAutomatically = true)
+  @Query(
+      value =
+          """
+            UPDATE google_operation_jobs
+            SET conflict_detected = TRUE, updated_at = CURRENT_TIMESTAMP
+            WHERE id = :jobId AND job_state = 'PROCESSING'
+              AND owner_token = :owner
+              AND EXISTS (
+                  SELECT 1 FROM google_calendar_integrations integration
+                  WHERE integration.id = google_operation_jobs.integration_id
+                    AND integration.google_operation_lease_owner = :owner
+                    AND integration.google_operation_lease_expires_at >= CURRENT_TIMESTAMP
+              )
+            """,
+      nativeQuery = true)
+  int markConflictDetected(@Param("jobId") Long jobId, @Param("owner") String owner);
+
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      value =
+          """
+            UPDATE google_operation_jobs
+            SET job_state = 'CONFLICTED', owner_token = NULL,
+                terminal_reason = 'MAPPING_CONFLICT_DETECTED', terminal_at = CURRENT_TIMESTAMP,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = :jobId AND job_state = 'PROCESSING'
+              AND owner_token = :owner AND conflict_detected = TRUE
+              AND EXISTS (
+                  SELECT 1 FROM google_calendar_integrations integration
+                  WHERE integration.id = google_operation_jobs.integration_id
+                    AND integration.google_operation_lease_owner = :owner
+                    AND integration.google_operation_lease_expires_at >= CURRENT_TIMESTAMP
+              )
+            """,
+      nativeQuery = true)
+  int terminateOwnedConflictDetected(@Param("jobId") Long jobId, @Param("owner") String owner);
+
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      value =
+          """
+            UPDATE google_operation_jobs
+            SET job_state = 'SKIPPED', owner_token = NULL,
+                terminal_reason = 'MAPPING_ALREADY_CONFLICTED', terminal_at = CURRENT_TIMESTAMP,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = :jobId AND job_state = 'PROCESSING'
+              AND owner_token = :owner
+              AND EXISTS (
+                  SELECT 1 FROM google_calendar_integrations integration
+                  WHERE integration.id = google_operation_jobs.integration_id
+                    AND integration.google_operation_lease_owner = :owner
+                    AND integration.google_operation_lease_expires_at >= CURRENT_TIMESTAMP
+              )
+            """,
+      nativeQuery = true)
+  int skipOwnedConflictedScope(@Param("jobId") Long jobId, @Param("owner") String owner);
+
   @Query(
       """
             select distinct job.accountId from GoogleOperationJob job
-            where (job.state = com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState.PENDING
-                   and job.runnableAt <= :now)
-               or job.state = com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState.PROCESSING
+            where ((job.state = com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState.PENDING
+                    and job.runnableAt <= :now)
+                   or job.state = com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState.PROCESSING)
+              and exists (
+                  select 1 from GoogleCalendarConnection connection
+                  where connection.integration.id = job.integrationId
+                    and connection.state = com.calio.calendar.integration.connection.domain.GoogleCalendarConnectionState.CONNECTED
+              )
             order by job.accountId
             """)
   List<Long> findRecoverableAccountIds(@Param("now") Instant now, Pageable pageable);
@@ -106,6 +170,59 @@ public interface GoogleOperationJobRepository extends JpaRepository<GoogleOperat
               and job.terminalAt < :cutoff order by job.id
             """)
   List<Long> findTerminalIdsBefore(@Param("cutoff") Instant cutoff, Pageable pageable);
+
+  @Query(
+      """
+            select (count(job) > 0)
+            from GoogleCalendarEventJob job
+            where job.accountId = :accountId
+              and job.integrationId = :integrationId
+              and job.eventId = :eventId
+              and job.state in (
+                  com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState.PENDING,
+                  com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState.PROCESSING
+              )
+            """)
+  boolean existsPendingEventJob(
+      @Param("accountId") Long accountId,
+      @Param("integrationId") Long integrationId,
+      @Param("eventId") Long eventId);
+
+  @Query(
+      """
+            select (count(job) > 0)
+            from GoogleCalendarRecurrenceJob job
+            where job.accountId = :accountId
+              and job.integrationId = :integrationId
+              and job.target.recurrenceEventId = :recurrenceEventId
+              and job.state in (
+                  com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState.PENDING,
+                  com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState.PROCESSING
+              )
+            """)
+  boolean existsPendingRecurrenceAggregateJob(
+      @Param("accountId") Long accountId,
+      @Param("integrationId") Long integrationId,
+      @Param("recurrenceEventId") Long recurrenceEventId);
+
+  @Query(
+      """
+            select (count(job) > 0)
+            from GoogleCalendarRecurrenceJob job
+            where job.accountId = :accountId
+              and job.integrationId = :integrationId
+              and job.target.recurrenceEventId = :recurrenceEventId
+              and job.target.originStartAt = :originStartAt
+              and job.state in (
+                  com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState.PENDING,
+                  com.calio.calendar.integration.sync.operation.domain.GoogleOperationJobState.PROCESSING
+              )
+            """)
+  boolean existsPendingRecurrenceOverrideJob(
+      @Param("accountId") Long accountId,
+      @Param("integrationId") Long integrationId,
+      @Param("recurrenceEventId") Long recurrenceEventId,
+      @Param("originStartAt") Instant originStartAt);
 
   @Modifying(flushAutomatically = true, clearAutomatically = true)
   @Query("delete from GoogleOperationJob job where job.integrationId = :integrationId")

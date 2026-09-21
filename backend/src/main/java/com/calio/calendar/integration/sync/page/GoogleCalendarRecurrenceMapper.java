@@ -5,6 +5,7 @@ import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.external.google.GoogleCalendarEventTimeNormalizer;
 import com.calio.calendar.external.google.dto.GoogleCalendarEventResponse;
 import com.calio.calendar.external.google.service.dto.NormalizedEventSchedule;
+import com.calio.calendar.integration.mapping.domain.GoogleCalendarMappingSyncState;
 import com.calio.calendar.integration.sync.page.dto.GoogleCalendarNormalizedPage.ActiveRecurrenceEventOverrideUpsert;
 import com.calio.calendar.integration.sync.page.dto.GoogleCalendarNormalizedPage.CancelledRecurrenceEventOverrideUpsert;
 import com.calio.calendar.integration.sync.page.dto.GoogleCalendarNormalizedPage.RecurrenceEventOverrideUpsert;
@@ -36,8 +37,7 @@ public class GoogleCalendarRecurrenceMapper {
     List<String> recurrenceRules = validateRecurrenceRules(recurrenceSchedule, item.recurrence());
     return new RecurrenceEventUpsert(
         item.id(),
-        item.etag(),
-        item.updatedAt(),
+        requireProviderEtag(item),
         eventTitle(item.summary()),
         item.description(),
         schedule,
@@ -49,15 +49,18 @@ public class GoogleCalendarRecurrenceMapper {
     Instant originStartAt = timeNormalizer.normalize(item.originalStartTime()).instant();
     if (item.isCancelled()) {
       return new CancelledRecurrenceEventOverrideUpsert(
-          item.id(), item.recurringEventId(), originStartAt, item.etag(), item.updatedAt());
+          item.id(),
+          item.recurringEventId(),
+          originStartAt,
+          requireProviderEtag(item),
+          item.updatedAt() == null ? originStartAt : item.updatedAt());
     }
     NormalizedEventSchedule schedule = timeNormalizer.normalizeSchedule(item.start(), item.end());
     return new ActiveRecurrenceEventOverrideUpsert(
         item.id(),
         item.recurringEventId(),
         originStartAt,
-        item.etag(),
-        item.updatedAt(),
+        requireProviderEtag(item),
         eventTitle(item.summary()),
         item.description(),
         schedule);
@@ -108,6 +111,7 @@ public class GoogleCalendarRecurrenceMapper {
         item == null
             || !hasText(item.id())
             || !hasText(item.recurringEventId())
+            || !hasText(item.etag())
             || item.originalStartTime() == null
             || item.isRecurrenceEvent();
     if (isInvalid) {
@@ -117,6 +121,14 @@ public class GoogleCalendarRecurrenceMapper {
 
   private String eventTitle(String summary) {
     return summary == null || summary.isBlank() ? UNTITLED_EVENT_TITLE : summary;
+  }
+
+  private String requireProviderEtag(GoogleCalendarEventResponse item) {
+    if (!hasText(item.etag())
+        || item.etag().length() > GoogleCalendarMappingSyncState.PROVIDER_ETAG_LENGTH) {
+      throw invalidResponse();
+    }
+    return item.etag();
   }
 
   private boolean hasText(String value) {

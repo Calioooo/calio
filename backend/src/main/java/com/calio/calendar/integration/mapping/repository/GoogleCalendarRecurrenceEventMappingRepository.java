@@ -14,52 +14,79 @@ import org.springframework.data.repository.query.Param;
 public interface GoogleCalendarRecurrenceEventMappingRepository
     extends JpaRepository<GoogleCalendarRecurrenceEventMapping, Long> {
 
-  Optional<GoogleCalendarRecurrenceEventMapping> findByRecurrenceEvent_Id(Long recurrenceEventId);
-
-  boolean existsByRecurrenceEvent_IdAndIntegration_AccountId(
-      Long recurrenceEventId, Long accountId);
+  @Query(
+      """
+            select distinct mapping.recurrenceEventId
+            from GoogleCalendarRecurrenceEventMapping mapping
+            where mapping.recurrenceEventId in :recurrenceEventIds
+            """)
+  List<Long> findRecurrenceEventIdsWithMappings(
+      @Param("recurrenceEventIds") Collection<Long> recurrenceEventIds);
 
   Optional<GoogleCalendarRecurrenceEventMapping>
-      findByIntegration_IdAndCalendarKeyAndExternalEventId(
-          Long integrationId, String calendarKey, String externalEventId);
+      findByConnection_IdAndCalendarKeyAndExternalEventId(
+          Long connectionId, String calendarKey, String externalEventId);
 
-  @EntityGraph(attributePaths = {"recurrenceEvent", "recurrenceEvent.tag"})
   @Query(
       """
             select mapping
             from GoogleCalendarRecurrenceEventMapping mapping
-            where mapping.integration.id = :integrationId
+            where mapping.connection.id = :connectionId
+              and mapping.recurrenceEventId = :recurrenceEventId
+            """)
+  Optional<GoogleCalendarRecurrenceEventMapping> findByConnectionIdAndRecurrenceEventId(
+      @Param("connectionId") Long connectionId, @Param("recurrenceEventId") Long recurrenceEventId);
+
+  @Query(
+      """
+            select mapping
+            from GoogleCalendarRecurrenceEventMapping mapping
+            join mapping.connection connection
+            where connection.integration.id = :integrationId
+              and connection.state <> com.calio.calendar.integration.connection.domain.GoogleCalendarConnectionState.CONNECTED
+              and mapping.recurrenceEventId = :recurrenceEventId
+              and mapping.localChanged = false
+            """)
+  List<GoogleCalendarRecurrenceEventMapping>
+      findAllInactiveAndUnchangedByIntegrationIdAndRecurrenceEventId(
+          @Param("integrationId") Long integrationId,
+          @Param("recurrenceEventId") Long recurrenceEventId);
+
+  @EntityGraph(attributePaths = "connection")
+  @Query(
+      """
+            select mapping
+            from GoogleCalendarRecurrenceEventMapping mapping
+            where mapping.connection.id = :connectionId
               and mapping.calendarKey = :calendarKey
               and mapping.externalEventId in :externalEventIds
             """)
   List<GoogleCalendarRecurrenceEventMapping> findAllWithRecurrenceEventAndTagByExternalIdentity(
-      @Param("integrationId") Long integrationId,
+      @Param("connectionId") Long connectionId,
       @Param("calendarKey") String calendarKey,
       @Param("externalEventIds") Collection<String> externalEventIds);
 
-  @EntityGraph(attributePaths = "recurrenceEvent")
+  @EntityGraph(attributePaths = "connection")
   @Query(
       """
             select mapping
             from GoogleCalendarRecurrenceEventMapping mapping
-            where mapping.integration.id = :integrationId
+            where mapping.connection.id = :connectionId
             """)
-  List<GoogleCalendarRecurrenceEventMapping> findAllWithRecurrenceEventByIntegrationId(
-      @Param("integrationId") Long integrationId);
+  List<GoogleCalendarRecurrenceEventMapping> findAllWithRecurrenceEventByConnectionId(
+      @Param("connectionId") Long connectionId);
 
-  @EntityGraph(attributePaths = "recurrenceEvent")
+  @EntityGraph(attributePaths = "connection")
   @Query(
       """
             select mapping
             from GoogleCalendarRecurrenceEventMapping mapping
-            where mapping.integration.id = :integrationId
+            where mapping.connection.id = :connectionId
               and mapping.id > :afterId
             order by mapping.id
             """)
-  List<GoogleCalendarRecurrenceEventMapping> findNextBatchWithRecurrenceEventByIntegrationId(
-      @Param("integrationId") Long integrationId,
-      @Param("afterId") Long afterId,
-      Pageable pageable);
+  List<GoogleCalendarRecurrenceEventMapping> findNextBatchWithRecurrenceEventByConnectionId(
+      @Param("connectionId") Long connectionId, @Param("afterId") Long afterId, Pageable pageable);
 
   @Modifying(flushAutomatically = true)
   @Query(

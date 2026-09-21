@@ -16,7 +16,9 @@ import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.common.testsupport.SharedIntegrationDatabase;
 import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.event.repository.EventRepository;
+import com.calio.calendar.integration.connection.domain.GoogleCalendarConnection;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
+import com.calio.calendar.integration.connection.repository.GoogleCalendarConnectionRepository;
 import com.calio.calendar.integration.connection.repository.GoogleCalendarIntegrationRepository;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.mapping.repository.GoogleCalendarEventMappingRepository;
@@ -66,6 +68,8 @@ class EventControllerTest {
   @Autowired private EventRepository eventRepository;
 
   @Autowired private GoogleCalendarIntegrationRepository googleCalendarIntegrationRepository;
+
+  @Autowired private GoogleCalendarConnectionRepository googleCalendarConnectionRepository;
 
   @Autowired private GoogleCalendarEventMappingRepository googleCalendarEventMappingRepository;
 
@@ -953,8 +957,8 @@ class EventControllerTest {
   }
 
   @Test
-  @DisplayName("Google mapping 일정은 모든 변경 요청을 차단한다")
-  void givenGoogleMappedEvent_whenMutate_thenAppliesExternalMutationPolicy() throws Exception {
+  @DisplayName("Google Calendar와 매핑된 Event도 Calio API에서 변경할 수 있다")
+  void givenGoogleMappedEvent_whenMutate_thenAppliesEventMutation() throws Exception {
     // given
     long eventId = createEvent("Google import", "2026-06-21T00:00:00Z", "2026-06-21T01:00:00Z");
     mapAsGoogleEvent(eventId);
@@ -967,24 +971,21 @@ class EventControllerTest {
                 .content(
                     """
                                 {
-                                  "title": "Blocked update",
+                                  "title": "Updated from Calio",
                                   "startAt": "2026-06-21T02:00:00Z",
                                   "endAt": "2026-06-21T03:00:00Z",
                                   "allDay": false,
                                   "timeZone": "UTC"
                                 }
                                 """))
-        .andExpect(status().isConflict())
-        .andExpect(jsonPath("$.title").value("EXTERNAL_EVENT_MUTATION_NOT_SUPPORTED"));
-
-    mockMvc
-        .perform(delete("/api/events/{eventId}", eventId))
-        .andExpect(status().isConflict())
-        .andExpect(jsonPath("$.title").value("EXTERNAL_EVENT_MUTATION_NOT_SUPPORTED"));
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.title").value("Updated from Calio"));
 
     updateImportantEventResult(eventId, true)
-        .andExpect(status().isConflict())
-        .andExpect(jsonPath("$.title").value("EXTERNAL_EVENT_MUTATION_NOT_SUPPORTED"));
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.importantEvent").value(true));
+
+    mockMvc.perform(delete("/api/events/{eventId}", eventId)).andExpect(status().isNoContent());
   }
 
   @Test
@@ -1121,8 +1122,11 @@ class EventControllerTest {
     Event event = eventRepository.findById(eventId).orElseThrow();
     GoogleCalendarIntegration integration =
         googleCalendarIntegrationRepository.saveAndFlush(
-            new GoogleCalendarIntegration(
-                event.getAccount().getId(),
+            new GoogleCalendarIntegration(event.getAccount().getId()));
+    GoogleCalendarConnection connection =
+        googleCalendarConnectionRepository.saveAndFlush(
+            new GoogleCalendarConnection(
+                integration,
                 "google-subject-" + eventId,
                 "user@example.com",
                 "encrypted-refresh-token",
@@ -1130,7 +1134,8 @@ class EventControllerTest {
                 Instant.parse("2026-06-21T02:00:00Z"),
                 Instant.parse("2026-06-21T00:00:00Z")));
     googleCalendarEventMappingRepository.saveAndFlush(
-        new GoogleCalendarEventMapping(integration, event, "external-" + eventId, null, null));
+        new GoogleCalendarEventMapping(
+            connection, event.getId(), "external-" + eventId, "a".repeat(64)));
   }
 
   private JsonNode readResponse(MvcResult result) throws Exception {

@@ -2,6 +2,8 @@ package com.calio.calendar.recurrence.domain;
 
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
+import jakarta.persistence.Column;
+import jakarta.persistence.Embeddable;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -13,21 +15,32 @@ import java.util.List;
 import java.util.Set;
 import net.fortuna.ical4j.model.TimeZoneRegistry;
 
+@Embeddable
 public record RecurrenceSchedule(
-    Instant firstOccurrenceStartAt, Instant firstOccurrenceEndAt, boolean allDay, String timeZone) {
+    @Column(name = "first_occurrence_start_at", nullable = false) Instant firstOccurrenceStartAt,
+    @Column(name = "first_occurrence_end_at", nullable = false) Instant firstOccurrenceEndAt,
+    @Column(name = "all_day", nullable = false) boolean allDay,
+    @Column(name = "time_zone") String timeZone) {
 
   private static final Set<String> IANA_TIME_ZONES = ZoneId.getAvailableZoneIds();
+
+  public RecurrenceSchedule {
+    requireOccurrenceRange(firstOccurrenceStartAt, firstOccurrenceEndAt);
+    if (allDay) {
+      validateAllDay(firstOccurrenceStartAt, firstOccurrenceEndAt, timeZone);
+      timeZone = null;
+    } else {
+      validateTimed(firstOccurrenceStartAt, firstOccurrenceEndAt, timeZone);
+    }
+  }
 
   public static RecurrenceSchedule create(
       Boolean allDay,
       Instant firstOccurrenceStartAt,
       Instant firstOccurrenceEndAt,
       String timeZone) {
-    requireOccurrenceRange(firstOccurrenceStartAt, firstOccurrenceEndAt);
-    if (Boolean.TRUE.equals(allDay)) {
-      return createAllDay(firstOccurrenceStartAt, firstOccurrenceEndAt, timeZone);
-    }
-    return createTimed(firstOccurrenceStartAt, firstOccurrenceEndAt, timeZone);
+    return new RecurrenceSchedule(
+        firstOccurrenceStartAt, firstOccurrenceEndAt, Boolean.TRUE.equals(allDay), timeZone);
   }
 
   public static RecurrenceSchedule from(RecurrenceEvent recurrenceEvent) {
@@ -62,17 +75,16 @@ public record RecurrenceSchedule(
     return Duration.between(firstOccurrenceStartAt, firstOccurrenceEndAt).toDays();
   }
 
-  private static RecurrenceSchedule createAllDay(
+  private static void validateAllDay(
       Instant firstOccurrenceStartAt, Instant firstOccurrenceEndAt, String timeZone) {
     boolean usesUtcMidnight =
         isUtcMidnight(firstOccurrenceStartAt) && isUtcMidnight(firstOccurrenceEndAt);
     if (timeZone != null || !usesUtcMidnight) {
       throw new CalioException(ErrorCode.INVALID_RECURRENCE_SCHEDULE);
     }
-    return new RecurrenceSchedule(firstOccurrenceStartAt, firstOccurrenceEndAt, true, null);
   }
 
-  private static RecurrenceSchedule createTimed(
+  private static void validateTimed(
       Instant firstOccurrenceStartAt, Instant firstOccurrenceEndAt, String timeZone) {
     if (timeZone == null || timeZone.isBlank()) {
       throw new CalioException(ErrorCode.INVALID_RECURRENCE_SCHEDULE);
@@ -85,7 +97,6 @@ public record RecurrenceSchedule(
     }
     validateCanonicalOffset(localStart, firstOccurrenceStartAt, zoneId);
     validateCanonicalEndOffset(localEnd, firstOccurrenceEndAt, firstOccurrenceStartAt, zoneId);
-    return new RecurrenceSchedule(firstOccurrenceStartAt, firstOccurrenceEndAt, false, timeZone);
   }
 
   private static void requireOccurrenceRange(Instant startAt, Instant endAt) {

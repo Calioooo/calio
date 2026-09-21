@@ -1,8 +1,10 @@
 package com.calio.calendar.integration.mapping.repository;
 
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarRecurrenceOverrideMapping;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -19,16 +21,56 @@ public interface GoogleCalendarRecurrenceOverrideMappingRepository
             select overrideMapping
             from GoogleCalendarRecurrenceOverrideMapping overrideMapping
             join overrideMapping.recurrenceEventMapping recurrenceEventMapping
-            where recurrenceEventMapping.integration.id = :integrationId
+            where recurrenceEventMapping.connection.id = :connectionId
               and recurrenceEventMapping.calendarKey = :calendarKey
               and overrideMapping.externalEventId in :externalEventIds
             """)
   List<GoogleCalendarRecurrenceOverrideMapping> findAllWithRecurrenceEventMappingByExternalEventIds(
-      @Param("integrationId") Long integrationId,
+      @Param("connectionId") Long connectionId,
       @Param("calendarKey") String calendarKey,
       @Param("externalEventIds") Collection<String> externalEventIds);
 
-  @EntityGraph(attributePaths = {"recurrenceEventMapping", "recurrenceEventOverride"})
+  @Query(
+      """
+            select mapping
+            from GoogleCalendarRecurrenceOverrideMapping mapping
+            where mapping.recurrenceEventMapping.id = :recurrenceEventMappingId
+              and mapping.originStartAt = :originStartAt
+            """)
+  Optional<GoogleCalendarRecurrenceOverrideMapping> findByRecurrenceEventMappingIdAndOriginStartAt(
+      @Param("recurrenceEventMappingId") Long recurrenceEventMappingId,
+      @Param("originStartAt") Instant originStartAt);
+
+  @EntityGraph(attributePaths = "recurrenceEventMapping")
+  @Query(
+      """
+            select overrideMapping
+            from GoogleCalendarRecurrenceOverrideMapping overrideMapping
+            join overrideMapping.recurrenceEventMapping recurrenceEventMapping
+            where recurrenceEventMapping.recurrenceEventId in :recurrenceEventIds
+            """)
+  List<GoogleCalendarRecurrenceOverrideMapping>
+      findAllWithRecurrenceEventMappingByRecurrenceEventIds(
+          @Param("recurrenceEventIds") Collection<Long> recurrenceEventIds);
+
+  @Query(
+      """
+            select overrideMapping
+            from GoogleCalendarRecurrenceOverrideMapping overrideMapping
+            join overrideMapping.recurrenceEventMapping recurrenceEventMapping
+            join recurrenceEventMapping.connection connection
+            where connection.integration.id = :integrationId
+              and connection.state <> com.calio.calendar.integration.connection.domain.GoogleCalendarConnectionState.CONNECTED
+              and recurrenceEventMapping.recurrenceEventId = :recurrenceEventId
+              and overrideMapping.originStartAt = :originStartAt
+              and overrideMapping.localChanged = false
+            """)
+  List<GoogleCalendarRecurrenceOverrideMapping> findAllInactiveAndUnchangedByIdentity(
+      @Param("integrationId") Long integrationId,
+      @Param("recurrenceEventId") Long recurrenceEventId,
+      @Param("originStartAt") Instant originStartAt);
+
+  @EntityGraph(attributePaths = "recurrenceEventMapping")
   @Query(
       """
             select overrideMapping
@@ -40,30 +82,30 @@ public interface GoogleCalendarRecurrenceOverrideMappingRepository
       findAllWithRecurrenceEventMappingAndRecurrenceEventOverrideByRecurrenceEventMappingIds(
           @Param("recurrenceEventMappingIds") Collection<Long> recurrenceEventMappingIds);
 
-  @EntityGraph(attributePaths = {"recurrenceEventMapping", "recurrenceEventOverride"})
+  @EntityGraph(attributePaths = "recurrenceEventMapping")
   @Query(
       """
             select overrideMapping
             from GoogleCalendarRecurrenceOverrideMapping overrideMapping
             join overrideMapping.recurrenceEventMapping recurrenceEventMapping
-            where recurrenceEventMapping.integration.id = :integrationId
+            where recurrenceEventMapping.connection.id = :connectionId
             """)
   List<GoogleCalendarRecurrenceOverrideMapping>
-      findAllWithRecurrenceEventMappingAndRecurrenceEventOverrideByIntegrationId(
-          @Param("integrationId") Long integrationId);
+      findAllWithRecurrenceEventMappingAndRecurrenceEventOverrideByConnectionId(
+          @Param("connectionId") Long connectionId);
 
-  @EntityGraph(attributePaths = {"recurrenceEventMapping", "recurrenceEventOverride"})
+  @EntityGraph(attributePaths = "recurrenceEventMapping")
   @Query(
       """
             select mapping
             from GoogleCalendarRecurrenceOverrideMapping mapping
-            where mapping.recurrenceEventMapping.integration.id = :integrationId
+            where mapping.recurrenceEventMapping.connection.id = :connectionId
               and mapping.id > :afterId
             order by mapping.id
             """)
   List<GoogleCalendarRecurrenceOverrideMapping>
-      findNextBatchWithRecurrenceEventMappingAndRecurrenceEventOverrideByIntegrationId(
-          @Param("integrationId") Long integrationId,
+      findNextBatchWithRecurrenceEventMappingAndRecurrenceEventOverrideByConnectionId(
+          @Param("connectionId") Long connectionId,
           @Param("afterId") Long afterId,
           Pageable pageable);
 

@@ -27,8 +27,7 @@ public record GoogleCalendarNormalizedPage(
 
   public record EventUpsert(
       String externalEventId,
-      String googleEtag,
-      Instant googleUpdatedAt,
+      String providerEtag,
       String title,
       String description,
       NormalizedEventSchedule schedule)
@@ -38,8 +37,7 @@ public record GoogleCalendarNormalizedPage(
 
   public record RecurrenceEventUpsert(
       String externalEventId,
-      String googleEtag,
-      Instant googleUpdatedAt,
+      String providerEtag,
       String title,
       String description,
       NormalizedEventSchedule schedule,
@@ -60,17 +58,14 @@ public record GoogleCalendarNormalizedPage(
 
     Instant originStartAt();
 
-    String googleEtag();
-
-    Instant googleUpdatedAt();
+    String providerEtag();
   }
 
   public record ActiveRecurrenceEventOverrideUpsert(
       String externalEventId,
       String recurrenceEventExternalId,
       Instant originStartAt,
-      String googleEtag,
-      Instant googleUpdatedAt,
+      String providerEtag,
       String title,
       String description,
       NormalizedEventSchedule schedule)
@@ -80,7 +75,7 @@ public record GoogleCalendarNormalizedPage(
       String externalEventId,
       String recurrenceEventExternalId,
       Instant originStartAt,
-      String googleEtag,
-      Instant googleUpdatedAt)
+      String providerEtag,
+      Instant deletedAt)
       implements RecurrenceEventOverrideUpsert {}
 }

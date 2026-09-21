@@ -3,12 +3,11 @@ package com.calio.calendar.event.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.inOrder;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -21,17 +20,15 @@ import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.event.controller.dto.CreateEventRequest;
 import com.calio.calendar.event.controller.dto.EventResponse;
 import com.calio.calendar.event.controller.dto.UpdateEventRequest;
-import com.calio.calendar.event.controller.dto.UpdateImportantEventRequest;
 import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.event.repository.EventRepository;
-import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingQueryService;
+import com.calio.calendar.integration.sync.operation.GoogleOperationJobEnqueueService;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceOccurrence;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
 import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
-import com.calio.calendar.recurrence.service.PersonalRecurrenceOccurrenceResolver;
 import com.calio.calendar.recurrence.service.RecurrenceEventQueryService;
 import com.calio.calendar.recurrence.service.Rfc5545RecurrenceEngine;
 import com.calio.calendar.sharing.event.service.PersonalEventGroupShareCommandService;
@@ -40,7 +37,6 @@ import com.calio.calendar.tag.service.TagQueryService;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
-import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -64,7 +60,7 @@ class EventServiceTest {
 
   @Mock private EventRepository eventRepository;
 
-  @Mock private GoogleCalendarEventMappingQueryService eventMappingQueryService;
+  @Mock private GoogleOperationJobEnqueueService jobEnqueueService;
 
   @Mock private RecurrenceEventRepository recurrenceEventRepository;
 
@@ -78,7 +74,7 @@ class EventServiceTest {
 
   @Test
   @DisplayName("일정 생성은 canonical schedule 검증 후 계정과 태그를 결합한 Event를 저장한다")
-  void givenValidRequest_whenCreateEvent_thenStoresCanonicalEvent() {
+  void givenValidRequest_whenCreateEvent_thenStoresEvent() {
     // given
     Account account = account();
     Tag tag = tag("기타");
@@ -91,7 +87,7 @@ class EventServiceTest {
             false,
             "Asia/Seoul",
             20L);
-    when(accountRepository.findById(1L)).thenReturn(Optional.of(account));
+    when(accountRepository.findById(1L)).thenReturn(java.util.Optional.of(account));
     when(tagQueryService.getTagOrDefault(1L, 20L)).thenReturn(tag);
     when(eventCommandService.createEvent(any(Event.class)))
         .thenAnswer(
@@ -116,6 +112,7 @@ class EventServiceTest {
     assertThat(storedEvent.getAccount()).isSameAs(account);
     assertThat(response.id()).isEqualTo(10L);
     assertThat(response.title()).isEqualTo("New event");
+    verify(jobEnqueueService).enqueueEventCreated(eq(1L), same(storedEvent));
   }
 
   @Test
@@ -134,7 +131,6 @@ class EventServiceTest {
             "UTC",
             30L);
     when(eventCommandService.lockEvent(1L, 10L)).thenReturn(event);
-    when(eventMappingQueryService.hasExternalEventMapping(10L, 1L)).thenReturn(false);
     when(tagQueryService.getTagOrDefault(1L, 30L)).thenReturn(updatedTag);
     doAnswer(
             invocation -> {
@@ -159,98 +155,32 @@ class EventServiceTest {
     EventResponse response = eventService.updateEvent(1L, 10L, request);
 
     // then
-    InOrder order = inOrder(eventMappingQueryService, tagQueryService, eventCommandService);
+    InOrder order = inOrder(tagQueryService, eventCommandService, jobEnqueueService);
     order.verify(eventCommandService).lockEvent(1L, 10L);
-    order.verify(eventMappingQueryService).hasExternalEventMapping(10L, 1L);
     order.verify(tagQueryService).getTagOrDefault(1L, 30L);
     order.verify(eventCommandService).updateEvent(any(), any(), any(), any());
+    order.verify(jobEnqueueService).enqueueEventUpdated(eq(1L), same(event));
     assertThat(response.title()).isEqualTo("After");
     assertThat(response.startAt()).isEqualTo(request.startAt());
     assertThat(response.tag().title()).isEqualTo("변경");
   }
 
   @Test
-  @DisplayName("외부 캘린더 일정 수정은 태그 조회와 상태 변경 없이 거절한다")
-  void givenExternalEvent_whenUpdateEvent_thenRejectsBeforeMutation() {
+  @DisplayName("일정 삭제는 공유 mapping과 canonical 일정을 정리한 뒤 DELETE Job을 등록한다")
+  void givenOwnedInternalEvent_whenDeleteEvent_thenDeletesAndEnqueuesDeleteSnapshot() {
     // given
-    Event event = event("External", tag("기타"));
+    Event event = event("Delete me", tag("기존"));
     when(eventCommandService.lockEvent(1L, 10L)).thenReturn(event);
-    when(eventMappingQueryService.hasExternalEventMapping(10L, 1L)).thenReturn(true);
-    UpdateEventRequest request =
-        new UpdateEventRequest(
-            "Blocked",
-            null,
-            Instant.parse("2027-01-02T00:00:00Z"),
-            Instant.parse("2027-01-02T01:00:00Z"),
-            false,
-            "UTC",
-            null);
-
-    // when, then
-    assertThatThrownBy(() -> eventService.updateEvent(1L, 10L, request))
-        .isInstanceOfSatisfying(
-            CalioException.class,
-            exception ->
-                assertThat(exception.getErrorCode())
-                    .isEqualTo(ErrorCode.EXTERNAL_EVENT_MUTATION_NOT_SUPPORTED));
-    verifyNoInteractions(tagQueryService);
-    verify(eventCommandService, never()).updateEvent(any(), any(), any(), any());
-    assertThat(event.getTitle()).isEqualTo("External");
-  }
-
-  @Test
-  @DisplayName("외부 캘린더 일정 삭제는 Command를 실행하지 않고 거절한다")
-  void givenExternalEvent_whenDeleteEvent_thenRejectsBeforeCommand() {
-    // given
-    Event event = event("External", tag("기타"));
-    when(eventCommandService.lockEvent(1L, 10L)).thenReturn(event);
-    when(eventMappingQueryService.hasExternalEventMapping(10L, 1L)).thenReturn(true);
-
-    // when, then
-    assertThatThrownBy(() -> eventService.deleteEvent(1L, 10L))
-        .isInstanceOfSatisfying(
-            CalioException.class,
-            exception ->
-                assertThat(exception.getErrorCode())
-                    .isEqualTo(ErrorCode.EXTERNAL_EVENT_MUTATION_NOT_SUPPORTED));
-    verify(eventCommandService, never()).deleteEvent(any());
-  }
-
-  @Test
-  @DisplayName("개인 일정 삭제는 원본 삭제 전에 Group Space 공유 mapping을 정리한다")
-  void givenPersonalEvent_whenDeleteEvent_thenCleansShareMappingsBeforeSource() {
-    Event event = event("Personal", tag("기타"));
-    when(eventCommandService.lockEvent(1L, 10L)).thenReturn(event);
-    when(eventMappingQueryService.hasExternalEventMapping(10L, 1L)).thenReturn(false);
-
-    eventService.deleteEvent(1L, 10L);
-
-    InOrder deletionOrder = inOrder(eventShareCommandService, eventCommandService);
-    deletionOrder.verify(eventShareCommandService).deleteAllForSourceEvent(10L);
-    deletionOrder.verify(eventCommandService).deleteEvent(event);
-  }
-
-  @Test
-  @DisplayName("외부 캘린더 일정의 중요 상태 변경은 Command를 실행하지 않고 거절한다")
-  void givenExternalEvent_whenUpdateImportantEvent_thenRejectsBeforeCommand() {
-    // given
-    Event event = event("External", tag("기타"));
-    when(eventCommandService.lockEvent(1L, 10L)).thenReturn(event);
-    when(eventMappingQueryService.hasExternalEventMapping(10L, 1L)).thenReturn(true);
 
     // when
-    assertThatThrownBy(
-            () -> eventService.updateImportantEvent(1L, 10L, new UpdateImportantEventRequest(true)))
-        .isInstanceOfSatisfying(
-            CalioException.class,
-            exception ->
-                assertThat(exception.getErrorCode())
-                    .isEqualTo(ErrorCode.EXTERNAL_EVENT_MUTATION_NOT_SUPPORTED));
+    eventService.deleteEvent(1L, 10L);
 
     // then
-    verify(eventMappingQueryService).hasExternalEventMapping(10L, 1L);
-    verify(eventCommandService, never()).updateImportantEvent(any(), anyBoolean());
-    assertThat(event.importantEvent()).isFalse();
+    InOrder order = inOrder(eventShareCommandService, eventCommandService, jobEnqueueService);
+    order.verify(eventCommandService).lockEvent(1L, 10L);
+    order.verify(eventShareCommandService).deleteAllForSourceEvent(10L);
+    order.verify(eventCommandService).deleteEvent(event);
+    order.verify(jobEnqueueService).enqueueEventDeleted(1L, 10L);
   }
 
   @Test
@@ -397,11 +327,11 @@ class EventServiceTest {
     return new EventService(
         queryService,
         eventCommandService,
-        eventMappingQueryService,
+        jobEnqueueService,
         accountRepository,
         tagQueryService,
         recurrenceQueryService,
-        new PersonalRecurrenceOccurrenceResolver(recurrenceEngine),
+        recurrenceEngine,
         eventShareCommandService);
   }
 

@@ -3,6 +3,7 @@ package com.calio.calendar.integration.mapping.domain;
 import com.calio.calendar.common.domain.BaseEntity;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -10,7 +11,6 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
@@ -24,7 +24,7 @@ import java.time.Instant;
           columnNames = {"google_calendar_recurrence_event_mapping_id", "external_event_id"}),
       @UniqueConstraint(
           name = "uk_google_calendar_recurrence_override_canonical",
-          columnNames = "recurrence_event_override_id")
+          columnNames = {"google_calendar_recurrence_event_mapping_id", "origin_start_at"})
     })
 public class GoogleCalendarRecurrenceOverrideMapping extends BaseEntity {
 
@@ -36,37 +36,28 @@ public class GoogleCalendarRecurrenceOverrideMapping extends BaseEntity {
   @JoinColumn(name = "google_calendar_recurrence_event_mapping_id", nullable = false)
   private GoogleCalendarRecurrenceEventMapping recurrenceEventMapping;
 
-  @OneToOne(fetch = FetchType.LAZY, optional = false)
-  @JoinColumn(name = "recurrence_event_override_id", nullable = false)
-  private RecurrenceEventOverride recurrenceEventOverride;
+  @Column(name = "origin_start_at", nullable = false, updatable = false)
+  private Instant originStartAt;
 
   @Column(name = "external_event_id", nullable = false, length = 1024)
   private String externalEventId;
 
-  @Column(name = "provider_etag", length = 1024)
-  private String providerEtag;
+  @Embedded private GoogleCalendarMappingSyncState syncState;
 
-  @Column(name = "provider_updated_at")
-  private Instant providerUpdatedAt;
+  @Column(name = "local_changed", nullable = false)
+  private boolean localChanged;
 
   protected GoogleCalendarRecurrenceOverrideMapping() {}
 
   public GoogleCalendarRecurrenceOverrideMapping(
       GoogleCalendarRecurrenceEventMapping recurrenceEventMapping,
-      RecurrenceEventOverride recurrenceEventOverride,
+      Instant originStartAt,
       String externalEventId,
-      String providerEtag,
-      Instant providerUpdatedAt) {
+      String providerEtag) {
     this.recurrenceEventMapping = recurrenceEventMapping;
-    this.recurrenceEventOverride = recurrenceEventOverride;
+    this.originStartAt = originStartAt;
     this.externalEventId = externalEventId;
-    this.providerEtag = providerEtag;
-    this.providerUpdatedAt = providerUpdatedAt;
-  }
-
-  public void updateProviderVersion(String providerEtag, Instant providerUpdatedAt) {
-    this.providerEtag = providerEtag;
-    this.providerUpdatedAt = providerUpdatedAt;
+    this.syncState = GoogleCalendarMappingSyncState.active(providerEtag);
   }
 
   public Long getId() {
@@ -77,19 +68,47 @@ public class GoogleCalendarRecurrenceOverrideMapping extends BaseEntity {
     return recurrenceEventMapping;
   }
 
-  public RecurrenceEventOverride getRecurrenceEventOverride() {
-    return recurrenceEventOverride;
+  public Instant getOriginStartAt() {
+    return originStartAt;
   }
 
   public String getExternalEventId() {
     return externalEventId;
   }
 
-  public String getProviderEtag() {
-    return providerEtag;
+  public void updateProviderEtag(String providerEtag) {
+    syncState.updateProviderEtag(providerEtag);
   }
 
-  public Instant getProviderUpdatedAt() {
-    return providerUpdatedAt;
+  public void markConflicted() {
+    syncState.markConflicted();
+  }
+
+  public GoogleCalendarRecurrenceOverrideMapping(
+      GoogleCalendarRecurrenceEventMapping recurrenceEventMapping,
+      RecurrenceEventOverride recurrenceEventOverride,
+      String externalEventId,
+      String providerEtag) {
+    this(
+        recurrenceEventMapping,
+        recurrenceEventOverride.getOriginStartAt(),
+        externalEventId,
+        providerEtag);
+  }
+
+  public void markLocalChanged() {
+    localChanged = true;
+  }
+
+  public boolean isLocalChanged() {
+    return localChanged;
+  }
+
+  public boolean isConflicted() {
+    return syncState.isConflicted();
+  }
+
+  public String getProviderEtag() {
+    return syncState.getProviderEtag();
   }
 }
