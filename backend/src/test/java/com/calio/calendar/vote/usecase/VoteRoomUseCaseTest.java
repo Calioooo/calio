@@ -43,29 +43,47 @@ class VoteRoomUseCaseTest {
   }
 
   @Test
-  @DisplayName("VoteRoom 생성은 KST 오늘을 시작일로 하고 포함 31일 후보 기간을 허용한다")
+  @DisplayName("VoteRoom 생성은 사용자가 선택한 KST 오늘 이후 시작일과 포함 31일 후보 기간을 허용한다")
   void givenMaximumCandidatePeriod_whenCreate_thenCreatesPublicVoteRoomForAuthenticatedAccount() {
     Account account = new Account();
     when(accountRepository.findById(ACCOUNT_ID)).thenReturn(Optional.of(account));
     when(voteRoomRepository.save(org.mockito.ArgumentMatchers.any(VoteRoom.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));
 
-    createVoteRoomUseCase.create(ACCOUNT_ID, "여행 일정", KOREA_TODAY.plusDays(30));
+    LocalDate candidateStartDate = KOREA_TODAY.plusDays(7);
+    createVoteRoomUseCase.create(
+        ACCOUNT_ID, "여행 일정", candidateStartDate, candidateStartDate.plusDays(30));
 
     ArgumentCaptor<VoteRoom> voteRoomCaptor = ArgumentCaptor.forClass(VoteRoom.class);
     verify(voteRoomRepository).save(voteRoomCaptor.capture());
     VoteRoom voteRoom = voteRoomCaptor.getValue();
     assertThat(voteRoom.getPublicId()).isNotNull();
-    assertThat(voteRoom.getCandidateStartDate()).isEqualTo(KOREA_TODAY);
-    assertThat(voteRoom.getCandidateEndDate()).isEqualTo(KOREA_TODAY.plusDays(30));
+    assertThat(voteRoom.getCandidateStartDate()).isEqualTo(candidateStartDate);
+    assertThat(voteRoom.getCandidateEndDate()).isEqualTo(candidateStartDate.plusDays(30));
     assertThat(voteRoom.getCreatedByAccountId()).isEqualTo(ACCOUNT_ID);
   }
 
   @Test
-  @DisplayName("후보 종료일이 KST 시작일보다 이르면 VoteRoom을 생성하지 않는다")
-  void givenEndDateBeforeKoreaToday_whenCreate_thenRejectsBeforeAccountLookup() {
+  @DisplayName("후보 시작일이 KST 오늘보다 과거이면 VoteRoom을 생성하지 않는다")
+  void givenPastCandidateStartDate_whenCreate_thenRejectsBeforeAccountLookup() {
     assertThatThrownBy(
-            () -> createVoteRoomUseCase.create(ACCOUNT_ID, "여행 일정", KOREA_TODAY.minusDays(1)))
+            () ->
+                createVoteRoomUseCase.create(
+                    ACCOUNT_ID, "여행 일정", KOREA_TODAY.minusDays(1), KOREA_TODAY.plusDays(1)))
+        .isInstanceOfSatisfying(
+            CalioException.class,
+            exception ->
+                assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.VALIDATION_FAILED));
+
+    verify(accountRepository, never()).findById(ACCOUNT_ID);
+    verify(voteRoomRepository, never()).save(org.mockito.ArgumentMatchers.any());
+  }
+
+  @Test
+  @DisplayName("후보 시작일이 없으면 VoteRoom을 생성하지 않는다")
+  void givenMissingCandidateStartDate_whenCreate_thenRejectsBeforeAccountLookup() {
+    assertThatThrownBy(
+            () -> createVoteRoomUseCase.create(ACCOUNT_ID, "여행 일정", null, KOREA_TODAY.plusDays(1)))
         .isInstanceOfSatisfying(
             CalioException.class,
             exception ->
@@ -79,7 +97,25 @@ class VoteRoomUseCaseTest {
   @DisplayName("후보 기간이 포함 31일을 초과하면 VoteRoom을 생성하지 않는다")
   void givenCandidatePeriodOverThirtyOneDays_whenCreate_thenRejectsBeforeAccountLookup() {
     assertThatThrownBy(
-            () -> createVoteRoomUseCase.create(ACCOUNT_ID, "여행 일정", KOREA_TODAY.plusDays(31)))
+            () ->
+                createVoteRoomUseCase.create(
+                    ACCOUNT_ID, "여행 일정", KOREA_TODAY, KOREA_TODAY.plusDays(31)))
+        .isInstanceOfSatisfying(
+            CalioException.class,
+            exception ->
+                assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.VALIDATION_FAILED));
+
+    verify(accountRepository, never()).findById(ACCOUNT_ID);
+    verify(voteRoomRepository, never()).save(org.mockito.ArgumentMatchers.any());
+  }
+
+  @Test
+  @DisplayName("후보 종료일이 시작일보다 이르면 VoteRoom을 생성하지 않는다")
+  void givenCandidateEndDateBeforeStartDate_whenCreate_thenRejectsBeforeAccountLookup() {
+    assertThatThrownBy(
+            () ->
+                createVoteRoomUseCase.create(
+                    ACCOUNT_ID, "여행 일정", KOREA_TODAY.plusDays(1), KOREA_TODAY))
         .isInstanceOfSatisfying(
             CalioException.class,
             exception ->

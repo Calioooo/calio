@@ -69,7 +69,7 @@ class VoteRoomControllerTest {
   }
 
   @Test
-  @DisplayName("인증된 사용자는 KST 생성일을 시작일로 하는 투표방을 생성한다")
+  @DisplayName("인증된 사용자는 선택한 후보 시작일로 투표방을 생성한다")
   void givenValidRequest_whenCreateVoteRoom_thenReturnsVoteRoomJsonContract() throws Exception {
     // when
     MvcResult result =
@@ -81,6 +81,7 @@ class VoteRoomControllerTest {
                         """
                                 {
                                   "name": "주말 여행",
+                                  "candidateStartDate": "2026-08-17",
                                   "candidateEndDate": "2026-08-20"
                                 }
                                 """))
@@ -88,7 +89,7 @@ class VoteRoomControllerTest {
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.publicId").isString())
             .andExpect(jsonPath("$.name").value("주말 여행"))
-            .andExpect(jsonPath("$.candidateStartDate").value("2026-08-14"))
+            .andExpect(jsonPath("$.candidateStartDate").value("2026-08-17"))
             .andExpect(jsonPath("$.candidateEndDate").value("2026-08-20"))
             .andExpect(jsonPath("$.id").doesNotExist())
             .andExpect(jsonPath("$.*", hasSize(4)))
@@ -100,7 +101,7 @@ class VoteRoomControllerTest {
   }
 
   @Test
-  @DisplayName("투표방 이름 또는 후보 종료일이 유효하지 않으면 VALIDATION_FAILED를 반환한다")
+  @DisplayName("투표방 이름 또는 후보 기간이 유효하지 않으면 VALIDATION_FAILED를 반환한다")
   void givenInvalidCreateRequest_whenCreateVoteRoom_thenReturnsValidationFailed() throws Exception {
     mockMvc
         .perform(
@@ -124,7 +125,39 @@ class VoteRoomControllerTest {
                     """
                                 {
                                   "name": "기간 초과",
+                                  "candidateStartDate": "2026-08-14",
                                   "candidateEndDate": "2026-09-14"
+                                }
+                                """))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"))
+        .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"));
+
+    mockMvc
+        .perform(
+            post("/api/vote-rooms")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                                {
+                                  "name": "과거 시작일",
+                                  "candidateStartDate": "2026-08-13",
+                                  "candidateEndDate": "2026-08-20"
+                                }
+                                """))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"))
+        .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"));
+
+    mockMvc
+        .perform(
+            post("/api/vote-rooms")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                                {
+                                  "name": "시작일 누락",
+                                  "candidateEndDate": "2026-08-20"
                                 }
                                 """))
         .andExpect(status().isBadRequest())
@@ -144,6 +177,7 @@ class VoteRoomControllerTest {
                     """
                                 {
                                   "name": "인증 필요",
+                                  "candidateStartDate": "2026-08-14",
                                   "candidateEndDate": "2026-08-20"
                                 }
                                 """))

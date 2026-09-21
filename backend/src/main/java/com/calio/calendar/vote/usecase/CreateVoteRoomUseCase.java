@@ -30,8 +30,12 @@ public class CreateVoteRoomUseCase {
   }
 
   @Transactional
-  public VoteRoomResponse create(Long accountId, String name, LocalDate candidateEndDate) {
-    LocalDate candidateStartDate = LocalDate.now(clock.withZone(KOREA_ZONE));
+  public VoteRoomResponse create(
+      Long accountId, String name, LocalDate candidateStartDate, LocalDate candidateEndDate) {
+    if (candidateStartDate == null
+        || candidateStartDate.isBefore(LocalDate.now(clock.withZone(KOREA_ZONE)))) {
+      throw new CalioException(ErrorCode.VALIDATION_FAILED);
+    }
     VoteCandidateDateRange candidateDateRange =
         VoteCandidateDateRange.of(candidateStartDate, candidateEndDate);
     accountRepository

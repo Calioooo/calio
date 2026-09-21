@@ -42,7 +42,10 @@ public class VoteRoomController {
     return ResponseEntity.status(HttpStatus.CREATED)
         .body(
             createVoteRoomUseCase.create(
-                account.accountId(), request.name(), request.candidateEndDate()));
+                account.accountId(),
+                request.name(),
+                request.candidateStartDate(),
+                request.candidateEndDate()));
   }
 
   @GetMapping("/me")
