@@ -39,7 +39,7 @@ public class GetVoteResultUseCase {
         voteRoomRepository
             .findByPublicId(voteRoomPublicId)
             .orElseThrow(() -> new CalioException(ErrorCode.VOTE_ROOM_NOT_FOUND));
-    Map<LocalDate, List<String>> unavailableNicknames =
+    Map<LocalDate, List<String>> unavailableVotersByDate =
         voteRepository.findAllSubmittedByVoteRoomPublicId(voteRoomPublicId).stream()
             .collect(
                 Collectors.groupingBy(
@@ -52,7 +52,7 @@ public class GetVoteResultUseCase {
             .datesUntil(voteRoom.getCandidateEndDate().plusDays(1))
             .map(
                 date -> {
-                  List<String> nicknames = unavailableNicknames.getOrDefault(date, List.of());
+                  List<String> nicknames = unavailableVotersByDate.getOrDefault(date, List.of());
                   return VoteDateResultResponse.from(date, nicknames.size(), nicknames);
                 })
             .toList();
