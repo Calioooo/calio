@@ -1,4 +1,4 @@
-package com.calio.calendar.vote.service;
+package com.calio.calendar.vote.usecase;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -7,10 +7,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
-import com.calio.calendar.vote.controller.dto.LookupVoteParticipantSelectionRequest;
 import com.calio.calendar.vote.domain.Vote;
 import com.calio.calendar.vote.domain.VoteParticipant;
 import com.calio.calendar.vote.domain.VoteParticipantStatus;
@@ -32,7 +30,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 @ExtendWith(MockitoExtension.class)
-class VoteParticipantSelectionLookupServiceTest {
+class LookupVoteParticipantSelectionUseCaseTest {
 
   private static final UUID VOTE_ROOM_PUBLIC_ID =
       UUID.fromString("7ab6b7d8-11cd-4ce2-83e3-b81ad87ea3c9");
@@ -43,15 +41,18 @@ class VoteParticipantSelectionLookupServiceTest {
 
   @Mock private VoteRepository voteRepository;
 
-  private VoteParticipantSelectionLookupService lookupService;
+  private LookupVoteParticipantSelectionUseCase lookupVoteParticipantSelectionUseCase;
   private PasswordEncoder passwordEncoder;
 
   @BeforeEach
   void setUp() {
     passwordEncoder = new BCryptPasswordEncoder();
-    lookupService =
-        new VoteParticipantSelectionLookupService(
-            voteRoomRepository, voteParticipantRepository, voteRepository, passwordEncoder);
+    lookupVoteParticipantSelectionUseCase =
+        new LookupVoteParticipantSelectionUseCase(
+            voteRoomRepository,
+            voteParticipantRepository,
+            voteRepository,
+            new VoteParticipantCredentialVerifier(passwordEncoder));
   }
 
   @Test
@@ -60,12 +61,12 @@ class VoteParticipantSelectionLookupServiceTest {
     // given
     VoteRoom voteRoom = voteRoom();
     VoteParticipant participant =
-        new VoteParticipant(voteRoom, "calio", passwordEncoder.encode("secret"));
+        new VoteParticipant(voteRoom.getId(), "calio", passwordEncoder.encode("secret"));
     participant.submit();
     when(voteRoomRepository.findByPublicId(VOTE_ROOM_PUBLIC_ID)).thenReturn(Optional.of(voteRoom));
     when(voteParticipantRepository.findByVoteRoomPublicIdAndNickname(VOTE_ROOM_PUBLIC_ID, "calio"))
         .thenReturn(Optional.of(participant));
-    when(voteRepository.findAllByVoteParticipantId(participant.getId()))
+    when(voteRepository.findByVoteParticipantIdOrderByUnavailableDateAsc(participant.getId()))
         .thenReturn(
             List.of(
                 new Vote(participant, LocalDate.of(2026, 8, 15)),
@@ -73,8 +74,7 @@ class VoteParticipantSelectionLookupServiceTest {
 
     // when
     var response =
-        lookupService.lookup(
-            VOTE_ROOM_PUBLIC_ID, new LookupVoteParticipantSelectionRequest("calio", "secret"));
+        lookupVoteParticipantSelectionUseCase.lookup(VOTE_ROOM_PUBLIC_ID, "calio", "secret");
 
     // then
     assertThat(response.nickname()).isEqualTo("calio");
@@ -88,20 +88,19 @@ class VoteParticipantSelectionLookupServiceTest {
   void givenRegisteredParticipant_whenLookup_thenReturnsEmptyUnavailableDates() {
     // given
     VoteRoom voteRoom = voteRoom();
-    VoteParticipant participant = new VoteParticipant(voteRoom, "calio", null);
+    VoteParticipant participant = new VoteParticipant(voteRoom.getId(), "calio", null);
     when(voteRoomRepository.findByPublicId(VOTE_ROOM_PUBLIC_ID)).thenReturn(Optional.of(voteRoom));
     when(voteParticipantRepository.findByVoteRoomPublicIdAndNickname(VOTE_ROOM_PUBLIC_ID, "calio"))
         .thenReturn(Optional.of(participant));
 
     // when
-    var response =
-        lookupService.lookup(
-            VOTE_ROOM_PUBLIC_ID, new LookupVoteParticipantSelectionRequest("calio", null));
+    var response = lookupVoteParticipantSelectionUseCase.lookup(VOTE_ROOM_PUBLIC_ID, "calio", null);
 
     // then
     assertThat(response.status()).isEqualTo(VoteParticipantStatus.REGISTERED);
     assertThat(response.unavailableDates()).isEmpty();
-    verify(voteRepository, never()).findAllByVoteParticipantId(participant.getId());
+    verify(voteRepository, never())
+        .findByVoteParticipantIdOrderByUnavailableDateAsc(participant.getId());
   }
 
   @Test
@@ -112,9 +111,7 @@ class VoteParticipantSelectionLookupServiceTest {
 
     // when, then
     assertThatThrownBy(
-            () ->
-                lookupService.lookup(
-                    VOTE_ROOM_PUBLIC_ID, new LookupVoteParticipantSelectionRequest("calio", null)))
+            () -> lookupVoteParticipantSelectionUseCase.lookup(VOTE_ROOM_PUBLIC_ID, "calio", null))
         .isInstanceOfSatisfying(
             CalioException.class,
             exception ->
@@ -124,10 +121,6 @@ class VoteParticipantSelectionLookupServiceTest {
 
   private VoteRoom voteRoom() {
     return new VoteRoom(
-        VOTE_ROOM_PUBLIC_ID,
-        "여행 일정",
-        LocalDate.of(2026, 8, 14),
-        LocalDate.of(2026, 8, 20),
-        new Account());
+        VOTE_ROOM_PUBLIC_ID, "여행 일정", LocalDate.of(2026, 8, 14), LocalDate.of(2026, 8, 20), 1L);
   }
 }

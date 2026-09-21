@@ -1,15 +1,12 @@
 package com.calio.calendar.vote.domain;
 
-import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.common.domain.BaseEntity;
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.LocalDate;
 import java.util.UUID;
@@ -28,15 +25,10 @@ public class VoteRoom extends BaseEntity {
   @Column(nullable = false)
   private String name;
 
-  @Column(name = "candidate_start_date", nullable = false)
-  private LocalDate candidateStartDate;
+  @Embedded private VoteCandidateDateRange candidateDateRange;
 
-  @Column(name = "candidate_end_date", nullable = false)
-  private LocalDate candidateEndDate;
-
-  @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "created_by_account_id")
-  private Account createdByAccount;
+  @Column(name = "created_by_account_id")
+  private Long createdByAccountId;
 
   protected VoteRoom() {}
 
@@ -45,12 +37,23 @@ public class VoteRoom extends BaseEntity {
       String name,
       LocalDate candidateStartDate,
       LocalDate candidateEndDate,
-      Account createdByAccount) {
+      Long createdByAccountId) {
+    this(
+        publicId,
+        name,
+        VoteCandidateDateRange.of(candidateStartDate, candidateEndDate),
+        createdByAccountId);
+  }
+
+  public VoteRoom(
+      UUID publicId,
+      String name,
+      VoteCandidateDateRange candidateDateRange,
+      Long createdByAccountId) {
     this.publicId = publicId;
     this.name = name;
-    this.candidateStartDate = candidateStartDate;
-    this.candidateEndDate = candidateEndDate;
-    this.createdByAccount = createdByAccount;
+    this.candidateDateRange = candidateDateRange;
+    this.createdByAccountId = createdByAccountId;
   }
 
   public Long getId() {
@@ -66,14 +69,18 @@ public class VoteRoom extends BaseEntity {
   }
 
   public LocalDate getCandidateStartDate() {
-    return candidateStartDate;
+    return candidateDateRange.candidateStartDate();
   }
 
   public LocalDate getCandidateEndDate() {
-    return candidateEndDate;
+    return candidateDateRange.candidateEndDate();
   }
 
-  public Account getCreatedByAccount() {
-    return createdByAccount;
+  public VoteCandidateDateRange getCandidateDateRange() {
+    return candidateDateRange;
+  }
+
+  public Long getCreatedByAccountId() {
+    return createdByAccountId;
   }
 }

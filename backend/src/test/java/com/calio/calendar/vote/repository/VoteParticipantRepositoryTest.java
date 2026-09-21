@@ -60,16 +60,17 @@ class VoteParticipantRepositoryTest {
                 "여행 일정",
                 LocalDate.of(2026, 8, 14),
                 LocalDate.of(2026, 8, 20),
-                account));
+                account.getId()));
   }
 
   @Test
   @Transactional
-  @DisplayName("참여자는 VoteRoom 공개 ID와 대소문자 무관 닉네임으로 VoteRoom을 함께 조회한다")
-  void givenParticipant_whenFindByVoteRoomPublicIdAndNickname_thenLoadsVoteRoom() {
+  @DisplayName("참여자는 VoteRoom 공개 ID와 대소문자 무관 닉네임으로 조회한다")
+  void givenParticipant_whenFindByVoteRoomPublicIdAndNickname_thenFindsParticipant() {
     // given
     VoteParticipant participant =
-        voteParticipantRepository.saveAndFlush(new VoteParticipant(voteRoom, "calio", null));
+        voteParticipantRepository.saveAndFlush(
+            new VoteParticipant(voteRoom.getId(), "calio", null));
 
     // when
     VoteParticipant foundParticipant =
@@ -79,7 +80,7 @@ class VoteParticipantRepositoryTest {
 
     // then
     assertThat(foundParticipant.getId()).isEqualTo(participant.getId());
-    assertThat(foundParticipant.getVoteRoom().getId()).isEqualTo(voteRoom.getId());
+    assertThat(foundParticipant.getVoteRoomId()).isEqualTo(voteRoom.getId());
     assertThat(foundParticipant.getPasswordHash()).isNull();
     assertThat(foundParticipant.getStatus()).isEqualTo(VoteParticipantStatus.REGISTERED);
   }
@@ -90,7 +91,8 @@ class VoteParticipantRepositoryTest {
   void givenRegisteredParticipant_whenSubmit_thenPersistsSubmittedStatus() {
     // given
     VoteParticipant participant =
-        voteParticipantRepository.saveAndFlush(new VoteParticipant(voteRoom, "calio", null));
+        voteParticipantRepository.saveAndFlush(
+            new VoteParticipant(voteRoom.getId(), "calio", null));
 
     // when
     participant.submit();
@@ -107,13 +109,13 @@ class VoteParticipantRepositoryTest {
   @DisplayName("같은 VoteRoom에서는 같은 닉네임의 참여자를 저장할 수 없다")
   void givenDuplicateNicknameInVoteRoom_whenSave_thenRejectsUniqueConstraint() {
     // given
-    voteParticipantRepository.saveAndFlush(new VoteParticipant(voteRoom, "calio", null));
+    voteParticipantRepository.saveAndFlush(new VoteParticipant(voteRoom.getId(), "calio", null));
 
     // when, then
     assertThatThrownBy(
             () ->
                 voteParticipantRepository.saveAndFlush(
-                    new VoteParticipant(voteRoom, "calio", "hashed-password")))
+                    new VoteParticipant(voteRoom.getId(), "calio", "hashed-password")))
         .isInstanceOf(DataIntegrityViolationException.class);
   }
 
@@ -122,7 +124,8 @@ class VoteParticipantRepositoryTest {
   void givenDuplicateUnavailableDateForParticipant_whenSave_thenRejectsUniqueConstraint() {
     // given
     VoteParticipant participant =
-        voteParticipantRepository.saveAndFlush(new VoteParticipant(voteRoom, "calio", null));
+        voteParticipantRepository.saveAndFlush(
+            new VoteParticipant(voteRoom.getId(), "calio", null));
     LocalDate unavailableDate = LocalDate.of(2026, 8, 15);
     voteRepository.saveAndFlush(new Vote(participant, unavailableDate));
 
@@ -137,14 +140,14 @@ class VoteParticipantRepositoryTest {
     // given
     VoteParticipant participant =
         voteParticipantRepository.saveAndFlush(
-            new VoteParticipant(voteRoom, "calio", "hashed-password"));
+            new VoteParticipant(voteRoom.getId(), "calio", "hashed-password"));
     voteRepository.saveAllAndFlush(
         List.of(
             new Vote(participant, LocalDate.of(2026, 8, 20)),
             new Vote(participant, LocalDate.of(2026, 8, 15))));
 
     // when, then
-    assertThat(voteRepository.findAllByVoteParticipantId(participant.getId()))
+    assertThat(voteRepository.findByVoteParticipantIdOrderByUnavailableDateAsc(participant.getId()))
         .extracting(Vote::getUnavailableDate)
         .containsExactly(LocalDate.of(2026, 8, 15), LocalDate.of(2026, 8, 20));
   }
@@ -154,11 +157,13 @@ class VoteParticipantRepositoryTest {
   void
       givenSubmittedAndRegisteredParticipants_whenFindResultProjections_thenExcludesRegisteredParticipant() {
     VoteParticipant submittedParticipant =
-        voteParticipantRepository.saveAndFlush(new VoteParticipant(voteRoom, "submitted", null));
+        voteParticipantRepository.saveAndFlush(
+            new VoteParticipant(voteRoom.getId(), "submitted", null));
     submittedParticipant.submit();
     voteParticipantRepository.saveAndFlush(submittedParticipant);
     VoteParticipant registeredParticipant =
-        voteParticipantRepository.saveAndFlush(new VoteParticipant(voteRoom, "register", null));
+        voteParticipantRepository.saveAndFlush(
+            new VoteParticipant(voteRoom.getId(), "register", null));
     LocalDate selectedDate = LocalDate.of(2026, 8, 15);
     voteRepository.saveAllAndFlush(
         List.of(

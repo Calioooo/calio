@@ -1,4 +1,4 @@
-package com.calio.calendar.vote.service;
+package com.calio.calendar.vote.usecase;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -34,9 +34,9 @@ import org.springframework.boot.test.context.SpringBootTest;
       "spring.jpa.hibernate.ddl-auto=create-drop"
     })
 @SharedIntegrationDatabase
-class VoteParticipantServiceIntegrationTest {
+class CreateVoteParticipantUseCaseIntegrationTest {
 
-  @Autowired private VoteParticipantService voteParticipantService;
+  @Autowired private CreateVoteParticipantUseCase createVoteParticipantUseCase;
 
   @Autowired private VoteRepository voteRepository;
 
@@ -63,7 +63,7 @@ class VoteParticipantServiceIntegrationTest {
                 "여행 일정",
                 LocalDate.of(2026, 8, 14),
                 LocalDate.of(2026, 8, 20),
-                account));
+                account.getId()));
   }
 
   @Test
@@ -105,7 +105,7 @@ class VoteParticipantServiceIntegrationTest {
     ready.countDown();
     start.await();
     try {
-      voteParticipantService.create(voteRoom.getPublicId(), nickname, null);
+      createVoteParticipantUseCase.createParticipant(voteRoom.getPublicId(), nickname, null);
       return new CreateResult(true, null);
     } catch (CalioException exception) {
       return new CreateResult(false, exception.getErrorCode());

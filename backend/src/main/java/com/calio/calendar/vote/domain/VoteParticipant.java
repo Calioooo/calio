@@ -1,16 +1,15 @@
 package com.calio.calendar.vote.domain;
 
 import com.calio.calendar.common.domain.BaseEntity;
+import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 
@@ -27,12 +26,14 @@ public class VoteParticipant extends BaseEntity {
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
 
-  @ManyToOne(fetch = FetchType.LAZY, optional = false)
-  @JoinColumn(name = "vote_room_id", nullable = false)
-  private VoteRoom voteRoom;
+  @Column(name = "vote_room_id", nullable = false)
+  private Long voteRoomId;
 
-  @Column(nullable = false, length = 9)
-  private String nickname;
+  @Embedded
+  @AttributeOverride(
+      name = "value",
+      column = @Column(name = "nickname", nullable = false, length = 9))
+  private VoteParticipantNickname nickname;
 
   @Column(name = "password_hash")
   private String passwordHash;
@@ -43,8 +44,12 @@ public class VoteParticipant extends BaseEntity {
 
   protected VoteParticipant() {}
 
-  public VoteParticipant(VoteRoom voteRoom, String nickname, String passwordHash) {
-    this.voteRoom = voteRoom;
+  public VoteParticipant(Long voteRoomId, String nickname, String passwordHash) {
+    this(voteRoomId, VoteParticipantNickname.of(nickname), passwordHash);
+  }
+
+  public VoteParticipant(Long voteRoomId, VoteParticipantNickname nickname, String passwordHash) {
+    this.voteRoomId = voteRoomId;
     this.nickname = nickname;
     this.passwordHash = passwordHash;
     this.status = VoteParticipantStatus.REGISTERED;
@@ -54,12 +59,12 @@ public class VoteParticipant extends BaseEntity {
     return id;
   }
 
-  public VoteRoom getVoteRoom() {
-    return voteRoom;
+  public Long getVoteRoomId() {
+    return voteRoomId;
   }
 
   public String getNickname() {
-    return nickname;
+    return nickname.value();
   }
 
   public String getPasswordHash() {
@@ -72,6 +77,10 @@ public class VoteParticipant extends BaseEntity {
 
   public boolean hasSubmittedVotes() {
     return status == VoteParticipantStatus.SUBMITTED;
+  }
+
+  public boolean hasPassword() {
+    return passwordHash != null;
   }
 
   public void submit() {

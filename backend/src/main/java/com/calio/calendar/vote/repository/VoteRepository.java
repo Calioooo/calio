@@ -11,22 +11,17 @@ import org.springframework.data.repository.query.Param;
 
 public interface VoteRepository extends JpaRepository<Vote, Long> {
 
-  @Query(
-      """
-            select vote
-            from Vote vote
-            where vote.voteParticipant.id = :voteParticipantId
-            order by vote.unavailableDate
-            """)
-  List<Vote> findAllByVoteParticipantId(@Param("voteParticipantId") Long voteParticipantId);
+  List<Vote> findByVoteParticipantIdOrderByUnavailableDateAsc(Long voteParticipantId);
 
-  @EntityGraph(attributePaths = {"voteParticipant", "voteParticipant.voteRoom"})
+  @EntityGraph(attributePaths = "voteParticipant")
   @Query(
       """
             select vote
             from Vote vote
-            where vote.voteParticipant.voteRoom.publicId = :voteRoomPublicId
-              and vote.voteParticipant.status = com.calio.calendar.vote.domain.VoteParticipantStatus.SUBMITTED
+            join vote.voteParticipant participant
+            join VoteRoom voteRoom on participant.voteRoomId = voteRoom.id
+            where voteRoom.publicId = :voteRoomPublicId
+              and participant.status = com.calio.calendar.vote.domain.VoteParticipantStatus.SUBMITTED
             order by vote.unavailableDate
             """)
   List<Vote> findAllSubmittedByVoteRoomPublicId(@Param("voteRoomPublicId") UUID voteRoomPublicId);
