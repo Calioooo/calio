@@ -4,8 +4,8 @@ import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.service.AccountQueryService;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
-import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
-import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrationQueryService;
+import com.calio.calendar.integration.connection.domain.GoogleCalendarConnection;
+import com.calio.calendar.integration.connection.service.GoogleCalendarConnectionQueryService;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarRecurrenceEventMapping;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarRecurrenceOverrideMapping;
@@ -39,7 +39,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class GoogleCalendarPageChangeService {
 
-  private final GoogleCalendarIntegrationQueryService integrationQueryService;
+  private final GoogleCalendarConnectionQueryService connectionQueryService;
   private final GoogleCalendarEventMappingQueryService eventMappingQueryService;
   private final GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService;
   private final GoogleCalendarEventChangeService eventChangeService;
@@ -50,7 +50,7 @@ public class GoogleCalendarPageChangeService {
   private final GoogleOperationLeaseService operationLeaseService;
 
   public GoogleCalendarPageChangeService(
-      GoogleCalendarIntegrationQueryService integrationQueryService,
+      GoogleCalendarConnectionQueryService connectionQueryService,
       GoogleCalendarEventMappingQueryService eventMappingQueryService,
       GoogleCalendarEventChangeService eventChangeService,
       GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService,
@@ -59,7 +59,7 @@ public class GoogleCalendarPageChangeService {
       RecurrenceEventQueryService recurrenceEventQueryService,
       GoogleCalendarRecurrenceChangeService recurrenceChangeService,
       GoogleOperationLeaseService operationLeaseService) {
-    this.integrationQueryService = integrationQueryService;
+    this.connectionQueryService = connectionQueryService;
     this.eventMappingQueryService = eventMappingQueryService;
     this.eventChangeService = eventChangeService;
     this.recurrenceMappingQueryService = recurrenceMappingQueryService;
@@ -72,22 +72,22 @@ public class GoogleCalendarPageChangeService {
 
   @Transactional
   public void applyNormalizedPage(
-      Long integrationId,
+      Long connectionId,
       Long accountId,
       GoogleCalendarPageOwnership ownership,
       GoogleCalendarNormalizedPage page) {
     operationLeaseService.extend(ownership.jobId(), accountId, ownership.workerToken());
-    GoogleCalendarIntegration integration =
-        integrationQueryService.getIntegrationById(integrationId);
-    applyPageChanges(integration, accountId, ownership, page.items());
+    GoogleCalendarConnection connection =
+        connectionQueryService.getConnectedConnectionById(connectionId);
+    applyPageChanges(connection, accountId, ownership, page.items());
   }
 
   private void applyPageChanges(
-      GoogleCalendarIntegration integration,
+      GoogleCalendarConnection connection,
       Long accountId,
       GoogleCalendarPageOwnership ownership,
       List<NormalizedItem> items) {
-    GoogleCalendarPageRecordCache cache = loadPageRecordCache(integration.getId(), items);
+    GoogleCalendarPageRecordCache cache = loadPageRecordCache(connection.getId(), items);
 
     Account account = accountQueryService.getAccount(accountId);
     Tag defaultTag = tagQueryService.getTagOrDefault(accountId, null);
@@ -97,7 +97,7 @@ public class GoogleCalendarPageChangeService {
         case EventUpsert event -> {
           if (removeRecurrenceEventWithSameExternalId(event.externalEventId(), cache, ownership)) {
             eventChangeService.applyUpsert(
-                integration, event, cache, account, defaultTag, ownership);
+                connection, event, cache, account, defaultTag, ownership);
           }
         }
         case EventCancellation cancellation ->
@@ -105,7 +105,7 @@ public class GoogleCalendarPageChangeService {
         case RecurrenceEventUpsert recurrenceEvent -> {
           if (removeEventWithSameExternalId(recurrenceEvent.externalEventId(), cache, ownership)) {
             recurrenceChangeService.applyUpsert(
-                integration, recurrenceEvent, cache, account, defaultTag, ownership);
+                connection, recurrenceEvent, cache, account, defaultTag, ownership);
           }
         }
         case RecurrenceEventCancellation cancellation ->
@@ -140,7 +140,7 @@ public class GoogleCalendarPageChangeService {
   }
 
   private GoogleCalendarPageRecordCache loadPageRecordCache(
-      Long integrationId, List<NormalizedItem> items) {
+      Long connectionId, List<NormalizedItem> items) {
     Set<String> externalEventIds =
         items.stream()
             .map(NormalizedItem::externalEventId)
@@ -152,11 +152,11 @@ public class GoogleCalendarPageChangeService {
     Map<String, GoogleCalendarEventMapping> eventMappings =
         indexEventMappings(
             eventMappingQueryService.listEventMappings(
-                integrationId, GoogleCalendarEventMapping.PRIMARY_CALENDAR_KEY, externalEventIds));
+                connectionId, GoogleCalendarEventMapping.PRIMARY_CALENDAR_KEY, externalEventIds));
     Map<String, GoogleCalendarRecurrenceEventMapping> recurrenceEventMappings =
         indexRecurrenceEventMappings(
             recurrenceMappingQueryService.listRecurrenceEventMappings(
-                integrationId,
+                connectionId,
                 GoogleCalendarRecurrenceEventMapping.PRIMARY_CALENDAR_KEY,
                 recurrenceEventExternalIds));
     Map<GoogleCalendarRecurrenceOverrideKey, GoogleCalendarRecurrenceOverrideMapping>
@@ -166,7 +166,7 @@ public class GoogleCalendarPageChangeService {
                 expectedParents.isEmpty()
                     ? List.of()
                     : recurrenceMappingQueryService.listOverrideMappings(
-                        integrationId,
+                        connectionId,
                         GoogleCalendarRecurrenceEventMapping.PRIMARY_CALENDAR_KEY,
                         expectedParents.keySet()));
 
@@ -250,7 +250,7 @@ public class GoogleCalendarPageChangeService {
                   .map(RecurrenceEventOverrideUpsert::originStartAt)
                   .collect(Collectors.toSet());
           recurrenceEventQueryService
-              .listOverrides(recurrenceEventMapping.getRecurrenceEvent().getId(), originStartTimes)
+              .listOverrides(recurrenceEventMapping.getRecurrenceEventId(), originStartTimes)
               .forEach(
                   recurrenceEventOverride ->
                       recurrenceEventOverrides.put(

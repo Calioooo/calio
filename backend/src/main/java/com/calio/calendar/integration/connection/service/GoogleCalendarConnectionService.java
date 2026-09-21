@@ -1,22 +1,21 @@
 package com.calio.calendar.integration.connection.service;
 
+import com.calio.calendar.account.service.AccountCommandService;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.external.google.GoogleOAuthClient;
 import com.calio.calendar.external.google.GoogleOAuthProperties;
 import com.calio.calendar.external.google.dto.GoogleTokenResponse;
 import com.calio.calendar.external.google.dto.GoogleUserInfoResponse;
-import com.calio.calendar.integration.connection.controller.dto.GoogleCalendarIntegrationResponse;
+import com.calio.calendar.integration.connection.controller.dto.GoogleCalendarConnectionResponse;
+import com.calio.calendar.integration.connection.domain.GoogleCalendarConnection;
+import com.calio.calendar.integration.connection.domain.GoogleCalendarConnectionState;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
-import com.calio.calendar.integration.sync.GoogleCalendarIntegrationDataService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobCommandService;
+import com.calio.calendar.integration.sync.operation.GoogleOperationJobEnqueueService;
 import com.calio.calendar.security.TokenEncryptor;
 import java.time.Clock;
 import java.time.Instant;
-import java.util.Optional;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
@@ -24,225 +23,149 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 public class GoogleCalendarConnectionService {
+  private final GoogleOAuthProperties properties;
+  private final GoogleOAuthClient oauthClient;
+  private final TokenEncryptor encryptor;
+  private final AccountCommandService accountCommandService;
+  private final GoogleCalendarIntegrationCommandService integrationCommandService;
+  private final GoogleCalendarConnectionQueryService connectionQueryService;
+  private final GoogleCalendarConnectionCommandService connectionCommandService;
+  private final GoogleCalendarTokenRevocationService tokenRevocationService;
+  private final GoogleOperationJobCommandService jobCommandService;
+  private final GoogleOperationJobEnqueueService enqueueService;
+  private final TransactionTemplate registrationTransaction;
+  private final TransactionTemplate disconnectTransaction;
+  private final Clock clock;
 
-    private static final Logger log = LoggerFactory.getLogger(GoogleCalendarConnectionService.class);
+  public GoogleCalendarConnectionService(
+      GoogleOAuthProperties properties,
+      GoogleOAuthClient oauthClient,
+      TokenEncryptor encryptor,
+      AccountCommandService accountCommandService,
+      GoogleCalendarIntegrationCommandService integrationCommandService,
+      GoogleCalendarConnectionQueryService connectionQueryService,
+      GoogleCalendarConnectionCommandService connectionCommandService,
+      GoogleCalendarTokenRevocationService tokenRevocationService,
+      GoogleOperationJobCommandService jobCommandService,
+      GoogleOperationJobEnqueueService enqueueService,
+      PlatformTransactionManager transactionManager,
+      Clock clock) {
+    this.properties = properties;
+    this.oauthClient = oauthClient;
+    this.encryptor = encryptor;
+    this.accountCommandService = accountCommandService;
+    this.integrationCommandService = integrationCommandService;
+    this.connectionQueryService = connectionQueryService;
+    this.connectionCommandService = connectionCommandService;
+    this.tokenRevocationService = tokenRevocationService;
+    this.jobCommandService = jobCommandService;
+    this.enqueueService = enqueueService;
+    this.clock = clock;
+    registrationTransaction = new TransactionTemplate(transactionManager);
+    registrationTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+    disconnectTransaction = new TransactionTemplate(transactionManager);
+  }
 
-    private final GoogleOAuthProperties googleOAuthProperties;
-    private final GoogleOAuthClient googleOAuthClient;
-    private final TokenEncryptor tokenEncryptor;
-    private final GoogleCalendarIntegrationQueryService integrationQueryService;
-    private final GoogleCalendarIntegrationCommandService integrationCommandService;
-    private final GoogleCalendarIntegrationDataService integrationDataService;
-    private final GoogleOperationJobCommandService jobCommandService;
-    private final TransactionTemplate registrationTransaction;
-    private final TransactionTemplate removalTransaction;
-    private final Clock clock;
-
-    public GoogleCalendarConnectionService(
-            GoogleOAuthProperties googleOAuthProperties,
-            GoogleOAuthClient googleOAuthClient,
-            TokenEncryptor tokenEncryptor,
-            GoogleCalendarIntegrationQueryService integrationQueryService,
-            GoogleCalendarIntegrationCommandService integrationCommandService,
-            GoogleCalendarIntegrationDataService integrationDataService,
-            GoogleOperationJobCommandService jobCommandService,
-            PlatformTransactionManager transactionManager,
-            Clock clock
-    ) {
-        this.googleOAuthProperties = googleOAuthProperties;
-        this.googleOAuthClient = googleOAuthClient;
-        this.tokenEncryptor = tokenEncryptor;
-        this.integrationQueryService = integrationQueryService;
-        this.integrationCommandService = integrationCommandService;
-        this.integrationDataService = integrationDataService;
-        this.jobCommandService = jobCommandService;
-        this.registrationTransaction = new TransactionTemplate(transactionManager);
-        this.registrationTransaction.setPropagationBehavior(
-                TransactionDefinition.PROPAGATION_REQUIRES_NEW
-        );
-        this.removalTransaction = new TransactionTemplate(transactionManager);
-        this.clock = clock;
+  public GoogleCalendarConnectionResponse connect(Long accountId, String authorizationCode) {
+    if (!properties.isConfigured()) {
+      throw new CalioException(ErrorCode.GOOGLE_CALENDAR_CONFIGURATION_MISSING);
     }
+    Instant now = Instant.now(clock);
+    GoogleTokenResponse token = oauthClient.exchangeAuthorizationCode(authorizationCode);
+    GoogleUserInfoResponse user = oauthClient.fetchUserInfo(token.accessToken());
+    GoogleCalendarConnection connection =
+        registerAndEnqueueInitialSync(
+            accountId, user, token, now.plusSeconds(token.expiresIn()), now);
+    return GoogleCalendarConnectionResponse.connected(connection);
+  }
 
-    public GoogleCalendarIntegrationResponse connect(Long accountId, String authorizationCode) {
-        validateConfiguration();
+  public GoogleCalendarConnectionResponse getConnectionStatus(Long accountId) {
+    return connectionQueryService
+        .getConnectedConnectionIfExists(accountId)
+        .map(GoogleCalendarConnectionResponse::connected)
+        .orElseGet(GoogleCalendarConnectionResponse::disconnected);
+  }
 
-        Instant tokenReceivedAt = Instant.now(clock);
-        GoogleTokenResponse tokenResponse = googleOAuthClient.exchangeAuthorizationCode(authorizationCode);
-        GoogleUserInfoResponse userInfo = googleOAuthClient.fetchUserInfo(tokenResponse.accessToken());
-        EncryptedGoogleTokens encryptedTokens = encryptTokens(tokenResponse);
-        Instant accessTokenExpiresAt = tokenReceivedAt.plusSeconds(tokenResponse.expiresIn());
+  public void disconnect(Long accountId) {
+    String encryptedRefreshToken = disconnectLocally(accountId);
+    tokenRevocationService.revokeSafely(accountId, encryptedRefreshToken);
+  }
 
-        GoogleCalendarIntegration integration = registerConnection(
-                accountId,
-                userInfo,
-                encryptedTokens,
-                accessTokenExpiresAt,
-                tokenReceivedAt
-        );
-        return GoogleCalendarIntegrationResponse.connected(integration);
+  private String disconnectLocally(Long accountId) {
+    return disconnectTransaction.execute(
+        status ->
+            integrationCommandService
+                .tryLockIntegration(accountId)
+                .flatMap(
+                    integration ->
+                        connectionCommandService.tryLockDisconnectableConnectionByIntegration(
+                            integration.getId()))
+                .map(
+                    connection -> {
+                      String refreshToken = connection.getEncryptedRefreshToken();
+                      jobCommandService.deleteJobsForIntegration(
+                          connection.getIntegration().getId());
+                      connectionCommandService.disconnect(connection, Instant.now(clock));
+                      return refreshToken;
+                    })
+                .orElse(null));
+  }
+
+  private GoogleCalendarConnection registerAndEnqueueInitialSync(
+      Long accountId,
+      GoogleUserInfoResponse user,
+      GoogleTokenResponse token,
+      Instant expiresAt,
+      Instant connectedAt) {
+    return registrationTransaction.execute(
+        status -> {
+          accountCommandService.lockAccount(accountId);
+          GoogleCalendarConnection connection =
+              registerInTransaction(accountId, user, token, expiresAt, connectedAt);
+          enqueueService.enqueueManualSync(accountId);
+          return connection;
+        });
+  }
+
+  private GoogleCalendarConnection registerInTransaction(
+      Long accountId,
+      GoogleUserInfoResponse user,
+      GoogleTokenResponse token,
+      Instant expiresAt,
+      Instant connectedAt) {
+    GoogleCalendarIntegration integration =
+        integrationCommandService
+            .tryLockIntegration(accountId)
+            .orElseGet(() -> integrationCommandService.createIntegration(accountId));
+    GoogleCalendarConnection active =
+        connectionCommandService
+            .tryLockConnectionByIntegrationAndState(
+                integration.getId(), GoogleCalendarConnectionState.CONNECTED)
+            .orElse(null);
+    if (active != null) {
+      throw new CalioException(ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED);
     }
-
-    public GoogleCalendarIntegrationResponse getConnectionStatus(Long accountId) {
-        return integrationQueryService.getIntegrationIfExists(accountId)
-                .map(GoogleCalendarIntegrationResponse::connected)
-                .orElseGet(GoogleCalendarIntegrationResponse::disconnected);
+    GoogleCalendarConnection retained =
+        connectionCommandService
+            .tryLockConnection(integration.getId(), user.subject())
+            .orElse(null);
+    if (retained != null) {
+      connectionCommandService.replaceCredentials(
+          retained,
+          user.email(),
+          encryptor.encryptRefreshToken(token.refreshToken()),
+          encryptor.encryptAccessToken(token.accessToken()),
+          expiresAt,
+          connectedAt);
+      return retained;
     }
-
-    public void disconnect(Long accountId) {
-        Optional<GoogleCalendarIntegration> integration =
-                integrationQueryService.getIntegrationIfExists(accountId);
-        if (integration.isEmpty()) {
-            return;
-        }
-
-        String refreshToken = tokenEncryptor.decrypt(
-                integration.get().getEncryptedRefreshToken()
-        );
-        googleOAuthClient.revokeToken(refreshToken);
-        removeLocalConnection(accountId);
-    }
-
-    private void validateConfiguration() {
-        if (!googleOAuthProperties.isConfigured()) {
-            logIntegrationFailure("validateConfiguration", ErrorCode.GOOGLE_CALENDAR_CONFIGURATION_MISSING);
-            throw new CalioException(ErrorCode.GOOGLE_CALENDAR_CONFIGURATION_MISSING);
-        }
-    }
-
-    private EncryptedGoogleTokens encryptTokens(GoogleTokenResponse tokenResponse) {
-        return new EncryptedGoogleTokens(
-                tokenEncryptor.encryptRefreshToken(tokenResponse.refreshToken()),
-                tokenEncryptor.encryptAccessToken(tokenResponse.accessToken())
-        );
-    }
-
-    private GoogleCalendarIntegration registerConnection(
-            Long accountId,
-            GoogleUserInfoResponse userInfo,
-            EncryptedGoogleTokens encryptedTokens,
-            Instant accessTokenExpiresAt,
-            Instant connectedAt
-    ) {
-        GoogleCalendarConnectionCredentials credentials =
-                new GoogleCalendarConnectionCredentials(
-                        accountId,
-                        userInfo.subject(),
-                        userInfo.email(),
-                        encryptedTokens.refreshToken(),
-                        encryptedTokens.accessToken(),
-                        accessTokenExpiresAt,
-                        connectedAt
-                );
-        try {
-            return register(credentials);
-        } catch (DataIntegrityViolationException exception) {
-            return retryRegistrationAfterRace(credentials);
-        }
-    }
-
-    private GoogleCalendarIntegration retryRegistrationAfterRace(
-            GoogleCalendarConnectionCredentials credentials
-    ) {
-        try {
-            return register(credentials);
-        } catch (DataIntegrityViolationException exception) {
-            logIntegrationFailure(
-                    "registerConnection",
-                    ErrorCode.GOOGLE_CALENDAR_INTEGRATION_SAVE_FAILED,
-                    exception
-            );
-            throw new CalioException(ErrorCode.GOOGLE_CALENDAR_INTEGRATION_SAVE_FAILED, exception);
-        }
-    }
-
-    private void logIntegrationFailure(String operation, ErrorCode errorCode) {
-        log.warn(
-                "Google Calendar integration failure. operation={} errorCode={}",
-                operation,
-                errorCode.name()
-        );
-    }
-
-    private void logIntegrationFailure(String operation, ErrorCode errorCode, Exception exception) {
-        log.warn(
-                "Google Calendar integration failure. operation={} errorCode={} causeType={}",
-                operation,
-                errorCode.name(),
-                exception.getClass().getSimpleName()
-        );
-    }
-
-    private GoogleCalendarIntegration register(
-            GoogleCalendarConnectionCredentials credentials
-    ) {
-        return registrationTransaction.execute(status -> createOrReplace(credentials));
-    }
-
-    private GoogleCalendarIntegration createOrReplace(
-            GoogleCalendarConnectionCredentials credentials
-    ) {
-        return integrationCommandService.tryLockIntegration(credentials.accountId())
-                .map(integration -> replaceConnection(integration, credentials))
-                .orElseGet(() -> createConnection(credentials));
-    }
-
-    private GoogleCalendarIntegration createConnection(
-            GoogleCalendarConnectionCredentials credentials
-    ) {
-        return integrationCommandService.createIntegration(
-                credentials.accountId(),
-                credentials.googleSubject(),
-                credentials.googleEmail(),
-                credentials.encryptedRefreshToken(),
-                credentials.encryptedAccessToken(),
-                credentials.accessTokenExpiresAt(),
-                credentials.connectedAt()
-        );
-    }
-
-    private GoogleCalendarIntegration replaceConnection(
-            GoogleCalendarIntegration integration,
-            GoogleCalendarConnectionCredentials credentials
-    ) {
-        integrationDataService.deleteIntegrationData(integration.getId());
-        return integrationCommandService.replaceIntegration(
-                integration,
-                credentials.googleSubject(),
-                credentials.googleEmail(),
-                credentials.encryptedRefreshToken(),
-                credentials.encryptedAccessToken(),
-                credentials.accessTokenExpiresAt(),
-                credentials.connectedAt()
-        );
-    }
-
-    private void removeLocalConnection(Long accountId) {
-        removalTransaction.executeWithoutResult(status ->
-                integrationCommandService.tryLockIntegration(accountId)
-                        .ifPresent(this::removeConnection));
-    }
-
-    private void removeConnection(GoogleCalendarIntegration integration) {
-        jobCommandService.deleteJobsForIntegration(integration.getId());
-        integrationDataService.deleteIntegrationData(integration.getId());
-        integrationCommandService.deleteIntegration(integration);
-    }
-
-    private record EncryptedGoogleTokens(
-            String refreshToken,
-            String accessToken
-    ) {
-    }
-
-    private record GoogleCalendarConnectionCredentials(
-            Long accountId,
-            String googleSubject,
-            String googleEmail,
-            String encryptedRefreshToken,
-            String encryptedAccessToken,
-            Instant accessTokenExpiresAt,
-            Instant connectedAt
-    ) {
-    }
+    return connectionCommandService.createConnection(
+        integration,
+        user.subject(),
+        user.email(),
+        encryptor.encryptRefreshToken(token.refreshToken()),
+        encryptor.encryptAccessToken(token.accessToken()),
+        expiresAt,
+        connectedAt);
+  }
 }
