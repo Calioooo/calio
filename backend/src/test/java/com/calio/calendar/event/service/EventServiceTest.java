@@ -31,6 +31,7 @@ import com.calio.calendar.recurrence.domain.RecurrenceOccurrence;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
 import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
+import com.calio.calendar.recurrence.service.PersonalRecurrenceOccurrenceResolver;
 import com.calio.calendar.recurrence.service.RecurrenceEventQueryService;
 import com.calio.calendar.recurrence.service.Rfc5545RecurrenceEngine;
 import com.calio.calendar.sharing.event.service.PersonalEventGroupShareCommandService;
@@ -400,7 +401,7 @@ class EventServiceTest {
         accountRepository,
         tagQueryService,
         recurrenceQueryService,
-        recurrenceEngine,
+        new PersonalRecurrenceOccurrenceResolver(recurrenceEngine),
         eventShareCommandService);
   }
 

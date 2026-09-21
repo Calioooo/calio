@@ -13,6 +13,7 @@ import com.calio.calendar.groupcalendar.event.domain.GroupCalendarEvent;
 import com.calio.calendar.groupcalendar.event.service.GroupCalendarEventQueryService;
 import com.calio.calendar.groupcalendar.recurrence.domain.GroupCalendarRecurrenceEvent;
 import com.calio.calendar.groupcalendar.recurrence.domain.GroupCalendarRecurrenceOverride;
+import com.calio.calendar.groupcalendar.recurrence.service.GroupCalendarRecurrenceOccurrenceResolver;
 import com.calio.calendar.groupcalendar.recurrence.service.GroupCalendarRecurrenceOverrideQueryService;
 import com.calio.calendar.groupcalendar.recurrence.service.GroupCalendarRecurrenceQueryService;
 import com.calio.calendar.groupspace.domain.GroupMember;
@@ -62,7 +63,7 @@ class GroupCalendarServiceTest {
             eventQueryService,
             recurrenceQueryService,
             overrideQueryService,
-            recurrenceEngine);
+            new GroupCalendarRecurrenceOccurrenceResolver(recurrenceEngine));
     groupSpace = new GroupSpace(ACCOUNT_ID, "group", null);
     ReflectionTestUtils.setField(groupSpace, "id", GROUP_SPACE_ID);
     account = new Account();

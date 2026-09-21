@@ -12,12 +12,12 @@ import com.calio.calendar.event.controller.dto.UpdateImportantEventRequest;
 import com.calio.calendar.event.domain.Event;
 import com.calio.calendar.event.service.dto.CalendarFreeTime;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingQueryService;
+import com.calio.calendar.recurrence.domain.PersonalRecurrenceOccurrence;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceOccurrence;
-import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
+import com.calio.calendar.recurrence.service.PersonalRecurrenceOccurrenceResolver;
 import com.calio.calendar.recurrence.service.RecurrenceEventQueryService;
-import com.calio.calendar.recurrence.service.Rfc5545RecurrenceEngine;
 import com.calio.calendar.sharing.event.service.PersonalEventGroupShareCommandService;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.service.TagQueryService;
@@ -52,7 +52,7 @@ public class EventService {
   private final AccountRepository accountRepository;
   private final TagQueryService tagQueryService;
   private final RecurrenceEventQueryService recurrenceEventQueryService;
-  private final Rfc5545RecurrenceEngine recurrenceEngine;
+  private final PersonalRecurrenceOccurrenceResolver recurrenceOccurrenceResolver;
   private final PersonalEventGroupShareCommandService eventShareCommandService;
 
   public EventService(
@@ -62,7 +62,7 @@ public class EventService {
       AccountRepository accountRepository,
       TagQueryService tagQueryService,
       RecurrenceEventQueryService recurrenceEventQueryService,
-      Rfc5545RecurrenceEngine recurrenceEngine,
+      PersonalRecurrenceOccurrenceResolver recurrenceOccurrenceResolver,
       PersonalEventGroupShareCommandService eventShareCommandService) {
     this.eventQueryService = eventQueryService;
     this.eventCommandService = eventCommandService;
@@ -70,7 +70,7 @@ public class EventService {
     this.accountRepository = accountRepository;
     this.tagQueryService = tagQueryService;
     this.recurrenceEventQueryService = recurrenceEventQueryService;
-    this.recurrenceEngine = recurrenceEngine;
+    this.recurrenceOccurrenceResolver = recurrenceOccurrenceResolver;
     this.eventShareCommandService = eventShareCommandService;
   }
 
@@ -291,21 +291,12 @@ public class EventService {
       Set<OccurrenceKey> responseKeys,
       List<EventResponse> responses) {
     List<RecurrenceOccurrence> occurrences =
-        recurrenceEngine.expand(
-            RecurrenceSchedule.from(recurrenceEvent),
-            recurrenceEvent.getRecurrenceRules(),
-            from,
-            to);
+        recurrenceOccurrenceResolver.expand(recurrenceEvent, from, to);
     Map<Instant, RecurrenceEventOverride> overridesByOrigin =
         findOverridesByOrigin(recurrenceEvent, occurrences);
-    for (RecurrenceOccurrence occurrence : occurrences) {
-      OccurrenceKey key = new OccurrenceKey(recurrenceEvent.getId(), occurrence.originStartAt());
-      RecurrenceEventOverride override = overridesByOrigin.get(occurrence.originStartAt());
-      EventResponse response = finalOccurrenceResponse(recurrenceEvent, occurrence, override);
-      if (response != null && overlaps(response, from, to) && responseKeys.add(key)) {
-        responses.add(response);
-      }
-    }
+    recurrenceOccurrenceResolver
+        .resolve(recurrenceEvent, occurrences, List.copyOf(overridesByOrigin.values()), from, to)
+        .forEach(occurrence -> addResolvedOccurrence(occurrence, responseKeys, responses));
   }
 
   private Map<Instant, RecurrenceEventOverride> findOverridesByOrigin(
@@ -321,14 +312,15 @@ public class EventService {
         .collect(Collectors.toMap(RecurrenceEventOverride::getOriginStartAt, Function.identity()));
   }
 
-  private EventResponse finalOccurrenceResponse(
-      RecurrenceEvent recurrenceEvent,
-      RecurrenceOccurrence occurrence,
-      RecurrenceEventOverride override) {
-    if (override == null) {
-      return EventResponse.recurrenceOccurrence(recurrenceEvent, occurrence);
+  private void addResolvedOccurrence(
+      PersonalRecurrenceOccurrence occurrence,
+      Set<OccurrenceKey> responseKeys,
+      List<EventResponse> responses) {
+    OccurrenceKey key =
+        new OccurrenceKey(occurrence.recurrenceEvent().getId(), occurrence.originStartAt());
+    if (responseKeys.add(key)) {
+      responses.add(EventResponse.recurrenceOccurrence(occurrence));
     }
-    return override.isDeleted() ? null : EventResponse.recurrenceOverride(override);
   }
 
   private void addMovedInOverrides(
@@ -337,14 +329,12 @@ public class EventService {
       Instant to,
       Set<OccurrenceKey> responseKeys,
       List<EventResponse> responses) {
-    recurrenceEventQueryService.listActiveOverlappingOverrides(accountId, from, to).stream()
-        .filter(override -> responseKeys.add(OccurrenceKey.from(override)))
-        .map(EventResponse::recurrenceOverride)
-        .forEach(responses::add);
-  }
-
-  private boolean overlaps(EventResponse response, Instant from, Instant to) {
-    return response.startAt().isBefore(to) && response.endAt().isAfter(from);
+    recurrenceOccurrenceResolver
+        .resolveMovedIn(
+            recurrenceEventQueryService.listActiveOverlappingOverrides(accountId, from, to),
+            from,
+            to)
+        .forEach(occurrence -> addResolvedOccurrence(occurrence, responseKeys, responses));
   }
 
   private void validateListTimeRange(Instant from, Instant to) {

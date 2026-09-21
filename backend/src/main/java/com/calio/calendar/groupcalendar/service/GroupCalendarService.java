@@ -5,13 +5,14 @@ import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.groupcalendar.controller.dto.GroupCalendarItemResponse;
 import com.calio.calendar.groupcalendar.event.service.GroupCalendarEventQueryService;
 import com.calio.calendar.groupcalendar.recurrence.domain.GroupCalendarRecurrenceEvent;
+import com.calio.calendar.groupcalendar.recurrence.domain.GroupCalendarRecurrenceOccurrence;
 import com.calio.calendar.groupcalendar.recurrence.domain.GroupCalendarRecurrenceOverride;
+import com.calio.calendar.groupcalendar.recurrence.service.GroupCalendarRecurrenceOccurrenceResolver;
 import com.calio.calendar.groupcalendar.recurrence.service.GroupCalendarRecurrenceOverrideQueryService;
 import com.calio.calendar.groupcalendar.recurrence.service.GroupCalendarRecurrenceQueryService;
 import com.calio.calendar.groupspace.domain.GroupMember;
 import com.calio.calendar.groupspace.service.GroupMembershipQueryService;
 import com.calio.calendar.recurrence.domain.RecurrenceOccurrence;
-import com.calio.calendar.recurrence.service.Rfc5545RecurrenceEngine;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -35,19 +36,19 @@ public class GroupCalendarService {
   private final GroupCalendarEventQueryService eventQueryService;
   private final GroupCalendarRecurrenceQueryService recurrenceQueryService;
   private final GroupCalendarRecurrenceOverrideQueryService overrideQueryService;
-  private final Rfc5545RecurrenceEngine recurrenceEngine;
+  private final GroupCalendarRecurrenceOccurrenceResolver recurrenceOccurrenceResolver;
 
   public GroupCalendarService(
       GroupMembershipQueryService membershipQueryService,
       GroupCalendarEventQueryService eventQueryService,
       GroupCalendarRecurrenceQueryService recurrenceQueryService,
       GroupCalendarRecurrenceOverrideQueryService overrideQueryService,
-      Rfc5545RecurrenceEngine recurrenceEngine) {
+      GroupCalendarRecurrenceOccurrenceResolver recurrenceOccurrenceResolver) {
     this.membershipQueryService = membershipQueryService;
     this.eventQueryService = eventQueryService;
     this.recurrenceQueryService = recurrenceQueryService;
     this.overrideQueryService = overrideQueryService;
-    this.recurrenceEngine = recurrenceEngine;
+    this.recurrenceOccurrenceResolver = recurrenceOccurrenceResolver;
   }
 
   public List<GroupCalendarItemResponse> listItems(
@@ -100,22 +101,12 @@ public class GroupCalendarService {
       List<GroupCalendarItemResponse> items,
       String nickname) {
     List<RecurrenceOccurrence> occurrences =
-        recurrenceEngine.expand(
-            recurrenceEvent.toRecurrenceSchedule(), recurrenceEvent.getRecurrenceRules(), from, to);
+        recurrenceOccurrenceResolver.expand(recurrenceEvent, from, to);
     Map<Instant, GroupCalendarRecurrenceOverride> overridesByOrigin =
         overridesByOrigin(recurrenceEvent, occurrences);
-    for (RecurrenceOccurrence occurrence : occurrences) {
-      OccurrenceKey key = new OccurrenceKey(recurrenceEvent.getId(), occurrence.originStartAt());
-      GroupCalendarItemResponse item =
-          occurrenceItem(
-              recurrenceEvent,
-              occurrence,
-              overridesByOrigin.get(occurrence.originStartAt()),
-              nickname);
-      if (item != null && overlaps(item, from, to) && occurrenceKeys.add(key)) {
-        items.add(item);
-      }
-    }
+    recurrenceOccurrenceResolver
+        .resolve(recurrenceEvent, occurrences, List.copyOf(overridesByOrigin.values()), from, to)
+        .forEach(occurrence -> addResolvedOccurrence(occurrence, nickname, occurrenceKeys, items));
   }
 
   private Map<Instant, GroupCalendarRecurrenceOverride> overridesByOrigin(
@@ -130,17 +121,16 @@ public class GroupCalendarService {
                 GroupCalendarRecurrenceOverride::getOriginStartAt, Function.identity()));
   }
 
-  private GroupCalendarItemResponse occurrenceItem(
-      GroupCalendarRecurrenceEvent recurrenceEvent,
-      RecurrenceOccurrence occurrence,
-      GroupCalendarRecurrenceOverride override,
-      String nickname) {
-    if (override == null) {
-      return GroupCalendarItemResponse.recurrenceOccurrence(recurrenceEvent, occurrence, nickname);
+  private void addResolvedOccurrence(
+      GroupCalendarRecurrenceOccurrence occurrence,
+      String nickname,
+      Set<OccurrenceKey> occurrenceKeys,
+      List<GroupCalendarItemResponse> items) {
+    OccurrenceKey key =
+        new OccurrenceKey(occurrence.recurrenceEvent().getId(), occurrence.originStartAt());
+    if (occurrenceKeys.add(key)) {
+      items.add(GroupCalendarItemResponse.recurrenceOccurrence(occurrence, nickname));
     }
-    return override.isDeleted()
-        ? null
-        : GroupCalendarItemResponse.recurrenceOverride(override, nickname);
   }
 
   private void addMovedInOverrides(
@@ -150,16 +140,16 @@ public class GroupCalendarService {
       Set<OccurrenceKey> occurrenceKeys,
       List<GroupCalendarItemResponse> items,
       Map<Long, String> nicknamesByAccountId) {
-    overrideQueryService.listMovedInOverrides(groupSpaceId, from, to).stream()
-        .filter(override -> occurrenceKeys.add(OccurrenceKey.from(override)))
-        .map(
-            override ->
-                GroupCalendarItemResponse.recurrenceOverride(
-                    override,
+    recurrenceOccurrenceResolver
+        .resolveMovedIn(overrideQueryService.listMovedInOverrides(groupSpaceId, from, to), from, to)
+        .forEach(
+            occurrence ->
+                addResolvedOccurrence(
+                    occurrence,
                     nicknameOf(
-                        nicknamesByAccountId,
-                        override.getRecurrenceEvent().getCreatedBy().getId())))
-        .forEach(items::add);
+                        nicknamesByAccountId, occurrence.recurrenceEvent().getCreatedBy().getId()),
+                    occurrenceKeys,
+                    items));
   }
 
   private Map<Long, String> listNicknames(Long groupSpaceId) {
@@ -171,10 +161,6 @@ public class GroupCalendarService {
     return nicknamesByAccountId.get(accountId);
   }
 
-  private boolean overlaps(GroupCalendarItemResponse item, Instant from, Instant to) {
-    return item.startAt().isBefore(to) && item.endAt().isAfter(from);
-  }
-
   private void validateRange(Instant from, Instant to) {
     if (!from.isBefore(to)) {
       throw new CalioException(ErrorCode.INVALID_TIME_RANGE);
@@ -184,9 +170,5 @@ public class GroupCalendarService {
     }
   }
 
-  private record OccurrenceKey(Long recurrenceId, Instant originStartAt) {
-    private static OccurrenceKey from(GroupCalendarRecurrenceOverride override) {
-      return new OccurrenceKey(override.getRecurrenceEvent().getId(), override.getOriginStartAt());
-    }
-  }
+  private record OccurrenceKey(Long recurrenceId, Instant originStartAt) {}
 }

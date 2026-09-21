@@ -90,6 +90,9 @@ public enum ErrorCode {
   AI_CALENDAR_PROVIDER_UNAVAILABLE(
       HttpStatus.SERVICE_UNAVAILABLE, "AI calendar provider is temporarily unavailable."),
 
+  NOTIFICATION_ENDPOINT_TOKEN_CONFLICT(
+      HttpStatus.CONFLICT, "Notification endpoint token is already being registered."),
+
   HOLIDAY_API_CONFIGURATION_MISSING(
       HttpStatus.INTERNAL_SERVER_ERROR, "Holiday API configuration is missing."),
   EXTERNAL_API_UNAVAILABLE(

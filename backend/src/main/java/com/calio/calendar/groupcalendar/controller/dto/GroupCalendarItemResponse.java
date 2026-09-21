@@ -2,6 +2,7 @@ package com.calio.calendar.groupcalendar.controller.dto;
 
 import com.calio.calendar.groupcalendar.event.domain.GroupCalendarEvent;
 import com.calio.calendar.groupcalendar.recurrence.domain.GroupCalendarRecurrenceEvent;
+import com.calio.calendar.groupcalendar.recurrence.domain.GroupCalendarRecurrenceOccurrence;
 import com.calio.calendar.groupcalendar.recurrence.domain.GroupCalendarRecurrenceOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceOccurrence;
 import com.calio.calendar.tag.controller.dto.TagResponse;
@@ -69,6 +70,24 @@ public record GroupCalendarItemResponse(
         recurrenceEvent.getId(),
         true,
         override.getOriginStartAt(),
+        TagResponse.from(recurrenceEvent.getTag()),
+        creatorNickname);
+  }
+
+  public static GroupCalendarItemResponse recurrenceOccurrence(
+      GroupCalendarRecurrenceOccurrence occurrence, String creatorNickname) {
+    GroupCalendarRecurrenceEvent recurrenceEvent = occurrence.recurrenceEvent();
+    return new GroupCalendarItemResponse(
+        null,
+        occurrence.title(),
+        occurrence.description(),
+        occurrence.startAt(),
+        occurrence.endAt(),
+        occurrence.allDay(),
+        occurrence.timeZone(),
+        recurrenceEvent.getId(),
+        true,
+        occurrence.originStartAt(),
         TagResponse.from(recurrenceEvent.getTag()),
         creatorNickname);
   }

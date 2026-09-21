@@ -8,6 +8,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.util.Objects;
 
 @Entity
 @Table(name = "accounts")
@@ -17,12 +18,23 @@ public class Account extends BaseEntity {
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
 
+  @Embedded
+  private AccountNotificationSettings notificationSettings = AccountNotificationSettings.defaults();
+
   @Embedded private AccountAuthToken authToken;
 
   public Account() {}
 
   public Long getId() {
     return id;
+  }
+
+  public AccountNotificationSettings getNotificationSettings() {
+    return notificationSettings;
+  }
+
+  public void changeNotificationSettings(AccountNotificationSettings notificationSettings) {
+    this.notificationSettings = Objects.requireNonNull(notificationSettings);
   }
 
   public void issueAuthToken(String tokenHash) {
