@@ -255,14 +255,14 @@ class GoogleCalendarSyncMigrationTest {
   }
 
   @Test
-  @DisplayName("V26은 empty mapping deployment에 conflict 상태와 pending scope index를 추가한다")
-  void givenEmptyV17Schema_whenMigrateToV26_thenAddsConflictFoundation() throws Exception {
+  @DisplayName("V30은 empty mapping deployment에 conflict 상태와 pending scope index를 추가한다")
+  void givenEmptyV17Schema_whenMigrateToV30_thenAddsConflictFoundation() throws Exception {
     // given
     String url = "jdbc:h2:mem:google-mapping-conflict-foundation;MODE=MySQL;DB_CLOSE_DELAY=-1";
     migrateTo(url, MigrationVersion.fromVersion("17"));
 
     // when
-    migrateTo(url, MigrationVersion.fromVersion("26"));
+    migrateTo(url, MigrationVersion.fromVersion("30"));
 
     // then
     try (Connection connection = DriverManager.getConnection(url, "sa", "")) {
@@ -284,14 +284,14 @@ class GoogleCalendarSyncMigrationTest {
   }
 
   @Test
-  @DisplayName("V27는 Google operation Job의 target payload 이름을 적용한다")
-  void givenV26Schema_whenMigrateToV27_thenRenamesTargetPayload() throws Exception {
+  @DisplayName("V31은 Google operation Job의 target payload 이름을 적용한다")
+  void givenV30Schema_whenMigrateToV31_thenRenamesTargetPayload() throws Exception {
     // given
     String url = "jdbc:h2:mem:google-operation-job-target-fields;MODE=MySQL;DB_CLOSE_DELAY=-1";
-    migrateTo(url, MigrationVersion.fromVersion("26"));
+    migrateTo(url, MigrationVersion.fromVersion("30"));
 
     // when
-    migrateTo(url, MigrationVersion.fromVersion("27"));
+    migrateTo(url, MigrationVersion.fromVersion("31"));
 
     // then
     try (Connection connection = DriverManager.getConnection(url, "sa", "")) {
@@ -302,12 +302,12 @@ class GoogleCalendarSyncMigrationTest {
   }
 
   @Test
-  @DisplayName("V26은 mapping eTag와 status의 null 또는 잘못된 값을 거부한다")
-  void givenV26Schema_whenInsertInvalidMappingState_thenRejectsIt() throws Exception {
+  @DisplayName("V30은 mapping eTag와 status의 null 또는 잘못된 값을 거부한다")
+  void givenV30Schema_whenInsertInvalidMappingState_thenRejectsIt() throws Exception {
     String url = "jdbc:h2:mem:google-mapping-conflict-constraints;MODE=MySQL;DB_CLOSE_DELAY=-1";
     migrateTo(url, MigrationVersion.fromVersion("17"));
     insertCurrentEventAndIntegration(url, false);
-    migrateTo(url, MigrationVersion.fromVersion("26"));
+    migrateTo(url, MigrationVersion.fromVersion("30"));
 
     try (Connection connection = DriverManager.getConnection(url, "sa", "");
         Statement statement = connection.createStatement()) {
@@ -349,13 +349,13 @@ class GoogleCalendarSyncMigrationTest {
   }
 
   @Test
-  @DisplayName("V28은 retained integration lifecycle 상태와 credential 제약을 적용한다")
-  void givenV27Schema_whenMigrateToV28_thenEnforcesRetainedIntegrationLifecycle() throws Exception {
+  @DisplayName("V32는 retained integration lifecycle 상태와 credential 제약을 적용한다")
+  void givenV31Schema_whenMigrateToV32_thenEnforcesRetainedIntegrationLifecycle() throws Exception {
     String url = "jdbc:h2:mem:google-retained-integration-lifecycle;MODE=MySQL;DB_CLOSE_DELAY=-1";
-    migrateTo(url, MigrationVersion.fromVersion("27"));
+    migrateTo(url, MigrationVersion.fromVersion("31"));
     insertCurrentEventAndIntegration(url, false);
 
-    migrateTo(url, MigrationVersion.fromVersion("28"));
+    migrateTo(url, MigrationVersion.fromVersion("32"));
 
     try (Connection connection = DriverManager.getConnection(url, "sa", "");
         Statement statement = connection.createStatement()) {
@@ -412,17 +412,17 @@ class GoogleCalendarSyncMigrationTest {
   }
 
   @Test
-  @DisplayName("V29는 기존 Google 연결을 Connection으로 보존하고 Account Integration을 분리한다")
+  @DisplayName("V33은 기존 Google 연결을 Connection으로 보존하고 Account Integration을 분리한다")
   void
-      givenV28ConnectedIntegration_whenMigrateToV29_thenKeepsConnectionRuntimeAndCreatesAccountIntegration()
+      givenV32ConnectedIntegration_whenMigrateToV33_thenKeepsConnectionRuntimeAndCreatesAccountIntegration()
           throws Exception {
     String url =
         "jdbc:h2:mem:google-calendar-integration-connection-model;MODE=MySQL;DB_CLOSE_DELAY=-1";
-    migrateTo(url, MigrationVersion.fromVersion("28"));
+    migrateTo(url, MigrationVersion.fromVersion("32"));
     insertCurrentEventAndIntegration(url, true);
     updateSyncToken(url, "retained-cursor");
 
-    migrateTo(url, MigrationVersion.fromVersion("29"));
+    migrateTo(url, MigrationVersion.fromVersion("33"));
 
     try (Connection connection = DriverManager.getConnection(url, "sa", "")) {
       assertThat(columnNames(connection, "GOOGLE_CALENDAR_INTEGRATIONS"))
@@ -504,14 +504,14 @@ class GoogleCalendarSyncMigrationTest {
   }
 
   @Test
-  @DisplayName("V30은 기존 Connection runtime을 Integration으로 보존해 옮긴다")
-  void givenV29ConnectionRuntime_whenMigrateToV30_thenMovesRuntimeToIntegration() throws Exception {
+  @DisplayName("V34는 기존 Connection runtime을 Integration으로 보존해 옮긴다")
+  void givenV33ConnectionRuntime_whenMigrateToV34_thenMovesRuntimeToIntegration() throws Exception {
     String url = "jdbc:h2:mem:google-integration-job-runtime;MODE=MySQL;DB_CLOSE_DELAY=-1";
     migrateTo(url, MigrationVersion.fromVersion("16"));
     insertV16IntegrationRuntime(url);
-    migrateTo(url, MigrationVersion.fromVersion("29"));
+    migrateTo(url, MigrationVersion.fromVersion("33"));
 
-    migrateTo(url, MigrationVersion.fromVersion("30"));
+    migrateTo(url, MigrationVersion.fromVersion("34"));
 
     try (Connection connection = DriverManager.getConnection(url, "sa", "");
         Statement statement = connection.createStatement()) {
@@ -580,12 +580,12 @@ class GoogleCalendarSyncMigrationTest {
   }
 
   @Test
-  @DisplayName("V31은 event operation kind를 nullable로 바꾸고 주기 동기화 제약을 scope 기준으로 유지한다")
-  void givenEmptyDatabase_whenMigrateToV31_thenKeepsActivePeriodicSyncConstraintByScope()
+  @DisplayName("V35는 event operation kind를 nullable로 바꾸고 주기 동기화 제약을 scope 기준으로 유지한다")
+  void givenEmptyDatabase_whenMigrateToV35_thenKeepsActivePeriodicSyncConstraintByScope()
       throws Exception {
     String url = "jdbc:h2:mem:google-typed-operation-jobs;MODE=MySQL;DB_CLOSE_DELAY=-1";
 
-    migrateTo(url, MigrationVersion.fromVersion("31"));
+    migrateTo(url, MigrationVersion.fromVersion("35"));
 
     try (Connection connection = DriverManager.getConnection(url, "sa", "")) {
       assertThat(isNullable(connection, "GOOGLE_OPERATION_JOBS", "EVENT_OPERATION_KIND")).isTrue();
@@ -600,13 +600,13 @@ class GoogleCalendarSyncMigrationTest {
   }
 
   @Test
-  @DisplayName("V32는 mapping event ID 조회를 위한 non-unique index를 유지한다")
-  void givenV31Schema_whenMigrateToV32_thenAddsEventIdLookupIndex() throws Exception {
+  @DisplayName("V36은 mapping event ID 조회를 위한 non-unique index를 유지한다")
+  void givenV35Schema_whenMigrateToV36_thenAddsEventIdLookupIndex() throws Exception {
     // given
     String url = "jdbc:h2:mem:google-event-mapping-event-id-index;MODE=MySQL;DB_CLOSE_DELAY=-1";
 
     // when
-    migrateTo(url, MigrationVersion.fromVersion("32"));
+    migrateTo(url, MigrationVersion.fromVersion("36"));
 
     // then
     try (Connection connection = DriverManager.getConnection(url, "sa", "")) {
