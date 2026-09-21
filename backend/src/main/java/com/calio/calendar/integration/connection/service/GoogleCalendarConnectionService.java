@@ -16,18 +16,13 @@ import com.calio.calendar.integration.sync.operation.GoogleOperationJobEnqueueSe
 import com.calio.calendar.security.TokenEncryptor;
 import java.time.Clock;
 import java.time.Instant;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 public class GoogleCalendarConnectionService {
-
-  private static final Logger log = LoggerFactory.getLogger(GoogleCalendarConnectionService.class);
   private final GoogleOAuthProperties properties;
   private final GoogleOAuthClient oauthClient;
   private final TokenEncryptor encryptor;
@@ -35,6 +30,7 @@ public class GoogleCalendarConnectionService {
   private final GoogleCalendarIntegrationCommandService integrationCommandService;
   private final GoogleCalendarConnectionQueryService connectionQueryService;
   private final GoogleCalendarConnectionCommandService connectionCommandService;
+  private final GoogleCalendarTokenRevocationService tokenRevocationService;
   private final GoogleOperationJobCommandService jobCommandService;
   private final GoogleOperationJobEnqueueService enqueueService;
   private final TransactionTemplate registrationTransaction;
@@ -49,6 +45,7 @@ public class GoogleCalendarConnectionService {
       GoogleCalendarIntegrationCommandService integrationCommandService,
       GoogleCalendarConnectionQueryService connectionQueryService,
       GoogleCalendarConnectionCommandService connectionCommandService,
+      GoogleCalendarTokenRevocationService tokenRevocationService,
       GoogleOperationJobCommandService jobCommandService,
       GoogleOperationJobEnqueueService enqueueService,
       PlatformTransactionManager transactionManager,
@@ -60,6 +57,7 @@ public class GoogleCalendarConnectionService {
     this.integrationCommandService = integrationCommandService;
     this.connectionQueryService = connectionQueryService;
     this.connectionCommandService = connectionCommandService;
+    this.tokenRevocationService = tokenRevocationService;
     this.jobCommandService = jobCommandService;
     this.enqueueService = enqueueService;
     this.clock = clock;
@@ -90,9 +88,7 @@ public class GoogleCalendarConnectionService {
 
   public void disconnect(Long accountId) {
     String encryptedRefreshToken = disconnectLocally(accountId);
-    if (encryptedRefreshToken != null) {
-      revokeTokenSafely(accountId, encryptedRefreshToken);
-    }
+    tokenRevocationService.revokeSafely(accountId, encryptedRefreshToken);
   }
 
   private String disconnectLocally(Long accountId) {
@@ -171,22 +167,5 @@ public class GoogleCalendarConnectionService {
         encryptor.encryptAccessToken(token.accessToken()),
         expiresAt,
         connectedAt);
-  }
-
-  @Transactional
-  public void pauseConnectedConnectionForReconnect(
-      Long accountId, String reason, Instant occurredAt) {
-    connectionCommandService.markConnectedConnectionSyncError(accountId, reason, occurredAt);
-  }
-
-  private void revokeTokenSafely(Long accountId, String encryptedRefreshToken) {
-    try {
-      oauthClient.revokeToken(encryptor.decrypt(encryptedRefreshToken));
-    } catch (RuntimeException exception) {
-      log.warn(
-          "Google Calendar token revocation failed after local disconnect. accountId={}",
-          accountId,
-          exception);
-    }
   }
 }

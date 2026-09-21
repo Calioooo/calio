@@ -99,10 +99,7 @@ public class GoogleCalendarConnection extends BaseEntity {
   }
 
   public void disconnect(Instant at) {
-    encryptedRefreshToken = null;
-    encryptedAccessToken = null;
-    accessTokenExpiresAt = null;
-    nextSyncToken = null;
+    clearCredentialsAndCursor();
     state = GoogleCalendarConnectionState.DISCONNECTED;
     disconnectedAt = at;
     syncErrorReason = null;
@@ -110,10 +107,18 @@ public class GoogleCalendarConnection extends BaseEntity {
   }
 
   public void markSyncError(String reason, Instant at) {
+    clearCredentialsAndCursor();
     state = GoogleCalendarConnectionState.SYNC_ERROR;
     disconnectedAt = null;
     syncErrorReason = reason;
     syncErrorAt = at;
+  }
+
+  private void clearCredentialsAndCursor() {
+    encryptedRefreshToken = null;
+    encryptedAccessToken = null;
+    accessTokenExpiresAt = null;
+    nextSyncToken = null;
   }
 
   public void replaceAccessToken(String encryptedAccessToken, Instant accessTokenExpiresAt) {

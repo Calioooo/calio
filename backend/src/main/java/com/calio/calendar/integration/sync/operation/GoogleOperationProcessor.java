@@ -3,9 +3,13 @@ package com.calio.calendar.integration.sync.operation;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.external.google.GoogleCalendarInvalidGrantException;
-import com.calio.calendar.integration.connection.service.GoogleCalendarConnectionCommandService;
+import com.calio.calendar.integration.connection.service.GoogleCalendarConnectionFailureService;
 import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrationQueryService;
+import com.calio.calendar.integration.sync.GoogleCalendarEventJobService;
+import com.calio.calendar.integration.sync.GoogleCalendarRecurrenceJobHandler;
 import com.calio.calendar.integration.sync.GoogleCalendarSyncService;
+import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEventJob;
+import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarRecurrenceJob;
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarSyncJob;
 import com.calio.calendar.integration.sync.operation.domain.GoogleOperationJob;
 import com.calio.calendar.integration.sync.operation.dto.GoogleOperationFailureDecision;
@@ -17,13 +21,13 @@ import org.springframework.stereotype.Service;
 @Service
 public class GoogleOperationProcessor {
 
-  private static final String UNSUPPORTED_JOB_SCOPE = "UNSUPPORTED_JOB_SCOPE";
-
   private final GoogleOperationJobService jobService;
   private final GoogleOperationLeaseService operationLeaseService;
   private final GoogleCalendarSyncService syncService;
+  private final GoogleCalendarEventJobService eventJobService;
+  private final GoogleCalendarRecurrenceJobHandler recurrenceJobHandler;
   private final GoogleOperationFailureClassifier failureClassifier;
-  private final GoogleCalendarConnectionCommandService connectionCommandService;
+  private final GoogleCalendarConnectionFailureService connectionFailureService;
   private final GoogleCalendarIntegrationQueryService integrationQueryService;
   private final Clock clock;
 
@@ -31,15 +35,19 @@ public class GoogleOperationProcessor {
       GoogleOperationJobService jobService,
       GoogleOperationLeaseService operationLeaseService,
       GoogleCalendarSyncService syncService,
+      GoogleCalendarEventJobService eventJobService,
+      GoogleCalendarRecurrenceJobHandler recurrenceJobHandler,
       GoogleOperationFailureClassifier failureClassifier,
-      GoogleCalendarConnectionCommandService connectionCommandService,
+      GoogleCalendarConnectionFailureService connectionFailureService,
       GoogleCalendarIntegrationQueryService integrationQueryService,
       Clock clock) {
     this.jobService = jobService;
     this.operationLeaseService = operationLeaseService;
     this.syncService = syncService;
+    this.eventJobService = eventJobService;
+    this.recurrenceJobHandler = recurrenceJobHandler;
     this.failureClassifier = failureClassifier;
-    this.connectionCommandService = connectionCommandService;
+    this.connectionFailureService = connectionFailureService;
     this.integrationQueryService = integrationQueryService;
     this.clock = clock;
   }
@@ -68,25 +76,50 @@ public class GoogleOperationProcessor {
     return execute(job, workerToken);
   }
 
-  private JobExecutionResult terminateUnsupported(
-      GoogleOperationJob job, String workerToken, String reason) {
-    jobService.terminate(job.getId(), job.getAccountId(), workerToken, reason);
+  private JobExecutionResult terminateUnsupported(GoogleOperationJob job, String workerToken) {
+    jobService.terminate(job.getId(), job.getAccountId(), workerToken, "UNSUPPORTED_JOB_SCOPE");
     return JobExecutionResult.CONTINUE_WITH_NEXT_JOB;
   }
 
   private JobExecutionResult execute(GoogleOperationJob job, String workerToken) {
-    if (!(job instanceof GoogleCalendarSyncJob syncJob)) {
-      return terminateUnsupported(job, workerToken, UNSUPPORTED_JOB_SCOPE);
-    }
+    return switch (job) {
+      case GoogleCalendarSyncJob syncJob -> executeSyncJob(syncJob, workerToken);
+      case GoogleCalendarEventJob eventJob -> executeEventJob(eventJob, workerToken);
+      case GoogleCalendarRecurrenceJob recurrenceJob ->
+          executeRecurrenceJob(recurrenceJob, workerToken);
+      default -> terminateUnsupported(job, workerToken);
+    };
+  }
+
+  private JobExecutionResult executeSyncJob(GoogleCalendarSyncJob job, String workerToken) {
     try {
-      syncService.synchronize(syncJob.getId(), syncJob.getAccountId(), workerToken);
+      syncService.synchronize(job.getId(), job.getAccountId(), workerToken);
       return JobExecutionResult.CONTINUE_WITH_NEXT_JOB;
     } catch (RuntimeException failure) {
-      return handleSyncFailure(job, workerToken, failure);
+      return handleJobFailure(job, workerToken, failure);
     }
   }
 
-  private JobExecutionResult handleSyncFailure(
+  private JobExecutionResult executeEventJob(GoogleCalendarEventJob job, String workerToken) {
+    try {
+      eventJobService.execute(job, workerToken);
+      return JobExecutionResult.CONTINUE_WITH_NEXT_JOB;
+    } catch (RuntimeException failure) {
+      return handleJobFailure(job, workerToken, failure);
+    }
+  }
+
+  private JobExecutionResult executeRecurrenceJob(
+      GoogleCalendarRecurrenceJob job, String workerToken) {
+    try {
+      recurrenceJobHandler.execute(job, workerToken);
+      return JobExecutionResult.CONTINUE_WITH_NEXT_JOB;
+    } catch (RuntimeException failure) {
+      return handleJobFailure(job, workerToken, failure);
+    }
+  }
+
+  private JobExecutionResult handleJobFailure(
       GoogleOperationJob job, String workerToken, RuntimeException failure) {
     if (isAlreadyDisconnectedAfterInvalidGrant(failure)) {
       return JobExecutionResult.STOP_ACCOUNT_PROCESSING;
@@ -96,7 +129,7 @@ public class GoogleOperationProcessor {
     if (!requiresIntegrationPause(failure)) {
       return mapExecutionResult(failureDecision);
     }
-    connectionCommandService.markConnectedConnectionSyncError(
+    connectionFailureService.pauseForReconnect(
         job.getAccountId(),
         ErrorCode.GOOGLE_CALENDAR_RECONNECT_REQUIRED.name(),
         Instant.now(clock));

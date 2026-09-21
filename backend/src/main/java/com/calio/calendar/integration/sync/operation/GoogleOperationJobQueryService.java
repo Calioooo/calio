@@ -28,11 +28,15 @@ public class GoogleOperationJobQueryService {
 
   public boolean hasPendingOutboundJob(
       Long accountId, Long integrationId, GoogleCalendarEffectiveScope scope) {
-    if (scope.type()
-        != com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEffectiveScopeType
-            .EVENT) {
-      return false;
-    }
-    return jobRepository.existsPendingEventJob(accountId, integrationId, scope.canonicalId());
+    return switch (scope.type()) {
+      case EVENT ->
+          jobRepository.existsPendingEventJob(accountId, integrationId, scope.canonicalId());
+      case RECURRENCE_EVENT ->
+          jobRepository.existsPendingRecurrenceAggregateJob(
+              accountId, integrationId, scope.canonicalId());
+      case RECURRENCE_OVERRIDE ->
+          jobRepository.existsPendingRecurrenceOverrideJob(
+              accountId, integrationId, scope.canonicalId(), scope.originStartAt());
+    };
   }
 }
