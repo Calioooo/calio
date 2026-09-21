@@ -6,8 +6,10 @@ import com.calio.calendar.vote.controller.dto.VoteSubmissionResponse;
 import com.calio.calendar.vote.domain.Vote;
 import com.calio.calendar.vote.domain.VoteParticipant;
 import com.calio.calendar.vote.domain.VoteParticipantNickname;
+import com.calio.calendar.vote.domain.VoteRoom;
 import com.calio.calendar.vote.repository.VoteParticipantRepository;
 import com.calio.calendar.vote.repository.VoteRepository;
+import com.calio.calendar.vote.repository.VoteRoomRepository;
 import java.time.LocalDate;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -20,14 +22,17 @@ public class SubmitVoteUseCase {
 
   private final VoteParticipantRepository voteParticipantRepository;
   private final VoteRepository voteRepository;
+  private final VoteRoomRepository voteRoomRepository;
   private final VoteParticipantCredentialVerifier credentialVerifier;
 
   public SubmitVoteUseCase(
       VoteParticipantRepository voteParticipantRepository,
       VoteRepository voteRepository,
+      VoteRoomRepository voteRoomRepository,
       VoteParticipantCredentialVerifier credentialVerifier) {
     this.voteParticipantRepository = voteParticipantRepository;
     this.voteRepository = voteRepository;
+    this.voteRoomRepository = voteRoomRepository;
     this.credentialVerifier = credentialVerifier;
   }
 
@@ -46,10 +51,13 @@ public class SubmitVoteUseCase {
             .findByVoteRoomPublicIdAndNicknameForUpdate(
                 voteRoomPublicId, normalizedNickname.value())
             .orElseThrow(() -> new CalioException(ErrorCode.VOTE_PARTICIPANT_CREDENTIAL_INVALID));
+    VoteRoom voteRoom =
+        voteRoomRepository
+            .findById(lockedParticipant.getVoteRoomId())
+            .orElseThrow(() -> new CalioException(ErrorCode.VOTE_ROOM_NOT_FOUND));
     List<LocalDate> unavailableDates = normalizeDates(requestedDates);
     if (unavailableDates.stream()
-        .anyMatch(
-            date -> !lockedParticipant.getVoteRoom().getCandidateDateRange().contains(date))) {
+        .anyMatch(date -> !voteRoom.getCandidateDateRange().contains(date))) {
       throw new CalioException(ErrorCode.VALIDATION_FAILED);
     }
     voteRepository.deleteAllByVoteParticipantId(lockedParticipant.getId());

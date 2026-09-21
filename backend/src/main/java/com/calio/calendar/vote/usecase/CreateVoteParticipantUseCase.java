@@ -50,7 +50,7 @@ public class CreateVoteParticipantUseCase {
     }
     try {
       return voteParticipantRepository.save(
-          new VoteParticipant(voteRoom, normalizedNickname, hashPassword(password)));
+          new VoteParticipant(voteRoom.getId(), normalizedNickname, hashPassword(password)));
     } catch (DataIntegrityViolationException exception) {
       throw new CalioException(ErrorCode.VOTE_PARTICIPANT_NICKNAME_CONFLICT, exception);
     }

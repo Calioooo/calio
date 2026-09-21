@@ -70,12 +70,12 @@ class VoteResultControllerTest {
       throws Exception {
     VoteParticipant submittedParticipant =
         voteParticipantRepository.saveAndFlush(
-            new VoteParticipant(voteRoom, "calio", "hashed-secret"));
+            new VoteParticipant(voteRoom.getId(), "calio", "hashed-secret"));
     submittedParticipant.submit();
     voteParticipantRepository.saveAndFlush(submittedParticipant);
     VoteParticipant registeredParticipant =
         voteParticipantRepository.saveAndFlush(
-            new VoteParticipant(voteRoom, "guest", "other-secret"));
+            new VoteParticipant(voteRoom.getId(), "guest", "other-secret"));
     voteRepository.saveAllAndFlush(
         List.of(
             new Vote(submittedParticipant, LocalDate.of(2026, 8, 15)),

@@ -61,7 +61,7 @@ class LookupVoteParticipantSelectionUseCaseTest {
     // given
     VoteRoom voteRoom = voteRoom();
     VoteParticipant participant =
-        new VoteParticipant(voteRoom, "calio", passwordEncoder.encode("secret"));
+        new VoteParticipant(voteRoom.getId(), "calio", passwordEncoder.encode("secret"));
     participant.submit();
     when(voteRoomRepository.findByPublicId(VOTE_ROOM_PUBLIC_ID)).thenReturn(Optional.of(voteRoom));
     when(voteParticipantRepository.findByVoteRoomPublicIdAndNickname(VOTE_ROOM_PUBLIC_ID, "calio"))
@@ -88,7 +88,7 @@ class LookupVoteParticipantSelectionUseCaseTest {
   void givenRegisteredParticipant_whenLookup_thenReturnsEmptyUnavailableDates() {
     // given
     VoteRoom voteRoom = voteRoom();
-    VoteParticipant participant = new VoteParticipant(voteRoom, "calio", null);
+    VoteParticipant participant = new VoteParticipant(voteRoom.getId(), "calio", null);
     when(voteRoomRepository.findByPublicId(VOTE_ROOM_PUBLIC_ID)).thenReturn(Optional.of(voteRoom));
     when(voteParticipantRepository.findByVoteRoomPublicIdAndNickname(VOTE_ROOM_PUBLIC_ID, "calio"))
         .thenReturn(Optional.of(participant));

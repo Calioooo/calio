@@ -26,7 +26,8 @@ class VoteParticipantCredentialVerifierTest {
   @Test
   @DisplayName("비밀번호가 있는 참여자는 일치하는 비밀번호를 제공해야 한다")
   void givenPasswordProtectedParticipant_whenVerify_thenRequiresMatchingPassword() {
-    VoteParticipant participant = new VoteParticipant(voteRoom(), "calio", "hashed-password");
+    VoteParticipant participant =
+        new VoteParticipant(voteRoom().getId(), "calio", "hashed-password");
     when(passwordEncoder.matches("secret", "hashed-password")).thenReturn(true);
     VoteParticipantCredentialVerifier credentialVerifier =
         new VoteParticipantCredentialVerifier(passwordEncoder);
@@ -42,7 +43,7 @@ class VoteParticipantCredentialVerifierTest {
     VoteParticipantCredentialVerifier credentialVerifier =
         new VoteParticipantCredentialVerifier(passwordEncoder);
 
-    credentialVerifier.verify(new VoteParticipant(voteRoom(), "calio", null), null);
+    credentialVerifier.verify(new VoteParticipant(voteRoom().getId(), "calio", null), null);
 
     verify(passwordEncoder, never())
         .matches(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
@@ -53,7 +54,8 @@ class VoteParticipantCredentialVerifierTest {
   void givenInvalidPassword_whenVerify_thenRejects() {
     VoteParticipantCredentialVerifier credentialVerifier =
         new VoteParticipantCredentialVerifier(passwordEncoder);
-    VoteParticipant participant = new VoteParticipant(voteRoom(), "calio", "hashed-password");
+    VoteParticipant participant =
+        new VoteParticipant(voteRoom().getId(), "calio", "hashed-password");
     when(passwordEncoder.matches("wrong", "hashed-password")).thenReturn(false);
 
     assertThatThrownBy(() -> credentialVerifier.verify(participant, null))

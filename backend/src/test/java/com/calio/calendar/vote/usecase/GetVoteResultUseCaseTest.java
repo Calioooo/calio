@@ -47,7 +47,7 @@ class GetVoteResultUseCaseTest {
         new VoteRoom(
             VOTE_ROOM_PUBLIC_ID, "여행 일정", LocalDate.of(2026, 8, 14), LocalDate.of(2026, 8, 16), 1L);
     when(voteRoomRepository.findByPublicId(VOTE_ROOM_PUBLIC_ID)).thenReturn(Optional.of(voteRoom));
-    VoteParticipant submittedParticipant = new VoteParticipant(voteRoom, "submitted", null);
+    VoteParticipant submittedParticipant = new VoteParticipant(voteRoom.getId(), "submitted", null);
     submittedParticipant.submit();
     when(voteRepository.findAllSubmittedByVoteRoomPublicId(VOTE_ROOM_PUBLIC_ID))
         .thenReturn(List.of(new Vote(submittedParticipant, LocalDate.of(2026, 8, 15))));

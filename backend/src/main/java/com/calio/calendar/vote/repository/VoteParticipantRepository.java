@@ -5,7 +5,6 @@ import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -13,24 +12,24 @@ import org.springframework.data.repository.query.Param;
 
 public interface VoteParticipantRepository extends JpaRepository<VoteParticipant, Long> {
 
-  @EntityGraph(attributePaths = "voteRoom")
   @Query(
       """
             select participant
             from VoteParticipant participant
-            where participant.voteRoom.publicId = :voteRoomPublicId
+            join VoteRoom voteRoom on participant.voteRoomId = voteRoom.id
+            where voteRoom.publicId = :voteRoomPublicId
               and lower(participant.nickname.value) = lower(:nickname)
             """)
   Optional<VoteParticipant> findByVoteRoomPublicIdAndNickname(
       @Param("voteRoomPublicId") UUID voteRoomPublicId, @Param("nickname") String nickname);
 
   @Lock(LockModeType.PESSIMISTIC_WRITE)
-  @EntityGraph(attributePaths = "voteRoom")
   @Query(
       """
             select participant
             from VoteParticipant participant
-            where participant.voteRoom.publicId = :voteRoomPublicId
+            join VoteRoom voteRoom on participant.voteRoomId = voteRoom.id
+            where voteRoom.publicId = :voteRoomPublicId
               and lower(participant.nickname.value) = lower(:nickname)
             """)
   Optional<VoteParticipant> findByVoteRoomPublicIdAndNicknameForUpdate(
@@ -40,7 +39,8 @@ public interface VoteParticipantRepository extends JpaRepository<VoteParticipant
       """
             select participant.nickname.value
             from VoteParticipant participant
-            where participant.voteRoom.publicId = :voteRoomPublicId
+            join VoteRoom voteRoom on participant.voteRoomId = voteRoom.id
+            where voteRoom.publicId = :voteRoomPublicId
               and participant.status = com.calio.calendar.vote.domain.VoteParticipantStatus.SUBMITTED
             """)
   List<String> findSubmittedNicknamesByVoteRoomPublicId(

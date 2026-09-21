@@ -7,12 +7,9 @@ import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 
@@ -29,9 +26,8 @@ public class VoteParticipant extends BaseEntity {
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
 
-  @ManyToOne(fetch = FetchType.LAZY, optional = false)
-  @JoinColumn(name = "vote_room_id", nullable = false)
-  private VoteRoom voteRoom;
+  @Column(name = "vote_room_id", nullable = false)
+  private Long voteRoomId;
 
   @Embedded
   @AttributeOverride(
@@ -48,12 +44,12 @@ public class VoteParticipant extends BaseEntity {
 
   protected VoteParticipant() {}
 
-  public VoteParticipant(VoteRoom voteRoom, String nickname, String passwordHash) {
-    this(voteRoom, VoteParticipantNickname.of(nickname), passwordHash);
+  public VoteParticipant(Long voteRoomId, String nickname, String passwordHash) {
+    this(voteRoomId, VoteParticipantNickname.of(nickname), passwordHash);
   }
 
-  public VoteParticipant(VoteRoom voteRoom, VoteParticipantNickname nickname, String passwordHash) {
-    this.voteRoom = voteRoom;
+  public VoteParticipant(Long voteRoomId, VoteParticipantNickname nickname, String passwordHash) {
+    this.voteRoomId = voteRoomId;
     this.nickname = nickname;
     this.passwordHash = passwordHash;
     this.status = VoteParticipantStatus.REGISTERED;
@@ -63,8 +59,8 @@ public class VoteParticipant extends BaseEntity {
     return id;
   }
 
-  public VoteRoom getVoteRoom() {
-    return voteRoom;
+  public Long getVoteRoomId() {
+    return voteRoomId;
   }
 
   public String getNickname() {

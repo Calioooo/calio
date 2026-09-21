@@ -37,6 +37,7 @@ class VoteParticipantUseCaseTest {
 
   private static final UUID VOTE_ROOM_PUBLIC_ID =
       UUID.fromString("7ab6b7d8-11cd-4ce2-83e3-b81ad87ea3c9");
+  private static final Long VOTE_ROOM_ID = 1L;
 
   @Mock private VoteRoomRepository voteRoomRepository;
   @Mock private VoteParticipantRepository voteParticipantRepository;
@@ -56,13 +57,15 @@ class VoteParticipantUseCaseTest {
         new CreateVoteParticipantUseCase(
             voteRoomRepository, voteParticipantRepository, passwordEncoder);
     submitVoteUseCase =
-        new SubmitVoteUseCase(voteParticipantRepository, voteRepository, credentialVerifier);
+        new SubmitVoteUseCase(
+            voteParticipantRepository, voteRepository, voteRoomRepository, credentialVerifier);
   }
 
   @Test
-  @DisplayName("새 참여자는 VoteRoom에 연결된 REGISTERED 상태로 생성된다")
+  @DisplayName("새 참여자는 VoteRoom ID를 참조하는 REGISTERED 상태로 생성된다")
   void givenAvailableNicknameWithoutPassword_whenCreate_thenCreatesRegisteredParticipant() {
-    VoteRoom voteRoom = voteRoom();
+    VoteRoom voteRoom = org.mockito.Mockito.mock(VoteRoom.class);
+    when(voteRoom.getId()).thenReturn(VOTE_ROOM_ID);
     when(voteRoomRepository.findForUpdateByPublicId(VOTE_ROOM_PUBLIC_ID))
         .thenReturn(Optional.of(voteRoom));
     when(voteParticipantRepository.findByVoteRoomPublicIdAndNickname(VOTE_ROOM_PUBLIC_ID, "calio"))
@@ -76,7 +79,7 @@ class VoteParticipantUseCaseTest {
     ArgumentCaptor<VoteParticipant> captor = ArgumentCaptor.forClass(VoteParticipant.class);
     verify(voteParticipantRepository).save(captor.capture());
     assertThat(participant).isSameAs(captor.getValue());
-    assertThat(participant.getVoteRoom()).isSameAs(voteRoom);
+    assertThat(participant.getVoteRoomId()).isEqualTo(VOTE_ROOM_ID);
     assertThat(participant.getNickname()).isEqualTo("calio");
     assertThat(participant.getPasswordHash()).isNull();
     assertThat(participant.getStatus()).isEqualTo(VoteParticipantStatus.REGISTERED);
@@ -132,7 +135,7 @@ class VoteParticipantUseCaseTest {
     when(voteRoomRepository.findForUpdateByPublicId(VOTE_ROOM_PUBLIC_ID))
         .thenReturn(Optional.of(voteRoom));
     when(voteParticipantRepository.findByVoteRoomPublicIdAndNickname(VOTE_ROOM_PUBLIC_ID, "Calio"))
-        .thenReturn(Optional.of(new VoteParticipant(voteRoom, "calio", null)));
+        .thenReturn(Optional.of(new VoteParticipant(VOTE_ROOM_ID, "calio", null)));
 
     assertThatThrownBy(
             () ->
@@ -183,7 +186,7 @@ class VoteParticipantUseCaseTest {
   @DisplayName("잘못된 비밀번호의 투표 제출은 참여자 잠금과 Vote 교체를 실행하지 않는다")
   void givenInvalidPassword_whenSubmitVotes_thenRejectsBeforeAcquiringLock() {
     VoteParticipant participant =
-        new VoteParticipant(voteRoom(), "calio", passwordEncoder.encode("secret"));
+        new VoteParticipant(VOTE_ROOM_ID, "calio", passwordEncoder.encode("secret"));
     when(voteParticipantRepository.findByVoteRoomPublicIdAndNickname(VOTE_ROOM_PUBLIC_ID, "calio"))
         .thenReturn(Optional.of(participant));
 
@@ -205,17 +208,20 @@ class VoteParticipantUseCaseTest {
   @DisplayName("투표 제출은 비잠금 인증을 마친 뒤 참여자 쓰기 잠금을 획득한다")
   void givenValidCredential_whenSubmitVotes_thenVerifiesCredentialBeforeAcquiringLock() {
     VoteParticipant participant =
-        new VoteParticipant(voteRoom(), "calio", passwordEncoder.encode("secret"));
+        new VoteParticipant(VOTE_ROOM_ID, "calio", passwordEncoder.encode("secret"));
+    VoteRoom voteRoom = voteRoom();
     when(voteParticipantRepository.findByVoteRoomPublicIdAndNickname(VOTE_ROOM_PUBLIC_ID, "calio"))
         .thenReturn(Optional.of(participant));
     when(voteParticipantRepository.findByVoteRoomPublicIdAndNicknameForUpdate(
             VOTE_ROOM_PUBLIC_ID, "calio"))
         .thenReturn(Optional.of(participant));
+    when(voteRoomRepository.findById(VOTE_ROOM_ID)).thenReturn(Optional.of(voteRoom));
 
     submitVoteUseCase.submit(
         VOTE_ROOM_PUBLIC_ID, "calio", "secret", List.of(LocalDate.of(2026, 8, 15)));
 
-    InOrder inOrder = inOrder(voteParticipantRepository, credentialVerifier, voteRepository);
+    InOrder inOrder =
+        inOrder(voteParticipantRepository, credentialVerifier, voteRoomRepository, voteRepository);
     inOrder
         .verify(voteParticipantRepository)
         .findByVoteRoomPublicIdAndNickname(VOTE_ROOM_PUBLIC_ID, "calio");
@@ -223,6 +229,7 @@ class VoteParticipantUseCaseTest {
     inOrder
         .verify(voteParticipantRepository)
         .findByVoteRoomPublicIdAndNicknameForUpdate(VOTE_ROOM_PUBLIC_ID, "calio");
+    inOrder.verify(voteRoomRepository).findById(VOTE_ROOM_ID);
     inOrder.verify(voteRepository).deleteAllByVoteParticipantId(participant.getId());
     assertThat(participant.getStatus()).isEqualTo(VoteParticipantStatus.SUBMITTED);
   }
