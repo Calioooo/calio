@@ -13,8 +13,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.calio.calendar.account.domain.Account;
-import com.calio.calendar.account.domain.AccountAuthToken;
-import com.calio.calendar.account.repository.AccountAuthTokenRepository;
 import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.auth.service.AccessTokenEncoder;
 import com.calio.calendar.common.testsupport.SharedIntegrationDatabase;
@@ -69,8 +67,6 @@ class GroupMembershipLifecycleControllerTest {
 
   @Autowired private AccountRepository accountRepository;
 
-  @Autowired private AccountAuthTokenRepository accountAuthTokenRepository;
-
   @Autowired private GroupSpaceRepository groupSpaceRepository;
 
   @Autowired private GroupMemberRepository groupMemberRepository;
@@ -86,7 +82,6 @@ class GroupMembershipLifecycleControllerTest {
     groupInvitationRepository.deleteAll();
     groupMemberRepository.deleteAll();
     groupSpaceRepository.deleteAll();
-    accountAuthTokenRepository.deleteAll();
   }
 
   @Test
@@ -322,10 +317,10 @@ class GroupMembershipLifecycleControllerTest {
   }
 
   private String createAuthenticatedToken() {
-    Account account = accountRepository.saveAndFlush(new Account());
     String accessToken = accessTokenEncoder.generateRawToken();
-    accountAuthTokenRepository.saveAndFlush(
-        new AccountAuthToken(account, accessTokenEncoder.hash(accessToken)));
+    Account account = new Account();
+    account.issueAuthToken(accessTokenEncoder.hash(accessToken));
+    accountRepository.saveAndFlush(account);
     return accessToken;
   }
 

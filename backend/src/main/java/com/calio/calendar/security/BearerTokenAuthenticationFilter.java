@@ -2,6 +2,7 @@ package com.calio.calendar.security;
 
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
+import com.calio.calendar.security.usecase.AuthenticateAccountTokenUseCase;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -19,13 +20,13 @@ public class BearerTokenAuthenticationFilter extends OncePerRequestFilter {
 
   private static final String BEARER_PREFIX = "Bearer ";
 
-  private final AccountTokenAuthenticationService accountTokenAuthenticationService;
+  private final AuthenticateAccountTokenUseCase authenticateAccountTokenUseCase;
   private final AuthenticationErrorResponseWriter errorResponseWriter;
 
   public BearerTokenAuthenticationFilter(
-      AccountTokenAuthenticationService accountTokenAuthenticationService,
+      AuthenticateAccountTokenUseCase authenticateAccountTokenUseCase,
       AuthenticationErrorResponseWriter errorResponseWriter) {
-    this.accountTokenAuthenticationService = accountTokenAuthenticationService;
+    this.authenticateAccountTokenUseCase = authenticateAccountTokenUseCase;
     this.errorResponseWriter = errorResponseWriter;
   }
 
@@ -52,7 +53,7 @@ public class BearerTokenAuthenticationFilter extends OncePerRequestFilter {
       throws IOException {
     try {
       String rawToken = extractBearerToken(authorizationHeader);
-      AuthenticatedAccount principal = accountTokenAuthenticationService.authenticate(rawToken);
+      AuthenticatedAccount principal = authenticateAccountTokenUseCase.authenticate(rawToken);
       SecurityContextHolder.getContext().setAuthentication(toAuthentication(principal));
       return true;
     } catch (CalioException exception) {

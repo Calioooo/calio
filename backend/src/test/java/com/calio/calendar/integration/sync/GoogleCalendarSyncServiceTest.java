@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.calio.calendar.account.service.AccountQueryService;
+import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.external.google.GoogleCalendarEventsClient;
@@ -459,7 +459,7 @@ class GoogleCalendarSyncServiceTest {
           mock(GoogleCalendarEventMappingQueryService.class),
           mock(GoogleCalendarEventChangeService.class),
           mock(GoogleCalendarRecurrenceMappingQueryService.class),
-          mock(AccountQueryService.class),
+          mock(AccountRepository.class),
           mock(TagQueryService.class),
           mock(RecurrenceEventQueryService.class),
           mock(GoogleCalendarRecurrenceChangeService.class));

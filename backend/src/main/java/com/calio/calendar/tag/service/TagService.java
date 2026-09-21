@@ -1,7 +1,9 @@
 package com.calio.calendar.tag.service;
 
 import com.calio.calendar.account.domain.Account;
-import com.calio.calendar.account.service.AccountQueryService;
+import com.calio.calendar.account.repository.AccountRepository;
+import com.calio.calendar.common.error.CalioException;
+import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.event.service.EventCommandService;
 import com.calio.calendar.recurrence.service.RecurrenceEventCommandService;
 import com.calio.calendar.tag.controller.dto.CustomTagRequest;
@@ -17,19 +19,19 @@ public class TagService {
 
   private final TagQueryService tagQueryService;
   private final TagCommandService tagCommandService;
-  private final AccountQueryService accountQueryService;
+  private final AccountRepository accountRepository;
   private final EventCommandService eventCommandService;
   private final RecurrenceEventCommandService recurrenceEventCommandService;
 
   public TagService(
       TagQueryService tagQueryService,
       TagCommandService tagCommandService,
-      AccountQueryService accountQueryService,
+      AccountRepository accountRepository,
       EventCommandService eventCommandService,
       RecurrenceEventCommandService recurrenceEventCommandService) {
     this.tagQueryService = tagQueryService;
     this.tagCommandService = tagCommandService;
-    this.accountQueryService = accountQueryService;
+    this.accountRepository = accountRepository;
     this.eventCommandService = eventCommandService;
     this.recurrenceEventCommandService = recurrenceEventCommandService;
   }
@@ -48,9 +50,15 @@ public class TagService {
 
   @Transactional
   public TagResponse createCustomTag(Long accountId, CustomTagRequest request) {
-    Account account = accountQueryService.getAccount(accountId);
+    Account account = getAccount(accountId);
     Tag tag = tagCommandService.createCustomTag(account, request.title(), request.colorCode());
     return TagResponse.from(tag);
+  }
+
+  private Account getAccount(Long accountId) {
+    return accountRepository
+        .findById(accountId)
+        .orElseThrow(() -> new CalioException(ErrorCode.INTERNAL_SERVER_ERROR));
   }
 
   @Transactional

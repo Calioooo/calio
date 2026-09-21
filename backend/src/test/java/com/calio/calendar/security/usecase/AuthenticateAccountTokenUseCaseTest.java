@@ -1,16 +1,15 @@
-package com.calio.calendar.security;
+package com.calio.calendar.security.usecase;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.calio.calendar.account.domain.Account;
-import com.calio.calendar.account.domain.AccountAuthToken;
-import com.calio.calendar.account.repository.AccountAuthTokenRepository;
 import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.auth.service.AccessTokenEncoder;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.common.testsupport.SharedIntegrationDatabase;
+import com.calio.calendar.security.AuthenticatedAccount;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -27,19 +26,16 @@ import org.springframework.boot.test.context.SpringBootTest;
       "spring.jpa.hibernate.ddl-auto=create-drop"
     })
 @SharedIntegrationDatabase
-class AccountTokenAuthenticationServiceTest {
+class AuthenticateAccountTokenUseCaseTest {
 
-  @Autowired private AccountTokenAuthenticationService authenticationService;
+  @Autowired private AuthenticateAccountTokenUseCase authenticateAccountTokenUseCase;
 
   @Autowired private AccessTokenEncoder accessTokenEncoder;
 
   @Autowired private AccountRepository accountRepository;
 
-  @Autowired private AccountAuthTokenRepository accountAuthTokenRepository;
-
   @BeforeEach
   void setUp() {
-    accountAuthTokenRepository.deleteAll();
     accountRepository.deleteAll();
   }
 
@@ -48,28 +44,26 @@ class AccountTokenAuthenticationServiceTest {
   void givenValidToken_whenAuthenticate_thenReturnsAccountIdOnlyPrincipalAndUpdatesLastUsedAt() {
     // given
     String rawToken = "valid-token";
-    Account account = accountRepository.saveAndFlush(new Account());
-    AccountAuthToken authToken =
-        accountAuthTokenRepository.saveAndFlush(
-            new AccountAuthToken(account, accessTokenEncoder.hash(rawToken)));
+    Account account = new Account();
+    account.issueAuthToken(accessTokenEncoder.hash(rawToken));
+    account = accountRepository.saveAndFlush(account);
     Instant beforeAuthentication = Instant.now();
 
     // when
-    AuthenticatedAccount principal = authenticationService.authenticate(rawToken);
+    AuthenticatedAccount principal = authenticateAccountTokenUseCase.authenticate(rawToken);
 
     // then
-    AccountAuthToken updatedToken =
-        accountAuthTokenRepository.findById(authToken.getId()).orElseThrow();
+    Account updatedAccount = accountRepository.findById(account.getId()).orElseThrow();
     assertThat(principal.accountId()).isEqualTo(account.getId());
-    assertThat(updatedToken.getLastUsedAt()).isNotNull();
-    assertThat(updatedToken.getLastUsedAt()).isAfterOrEqualTo(beforeAuthentication.minusSeconds(1));
+    assertThat(updatedAccount.getAuthTokenLastUsedAt()).isNotNull();
+    assertThat(updatedAccount.getAuthTokenLastUsedAt())
+        .isAfterOrEqualTo(beforeAuthentication.minusSeconds(1));
   }
 
   @Test
   @DisplayName("저장된 tokenHash가 없으면 AUTH_TOKEN_INVALID로 거부한다")
   void givenUnknownToken_whenAuthenticate_thenThrowsInvalidToken() {
-    // when, then
-    assertThatThrownBy(() -> authenticationService.authenticate("missing-token"))
+    assertThatThrownBy(() -> authenticateAccountTokenUseCase.authenticate("missing-token"))
         .isInstanceOfSatisfying(
             CalioException.class,
             exception ->
@@ -81,13 +75,13 @@ class AccountTokenAuthenticationServiceTest {
   void givenRevokedToken_whenAuthenticate_thenThrowsRevokedToken() {
     // given
     String rawToken = "revoked-token";
-    Account account = accountRepository.saveAndFlush(new Account());
-    AccountAuthToken authToken = new AccountAuthToken(account, accessTokenEncoder.hash(rawToken));
-    authToken.revoke(Instant.parse("2026-07-10T00:00:00Z"));
-    accountAuthTokenRepository.saveAndFlush(authToken);
+    Account account = new Account();
+    account.issueAuthToken(accessTokenEncoder.hash(rawToken));
+    account.revokeAuthToken(Instant.parse("2026-07-10T00:00:00Z"));
+    accountRepository.saveAndFlush(account);
 
     // when, then
-    assertThatThrownBy(() -> authenticationService.authenticate(rawToken))
+    assertThatThrownBy(() -> authenticateAccountTokenUseCase.authenticate(rawToken))
         .isInstanceOfSatisfying(
             CalioException.class,
             exception ->
