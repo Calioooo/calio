@@ -82,7 +82,30 @@ class VoteParticipantRepositoryTest {
     assertThat(foundParticipant.getId()).isEqualTo(participant.getId());
     assertThat(foundParticipant.getVoteRoomId()).isEqualTo(voteRoom.getId());
     assertThat(foundParticipant.getPasswordHash()).isNull();
+    assertThat(foundParticipant.getAccountId()).isNull();
     assertThat(foundParticipant.getStatus()).isEqualTo(VoteParticipantStatus.REGISTERED);
+  }
+
+  @Test
+  @Transactional
+  @DisplayName("사용자 참여자는 투표방 공개 ID와 accountId로 조회한다")
+  void givenAccountParticipant_whenFindByVoteRoomPublicIdAndAccountId_thenFindsParticipant() {
+    // given
+    Account account = accountRepository.saveAndFlush(new Account());
+    VoteParticipant participant =
+        voteParticipantRepository.saveAndFlush(
+            VoteParticipant.forAccount(voteRoom.getId(), "calio", account.getId()));
+
+    // when
+    VoteParticipant foundParticipant =
+        voteParticipantRepository
+            .findByVoteRoomPublicIdAndAccountId(voteRoom.getPublicId(), account.getId())
+            .orElseThrow();
+
+    // then
+    assertThat(foundParticipant.getId()).isEqualTo(participant.getId());
+    assertThat(foundParticipant.getAccountId()).isEqualTo(account.getId());
+    assertThat(foundParticipant.getPasswordHash()).isNull();
   }
 
   @Test
@@ -116,6 +139,22 @@ class VoteParticipantRepositoryTest {
             () ->
                 voteParticipantRepository.saveAndFlush(
                     new VoteParticipant(voteRoom.getId(), "calio", "hashed-password")))
+        .isInstanceOf(DataIntegrityViolationException.class);
+  }
+
+  @Test
+  @DisplayName("같은 VoteRoom에서는 같은 accountId의 참여자를 저장할 수 없다")
+  void givenDuplicateAccountInVoteRoom_whenSave_thenRejectsUniqueConstraint() {
+    // given
+    Account account = accountRepository.saveAndFlush(new Account());
+    voteParticipantRepository.saveAndFlush(
+        VoteParticipant.forAccount(voteRoom.getId(), "first", account.getId()));
+
+    // when, then
+    assertThatThrownBy(
+            () ->
+                voteParticipantRepository.saveAndFlush(
+                    VoteParticipant.forAccount(voteRoom.getId(), "second", account.getId())))
         .isInstanceOf(DataIntegrityViolationException.class);
   }
 
