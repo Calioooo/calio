@@ -6,7 +6,6 @@ import com.calio.calendar.vote.controller.dto.VoteSubmissionResponse;
 import com.calio.calendar.vote.domain.Vote;
 import com.calio.calendar.vote.domain.VoteParticipant;
 import com.calio.calendar.vote.domain.VoteRoom;
-import com.calio.calendar.vote.domain.VoteUnavailableDates;
 import com.calio.calendar.vote.repository.VoteParticipantRepository;
 import com.calio.calendar.vote.repository.VoteRepository;
 import com.calio.calendar.vote.repository.VoteRoomRepository;
@@ -43,7 +42,7 @@ public class SubmitMyVoteUseCase {
         voteRoomRepository
             .findById(participant.getVoteRoomId())
             .orElseThrow(() -> new CalioException(ErrorCode.VOTE_ROOM_NOT_FOUND));
-    VoteUnavailableDates unavailableDates = VoteUnavailableDates.of(requestedDates);
+    VoteSubmissionDates unavailableDates = VoteSubmissionDates.of(requestedDates);
     if (unavailableDates.hasDateOutside(voteRoom.getCandidateDateRange())) {
       throw new CalioException(ErrorCode.VALIDATION_FAILED);
     }
