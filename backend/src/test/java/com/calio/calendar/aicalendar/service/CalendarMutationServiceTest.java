@@ -129,6 +129,30 @@ class CalendarMutationServiceTest {
   }
 
   @Test
+  @DisplayName("AI 일정 변경 요청의 제목도 80자를 초과하면 거부한다")
+  void givenOverlengthTitle_whenPreviewCreation_thenRejectsRequest() {
+    CalendarMutationToolRequest request =
+        new CalendarMutationToolRequest(
+            CalendarMutationOperation.CREATE_EVENT,
+            null,
+            null,
+            null,
+            "a".repeat(81),
+            "새 회의 설명",
+            Instant.parse("2026-08-22T05:00:00Z"),
+            Instant.parse("2026-08-22T06:00:00Z"),
+            false,
+            "Asia/Seoul",
+            1L,
+            null);
+
+    assertThatThrownBy(() -> service().preview(1L, request))
+        .isInstanceOf(CalioException.class)
+        .extracting(exception -> ((CalioException) exception).getErrorCode())
+        .isEqualTo(ErrorCode.VALIDATION_FAILED);
+  }
+
+  @Test
   @DisplayName("일정 삭제 Preview는 삭제하지 않고 삭제될 일정을 반환한다")
   void givenEventDeletion_whenPreview_thenReturnsBeforeWithoutDeletingEvent() {
     // given

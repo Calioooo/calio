@@ -9,7 +9,7 @@ import jakarta.persistence.Embeddable;
 public record SingleEventTitle(
     @Column(name = "title", nullable = false, length = SingleEventTitle.MAX_LENGTH) String value) {
 
-  public static final int MAX_LENGTH = 80;
+  public static final int MAX_LENGTH = 255;
 
   public SingleEventTitle {
     if (value == null || value.length() > MAX_LENGTH) {
