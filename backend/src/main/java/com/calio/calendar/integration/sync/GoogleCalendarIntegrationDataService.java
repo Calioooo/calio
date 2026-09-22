@@ -407,7 +407,7 @@ public class GoogleCalendarIntegrationDataService {
         eventIds.stream().filter(eventId -> !mappedEventIds.contains(eventId)).toList();
     if (!unmappedEventIds.isEmpty()) {
       eventShareCommandService.deleteAllForSourceEvents(unmappedEventIds);
-      singleEventRepository.deleteAllByIds(unmappedEventIds);
+      singleEventRepository.deleteAllByIdInBatch(unmappedEventIds);
     }
   }
 

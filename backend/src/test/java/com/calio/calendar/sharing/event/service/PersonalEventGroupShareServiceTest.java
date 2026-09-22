@@ -41,8 +41,7 @@ class PersonalEventGroupShareServiceTest {
   void createPartiallySucceedsForActiveMembershipsOnly() {
     SingleEvent event = event(1L);
     GroupSpace activeGroup = groupSpace(10L);
-    when(eventRepository.findAllShareableByIdsAndAccountId(List.of(1L), 100L))
-        .thenReturn(List.of(event));
+    when(eventRepository.findAllByIdInAndAccountId(List.of(1L), 100L)).thenReturn(List.of(event));
     when(membershipQueryService.listActiveMemberships(100L, List.of(10L, 20L)))
         .thenReturn(List.of(member(activeGroup)));
     when(shareQueryService.listExistingShares(List.of(1L), List.of(10L, 20L)))
@@ -64,7 +63,7 @@ class PersonalEventGroupShareServiceTest {
   @DisplayName("소유하지 않았거나 없는 일정은 대상 처리 전에 전체 요청을 거절한다")
   void createRejectsInvalidSourceBeforeTargetProcessing() {
     SingleEvent ownedEvent = event(1L);
-    when(eventRepository.findAllShareableByIdsAndAccountId(List.of(1L, 2L), 100L))
+    when(eventRepository.findAllByIdInAndAccountId(List.of(1L, 2L), 100L))
         .thenReturn(List.of(ownedEvent));
 
     assertThatThrownBy(
@@ -83,8 +82,7 @@ class PersonalEventGroupShareServiceTest {
     SingleEvent event = event(1L);
     GroupSpace firstGroup = groupSpace(10L);
     GroupSpace secondGroup = groupSpace(20L);
-    when(eventRepository.findAllShareableByIdsAndAccountId(List.of(1L), 100L))
-        .thenReturn(List.of(event));
+    when(eventRepository.findAllByIdInAndAccountId(List.of(1L), 100L)).thenReturn(List.of(event));
     when(membershipQueryService.listActiveMemberships(100L, List.of(10L, 20L)))
         .thenReturn(List.of(member(firstGroup), member(secondGroup)));
     when(shareQueryService.listExistingShares(List.of(1L), List.of(10L, 20L)))

@@ -68,7 +68,7 @@ public class PersonalEventGroupShareService {
 
   private Map<Long, SingleEvent> validateSources(Long accountId, List<Long> eventIds) {
     Map<Long, SingleEvent> eventsById =
-        eventRepository.findAllShareableByIdsAndAccountId(eventIds, accountId).stream()
+        eventRepository.findAllByIdInAndAccountId(eventIds, accountId).stream()
             .collect(Collectors.toMap(SingleEvent::getId, event -> event));
     if (eventsById.size() != eventIds.size()) {
       throw new CalioException(ErrorCode.EVENT_NOT_FOUND);
