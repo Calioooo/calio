@@ -38,6 +38,7 @@ class VoteParticipantUseCaseTest {
   private static final UUID VOTE_ROOM_PUBLIC_ID =
       UUID.fromString("7ab6b7d8-11cd-4ce2-83e3-b81ad87ea3c9");
   private static final Long VOTE_ROOM_ID = 1L;
+  private static final Long ACCOUNT_ID = 2L;
 
   @Mock private VoteRoomRepository voteRoomRepository;
   @Mock private VoteParticipantRepository voteParticipantRepository;
@@ -47,6 +48,7 @@ class VoteParticipantUseCaseTest {
   private VoteParticipantCredentialVerifier credentialVerifier;
   private CreateVoteParticipantUseCase createVoteParticipantUseCase;
   private SubmitVoteUseCase submitVoteUseCase;
+  private LookupVoteParticipantSelectionUseCase lookupVoteParticipantSelectionUseCase;
 
   @BeforeEach
   void setUp() {
@@ -59,6 +61,9 @@ class VoteParticipantUseCaseTest {
     submitVoteUseCase =
         new SubmitVoteUseCase(
             voteParticipantRepository, voteRepository, voteRoomRepository, credentialVerifier);
+    lookupVoteParticipantSelectionUseCase =
+        new LookupVoteParticipantSelectionUseCase(
+            voteRoomRepository, voteParticipantRepository, voteRepository, credentialVerifier);
   }
 
   @Test
@@ -232,6 +237,47 @@ class VoteParticipantUseCaseTest {
     inOrder.verify(voteRoomRepository).findById(VOTE_ROOM_ID);
     inOrder.verify(voteRepository).deleteAllByVoteParticipantId(participant.getId());
     assertThat(participant.getStatus()).isEqualTo(VoteParticipantStatus.SUBMITTED);
+  }
+
+  @Test
+  @DisplayName("인증 사용자의 투표 제출은 accountId로 참여자를 잠그고 비밀번호를 검증하지 않는다")
+  void givenAccountParticipant_whenSubmitVotes_thenUsesAccountIdWithoutCredentialVerification() {
+    VoteParticipant participant = VoteParticipant.forAccount(VOTE_ROOM_ID, "calio", ACCOUNT_ID);
+    VoteRoom voteRoom = voteRoom();
+    when(voteParticipantRepository.findByVoteRoomPublicIdAndAccountIdForUpdate(
+            VOTE_ROOM_PUBLIC_ID, ACCOUNT_ID))
+        .thenReturn(Optional.of(participant));
+    when(voteRoomRepository.findById(VOTE_ROOM_ID)).thenReturn(Optional.of(voteRoom));
+
+    submitVoteUseCase.submit(VOTE_ROOM_PUBLIC_ID, ACCOUNT_ID, List.of(LocalDate.of(2026, 8, 15)));
+
+    verify(voteParticipantRepository)
+        .findByVoteRoomPublicIdAndAccountIdForUpdate(VOTE_ROOM_PUBLIC_ID, ACCOUNT_ID);
+    verify(voteParticipantRepository, never())
+        .findByVoteRoomPublicIdAndNickname(VOTE_ROOM_PUBLIC_ID, "calio");
+    verifyNoInteractions(credentialVerifier);
+    assertThat(participant.getStatus()).isEqualTo(VoteParticipantStatus.SUBMITTED);
+  }
+
+  @Test
+  @DisplayName("인증 사용자의 선택 조회는 accountId로 참여자를 찾고 비밀번호를 검증하지 않는다")
+  void givenAccountParticipant_whenLookup_thenUsesAccountIdWithoutCredentialVerification() {
+    VoteRoom voteRoom = voteRoom();
+    VoteParticipant participant = VoteParticipant.forAccount(VOTE_ROOM_ID, "calio", ACCOUNT_ID);
+    when(voteRoomRepository.findByPublicId(VOTE_ROOM_PUBLIC_ID)).thenReturn(Optional.of(voteRoom));
+    when(voteParticipantRepository.findByVoteRoomPublicIdAndAccountId(
+            VOTE_ROOM_PUBLIC_ID, ACCOUNT_ID))
+        .thenReturn(Optional.of(participant));
+
+    var response = lookupVoteParticipantSelectionUseCase.lookup(VOTE_ROOM_PUBLIC_ID, ACCOUNT_ID);
+
+    assertThat(response.nickname()).isEqualTo("calio");
+    assertThat(response.status()).isEqualTo(VoteParticipantStatus.REGISTERED);
+    verify(voteParticipantRepository)
+        .findByVoteRoomPublicIdAndAccountId(VOTE_ROOM_PUBLIC_ID, ACCOUNT_ID);
+    verify(voteParticipantRepository, never())
+        .findByVoteRoomPublicIdAndNickname(VOTE_ROOM_PUBLIC_ID, "calio");
+    verifyNoInteractions(credentialVerifier);
   }
 
   private VoteRoom voteRoom() {
