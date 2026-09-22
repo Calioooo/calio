@@ -11,6 +11,7 @@ import com.calio.calendar.vote.repository.VoteRoomRepository;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -27,6 +28,7 @@ class ListParticipatedVoteRoomsUseCaseTest {
   @Mock private VoteRoomRepository voteRoomRepository;
 
   @Test
+  @DisplayName("참여자 수정순으로 참여한 투표방을 같은 순서로 반환한다")
   void givenParticipantsOrderedByUpdatedAt_whenList_thenReturnsTheirVoteRoomsInSameOrder() {
     VoteParticipant firstParticipant =
         VoteParticipant.forAccount(FIRST_VOTE_ROOM_ID, "first", ACCOUNT_ID);
