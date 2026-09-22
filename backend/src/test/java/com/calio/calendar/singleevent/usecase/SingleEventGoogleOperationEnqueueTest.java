@@ -3,12 +3,13 @@ package com.calio.calendar.singleevent.usecase;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
-import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobEnqueueService;
+import com.calio.calendar.integration.sync.operation.GoogleOperationJobEnqueueService.OutboundOperation;
 import com.calio.calendar.sharing.event.service.PersonalEventGroupShareCommandService;
 import com.calio.calendar.singleevent.controller.dto.CreateSingleEventRequest;
 import com.calio.calendar.singleevent.controller.dto.UpdateSingleEventRequest;
@@ -42,6 +43,8 @@ class SingleEventGoogleOperationEnqueueTest {
   @DisplayName("SingleEvent 생성 후 생성 job을 enqueue한다")
   void givenCreatedSingleEvent_whenCreate_thenEnqueuesCreateJob() {
     Tag tag = tag();
+    OutboundOperation outboundOperation = mock();
+    when(jobEnqueueService.prepareOutboundOperation(ACCOUNT_ID)).thenReturn(outboundOperation);
     when(accountRepository.findById(ACCOUNT_ID)).thenReturn(Optional.of(new Account()));
     when(tagQueryService.getTagOrDefault(ACCOUNT_ID, null)).thenReturn(tag);
     when(eventRepository.save(any(SingleEvent.class)))
@@ -56,7 +59,10 @@ class SingleEventGoogleOperationEnqueueTest {
             accountRepository, eventRepository, tagQueryService, jobEnqueueService)
         .create(ACCOUNT_ID, request());
 
-    verify(jobEnqueueService).enqueueEventCreated(eq(ACCOUNT_ID), any(SingleEvent.class));
+    InOrder ordered = inOrder(jobEnqueueService, eventRepository);
+    ordered.verify(jobEnqueueService).prepareOutboundOperation(ACCOUNT_ID);
+    ordered.verify(eventRepository).save(any(SingleEvent.class));
+    ordered.verify(jobEnqueueService).enqueueEventCreated(eq(outboundOperation), any());
   }
 
   @Test
@@ -64,6 +70,8 @@ class SingleEventGoogleOperationEnqueueTest {
   void givenUpdatedSingleEvent_whenUpdate_thenFlushesAndEnqueuesUpdateJob() {
     SingleEvent event = eventWithId();
     Tag tag = tag();
+    OutboundOperation outboundOperation = mock();
+    when(jobEnqueueService.prepareOutboundOperation(ACCOUNT_ID)).thenReturn(outboundOperation);
     when(eventRepository.findByIdAndAccountIdForUpdate(EVENT_ID, ACCOUNT_ID))
         .thenReturn(Optional.of(event));
     when(tagQueryService.getTagOrDefault(ACCOUNT_ID, null)).thenReturn(tag);
@@ -72,14 +80,18 @@ class SingleEventGoogleOperationEnqueueTest {
         .update(ACCOUNT_ID, EVENT_ID, updateRequest());
 
     InOrder ordered = inOrder(eventRepository, jobEnqueueService);
+    ordered.verify(jobEnqueueService).prepareOutboundOperation(ACCOUNT_ID);
+    ordered.verify(eventRepository).findByIdAndAccountIdForUpdate(EVENT_ID, ACCOUNT_ID);
     ordered.verify(eventRepository).flush();
-    ordered.verify(jobEnqueueService).enqueueEventUpdated(ACCOUNT_ID, event);
+    ordered.verify(jobEnqueueService).enqueueEventUpdated(outboundOperation, event);
   }
 
   @Test
   @DisplayName("SingleEvent 삭제 후 삭제 job을 enqueue한다")
   void givenDeletedSingleEvent_whenDelete_thenEnqueuesDeleteJobAfterLocalDeletion() {
     SingleEvent event = eventWithId();
+    OutboundOperation outboundOperation = mock();
+    when(jobEnqueueService.prepareOutboundOperation(ACCOUNT_ID)).thenReturn(outboundOperation);
     when(eventRepository.findByIdAndAccountIdForUpdate(EVENT_ID, ACCOUNT_ID))
         .thenReturn(Optional.of(event));
 
@@ -87,9 +99,11 @@ class SingleEventGoogleOperationEnqueueTest {
         .delete(ACCOUNT_ID, EVENT_ID);
 
     InOrder ordered = inOrder(shareCommandService, eventRepository, jobEnqueueService);
+    ordered.verify(jobEnqueueService).prepareOutboundOperation(ACCOUNT_ID);
+    ordered.verify(eventRepository).findByIdAndAccountIdForUpdate(EVENT_ID, ACCOUNT_ID);
     ordered.verify(shareCommandService).deleteAllForSourceEvent(EVENT_ID);
     ordered.verify(eventRepository).delete(event);
-    ordered.verify(jobEnqueueService).enqueueEventDeleted(ACCOUNT_ID, EVENT_ID);
+    ordered.verify(jobEnqueueService).enqueueEventDeleted(outboundOperation, EVENT_ID);
   }
 
   private CreateSingleEventRequest request() {

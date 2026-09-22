@@ -3,6 +3,7 @@ package com.calio.calendar.singleevent.usecase;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobEnqueueService;
+import com.calio.calendar.integration.sync.operation.GoogleOperationJobEnqueueService.OutboundOperation;
 import com.calio.calendar.singleevent.controller.dto.EventResponse;
 import com.calio.calendar.singleevent.controller.dto.UpdateSingleEventRequest;
 import com.calio.calendar.singleevent.domain.SingleEvent;
@@ -32,6 +33,7 @@ public class UpdateSingleEventUseCase {
 
   @Transactional
   public EventResponse update(Long accountId, Long eventId, UpdateSingleEventRequest request) {
+    OutboundOperation outboundOperation = jobEnqueueService.prepareOutboundOperation(accountId);
     SingleEvent event =
         eventRepository
             .findByIdAndAccountIdForUpdate(eventId, accountId)
@@ -44,7 +46,7 @@ public class UpdateSingleEventUseCase {
             request.startAt(), request.endAt(), request.allDay(), request.timeZone()));
     event.changeTag(tag.getId());
     eventRepository.flush();
-    jobEnqueueService.enqueueEventUpdated(accountId, event);
+    jobEnqueueService.enqueueEventUpdated(outboundOperation, event);
     return EventResponse.from(event, tag);
   }
 }

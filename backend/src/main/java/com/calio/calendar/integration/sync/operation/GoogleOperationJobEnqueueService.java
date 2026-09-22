@@ -17,12 +17,24 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 public class GoogleOperationJobEnqueueService {
+
+  public static final class OutboundOperation {
+
+    private final Long accountId;
+    private final GoogleCalendarIntegration integration;
+
+    private OutboundOperation(Long accountId, GoogleCalendarIntegration integration) {
+      this.accountId = accountId;
+      this.integration = integration;
+    }
+  }
 
   private final GoogleCalendarConnectionCommandService connectionCommandService;
   private final GoogleCalendarIntegrationCommandService integrationCommandService;
@@ -69,32 +81,38 @@ public class GoogleOperationJobEnqueueService {
     wakeAfterCommit(accountId);
   }
 
-  @Transactional
-  public boolean enqueueEventCreated(Long accountId, SingleEvent event) {
-    return enqueueEventSnapshot(accountId, event, GoogleCalendarEventJobKind.CREATE);
+  @Transactional(propagation = Propagation.MANDATORY)
+  public OutboundOperation prepareOutboundOperation(Long accountId) {
+    return new OutboundOperation(
+        accountId, integrationCommandService.tryLockIntegration(accountId).orElse(null));
   }
 
-  @Transactional
-  public boolean enqueueEventUpdated(Long accountId, SingleEvent event) {
-    return enqueueEventSnapshot(accountId, event, GoogleCalendarEventJobKind.UPDATE);
+  @Transactional(propagation = Propagation.MANDATORY)
+  public boolean enqueueEventCreated(OutboundOperation operation, SingleEvent event) {
+    return enqueueEventSnapshot(operation, event, GoogleCalendarEventJobKind.CREATE);
   }
 
-  @Transactional
-  public boolean enqueueEventDeleted(Long accountId, Long eventId) {
-    return enqueueEventJob(accountId, eventId, GoogleCalendarEventJobKind.DELETE, null);
+  @Transactional(propagation = Propagation.MANDATORY)
+  public boolean enqueueEventUpdated(OutboundOperation operation, SingleEvent event) {
+    return enqueueEventSnapshot(operation, event, GoogleCalendarEventJobKind.UPDATE);
+  }
+
+  @Transactional(propagation = Propagation.MANDATORY)
+  public boolean enqueueEventDeleted(OutboundOperation operation, Long eventId) {
+    return enqueueEventJob(operation, eventId, GoogleCalendarEventJobKind.DELETE, null);
   }
 
   private boolean enqueueEventSnapshot(
-      Long accountId, SingleEvent event, GoogleCalendarEventJobKind kind) {
-    return enqueueEventJob(accountId, event.getId(), kind, GoogleEventJobPayload.from(event));
+      OutboundOperation operation, SingleEvent event, GoogleCalendarEventJobKind kind) {
+    return enqueueEventJob(operation, event.getId(), kind, GoogleEventJobPayload.from(event));
   }
 
   private boolean enqueueEventJob(
-      Long accountId,
+      OutboundOperation operation,
       Long eventId,
       GoogleCalendarEventJobKind kind,
       GoogleEventJobPayload targetPayload) {
-    var integration = integrationCommandService.tryLockIntegration(accountId).orElse(null);
+    GoogleCalendarIntegration integration = operation.integration;
     if (integration == null) {
       return false;
     }
@@ -103,7 +121,7 @@ public class GoogleOperationJobEnqueueService {
         GoogleCalendarEventJob.create(
             operationId,
             integration.getId(),
-            accountId,
+            operation.accountId,
             integration.allocateGoogleOperationSequence(),
             kind,
             eventId,
@@ -111,48 +129,48 @@ public class GoogleOperationJobEnqueueService {
             targetPayload,
             Instant.now(clock));
     jobCommandService.enqueueOperationJob(job);
-    wakeAfterCommit(accountId);
+    wakeAfterCommit(operation.accountId);
     return true;
   }
 
-  @Transactional
+  @Transactional(propagation = Propagation.MANDATORY)
   public boolean enqueueRecurrence(
-      Long accountId,
+      OutboundOperation operation,
       Long recurrenceEventId,
       GoogleCalendarRecurrenceJobKind kind,
       GoogleRecurrenceJobPayload payload) {
-    return enqueueRecurrenceJob(accountId, recurrenceEventId, kind, null, payload);
+    return enqueueRecurrenceJob(operation, recurrenceEventId, kind, null, payload);
   }
 
-  @Transactional
-  public boolean enqueueRecurrenceDeleted(Long accountId, Long recurrenceEventId) {
+  @Transactional(propagation = Propagation.MANDATORY)
+  public boolean enqueueRecurrenceDeleted(OutboundOperation operation, Long recurrenceEventId) {
     return enqueueRecurrenceJob(
-        accountId,
+        operation,
         recurrenceEventId,
         GoogleCalendarRecurrenceJobKind.RECURRENCE_DELETE,
         null,
         null);
   }
 
-  @Transactional
+  @Transactional(propagation = Propagation.MANDATORY)
   public boolean enqueueRecurrenceOverride(
-      Long accountId,
+      OutboundOperation operation,
       Long recurrenceEventId,
       Instant originStartAt,
       GoogleRecurrenceOverrideJobPayload payload) {
     return enqueueRecurrenceJob(
-        accountId,
+        operation,
         recurrenceEventId,
         GoogleCalendarRecurrenceJobKind.OVERRIDE_UPSERT,
         originStartAt,
         GoogleRecurrenceJobPayload.from(payload));
   }
 
-  @Transactional
+  @Transactional(propagation = Propagation.MANDATORY)
   public boolean enqueueRecurrenceOverrideDeleted(
-      Long accountId, Long recurrenceEventId, Instant originStartAt) {
+      OutboundOperation operation, Long recurrenceEventId, Instant originStartAt) {
     return enqueueRecurrenceJob(
-        accountId,
+        operation,
         recurrenceEventId,
         GoogleCalendarRecurrenceJobKind.OVERRIDE_DELETE,
         originStartAt,
@@ -160,12 +178,12 @@ public class GoogleOperationJobEnqueueService {
   }
 
   private boolean enqueueRecurrenceJob(
-      Long accountId,
+      OutboundOperation operation,
       Long recurrenceEventId,
       GoogleCalendarRecurrenceJobKind kind,
       Instant originStartAt,
       GoogleRecurrenceJobPayload targetPayload) {
-    var integration = integrationCommandService.tryLockIntegration(accountId).orElse(null);
+    GoogleCalendarIntegration integration = operation.integration;
     if (integration == null) {
       return false;
     }
@@ -174,7 +192,7 @@ public class GoogleOperationJobEnqueueService {
         GoogleCalendarRecurrenceJob.create(
             operationId,
             integration.getId(),
-            accountId,
+            operation.accountId,
             integration.allocateGoogleOperationSequence(),
             kind,
             recurrenceEventId,
@@ -185,7 +203,7 @@ public class GoogleOperationJobEnqueueService {
                 : null,
             Instant.now(clock));
     jobCommandService.enqueueOperationJob(job);
-    wakeAfterCommit(accountId);
+    wakeAfterCommit(operation.accountId);
     return true;
   }
 
