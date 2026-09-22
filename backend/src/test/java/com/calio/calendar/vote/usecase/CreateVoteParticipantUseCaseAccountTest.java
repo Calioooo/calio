@@ -22,9 +22,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 @ExtendWith(MockitoExtension.class)
-class CreateMyVoteParticipantUseCaseTest {
+class CreateVoteParticipantUseCaseAccountTest {
 
   private static final UUID VOTE_ROOM_PUBLIC_ID =
       UUID.fromString("7ab6b7d8-11cd-4ce2-83e3-b81ad87ea3c9");
@@ -33,13 +34,15 @@ class CreateMyVoteParticipantUseCaseTest {
 
   @Mock private VoteRoomRepository voteRoomRepository;
   @Mock private VoteParticipantRepository voteParticipantRepository;
+  @Mock private PasswordEncoder passwordEncoder;
 
-  private CreateMyVoteParticipantUseCase createMyVoteParticipantUseCase;
+  private CreateVoteParticipantUseCase createVoteParticipantUseCase;
 
   @BeforeEach
   void setUp() {
-    createMyVoteParticipantUseCase =
-        new CreateMyVoteParticipantUseCase(voteRoomRepository, voteParticipantRepository);
+    createVoteParticipantUseCase =
+        new CreateVoteParticipantUseCase(
+            voteRoomRepository, voteParticipantRepository, passwordEncoder);
   }
 
   @Test
@@ -57,7 +60,7 @@ class CreateMyVoteParticipantUseCaseTest {
     when(voteParticipantRepository.save(org.mockito.ArgumentMatchers.any(VoteParticipant.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));
 
-    createMyVoteParticipantUseCase.create(VOTE_ROOM_PUBLIC_ID, ACCOUNT_ID, "calio");
+    createVoteParticipantUseCase.create(VOTE_ROOM_PUBLIC_ID, ACCOUNT_ID, "calio");
 
     ArgumentCaptor<VoteParticipant> captor = ArgumentCaptor.forClass(VoteParticipant.class);
     verify(voteParticipantRepository).save(captor.capture());
@@ -77,7 +80,7 @@ class CreateMyVoteParticipantUseCaseTest {
         .thenReturn(Optional.of(VoteParticipant.forAccount(VOTE_ROOM_ID, "calio", ACCOUNT_ID)));
 
     assertThatThrownBy(
-            () -> createMyVoteParticipantUseCase.create(VOTE_ROOM_PUBLIC_ID, ACCOUNT_ID, "calio"))
+            () -> createVoteParticipantUseCase.create(VOTE_ROOM_PUBLIC_ID, ACCOUNT_ID, "calio"))
         .isInstanceOfSatisfying(
             CalioException.class,
             exception ->

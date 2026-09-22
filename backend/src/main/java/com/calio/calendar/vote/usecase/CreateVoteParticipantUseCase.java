@@ -32,17 +32,35 @@ public class CreateVoteParticipantUseCase {
 
   @Transactional
   public VoteParticipantResponse create(UUID voteRoomPublicId, String nickname, String password) {
-    return VoteParticipantResponse.from(createParticipant(voteRoomPublicId, nickname, password));
+    return VoteParticipantResponse.from(
+        createParticipant(voteRoomPublicId, null, nickname, password));
+  }
+
+  @Transactional
+  public VoteParticipantResponse create(UUID voteRoomPublicId, Long accountId, String nickname) {
+    return VoteParticipantResponse.from(
+        createParticipant(voteRoomPublicId, accountId, nickname, null));
   }
 
   @Transactional
   public VoteParticipant createParticipant(
       UUID voteRoomPublicId, String nickname, String password) {
+    return createParticipant(voteRoomPublicId, null, nickname, password);
+  }
+
+  private VoteParticipant createParticipant(
+      UUID voteRoomPublicId, Long accountId, String nickname, String password) {
     VoteParticipantNickname normalizedNickname = VoteParticipantNickname.of(nickname);
     VoteRoom voteRoom =
         voteRoomRepository
             .findForUpdateByPublicId(voteRoomPublicId)
             .orElseThrow(() -> new CalioException(ErrorCode.VOTE_ROOM_NOT_FOUND));
+    if (accountId != null
+        && voteParticipantRepository
+            .findByVoteRoomPublicIdAndAccountId(voteRoomPublicId, accountId)
+            .isPresent()) {
+      throw new CalioException(ErrorCode.VOTE_PARTICIPANT_ALREADY_EXISTS);
+    }
     if (voteParticipantRepository
         .findByVoteRoomPublicIdAndNickname(voteRoomPublicId, normalizedNickname.value())
         .isPresent()) {
@@ -50,9 +68,15 @@ public class CreateVoteParticipantUseCase {
     }
     try {
       return voteParticipantRepository.save(
-          new VoteParticipant(voteRoom.getId(), normalizedNickname, hashPassword(password)));
+          accountId == null
+              ? new VoteParticipant(voteRoom.getId(), normalizedNickname, hashPassword(password))
+              : VoteParticipant.forAccount(voteRoom.getId(), normalizedNickname, accountId));
     } catch (DataIntegrityViolationException exception) {
-      throw new CalioException(ErrorCode.VOTE_PARTICIPANT_NICKNAME_CONFLICT, exception);
+      throw new CalioException(
+          accountId == null
+              ? ErrorCode.VOTE_PARTICIPANT_NICKNAME_CONFLICT
+              : ErrorCode.VOTE_PARTICIPANT_ALREADY_EXISTS,
+          exception);
     }
   }
 

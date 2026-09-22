@@ -9,11 +9,8 @@ import com.calio.calendar.vote.controller.dto.SubmitVoteRequest;
 import com.calio.calendar.vote.controller.dto.VoteParticipantResponse;
 import com.calio.calendar.vote.controller.dto.VoteParticipantSelectionResponse;
 import com.calio.calendar.vote.controller.dto.VoteSubmissionResponse;
-import com.calio.calendar.vote.usecase.CreateMyVoteParticipantUseCase;
 import com.calio.calendar.vote.usecase.CreateVoteParticipantUseCase;
-import com.calio.calendar.vote.usecase.LookupMyVoteParticipantSelectionUseCase;
 import com.calio.calendar.vote.usecase.LookupVoteParticipantSelectionUseCase;
-import com.calio.calendar.vote.usecase.SubmitMyVoteUseCase;
 import com.calio.calendar.vote.usecase.SubmitVoteUseCase;
 import jakarta.validation.Valid;
 import java.util.UUID;
@@ -33,25 +30,16 @@ import org.springframework.web.bind.annotation.RestController;
 public class VoteParticipantController {
 
   private final CreateVoteParticipantUseCase createVoteParticipantUseCase;
-  private final CreateMyVoteParticipantUseCase createMyVoteParticipantUseCase;
   private final SubmitVoteUseCase submitVoteUseCase;
-  private final SubmitMyVoteUseCase submitMyVoteUseCase;
   private final LookupVoteParticipantSelectionUseCase lookupVoteParticipantSelectionUseCase;
-  private final LookupMyVoteParticipantSelectionUseCase lookupMyVoteParticipantSelectionUseCase;
 
   public VoteParticipantController(
       CreateVoteParticipantUseCase createVoteParticipantUseCase,
-      CreateMyVoteParticipantUseCase createMyVoteParticipantUseCase,
       SubmitVoteUseCase submitVoteUseCase,
-      SubmitMyVoteUseCase submitMyVoteUseCase,
-      LookupVoteParticipantSelectionUseCase lookupVoteParticipantSelectionUseCase,
-      LookupMyVoteParticipantSelectionUseCase lookupMyVoteParticipantSelectionUseCase) {
+      LookupVoteParticipantSelectionUseCase lookupVoteParticipantSelectionUseCase) {
     this.createVoteParticipantUseCase = createVoteParticipantUseCase;
-    this.createMyVoteParticipantUseCase = createMyVoteParticipantUseCase;
     this.submitVoteUseCase = submitVoteUseCase;
-    this.submitMyVoteUseCase = submitMyVoteUseCase;
     this.lookupVoteParticipantSelectionUseCase = lookupVoteParticipantSelectionUseCase;
-    this.lookupMyVoteParticipantSelectionUseCase = lookupMyVoteParticipantSelectionUseCase;
   }
 
   @PostMapping("/participants")
@@ -69,8 +57,7 @@ public class VoteParticipantController {
       @Valid @RequestBody CreateMyVoteParticipantRequest request) {
     return ResponseEntity.status(HttpStatus.CREATED)
         .body(
-            createMyVoteParticipantUseCase.create(
-                publicId, account.accountId(), request.nickname()));
+            createVoteParticipantUseCase.create(publicId, account.accountId(), request.nickname()));
   }
 
   @PutMapping("/votes")
@@ -85,7 +72,7 @@ public class VoteParticipantController {
       @PathVariable UUID publicId,
       @AuthenticationPrincipal AuthenticatedAccount account,
       @Valid @RequestBody SubmitMyVoteRequest request) {
-    return submitMyVoteUseCase.submit(publicId, account.accountId(), request.unavailableDates());
+    return submitVoteUseCase.submit(publicId, account.accountId(), request.unavailableDates());
   }
 
   @PostMapping("/votes/lookup")
@@ -99,6 +86,6 @@ public class VoteParticipantController {
   @GetMapping("/participants/me")
   public VoteParticipantSelectionResponse lookupMySelection(
       @PathVariable UUID publicId, @AuthenticationPrincipal AuthenticatedAccount account) {
-    return lookupMyVoteParticipantSelectionUseCase.lookup(publicId, account.accountId());
+    return lookupVoteParticipantSelectionUseCase.lookup(publicId, account.accountId());
   }
 }

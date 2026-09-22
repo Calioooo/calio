@@ -38,18 +38,23 @@ public class SubmitVoteUseCase {
   @Transactional
   public VoteSubmissionResponse submit(
       UUID voteRoomPublicId, String nickname, String password, List<LocalDate> requestedDates) {
-    VoteParticipantNickname normalizedNickname = VoteParticipantNickname.of(nickname);
-    VoteParticipant participant =
-        voteParticipantRepository
-            .findByVoteRoomPublicIdAndNickname(voteRoomPublicId, normalizedNickname.value())
-            .orElseThrow(() -> new CalioException(ErrorCode.VOTE_PARTICIPANT_CREDENTIAL_INVALID));
-    credentialVerifier.verify(participant, password);
+    return submit(voteRoomPublicId, null, nickname, password, requestedDates);
+  }
 
+  @Transactional
+  public VoteSubmissionResponse submit(
+      UUID voteRoomPublicId, Long accountId, List<LocalDate> requestedDates) {
+    return submit(voteRoomPublicId, accountId, null, null, requestedDates);
+  }
+
+  private VoteSubmissionResponse submit(
+      UUID voteRoomPublicId,
+      Long accountId,
+      String nickname,
+      String password,
+      List<LocalDate> requestedDates) {
     VoteParticipant lockedParticipant =
-        voteParticipantRepository
-            .findByVoteRoomPublicIdAndNicknameForUpdate(
-                voteRoomPublicId, normalizedNickname.value())
-            .orElseThrow(() -> new CalioException(ErrorCode.VOTE_PARTICIPANT_CREDENTIAL_INVALID));
+        findParticipantForSubmission(voteRoomPublicId, accountId, nickname, password);
     VoteRoom voteRoom =
         voteRoomRepository
             .findById(lockedParticipant.getVoteRoomId())
@@ -63,5 +68,24 @@ public class SubmitVoteUseCase {
         unavailableDates.values().stream().map(date -> new Vote(lockedParticipant, date)).toList());
     lockedParticipant.submit();
     return VoteSubmissionResponse.from(lockedParticipant, unavailableDates.values());
+  }
+
+  private VoteParticipant findParticipantForSubmission(
+      UUID voteRoomPublicId, Long accountId, String nickname, String password) {
+    if (accountId != null) {
+      return voteParticipantRepository
+          .findByVoteRoomPublicIdAndAccountIdForUpdate(voteRoomPublicId, accountId)
+          .orElseThrow(() -> new CalioException(ErrorCode.VOTE_PARTICIPANT_CREDENTIAL_INVALID));
+    }
+
+    VoteParticipantNickname normalizedNickname = VoteParticipantNickname.of(nickname);
+    VoteParticipant participant =
+        voteParticipantRepository
+            .findByVoteRoomPublicIdAndNickname(voteRoomPublicId, normalizedNickname.value())
+            .orElseThrow(() -> new CalioException(ErrorCode.VOTE_PARTICIPANT_CREDENTIAL_INVALID));
+    credentialVerifier.verify(participant, password);
+    return voteParticipantRepository
+        .findByVoteRoomPublicIdAndNicknameForUpdate(voteRoomPublicId, normalizedNickname.value())
+        .orElseThrow(() -> new CalioException(ErrorCode.VOTE_PARTICIPANT_CREDENTIAL_INVALID));
   }
 }
