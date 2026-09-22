@@ -47,7 +47,8 @@ public class VoteParticipantController {
       @PathVariable UUID publicId, @Valid @RequestBody CreateVoteParticipantRequest request) {
     return ResponseEntity.status(HttpStatus.CREATED)
         .body(
-            createVoteParticipantUseCase.create(publicId, request.nickname(), request.password()));
+            createVoteParticipantUseCase.createForNonCalioUser(
+                publicId, request.nickname(), request.password()));
   }
 
   @PostMapping("/participants/me")
@@ -57,13 +58,14 @@ public class VoteParticipantController {
       @Valid @RequestBody CreateMyVoteParticipantRequest request) {
     return ResponseEntity.status(HttpStatus.CREATED)
         .body(
-            createVoteParticipantUseCase.create(publicId, account.accountId(), request.nickname()));
+            createVoteParticipantUseCase.createForCalioUser(
+                publicId, account.accountId(), request.nickname()));
   }
 
   @PutMapping("/votes")
   public VoteSubmissionResponse submitVotes(
       @PathVariable UUID publicId, @Valid @RequestBody SubmitVoteRequest request) {
-    return submitVoteUseCase.submit(
+    return submitVoteUseCase.submitForNonCalioUser(
         publicId, request.nickname(), request.password(), request.unavailableDates());
   }
 
@@ -72,20 +74,21 @@ public class VoteParticipantController {
       @PathVariable UUID publicId,
       @AuthenticationPrincipal AuthenticatedAccount account,
       @Valid @RequestBody SubmitMyVoteRequest request) {
-    return submitVoteUseCase.submit(publicId, account.accountId(), request.unavailableDates());
+    return submitVoteUseCase.submitForCalioUser(
+        publicId, account.accountId(), request.unavailableDates());
   }
 
   @PostMapping("/votes/lookup")
   public VoteParticipantSelectionResponse lookupSelection(
       @PathVariable UUID publicId,
       @Valid @RequestBody LookupVoteParticipantSelectionRequest request) {
-    return lookupVoteParticipantSelectionUseCase.lookup(
+    return lookupVoteParticipantSelectionUseCase.lookupForNonCalioUser(
         publicId, request.nickname(), request.password());
   }
 
   @GetMapping("/participants/me")
   public VoteParticipantSelectionResponse lookupMySelection(
       @PathVariable UUID publicId, @AuthenticationPrincipal AuthenticatedAccount account) {
-    return lookupVoteParticipantSelectionUseCase.lookup(publicId, account.accountId());
+    return lookupVoteParticipantSelectionUseCase.lookupForCalioUser(publicId, account.accountId());
   }
 }

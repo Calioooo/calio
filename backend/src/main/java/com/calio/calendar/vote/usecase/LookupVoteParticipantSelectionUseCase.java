@@ -35,13 +35,14 @@ public class LookupVoteParticipantSelectionUseCase {
   }
 
   @Transactional(readOnly = true)
-  public VoteParticipantSelectionResponse lookup(
+  public VoteParticipantSelectionResponse lookupForNonCalioUser(
       UUID voteRoomPublicId, String nickname, String password) {
     return lookup(voteRoomPublicId, null, nickname, password);
   }
 
   @Transactional(readOnly = true)
-  public VoteParticipantSelectionResponse lookup(UUID voteRoomPublicId, Long accountId) {
+  public VoteParticipantSelectionResponse lookupForCalioUser(
+      UUID voteRoomPublicId, Long accountId) {
     return lookup(voteRoomPublicId, accountId, null, null);
   }
 

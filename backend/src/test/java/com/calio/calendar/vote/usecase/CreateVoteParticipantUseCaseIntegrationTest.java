@@ -105,7 +105,8 @@ class CreateVoteParticipantUseCaseIntegrationTest {
     ready.countDown();
     start.await();
     try {
-      createVoteParticipantUseCase.createParticipant(voteRoom.getPublicId(), nickname, null);
+      createVoteParticipantUseCase.createParticipantForNonCalioUser(
+          voteRoom.getPublicId(), nickname, null);
       return new CreateResult(true, null);
     } catch (CalioException exception) {
       return new CreateResult(false, exception.getErrorCode());

@@ -36,13 +36,13 @@ public class SubmitVoteUseCase {
   }
 
   @Transactional
-  public VoteSubmissionResponse submit(
+  public VoteSubmissionResponse submitForNonCalioUser(
       UUID voteRoomPublicId, String nickname, String password, List<LocalDate> requestedDates) {
     return submit(voteRoomPublicId, null, nickname, password, requestedDates);
   }
 
   @Transactional
-  public VoteSubmissionResponse submit(
+  public VoteSubmissionResponse submitForCalioUser(
       UUID voteRoomPublicId, Long accountId, List<LocalDate> requestedDates) {
     return submit(voteRoomPublicId, accountId, null, null, requestedDates);
   }

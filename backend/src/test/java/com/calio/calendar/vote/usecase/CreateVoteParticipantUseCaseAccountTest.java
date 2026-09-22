@@ -60,7 +60,7 @@ class CreateVoteParticipantUseCaseAccountTest {
     when(voteParticipantRepository.save(org.mockito.ArgumentMatchers.any(VoteParticipant.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));
 
-    createVoteParticipantUseCase.create(VOTE_ROOM_PUBLIC_ID, ACCOUNT_ID, "calio");
+    createVoteParticipantUseCase.createForCalioUser(VOTE_ROOM_PUBLIC_ID, ACCOUNT_ID, "calio");
 
     ArgumentCaptor<VoteParticipant> captor = ArgumentCaptor.forClass(VoteParticipant.class);
     verify(voteParticipantRepository).save(captor.capture());
@@ -80,7 +80,9 @@ class CreateVoteParticipantUseCaseAccountTest {
         .thenReturn(Optional.of(VoteParticipant.forAccount(VOTE_ROOM_ID, "calio", ACCOUNT_ID)));
 
     assertThatThrownBy(
-            () -> createVoteParticipantUseCase.create(VOTE_ROOM_PUBLIC_ID, ACCOUNT_ID, "calio"))
+            () ->
+                createVoteParticipantUseCase.createForCalioUser(
+                    VOTE_ROOM_PUBLIC_ID, ACCOUNT_ID, "calio"))
         .isInstanceOfSatisfying(
             CalioException.class,
             exception ->

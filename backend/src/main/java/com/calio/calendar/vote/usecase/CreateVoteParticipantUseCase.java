@@ -31,19 +31,21 @@ public class CreateVoteParticipantUseCase {
   }
 
   @Transactional
-  public VoteParticipantResponse create(UUID voteRoomPublicId, String nickname, String password) {
+  public VoteParticipantResponse createForNonCalioUser(
+      UUID voteRoomPublicId, String nickname, String password) {
     return VoteParticipantResponse.from(
         createParticipant(voteRoomPublicId, null, nickname, password));
   }
 
   @Transactional
-  public VoteParticipantResponse create(UUID voteRoomPublicId, Long accountId, String nickname) {
+  public VoteParticipantResponse createForCalioUser(
+      UUID voteRoomPublicId, Long accountId, String nickname) {
     return VoteParticipantResponse.from(
         createParticipant(voteRoomPublicId, accountId, nickname, null));
   }
 
   @Transactional
-  public VoteParticipant createParticipant(
+  public VoteParticipant createParticipantForNonCalioUser(
       UUID voteRoomPublicId, String nickname, String password) {
     return createParticipant(voteRoomPublicId, null, nickname, password);
   }
