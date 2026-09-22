@@ -110,17 +110,19 @@ class VoteRoomUseCaseTest {
   }
 
   @Test
-  @DisplayName("후보 시작일과 종료일이 같으면 VoteRoom을 생성하지 않는다")
-  void givenCandidateStartDateEqualToEndDate_whenCreate_thenRejectsBeforeAccountLookup() {
-    assertThatThrownBy(
-            () -> createVoteRoomUseCase.create(ACCOUNT_ID, "여행 일정", KOREA_TODAY, KOREA_TODAY))
-        .isInstanceOfSatisfying(
-            CalioException.class,
-            exception ->
-                assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.VALIDATION_FAILED));
+  @DisplayName("후보 시작일과 종료일이 같으면 하루짜리 VoteRoom을 생성한다")
+  void givenSingleDayCandidatePeriod_whenCreate_thenCreatesVoteRoom() {
+    Account account = new Account();
+    when(accountRepository.findById(ACCOUNT_ID)).thenReturn(Optional.of(account));
+    when(voteRoomRepository.save(org.mockito.ArgumentMatchers.any(VoteRoom.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
 
-    verify(accountRepository, never()).findById(ACCOUNT_ID);
-    verify(voteRoomRepository, never()).save(org.mockito.ArgumentMatchers.any());
+    createVoteRoomUseCase.create(ACCOUNT_ID, "하루 일정", KOREA_TODAY, KOREA_TODAY);
+
+    ArgumentCaptor<VoteRoom> voteRoomCaptor = ArgumentCaptor.forClass(VoteRoom.class);
+    verify(voteRoomRepository).save(voteRoomCaptor.capture());
+    assertThat(voteRoomCaptor.getValue().getCandidateStartDate()).isEqualTo(KOREA_TODAY);
+    assertThat(voteRoomCaptor.getValue().getCandidateEndDate()).isEqualTo(KOREA_TODAY);
   }
 
   @Test

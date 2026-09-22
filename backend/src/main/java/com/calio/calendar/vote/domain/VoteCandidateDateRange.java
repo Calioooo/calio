@@ -28,7 +28,7 @@ public class VoteCandidateDateRange {
       LocalDate candidateStartDate, LocalDate candidateEndDate) {
     if (candidateStartDate == null
         || candidateEndDate == null
-        || !candidateEndDate.isAfter(candidateStartDate)
+        || candidateEndDate.isBefore(candidateStartDate)
         || candidateEndDate.isAfter(candidateStartDate.plusDays(MAX_CANDIDATE_DAYS - 1))) {
       throw new CalioException(ErrorCode.VALIDATION_FAILED);
     }
