@@ -38,7 +38,6 @@ class VoteParticipantUseCaseTest {
   private static final UUID VOTE_ROOM_PUBLIC_ID =
       UUID.fromString("7ab6b7d8-11cd-4ce2-83e3-b81ad87ea3c9");
   private static final Long VOTE_ROOM_ID = 1L;
-  private static final Long ACCOUNT_ID = 2L;
 
   @Mock private VoteRoomRepository voteRoomRepository;
   @Mock private VoteParticipantRepository voteParticipantRepository;
@@ -79,8 +78,7 @@ class VoteParticipantUseCaseTest {
         .thenAnswer(invocation -> invocation.getArgument(0));
 
     VoteParticipant participant =
-        createVoteParticipantUseCase.createParticipantForNonCalioUser(
-            VOTE_ROOM_PUBLIC_ID, "calio", null);
+        createVoteParticipantUseCase.createParticipant(VOTE_ROOM_PUBLIC_ID, null, "calio", null);
 
     ArgumentCaptor<VoteParticipant> captor = ArgumentCaptor.forClass(VoteParticipant.class);
     verify(voteParticipantRepository).save(captor.capture());
@@ -103,8 +101,8 @@ class VoteParticipantUseCaseTest {
         .thenAnswer(invocation -> invocation.getArgument(0));
 
     VoteParticipant participant =
-        createVoteParticipantUseCase.createParticipantForNonCalioUser(
-            VOTE_ROOM_PUBLIC_ID, "calio", "participant-password");
+        createVoteParticipantUseCase.createParticipant(
+            VOTE_ROOM_PUBLIC_ID, null, "calio", "participant-password");
 
     assertThat(participant.getPasswordHash()).isNotEqualTo("participant-password");
     assertThat(passwordEncoder.matches("participant-password", participant.getPasswordHash()))
@@ -126,8 +124,8 @@ class VoteParticipantUseCaseTest {
         .thenAnswer(invocation -> invocation.getArgument(0));
 
     VoteParticipant participant =
-        createVoteParticipantUseCase.createParticipantForNonCalioUser(
-            VOTE_ROOM_PUBLIC_ID, decomposedNickname, null);
+        createVoteParticipantUseCase.createParticipant(
+            VOTE_ROOM_PUBLIC_ID, null, decomposedNickname, null);
 
     verify(voteParticipantRepository)
         .findByVoteRoomPublicIdAndNickname(VOTE_ROOM_PUBLIC_ID, normalizedNickname);
@@ -145,8 +143,8 @@ class VoteParticipantUseCaseTest {
 
     assertThatThrownBy(
             () ->
-                createVoteParticipantUseCase.createParticipantForNonCalioUser(
-                    VOTE_ROOM_PUBLIC_ID, "Calio", "participant-password"))
+                createVoteParticipantUseCase.createParticipant(
+                    VOTE_ROOM_PUBLIC_ID, null, "Calio", "participant-password"))
         .isInstanceOfSatisfying(
             CalioException.class,
             exception ->
@@ -160,8 +158,8 @@ class VoteParticipantUseCaseTest {
   void givenInvalidNickname_whenCreate_thenRejectsBeforeVoteRoomLookup() {
     assertThatThrownBy(
             () ->
-                createVoteParticipantUseCase.createParticipantForNonCalioUser(
-                    VOTE_ROOM_PUBLIC_ID, "calio-user", null))
+                createVoteParticipantUseCase.createParticipant(
+                    VOTE_ROOM_PUBLIC_ID, null, "calio-user", null))
         .isInstanceOfSatisfying(
             CalioException.class,
             exception ->
@@ -178,8 +176,8 @@ class VoteParticipantUseCaseTest {
 
     assertThatThrownBy(
             () ->
-                createVoteParticipantUseCase.createParticipantForNonCalioUser(
-                    VOTE_ROOM_PUBLIC_ID, "calio", null))
+                createVoteParticipantUseCase.createParticipant(
+                    VOTE_ROOM_PUBLIC_ID, null, "calio", null))
         .isInstanceOfSatisfying(
             CalioException.class,
             exception ->
@@ -199,7 +197,7 @@ class VoteParticipantUseCaseTest {
 
     assertThatThrownBy(
             () ->
-                submitVoteUseCase.submitForNonCalioUser(
+                submitVoteUseCase.submit(
                     VOTE_ROOM_PUBLIC_ID, "calio", "wrong", List.of(LocalDate.of(2026, 8, 15))))
         .isInstanceOfSatisfying(
             CalioException.class,
@@ -224,7 +222,7 @@ class VoteParticipantUseCaseTest {
         .thenReturn(Optional.of(participant));
     when(voteRoomRepository.findById(VOTE_ROOM_ID)).thenReturn(Optional.of(voteRoom));
 
-    submitVoteUseCase.submitForNonCalioUser(
+    submitVoteUseCase.submit(
         VOTE_ROOM_PUBLIC_ID, "calio", "secret", List.of(LocalDate.of(2026, 8, 15)));
 
     InOrder inOrder =
@@ -239,49 +237,6 @@ class VoteParticipantUseCaseTest {
     inOrder.verify(voteRoomRepository).findById(VOTE_ROOM_ID);
     inOrder.verify(voteRepository).deleteAllByVoteParticipantId(participant.getId());
     assertThat(participant.getStatus()).isEqualTo(VoteParticipantStatus.SUBMITTED);
-  }
-
-  @Test
-  @DisplayName("인증 사용자의 투표 제출은 accountId로 참여자를 잠그고 비밀번호를 검증하지 않는다")
-  void givenAccountParticipant_whenSubmitVotes_thenUsesAccountIdWithoutCredentialVerification() {
-    VoteParticipant participant = VoteParticipant.forAccount(VOTE_ROOM_ID, "calio", ACCOUNT_ID);
-    VoteRoom voteRoom = voteRoom();
-    when(voteParticipantRepository.findByVoteRoomPublicIdAndAccountIdForUpdate(
-            VOTE_ROOM_PUBLIC_ID, ACCOUNT_ID))
-        .thenReturn(Optional.of(participant));
-    when(voteRoomRepository.findById(VOTE_ROOM_ID)).thenReturn(Optional.of(voteRoom));
-
-    submitVoteUseCase.submitForCalioUser(
-        VOTE_ROOM_PUBLIC_ID, ACCOUNT_ID, List.of(LocalDate.of(2026, 8, 15)));
-
-    verify(voteParticipantRepository)
-        .findByVoteRoomPublicIdAndAccountIdForUpdate(VOTE_ROOM_PUBLIC_ID, ACCOUNT_ID);
-    verify(voteParticipantRepository, never())
-        .findByVoteRoomPublicIdAndNickname(VOTE_ROOM_PUBLIC_ID, "calio");
-    verifyNoInteractions(credentialVerifier);
-    assertThat(participant.getStatus()).isEqualTo(VoteParticipantStatus.SUBMITTED);
-  }
-
-  @Test
-  @DisplayName("인증 사용자의 선택 조회는 accountId로 참여자를 찾고 비밀번호를 검증하지 않는다")
-  void givenAccountParticipant_whenLookup_thenUsesAccountIdWithoutCredentialVerification() {
-    VoteRoom voteRoom = voteRoom();
-    VoteParticipant participant = VoteParticipant.forAccount(VOTE_ROOM_ID, "calio", ACCOUNT_ID);
-    when(voteRoomRepository.findByPublicId(VOTE_ROOM_PUBLIC_ID)).thenReturn(Optional.of(voteRoom));
-    when(voteParticipantRepository.findByVoteRoomPublicIdAndAccountId(
-            VOTE_ROOM_PUBLIC_ID, ACCOUNT_ID))
-        .thenReturn(Optional.of(participant));
-
-    var response =
-        lookupVoteParticipantSelectionUseCase.lookupForCalioUser(VOTE_ROOM_PUBLIC_ID, ACCOUNT_ID);
-
-    assertThat(response.nickname()).isEqualTo("calio");
-    assertThat(response.status()).isEqualTo(VoteParticipantStatus.REGISTERED);
-    verify(voteParticipantRepository)
-        .findByVoteRoomPublicIdAndAccountId(VOTE_ROOM_PUBLIC_ID, ACCOUNT_ID);
-    verify(voteParticipantRepository, never())
-        .findByVoteRoomPublicIdAndNickname(VOTE_ROOM_PUBLIC_ID, "calio");
-    verifyNoInteractions(credentialVerifier);
   }
 
   private VoteRoom voteRoom() {

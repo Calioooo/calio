@@ -4,7 +4,6 @@ import static com.calio.calendar.security.TestAccountSupport.currentAccountId;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.anonymous;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -30,6 +29,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest(
@@ -74,13 +74,14 @@ class AuthenticatedVoteParticipantControllerTest {
   }
 
   @Test
-  @DisplayName("인증 사용자는 비밀번호 없이 참여자를 만들고 기존 선택을 조회 및 수정한다")
-  void authenticatedParticipantCreatesLooksUpAndSubmitsVotesWithoutPassword() throws Exception {
+  @DisplayName("인증 사용자는 nickname과 선택적 password로 참여자를 만들고 공통 API로 기존 선택을 조회 및 수정한다")
+  void authenticatedParticipantCreatesLooksUpAndSubmitsVotesWithCommonCredentials()
+      throws Exception {
     mockMvc
         .perform(
             post("/api/vote-rooms/{publicId}/participants/me", voteRoom.getPublicId())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"nickname\":\"calio\"}"))
+                .content("{\"nickname\":\"calio\",\"password\":\"secret\"}"))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.nickname").value("calio"))
         .andExpect(jsonPath("$.status").value("REGISTERED"))
@@ -89,13 +90,19 @@ class AuthenticatedVoteParticipantControllerTest {
         .andExpect(jsonPath("$.accountId").doesNotExist());
 
     VoteParticipant participant =
-        participantRepository
-            .findByVoteRoomPublicIdAndAccountId(voteRoom.getPublicId(), authenticatedAccountId)
+        participantRepository.findAll().stream()
+            .filter(candidate -> candidate.getNickname().equals("calio"))
+            .findFirst()
             .orElseThrow();
-    assertThat(participant.getPasswordHash()).isNull();
+    assertThat(participant.getAccountId()).isEqualTo(authenticatedAccountId);
+    assertThat(new BCryptPasswordEncoder().matches("secret", participant.getPasswordHash()))
+        .isTrue();
 
     mockMvc
-        .perform(get("/api/vote-rooms/{publicId}/participants/me", voteRoom.getPublicId()))
+        .perform(
+            post("/api/vote-rooms/{publicId}/votes/lookup", voteRoom.getPublicId())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"nickname\":\"calio\",\"password\":\"secret\"}"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.status").value("REGISTERED"))
         .andExpect(jsonPath("$.unavailableDates", hasSize(0)))
@@ -104,9 +111,10 @@ class AuthenticatedVoteParticipantControllerTest {
 
     mockMvc
         .perform(
-            put("/api/vote-rooms/{publicId}/participants/me/votes", voteRoom.getPublicId())
+            put("/api/vote-rooms/{publicId}/votes", voteRoom.getPublicId())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"unavailableDates\":[\"2026-08-17\",\"2026-08-15\",\"2026-08-17\"]}"))
+                .content(
+                    "{\"nickname\":\"calio\",\"password\":\"secret\",\"unavailableDates\":[\"2026-08-17\",\"2026-08-15\",\"2026-08-17\"]}"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.status").value("SUBMITTED"))
         .andExpect(jsonPath("$.unavailableDates", hasSize(2)))
@@ -117,9 +125,10 @@ class AuthenticatedVoteParticipantControllerTest {
 
     mockMvc
         .perform(
-            put("/api/vote-rooms/{publicId}/participants/me/votes", voteRoom.getPublicId())
+            put("/api/vote-rooms/{publicId}/votes", voteRoom.getPublicId())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"unavailableDates\":[]}"))
+                .content(
+                    "{\"nickname\":\"calio\",\"password\":\"secret\",\"unavailableDates\":[]}"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.status").value("SUBMITTED"))
         .andExpect(jsonPath("$.unavailableDates", hasSize(0)));
@@ -127,45 +136,38 @@ class AuthenticatedVoteParticipantControllerTest {
   }
 
   @Test
-  @DisplayName("인증 사용자는 같은 투표방에 두 번째 참여자를 만들 수 없다")
-  void authenticatedParticipantCannotCreateDuplicateAccountParticipant() throws Exception {
-    participantRepository.saveAndFlush(
-        VoteParticipant.forAccount(voteRoom.getId(), "first", authenticatedAccountId));
+  @DisplayName("인증 사용자는 같은 투표방에 nickname이 다른 여러 참여자를 만들 수 있다")
+  void authenticatedParticipantCanCreateMultipleParticipantsWithDifferentNicknames()
+      throws Exception {
+    mockMvc
+        .perform(
+            post("/api/vote-rooms/{publicId}/participants/me", voteRoom.getPublicId())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"nickname\":\"first\"}"))
+        .andExpect(status().isCreated());
 
     mockMvc
         .perform(
             post("/api/vote-rooms/{publicId}/participants/me", voteRoom.getPublicId())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"nickname\":\"second\"}"))
-        .andExpect(status().isConflict())
-        .andExpect(jsonPath("$.errorCode").value("VOTE_PARTICIPANT_ALREADY_EXISTS"));
+                .content("{\"nickname\":\"second\",\"password\":\"secret\"}"))
+        .andExpect(status().isCreated());
+
+    assertThat(participantRepository.findAll())
+        .filteredOn(participant -> authenticatedAccountId.equals(participant.getAccountId()))
+        .extracting(VoteParticipant::getNickname)
+        .containsExactlyInAnyOrder("first", "second");
   }
 
   @Test
-  @DisplayName("인증 없는 요청은 인증 사용자 참여 API를 사용할 수 없다")
-  void unauthenticatedRequestCannotUseAuthenticatedParticipantEndpoints() throws Exception {
+  @DisplayName("인증 없는 요청은 accountId 연결 참여자 생성 API를 사용할 수 없다")
+  void unauthenticatedRequestCannotCreateAccountLinkedParticipant() throws Exception {
     mockMvc
         .perform(
             post("/api/vote-rooms/{publicId}/participants/me", voteRoom.getPublicId())
                 .with(anonymous())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"nickname\":\"calio\"}"))
-        .andExpect(status().isUnauthorized())
-        .andExpect(jsonPath("$.errorCode").value("AUTH_TOKEN_REQUIRED"));
-
-    mockMvc
-        .perform(
-            get("/api/vote-rooms/{publicId}/participants/me", voteRoom.getPublicId())
-                .with(anonymous()))
-        .andExpect(status().isUnauthorized())
-        .andExpect(jsonPath("$.errorCode").value("AUTH_TOKEN_REQUIRED"));
-
-    mockMvc
-        .perform(
-            put("/api/vote-rooms/{publicId}/participants/me/votes", voteRoom.getPublicId())
-                .with(anonymous())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"unavailableDates\":[]}"))
         .andExpect(status().isUnauthorized())
         .andExpect(jsonPath("$.errorCode").value("AUTH_TOKEN_REQUIRED"));
   }

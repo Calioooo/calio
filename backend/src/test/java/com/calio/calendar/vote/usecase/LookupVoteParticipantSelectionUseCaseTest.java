@@ -74,8 +74,7 @@ class LookupVoteParticipantSelectionUseCaseTest {
 
     // when
     var response =
-        lookupVoteParticipantSelectionUseCase.lookupForNonCalioUser(
-            VOTE_ROOM_PUBLIC_ID, "calio", "secret");
+        lookupVoteParticipantSelectionUseCase.lookup(VOTE_ROOM_PUBLIC_ID, "calio", "secret");
 
     // then
     assertThat(response.nickname()).isEqualTo("calio");
@@ -95,9 +94,7 @@ class LookupVoteParticipantSelectionUseCaseTest {
         .thenReturn(Optional.of(participant));
 
     // when
-    var response =
-        lookupVoteParticipantSelectionUseCase.lookupForNonCalioUser(
-            VOTE_ROOM_PUBLIC_ID, "calio", null);
+    var response = lookupVoteParticipantSelectionUseCase.lookup(VOTE_ROOM_PUBLIC_ID, "calio", null);
 
     // then
     assertThat(response.status()).isEqualTo(VoteParticipantStatus.REGISTERED);
@@ -114,9 +111,7 @@ class LookupVoteParticipantSelectionUseCaseTest {
 
     // when, then
     assertThatThrownBy(
-            () ->
-                lookupVoteParticipantSelectionUseCase.lookupForNonCalioUser(
-                    VOTE_ROOM_PUBLIC_ID, "calio", null))
+            () -> lookupVoteParticipantSelectionUseCase.lookup(VOTE_ROOM_PUBLIC_ID, "calio", null))
         .isInstanceOfSatisfying(
             CalioException.class,
             exception ->
