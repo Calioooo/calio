@@ -4,7 +4,6 @@ import com.calio.calendar.security.AuthenticatedAccount;
 import com.calio.calendar.vote.controller.dto.CreateMyVoteParticipantRequest;
 import com.calio.calendar.vote.controller.dto.CreateVoteParticipantRequest;
 import com.calio.calendar.vote.controller.dto.LookupVoteParticipantSelectionRequest;
-import com.calio.calendar.vote.controller.dto.SubmitMyVoteRequest;
 import com.calio.calendar.vote.controller.dto.SubmitVoteRequest;
 import com.calio.calendar.vote.controller.dto.VoteParticipantResponse;
 import com.calio.calendar.vote.controller.dto.VoteParticipantSelectionResponse;
@@ -17,7 +16,6 @@ import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -47,8 +45,8 @@ public class VoteParticipantController {
       @PathVariable UUID publicId, @Valid @RequestBody CreateVoteParticipantRequest request) {
     return ResponseEntity.status(HttpStatus.CREATED)
         .body(
-            createVoteParticipantUseCase.createForNonCalioUser(
-                publicId, request.nickname(), request.password()));
+            createVoteParticipantUseCase.create(
+                publicId, null, request.nickname(), request.password()));
   }
 
   @PostMapping("/participants/me")
@@ -58,37 +56,22 @@ public class VoteParticipantController {
       @Valid @RequestBody CreateMyVoteParticipantRequest request) {
     return ResponseEntity.status(HttpStatus.CREATED)
         .body(
-            createVoteParticipantUseCase.createForCalioUser(
-                publicId, account.accountId(), request.nickname()));
+            createVoteParticipantUseCase.create(
+                publicId, account.accountId(), request.nickname(), request.password()));
   }
 
   @PutMapping("/votes")
   public VoteSubmissionResponse submitVotes(
       @PathVariable UUID publicId, @Valid @RequestBody SubmitVoteRequest request) {
-    return submitVoteUseCase.submitForNonCalioUser(
+    return submitVoteUseCase.submit(
         publicId, request.nickname(), request.password(), request.unavailableDates());
-  }
-
-  @PutMapping("/participants/me/votes")
-  public VoteSubmissionResponse submitMyVotes(
-      @PathVariable UUID publicId,
-      @AuthenticationPrincipal AuthenticatedAccount account,
-      @Valid @RequestBody SubmitMyVoteRequest request) {
-    return submitVoteUseCase.submitForCalioUser(
-        publicId, account.accountId(), request.unavailableDates());
   }
 
   @PostMapping("/votes/lookup")
   public VoteParticipantSelectionResponse lookupSelection(
       @PathVariable UUID publicId,
       @Valid @RequestBody LookupVoteParticipantSelectionRequest request) {
-    return lookupVoteParticipantSelectionUseCase.lookupForNonCalioUser(
+    return lookupVoteParticipantSelectionUseCase.lookup(
         publicId, request.nickname(), request.password());
-  }
-
-  @GetMapping("/participants/me")
-  public VoteParticipantSelectionResponse lookupMySelection(
-      @PathVariable UUID publicId, @AuthenticationPrincipal AuthenticatedAccount account) {
-    return lookupVoteParticipantSelectionUseCase.lookupForCalioUser(publicId, account.accountId());
   }
 }

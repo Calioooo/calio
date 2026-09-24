@@ -35,34 +35,16 @@ public class LookupVoteParticipantSelectionUseCase {
   }
 
   @Transactional(readOnly = true)
-  public VoteParticipantSelectionResponse lookupForNonCalioUser(
+  public VoteParticipantSelectionResponse lookup(
       UUID voteRoomPublicId, String nickname, String password) {
-    return lookup(voteRoomPublicId, null, nickname, password);
-  }
-
-  @Transactional(readOnly = true)
-  public VoteParticipantSelectionResponse lookupForCalioUser(
-      UUID voteRoomPublicId, Long accountId) {
-    return lookup(voteRoomPublicId, accountId, null, null);
-  }
-
-  private VoteParticipantSelectionResponse lookup(
-      UUID voteRoomPublicId, Long accountId, String nickname, String password) {
     voteRoomRepository
         .findByPublicId(voteRoomPublicId)
         .orElseThrow(() -> new CalioException(ErrorCode.VOTE_ROOM_NOT_FOUND));
-    VoteParticipant participant = findParticipant(voteRoomPublicId, accountId, nickname, password);
+    VoteParticipant participant = findParticipant(voteRoomPublicId, nickname, password);
     return VoteParticipantSelectionResponse.from(participant, getUnavailableDates(participant));
   }
 
-  private VoteParticipant findParticipant(
-      UUID voteRoomPublicId, Long accountId, String nickname, String password) {
-    if (accountId != null) {
-      return voteParticipantRepository
-          .findByVoteRoomPublicIdAndAccountId(voteRoomPublicId, accountId)
-          .orElseThrow(() -> new CalioException(ErrorCode.VOTE_PARTICIPANT_CREDENTIAL_INVALID));
-    }
-
+  private VoteParticipant findParticipant(UUID voteRoomPublicId, String nickname, String password) {
     VoteParticipant participant =
         voteParticipantRepository
             .findByVoteRoomPublicIdAndNickname(

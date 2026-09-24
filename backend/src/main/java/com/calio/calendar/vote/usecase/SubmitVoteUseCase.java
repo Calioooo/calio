@@ -36,25 +36,10 @@ public class SubmitVoteUseCase {
   }
 
   @Transactional
-  public VoteSubmissionResponse submitForNonCalioUser(
+  public VoteSubmissionResponse submit(
       UUID voteRoomPublicId, String nickname, String password, List<LocalDate> requestedDates) {
-    return submit(voteRoomPublicId, null, nickname, password, requestedDates);
-  }
-
-  @Transactional
-  public VoteSubmissionResponse submitForCalioUser(
-      UUID voteRoomPublicId, Long accountId, List<LocalDate> requestedDates) {
-    return submit(voteRoomPublicId, accountId, null, null, requestedDates);
-  }
-
-  private VoteSubmissionResponse submit(
-      UUID voteRoomPublicId,
-      Long accountId,
-      String nickname,
-      String password,
-      List<LocalDate> requestedDates) {
     VoteParticipant lockedParticipant =
-        findParticipantForSubmission(voteRoomPublicId, accountId, nickname, password);
+        findParticipantForSubmission(voteRoomPublicId, nickname, password);
     VoteRoom voteRoom =
         voteRoomRepository
             .findById(lockedParticipant.getVoteRoomId())
@@ -71,13 +56,7 @@ public class SubmitVoteUseCase {
   }
 
   private VoteParticipant findParticipantForSubmission(
-      UUID voteRoomPublicId, Long accountId, String nickname, String password) {
-    if (accountId != null) {
-      return voteParticipantRepository
-          .findByVoteRoomPublicIdAndAccountIdForUpdate(voteRoomPublicId, accountId)
-          .orElseThrow(() -> new CalioException(ErrorCode.VOTE_PARTICIPANT_CREDENTIAL_INVALID));
-    }
-
+      UUID voteRoomPublicId, String nickname, String password) {
     VoteParticipantNickname normalizedNickname = VoteParticipantNickname.of(nickname);
     VoteParticipant participant =
         voteParticipantRepository

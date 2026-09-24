@@ -23,29 +23,6 @@ public interface VoteParticipantRepository extends JpaRepository<VoteParticipant
   Optional<VoteParticipant> findByVoteRoomPublicIdAndNickname(
       @Param("voteRoomPublicId") UUID voteRoomPublicId, @Param("nickname") String nickname);
 
-  @Query(
-      """
-            select participant
-            from VoteParticipant participant
-            join VoteRoom voteRoom on participant.voteRoomId = voteRoom.id
-            where voteRoom.publicId = :voteRoomPublicId
-              and participant.accountId = :accountId
-            """)
-  Optional<VoteParticipant> findByVoteRoomPublicIdAndAccountId(
-      @Param("voteRoomPublicId") UUID voteRoomPublicId, @Param("accountId") Long accountId);
-
-  @Lock(LockModeType.PESSIMISTIC_WRITE)
-  @Query(
-      """
-            select participant
-            from VoteParticipant participant
-            join VoteRoom voteRoom on participant.voteRoomId = voteRoom.id
-            where voteRoom.publicId = :voteRoomPublicId
-              and participant.accountId = :accountId
-            """)
-  Optional<VoteParticipant> findByVoteRoomPublicIdAndAccountIdForUpdate(
-      @Param("voteRoomPublicId") UUID voteRoomPublicId, @Param("accountId") Long accountId);
-
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query(
       """
