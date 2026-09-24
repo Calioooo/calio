@@ -16,14 +16,10 @@ import jakarta.persistence.UniqueConstraint;
 @Entity
 @Table(
     name = "vote_participants",
-    uniqueConstraints = {
-      @UniqueConstraint(
-          name = "uk_vote_participant_room_nickname",
-          columnNames = {"vote_room_id", "nickname"}),
-      @UniqueConstraint(
-          name = "uk_vote_participant_room_account",
-          columnNames = {"vote_room_id", "account_id"})
-    })
+    uniqueConstraints =
+        @UniqueConstraint(
+            name = "uk_vote_participant_room_nickname",
+            columnNames = {"vote_room_id", "nickname"}))
 public class VoteParticipant extends BaseEntity {
 
   @Id
@@ -63,12 +59,22 @@ public class VoteParticipant extends BaseEntity {
   }
 
   public static VoteParticipant forAccount(Long voteRoomId, String nickname, Long accountId) {
-    return forAccount(voteRoomId, VoteParticipantNickname.of(nickname), accountId);
+    return forAccount(voteRoomId, VoteParticipantNickname.of(nickname), null, accountId);
+  }
+
+  public static VoteParticipant forAccount(
+      Long voteRoomId, String nickname, String passwordHash, Long accountId) {
+    return forAccount(voteRoomId, VoteParticipantNickname.of(nickname), passwordHash, accountId);
   }
 
   public static VoteParticipant forAccount(
       Long voteRoomId, VoteParticipantNickname nickname, Long accountId) {
-    VoteParticipant participant = new VoteParticipant(voteRoomId, nickname, null);
+    return forAccount(voteRoomId, nickname, null, accountId);
+  }
+
+  public static VoteParticipant forAccount(
+      Long voteRoomId, VoteParticipantNickname nickname, String passwordHash, Long accountId) {
+    VoteParticipant participant = new VoteParticipant(voteRoomId, nickname, passwordHash);
     participant.accountId = accountId;
     return participant;
   }
