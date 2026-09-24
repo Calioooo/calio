@@ -55,6 +55,30 @@ class ListParticipatedVoteRoomsUseCaseTest {
     verify(voteRoomRepository).findAllById(List.of(SECOND_VOTE_ROOM_ID, FIRST_VOTE_ROOM_ID));
   }
 
+  @Test
+  @DisplayName("같은 Account가 같은 투표방에 nickname이 다른 참여자를 여러 명 만들면 참여자별 목록 항목을 반환한다")
+  void givenMultipleParticipantsForSameAccountAndVoteRoom_whenList_thenReturnsEachParticipant() {
+    VoteParticipant firstParticipant =
+        VoteParticipant.forAccount(FIRST_VOTE_ROOM_ID, "first", ACCOUNT_ID);
+    VoteParticipant secondParticipant =
+        VoteParticipant.forAccount(FIRST_VOTE_ROOM_ID, "second", ACCOUNT_ID);
+    VoteRoom voteRoom = voteRoom(FIRST_VOTE_ROOM_ID, "같은 투표방");
+    when(voteParticipantRepository.findByAccountIdOrderByUpdatedAtDesc(ACCOUNT_ID))
+        .thenReturn(List.of(secondParticipant, firstParticipant));
+    when(voteRoomRepository.findAllById(List.of(FIRST_VOTE_ROOM_ID))).thenReturn(List.of(voteRoom));
+
+    var responses =
+        new ListParticipatedVoteRoomsUseCase(voteParticipantRepository, voteRoomRepository)
+            .list(ACCOUNT_ID);
+
+    assertThat(responses)
+        .extracting(response -> response.nickname())
+        .containsExactly("second", "first");
+    assertThat(responses)
+        .extracting(response -> response.publicId())
+        .containsOnly(voteRoom.getPublicId());
+  }
+
   private VoteRoom voteRoom(Long id, String name) {
     VoteRoom voteRoom = org.mockito.Mockito.mock(VoteRoom.class);
     when(voteRoom.getId()).thenReturn(id);

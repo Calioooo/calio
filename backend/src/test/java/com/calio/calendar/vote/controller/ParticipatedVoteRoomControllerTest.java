@@ -123,6 +123,32 @@ class ParticipatedVoteRoomControllerTest {
   }
 
   @Test
+  @DisplayName("같은 투표방에 nickname이 다른 여러 참여자가 연결되면 참여자별 목록 항목을 반환한다")
+  void givenMultipleParticipantsForSameVoteRoom_whenListParticipated_thenReturnsEachNickname()
+      throws Exception {
+    VoteRoom voteRoom = voteRoom("같은 투표방", authenticatedAccountId);
+    voteRoomRepository.saveAndFlush(voteRoom);
+    VoteParticipant firstParticipant =
+        voteParticipantRepository.saveAndFlush(
+            VoteParticipant.forAccount(voteRoom.getId(), "first", authenticatedAccountId));
+    VoteParticipant secondParticipant =
+        voteParticipantRepository.saveAndFlush(
+            VoteParticipant.forAccount(voteRoom.getId(), "second", authenticatedAccountId));
+    updateParticipantUpdatedAt(firstParticipant, "2026-08-15T00:00:00Z");
+    updateParticipantUpdatedAt(secondParticipant, "2026-08-16T00:00:00Z");
+    entityManager.clear();
+
+    mockMvc
+        .perform(get("/api/vote-rooms/me/participated"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$", hasSize(2)))
+        .andExpect(jsonPath("$[0].publicId").value(voteRoom.getPublicId().toString()))
+        .andExpect(jsonPath("$[0].nickname").value("second"))
+        .andExpect(jsonPath("$[1].publicId").value(voteRoom.getPublicId().toString()))
+        .andExpect(jsonPath("$[1].nickname").value("first"));
+  }
+
+  @Test
   @DisplayName("인증 없는 요청은 내가 참여한 투표 목록을 조회할 수 없다")
   void unauthenticatedRequestCannotListParticipatedVoteRooms() throws Exception {
     mockMvc
