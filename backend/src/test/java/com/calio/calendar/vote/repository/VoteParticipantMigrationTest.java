@@ -17,7 +17,7 @@ import org.junit.jupiter.api.Test;
 class VoteParticipantMigrationTest {
 
   @Test
-  @DisplayName("VoteParticipant accountId migration은 기존 제약과 느슨한 account 식별을 유지한다")
+  @DisplayName("VoteParticipant accountId migration은 nickname 유니크와 느슨한 account 식별을 유지한다")
   void givenVoteRoomSchema_whenMigrate_thenCreatesParticipantAndVoteConstraints() throws Exception {
     // given
     String url = "jdbc:h2:mem:vote-participant-migration;MODE=MySQL;DB_CLOSE_DELAY=-1";
@@ -40,7 +40,8 @@ class VoteParticipantMigrationTest {
       assertThat(isNullable(connection, "VOTE_PARTICIPANTS", "NICKNAME")).isFalse();
       assertThat(isNullable(connection, "VOTES", "UNAVAILABLE_DATE")).isFalse();
       assertThat(uniqueConstraintNames(connection, "VOTE_PARTICIPANTS"))
-          .contains("UK_VOTE_PARTICIPANT_ROOM_NICKNAME", "UK_VOTE_PARTICIPANT_ROOM_ACCOUNT");
+          .contains("UK_VOTE_PARTICIPANT_ROOM_NICKNAME")
+          .doesNotContain("UK_VOTE_PARTICIPANT_ROOM_ACCOUNT");
       assertThat(uniqueConstraintNames(connection, "VOTES"))
           .contains("UK_VOTE_PARTICIPANT_UNAVAILABLE_DATE");
       assertThat(importedKeyDeleteRule(connection, "VOTE_PARTICIPANTS", "VOTE_ROOMS"))
