@@ -39,7 +39,7 @@ public class ListParticipatedVoteRoomsUseCase {
 
   private Map<Long, VoteRoom> findVoteRoomsById(List<VoteParticipant> participants) {
     return voteRoomRepository
-        .findAllById(participants.stream().map(VoteParticipant::getVoteRoomId).toList())
+        .findAllById(participants.stream().map(VoteParticipant::getVoteRoomId).distinct().toList())
         .stream()
         .collect(Collectors.toMap(VoteRoom::getId, Function.identity()));
   }
