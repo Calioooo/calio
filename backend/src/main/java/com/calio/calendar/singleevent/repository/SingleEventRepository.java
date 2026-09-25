@@ -15,15 +15,7 @@ public interface SingleEventRepository extends JpaRepository<SingleEvent, Long> 
 
   Optional<SingleEvent> findByIdAndAccountId(Long id, Long accountId);
 
-  @Query(
-      """
-            select event
-            from SingleEvent event
-            where event.id in :eventIds
-              and event.accountId = :accountId
-            """)
-  List<SingleEvent> findAllShareableByIdsAndAccountId(
-      @Param("eventIds") List<Long> eventIds, @Param("accountId") Long accountId);
+  List<SingleEvent> findAllByIdInAndAccountId(List<Long> eventIds, Long accountId);
 
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query(
@@ -35,10 +27,6 @@ public interface SingleEventRepository extends JpaRepository<SingleEvent, Long> 
             """)
   Optional<SingleEvent> findByIdAndAccountIdForUpdate(
       @Param("eventId") Long eventId, @Param("accountId") Long accountId);
-
-  @Modifying(flushAutomatically = true)
-  @Query("delete from SingleEvent event where event.id in :eventIds")
-  int deleteAllByIds(@Param("eventIds") List<Long> eventIds);
 
   @Query(
       """

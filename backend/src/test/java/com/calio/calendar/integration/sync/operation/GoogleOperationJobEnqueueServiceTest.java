@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.connection.service.GoogleCalendarConnectionCommandService;
 import com.calio.calendar.integration.connection.service.GoogleCalendarIntegrationCommandService;
+import com.calio.calendar.integration.sync.operation.GoogleOperationJobEnqueueService.OutboundOperation;
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEventJob;
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarRecurrenceJob;
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarRecurrenceJobKind;
@@ -68,7 +69,8 @@ class GoogleOperationJobEnqueueServiceTest {
     TransactionSynchronizationManager.initSynchronization();
 
     // when
-    boolean enqueued = service.enqueueEventCreated(10L, event);
+    OutboundOperation operation = service.prepareOutboundOperation(10L);
+    boolean enqueued = service.enqueueEventCreated(operation, event);
 
     // then
     ArgumentCaptor<GoogleOperationJob> jobCaptor =
@@ -97,9 +99,10 @@ class GoogleOperationJobEnqueueServiceTest {
     when(integrationCommandService.tryLockIntegration(10L)).thenReturn(Optional.of(integration));
     TransactionSynchronizationManager.initSynchronization();
 
+    OutboundOperation operation = service.prepareOutboundOperation(10L);
     boolean enqueued =
         service.enqueueRecurrence(
-            10L, 40L, GoogleCalendarRecurrenceJobKind.RECURRENCE_CREATE, payload);
+            operation, 40L, GoogleCalendarRecurrenceJobKind.RECURRENCE_CREATE, payload);
 
     ArgumentCaptor<GoogleOperationJob> captor = ArgumentCaptor.forClass(GoogleOperationJob.class);
     verify(jobCommandService).enqueueOperationJob(captor.capture());
@@ -118,8 +121,10 @@ class GoogleOperationJobEnqueueServiceTest {
     when(integrationCommandService.tryLockIntegration(10L)).thenReturn(Optional.empty());
     TransactionSynchronizationManager.initSynchronization();
 
+    OutboundOperation operation = service.prepareOutboundOperation(10L);
     boolean enqueued =
-        service.enqueueRecurrenceOverrideDeleted(10L, 40L, Instant.parse("2026-09-04T00:00:00Z"));
+        service.enqueueRecurrenceOverrideDeleted(
+            operation, 40L, Instant.parse("2026-09-04T00:00:00Z"));
 
     assertThat(enqueued).isFalse();
     org.mockito.Mockito.verifyNoInteractions(jobCommandService, worker);
@@ -143,7 +148,8 @@ class GoogleOperationJobEnqueueServiceTest {
     when(integrationCommandService.tryLockIntegration(10L)).thenReturn(Optional.of(integration));
     TransactionSynchronizationManager.initSynchronization();
 
-    service.enqueueRecurrenceOverride(10L, 40L, origin, payload);
+    OutboundOperation operation = service.prepareOutboundOperation(10L);
+    service.enqueueRecurrenceOverride(operation, 40L, origin, payload);
 
     ArgumentCaptor<GoogleOperationJob> captor = ArgumentCaptor.forClass(GoogleOperationJob.class);
     verify(jobCommandService).enqueueOperationJob(captor.capture());

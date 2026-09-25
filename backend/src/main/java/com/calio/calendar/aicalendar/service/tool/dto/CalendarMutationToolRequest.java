@@ -28,7 +28,7 @@ public record CalendarMutationToolRequest(
         Instant originStartAt,
     @ToolParam(
             description =
-                "Event title. Required for CREATE_EVENT and CREATE_RECURRENCE_EVENT; optional replacement title for updates.",
+                "Event title, at most 80 characters. Required for CREATE_EVENT and CREATE_RECURRENCE_EVENT; optional replacement title for updates.",
             required = false)
         String title,
     @ToolParam(

@@ -4,6 +4,7 @@ import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobEnqueueService;
+import com.calio.calendar.integration.sync.operation.GoogleOperationJobEnqueueService.OutboundOperation;
 import com.calio.calendar.singleevent.controller.dto.CreateSingleEventRequest;
 import com.calio.calendar.singleevent.controller.dto.EventResponse;
 import com.calio.calendar.singleevent.domain.SingleEvent;
@@ -36,6 +37,7 @@ public class CreateSingleEventUseCase {
 
   @Transactional
   public EventResponse create(Long accountId, CreateSingleEventRequest request) {
+    OutboundOperation outboundOperation = jobEnqueueService.prepareOutboundOperation(accountId);
     accountRepository
         .findById(accountId)
         .orElseThrow(() -> new CalioException(ErrorCode.ACCOUNT_NOT_FOUND));
@@ -49,7 +51,7 @@ public class CreateSingleEventUseCase {
                     request.startAt(), request.endAt(), request.allDay(), request.timeZone()),
                 tag.getId(),
                 accountId));
-    jobEnqueueService.enqueueEventCreated(accountId, event);
+    jobEnqueueService.enqueueEventCreated(outboundOperation, event);
     return EventResponse.from(event, tag);
   }
 

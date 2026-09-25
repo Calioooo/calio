@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -15,6 +16,7 @@ import com.calio.calendar.common.domain.CanonicalSchedule;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobEnqueueService;
+import com.calio.calendar.integration.sync.operation.GoogleOperationJobEnqueueService.OutboundOperation;
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarRecurrenceJobKind;
 import com.calio.calendar.recurrence.controller.dto.CreateRecurrenceEventRequest;
 import com.calio.calendar.recurrence.controller.dto.RecurrenceEventResponse;
@@ -62,10 +64,13 @@ class RecurrenceEventServiceTest {
 
   @Mock private GoogleOperationJobEnqueueService jobEnqueueService;
 
+  @Mock private OutboundOperation outboundOperation;
+
   private RecurrenceEventService recurrenceEventService;
 
   @BeforeEach
   void setUp() {
+    lenient().when(jobEnqueueService.prepareOutboundOperation(1L)).thenReturn(outboundOperation);
     RecurrenceEventQueryService queryService =
         new RecurrenceEventQueryService(
             recurrenceEventRepository, recurrenceEventOverrideRepository);
@@ -117,7 +122,10 @@ class RecurrenceEventServiceTest {
     assertThat(response.recurrenceId()).isEqualTo(10L);
     verify(jobEnqueueService)
         .enqueueRecurrence(
-            eq(1L), eq(10L), eq(GoogleCalendarRecurrenceJobKind.RECURRENCE_CREATE), any());
+            eq(outboundOperation),
+            eq(10L),
+            eq(GoogleCalendarRecurrenceJobKind.RECURRENCE_CREATE),
+            any());
   }
 
   @Test
@@ -167,10 +175,16 @@ class RecurrenceEventServiceTest {
     assertThat(recurrenceEvent.getTitle()).isEqualTo("Updated");
     assertThat(recurrenceEvent.isAllDay()).isTrue();
     assertThat(recurrenceEvent.getTimeZone()).isNull();
+    InOrder lockOrder = inOrder(jobEnqueueService, recurrenceEventRepository);
+    lockOrder.verify(jobEnqueueService).prepareOutboundOperation(1L);
+    lockOrder.verify(recurrenceEventRepository).findByIdAndAccountIdForUpdate(10L, 1L);
     verify(recurrenceEventOverrideRepository, never()).deleteAllByRecurrenceEventIds(any());
     verify(jobEnqueueService)
         .enqueueRecurrence(
-            eq(1L), eq(10L), eq(GoogleCalendarRecurrenceJobKind.RECURRENCE_UPDATE), any());
+            eq(outboundOperation),
+            eq(10L),
+            eq(GoogleCalendarRecurrenceJobKind.RECURRENCE_UPDATE),
+            any());
   }
 
   @Test
@@ -187,16 +201,18 @@ class RecurrenceEventServiceTest {
     // then
     InOrder deletionOrder =
         inOrder(
+            jobEnqueueService,
             recurrenceEventRepository,
             recurrenceEventOverrideRepository,
             recurrenceShareCommandService);
+    deletionOrder.verify(jobEnqueueService).prepareOutboundOperation(1L);
     deletionOrder.verify(recurrenceEventRepository).findByIdAndAccountIdForUpdate(10L, 1L);
     deletionOrder.verify(recurrenceShareCommandService).deleteAllForSourceRecurrence(10L);
     deletionOrder
         .verify(recurrenceEventOverrideRepository)
         .deleteAllByRecurrenceEventIds(List.of(10L));
     deletionOrder.verify(recurrenceEventRepository).deleteAllByIds(List.of(10L));
-    verify(jobEnqueueService).enqueueRecurrenceDeleted(1L, 10L);
+    verify(jobEnqueueService).enqueueRecurrenceDeleted(outboundOperation, 10L);
   }
 
   @Test
@@ -236,7 +252,11 @@ class RecurrenceEventServiceTest {
     assertThat(response.title()).isEqualTo("Final title");
     assertThat(response.description()).isNull();
     assertThat(response.originStartAt()).isEqualTo(originStartAt);
-    verify(jobEnqueueService).enqueueRecurrenceOverride(eq(1L), eq(10L), eq(originStartAt), any());
+    InOrder lockOrder = inOrder(jobEnqueueService, recurrenceEventRepository);
+    lockOrder.verify(jobEnqueueService).prepareOutboundOperation(1L);
+    lockOrder.verify(recurrenceEventRepository).findByIdAndAccountIdForUpdate(10L, 1L);
+    verify(jobEnqueueService)
+        .enqueueRecurrenceOverride(eq(outboundOperation), eq(10L), eq(originStartAt), any());
   }
 
   @Test
@@ -363,7 +383,11 @@ class RecurrenceEventServiceTest {
     assertThat(existingOverride.getOriginStartAt()).isEqualTo(originStartAt);
     assertThat(existingOverride.isDeleted()).isTrue();
     assertThat(existingOverride.getDeletedAt()).isEqualTo(deletedAt);
-    verify(jobEnqueueService).enqueueRecurrenceOverrideDeleted(1L, 10L, originStartAt);
+    InOrder lockOrder = inOrder(jobEnqueueService, recurrenceEventRepository);
+    lockOrder.verify(jobEnqueueService).prepareOutboundOperation(1L);
+    lockOrder.verify(recurrenceEventRepository).findByIdAndAccountIdForUpdate(10L, 1L);
+    verify(jobEnqueueService)
+        .enqueueRecurrenceOverrideDeleted(outboundOperation, 10L, originStartAt);
   }
 
   @Test

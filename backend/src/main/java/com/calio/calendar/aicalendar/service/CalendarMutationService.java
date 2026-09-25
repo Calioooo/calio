@@ -32,6 +32,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class CalendarMutationService {
 
+  private static final int MAX_REQUEST_TITLE_LENGTH = 80;
+
   private final CreateSingleEventUseCase createEventUseCase;
   private final GetSingleEventUseCase getEventUseCase;
   private final UpdateSingleEventUseCase updateEventUseCase;
@@ -489,7 +491,9 @@ public class CalendarMutationService {
   }
 
   private String requireTitle(CalendarMutationToolRequest request) {
-    if (request.title() == null || request.title().isBlank()) {
+    if (request.title() == null
+        || request.title().isBlank()
+        || request.title().codePointCount(0, request.title().length()) > MAX_REQUEST_TITLE_LENGTH) {
       throw new CalioException(ErrorCode.VALIDATION_FAILED);
     }
     return request.title();

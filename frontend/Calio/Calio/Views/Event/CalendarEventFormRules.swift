@@ -34,7 +34,7 @@ enum CalendarEventFormRules {
     recurrenceEndTime: Date,
     isAllDay: Bool = false
   ) -> Bool {
-    guard title.utf16.count <= eventTitleMaxLength else {
+    guard title.unicodeScalars.count <= eventTitleMaxLength else {
       return false
     }
 

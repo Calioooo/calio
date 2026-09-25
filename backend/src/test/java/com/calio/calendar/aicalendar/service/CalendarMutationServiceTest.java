@@ -132,6 +132,55 @@ class CalendarMutationServiceTest {
   }
 
   @Test
+  @DisplayName("AI 일정 변경 요청의 제목도 80자를 초과하면 거부한다")
+  void givenOverlengthTitle_whenPreviewCreation_thenRejectsRequest() {
+    CalendarMutationToolRequest request =
+        new CalendarMutationToolRequest(
+            CalendarMutationOperation.CREATE_EVENT,
+            null,
+            null,
+            null,
+            "a".repeat(81),
+            "새 회의 설명",
+            Instant.parse("2026-08-22T05:00:00Z"),
+            Instant.parse("2026-08-22T06:00:00Z"),
+            false,
+            "Asia/Seoul",
+            1L,
+            null);
+
+    assertThatThrownBy(() -> service().preview(1L, request))
+        .isInstanceOf(CalioException.class)
+        .extracting(exception -> ((CalioException) exception).getErrorCode())
+        .isEqualTo(ErrorCode.VALIDATION_FAILED);
+  }
+
+  @Test
+  @DisplayName("AI 일정 변경 요청은 80개의 보조 문자를 제목으로 허용한다")
+  void givenTitleWithEightyCodePoints_whenPreviewCreation_thenAllowsRequest() {
+    CalendarMutationToolRequest request =
+        new CalendarMutationToolRequest(
+            CalendarMutationOperation.CREATE_EVENT,
+            null,
+            null,
+            null,
+            "😀".repeat(80),
+            "새 회의 설명",
+            Instant.parse("2026-08-22T05:00:00Z"),
+            Instant.parse("2026-08-22T06:00:00Z"),
+            false,
+            "Asia/Seoul",
+            1L,
+            null);
+    when(tagRepository.findPersonalDefaultTagById(1L))
+        .thenReturn(Optional.of(Tag.personalDefault("업무", "#64748B")));
+
+    var preview = service().preview(1L, request);
+
+    assertThat(preview.after().title()).isEqualTo("😀".repeat(80));
+  }
+
+  @Test
   @DisplayName("일정 삭제 Preview는 삭제하지 않고 삭제될 일정을 반환한다")
   void givenEventDeletion_whenPreview_thenReturnsBeforeWithoutDeletingEvent() {
     // given
