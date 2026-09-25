@@ -108,8 +108,9 @@ class GoogleCalendarIntegrationDataServiceTest {
 
     // then
     verify(eventMappingCommandService).deleteEventMappingsWithIds(List.of(10L));
-    verify(eventShareCommandService).deleteAllForSourceEvents(List.of(20L));
-    verify(singleEventRepository).deleteAllByIdInBatch(List.of(20L));
+    InOrder eventCleanup = inOrder(eventShareCommandService, singleEventRepository);
+    eventCleanup.verify(eventShareCommandService).deleteAllForSourceEvents(List.of(20L));
+    eventCleanup.verify(singleEventRepository).deleteAllByIdInBatch(List.of(20L));
     verify(eventMappingQueryService, times(2))
         .listEventMappingBatch(eq(1L), any(Long.class), eq(500));
     InOrder syncTokenUpdate = inOrder(connectionCommandService);
