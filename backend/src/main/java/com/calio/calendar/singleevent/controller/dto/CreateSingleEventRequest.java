@@ -1,13 +1,14 @@
 package com.calio.calendar.singleevent.controller.dto;
 
+import com.calio.calendar.common.validation.MaxCodePointLength;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
 import java.time.Instant;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record CreateSingleEventRequest(
-    @NotNull(message = "이벤트 제목은 필수입니다.") @Size(max = 80, message = "이벤트 제목은 80자 이하여야 합니다.")
+    @NotNull(message = "이벤트 제목은 필수입니다.")
+        @MaxCodePointLength(max = 80, message = "이벤트 제목은 80자 이하여야 합니다.")
         String title,
     String description,
     @NotNull(message = "이벤트 시작 시각은 필수입니다.") Instant startAt,

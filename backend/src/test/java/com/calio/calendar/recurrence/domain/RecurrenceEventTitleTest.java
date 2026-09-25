@@ -13,7 +13,7 @@ class RecurrenceEventTitleTest {
   @Test
   @DisplayName("외부 반복 일정 제목을 저장하기 위해 255자까지 허용한다")
   void givenExternalTitleWithinStorageLimit_whenCreate_thenKeepsValue() {
-    String title = "a".repeat(RecurrenceEventTitle.MAX_LENGTH);
+    String title = "😀".repeat(RecurrenceEventTitle.MAX_LENGTH);
 
     assertThat(new RecurrenceEventTitle(title).value()).isEqualTo(title);
   }
@@ -22,7 +22,7 @@ class RecurrenceEventTitleTest {
   @DisplayName("반복 일정 제목은 저장 한도인 255자를 초과할 수 없다")
   void givenOverlengthTitle_whenCreate_thenRejectsTitle() {
     assertThatThrownBy(
-            () -> new RecurrenceEventTitle("a".repeat(RecurrenceEventTitle.MAX_LENGTH + 1)))
+            () -> new RecurrenceEventTitle("😀".repeat(RecurrenceEventTitle.MAX_LENGTH + 1)))
         .isInstanceOf(CalioException.class)
         .extracting(exception -> ((CalioException) exception).getErrorCode())
         .isEqualTo(ErrorCode.INVALID_EVENT_TITLE);

@@ -478,7 +478,7 @@ public class CalendarMutationService {
   private String requireTitle(CalendarMutationToolRequest request) {
     if (request.title() == null
         || request.title().isBlank()
-        || request.title().length() > MAX_REQUEST_TITLE_LENGTH) {
+        || request.title().codePointCount(0, request.title().length()) > MAX_REQUEST_TITLE_LENGTH) {
       throw new CalioException(ErrorCode.VALIDATION_FAILED);
     }
     return request.title();

@@ -25,7 +25,7 @@ class SingleEventTitleTest {
   @Test
   @DisplayName("외부 일정 제목을 저장하기 위해 255자까지 허용한다")
   void givenExternalTitleWithinStorageLimit_whenCreate_thenKeepsValue() {
-    String title = "a".repeat(SingleEventTitle.MAX_LENGTH);
+    String title = "😀".repeat(SingleEventTitle.MAX_LENGTH);
 
     assertThat(new SingleEventTitle(title).value()).isEqualTo(title);
   }
@@ -33,7 +33,7 @@ class SingleEventTitleTest {
   @Test
   @DisplayName("일정 제목은 저장 한도인 255자를 초과할 수 없다")
   void givenOverlengthTitle_whenCreate_thenRejectsTitle() {
-    assertThatThrownBy(() -> new SingleEventTitle("a".repeat(SingleEventTitle.MAX_LENGTH + 1)))
+    assertThatThrownBy(() -> new SingleEventTitle("😀".repeat(SingleEventTitle.MAX_LENGTH + 1)))
         .isInstanceOf(CalioException.class)
         .extracting(exception -> ((CalioException) exception).getErrorCode())
         .isEqualTo(ErrorCode.INVALID_EVENT_TITLE);

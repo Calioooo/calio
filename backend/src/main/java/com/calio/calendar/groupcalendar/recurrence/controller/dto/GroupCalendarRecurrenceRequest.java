@@ -1,14 +1,14 @@
 package com.calio.calendar.groupcalendar.recurrence.controller.dto;
 
+import com.calio.calendar.common.validation.MaxCodePointLength;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
 import java.time.Instant;
 import java.util.List;
 
 public record GroupCalendarRecurrenceRequest(
     @NotBlank(message = "반복 일정 제목은 공백일 수 없습니다.")
-        @Size(max = 80, message = "반복 일정 제목은 80자 이하여야 합니다.")
+        @MaxCodePointLength(max = 80, message = "반복 일정 제목은 80자 이하여야 합니다.")
         String title,
     String description,
     @NotNull(message = "종일 여부는 필수입니다.") Boolean allDay,
