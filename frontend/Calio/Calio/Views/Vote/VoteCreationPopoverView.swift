@@ -94,6 +94,7 @@ struct VoteCreationPopoverView: View {
         isSelectableDay: viewModel.isSelectableCandidateDay(_:),
         selectedStartDay: viewModel.selectedCandidateStartDay,
         selectedEndDay: viewModel.selectedCandidateEndDay,
+        selectedPeriod: viewModel.selectedCandidatePeriod,
         onMonthChange: { viewModel.moveMonth(by: $0) },
         onSelectDay: { viewModel.selectCandidateDay($0) }
       )
@@ -203,11 +204,12 @@ private struct VoteMonthCalendarView: View {
   let isSelectableDay: (VoteDay) -> Bool
   let selectedStartDay: VoteDay?
   let selectedEndDay: VoteDay?
+  let selectedPeriod: VoteCandidatePeriod?
   let onMonthChange: (Int) -> Void
   let onSelectDay: (VoteDay) -> Void
 
   private let weekdaySymbols = ["일", "월", "화", "수", "목", "금", "토"]
-  private let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 7)
+  private let columns = Array(repeating: GridItem(.flexible(), spacing: 0), count: 7)
 
   var body: some View {
     VStack(spacing: 16) {
@@ -224,7 +226,7 @@ private struct VoteMonthCalendarView: View {
         Spacer()
         monthButton(symbol: "chevron.right", direction: 1)
       }
-      LazyVGrid(columns: columns, spacing: 8) {
+      LazyVGrid(columns: columns, spacing: 0) {
         ForEach(weekdaySymbols, id: \.self) { symbol in
           Text(symbol)
             .font(.caption.weight(.semibold))
@@ -235,7 +237,7 @@ private struct VoteMonthCalendarView: View {
           if let day {
             dayButton(day)
           } else {
-            Color.clear.frame(height: 38)
+            Color.clear.frame(maxWidth: .infinity, minHeight: 38)
           }
         }
       }
@@ -286,15 +288,24 @@ private struct VoteMonthCalendarView: View {
 
   private func dayButton(_ day: VoteDay) -> some View {
     let isSelectable = isSelectableDay(day)
-    let isSelected = selectedStartDay == day || selectedEndDay == day
+    let isRangeBoundary = selectedStartDay == day || selectedEndDay == day
+    let isWithinSelectedPeriod = selectedPeriod?.contains(day) ?? false
     return Button {
       onSelectDay(day)
     } label: {
       Text("\(day.day)")
-        .font(.subheadline.weight(isSelected ? .bold : .regular))
-        .foregroundStyle(isSelected ? .white : isSelectable ? .calioPrimary : .calioTextSecondary)
-        .frame(width: 38, height: 38)
-        .background(isSelected ? Color.voteAccent : .clear, in: Circle())
+        .font(.subheadline.weight(isRangeBoundary ? .bold : .regular))
+        .foregroundStyle(
+          isRangeBoundary ? .white : isSelectable ? .calioPrimary : .calioTextSecondary
+        )
+        .frame(maxWidth: .infinity, minHeight: 38)
+        .background {
+          if isRangeBoundary {
+            Circle().fill(Color.voteAccent)
+          } else if isWithinSelectedPeriod {
+            Rectangle().fill(Color.voteAccentSoft)
+          }
+        }
         .opacity(isSelectable ? 1 : 0.35)
     }
     .buttonStyle(.plain)
