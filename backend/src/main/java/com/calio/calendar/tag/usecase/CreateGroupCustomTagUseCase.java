@@ -30,18 +30,10 @@ public class CreateGroupCustomTagUseCase {
   public TagResponse create(Long accountId, Long groupSpaceId, String title, String colorCode) {
     groupSpaceQueryService.getGroupSpace(groupSpaceId);
     groupMembershipQueryService.getActiveMembership(groupSpaceId, accountId);
-    rejectDuplicateTitle(groupSpaceId, title, null);
-    Tag tag = tagRepository.save(Tag.groupCustom(groupSpaceId, title, colorCode));
-    return TagResponse.from(tag);
-  }
-
-  private void rejectDuplicateTitle(Long groupSpaceId, String title, Long excludedTagId) {
-    boolean exists =
-        excludedTagId == null
-            ? tagRepository.existsGroupCustomTagByTitle(title, groupSpaceId)
-            : tagRepository.existsOtherGroupCustomTagByTitle(title, groupSpaceId, excludedTagId);
-    if (exists) {
+    if (tagRepository.existsGroupCustomTagByTitle(title, groupSpaceId)) {
       throw new CalioException(ErrorCode.VALIDATION_FAILED);
     }
+    Tag tag = tagRepository.save(Tag.groupCustom(groupSpaceId, title, colorCode));
+    return TagResponse.from(tag);
   }
 }
