@@ -91,10 +91,11 @@ struct VoteCreationPopoverView: View {
         .foregroundStyle(.calioPrimary)
       VoteMonthCalendarView(
         month: viewModel.displayedMonth,
-        candidatePeriod: viewModel.candidatePeriod,
-        selectedDay: viewModel.selectedCandidateEndDay,
+        isSelectableDay: viewModel.isSelectableCandidateDay(_:),
+        selectedStartDay: viewModel.selectedCandidateStartDay,
+        selectedEndDay: viewModel.selectedCandidateEndDay,
         onMonthChange: { viewModel.moveMonth(by: $0) },
-        onSelectDay: { viewModel.selectCandidateEndDay($0) }
+        onSelectDay: { viewModel.selectCandidateDay($0) }
       )
       periodSummary
     }
@@ -104,14 +105,14 @@ struct VoteCreationPopoverView: View {
     HStack(spacing: 6) {
       Image(systemName: "calendar")
         .foregroundStyle(.voteAccent)
-      Text("\(dayText(viewModel.selectedCandidateEndDay))까지")
+      Text(periodSummaryText)
         .font(.caption.weight(.semibold))
         .foregroundStyle(.calioPrimary)
         .lineLimit(1)
         .minimumScaleFactor(0.8)
       Divider()
         .frame(height: 24)
-      Text("오늘부터 \(viewModel.selectedDayCount)일 동안")
+      Text(selectedDayCountText)
         .font(.caption)
         .foregroundStyle(.calioTextSecondary)
         .lineLimit(1)
@@ -158,6 +159,23 @@ struct VoteCreationPopoverView: View {
     "\(String(day.year))년 \(day.month)월 \(day.day)일"
   }
 
+  private var periodSummaryText: String {
+    guard let startDay = viewModel.selectedCandidateStartDay else {
+      return "시작일을 선택해주세요"
+    }
+    guard let endDay = viewModel.selectedCandidateEndDay else {
+      return "종료일을 선택해주세요"
+    }
+    return "\(dayText(startDay)) ~ \(dayText(endDay))"
+  }
+
+  private var selectedDayCountText: String {
+    guard viewModel.selectedCandidatePeriod != nil else {
+      return "최대 31일까지 선택할 수 있어요"
+    }
+    return "총 \(viewModel.selectedDayCount)일"
+  }
+
   private func createVoteRoom() {
     guard creationTask == nil else {
       return
@@ -182,8 +200,9 @@ struct VoteCreationPopoverView: View {
 
 private struct VoteMonthCalendarView: View {
   let month: VoteMonth
-  let candidatePeriod: VoteCandidatePeriod
-  let selectedDay: VoteDay
+  let isSelectableDay: (VoteDay) -> Bool
+  let selectedStartDay: VoteDay?
+  let selectedEndDay: VoteDay?
   let onMonthChange: (Int) -> Void
   let onSelectDay: (VoteDay) -> Void
 
@@ -266,8 +285,8 @@ private struct VoteMonthCalendarView: View {
   }
 
   private func dayButton(_ day: VoteDay) -> some View {
-    let isSelectable = candidatePeriod.contains(day)
-    let isSelected = selectedDay == day
+    let isSelectable = isSelectableDay(day)
+    let isSelected = selectedStartDay == day || selectedEndDay == day
     return Button {
       onSelectDay(day)
     } label: {

@@ -9,11 +9,12 @@ private let voteKoreaCalendar: Calendar = {
 @MainActor
 final class VoteCreationViewModel: ObservableObject {
   @Published private(set) var name = ""
-  @Published private(set) var selectedCandidateEndDay: VoteDay
+  @Published private(set) var selectedCandidateStartDay: VoteDay?
+  @Published private(set) var selectedCandidateEndDay: VoteDay?
   @Published private(set) var displayedMonth: VoteMonth
   @Published private(set) var state: VoteCreationState = .editing
 
-  let candidatePeriod: VoteCandidatePeriod
+  let earliestCandidateStartDay: VoteDay
 
   private let voteService: VoteService
   private let calendar: Calendar
@@ -26,26 +27,18 @@ final class VoteCreationViewModel: ObservableObject {
     self.voteService = voteService
     self.calendar = calendar
 
-    let startDay = VoteDay(date: currentDate, calendar: calendar)
-    guard let lastSelectableDate = calendar.date(byAdding: .day, value: 30, to: currentDate) else {
-      preconditionFailure("Failed to calculate VoteRoom candidate period")
-    }
-    let lastSelectableEndDay = VoteDay(date: lastSelectableDate, calendar: calendar)
-    candidatePeriod = VoteCandidatePeriod(
-      startDay: startDay,
-      lastSelectableEndDay: lastSelectableEndDay
-    )
-    selectedCandidateEndDay = startDay
-    displayedMonth = VoteMonth(day: startDay)
+    earliestCandidateStartDay = VoteDay(date: currentDate, calendar: calendar)
+    displayedMonth = VoteMonth(day: earliestCandidateStartDay)
   }
 
   var canCreate: Bool {
-    !trimmedName.isEmpty && candidatePeriod.contains(selectedCandidateEndDay) && !state.isCreating
+    !trimmedName.isEmpty && selectedCandidatePeriod != nil && !state.isCreating
   }
 
   var selectedDayCount: Int {
-    guard let startDate = calendar.date(from: dateComponents(for: candidatePeriod.startDay)),
-      let endDate = calendar.date(from: dateComponents(for: selectedCandidateEndDay))
+    guard let selectedCandidatePeriod,
+      let startDate = calendar.date(from: dateComponents(for: selectedCandidatePeriod.startDay)),
+      let endDate = calendar.date(from: dateComponents(for: selectedCandidatePeriod.endDay))
     else {
       return 0
     }
@@ -57,11 +50,35 @@ final class VoteCreationViewModel: ObservableObject {
     clearFailure()
   }
 
-  func selectCandidateEndDay(_ day: VoteDay) {
-    guard candidatePeriod.contains(day) else {
+  var selectedCandidatePeriod: VoteCandidatePeriod? {
+    guard let selectedCandidateStartDay, let selectedCandidateEndDay else {
+      return nil
+    }
+    return VoteCandidatePeriod(startDay: selectedCandidateStartDay, endDay: selectedCandidateEndDay)
+  }
+
+  func isSelectableCandidateDay(_ day: VoteDay) -> Bool {
+    guard day >= earliestCandidateStartDay else {
+      return false
+    }
+    guard let selectedCandidateStartDay, selectedCandidateEndDay == nil else {
+      return true
+    }
+    return day >= selectedCandidateStartDay
+      && day <= latestCandidateEndDay(for: selectedCandidateStartDay)
+  }
+
+  func selectCandidateDay(_ day: VoteDay) {
+    guard isSelectableCandidateDay(day) else {
       return
     }
-    selectedCandidateEndDay = day
+
+    if selectedCandidateStartDay == nil || selectedCandidateEndDay != nil {
+      selectedCandidateStartDay = day
+      selectedCandidateEndDay = nil
+    } else {
+      selectedCandidateEndDay = day
+    }
     clearFailure()
   }
 
@@ -77,7 +94,7 @@ final class VoteCreationViewModel: ObservableObject {
   }
 
   func createRoom() async -> VoteRoom? {
-    guard canCreate else {
+    guard let selectedCandidatePeriod, canCreate else {
       state = .failed(.validation)
       return nil
     }
@@ -86,7 +103,8 @@ final class VoteCreationViewModel: ObservableObject {
     do {
       let room = try await voteService.createRoom(
         name: trimmedName,
-        candidateEndDay: selectedCandidateEndDay
+        candidateStartDay: selectedCandidatePeriod.startDay,
+        candidateEndDay: selectedCandidatePeriod.endDay
       )
       state = .created(room)
       return room
@@ -126,5 +144,14 @@ final class VoteCreationViewModel: ObservableObject {
 
   private func dateComponents(for day: VoteDay) -> DateComponents {
     DateComponents(year: day.year, month: day.month, day: day.day)
+  }
+
+  private func latestCandidateEndDay(for startDay: VoteDay) -> VoteDay {
+    guard let date = calendar.date(from: dateComponents(for: startDay)),
+      let latestEndDate = calendar.date(byAdding: .day, value: 30, to: date)
+    else {
+      preconditionFailure("Failed to calculate VoteRoom candidate period")
+    }
+    return VoteDay(date: latestEndDate, calendar: calendar)
   }
 }

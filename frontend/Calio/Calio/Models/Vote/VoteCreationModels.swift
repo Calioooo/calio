@@ -2,10 +2,10 @@ import Foundation
 
 struct VoteCandidatePeriod: Equatable {
   let startDay: VoteDay
-  let lastSelectableEndDay: VoteDay
+  let endDay: VoteDay
 
   func contains(_ day: VoteDay) -> Bool {
-    startDay <= day && day <= lastSelectableEndDay
+    startDay <= day && day <= endDay
   }
 }
 
@@ -41,7 +41,7 @@ enum VoteCreationFailure: Equatable {
   var message: String {
     switch self {
     case .validation:
-      return "투표방 이름과 후보 종료일을 확인해주세요."
+      return "투표방 이름과 후보 기간을 확인해주세요."
     case .network:
       return "네트워크 연결을 확인하고 다시 시도해주세요."
     case .unexpected:
