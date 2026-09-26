@@ -1,4 +1,5 @@
 import Foundation
+
 import Testing
 
 @testable import Calio
@@ -296,23 +297,18 @@ struct GroupSpaceServiceTests {
   }
 
   @MainActor @Test func invitationViewModelIgnoresAnOlderInvitationLoadThatFinishesLast() async {
-    let oldInvitation = GroupInvitationSummaryResponseDTO(
-      invitationId: 1, expiresAt: GroupSpaceRepositoryStub.date)
-    let latestInvitation = GroupInvitationSummaryResponseDTO(
-      invitationId: 2, expiresAt: GroupSpaceRepositoryStub.date)
-    let repository = GroupSpaceRepositoryStub(
-      invitationFetchResponses: [[oldInvitation], [latestInvitation]],
-      invitationFetchDelays: [50_000_000, 1_000_000]
-    )
+    let repository = OutOfOrderGroupSpaceRepository()
     let viewModel = GroupInvitationViewModel(
       service: GroupInvitationService(repository: repository))
 
     let firstLoad = Task { await viewModel.load(groupSpaceId: 7) }
-    while repository.invitationFetchCallCount == 0 { await Task.yield() }
+    while await repository.startedInvitationFetchCount() == 0 { await Task.yield() }
     let secondLoad = Task { await viewModel.load(groupSpaceId: 7) }
 
-    await firstLoad.value
+    while await repository.startedInvitationFetchCount() < 2 { await Task.yield() }
     await secondLoad.value
+    await repository.finishFirstInvitationFetch()
+    await firstLoad.value
 
     #expect(viewModel.invitations.map(\.id) == [2])
     #expect(viewModel.errorMessage == nil)
@@ -472,7 +468,6 @@ struct GroupSpaceServiceTests {
   }
 
 }
-
 private final class GroupSpaceRepositoryStub: GroupSpaceRepository {
   static let date = Date(timeIntervalSince1970: 0)
   var operations: [String] = []
@@ -680,7 +675,6 @@ private final class GroupSpaceRepositoryStub: GroupSpaceRepository {
 
   deinit {}
 }
-
 extension GroupSpaceRepository {
   fileprivate func issueInvitation(groupSpaceId: Int64) async throws -> GroupInvitationResponseDTO {
     throw GroupSpaceRepositoryStub.StubError.failed
@@ -708,7 +702,6 @@ extension GroupSpaceRepository {
     throw GroupSpaceRepositoryStub.StubError.failed
   }
 }
-
 private struct FailingGroupSpaceRepository: GroupSpaceRepository {
   let error: APIError
 
@@ -727,16 +720,23 @@ private struct FailingGroupSpaceRepository: GroupSpaceRepository {
   func leaveGroupSpace(groupSpaceId: Int64) async throws { throw error }
   func removeMember(groupSpaceId: Int64, memberId: Int64) async throws { throw error }
 }
-
 private actor OutOfOrderGroupSpaceRepository: GroupSpaceRepository {
   private var fetchCount = 0
   private var firstFetchContinuation: CheckedContinuation<Void, Never>?
+  private var invitationFetchCount = 0
+  private var firstInvitationFetchContinuation: CheckedContinuation<Void, Never>?
 
   func startedFetchCount() -> Int { fetchCount }
+  func startedInvitationFetchCount() -> Int { invitationFetchCount }
 
   func finishFirstFetch() {
     firstFetchContinuation?.resume()
     firstFetchContinuation = nil
+  }
+
+  func finishFirstInvitationFetch() {
+    firstInvitationFetchContinuation?.resume()
+    firstInvitationFetchContinuation = nil
   }
 
   func fetchGroupSpaces() async throws -> GroupSpaceListResponseDTO {
@@ -749,6 +749,19 @@ private actor OutOfOrderGroupSpaceRepository: GroupSpaceRepository {
     }
     return .init(groupSpaces: [
       GroupSpaceRepositoryStub.sampleSpace(name: requestNumber == 1 ? "이전 공간" : "최신 공간")
+    ])
+  }
+
+  func fetchInvitations(groupSpaceId: Int64) async throws -> GroupInvitationListResponseDTO {
+    invitationFetchCount += 1
+    let requestNumber = invitationFetchCount
+    if requestNumber == 1 {
+      await withCheckedContinuation { continuation in
+        firstInvitationFetchContinuation = continuation
+      }
+    }
+    return .init(invitations: [
+      .init(invitationId: Int64(requestNumber), expiresAt: GroupSpaceRepositoryStub.date)
     ])
   }
 
@@ -772,7 +785,6 @@ private actor OutOfOrderGroupSpaceRepository: GroupSpaceRepository {
     fatalError("Unexpected call")
   }
 }
-
 private actor CreateWhileLoadingGroupSpaceRepository: GroupSpaceRepository {
   private var fetchCount = 0
 
@@ -807,7 +819,6 @@ private actor CreateWhileLoadingGroupSpaceRepository: GroupSpaceRepository {
     fatalError("Unexpected call")
   }
 }
-
 private struct CancelledGroupSpaceRepository: GroupSpaceRepository {
   func fetchGroupSpaces() async throws -> GroupSpaceListResponseDTO { throw CancellationError() }
   func fetchGroupSpace(groupSpaceId: Int64) async throws -> GroupSpaceResponseDTO {
@@ -828,7 +839,6 @@ private struct CancelledGroupSpaceRepository: GroupSpaceRepository {
   func leaveGroupSpace(groupSpaceId: Int64) async throws { throw CancellationError() }
   func removeMember(groupSpaceId: Int64, memberId: Int64) async throws { throw CancellationError() }
 }
-
 private actor CancellableGroupSpaceRepository: GroupSpaceRepository {
   private var fetchCount = 0
 
