@@ -2,6 +2,7 @@ import Foundation
 
 struct CreateVoteRoomRequestDTO: Encodable, Equatable {
   let name: String
+  let candidateStartDate: String
   let candidateEndDate: String
 }
 

@@ -7,9 +7,16 @@ struct VoteService {
     self.repository = repository
   }
 
-  func createRoom(name: String, candidateEndDay: VoteDay) async throws -> VoteRoom {
+  func createRoom(
+    name: String,
+    candidateStartDay: VoteDay,
+    candidateEndDay: VoteDay
+  ) async throws -> VoteRoom {
     let request = CreateVoteRoomRequestDTO(
-      name: name, candidateEndDate: candidateEndDay.apiDateString)
+      name: name,
+      candidateStartDate: candidateStartDay.apiDateString,
+      candidateEndDate: candidateEndDay.apiDateString
+    )
     let response = try await perform { try await repository.createVoteRoom(request) }
     return try mapVoteRoom(response)
   }
