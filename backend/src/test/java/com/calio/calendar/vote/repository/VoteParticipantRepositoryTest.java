@@ -89,7 +89,7 @@ class VoteParticipantRepositoryTest {
   @Test
   @Transactional
   @DisplayName("accountId가 연결된 참여자는 선택적 password hash를 함께 보관한다")
-  void givenAccountParticipant_whenFindByVoteRoomPublicIdAndAccountId_thenFindsParticipant() {
+  void givenAccountParticipant_whenFindById_thenRetainsAccountIdAndPasswordHash() {
     // given
     Account account = accountRepository.saveAndFlush(new Account());
     String passwordHash = "hashed-password";
@@ -98,10 +98,9 @@ class VoteParticipantRepositoryTest {
             VoteParticipant.forAccount(voteRoom.getId(), "calio", passwordHash, account.getId()));
 
     // when
+    entityManager.clear();
     VoteParticipant foundParticipant =
-        voteParticipantRepository
-            .findByVoteRoomPublicIdAndAccountId(voteRoom.getPublicId(), account.getId())
-            .orElseThrow();
+        voteParticipantRepository.findById(participant.getId()).orElseThrow();
 
     // then
     assertThat(foundParticipant.getId()).isEqualTo(participant.getId());

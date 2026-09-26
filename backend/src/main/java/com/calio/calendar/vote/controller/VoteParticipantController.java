@@ -1,5 +1,7 @@
 package com.calio.calendar.vote.controller;
 
+import com.calio.calendar.security.AuthenticatedAccount;
+import com.calio.calendar.vote.controller.dto.CreateMyVoteParticipantRequest;
 import com.calio.calendar.vote.controller.dto.CreateVoteParticipantRequest;
 import com.calio.calendar.vote.controller.dto.LookupVoteParticipantSelectionRequest;
 import com.calio.calendar.vote.controller.dto.SubmitVoteRequest;
@@ -13,6 +15,7 @@ import jakarta.validation.Valid;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -42,7 +45,19 @@ public class VoteParticipantController {
       @PathVariable UUID publicId, @Valid @RequestBody CreateVoteParticipantRequest request) {
     return ResponseEntity.status(HttpStatus.CREATED)
         .body(
-            createVoteParticipantUseCase.create(publicId, request.nickname(), request.password()));
+            createVoteParticipantUseCase.create(
+                publicId, null, request.nickname(), request.password()));
+  }
+
+  @PostMapping("/participants/me")
+  public ResponseEntity<VoteParticipantResponse> createMine(
+      @PathVariable UUID publicId,
+      @AuthenticationPrincipal AuthenticatedAccount account,
+      @Valid @RequestBody CreateMyVoteParticipantRequest request) {
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(
+            createVoteParticipantUseCase.create(
+                publicId, account.accountId(), request.nickname(), request.password()));
   }
 
   @PutMapping("/votes")

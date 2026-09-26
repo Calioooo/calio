@@ -31,13 +31,15 @@ public class CreateVoteParticipantUseCase {
   }
 
   @Transactional
-  public VoteParticipantResponse create(UUID voteRoomPublicId, String nickname, String password) {
-    return VoteParticipantResponse.from(createParticipant(voteRoomPublicId, nickname, password));
+  public VoteParticipantResponse create(
+      UUID voteRoomPublicId, Long accountId, String nickname, String password) {
+    return VoteParticipantResponse.from(
+        createParticipant(voteRoomPublicId, accountId, nickname, password));
   }
 
   @Transactional
   public VoteParticipant createParticipant(
-      UUID voteRoomPublicId, String nickname, String password) {
+      UUID voteRoomPublicId, Long accountId, String nickname, String password) {
     VoteParticipantNickname normalizedNickname = VoteParticipantNickname.of(nickname);
     VoteRoom voteRoom =
         voteRoomRepository
@@ -50,7 +52,10 @@ public class CreateVoteParticipantUseCase {
     }
     try {
       return voteParticipantRepository.save(
-          new VoteParticipant(voteRoom.getId(), normalizedNickname, hashPassword(password)));
+          accountId == null
+              ? new VoteParticipant(voteRoom.getId(), normalizedNickname, hashPassword(password))
+              : VoteParticipant.forAccount(
+                  voteRoom.getId(), normalizedNickname, hashPassword(password), accountId));
     } catch (DataIntegrityViolationException exception) {
       throw new CalioException(ErrorCode.VOTE_PARTICIPANT_NICKNAME_CONFLICT, exception);
     }
