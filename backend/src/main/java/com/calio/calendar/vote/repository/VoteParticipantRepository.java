@@ -12,6 +12,8 @@ import org.springframework.data.repository.query.Param;
 
 public interface VoteParticipantRepository extends JpaRepository<VoteParticipant, Long> {
 
+  List<VoteParticipant> findByAccountIdOrderByUpdatedAtDesc(Long accountId);
+
   @Query(
       """
             select participant

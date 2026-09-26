@@ -47,6 +47,7 @@ class VoteParticipantUseCaseTest {
   private VoteParticipantCredentialVerifier credentialVerifier;
   private CreateVoteParticipantUseCase createVoteParticipantUseCase;
   private SubmitVoteUseCase submitVoteUseCase;
+  private LookupVoteParticipantSelectionUseCase lookupVoteParticipantSelectionUseCase;
 
   @BeforeEach
   void setUp() {
@@ -59,6 +60,9 @@ class VoteParticipantUseCaseTest {
     submitVoteUseCase =
         new SubmitVoteUseCase(
             voteParticipantRepository, voteRepository, voteRoomRepository, credentialVerifier);
+    lookupVoteParticipantSelectionUseCase =
+        new LookupVoteParticipantSelectionUseCase(
+            voteRoomRepository, voteParticipantRepository, voteRepository, credentialVerifier);
   }
 
   @Test
@@ -74,7 +78,7 @@ class VoteParticipantUseCaseTest {
         .thenAnswer(invocation -> invocation.getArgument(0));
 
     VoteParticipant participant =
-        createVoteParticipantUseCase.createParticipant(VOTE_ROOM_PUBLIC_ID, "calio", null);
+        createVoteParticipantUseCase.createParticipant(VOTE_ROOM_PUBLIC_ID, null, "calio", null);
 
     ArgumentCaptor<VoteParticipant> captor = ArgumentCaptor.forClass(VoteParticipant.class);
     verify(voteParticipantRepository).save(captor.capture());
@@ -98,7 +102,7 @@ class VoteParticipantUseCaseTest {
 
     VoteParticipant participant =
         createVoteParticipantUseCase.createParticipant(
-            VOTE_ROOM_PUBLIC_ID, "calio", "participant-password");
+            VOTE_ROOM_PUBLIC_ID, null, "calio", "participant-password");
 
     assertThat(participant.getPasswordHash()).isNotEqualTo("participant-password");
     assertThat(passwordEncoder.matches("participant-password", participant.getPasswordHash()))
@@ -121,7 +125,7 @@ class VoteParticipantUseCaseTest {
 
     VoteParticipant participant =
         createVoteParticipantUseCase.createParticipant(
-            VOTE_ROOM_PUBLIC_ID, decomposedNickname, null);
+            VOTE_ROOM_PUBLIC_ID, null, decomposedNickname, null);
 
     verify(voteParticipantRepository)
         .findByVoteRoomPublicIdAndNickname(VOTE_ROOM_PUBLIC_ID, normalizedNickname);
@@ -140,7 +144,7 @@ class VoteParticipantUseCaseTest {
     assertThatThrownBy(
             () ->
                 createVoteParticipantUseCase.createParticipant(
-                    VOTE_ROOM_PUBLIC_ID, "Calio", "participant-password"))
+                    VOTE_ROOM_PUBLIC_ID, null, "Calio", "participant-password"))
         .isInstanceOfSatisfying(
             CalioException.class,
             exception ->
@@ -155,7 +159,7 @@ class VoteParticipantUseCaseTest {
     assertThatThrownBy(
             () ->
                 createVoteParticipantUseCase.createParticipant(
-                    VOTE_ROOM_PUBLIC_ID, "calio-user", null))
+                    VOTE_ROOM_PUBLIC_ID, null, "calio-user", null))
         .isInstanceOfSatisfying(
             CalioException.class,
             exception ->
@@ -172,7 +176,8 @@ class VoteParticipantUseCaseTest {
 
     assertThatThrownBy(
             () ->
-                createVoteParticipantUseCase.createParticipant(VOTE_ROOM_PUBLIC_ID, "calio", null))
+                createVoteParticipantUseCase.createParticipant(
+                    VOTE_ROOM_PUBLIC_ID, null, "calio", null))
         .isInstanceOfSatisfying(
             CalioException.class,
             exception ->

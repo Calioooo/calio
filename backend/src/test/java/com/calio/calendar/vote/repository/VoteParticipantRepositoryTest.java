@@ -82,7 +82,30 @@ class VoteParticipantRepositoryTest {
     assertThat(foundParticipant.getId()).isEqualTo(participant.getId());
     assertThat(foundParticipant.getVoteRoomId()).isEqualTo(voteRoom.getId());
     assertThat(foundParticipant.getPasswordHash()).isNull();
+    assertThat(foundParticipant.getAccountId()).isNull();
     assertThat(foundParticipant.getStatus()).isEqualTo(VoteParticipantStatus.REGISTERED);
+  }
+
+  @Test
+  @Transactional
+  @DisplayName("accountId가 연결된 참여자는 선택적 password hash를 함께 보관한다")
+  void givenAccountParticipant_whenFindById_thenRetainsAccountIdAndPasswordHash() {
+    // given
+    Account account = accountRepository.saveAndFlush(new Account());
+    String passwordHash = "hashed-password";
+    VoteParticipant participant =
+        voteParticipantRepository.saveAndFlush(
+            VoteParticipant.forAccount(voteRoom.getId(), "calio", passwordHash, account.getId()));
+
+    // when
+    entityManager.clear();
+    VoteParticipant foundParticipant =
+        voteParticipantRepository.findById(participant.getId()).orElseThrow();
+
+    // then
+    assertThat(foundParticipant.getId()).isEqualTo(participant.getId());
+    assertThat(foundParticipant.getAccountId()).isEqualTo(account.getId());
+    assertThat(foundParticipant.getPasswordHash()).isEqualTo(passwordHash);
   }
 
   @Test
@@ -117,6 +140,25 @@ class VoteParticipantRepositoryTest {
                 voteParticipantRepository.saveAndFlush(
                     new VoteParticipant(voteRoom.getId(), "calio", "hashed-password")))
         .isInstanceOf(DataIntegrityViolationException.class);
+  }
+
+  @Test
+  @DisplayName("같은 VoteRoom에서 같은 accountId로 nickname이 다른 참여자를 여러 명 저장할 수 있다")
+  void givenMultipleNicknamesForSameAccountInVoteRoom_whenSave_thenPersistsAllParticipants() {
+    // given
+    Account account = accountRepository.saveAndFlush(new Account());
+    voteParticipantRepository.saveAndFlush(
+        VoteParticipant.forAccount(voteRoom.getId(), "first", "first-hash", account.getId()));
+
+    // when
+    voteParticipantRepository.saveAndFlush(
+        VoteParticipant.forAccount(voteRoom.getId(), "second", "second-hash", account.getId()));
+
+    // then
+    assertThat(voteParticipantRepository.findAll())
+        .filteredOn(participant -> account.getId().equals(participant.getAccountId()))
+        .extracting(VoteParticipant::getNickname)
+        .containsExactlyInAnyOrder("first", "second");
   }
 
   @Test

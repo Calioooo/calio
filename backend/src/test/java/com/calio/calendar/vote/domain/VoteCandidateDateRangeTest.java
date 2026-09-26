@@ -14,11 +14,14 @@ class VoteCandidateDateRangeTest {
   private static final LocalDate START_DATE = LocalDate.of(2026, 8, 14);
 
   @Test
-  @DisplayName("후보 기간은 시작일을 포함해 최대 31일까지 허용한다")
-  void givenThirtyOneDayRange_whenCreate_thenCreatesCandidateDateRange() {
+  @DisplayName("후보 기간은 하루 또는 시작일을 포함해 최대 31일까지 허용한다")
+  void givenValidRange_whenCreate_thenCreatesCandidateDateRange() {
+    VoteCandidateDateRange singleDayCandidateDateRange =
+        VoteCandidateDateRange.of(START_DATE, START_DATE);
     VoteCandidateDateRange candidateDateRange =
         VoteCandidateDateRange.of(START_DATE, START_DATE.plusDays(30));
 
+    assertThat(singleDayCandidateDateRange.contains(START_DATE)).isTrue();
     assertThat(candidateDateRange.contains(START_DATE)).isTrue();
     assertThat(candidateDateRange.contains(START_DATE.plusDays(30))).isTrue();
     assertThat(candidateDateRange.contains(START_DATE.plusDays(31))).isFalse();

@@ -38,6 +38,9 @@ public class VoteParticipant extends BaseEntity {
   @Column(name = "password_hash")
   private String passwordHash;
 
+  @Column(name = "account_id")
+  private Long accountId;
+
   @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 16)
   private VoteParticipantStatus status;
@@ -55,6 +58,27 @@ public class VoteParticipant extends BaseEntity {
     this.status = VoteParticipantStatus.REGISTERED;
   }
 
+  public static VoteParticipant forAccount(Long voteRoomId, String nickname, Long accountId) {
+    return forAccount(voteRoomId, VoteParticipantNickname.of(nickname), null, accountId);
+  }
+
+  public static VoteParticipant forAccount(
+      Long voteRoomId, String nickname, String passwordHash, Long accountId) {
+    return forAccount(voteRoomId, VoteParticipantNickname.of(nickname), passwordHash, accountId);
+  }
+
+  public static VoteParticipant forAccount(
+      Long voteRoomId, VoteParticipantNickname nickname, Long accountId) {
+    return forAccount(voteRoomId, nickname, null, accountId);
+  }
+
+  public static VoteParticipant forAccount(
+      Long voteRoomId, VoteParticipantNickname nickname, String passwordHash, Long accountId) {
+    VoteParticipant participant = new VoteParticipant(voteRoomId, nickname, passwordHash);
+    participant.accountId = accountId;
+    return participant;
+  }
+
   public Long getId() {
     return id;
   }
@@ -69,6 +93,10 @@ public class VoteParticipant extends BaseEntity {
 
   public String getPasswordHash() {
     return passwordHash;
+  }
+
+  public Long getAccountId() {
+    return accountId;
   }
 
   public VoteParticipantStatus getStatus() {

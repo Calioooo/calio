@@ -17,7 +17,7 @@ import org.junit.jupiter.api.Test;
 class VoteParticipantMigrationTest {
 
   @Test
-  @DisplayName("V25는 VoteParticipant와 날짜 Vote의 제약 및 VoteRoom cascade schema를 생성한다")
+  @DisplayName("VoteParticipant accountId migration은 nickname 유니크와 느슨한 account 식별을 유지한다")
   void givenVoteRoomSchema_whenMigrate_thenCreatesParticipantAndVoteConstraints() throws Exception {
     // given
     String url = "jdbc:h2:mem:vote-participant-migration;MODE=MySQL;DB_CLOSE_DELAY=-1";
@@ -32,14 +32,16 @@ class VoteParticipantMigrationTest {
     // then
     try (Connection connection = DriverManager.getConnection(url, "sa", "")) {
       assertThat(columnNames(connection, "VOTE_PARTICIPANTS"))
-          .contains("VOTE_ROOM_ID", "NICKNAME", "PASSWORD_HASH", "STATUS");
+          .contains("VOTE_ROOM_ID", "NICKNAME", "PASSWORD_HASH", "ACCOUNT_ID", "STATUS");
       assertThat(columnNames(connection, "VOTES"))
           .contains("VOTE_PARTICIPANT_ID", "UNAVAILABLE_DATE");
       assertThat(isNullable(connection, "VOTE_PARTICIPANTS", "PASSWORD_HASH")).isTrue();
+      assertThat(isNullable(connection, "VOTE_PARTICIPANTS", "ACCOUNT_ID")).isTrue();
       assertThat(isNullable(connection, "VOTE_PARTICIPANTS", "NICKNAME")).isFalse();
       assertThat(isNullable(connection, "VOTES", "UNAVAILABLE_DATE")).isFalse();
       assertThat(uniqueConstraintNames(connection, "VOTE_PARTICIPANTS"))
-          .contains("UK_VOTE_PARTICIPANT_ROOM_NICKNAME");
+          .contains("UK_VOTE_PARTICIPANT_ROOM_NICKNAME")
+          .doesNotContain("UK_VOTE_PARTICIPANT_ROOM_ACCOUNT");
       assertThat(uniqueConstraintNames(connection, "VOTES"))
           .contains("UK_VOTE_PARTICIPANT_UNAVAILABLE_DATE");
       assertThat(importedKeyDeleteRule(connection, "VOTE_PARTICIPANTS", "VOTE_ROOMS"))

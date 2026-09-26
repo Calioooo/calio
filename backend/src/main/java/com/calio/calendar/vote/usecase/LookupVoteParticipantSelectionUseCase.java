@@ -40,13 +40,18 @@ public class LookupVoteParticipantSelectionUseCase {
     voteRoomRepository
         .findByPublicId(voteRoomPublicId)
         .orElseThrow(() -> new CalioException(ErrorCode.VOTE_ROOM_NOT_FOUND));
+    VoteParticipant participant = findParticipant(voteRoomPublicId, nickname, password);
+    return VoteParticipantSelectionResponse.from(participant, getUnavailableDates(participant));
+  }
+
+  private VoteParticipant findParticipant(UUID voteRoomPublicId, String nickname, String password) {
     VoteParticipant participant =
         voteParticipantRepository
             .findByVoteRoomPublicIdAndNickname(
                 voteRoomPublicId, VoteParticipantNickname.of(nickname).value())
             .orElseThrow(() -> new CalioException(ErrorCode.VOTE_PARTICIPANT_CREDENTIAL_INVALID));
     credentialVerifier.verify(participant, password);
-    return VoteParticipantSelectionResponse.from(participant, getUnavailableDates(participant));
+    return participant;
   }
 
   private List<LocalDate> getUnavailableDates(VoteParticipant participant) {

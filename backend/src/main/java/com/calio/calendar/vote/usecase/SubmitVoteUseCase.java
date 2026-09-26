@@ -11,7 +11,6 @@ import com.calio.calendar.vote.repository.VoteParticipantRepository;
 import com.calio.calendar.vote.repository.VoteRepository;
 import com.calio.calendar.vote.repository.VoteRoomRepository;
 import java.time.LocalDate;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -39,35 +38,33 @@ public class SubmitVoteUseCase {
   @Transactional
   public VoteSubmissionResponse submit(
       UUID voteRoomPublicId, String nickname, String password, List<LocalDate> requestedDates) {
+    VoteParticipant lockedParticipant =
+        findParticipantForSubmission(voteRoomPublicId, nickname, password);
+    VoteRoom voteRoom =
+        voteRoomRepository
+            .findById(lockedParticipant.getVoteRoomId())
+            .orElseThrow(() -> new CalioException(ErrorCode.VOTE_ROOM_NOT_FOUND));
+    VoteSubmissionDates unavailableDates = VoteSubmissionDates.of(requestedDates);
+    if (unavailableDates.hasDateOutside(voteRoom.getCandidateDateRange())) {
+      throw new CalioException(ErrorCode.VALIDATION_FAILED);
+    }
+    voteRepository.deleteAllByVoteParticipantId(lockedParticipant.getId());
+    voteRepository.saveAll(
+        unavailableDates.values().stream().map(date -> new Vote(lockedParticipant, date)).toList());
+    lockedParticipant.submit();
+    return VoteSubmissionResponse.from(lockedParticipant, unavailableDates.values());
+  }
+
+  private VoteParticipant findParticipantForSubmission(
+      UUID voteRoomPublicId, String nickname, String password) {
     VoteParticipantNickname normalizedNickname = VoteParticipantNickname.of(nickname);
     VoteParticipant participant =
         voteParticipantRepository
             .findByVoteRoomPublicIdAndNickname(voteRoomPublicId, normalizedNickname.value())
             .orElseThrow(() -> new CalioException(ErrorCode.VOTE_PARTICIPANT_CREDENTIAL_INVALID));
     credentialVerifier.verify(participant, password);
-
-    VoteParticipant lockedParticipant =
-        voteParticipantRepository
-            .findByVoteRoomPublicIdAndNicknameForUpdate(
-                voteRoomPublicId, normalizedNickname.value())
-            .orElseThrow(() -> new CalioException(ErrorCode.VOTE_PARTICIPANT_CREDENTIAL_INVALID));
-    VoteRoom voteRoom =
-        voteRoomRepository
-            .findById(lockedParticipant.getVoteRoomId())
-            .orElseThrow(() -> new CalioException(ErrorCode.VOTE_ROOM_NOT_FOUND));
-    List<LocalDate> unavailableDates = normalizeDates(requestedDates);
-    if (unavailableDates.stream()
-        .anyMatch(date -> !voteRoom.getCandidateDateRange().contains(date))) {
-      throw new CalioException(ErrorCode.VALIDATION_FAILED);
-    }
-    voteRepository.deleteAllByVoteParticipantId(lockedParticipant.getId());
-    voteRepository.saveAll(
-        unavailableDates.stream().map(date -> new Vote(lockedParticipant, date)).toList());
-    lockedParticipant.submit();
-    return VoteSubmissionResponse.from(lockedParticipant, unavailableDates);
-  }
-
-  private List<LocalDate> normalizeDates(List<LocalDate> requestedDates) {
-    return new LinkedHashSet<>(requestedDates).stream().sorted().toList();
+    return voteParticipantRepository
+        .findByVoteRoomPublicIdAndNicknameForUpdate(voteRoomPublicId, normalizedNickname.value())
+        .orElseThrow(() -> new CalioException(ErrorCode.VOTE_PARTICIPANT_CREDENTIAL_INVALID));
   }
 }
