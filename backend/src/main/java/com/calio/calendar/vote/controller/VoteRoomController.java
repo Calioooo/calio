@@ -2,11 +2,13 @@ package com.calio.calendar.vote.controller;
 
 import com.calio.calendar.security.AuthenticatedAccount;
 import com.calio.calendar.vote.controller.dto.CreateVoteRoomRequest;
+import com.calio.calendar.vote.controller.dto.ParticipatedVoteRoomResponse;
 import com.calio.calendar.vote.controller.dto.VoteResultResponse;
 import com.calio.calendar.vote.controller.dto.VoteRoomResponse;
 import com.calio.calendar.vote.usecase.CreateVoteRoomUseCase;
 import com.calio.calendar.vote.usecase.GetVoteResultUseCase;
 import com.calio.calendar.vote.usecase.ListMyVoteRoomsUseCase;
+import com.calio.calendar.vote.usecase.ListParticipatedVoteRoomsUseCase;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.http.HttpStatus;
@@ -24,14 +26,17 @@ import org.springframework.web.bind.annotation.RestController;
 public class VoteRoomController {
   private final CreateVoteRoomUseCase createVoteRoomUseCase;
   private final ListMyVoteRoomsUseCase listMyVoteRoomsUseCase;
+  private final ListParticipatedVoteRoomsUseCase listParticipatedVoteRoomsUseCase;
   private final GetVoteResultUseCase getVoteResultUseCase;
 
   public VoteRoomController(
       CreateVoteRoomUseCase createVoteRoomUseCase,
       ListMyVoteRoomsUseCase listMyVoteRoomsUseCase,
+      ListParticipatedVoteRoomsUseCase listParticipatedVoteRoomsUseCase,
       GetVoteResultUseCase getVoteResultUseCase) {
     this.createVoteRoomUseCase = createVoteRoomUseCase;
     this.listMyVoteRoomsUseCase = listMyVoteRoomsUseCase;
+    this.listParticipatedVoteRoomsUseCase = listParticipatedVoteRoomsUseCase;
     this.getVoteResultUseCase = getVoteResultUseCase;
   }
 
@@ -51,6 +56,12 @@ public class VoteRoomController {
   @GetMapping("/me")
   public List<VoteRoomResponse> listMine(@AuthenticationPrincipal AuthenticatedAccount account) {
     return listMyVoteRoomsUseCase.list(account.accountId());
+  }
+
+  @GetMapping("/me/participated")
+  public List<ParticipatedVoteRoomResponse> listParticipated(
+      @AuthenticationPrincipal AuthenticatedAccount account) {
+    return listParticipatedVoteRoomsUseCase.list(account.accountId());
   }
 
   @GetMapping("/{publicId}")
