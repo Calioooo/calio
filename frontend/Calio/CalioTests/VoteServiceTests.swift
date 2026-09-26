@@ -19,6 +19,7 @@ struct VoteServiceTests {
 
     let room = try await service.createRoom(
       name: "가을 여행 일정",
+      candidateStartDay: VoteDay(year: 2026, month: 10, day: 10),
       candidateEndDay: VoteDay(year: 2026, month: 10, day: 18)
     )
 
@@ -26,6 +27,7 @@ struct VoteServiceTests {
       repository.createRoomRequest
         == CreateVoteRoomRequestDTO(
           name: "가을 여행 일정",
+          candidateStartDate: "2026-10-10",
           candidateEndDate: "2026-10-18"
         ))
     #expect(
@@ -152,6 +154,61 @@ struct VoteServiceTests {
     #expect(participant == VoteParticipant(nickname: "민지", status: .registered))
   }
 
+  @Test func createAuthenticatedParticipantMapsNicknameAndOptionalPassword() async throws {
+    let repository = RecordingVoteRepository(
+      participantResponse: VoteParticipantResponseDTO(nickname: "민지", status: .registered)
+    )
+    let service = VoteService(repository: repository)
+
+    let participant = try await service.createAuthenticatedParticipant(
+      publicId: publicId,
+      nickname: "민지",
+      password: nil
+    )
+
+    #expect(repository.authenticatedParticipantPublicId == publicId)
+    #expect(
+      repository.authenticatedParticipantRequest
+        == CreateVoteParticipantRequestDTO(nickname: "민지", password: nil)
+    )
+    #expect(participant == VoteParticipant(nickname: "민지", status: .registered))
+  }
+
+  @Test func fetchMyParticipatedRoomsPreservesParticipantAliasesForSameVoteRoom() async throws {
+    let updatedAt = Date(timeIntervalSince1970: 1_792_337_800)
+    let repository = RecordingVoteRepository(
+      participatedRoomResponses: [
+        ParticipatedVoteRoomResponseDTO(
+          publicId: publicId,
+          name: "가을 여행 일정",
+          candidateStartDate: "2026-10-10",
+          candidateEndDate: "2026-10-18",
+          nickname: "민지",
+          participantStatus: .submitted,
+          participantUpdatedAt: updatedAt
+        ),
+        ParticipatedVoteRoomResponseDTO(
+          publicId: publicId,
+          name: "가을 여행 일정",
+          candidateStartDate: "2026-10-10",
+          candidateEndDate: "2026-10-18",
+          nickname: "준호",
+          participantStatus: .registered,
+          participantUpdatedAt: updatedAt
+        ),
+      ]
+    )
+    let service = VoteService(repository: repository)
+
+    let rooms = try await service.fetchMyParticipatedRooms()
+
+    #expect(rooms.map(\.nickname) == ["민지", "준호"])
+    #expect(rooms.map(\.room.publicId) == [publicId, publicId])
+    #expect(rooms.map(\.id) == ["\(publicId.uuidString):민지", "\(publicId.uuidString):준호"])
+    #expect(rooms.map(\.participantStatus) == [.submitted, .registered])
+    #expect(rooms.map(\.participantUpdatedAt) == [updatedAt, updatedAt])
+  }
+
   @Test func knownBackendErrorCodeBecomesVoteServiceError() async {
     let repository = RecordingVoteRepository(
       resultError: APIError.backend(
@@ -233,11 +290,14 @@ private final class RecordingVoteRepository: VoteRepository {
   var createRoomRequest: CreateVoteRoomRequestDTO?
   var createParticipantPublicId: UUID?
   var createParticipantRequest: CreateVoteParticipantRequestDTO?
+  var authenticatedParticipantPublicId: UUID?
+  var authenticatedParticipantRequest: CreateVoteParticipantRequestDTO?
   var lookupRequest: LookupVoteParticipantSelectionRequestDTO?
   var submitRequest: SubmitVoteRequestDTO?
 
   private let createRoomResponse: VoteRoomResponseDTO
   private let resultResponse: VoteResultResponseDTO
+  private let participatedRoomResponses: [ParticipatedVoteRoomResponseDTO]
   private let selectionResponse: VoteParticipantSelectionResponseDTO
   private let participantResponse: VoteParticipantResponseDTO
   private let submissionResponse: VoteSubmissionResponseDTO
@@ -258,6 +318,7 @@ private final class RecordingVoteRepository: VoteRepository {
       dates: [],
       submittedNicknames: []
     ),
+    participatedRoomResponses: [ParticipatedVoteRoomResponseDTO] = [],
     selectionResponse: VoteParticipantSelectionResponseDTO = VoteParticipantSelectionResponseDTO(
       nickname: "민지",
       status: .registered,
@@ -276,6 +337,7 @@ private final class RecordingVoteRepository: VoteRepository {
   ) {
     self.createRoomResponse = createRoomResponse
     self.resultResponse = resultResponse
+    self.participatedRoomResponses = participatedRoomResponses
     self.selectionResponse = selectionResponse
     self.participantResponse = participantResponse
     self.submissionResponse = submissionResponse
@@ -285,6 +347,10 @@ private final class RecordingVoteRepository: VoteRepository {
   func createVoteRoom(_ request: CreateVoteRoomRequestDTO) async throws -> VoteRoomResponseDTO {
     createRoomRequest = request
     return createRoomResponse
+  }
+
+  func fetchMyParticipatedVoteRooms() async throws -> [ParticipatedVoteRoomResponseDTO] {
+    participatedRoomResponses
   }
 
   func fetchVoteResult(publicId: UUID) async throws -> VoteResultResponseDTO {
@@ -300,6 +366,15 @@ private final class RecordingVoteRepository: VoteRepository {
   ) async throws -> VoteParticipantResponseDTO {
     createParticipantPublicId = publicId
     createParticipantRequest = request
+    return participantResponse
+  }
+
+  func createAuthenticatedVoteParticipant(
+    publicId: UUID,
+    request: CreateVoteParticipantRequestDTO
+  ) async throws -> VoteParticipantResponseDTO {
+    authenticatedParticipantPublicId = publicId
+    authenticatedParticipantRequest = request
     return participantResponse
   }
 

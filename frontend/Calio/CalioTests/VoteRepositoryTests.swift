@@ -20,7 +20,13 @@ struct VoteRepositoryTests {
       #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer guest-token")
       let body = try #require(requestBodyData(from: request))
       let payload = try #require(JSONSerialization.jsonObject(with: body) as? [String: String])
-      #expect(payload == ["name": "가을 여행 일정", "candidateEndDate": "2026-10-18"])
+      #expect(
+        payload
+          == [
+            "name": "가을 여행 일정",
+            "candidateStartDate": "2026-10-10",
+            "candidateEndDate": "2026-10-18",
+          ])
       return voteResponse(
         for: request,
         statusCode: 201,
@@ -29,8 +35,25 @@ struct VoteRepositoryTests {
       )
     }
     _ = try await repository.createVoteRoom(
-      CreateVoteRoomRequestDTO(name: "가을 여행 일정", candidateEndDate: "2026-10-18")
+      CreateVoteRoomRequestDTO(
+        name: "가을 여행 일정",
+        candidateStartDate: "2026-10-10",
+        candidateEndDate: "2026-10-18"
+      )
     )
+
+    MockURLProtocol.requestHandler = { request in
+      #expect(request.url?.path == "/api/vote-rooms/me/participated")
+      #expect(request.httpMethod == "GET")
+      #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer guest-token")
+      return voteResponse(
+        for: request,
+        statusCode: 200,
+        body:
+          #"[{"publicId":"9F17BFC0-D2ED-48EA-9253-7A98EBCA4C2F","name":"가을 여행 일정","candidateStartDate":"2026-10-10","candidateEndDate":"2026-10-18","nickname":"민지","participantStatus":"SUBMITTED","participantUpdatedAt":"2026-10-18T10:30:00Z"}]"#
+      )
+    }
+    _ = try await repository.fetchMyParticipatedVoteRooms()
 
     MockURLProtocol.requestHandler = { request in
       #expect(request.url?.path == "/api/vote-rooms/9F17BFC0-D2ED-48EA-9253-7A98EBCA4C2F")
@@ -57,6 +80,23 @@ struct VoteRepositoryTests {
         for: request, statusCode: 201, body: #"{"nickname":"민지","status":"REGISTERED"}"#)
     }
     _ = try await repository.createVoteParticipant(
+      publicId: publicId,
+      request: CreateVoteParticipantRequestDTO(nickname: "민지", password: "secret")
+    )
+
+    MockURLProtocol.requestHandler = { request in
+      #expect(
+        request.url?.path
+          == "/api/vote-rooms/9F17BFC0-D2ED-48EA-9253-7A98EBCA4C2F/participants/me")
+      #expect(request.httpMethod == "POST")
+      #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer guest-token")
+      let body = try #require(requestBodyData(from: request))
+      let payload = try #require(JSONSerialization.jsonObject(with: body) as? [String: String])
+      #expect(payload == ["nickname": "민지", "password": "secret"])
+      return voteResponse(
+        for: request, statusCode: 201, body: #"{"nickname":"민지","status":"REGISTERED"}"#)
+    }
+    _ = try await repository.createAuthenticatedVoteParticipant(
       publicId: publicId,
       request: CreateVoteParticipantRequestDTO(nickname: "민지", password: "secret")
     )
