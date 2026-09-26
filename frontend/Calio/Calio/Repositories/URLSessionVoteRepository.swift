@@ -51,6 +51,19 @@ struct URLSessionVoteRepository: VoteRepository {
     )
   }
 
+  func createAuthenticatedVoteParticipant(
+    publicId: UUID,
+    request: CreateVoteParticipantRequestDTO
+  ) async throws -> VoteParticipantResponseDTO {
+    try await apiClient.send(
+      VoteParticipantResponseDTO.self,
+      method: .post,
+      pathComponents: voteRoomPath(publicId) + ["participants", "me"],
+      authorization: .bearer,
+      body: request
+    )
+  }
+
   func lookupVoteParticipantSelection(
     publicId: UUID,
     request: LookupVoteParticipantSelectionRequestDTO

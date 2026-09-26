@@ -7,6 +7,10 @@ protocol VoteRepository {
     publicId: UUID,
     request: CreateVoteParticipantRequestDTO
   ) async throws -> VoteParticipantResponseDTO
+  func createAuthenticatedVoteParticipant(
+    publicId: UUID,
+    request: CreateVoteParticipantRequestDTO
+  ) async throws -> VoteParticipantResponseDTO
   func lookupVoteParticipantSelection(
     publicId: UUID,
     request: LookupVoteParticipantSelectionRequestDTO

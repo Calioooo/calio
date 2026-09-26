@@ -38,6 +38,18 @@ struct VoteService {
     return mapVoteParticipant(response)
   }
 
+  func createAuthenticatedParticipant(
+    publicId: UUID,
+    nickname: String,
+    password: String?
+  ) async throws -> VoteParticipant {
+    let request = CreateVoteParticipantRequestDTO(nickname: nickname, password: password)
+    let response = try await perform {
+      try await repository.createAuthenticatedVoteParticipant(publicId: publicId, request: request)
+    }
+    return mapVoteParticipant(response)
+  }
+
   func lookupParticipantSelection(
     publicId: UUID,
     nickname: String,
