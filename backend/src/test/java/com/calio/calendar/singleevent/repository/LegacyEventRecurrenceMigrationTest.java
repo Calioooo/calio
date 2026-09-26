@@ -15,14 +15,14 @@ import org.junit.jupiter.api.Test;
 class LegacyEventRecurrenceMigrationTest {
 
   @Test
-  @DisplayName("V40은 legacy recurrence Event와 그 공유 레코드를 정리한 뒤 recurrence_id를 제거한다")
-  void givenLegacyRecurrenceEventWithShare_whenMigrateToV40_thenRemovesDependentRowsBeforeColumn()
+  @DisplayName("V41은 legacy recurrence Event와 그 공유 레코드를 정리한 뒤 recurrence_id를 제거한다")
+  void givenLegacyRecurrenceEventWithShare_whenMigrateToV41_thenRemovesDependentRowsBeforeColumn()
       throws Exception {
     String url = "jdbc:h2:mem:legacy-event-recurrence-migration;MODE=MySQL;DB_CLOSE_DELAY=-1";
-    migrateTo(url, "39");
+    migrateTo(url, "40");
     insertLegacyRecurrenceEventWithShare(url);
 
-    migrateTo(url, "40");
+    migrateTo(url, "41");
 
     try (Connection connection = DriverManager.getConnection(url, "sa", "")) {
       assertThat(rowCount(connection, "events")).isZero();
