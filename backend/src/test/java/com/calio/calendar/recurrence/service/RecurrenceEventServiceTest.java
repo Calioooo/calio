@@ -30,7 +30,7 @@ import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.sharing.recurrence.service.PersonalRecurrenceGroupShareCommandService;
 import com.calio.calendar.singleevent.controller.dto.EventResponse;
 import com.calio.calendar.tag.domain.Tag;
-import com.calio.calendar.tag.service.TagQueryService;
+import com.calio.calendar.tag.repository.TagRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -54,7 +54,7 @@ class RecurrenceEventServiceTest {
 
   @Mock private AccountRepository accountRepository;
 
-  @Mock private TagQueryService tagQueryService;
+  @Mock private TagRepository tagRepository;
 
   @Mock private Rfc5545RecurrenceEngine recurrenceEngine;
 
@@ -82,7 +82,7 @@ class RecurrenceEventServiceTest {
             queryService,
             commandService,
             accountRepository,
-            tagQueryService,
+            tagRepository,
             recurrenceEngine,
             clock,
             recurrenceShareCommandService,
@@ -95,7 +95,7 @@ class RecurrenceEventServiceTest {
     // given
     Tag tag = tag();
     List<String> normalized = List.of("RRULE:FREQ=DAILY;COUNT=3");
-    when(tagQueryService.getTagOrDefault(1L, null)).thenReturn(tag);
+    when(tagRepository.findPersonalFallbackTag()).thenReturn(Optional.of(tag));
     when(accountRepository.findById(1L)).thenReturn(Optional.of(account()));
     when(recurrenceEngine.validate(any(RecurrenceSchedule.class), any())).thenReturn(normalized);
     when(recurrenceEventRepository.save(any(RecurrenceEvent.class)))
@@ -155,7 +155,7 @@ class RecurrenceEventServiceTest {
     List<String> normalized = List.of("RRULE:FREQ=WEEKLY;COUNT=2");
     when(recurrenceEventRepository.findByIdAndAccountIdForUpdate(10L, 1L))
         .thenReturn(Optional.of(recurrenceEvent));
-    when(tagQueryService.getTagOrDefault(1L, null)).thenReturn(tag);
+    when(tagRepository.findPersonalFallbackTag()).thenReturn(Optional.of(tag));
     when(recurrenceEngine.validate(any(RecurrenceSchedule.class), any())).thenReturn(normalized);
     UpdateRecurrenceEventRequest request =
         new UpdateRecurrenceEventRequest(

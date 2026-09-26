@@ -3,7 +3,10 @@ package com.calio.calendar.tag.controller;
 import com.calio.calendar.security.AuthenticatedAccount;
 import com.calio.calendar.tag.controller.dto.CustomTagRequest;
 import com.calio.calendar.tag.controller.dto.TagResponse;
-import com.calio.calendar.tag.service.GroupTagService;
+import com.calio.calendar.tag.usecase.CreateGroupCustomTagUseCase;
+import com.calio.calendar.tag.usecase.DeleteGroupCustomTagUseCase;
+import com.calio.calendar.tag.usecase.ListGroupTagsUseCase;
+import com.calio.calendar.tag.usecase.UpdateGroupCustomTagUseCase;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.http.HttpStatus;
@@ -22,16 +25,26 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/group-spaces/{groupSpaceId}/tags")
 public class GroupTagController {
 
-  private final GroupTagService groupTagService;
+  private final ListGroupTagsUseCase listGroupTagsUseCase;
+  private final CreateGroupCustomTagUseCase createGroupCustomTagUseCase;
+  private final UpdateGroupCustomTagUseCase updateGroupCustomTagUseCase;
+  private final DeleteGroupCustomTagUseCase deleteGroupCustomTagUseCase;
 
-  public GroupTagController(GroupTagService groupTagService) {
-    this.groupTagService = groupTagService;
+  public GroupTagController(
+      ListGroupTagsUseCase listGroupTagsUseCase,
+      CreateGroupCustomTagUseCase createGroupCustomTagUseCase,
+      UpdateGroupCustomTagUseCase updateGroupCustomTagUseCase,
+      DeleteGroupCustomTagUseCase deleteGroupCustomTagUseCase) {
+    this.listGroupTagsUseCase = listGroupTagsUseCase;
+    this.createGroupCustomTagUseCase = createGroupCustomTagUseCase;
+    this.updateGroupCustomTagUseCase = updateGroupCustomTagUseCase;
+    this.deleteGroupCustomTagUseCase = deleteGroupCustomTagUseCase;
   }
 
   @GetMapping
   public List<TagResponse> list(
       @AuthenticationPrincipal AuthenticatedAccount account, @PathVariable Long groupSpaceId) {
-    return groupTagService.list(account.accountId(), groupSpaceId);
+    return listGroupTagsUseCase.list(account.accountId(), groupSpaceId);
   }
 
   @PostMapping
@@ -40,7 +53,8 @@ public class GroupTagController {
       @AuthenticationPrincipal AuthenticatedAccount account,
       @PathVariable Long groupSpaceId,
       @Valid @RequestBody CustomTagRequest request) {
-    return groupTagService.create(account.accountId(), groupSpaceId, request);
+    return createGroupCustomTagUseCase.create(
+        account.accountId(), groupSpaceId, request.title(), request.colorCode());
   }
 
   @PatchMapping("/{tagId}")
@@ -49,7 +63,8 @@ public class GroupTagController {
       @PathVariable Long groupSpaceId,
       @PathVariable Long tagId,
       @Valid @RequestBody CustomTagRequest request) {
-    return groupTagService.update(account.accountId(), groupSpaceId, tagId, request);
+    return updateGroupCustomTagUseCase.update(
+        account.accountId(), groupSpaceId, tagId, request.title(), request.colorCode());
   }
 
   @DeleteMapping("/{tagId}")
@@ -58,6 +73,6 @@ public class GroupTagController {
       @AuthenticationPrincipal AuthenticatedAccount account,
       @PathVariable Long groupSpaceId,
       @PathVariable Long tagId) {
-    groupTagService.delete(account.accountId(), groupSpaceId, tagId);
+    deleteGroupCustomTagUseCase.delete(account.accountId(), groupSpaceId, tagId);
   }
 }

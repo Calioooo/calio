@@ -155,7 +155,7 @@ class CustomTagControllerTest {
       throws Exception {
     // given
     Tag customTag =
-        tagRepository.save(Tag.personalCustom(currentAccountReference(), "기존", "#111111"));
+        tagRepository.save(Tag.personalCustom(currentAccountReference().getId(), "기존", "#111111"));
     Tag defaultTag = tagRepository.save(Tag.personalDefault("기타", "#64748B"));
 
     // when
@@ -185,9 +185,10 @@ class CustomTagControllerTest {
   void givenCustomTagInUse_whenDeleteCustomTag_thenReassignsAllUsagesToFallbackTag()
       throws Exception {
     // given
-    Tag fallbackTag = tagRepository.save(Tag.personalDefault("기타", "#64748B"));
+    Tag fallbackTag = tagRepository.save(Tag.personalFallback("기타", "#64748B"));
     Tag customTag =
-        tagRepository.save(Tag.personalCustom(currentAccountReference(), "삭제 대상", "#8B5CF6"));
+        tagRepository.save(
+            Tag.personalCustom(currentAccountReference().getId(), "삭제 대상", "#8B5CF6"));
     SingleEvent ordinaryEvent = eventRepository.save(event("일반", customTag));
     RecurrenceEvent recurrenceEvent = recurrenceEventRepository.save(recurrenceEvent(customTag));
 
@@ -214,7 +215,8 @@ class CustomTagControllerTest {
       throws Exception {
     // given
     Tag customTag =
-        tagRepository.save(Tag.personalCustom(currentAccountReference(), "삭제 보류", "#8B5CF6"));
+        tagRepository.save(
+            Tag.personalCustom(currentAccountReference().getId(), "삭제 보류", "#8B5CF6"));
     SingleEvent ordinaryEvent = eventRepository.save(event("일반", customTag));
     RecurrenceEvent recurrenceEvent = recurrenceEventRepository.save(recurrenceEvent(customTag));
 

@@ -16,7 +16,7 @@ import com.calio.calendar.singleevent.controller.dto.UpdateSingleEventRequest;
 import com.calio.calendar.singleevent.domain.SingleEvent;
 import com.calio.calendar.singleevent.repository.SingleEventRepository;
 import com.calio.calendar.tag.domain.Tag;
-import com.calio.calendar.tag.service.TagQueryService;
+import com.calio.calendar.tag.repository.TagRepository;
 import java.time.Instant;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
@@ -33,7 +33,7 @@ class SingleEventGoogleOperationEnqueueTest {
       org.mockito.Mockito.mock(AccountRepository.class);
   private final SingleEventRepository eventRepository =
       org.mockito.Mockito.mock(SingleEventRepository.class);
-  private final TagQueryService tagQueryService = org.mockito.Mockito.mock(TagQueryService.class);
+  private final TagRepository tagRepository = org.mockito.Mockito.mock(TagRepository.class);
   private final PersonalEventGroupShareCommandService shareCommandService =
       org.mockito.Mockito.mock(PersonalEventGroupShareCommandService.class);
   private final GoogleOperationJobEnqueueService jobEnqueueService =
@@ -46,7 +46,7 @@ class SingleEventGoogleOperationEnqueueTest {
     OutboundOperation outboundOperation = mock();
     when(jobEnqueueService.prepareOutboundOperation(ACCOUNT_ID)).thenReturn(outboundOperation);
     when(accountRepository.findById(ACCOUNT_ID)).thenReturn(Optional.of(new Account()));
-    when(tagQueryService.getTagOrDefault(ACCOUNT_ID, null)).thenReturn(tag);
+    when(tagRepository.findPersonalFallbackTag()).thenReturn(Optional.of(tag));
     when(eventRepository.save(any(SingleEvent.class)))
         .thenAnswer(
             invocation -> {
@@ -56,7 +56,7 @@ class SingleEventGoogleOperationEnqueueTest {
             });
 
     new CreateSingleEventUseCase(
-            accountRepository, eventRepository, tagQueryService, jobEnqueueService)
+            accountRepository, eventRepository, tagRepository, jobEnqueueService)
         .create(ACCOUNT_ID, request());
 
     InOrder ordered = inOrder(jobEnqueueService, eventRepository);
@@ -74,9 +74,9 @@ class SingleEventGoogleOperationEnqueueTest {
     when(jobEnqueueService.prepareOutboundOperation(ACCOUNT_ID)).thenReturn(outboundOperation);
     when(eventRepository.findByIdAndAccountIdForUpdate(EVENT_ID, ACCOUNT_ID))
         .thenReturn(Optional.of(event));
-    when(tagQueryService.getTagOrDefault(ACCOUNT_ID, null)).thenReturn(tag);
+    when(tagRepository.findPersonalFallbackTag()).thenReturn(Optional.of(tag));
 
-    new UpdateSingleEventUseCase(eventRepository, tagQueryService, jobEnqueueService)
+    new UpdateSingleEventUseCase(eventRepository, tagRepository, jobEnqueueService)
         .update(ACCOUNT_ID, EVENT_ID, updateRequest());
 
     InOrder ordered = inOrder(eventRepository, jobEnqueueService);
@@ -144,7 +144,7 @@ class SingleEventGoogleOperationEnqueueTest {
   }
 
   private Tag tag() {
-    Tag tag = Tag.personalDefault("기타", "#64748B");
+    Tag tag = Tag.personalFallback("기타", "#64748B");
     ReflectionTestUtils.setField(tag, "id", 2L);
     return tag;
   }

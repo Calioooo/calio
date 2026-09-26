@@ -5,7 +5,8 @@ import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.singleevent.controller.dto.EventResponse;
 import com.calio.calendar.singleevent.domain.SingleEvent;
 import com.calio.calendar.singleevent.repository.SingleEventRepository;
-import com.calio.calendar.tag.service.TagQueryService;
+import com.calio.calendar.tag.domain.Tag;
+import com.calio.calendar.tag.repository.TagRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -13,12 +14,12 @@ import org.springframework.transaction.annotation.Transactional;
 public class UpdateImportantSingleEventUseCase {
 
   private final SingleEventRepository eventRepository;
-  private final TagQueryService tagQueryService;
+  private final TagRepository tagRepository;
 
   public UpdateImportantSingleEventUseCase(
-      SingleEventRepository eventRepository, TagQueryService tagQueryService) {
+      SingleEventRepository eventRepository, TagRepository tagRepository) {
     this.eventRepository = eventRepository;
-    this.tagQueryService = tagQueryService;
+    this.tagRepository = tagRepository;
   }
 
   @Transactional
@@ -29,6 +30,13 @@ public class UpdateImportantSingleEventUseCase {
             .orElseThrow(() -> new CalioException(ErrorCode.EVENT_NOT_FOUND));
     event.changeImportantEvent(importantEvent);
     eventRepository.flush();
-    return EventResponse.from(event, tagQueryService.getTag(accountId, event.getTagId()));
+    return EventResponse.from(event, getPersonalTag(accountId, event.getTagId()));
+  }
+
+  private Tag getPersonalTag(Long accountId, Long tagId) {
+    return tagRepository
+        .findPersonalDefaultTagById(tagId)
+        .or(() -> tagRepository.findPersonalCustomTagById(accountId, tagId))
+        .orElseThrow(() -> new CalioException(ErrorCode.TAG_NOT_FOUND));
   }
 }

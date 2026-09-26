@@ -21,7 +21,7 @@ import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
 import com.calio.calendar.sharing.recurrence.service.PersonalRecurrenceGroupShareCommandService;
 import com.calio.calendar.singleevent.controller.dto.EventResponse;
 import com.calio.calendar.tag.domain.Tag;
-import com.calio.calendar.tag.service.TagQueryService;
+import com.calio.calendar.tag.repository.TagRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -36,7 +36,7 @@ public class RecurrenceEventService {
   private final RecurrenceEventQueryService recurrenceEventQueryService;
   private final RecurrenceEventCommandService recurrenceEventCommandService;
   private final AccountRepository accountRepository;
-  private final TagQueryService tagQueryService;
+  private final TagRepository tagRepository;
   private final Rfc5545RecurrenceEngine recurrenceEngine;
   private final Clock clock;
   private final PersonalRecurrenceGroupShareCommandService recurrenceShareCommandService;
@@ -46,7 +46,7 @@ public class RecurrenceEventService {
       RecurrenceEventQueryService recurrenceEventQueryService,
       RecurrenceEventCommandService recurrenceEventCommandService,
       AccountRepository accountRepository,
-      TagQueryService tagQueryService,
+      TagRepository tagRepository,
       Rfc5545RecurrenceEngine recurrenceEngine,
       Clock clock,
       PersonalRecurrenceGroupShareCommandService recurrenceShareCommandService,
@@ -54,7 +54,7 @@ public class RecurrenceEventService {
     this.recurrenceEventQueryService = recurrenceEventQueryService;
     this.recurrenceEventCommandService = recurrenceEventCommandService;
     this.accountRepository = accountRepository;
-    this.tagQueryService = tagQueryService;
+    this.tagRepository = tagRepository;
     this.recurrenceEngine = recurrenceEngine;
     this.clock = clock;
     this.recurrenceShareCommandService = recurrenceShareCommandService;
@@ -71,7 +71,7 @@ public class RecurrenceEventService {
         accountRepository
             .findById(accountId)
             .orElseThrow(() -> new CalioException(ErrorCode.ACCOUNT_NOT_FOUND));
-    Tag tag = tagQueryService.getTagOrDefault(accountId, request.tagId());
+    Tag tag = getPersonalTagOrDefault(accountId, request.tagId());
     RecurrenceEvent recurrenceEvent =
         recurrenceEventCommandService.createRecurrenceEvent(
             new RecurrenceEvent(
@@ -113,7 +113,7 @@ public class RecurrenceEventService {
     OutboundOperation outboundOperation = jobEnqueueService.prepareOutboundOperation(accountId);
     RecurrenceEvent recurrenceEvent =
         recurrenceEventCommandService.lockRecurrenceEvent(accountId, recurrenceId);
-    Tag tag = tagQueryService.getTagOrDefault(accountId, request.tagId());
+    Tag tag = getPersonalTagOrDefault(accountId, request.tagId());
     recurrenceEventCommandService.updateRecurrenceEvent(
         recurrenceEvent, request, schedule, recurrenceRules, tag);
     jobEnqueueService.enqueueRecurrence(
@@ -187,6 +187,18 @@ public class RecurrenceEventService {
         request.firstOccurrenceStartAt(),
         request.firstOccurrenceEndAt(),
         request.timeZone());
+  }
+
+  private Tag getPersonalTagOrDefault(Long accountId, Long tagId) {
+    if (tagId == null) {
+      return tagRepository
+          .findPersonalFallbackTag()
+          .orElseThrow(() -> new CalioException(ErrorCode.DEFAULT_TAG_NOT_FOUND));
+    }
+    return tagRepository
+        .findPersonalDefaultTagById(tagId)
+        .or(() -> tagRepository.findPersonalCustomTagById(accountId, tagId))
+        .orElseThrow(() -> new CalioException(ErrorCode.TAG_NOT_FOUND));
   }
 
   private RecurrenceSchedule createSchedule(UpdateRecurrenceEventRequest request) {

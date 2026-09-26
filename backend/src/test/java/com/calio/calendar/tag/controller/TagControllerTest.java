@@ -1,6 +1,6 @@
 package com.calio.calendar.tag.controller;
 
-import static com.calio.calendar.security.TestAccountSupport.currentAccountReference;
+import static com.calio.calendar.security.TestAccountSupport.currentAccountId;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -46,8 +46,8 @@ class TagControllerTest {
   void givenPersonalDefaultAndCustomTags_whenListTags_thenReturnsAllTags() throws Exception {
     // given
     tagRepository.save(Tag.personalDefault("업무", "#2563eb"));
-    tagRepository.save(Tag.personalDefault("기타", "#64748b"));
-    tagRepository.save(Tag.personalCustom(currentAccountReference(), "사용자", "#111111"));
+    tagRepository.save(Tag.personalFallback("기타", "#64748b"));
+    tagRepository.save(Tag.personalCustom(currentAccountId(), "사용자", "#111111"));
 
     // when
     mockMvc

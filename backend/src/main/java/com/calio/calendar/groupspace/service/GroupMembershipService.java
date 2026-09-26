@@ -20,7 +20,7 @@ import com.calio.calendar.groupspace.domain.GroupMember;
 import com.calio.calendar.groupspace.domain.GroupMemberStatus;
 import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.domain.GroupSpaceFields;
-import com.calio.calendar.tag.service.GroupTagService;
+import com.calio.calendar.tag.repository.TagRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -42,7 +42,7 @@ public class GroupMembershipService {
   private final GroupScheduleShareCleanupPort groupScheduleShareCleanupPort;
   private final GroupCalendarEventCommandService groupCalendarEventCommandService;
   private final GroupCalendarRecurrenceCommandService groupCalendarRecurrenceCommandService;
-  private final GroupTagService groupTagService;
+  private final TagRepository tagRepository;
   private final Clock clock;
 
   public GroupMembershipService(
@@ -56,7 +56,7 @@ public class GroupMembershipService {
       GroupScheduleShareCleanupPort groupScheduleShareCleanupPort,
       GroupCalendarEventCommandService groupCalendarEventCommandService,
       GroupCalendarRecurrenceCommandService groupCalendarRecurrenceCommandService,
-      GroupTagService groupTagService,
+      TagRepository tagRepository,
       Clock clock) {
     this.queryService = queryService;
     this.commandService = commandService;
@@ -68,7 +68,7 @@ public class GroupMembershipService {
     this.groupScheduleShareCleanupPort = groupScheduleShareCleanupPort;
     this.groupCalendarEventCommandService = groupCalendarEventCommandService;
     this.groupCalendarRecurrenceCommandService = groupCalendarRecurrenceCommandService;
-    this.groupTagService = groupTagService;
+    this.tagRepository = tagRepository;
     this.clock = clock;
   }
 
@@ -244,7 +244,7 @@ public class GroupMembershipService {
     groupCalendarEventCommandService.deleteAllByGroupSpaceId(groupSpace.getId());
     groupCalendarRecurrenceCommandService.deleteAllInGroupSpace(groupSpace.getId());
     invitationCommandService.deleteAllByGroupSpaceId(groupSpace.getId());
-    groupTagService.deleteAll(groupSpace.getId());
+    tagRepository.deleteAll(tagRepository.findByGroupSpaceId(groupSpace.getId()));
     groupSpaceCommandService.delete(groupSpace);
   }
 

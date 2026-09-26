@@ -12,7 +12,7 @@ import com.calio.calendar.singleevent.domain.SingleEventSchedule;
 import com.calio.calendar.singleevent.domain.SingleEventTitle;
 import com.calio.calendar.singleevent.repository.SingleEventRepository;
 import com.calio.calendar.tag.domain.Tag;
-import com.calio.calendar.tag.service.TagQueryService;
+import com.calio.calendar.tag.repository.TagRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,17 +21,17 @@ public class CreateSingleEventUseCase {
 
   private final AccountRepository accountRepository;
   private final SingleEventRepository eventRepository;
-  private final TagQueryService tagQueryService;
+  private final TagRepository tagRepository;
   private final GoogleOperationJobEnqueueService jobEnqueueService;
 
   public CreateSingleEventUseCase(
       AccountRepository accountRepository,
       SingleEventRepository eventRepository,
-      TagQueryService tagQueryService,
+      TagRepository tagRepository,
       GoogleOperationJobEnqueueService jobEnqueueService) {
     this.accountRepository = accountRepository;
     this.eventRepository = eventRepository;
-    this.tagQueryService = tagQueryService;
+    this.tagRepository = tagRepository;
     this.jobEnqueueService = jobEnqueueService;
   }
 
@@ -41,7 +41,7 @@ public class CreateSingleEventUseCase {
     accountRepository
         .findById(accountId)
         .orElseThrow(() -> new CalioException(ErrorCode.ACCOUNT_NOT_FOUND));
-    Tag tag = tagQueryService.getTagOrDefault(accountId, request.tagId());
+    Tag tag = getPersonalTagOrDefault(accountId, request.tagId());
     SingleEvent event =
         eventRepository.save(
             new SingleEvent(
@@ -53,5 +53,17 @@ public class CreateSingleEventUseCase {
                 accountId));
     jobEnqueueService.enqueueEventCreated(outboundOperation, event);
     return EventResponse.from(event, tag);
+  }
+
+  private Tag getPersonalTagOrDefault(Long accountId, Long tagId) {
+    if (tagId == null) {
+      return tagRepository
+          .findPersonalFallbackTag()
+          .orElseThrow(() -> new CalioException(ErrorCode.DEFAULT_TAG_NOT_FOUND));
+    }
+    return tagRepository
+        .findPersonalDefaultTagById(tagId)
+        .or(() -> tagRepository.findPersonalCustomTagById(accountId, tagId))
+        .orElseThrow(() -> new CalioException(ErrorCode.TAG_NOT_FOUND));
   }
 }
