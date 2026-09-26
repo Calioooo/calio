@@ -2,7 +2,9 @@ package com.calio.calendar.recurrence.domain;
 
 import com.calio.calendar.common.domain.BaseEntity;
 import com.calio.calendar.common.domain.CanonicalSchedule;
+import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -34,8 +36,11 @@ public class RecurrenceEventOverride extends BaseEntity {
   @Column(name = "origin_start_at", nullable = false)
   private Instant originStartAt;
 
-  @Column(name = "override_title")
-  private String overrideTitle;
+  @Embedded
+  @AttributeOverride(
+      name = "value",
+      column = @Column(name = "override_title", length = RecurrenceEventTitle.MAX_LENGTH))
+  private RecurrenceEventTitle overrideTitle;
 
   @Column(name = "override_description")
   private String overrideDescription;
@@ -81,7 +86,7 @@ public class RecurrenceEventOverride extends BaseEntity {
   }
 
   public void activate(String title, String description, CanonicalSchedule schedule) {
-    this.overrideTitle = title;
+    this.overrideTitle = new RecurrenceEventTitle(title);
     this.overrideDescription = description;
     this.overrideStartAt = schedule.startAt();
     this.overrideEndAt = schedule.endAt();
@@ -121,7 +126,7 @@ public class RecurrenceEventOverride extends BaseEntity {
   }
 
   public String getOverrideTitle() {
-    return overrideTitle;
+    return overrideTitle == null ? null : overrideTitle.value();
   }
 
   public String getOverrideDescription() {

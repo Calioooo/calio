@@ -18,7 +18,7 @@ import com.calio.calendar.groupspace.service.GroupSpaceCommandService;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
 import com.calio.calendar.recurrence.service.Rfc5545RecurrenceEngine;
 import com.calio.calendar.tag.domain.Tag;
-import com.calio.calendar.tag.service.TagQueryService;
+import com.calio.calendar.tag.repository.TagRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -33,7 +33,7 @@ public class GroupCalendarRecurrenceService {
   private final GroupSpaceCommandService groupSpaceCommandService;
   private final GroupMembershipQueryService membershipQueryService;
   private final AccountRepository accountRepository;
-  private final TagQueryService tagQueryService;
+  private final TagRepository tagRepository;
   private final GroupCalendarRecurrenceQueryService recurrenceQueryService;
   private final GroupCalendarRecurrenceCommandService recurrenceCommandService;
   private final GroupCalendarRecurrenceOverrideQueryService overrideQueryService;
@@ -45,7 +45,7 @@ public class GroupCalendarRecurrenceService {
       GroupSpaceCommandService groupSpaceCommandService,
       GroupMembershipQueryService membershipQueryService,
       AccountRepository accountRepository,
-      TagQueryService tagQueryService,
+      TagRepository tagRepository,
       GroupCalendarRecurrenceQueryService recurrenceQueryService,
       GroupCalendarRecurrenceCommandService recurrenceCommandService,
       GroupCalendarRecurrenceOverrideQueryService overrideQueryService,
@@ -55,7 +55,7 @@ public class GroupCalendarRecurrenceService {
     this.groupSpaceCommandService = groupSpaceCommandService;
     this.membershipQueryService = membershipQueryService;
     this.accountRepository = accountRepository;
-    this.tagQueryService = tagQueryService;
+    this.tagRepository = tagRepository;
     this.recurrenceQueryService = recurrenceQueryService;
     this.recurrenceCommandService = recurrenceCommandService;
     this.overrideQueryService = overrideQueryService;
@@ -73,7 +73,7 @@ public class GroupCalendarRecurrenceService {
     RecurrenceSchedule schedule = createSchedule(request);
     List<String> recurrenceRules = recurrenceEngine.validate(schedule, request.recurrence());
     Account account = getAccount(accountId);
-    Tag tag = tagQueryService.getGroupTagOrDefault(groupSpaceId, request.tagId());
+    Tag tag = getGroupTagOrDefault(groupSpaceId, request.tagId());
     GroupCalendarRecurrenceEvent event =
         new GroupCalendarRecurrenceEvent(
             groupSpace,
@@ -112,7 +112,7 @@ public class GroupCalendarRecurrenceService {
 
     RecurrenceSchedule schedule = createSchedule(request);
     List<String> recurrenceRules = recurrenceEngine.validate(schedule, request.recurrence());
-    Tag tag = tagQueryService.getGroupTagOrDefault(groupSpaceId, request.tagId());
+    Tag tag = getGroupTagOrDefault(groupSpaceId, request.tagId());
     event.update(request.title(), request.description(), tag, schedule, recurrenceRules);
 
     return GroupCalendarRecurrenceResponse.from(event);
@@ -191,6 +191,17 @@ public class GroupCalendarRecurrenceService {
         request.firstOccurrenceStartAt(),
         request.firstOccurrenceEndAt(),
         request.timeZone());
+  }
+
+  private Tag getGroupTagOrDefault(Long groupSpaceId, Long tagId) {
+    if (tagId == null) {
+      return tagRepository
+          .findGroupFallbackTag(groupSpaceId)
+          .orElseThrow(() -> new CalioException(ErrorCode.GROUP_DEFAULT_TAG_NOT_FOUND));
+    }
+    return tagRepository
+        .findByIdAndGroupSpaceId(tagId, groupSpaceId)
+        .orElseThrow(() -> new CalioException(ErrorCode.GROUP_TAG_NOT_FOUND));
   }
 
   private void requireAuthorOrOwner(Long accountId, GroupCalendarRecurrenceEvent event) {

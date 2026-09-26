@@ -13,7 +13,7 @@ import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.service.GroupMembershipQueryService;
 import com.calio.calendar.groupspace.service.GroupSpaceCommandService;
 import com.calio.calendar.tag.domain.Tag;
-import com.calio.calendar.tag.service.TagQueryService;
+import com.calio.calendar.tag.repository.TagRepository;
 import java.time.Instant;
 import java.util.List;
 import org.springframework.stereotype.Service;
@@ -26,7 +26,7 @@ public class GroupCalendarEventService {
   private final GroupSpaceCommandService groupSpaceCommandService;
   private final GroupMembershipQueryService membershipQueryService;
   private final AccountRepository accountRepository;
-  private final TagQueryService tagQueryService;
+  private final TagRepository tagRepository;
   private final GroupCalendarEventQueryService eventQueryService;
   private final GroupCalendarEventCommandService eventCommandService;
 
@@ -34,13 +34,13 @@ public class GroupCalendarEventService {
       GroupSpaceCommandService groupSpaceCommandService,
       GroupMembershipQueryService membershipQueryService,
       AccountRepository accountRepository,
-      TagQueryService tagQueryService,
+      TagRepository tagRepository,
       GroupCalendarEventQueryService eventQueryService,
       GroupCalendarEventCommandService eventCommandService) {
     this.groupSpaceCommandService = groupSpaceCommandService;
     this.membershipQueryService = membershipQueryService;
     this.accountRepository = accountRepository;
-    this.tagQueryService = tagQueryService;
+    this.tagRepository = tagRepository;
     this.eventQueryService = eventQueryService;
     this.eventCommandService = eventCommandService;
   }
@@ -125,7 +125,14 @@ public class GroupCalendarEventService {
   }
 
   private Tag getTag(Long groupSpaceId, Long tagId) {
-    return tagQueryService.getGroupTagOrDefault(groupSpaceId, tagId);
+    if (tagId == null) {
+      return tagRepository
+          .findGroupFallbackTag(groupSpaceId)
+          .orElseThrow(() -> new CalioException(ErrorCode.GROUP_DEFAULT_TAG_NOT_FOUND));
+    }
+    return tagRepository
+        .findByIdAndGroupSpaceId(tagId, groupSpaceId)
+        .orElseThrow(() -> new CalioException(ErrorCode.GROUP_TAG_NOT_FOUND));
   }
 
   private void requireAuthorOrOwner(Long accountId, GroupCalendarEvent event) {

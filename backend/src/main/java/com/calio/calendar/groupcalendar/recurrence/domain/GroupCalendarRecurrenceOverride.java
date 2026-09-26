@@ -2,7 +2,9 @@ package com.calio.calendar.groupcalendar.recurrence.domain;
 
 import com.calio.calendar.common.domain.BaseEntity;
 import com.calio.calendar.common.domain.CanonicalSchedule;
+import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -34,8 +36,12 @@ public class GroupCalendarRecurrenceOverride extends BaseEntity {
   @Column(name = "origin_start_at", nullable = false)
   private Instant originStartAt;
 
-  @Column(name = "override_title")
-  private String title;
+  @Embedded
+  @AttributeOverride(
+      name = "value",
+      column =
+          @Column(name = "override_title", length = GroupCalendarRecurrenceEventTitle.MAX_LENGTH))
+  private GroupCalendarRecurrenceEventTitle title;
 
   @Column(name = "override_description")
   private String description;
@@ -84,7 +90,7 @@ public class GroupCalendarRecurrenceOverride extends BaseEntity {
   }
 
   public void activate(String title, String description, CanonicalSchedule schedule) {
-    this.title = title;
+    this.title = new GroupCalendarRecurrenceEventTitle(title);
     this.description = description;
     this.startAt = schedule.startAt();
     this.endAt = schedule.endAt();
@@ -116,7 +122,7 @@ public class GroupCalendarRecurrenceOverride extends BaseEntity {
   }
 
   public String getTitle() {
-    return title;
+    return title == null ? null : title.value();
   }
 
   public String getDescription() {

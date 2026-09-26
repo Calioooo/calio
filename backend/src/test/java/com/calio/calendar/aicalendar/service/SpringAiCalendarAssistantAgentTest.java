@@ -12,7 +12,8 @@ import com.calio.calendar.aicalendar.domain.CalendarConversationMessageRole;
 import com.calio.calendar.aicalendar.service.dto.CalendarAssistantRequest;
 import com.calio.calendar.aicalendar.service.dto.CalendarConversationHistoryMessage;
 import com.calio.calendar.aicalendar.service.tool.CalendarAgentTools;
-import com.calio.calendar.event.service.EventService;
+import com.calio.calendar.singleevent.usecase.FindAvailableTimesUseCase;
+import com.calio.calendar.singleevent.usecase.ListEventsUseCase;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -99,7 +100,8 @@ class SpringAiCalendarAssistantAgentTest {
     CalendarAIProperties properties = new CalendarAIProperties();
     CalendarAgentTools tools =
         new CalendarAgentTools(
-            mock(EventService.class),
+            mock(ListEventsUseCase.class),
+            mock(FindAvailableTimesUseCase.class),
             mock(CalendarMutationService.class),
             properties,
             mock(CalendarAgentObservationService.class));

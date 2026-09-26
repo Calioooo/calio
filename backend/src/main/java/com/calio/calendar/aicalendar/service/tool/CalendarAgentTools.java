@@ -9,9 +9,10 @@ import com.calio.calendar.aicalendar.service.tool.dto.CalendarLookupToolRequest;
 import com.calio.calendar.aicalendar.service.tool.dto.CalendarMutationToolRequest;
 import com.calio.calendar.aicalendar.service.tool.dto.FreeTimeSearchToolRequest;
 import com.calio.calendar.aicalendar.service.tool.dto.FreeTimeSearchToolResult;
-import com.calio.calendar.event.controller.dto.EventResponse;
-import com.calio.calendar.event.service.EventService;
-import com.calio.calendar.event.service.dto.CalendarFreeTime;
+import com.calio.calendar.singleevent.controller.dto.EventResponse;
+import com.calio.calendar.singleevent.service.dto.CalendarFreeTime;
+import com.calio.calendar.singleevent.usecase.FindAvailableTimesUseCase;
+import com.calio.calendar.singleevent.usecase.ListEventsUseCase;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalTime;
@@ -34,17 +35,20 @@ public class CalendarAgentTools {
   private static final String CALL_COUNTER_KEY = "calendarAgentToolCallCounter";
   private static final String RESULT_COLLECTOR_KEY = "calendarAgentToolResultCollector";
 
-  private final EventService eventService;
+  private final ListEventsUseCase listEventsUseCase;
+  private final FindAvailableTimesUseCase findAvailableTimesUseCase;
   private final CalendarMutationService mutationService;
   private final CalendarAIProperties properties;
   private final CalendarAgentObservationService observationService;
 
   public CalendarAgentTools(
-      EventService eventService,
+      ListEventsUseCase listEventsUseCase,
+      FindAvailableTimesUseCase findAvailableTimesUseCase,
       CalendarMutationService mutationService,
       CalendarAIProperties properties,
       CalendarAgentObservationService observationService) {
-    this.eventService = eventService;
+    this.listEventsUseCase = listEventsUseCase;
+    this.findAvailableTimesUseCase = findAvailableTimesUseCase;
     this.mutationService = mutationService;
     this.properties = properties;
     this.observationService = observationService;
@@ -95,7 +99,7 @@ public class CalendarAgentTools {
           LocalTime windowStart = LocalTime.parse(request.windowStart());
           LocalTime windowEnd = LocalTime.parse(request.windowEnd());
           List<CalendarFreeTime> freeTimes =
-              eventService.findAvailableTimes(
+              findAvailableTimesUseCase.find(
                   requestContext.accountId(),
                   range.startDate(),
                   range.endDate(),
@@ -112,7 +116,7 @@ public class CalendarAgentTools {
   @Tool(
       name = PREVIEW_MUTATION_TOOL_NAME,
       description =
-          "Prepare a non-mutating Preview for one fully specified and unambiguous Calio calendar creation, update, or deletion. For CREATE_EVENT, a user-stated event name and date or time resolved from system context are complete input. For CREATE_RECURRENCE_EVENT, pass exactly one supported RFC 5545 RRULE: DAILY, WEEKLY, MONTHLY, or YEARLY, with an optional UNTIL no later than December 31 of the current year plus 100 years; timed boundaries must be whole-minute. For UPDATE_EVENT or DELETE_EVENT, use an eventId from lookup_calendar_events. For a recurrence occurrence or entire series operation, use recurrenceId and, for an occurrence, originStartAt from lookup_calendar_events. Use this immediately after resolving exactly one target and recurrence scope.")
+          "Prepare a non-mutating Preview for one fully specified and unambiguous Calio calendar creation, update, or deletion. For CREATE_EVENT, a user-stated event name and date or time resolved from system context are complete input; do not ask the user to confirm a relative date or ask permission to prepare the Preview. For UPDATE_EVENT or DELETE_EVENT, use an eventId from lookup_calendar_events. For a recurrence occurrence or entire series operation, use recurrenceId and, for an occurrence, originStartAt from lookup_calendar_events. Use this immediately after resolving exactly one target and recurrence scope.")
   public CalendarMutationPreview previewCalendarMutation(
       CalendarMutationToolRequest request, ToolContext toolContext) {
     return runTool(
@@ -201,6 +205,6 @@ public class CalendarAgentTools {
   private List<EventResponse> getCalendarEvents(Long accountId, CalendarToolTimeRange range) {
     Instant from = range.startDate().atStartOfDay(range.timeZone()).toInstant();
     Instant to = range.endDate().plusDays(1).atStartOfDay(range.timeZone()).toInstant();
-    return eventService.listEvents(accountId, from, to);
+    return listEventsUseCase.list(accountId, from, to);
   }
 }

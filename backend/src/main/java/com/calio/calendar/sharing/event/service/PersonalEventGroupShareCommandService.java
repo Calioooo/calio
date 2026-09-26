@@ -2,6 +2,7 @@ package com.calio.calendar.sharing.event.service;
 
 import com.calio.calendar.sharing.event.domain.PersonalEventGroupShare;
 import com.calio.calendar.sharing.event.repository.PersonalEventGroupShareRepository;
+import java.util.Collection;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,6 +18,10 @@ public class PersonalEventGroupShareCommandService {
 
   public void deleteAllForSourceEvent(Long eventId) {
     shareRepository.deleteAllByEventId(eventId);
+  }
+
+  public void deleteAllForSourceEvents(Collection<Long> eventIds) {
+    shareRepository.deleteAllByEventIds(eventIds);
   }
 
   public void deleteAllForGroupSpace(Long groupSpaceId) {

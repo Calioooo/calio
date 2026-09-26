@@ -4,7 +4,7 @@ import com.calio.calendar.aicalendar.domain.CalendarMutationScope;
 import com.calio.calendar.aicalendar.domain.CalendarMutationType;
 import com.calio.calendar.aicalendar.service.dto.CalendarMutationPreview;
 import com.calio.calendar.aicalendar.service.dto.CalendarMutationRecurrencePreview;
-import com.calio.calendar.event.controller.dto.EventResponse;
+import com.calio.calendar.singleevent.controller.dto.EventResponse;
 import com.calio.calendar.tag.controller.dto.TagResponse;
 import java.time.Instant;
 import java.util.List;

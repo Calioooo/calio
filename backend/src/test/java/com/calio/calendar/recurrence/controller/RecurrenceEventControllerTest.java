@@ -13,9 +13,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
-import com.calio.calendar.common.testsupport.SharedIntegrationDatabase;
-import com.calio.calendar.event.domain.Event;
-import com.calio.calendar.event.repository.EventRepository;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
@@ -23,8 +20,8 @@ import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepositor
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.security.AuthenticatedAccountMockMvcTestConfig;
 import com.calio.calendar.security.WithAuthenticatedAccount;
+import com.calio.calendar.singleevent.repository.SingleEventRepository;
 import com.calio.calendar.tag.domain.Tag;
-import com.calio.calendar.tag.domain.TagType;
 import com.calio.calendar.tag.repository.TagRepository;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -48,7 +45,7 @@ import tools.jackson.databind.ObjectMapper;
 
 @SpringBootTest(
     properties = {
-      "spring.datasource.url=jdbc:h2:mem:calendar-shared-auth-controller-test;MODE=MySQL;DB_CLOSE_ON_EXIT=FALSE",
+      "spring.datasource.url=jdbc:h2:mem:calendar-recurrence-test;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE",
       "spring.datasource.driver-class-name=org.h2.Driver",
       "spring.datasource.username=sa",
       "spring.datasource.password=",
@@ -57,14 +54,13 @@ import tools.jackson.databind.ObjectMapper;
 @AutoConfigureMockMvc
 @WithAuthenticatedAccount
 @Import(AuthenticatedAccountMockMvcTestConfig.class)
-@SharedIntegrationDatabase
 class RecurrenceEventControllerTest {
 
   @Autowired private MockMvc mockMvc;
 
   @Autowired private ObjectMapper objectMapper;
 
-  @Autowired private EventRepository eventRepository;
+  @Autowired private SingleEventRepository eventRepository;
 
   @Autowired private RecurrenceEventRepository recurrenceEventRepository;
 
@@ -80,22 +76,18 @@ class RecurrenceEventControllerTest {
   void setUpDefaultTag() {
     accountId = currentAccountReference().getId();
     tagRepository
-        .findFirstByTagTypeAndTitleAndAccountIsNullAndGroupSpaceIsNullOrderByIdAsc(
-            TagType.PERSONAL_DEFAULT, "기타")
-        .orElseGet(() -> tagRepository.save(Tag.personalDefault("기타", "#64748B")));
+        .findPersonalFallbackTag()
+        .orElseGet(() -> tagRepository.save(Tag.personalFallback("기타", "#64748B")));
   }
 
   @Test
-  @DisplayName("timed master는 timezone과 RFC line을 왕복하고 occurrence를 Event row 없이 전개한다")
+  @DisplayName("timed master는 timezone과 RFC line을 왕복하고 occurrence를 SingleEvent row 없이 전개한다")
   void givenTimedMaster_whenCreateDetailAndList_thenReturnsCanonicalContract() throws Exception {
     // given, when
     long recurrenceId = createTimedRecurrence("Daily", "2026-08-01", "Asia/Seoul");
 
     // then
-    assertThat(
-            eventRepository.findByRecurrenceIdAndAccount_IdOrderByStartAtAsc(
-                recurrenceId, accountId))
-        .isEmpty();
+    assertThat(eventRepository.count()).isZero();
     mockMvc
         .perform(get("/api/recurrence-events/{id}", recurrenceId))
         .andExpect(status().isOk())
@@ -105,7 +97,6 @@ class RecurrenceEventControllerTest {
         .andExpect(jsonPath("$.firstOccurrenceEndAt").value("2026-08-01T01:00:00Z"))
         .andExpect(jsonPath("$.timeZone").value("Asia/Seoul"))
         .andExpect(jsonPath("$.recurrence[0]").value("RRULE:FREQ=DAILY;COUNT=3"))
-        .andExpect(jsonPath("$.canUpdateSeries").value(true))
         .andExpect(jsonPath("$.tag.title").value("기타"));
 
     mockMvc
@@ -430,7 +421,7 @@ class RecurrenceEventControllerTest {
   }
 
   @Test
-  @DisplayName("전체 master 수정은 active와 deleted override 및 legacy Event를 보존하고 orphan 조회를 유지한다")
+  @DisplayName("전체 master 수정은 active와 deleted override를 보존하고 orphan 조회를 유지한다")
   void givenActiveAndDeletedOverrides_whenReplaceMaster_thenPreservesChildStateAndOrphanQuery()
       throws Exception {
     // given
@@ -464,23 +455,8 @@ class RecurrenceEventControllerTest {
             .findByRecurrenceEvent_IdAndOriginStartAt(recurrenceId, deletedOrigin)
             .orElseThrow()
             .getDeletedAt();
-    Tag originalTag = recurrenceEventRepository.findById(recurrenceId).orElseThrow().getTag();
-    Event legacyEvent =
-        eventRepository.save(
-            new Event(
-                "Legacy",
-                null,
-                Instant.parse("2026-12-20T09:00:00Z"),
-                Instant.parse("2026-12-20T10:00:00Z"),
-                false,
-                "UTC",
-                recurrenceId,
-                originalTag,
-                accountRepository.getReferenceById(accountId)));
     Tag replacementTag =
-        tagRepository.save(
-            Tag.personalCustom(
-                accountRepository.getReferenceById(accountId), "Changed tag", "#123456"));
+        tagRepository.save(Tag.personalCustom(accountId, "Changed tag", "#123456"));
 
     // when
     mockMvc
@@ -535,8 +511,6 @@ class RecurrenceEventControllerTest {
               assertThat(override.getOverrideTimeZone()).isNull();
               assertThat(override.getDeletedAt()).isEqualTo(deletedAt);
             });
-    assertThat(eventRepository.findById(legacyEvent.getId())).isPresent();
-
     mockMvc
         .perform(
             get("/api/events")
@@ -798,11 +772,7 @@ class RecurrenceEventControllerTest {
       throws Exception {
     // given
     Account otherAccount = accountRepository.save(new Account());
-    Tag defaultTag =
-        tagRepository
-            .findFirstByTagTypeAndTitleAndAccountIsNullAndGroupSpaceIsNullOrderByIdAsc(
-                TagType.PERSONAL_DEFAULT, "기타")
-            .orElseThrow();
+    Tag defaultTag = tagRepository.findPersonalFallbackTag().orElseThrow();
     RecurrenceEvent otherMaster =
         recurrenceEventRepository.save(
             new RecurrenceEvent(
@@ -871,7 +841,7 @@ class RecurrenceEventControllerTest {
   }
 
   @Test
-  @DisplayName("전체 recurrence 삭제는 active와 deleted override, account legacy Event, master를 모두 제거한다")
+  @DisplayName("전체 recurrence 삭제는 active와 deleted override, master를 모두 제거한다")
   void givenRecurrenceChildren_whenDeleteMaster_thenRemovesAllChildrenAndMaster() throws Exception {
     // given
     long recurrenceId = createTimedRecurrence("Delete all", "2027-05-01", "UTC");
@@ -899,20 +869,6 @@ class RecurrenceEventControllerTest {
             delete("/api/recurrence-events/{id}/occurrences", recurrenceId)
                 .param("originStartAt", deletedOrigin.toString()))
         .andExpect(status().isNoContent());
-    RecurrenceEvent master = recurrenceEventRepository.findById(recurrenceId).orElseThrow();
-    Event legacyEvent =
-        eventRepository.save(
-            new Event(
-                "Legacy child",
-                null,
-                Instant.parse("2027-05-20T09:00:00Z"),
-                Instant.parse("2027-05-20T10:00:00Z"),
-                false,
-                "UTC",
-                recurrenceId,
-                master.getTag(),
-                accountRepository.getReferenceById(accountId)));
-
     // when
     mockMvc
         .perform(delete("/api/recurrence-events/{id}", recurrenceId))
@@ -926,7 +882,6 @@ class RecurrenceEventControllerTest {
             overrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(
                 recurrenceId, deletedOrigin))
         .isEmpty();
-    assertThat(eventRepository.findById(legacyEvent.getId())).isEmpty();
     assertThat(recurrenceEventRepository.findById(recurrenceId)).isEmpty();
   }
 
@@ -935,7 +890,7 @@ class RecurrenceEventControllerTest {
   void givenOtherAccountTag_whenCreate_thenReturnsTagNotFound() throws Exception {
     // given
     Account otherAccount = accountRepository.save(new Account());
-    Tag otherTag = tagRepository.save(Tag.personalCustom(otherAccount, "Other", "#123456"));
+    Tag otherTag = tagRepository.save(Tag.personalCustom(otherAccount.getId(), "Other", "#123456"));
 
     // when, then
     mockMvc

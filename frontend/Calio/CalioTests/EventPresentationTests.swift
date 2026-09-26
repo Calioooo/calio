@@ -156,22 +156,18 @@ struct EventPresentationTests {
     #expect(!CalendarEventDetailView.canDeleteRecurringEvent(recurringEventWithoutRecurrenceID))
   }
 
-  @Test func recurrenceScopeGuidancePreservesEligibleAndUnavailableActionMeaning() {
+  @Test func recurrenceScopeGuidanceSeparatesSeriesEditingFromSeriesDeletion() {
     #expect(
-      CalendarEventDetailView.recurrenceEditScopeGuidance(canUpdateSeries: true)
+      CalendarEventDetailView.recurrenceEditScopeGuidance(canEditSeries: true)
         == "이 일정만 수정은 선택한 날짜에, 전체 반복 일정 수정은 시리즈 전체에 적용됩니다."
     )
     #expect(
-      CalendarEventDetailView.recurrenceDeleteScopeGuidance(canUpdateSeries: true)
+      CalendarEventDetailView.recurrenceDeleteScopeGuidance()
         == "이 일정만 삭제는 선택한 날짜에, 전체 반복 일정 삭제는 시리즈 전체에 적용됩니다."
     )
     #expect(
-      CalendarEventDetailView.recurrenceEditScopeGuidance(canUpdateSeries: false)
+      CalendarEventDetailView.recurrenceEditScopeGuidance(canEditSeries: false)
         == "이 반복 일정은 전체 수정이 불가능해 선택한 날짜만 수정할 수 있습니다."
-    )
-    #expect(
-      CalendarEventDetailView.recurrenceDeleteScopeGuidance(canUpdateSeries: false)
-        == "이 반복 일정은 전체 삭제가 불가능해 선택한 날짜만 삭제할 수 있습니다."
     )
   }
 

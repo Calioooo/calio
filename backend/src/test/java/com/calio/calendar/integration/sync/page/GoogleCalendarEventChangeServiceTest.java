@@ -7,9 +7,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.calio.calendar.event.domain.Event;
-import com.calio.calendar.event.service.EventCommandService;
-import com.calio.calendar.event.service.EventQueryService;
 import com.calio.calendar.external.google.service.dto.NormalizedEventSchedule;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarConnection;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
@@ -21,6 +18,9 @@ import com.calio.calendar.integration.sync.operation.GoogleOperationJobService;
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEffectiveScope;
 import com.calio.calendar.integration.sync.page.dto.GoogleCalendarNormalizedPage.EventUpsert;
 import com.calio.calendar.integration.sync.page.dto.GoogleCalendarPageRecordCache;
+import com.calio.calendar.sharing.event.service.PersonalEventGroupShareCommandService;
+import com.calio.calendar.singleevent.domain.SingleEvent;
+import com.calio.calendar.singleevent.repository.SingleEventRepository;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -34,8 +34,9 @@ class GoogleCalendarEventChangeServiceTest {
       mock(GoogleCalendarEventMappingCommandService.class);
   private final GoogleCalendarEventMappingQueryService eventMappingQueryService =
       mock(GoogleCalendarEventMappingQueryService.class);
-  private final EventCommandService eventCommandService = mock(EventCommandService.class);
-  private final EventQueryService eventQueryService = mock(EventQueryService.class);
+  private final SingleEventRepository singleEventRepository = mock(SingleEventRepository.class);
+  private final PersonalEventGroupShareCommandService eventShareCommandService =
+      mock(PersonalEventGroupShareCommandService.class);
   private final GoogleOperationJobQueryService operationJobQueryService =
       mock(GoogleOperationJobQueryService.class);
   private final GoogleOperationJobService operationJobService =
@@ -44,8 +45,8 @@ class GoogleCalendarEventChangeServiceTest {
       new GoogleCalendarEventChangeService(
           eventMappingCommandService,
           eventMappingQueryService,
-          eventCommandService,
-          eventQueryService,
+          singleEventRepository,
+          eventShareCommandService,
           operationJobQueryService,
           operationJobService);
 
@@ -55,7 +56,7 @@ class GoogleCalendarEventChangeServiceTest {
     // given
     GoogleCalendarIntegration integration = mock(GoogleCalendarIntegration.class);
     GoogleCalendarConnection connection = mock(GoogleCalendarConnection.class);
-    Event event = mock(Event.class);
+    SingleEvent event = mock(SingleEvent.class);
     when(integration.getAccountId()).thenReturn(10L);
     when(integration.getId()).thenReturn(21L);
     when(connection.getId()).thenReturn(20L);
@@ -136,7 +137,7 @@ class GoogleCalendarEventChangeServiceTest {
             org.mockito.ArgumentMatchers.any(),
             org.mockito.ArgumentMatchers.any()))
         .thenReturn(false);
-    when(eventQueryService.getEventIfExists(10L, 30L)).thenReturn(Optional.empty());
+    when(singleEventRepository.findByIdAndAccountId(30L, 10L)).thenReturn(Optional.empty());
 
     // when
     service.applyUpsert(
@@ -149,11 +150,7 @@ class GoogleCalendarEventChangeServiceTest {
 
     // then
     assertThat(mapping.getProviderEtag()).isEqualTo("etag-before");
-    verify(eventCommandService, never()).createEvent(org.mockito.ArgumentMatchers.any());
-    verify(eventCommandService, never())
-        .updateEvent(
-            org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
-            org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    verify(singleEventRepository, never()).save(org.mockito.ArgumentMatchers.any());
   }
 
   @Test
@@ -186,6 +183,6 @@ class GoogleCalendarEventChangeServiceTest {
 
     // then
     verify(eventMappingCommandService).deleteEventMapping(mapping);
-    verify(eventCommandService, never()).deleteEvent(org.mockito.ArgumentMatchers.any());
+    verify(singleEventRepository, never()).delete(org.mockito.ArgumentMatchers.any());
   }
 }

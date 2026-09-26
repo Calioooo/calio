@@ -9,7 +9,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.calio.calendar.event.service.EventCommandService;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarConnection;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarIntegration;
 import com.calio.calendar.integration.connection.service.GoogleCalendarConnectionCommandService;
@@ -25,6 +24,9 @@ import com.calio.calendar.integration.sync.operation.GoogleOperationJobService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationLeaseService;
 import com.calio.calendar.integration.sync.page.GoogleCalendarRecurrenceChangeService;
 import com.calio.calendar.recurrence.service.RecurrenceEventCommandService;
+import com.calio.calendar.sharing.event.service.PersonalEventGroupShareCommandService;
+import com.calio.calendar.sharing.recurrence.service.PersonalRecurrenceGroupShareCommandService;
+import com.calio.calendar.singleevent.repository.SingleEventRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
@@ -44,7 +46,11 @@ class GoogleCalendarIntegrationDataServiceTest {
       mock(GoogleCalendarRecurrenceMappingQueryService.class);
   private final GoogleCalendarRecurrenceMappingCommandService recurrenceMappingCommandService =
       mock(GoogleCalendarRecurrenceMappingCommandService.class);
-  private final EventCommandService eventCommandService = mock(EventCommandService.class);
+  private final SingleEventRepository singleEventRepository = mock(SingleEventRepository.class);
+  private final PersonalEventGroupShareCommandService eventShareCommandService =
+      mock(PersonalEventGroupShareCommandService.class);
+  private final PersonalRecurrenceGroupShareCommandService recurrenceShareCommandService =
+      mock(PersonalRecurrenceGroupShareCommandService.class);
   private final RecurrenceEventCommandService recurrenceEventCommandService =
       mock(RecurrenceEventCommandService.class);
   private final GoogleOperationJobService operationJobPersistenceService =
@@ -58,6 +64,9 @@ class GoogleCalendarIntegrationDataServiceTest {
       mock(GoogleCalendarRecurrenceEventMapping.class);
   private final GoogleCalendarRecurrenceOverrideMapping recurrenceOverrideMapping =
       mock(GoogleCalendarRecurrenceOverrideMapping.class);
+
+  private final GoogleCalendarRecurrenceChangeService recurrenceChangeService =
+      mock(GoogleCalendarRecurrenceChangeService.class);
 
   @Test
   @DisplayName("FULL SYNC시 각 mapping batch에서 operation lease를 갱신한다")
@@ -83,19 +92,7 @@ class GoogleCalendarIntegrationDataServiceTest {
     when(recurrenceMappingQueryService.listRecurrenceEventMappingBatch(1L, 0L, 500))
         .thenReturn(List.of());
 
-    GoogleCalendarIntegrationDataService service =
-        new GoogleCalendarIntegrationDataService(
-            connectionCommandService,
-            eventMappingQueryService,
-            eventMappingCommandService,
-            recurrenceMappingQueryService,
-            recurrenceMappingCommandService,
-            eventCommandService,
-            recurrenceEventCommandService,
-            null,
-            operationLeaseService,
-            operationJobPersistenceService,
-            operationJobQueryService);
+    GoogleCalendarIntegrationDataService service = newService();
 
     // when
     service.completeSyncRun(
@@ -111,7 +108,9 @@ class GoogleCalendarIntegrationDataServiceTest {
 
     // then
     verify(eventMappingCommandService).deleteEventMappingsWithIds(List.of(10L));
-    verify(eventCommandService).deleteEventsByIds(List.of(20L));
+    InOrder eventCleanup = inOrder(eventShareCommandService, singleEventRepository);
+    eventCleanup.verify(eventShareCommandService).deleteAllForSourceEvents(List.of(20L));
+    eventCleanup.verify(singleEventRepository).deleteAllByIdInBatch(List.of(20L));
     verify(eventMappingQueryService, times(2))
         .listEventMappingBatch(eq(1L), any(Long.class), eq(500));
     InOrder syncTokenUpdate = inOrder(connectionCommandService);
@@ -144,19 +143,7 @@ class GoogleCalendarIntegrationDataServiceTest {
     when(eventMappingQueryService.listEventIdsWithMappings(List.of(20L))).thenReturn(List.of(20L));
     when(recurrenceMappingQueryService.listRecurrenceEventMappingBatch(1L, 0L, 500))
         .thenReturn(List.of());
-    GoogleCalendarIntegrationDataService service =
-        new GoogleCalendarIntegrationDataService(
-            connectionCommandService,
-            eventMappingQueryService,
-            eventMappingCommandService,
-            recurrenceMappingQueryService,
-            recurrenceMappingCommandService,
-            eventCommandService,
-            recurrenceEventCommandService,
-            null,
-            operationLeaseService,
-            operationJobPersistenceService,
-            operationJobQueryService);
+    GoogleCalendarIntegrationDataService service = newService();
 
     // when
     service.completeSyncRun(
@@ -172,7 +159,7 @@ class GoogleCalendarIntegrationDataServiceTest {
 
     // then
     verify(eventMappingCommandService).deleteEventMappingsWithIds(List.of(10L));
-    verify(eventCommandService, never()).deleteEventsByIds(any());
+    verify(singleEventRepository, never()).deleteAllByIdInBatch(any());
   }
 
   @Test
@@ -200,19 +187,7 @@ class GoogleCalendarIntegrationDataServiceTest {
     when(recurrenceMappingQueryService.listRecurrenceEventIdsWithMappings(List.of(40L)))
         .thenReturn(List.of(40L));
 
-    GoogleCalendarIntegrationDataService service =
-        new GoogleCalendarIntegrationDataService(
-            connectionCommandService,
-            eventMappingQueryService,
-            eventMappingCommandService,
-            recurrenceMappingQueryService,
-            recurrenceMappingCommandService,
-            eventCommandService,
-            recurrenceEventCommandService,
-            null,
-            operationLeaseService,
-            operationJobPersistenceService,
-            operationJobQueryService);
+    GoogleCalendarIntegrationDataService service = newService();
 
     service.completeSyncRun(
         9L,
@@ -229,7 +204,6 @@ class GoogleCalendarIntegrationDataServiceTest {
     verify(recurrenceEventCommandService, never()).deleteRecurrenceEventsByIds(any());
     verify(recurrenceEventCommandService, never())
         .deleteRecurrenceOverridesByRecurrenceEventIds(any());
-    verify(eventCommandService, never()).deleteEventsByRecurrenceEventIds(any());
   }
 
   @Test
@@ -265,19 +239,7 @@ class GoogleCalendarIntegrationDataServiceTest {
     when(recurrenceMappingQueryService.listRecurrenceEventMappingBatch(1L, 0L, 500))
         .thenReturn(List.of());
 
-    GoogleCalendarIntegrationDataService service =
-        new GoogleCalendarIntegrationDataService(
-            connectionCommandService,
-            eventMappingQueryService,
-            eventMappingCommandService,
-            recurrenceMappingQueryService,
-            recurrenceMappingCommandService,
-            eventCommandService,
-            recurrenceEventCommandService,
-            null,
-            operationLeaseService,
-            operationJobPersistenceService,
-            operationJobQueryService);
+    GoogleCalendarIntegrationDataService service = newService();
 
     service.completeSyncRun(
         9L,
@@ -304,8 +266,6 @@ class GoogleCalendarIntegrationDataServiceTest {
         mock(GoogleCalendarRecurrenceEventMapping.class);
     GoogleCalendarRecurrenceOverrideMapping otherConnectionOverrideMapping =
         mock(GoogleCalendarRecurrenceOverrideMapping.class);
-    GoogleCalendarRecurrenceChangeService recurrenceChangeService =
-        mock(GoogleCalendarRecurrenceChangeService.class);
     when(recurrenceMapping.getRecurrenceEventId()).thenReturn(40L);
     when(recurrenceOverrideMapping.getOriginStartAt()).thenReturn(originStartAt);
     when(recurrenceOverrideMapping.getRecurrenceEventMapping()).thenReturn(recurrenceMapping);
@@ -319,19 +279,7 @@ class GoogleCalendarIntegrationDataServiceTest {
         .thenReturn(List.of(otherConnectionOverrideMapping));
     when(recurrenceMappingQueryService.listRecurrenceEventMappings(1L)).thenReturn(List.of());
 
-    GoogleCalendarIntegrationDataService service =
-        new GoogleCalendarIntegrationDataService(
-            connectionCommandService,
-            eventMappingQueryService,
-            eventMappingCommandService,
-            recurrenceMappingQueryService,
-            recurrenceMappingCommandService,
-            eventCommandService,
-            recurrenceEventCommandService,
-            recurrenceChangeService,
-            operationLeaseService,
-            operationJobPersistenceService,
-            operationJobQueryService);
+    GoogleCalendarIntegrationDataService service = newService();
 
     // when
     service.deleteIntegrationData(1L);
@@ -346,5 +294,22 @@ class GoogleCalendarIntegrationDataServiceTest {
         .listOverrideMappingsByRecurrenceEventIds(List.of(40L));
     verify(recurrenceEventCommandService, never())
         .deleteRecurrenceOverridesByRecurrenceEventIdAndOriginStartAts(any(), any());
+  }
+
+  private GoogleCalendarIntegrationDataService newService() {
+    return new GoogleCalendarIntegrationDataService(
+        connectionCommandService,
+        eventMappingQueryService,
+        eventMappingCommandService,
+        recurrenceMappingQueryService,
+        recurrenceMappingCommandService,
+        singleEventRepository,
+        eventShareCommandService,
+        recurrenceShareCommandService,
+        recurrenceEventCommandService,
+        recurrenceChangeService,
+        operationLeaseService,
+        operationJobPersistenceService,
+        operationJobQueryService);
   }
 }

@@ -7,6 +7,7 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods;
 
+import com.calio.calendar.aicalendar.service.CalendarMutationService;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.domain.JavaField;
@@ -167,6 +168,23 @@ class ArchitectureTest {
         .should()
         .dependOnClassesThat()
         .haveSimpleNameEndingWith("UseCase")
+        .allowEmptyShould(true)
+        .check(productionClasses);
+  }
+
+  @Test
+  @DisplayName("AI 변경 조율자를 제외한 기존 Service는 UseCase를 직접 호출하지 않는다")
+  void servicesDoNotDependOnUseCases() {
+    noClasses()
+        .that()
+        .resideInAPackage("..service..")
+        .and()
+        .areAnnotatedWith(Service.class)
+        .and()
+        .doNotHaveFullyQualifiedName(CalendarMutationService.class.getName())
+        .should()
+        .dependOnClassesThat()
+        .resideInAPackage(USE_CASE_PACKAGE)
         .allowEmptyShould(true)
         .check(productionClasses);
   }

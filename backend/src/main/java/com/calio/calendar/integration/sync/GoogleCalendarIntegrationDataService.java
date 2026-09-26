@@ -2,7 +2,6 @@ package com.calio.calendar.integration.sync;
 
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
-import com.calio.calendar.event.service.EventCommandService;
 import com.calio.calendar.integration.connection.service.GoogleCalendarConnectionCommandService;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarRecurrenceEventMapping;
@@ -18,6 +17,9 @@ import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEffect
 import com.calio.calendar.integration.sync.page.GoogleCalendarRecurrenceChangeService;
 import com.calio.calendar.integration.sync.page.dto.GoogleCalendarRecurrenceOverrideExternalKey;
 import com.calio.calendar.recurrence.service.RecurrenceEventCommandService;
+import com.calio.calendar.sharing.event.service.PersonalEventGroupShareCommandService;
+import com.calio.calendar.sharing.recurrence.service.PersonalRecurrenceGroupShareCommandService;
+import com.calio.calendar.singleevent.repository.SingleEventRepository;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
@@ -38,7 +40,9 @@ public class GoogleCalendarIntegrationDataService {
   private final GoogleCalendarEventMappingCommandService eventMappingCommandService;
   private final GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService;
   private final GoogleCalendarRecurrenceMappingCommandService recurrenceMappingCommandService;
-  private final EventCommandService eventCommandService;
+  private final SingleEventRepository singleEventRepository;
+  private final PersonalEventGroupShareCommandService eventShareCommandService;
+  private final PersonalRecurrenceGroupShareCommandService recurrenceShareCommandService;
   private final RecurrenceEventCommandService recurrenceEventCommandService;
   private final GoogleCalendarRecurrenceChangeService recurrenceChangeService;
   private final GoogleOperationLeaseService operationLeaseService;
@@ -51,7 +55,9 @@ public class GoogleCalendarIntegrationDataService {
       GoogleCalendarEventMappingCommandService eventMappingCommandService,
       GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService,
       GoogleCalendarRecurrenceMappingCommandService recurrenceMappingCommandService,
-      EventCommandService eventCommandService,
+      SingleEventRepository singleEventRepository,
+      PersonalEventGroupShareCommandService eventShareCommandService,
+      PersonalRecurrenceGroupShareCommandService recurrenceShareCommandService,
       RecurrenceEventCommandService recurrenceEventCommandService,
       GoogleCalendarRecurrenceChangeService recurrenceChangeService,
       GoogleOperationLeaseService operationLeaseService,
@@ -62,7 +68,9 @@ public class GoogleCalendarIntegrationDataService {
     this.eventMappingCommandService = eventMappingCommandService;
     this.recurrenceMappingQueryService = recurrenceMappingQueryService;
     this.recurrenceMappingCommandService = recurrenceMappingCommandService;
-    this.eventCommandService = eventCommandService;
+    this.singleEventRepository = singleEventRepository;
+    this.eventShareCommandService = eventShareCommandService;
+    this.recurrenceShareCommandService = recurrenceShareCommandService;
     this.recurrenceEventCommandService = recurrenceEventCommandService;
     this.recurrenceChangeService = recurrenceChangeService;
     this.operationLeaseService = operationLeaseService;
@@ -331,7 +339,7 @@ public class GoogleCalendarIntegrationDataService {
     }
     recurrenceEventCommandService.deleteRecurrenceOverridesByRecurrenceEventIds(
         unmappedRecurrenceEventIds);
-    eventCommandService.deleteEventsByRecurrenceEventIds(unmappedRecurrenceEventIds);
+    unmappedRecurrenceEventIds.forEach(recurrenceShareCommandService::deleteAllForSourceRecurrence);
     recurrenceEventCommandService.deleteRecurrenceEventsByIds(unmappedRecurrenceEventIds);
   }
 
@@ -398,7 +406,8 @@ public class GoogleCalendarIntegrationDataService {
     List<Long> unmappedEventIds =
         eventIds.stream().filter(eventId -> !mappedEventIds.contains(eventId)).toList();
     if (!unmappedEventIds.isEmpty()) {
-      eventCommandService.deleteEventsByIds(unmappedEventIds);
+      eventShareCommandService.deleteAllForSourceEvents(unmappedEventIds);
+      singleEventRepository.deleteAllByIdInBatch(unmappedEventIds);
     }
   }
 

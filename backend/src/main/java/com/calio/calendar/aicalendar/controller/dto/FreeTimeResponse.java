@@ -1,6 +1,6 @@
 package com.calio.calendar.aicalendar.controller.dto;
 
-import com.calio.calendar.event.service.dto.CalendarFreeTime;
+import com.calio.calendar.singleevent.service.dto.CalendarFreeTime;
 import java.util.List;
 
 public record FreeTimeResponse(String start, String end, List<String> allDayNotices) {

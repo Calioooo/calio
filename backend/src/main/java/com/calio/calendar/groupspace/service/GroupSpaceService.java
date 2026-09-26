@@ -14,7 +14,8 @@ import com.calio.calendar.groupspace.controller.dto.UpdateGroupSpaceRequest;
 import com.calio.calendar.groupspace.domain.GroupMember;
 import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.domain.GroupSpaceFields;
-import com.calio.calendar.tag.service.GroupTagService;
+import com.calio.calendar.tag.domain.Tag;
+import com.calio.calendar.tag.repository.TagRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -32,7 +33,7 @@ public class GroupSpaceService {
   private final GroupSpaceCommandService commandService;
   private final GroupInvitationCommandService invitationCommandService;
   private final GroupScheduleShareCleanupPort groupScheduleShareCleanupPort;
-  private final GroupTagService groupTagService;
+  private final TagRepository tagRepository;
   private final GroupCalendarEventCommandService groupCalendarEventCommandService;
   private final GroupCalendarRecurrenceCommandService groupCalendarRecurrenceCommandService;
   private final Clock clock;
@@ -46,7 +47,7 @@ public class GroupSpaceService {
       GroupSpaceCommandService commandService,
       GroupInvitationCommandService invitationCommandService,
       GroupScheduleShareCleanupPort groupScheduleShareCleanupPort,
-      GroupTagService groupTagService,
+      TagRepository tagRepository,
       GroupCalendarEventCommandService groupCalendarEventCommandService,
       GroupCalendarRecurrenceCommandService groupCalendarRecurrenceCommandService,
       Clock clock) {
@@ -57,7 +58,7 @@ public class GroupSpaceService {
     this.commandService = commandService;
     this.invitationCommandService = invitationCommandService;
     this.groupScheduleShareCleanupPort = groupScheduleShareCleanupPort;
-    this.groupTagService = groupTagService;
+    this.tagRepository = tagRepository;
     this.groupCalendarEventCommandService = groupCalendarEventCommandService;
     this.groupCalendarRecurrenceCommandService = groupCalendarRecurrenceCommandService;
     this.clock = clock;
@@ -72,7 +73,7 @@ public class GroupSpaceService {
     Instant now = clock.instant();
 
     GroupSpace groupSpace = commandService.create(accountId, name, emoji);
-    groupTagService.createDefaultTag(groupSpace);
+    tagRepository.save(Tag.groupDefault(groupSpace.getId()));
     GroupMember membership =
         commandService.createOwnerMembership(groupSpace, accountId, nickname, now);
     return GroupSpaceDetailResponse.from(groupSpace, membership, 1);
@@ -115,7 +116,7 @@ public class GroupSpaceService {
     groupCalendarEventCommandService.deleteAllByGroupSpaceId(groupSpaceId);
     groupCalendarRecurrenceCommandService.deleteAllInGroupSpace(groupSpaceId);
     invitationCommandService.deleteAllByGroupSpaceId(groupSpaceId);
-    groupTagService.deleteAll(groupSpaceId);
+    tagRepository.deleteAll(tagRepository.findByGroupSpaceId(groupSpaceId));
     commandService.delete(groupSpace);
   }
 

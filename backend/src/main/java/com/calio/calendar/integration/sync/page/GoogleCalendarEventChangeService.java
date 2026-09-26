@@ -1,9 +1,6 @@
 package com.calio.calendar.integration.sync.page;
 
 import com.calio.calendar.account.domain.Account;
-import com.calio.calendar.event.domain.Event;
-import com.calio.calendar.event.service.EventCommandService;
-import com.calio.calendar.event.service.EventQueryService;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarConnection;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarEventMapping;
 import com.calio.calendar.integration.mapping.service.GoogleCalendarEventMappingCommandService;
@@ -13,6 +10,9 @@ import com.calio.calendar.integration.sync.operation.GoogleOperationJobService;
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEffectiveScope;
 import com.calio.calendar.integration.sync.page.dto.GoogleCalendarNormalizedPage.EventUpsert;
 import com.calio.calendar.integration.sync.page.dto.GoogleCalendarPageRecordCache;
+import com.calio.calendar.sharing.event.service.PersonalEventGroupShareCommandService;
+import com.calio.calendar.singleevent.domain.SingleEvent;
+import com.calio.calendar.singleevent.repository.SingleEventRepository;
 import com.calio.calendar.tag.domain.Tag;
 import java.util.List;
 import org.springframework.stereotype.Service;
@@ -22,22 +22,22 @@ public class GoogleCalendarEventChangeService {
 
   private final GoogleCalendarEventMappingCommandService eventMappingCommandService;
   private final GoogleCalendarEventMappingQueryService eventMappingQueryService;
-  private final EventCommandService eventCommandService;
-  private final EventQueryService eventQueryService;
+  private final SingleEventRepository singleEventRepository;
+  private final PersonalEventGroupShareCommandService eventShareCommandService;
   private final GoogleOperationJobQueryService operationJobQueryService;
   private final GoogleOperationJobService operationJobService;
 
   public GoogleCalendarEventChangeService(
       GoogleCalendarEventMappingCommandService eventMappingCommandService,
       GoogleCalendarEventMappingQueryService eventMappingQueryService,
-      EventCommandService eventCommandService,
-      EventQueryService eventQueryService,
+      SingleEventRepository singleEventRepository,
+      PersonalEventGroupShareCommandService eventShareCommandService,
       GoogleOperationJobQueryService operationJobQueryService,
       GoogleOperationJobService operationJobService) {
     this.eventMappingCommandService = eventMappingCommandService;
     this.eventMappingQueryService = eventMappingQueryService;
-    this.eventCommandService = eventCommandService;
-    this.eventQueryService = eventQueryService;
+    this.singleEventRepository = singleEventRepository;
+    this.eventShareCommandService = eventShareCommandService;
     this.operationJobQueryService = operationJobQueryService;
     this.operationJobService = operationJobService;
   }
@@ -55,18 +55,17 @@ public class GoogleCalendarEventChangeService {
       applyExistingMapping(existingMapping, item, ownership);
       return;
     }
-    Event event =
-        eventCommandService.createEvent(
-            new Event(
+    SingleEvent event =
+        singleEventRepository.save(
+            new SingleEvent(
                 item.title(),
                 item.description(),
                 item.schedule().startAt(),
                 item.schedule().endAt(),
                 item.schedule().allDay(),
                 item.schedule().timeZone(),
-                null,
-                defaultTag,
-                account));
+                defaultTag.getId(),
+                account.getId()));
     GoogleCalendarEventMapping mapping =
         eventMappingCommandService.createEventMapping(
             new GoogleCalendarEventMapping(
@@ -91,9 +90,9 @@ public class GoogleCalendarEventChangeService {
       recordSyncConflict(mapping, ownership);
       return;
     }
-    Event event =
-        eventQueryService
-            .getEventIfExists(mapping.getConnection().getAccountId(), mapping.getEventId())
+    SingleEvent event =
+        singleEventRepository
+            .findByIdAndAccountId(mapping.getEventId(), mapping.getConnection().getAccountId())
             .orElse(null);
     if (event == null) {
       return;
@@ -137,9 +136,14 @@ public class GoogleCalendarEventChangeService {
         .isEmpty()) {
       return;
     }
-    eventQueryService
-        .getEventIfExists(eventMapping.getConnection().getAccountId(), eventMapping.getEventId())
-        .ifPresent(eventCommandService::deleteEvent);
+    singleEventRepository
+        .findByIdAndAccountId(
+            eventMapping.getEventId(), eventMapping.getConnection().getAccountId())
+        .ifPresent(
+            event -> {
+              eventShareCommandService.deleteAllForSourceEvent(event.getId());
+              singleEventRepository.delete(event);
+            });
   }
 
   private void recordSyncConflict(

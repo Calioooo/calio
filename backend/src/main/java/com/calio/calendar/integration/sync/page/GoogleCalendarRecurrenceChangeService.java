@@ -4,7 +4,6 @@ import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.common.domain.CanonicalSchedule;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
-import com.calio.calendar.event.service.EventCommandService;
 import com.calio.calendar.external.google.service.dto.NormalizedEventSchedule;
 import com.calio.calendar.integration.connection.domain.GoogleCalendarConnection;
 import com.calio.calendar.integration.mapping.domain.GoogleCalendarRecurrenceEventMapping;
@@ -26,6 +25,7 @@ import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
 import com.calio.calendar.recurrence.service.RecurrenceEventCommandService;
 import com.calio.calendar.recurrence.service.RecurrenceEventQueryService;
+import com.calio.calendar.sharing.recurrence.service.PersonalRecurrenceGroupShareCommandService;
 import com.calio.calendar.tag.domain.Tag;
 import java.util.List;
 import java.util.Set;
@@ -36,25 +36,25 @@ public class GoogleCalendarRecurrenceChangeService {
 
   private final GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService;
   private final GoogleCalendarRecurrenceMappingCommandService recurrenceMappingCommandService;
-  private final EventCommandService eventCommandService;
   private final RecurrenceEventCommandService recurrenceEventCommandService;
   private final RecurrenceEventQueryService recurrenceEventQueryService;
+  private final PersonalRecurrenceGroupShareCommandService recurrenceShareCommandService;
   private final GoogleOperationJobQueryService operationJobQueryService;
   private final GoogleOperationJobService operationJobService;
 
   public GoogleCalendarRecurrenceChangeService(
       GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService,
       GoogleCalendarRecurrenceMappingCommandService recurrenceMappingCommandService,
-      EventCommandService eventCommandService,
       RecurrenceEventCommandService recurrenceEventCommandService,
       RecurrenceEventQueryService recurrenceEventQueryService,
+      PersonalRecurrenceGroupShareCommandService recurrenceShareCommandService,
       GoogleOperationJobQueryService operationJobQueryService,
       GoogleOperationJobService operationJobService) {
     this.recurrenceMappingQueryService = recurrenceMappingQueryService;
     this.recurrenceMappingCommandService = recurrenceMappingCommandService;
-    this.eventCommandService = eventCommandService;
     this.recurrenceEventCommandService = recurrenceEventCommandService;
     this.recurrenceEventQueryService = recurrenceEventQueryService;
+    this.recurrenceShareCommandService = recurrenceShareCommandService;
     this.operationJobQueryService = operationJobQueryService;
     this.operationJobService = operationJobService;
   }
@@ -292,9 +292,9 @@ public class GoogleCalendarRecurrenceChangeService {
         .isEmpty()) {
       return;
     }
+    recurrenceShareCommandService.deleteAllForSourceRecurrence(recurrenceEventId);
     recurrenceEventCommandService.deleteRecurrenceOverridesByRecurrenceEventIds(
         List.of(recurrenceEventId));
-    eventCommandService.deleteEventsByRecurrenceEventIds(List.of(recurrenceEventId));
     recurrenceEventCommandService.deleteRecurrenceEventsByIds(List.of(recurrenceEventId));
   }
 

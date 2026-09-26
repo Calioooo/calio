@@ -74,8 +74,7 @@ struct StubEventRepository: EventRepository, TagRepository {
       recurrence: request.recurrence,
       tag: tag(for: request.tagId),
       createdAt: Date(),
-      updatedAt: Date(),
-      canUpdateSeries: true
+      updatedAt: Date()
     )
   }
 
@@ -91,8 +90,7 @@ struct StubEventRepository: EventRepository, TagRepository {
       recurrence: ["RRULE:FREQ=DAILY;UNTIL=20261231T000000Z"],
       tag: Self.defaultTags[0],
       createdAt: Date(),
-      updatedAt: Date(),
-      canUpdateSeries: true
+      updatedAt: Date()
     )
   }
 
@@ -144,8 +142,7 @@ struct StubEventRepository: EventRepository, TagRepository {
       recurrence: request.recurrence,
       tag: tag(for: request.tagId),
       createdAt: Date(),
-      updatedAt: Date(),
-      canUpdateSeries: true
+      updatedAt: Date()
     )
   }
 

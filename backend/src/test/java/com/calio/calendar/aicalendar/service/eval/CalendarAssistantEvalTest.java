@@ -21,9 +21,10 @@ import com.calio.calendar.aicalendar.service.dto.CalendarConversationHistoryMess
 import com.calio.calendar.aicalendar.service.dto.CalendarMutationPreview;
 import com.calio.calendar.aicalendar.service.dto.CalendarMutationRecurrencePreview;
 import com.calio.calendar.aicalendar.service.tool.dto.CalendarMutationToolRequest;
-import com.calio.calendar.event.controller.dto.EventResponse;
-import com.calio.calendar.event.service.EventService;
-import com.calio.calendar.event.service.dto.CalendarFreeTime;
+import com.calio.calendar.singleevent.controller.dto.EventResponse;
+import com.calio.calendar.singleevent.service.dto.CalendarFreeTime;
+import com.calio.calendar.singleevent.usecase.FindAvailableTimesUseCase;
+import com.calio.calendar.singleevent.usecase.ListEventsUseCase;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -69,7 +70,9 @@ class CalendarAssistantEvalTest {
 
   @Autowired private ChatModel chatModel;
 
-  @MockitoBean private EventService eventService;
+  @MockitoBean private ListEventsUseCase listEventsUseCase;
+
+  @MockitoBean private FindAvailableTimesUseCase findAvailableTimesUseCase;
 
   @MockitoBean private CalendarMutationService mutationService;
 
@@ -114,7 +117,7 @@ class CalendarAssistantEvalTest {
 
     // then
     assertAgendaAnswer(evaluation, request, expectedSchedule, List.of(event));
-    verify(eventService).listEvents(any(), any(), any());
+    verify(listEventsUseCase).list(any(), any(), any());
   }
 
   @Test
@@ -144,7 +147,7 @@ class CalendarAssistantEvalTest {
 
     // then
     assertAgendaAnswer(evaluation, request, expectedSchedule, List.of(event));
-    verify(eventService).listEvents(any(), any(), any());
+    verify(listEventsUseCase).list(any(), any(), any());
   }
 
   @Test
@@ -167,7 +170,7 @@ class CalendarAssistantEvalTest {
 
     // then
     assertAgendaAnswer(evaluation, request, expectedSchedule, List.of(event));
-    verify(eventService).listEvents(any(), any(), any());
+    verify(listEventsUseCase).list(any(), any(), any());
   }
 
   @Test
@@ -187,7 +190,7 @@ class CalendarAssistantEvalTest {
 
     // then
     assertAgendaAnswer(evaluation, request, expectedSchedule, List.of());
-    verify(eventService).listEvents(any(), any(), any());
+    verify(listEventsUseCase).list(any(), any(), any());
   }
 
   @Test
@@ -216,7 +219,7 @@ class CalendarAssistantEvalTest {
 
     // then
     assertAgendaAnswer(evaluation, request, expectedSchedule, events);
-    verify(eventService).listEvents(any(), any(), any());
+    verify(listEventsUseCase).list(any(), any(), any());
   }
 
   @Test
@@ -235,7 +238,7 @@ class CalendarAssistantEvalTest {
                 Available time on 2026-08-15: 15:00 through 17:00.
                 Do not claim another available time.
                 """;
-    when(eventService.findAvailableTimes(any(), any(), any(), any(), any(), any(), any()))
+    when(findAvailableTimesUseCase.find(any(), any(), any(), any(), any(), any(), any()))
         .thenReturn(freeTimes);
 
     // when
@@ -263,7 +266,7 @@ class CalendarAssistantEvalTest {
                     answer,
                     factCheck.getFeedback()))
         .isTrue();
-    verify(eventService).findAvailableTimes(any(), any(), any(), any(), any(), any(), any());
+    verify(findAvailableTimesUseCase).find(any(), any(), any(), any(), any(), any(), any());
   }
 
   @Test
@@ -282,7 +285,7 @@ class CalendarAssistantEvalTest {
     assertThat(answer.freeTimes()).isEmpty();
     assertMutationOperation(CalendarMutationOperation.CREATE_EVENT);
     verify(mutationService, never()).apply(any(), any());
-    verifyNoInteractions(eventService);
+    verifyNoInteractions(listEventsUseCase, findAvailableTimesUseCase);
   }
 
   @Test
@@ -363,7 +366,7 @@ class CalendarAssistantEvalTest {
     CalendarMutationPreview preview =
         new CalendarMutationPreview(
             CalendarMutationType.UPDATE, CalendarMutationScope.EVENT, before, after);
-    when(eventService.listEvents(any(), any(), any())).thenReturn(List.of(before));
+    when(listEventsUseCase.list(any(), any(), any())).thenReturn(List.of(before));
     when(mutationService.preview(any(), any())).thenReturn(preview);
 
     // when
@@ -385,7 +388,7 @@ class CalendarAssistantEvalTest {
         timedEvent("팀 회의", null, "2026-08-16T05:00:00Z", "2026-08-16T06:00:00Z", "Asia/Seoul");
     EventResponse secondEvent =
         timedEvent("팀 회의", null, "2026-08-16T08:00:00Z", "2026-08-16T09:00:00Z", "Asia/Seoul");
-    when(eventService.listEvents(any(), any(), any())).thenReturn(List.of(firstEvent, secondEvent));
+    when(listEventsUseCase.list(any(), any(), any())).thenReturn(List.of(firstEvent, secondEvent));
 
     // when
     CalendarAssistantAnswer answer = requestAnswer(request("내일 팀 회의 삭제해줘"));
@@ -419,7 +422,7 @@ class CalendarAssistantEvalTest {
     CalendarMutationPreview preview =
         new CalendarMutationPreview(
             CalendarMutationType.UPDATE, CalendarMutationScope.THIS_OCCURRENCE, before, after);
-    when(eventService.listEvents(any(), any(), any())).thenReturn(List.of(before));
+    when(listEventsUseCase.list(any(), any(), any())).thenReturn(List.of(before));
     when(mutationService.preview(any(), any())).thenReturn(preview);
 
     // when
@@ -441,7 +444,7 @@ class CalendarAssistantEvalTest {
     // given
     EventResponse occurrence =
         recurrenceOccurrence("팀 회의", "2026-08-16T05:00:00Z", "2026-08-16T06:00:00Z");
-    when(eventService.listEvents(any(), any(), any())).thenReturn(List.of(occurrence));
+    when(listEventsUseCase.list(any(), any(), any())).thenReturn(List.of(occurrence));
 
     // when
     CalendarAssistantAnswer answer = requestAnswer(request("내일 반복 일정인 ‘팀 회의’의 이번 회차만 태그를 업무로 바꿔줘"));
@@ -470,7 +473,7 @@ class CalendarAssistantEvalTest {
             new CalendarMutationRecurrencePreview(
                 List.of("RRULE:FREQ=WEEKLY;BYDAY=SUN"),
                 List.of("RRULE:FREQ=WEEKLY;BYDAY=SUN;BYHOUR=6")));
-    when(eventService.listEvents(any(), any(), any())).thenReturn(List.of(before));
+    when(listEventsUseCase.list(any(), any(), any())).thenReturn(List.of(before));
     when(mutationService.preview(any(), any())).thenReturn(preview);
 
     // when
@@ -502,7 +505,7 @@ class CalendarAssistantEvalTest {
     CalendarMutationPreview preview =
         new CalendarMutationPreview(
             CalendarMutationType.UPDATE, CalendarMutationScope.EVENT, originalEvent, updatedEvent);
-    when(eventService.listEvents(any(), any(), any())).thenReturn(List.of(originalEvent));
+    when(listEventsUseCase.list(any(), any(), any())).thenReturn(List.of(originalEvent));
     when(mutationService.apply(eq(1L), any())).thenReturn(List.of(updatedEvent));
     CalendarAssistantRequest request =
         requestWithHistory(
@@ -528,7 +531,7 @@ class CalendarAssistantEvalTest {
     CalendarMutationPreview preview =
         new CalendarMutationPreview(
             CalendarMutationType.DELETE, CalendarMutationScope.EVENT, deletedEvent, null);
-    when(eventService.listEvents(any(), any(), any())).thenReturn(List.of(deletedEvent));
+    when(listEventsUseCase.list(any(), any(), any())).thenReturn(List.of(deletedEvent));
     when(mutationService.apply(eq(1L), any())).thenReturn(List.of());
     CalendarAssistantRequest request =
         requestWithHistory(
@@ -574,7 +577,7 @@ class CalendarAssistantEvalTest {
     CalendarAssistantAnswer answer = requestAnswer(request("오늘 점심 메뉴 추천해줘"));
 
     // then
-    verifyNoInteractions(eventService);
+    verifyNoInteractions(listEventsUseCase, findAvailableTimesUseCase);
     assertThat(answer.events()).isEmpty();
     assertThat(answer.freeTimes()).isEmpty();
   }
@@ -649,7 +652,7 @@ class CalendarAssistantEvalTest {
 
   private AgendaEvaluation evaluateAgenda(
       CalendarAssistantRequest request, List<EventResponse> events, String expectedSchedule) {
-    when(eventService.listEvents(any(), any(), any())).thenReturn(events);
+    when(listEventsUseCase.list(any(), any(), any())).thenReturn(events);
     CalendarAssistantAnswer answer = requestAnswer(request);
     return new AgendaEvaluation(
         answer,

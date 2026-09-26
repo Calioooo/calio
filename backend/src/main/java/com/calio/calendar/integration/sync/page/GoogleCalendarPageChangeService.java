@@ -25,7 +25,7 @@ import com.calio.calendar.integration.sync.page.dto.GoogleCalendarPageRecordCach
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.service.RecurrenceEventQueryService;
 import com.calio.calendar.tag.domain.Tag;
-import com.calio.calendar.tag.service.TagQueryService;
+import com.calio.calendar.tag.repository.TagRepository;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -44,7 +44,7 @@ public class GoogleCalendarPageChangeService {
   private final GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService;
   private final GoogleCalendarEventChangeService eventChangeService;
   private final AccountRepository accountRepository;
-  private final TagQueryService tagQueryService;
+  private final TagRepository tagRepository;
   private final RecurrenceEventQueryService recurrenceEventQueryService;
   private final GoogleCalendarRecurrenceChangeService recurrenceChangeService;
   private final GoogleOperationLeaseService operationLeaseService;
@@ -55,7 +55,7 @@ public class GoogleCalendarPageChangeService {
       GoogleCalendarEventChangeService eventChangeService,
       GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService,
       AccountRepository accountRepository,
-      TagQueryService tagQueryService,
+      TagRepository tagRepository,
       RecurrenceEventQueryService recurrenceEventQueryService,
       GoogleCalendarRecurrenceChangeService recurrenceChangeService,
       GoogleOperationLeaseService operationLeaseService) {
@@ -64,7 +64,7 @@ public class GoogleCalendarPageChangeService {
     this.eventChangeService = eventChangeService;
     this.recurrenceMappingQueryService = recurrenceMappingQueryService;
     this.accountRepository = accountRepository;
-    this.tagQueryService = tagQueryService;
+    this.tagRepository = tagRepository;
     this.recurrenceEventQueryService = recurrenceEventQueryService;
     this.recurrenceChangeService = recurrenceChangeService;
     this.operationLeaseService = operationLeaseService;
@@ -90,7 +90,10 @@ public class GoogleCalendarPageChangeService {
     GoogleCalendarPageRecordCache cache = loadPageRecordCache(connection.getId(), items);
 
     Account account = getAccount(accountId);
-    Tag defaultTag = tagQueryService.getTagOrDefault(accountId, null);
+    Tag defaultTag =
+        tagRepository
+            .findPersonalFallbackTag()
+            .orElseThrow(() -> new CalioException(ErrorCode.DEFAULT_TAG_NOT_FOUND));
 
     for (NormalizedItem item : items) {
       switch (item) {

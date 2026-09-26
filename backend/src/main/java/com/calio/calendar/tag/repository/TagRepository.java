@@ -1,7 +1,6 @@
 package com.calio.calendar.tag.repository;
 
 import com.calio.calendar.tag.domain.Tag;
-import com.calio.calendar.tag.domain.TagType;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -13,66 +12,65 @@ public interface TagRepository extends JpaRepository<Tag, Long> {
   @Query(
       """
             select tag from Tag tag
-            where tag.tagType = :tagType and tag.account is null and tag.groupSpace is null
+            where tag.tagType = PERSONAL_DEFAULT
+                and tag.accountId is null and tag.groupSpaceId is null
             order by tag.id
             """)
-  List<Tag> findByTagTypeAndAccountIsNullAndGroupSpaceIsNullOrderByIdAsc(
-      @Param("tagType") TagType tagType);
+  List<Tag> findPersonalDefaultTags();
 
   @Query(
       """
             select tag from Tag tag
-            where tag.tagType = :tagType and tag.account.id = :accountId and tag.groupSpace is null
+            where tag.tagType = CUSTOM
+                and tag.accountId = :accountId and tag.groupSpaceId is null
             order by tag.id
             """)
-  List<Tag> findByTagTypeAndAccount_IdOrderByIdAsc(
-      @Param("tagType") TagType tagType, @Param("accountId") Long accountId);
+  List<Tag> findPersonalCustomTags(@Param("accountId") Long accountId);
 
   @Query(
       """
             select tag from Tag tag
-            where tag.id = :id and tag.tagType = :tagType and tag.account is null and tag.groupSpace is null
+            where tag.id = :tagId and tag.tagType = PERSONAL_DEFAULT
+                and tag.accountId is null and tag.groupSpaceId is null
             """)
-  Optional<Tag> findByIdAndTagTypeAndAccountIsNullAndGroupSpaceIsNull(
-      @Param("id") Long id, @Param("tagType") TagType tagType);
+  Optional<Tag> findPersonalDefaultTagById(@Param("tagId") Long tagId);
 
   @Query(
       """
             select tag from Tag tag
-            where tag.id = :id and tag.tagType = :tagType and tag.account.id = :accountId and tag.groupSpace is null
+            where tag.id = :tagId and tag.tagType = CUSTOM
+                and tag.accountId = :accountId and tag.groupSpaceId is null
             """)
-  Optional<Tag> findByIdAndTagTypeAndAccount_Id(
-      @Param("id") Long id, @Param("tagType") TagType tagType, @Param("accountId") Long accountId);
+  Optional<Tag> findPersonalCustomTagById(
+      @Param("accountId") Long accountId, @Param("tagId") Long tagId);
 
   @Query(
       """
             select tag from Tag tag
-            where tag.tagType = :tagType and tag.title = :title and tag.account is null and tag.groupSpace is null
-            order by tag.id
-            limit 1
+            where tag.tagType = PERSONAL_DEFAULT and tag.fallback = true
+                and tag.accountId is null and tag.groupSpaceId is null
             """)
-  Optional<Tag> findFirstByTagTypeAndTitleAndAccountIsNullAndGroupSpaceIsNullOrderByIdAsc(
-      @Param("tagType") TagType tagType, @Param("title") String title);
+  Optional<Tag> findPersonalFallbackTag();
 
-  @Query("select tag from Tag tag where tag.groupSpace.id = :groupSpaceId order by tag.id")
-  List<Tag> findByGroupSpace_IdOrderByIdAsc(@Param("groupSpaceId") Long groupSpaceId);
+  List<Tag> findByGroupSpaceIdOrderByIdAsc(Long groupSpaceId);
 
-  @Query("select tag from Tag tag where tag.id = :tagId and tag.groupSpace.id = :groupSpaceId")
-  Optional<Tag> findByIdAndGroupSpace_Id(
-      @Param("tagId") Long tagId, @Param("groupSpaceId") Long groupSpaceId);
+  Optional<Tag> findByIdAndGroupSpaceId(Long tagId, Long groupSpaceId);
 
   @Query(
-      "select tag from Tag tag where tag.tagType = :tagType and tag.groupSpace.id = :groupSpaceId")
-  Optional<Tag> findByTagTypeAndGroupSpace_Id(
-      @Param("tagType") TagType tagType, @Param("groupSpaceId") Long groupSpaceId);
+      """
+            select tag from Tag tag
+            where tag.tagType = GROUP_DEFAULT and tag.fallback = true
+                and tag.accountId is null and tag.groupSpaceId = :groupSpaceId
+            """)
+  Optional<Tag> findGroupFallbackTag(@Param("groupSpaceId") Long groupSpaceId);
 
   @Query(
       """
             select count(tag) > 0 from Tag tag
-            where tag.tagType = :tagType and tag.title = :title and tag.groupSpace.id = :groupSpaceId and tag.id <> :tagId
+            where tag.tagType = CUSTOM and tag.title.value = :title
+                and tag.groupSpaceId = :groupSpaceId and tag.id <> :tagId
             """)
-  boolean existsByTagTypeAndTitleAndGroupSpace_IdAndIdNot(
-      @Param("tagType") TagType tagType,
+  boolean existsOtherGroupCustomTagByTitle(
       @Param("title") String title,
       @Param("groupSpaceId") Long groupSpaceId,
       @Param("tagId") Long tagId);
@@ -80,13 +78,11 @@ public interface TagRepository extends JpaRepository<Tag, Long> {
   @Query(
       """
             select count(tag) > 0 from Tag tag
-            where tag.tagType = :tagType and tag.title = :title and tag.groupSpace.id = :groupSpaceId
+            where tag.tagType = CUSTOM and tag.title.value = :title
+                and tag.groupSpaceId = :groupSpaceId
             """)
-  boolean existsByTagTypeAndTitleAndGroupSpace_Id(
-      @Param("tagType") TagType tagType,
-      @Param("title") String title,
-      @Param("groupSpaceId") Long groupSpaceId);
+  boolean existsGroupCustomTagByTitle(
+      @Param("title") String title, @Param("groupSpaceId") Long groupSpaceId);
 
-  @Query("select tag from Tag tag where tag.groupSpace.id = :groupSpaceId")
-  List<Tag> findByGroupSpace_Id(@Param("groupSpaceId") Long groupSpaceId);
+  List<Tag> findByGroupSpaceId(Long groupSpaceId);
 }

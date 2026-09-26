@@ -3,8 +3,6 @@ package com.calio.calendar.notification.usecase;
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.domain.AccountNotificationSettings;
 import com.calio.calendar.account.repository.AccountRepository;
-import com.calio.calendar.event.domain.Event;
-import com.calio.calendar.event.repository.EventRepository;
 import com.calio.calendar.groupcalendar.event.domain.GroupCalendarEvent;
 import com.calio.calendar.groupcalendar.event.repository.GroupCalendarEventRepository;
 import com.calio.calendar.groupcalendar.recurrence.domain.GroupCalendarRecurrenceEvent;
@@ -35,6 +33,8 @@ import com.calio.calendar.recurrence.domain.RecurrenceOccurrence;
 import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.recurrence.service.PersonalRecurrenceOccurrenceResolver;
+import com.calio.calendar.singleevent.domain.SingleEvent;
+import com.calio.calendar.singleevent.repository.SingleEventRepository;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -61,7 +61,7 @@ public class SendDueCalendarNotificationsUseCase {
       LoggerFactory.getLogger(SendDueCalendarNotificationsUseCase.class);
 
   private final AccountRepository accountRepository;
-  private final EventRepository eventRepository;
+  private final SingleEventRepository eventRepository;
   private final RecurrenceEventRepository recurrenceEventRepository;
   private final RecurrenceEventOverrideRepository recurrenceOverrideRepository;
   private final PersonalRecurrenceOccurrenceResolver personalRecurrenceOccurrenceResolver;
@@ -77,7 +77,7 @@ public class SendDueCalendarNotificationsUseCase {
 
   public SendDueCalendarNotificationsUseCase(
       AccountRepository accountRepository,
-      EventRepository eventRepository,
+      SingleEventRepository eventRepository,
       RecurrenceEventRepository recurrenceEventRepository,
       RecurrenceEventOverrideRepository recurrenceOverrideRepository,
       PersonalRecurrenceOccurrenceResolver personalRecurrenceOccurrenceResolver,
@@ -162,7 +162,7 @@ public class SendDueCalendarNotificationsUseCase {
       Long accountId, Instant from, Instant to) {
     List<NotificationSchedule> schedules = new ArrayList<>();
     eventRepository
-        .findNormalEvents(accountId, from, to)
+        .findSingleEvents(accountId, from, to)
         .forEach(event -> schedules.add(NotificationSchedule.personal(event)));
     recurrenceEventRepository
         .findExpansionCandidatesStartedBefore(accountId, to)
@@ -485,7 +485,7 @@ public class SendDueCalendarNotificationsUseCase {
       String groupName,
       boolean importantReminderSupported) {
 
-    private static NotificationSchedule personal(Event event) {
+    private static NotificationSchedule personal(SingleEvent event) {
       return new NotificationSchedule(
           NotificationScheduleKey.personalEvent(event.getId()),
           event.getTitle(),

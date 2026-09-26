@@ -5,9 +5,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
-import com.calio.calendar.common.testsupport.SharedIntegrationDatabase;
-import com.calio.calendar.event.domain.Event;
-import com.calio.calendar.event.repository.EventRepository;
 import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.repository.GroupSpaceRepository;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
@@ -17,6 +14,8 @@ import com.calio.calendar.sharing.event.domain.PersonalEventGroupShare;
 import com.calio.calendar.sharing.event.repository.PersonalEventGroupShareRepository;
 import com.calio.calendar.sharing.recurrence.domain.PersonalRecurrenceGroupShare;
 import com.calio.calendar.sharing.recurrence.repository.PersonalRecurrenceGroupShareRepository;
+import com.calio.calendar.singleevent.domain.SingleEvent;
+import com.calio.calendar.singleevent.repository.SingleEventRepository;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.repository.TagRepository;
 import java.time.Instant;
@@ -38,20 +37,19 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 @SpringBootTest(
     properties = {
-      "spring.datasource.url=jdbc:h2:mem:calendar-shared-integration-test;MODE=MySQL;DB_CLOSE_ON_EXIT=FALSE",
+      "spring.datasource.url=jdbc:h2:mem:personal-schedule-group-share-repository-test;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE",
       "spring.datasource.driver-class-name=org.h2.Driver",
       "spring.datasource.username=sa",
       "spring.datasource.password=",
       "spring.jpa.hibernate.ddl-auto=create-drop"
     })
-@SharedIntegrationDatabase
 class PersonalScheduleGroupShareRepositoryTest {
 
   private static final Instant START_AT = Instant.parse("2026-08-01T09:00:00Z");
 
   @Autowired private PersonalEventGroupShareRepository eventShareRepository;
   @Autowired private PersonalRecurrenceGroupShareRepository recurrenceShareRepository;
-  @Autowired private EventRepository eventRepository;
+  @Autowired private SingleEventRepository eventRepository;
   @Autowired private RecurrenceEventRepository recurrenceEventRepository;
   @Autowired private TagRepository tagRepository;
   @Autowired private GroupSpaceRepository groupSpaceRepository;
@@ -74,18 +72,17 @@ class PersonalScheduleGroupShareRepositoryTest {
   void eventShareKeepsTargetSpecificPublicUuid() {
     Account account = accountRepository.saveAndFlush(new Account());
     Tag tag = tagRepository.saveAndFlush(Tag.personalDefault("기타", "#64748B"));
-    Event event =
+    SingleEvent event =
         eventRepository.saveAndFlush(
-            new Event(
+            new SingleEvent(
                 "일정",
                 null,
                 START_AT,
                 START_AT.plusSeconds(3600),
                 false,
                 "UTC",
-                null,
-                tag,
-                account));
+                tag.getId(),
+                account.getId()));
     GroupSpace firstGroup =
         groupSpaceRepository.saveAndFlush(new GroupSpace(account.getId(), "first", null));
     GroupSpace secondGroup =
@@ -108,18 +105,17 @@ class PersonalScheduleGroupShareRepositoryTest {
   void eventSharePersistsOnlyOneMappingPerSourceAndGroupSpace() {
     Account account = accountRepository.saveAndFlush(new Account());
     Tag tag = tagRepository.saveAndFlush(Tag.personalDefault("기타", "#64748B"));
-    Event event =
+    SingleEvent event =
         eventRepository.saveAndFlush(
-            new Event(
+            new SingleEvent(
                 "일정",
                 null,
                 START_AT,
                 START_AT.plusSeconds(3600),
                 false,
                 "UTC",
-                null,
-                tag,
-                account));
+                tag.getId(),
+                account.getId()));
     GroupSpace groupSpace =
         groupSpaceRepository.saveAndFlush(new GroupSpace(account.getId(), "group", null));
     eventShareRepository.saveAndFlush(PersonalEventGroupShare.create(event, groupSpace));
@@ -136,18 +132,17 @@ class PersonalScheduleGroupShareRepositoryTest {
   void eventShareInsertIgnoreDoesNotRaiseUniqueConstraintFailure() throws Exception {
     Account account = accountRepository.saveAndFlush(new Account());
     Tag tag = tagRepository.saveAndFlush(Tag.personalDefault("기타", "#64748B"));
-    Event event =
+    SingleEvent event =
         eventRepository.saveAndFlush(
-            new Event(
+            new SingleEvent(
                 "일정",
                 null,
                 START_AT,
                 START_AT.plusSeconds(3600),
                 false,
                 "UTC",
-                null,
-                tag,
-                account));
+                tag.getId(),
+                account.getId()));
     GroupSpace groupSpace =
         groupSpaceRepository.saveAndFlush(new GroupSpace(account.getId(), "group", null));
 

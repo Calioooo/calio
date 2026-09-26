@@ -1,22 +1,17 @@
 package com.calio.calendar.tag.domain;
 
-import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.common.domain.BaseEntity;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
-import com.calio.calendar.groupspace.domain.GroupSpace;
 import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
 @Entity
@@ -31,8 +26,11 @@ public class Tag extends BaseEntity {
   @Column(nullable = false)
   private TagType tagType;
 
-  @Column(nullable = false)
-  private String title;
+  @Embedded
+  @AttributeOverride(
+      name = "value",
+      column = @Column(name = "title", nullable = false, length = 255))
+  private TagTitle title;
 
   @Embedded
   @AttributeOverride(
@@ -40,40 +38,59 @@ public class Tag extends BaseEntity {
       column = @Column(name = "color_code", nullable = false, length = 7))
   private ColorCode colorCode;
 
-  @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "account_id")
-  private Account account;
+  @Column(name = "account_id")
+  private Long accountId;
 
-  @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "group_space_id")
-  private GroupSpace groupSpace;
+  @Column(name = "group_space_id")
+  private Long groupSpaceId;
+
+  @Column(name = "is_fallback", nullable = false)
+  private boolean fallback;
 
   protected Tag() {}
 
   public static Tag personalDefault(String title, String colorCode) {
-    return new Tag(TagType.PERSONAL_DEFAULT, title, colorCode, null, null);
+    return new Tag(TagType.PERSONAL_DEFAULT, title, colorCode, null, null, false);
   }
 
-  public static Tag personalCustom(Account account, String title, String colorCode) {
-    return new Tag(TagType.CUSTOM, title, colorCode, account, null);
+  public static Tag personalFallback(String title, String colorCode) {
+    return new Tag(TagType.PERSONAL_DEFAULT, title, colorCode, null, null, true);
   }
 
-  public static Tag groupDefault(GroupSpace groupSpace) {
-    return new Tag(TagType.GROUP_DEFAULT, "기타", "#64748B", null, groupSpace);
+  public static Tag personalCustom(Long accountId, String title, String colorCode) {
+    if (accountId == null) {
+      throw new CalioException(ErrorCode.VALIDATION_FAILED);
+    }
+    return new Tag(TagType.CUSTOM, title, colorCode, accountId, null, false);
   }
 
-  public static Tag groupCustom(GroupSpace groupSpace, String title, String colorCode) {
-    return new Tag(TagType.CUSTOM, title, colorCode, null, groupSpace);
+  public static Tag groupDefault(Long groupSpaceId) {
+    if (groupSpaceId == null) {
+      throw new CalioException(ErrorCode.VALIDATION_FAILED);
+    }
+    return new Tag(TagType.GROUP_DEFAULT, "기타", "#64748B", null, groupSpaceId, true);
+  }
+
+  public static Tag groupCustom(Long groupSpaceId, String title, String colorCode) {
+    if (groupSpaceId == null) {
+      throw new CalioException(ErrorCode.VALIDATION_FAILED);
+    }
+    return new Tag(TagType.CUSTOM, title, colorCode, null, groupSpaceId, false);
   }
 
   private Tag(
-      TagType tagType, String title, String colorCode, Account account, GroupSpace groupSpace) {
-    validateOwnership(tagType, account, groupSpace);
+      TagType tagType,
+      String title,
+      String colorCode,
+      Long accountId,
+      Long groupSpaceId,
+      boolean fallback) {
     this.tagType = tagType;
-    this.title = title;
+    this.title = new TagTitle(title);
     this.colorCode = new ColorCode(colorCode);
-    this.account = account;
-    this.groupSpace = groupSpace;
+    this.accountId = accountId;
+    this.groupSpaceId = groupSpaceId;
+    this.fallback = fallback;
   }
 
   public void update(String title, String colorCode) {
@@ -81,7 +98,7 @@ public class Tag extends BaseEntity {
       throw new CalioException(ErrorCode.VALIDATION_FAILED);
     }
 
-    this.title = title;
+    this.title = new TagTitle(title);
     this.colorCode = new ColorCode(colorCode);
   }
 
@@ -94,31 +111,22 @@ public class Tag extends BaseEntity {
   }
 
   public String getTitle() {
-    return title;
+    return title.value();
   }
 
   public String getColorCode() {
     return colorCode.getValue();
   }
 
-  public Account getAccount() {
-    return account;
+  public Long getAccountId() {
+    return accountId;
   }
 
-  public GroupSpace getGroupSpace() {
-    return groupSpace;
+  public Long getGroupSpaceId() {
+    return groupSpaceId;
   }
 
-  private void validateOwnership(TagType tagType, Account account, GroupSpace groupSpace) {
-    boolean isPersonalDefault =
-        tagType == TagType.PERSONAL_DEFAULT && account == null && groupSpace == null;
-    boolean isPersonalCustom = tagType == TagType.CUSTOM && account != null && groupSpace == null;
-    boolean isGroupTag =
-        (tagType == TagType.GROUP_DEFAULT || tagType == TagType.CUSTOM)
-            && account == null
-            && groupSpace != null;
-    if (!isPersonalDefault && !isPersonalCustom && !isGroupTag) {
-      throw new CalioException(ErrorCode.VALIDATION_FAILED);
-    }
+  public boolean isFallback() {
+    return fallback;
   }
 }

@@ -9,14 +9,13 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.calio.calendar.common.testsupport.SharedIntegrationDatabase;
-import com.calio.calendar.event.domain.Event;
-import com.calio.calendar.event.repository.EventRepository;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.security.AuthenticatedAccountMockMvcTestConfig;
 import com.calio.calendar.security.WithAuthenticatedAccount;
+import com.calio.calendar.singleevent.domain.SingleEvent;
+import com.calio.calendar.singleevent.repository.SingleEventRepository;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.domain.TagType;
 import com.calio.calendar.tag.repository.TagRepository;
@@ -35,7 +34,7 @@ import org.springframework.test.web.servlet.MvcResult;
 
 @SpringBootTest(
     properties = {
-      "spring.datasource.url=jdbc:h2:mem:calendar-shared-auth-controller-test;MODE=MySQL;DB_CLOSE_ON_EXIT=FALSE",
+      "spring.datasource.url=jdbc:h2:mem:calendar-custom-tag-test;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE",
       "spring.datasource.driver-class-name=org.h2.Driver",
       "spring.datasource.username=sa",
       "spring.datasource.password=",
@@ -44,14 +43,13 @@ import org.springframework.test.web.servlet.MvcResult;
 @AutoConfigureMockMvc
 @WithAuthenticatedAccount
 @Import(AuthenticatedAccountMockMvcTestConfig.class)
-@SharedIntegrationDatabase
 class CustomTagControllerTest {
 
   @Autowired private MockMvc mockMvc;
 
   @Autowired private TagRepository tagRepository;
 
-  @Autowired private EventRepository eventRepository;
+  @Autowired private SingleEventRepository eventRepository;
 
   @Autowired private RecurrenceEventRepository recurrenceEventRepository;
 
@@ -157,7 +155,7 @@ class CustomTagControllerTest {
       throws Exception {
     // given
     Tag customTag =
-        tagRepository.save(Tag.personalCustom(currentAccountReference(), "기존", "#111111"));
+        tagRepository.save(Tag.personalCustom(currentAccountReference().getId(), "기존", "#111111"));
     Tag defaultTag = tagRepository.save(Tag.personalDefault("기타", "#64748B"));
 
     // when
@@ -183,18 +181,16 @@ class CustomTagControllerTest {
   }
 
   @Test
-  @DisplayName(
-      "custom tag를 삭제하면 event, recurrence event, occurrence event 모두 fallback 기타 태그로 재할당한다")
+  @DisplayName("custom tag를 삭제하면 단건 일정과 반복 일정 모두 fallback 기타 태그로 재할당한다")
   void givenCustomTagInUse_whenDeleteCustomTag_thenReassignsAllUsagesToFallbackTag()
       throws Exception {
     // given
-    Tag fallbackTag = tagRepository.save(Tag.personalDefault("기타", "#64748B"));
+    Tag fallbackTag = tagRepository.save(Tag.personalFallback("기타", "#64748B"));
     Tag customTag =
-        tagRepository.save(Tag.personalCustom(currentAccountReference(), "삭제 대상", "#8B5CF6"));
-    Event ordinaryEvent = eventRepository.save(event("일반", null, customTag));
+        tagRepository.save(
+            Tag.personalCustom(currentAccountReference().getId(), "삭제 대상", "#8B5CF6"));
+    SingleEvent ordinaryEvent = eventRepository.save(event("일반", customTag));
     RecurrenceEvent recurrenceEvent = recurrenceEventRepository.save(recurrenceEvent(customTag));
-    Event occurrenceEvent =
-        eventRepository.save(event("반복 occurrence", recurrenceEvent.getId(), customTag));
 
     // when
     MvcResult deleteResult =
@@ -207,11 +203,7 @@ class CustomTagControllerTest {
     assertThat(deleteResult.getResponse().getContentAsString(StandardCharsets.UTF_8)).isEmpty();
     assertThat(tagRepository.existsById(customTag.getId())).isFalse();
     assertThat(eventRepository.findById(ordinaryEvent.getId()))
-        .hasValueSatisfying(
-            event -> assertThat(event.getTag().getId()).isEqualTo(fallbackTag.getId()));
-    assertThat(eventRepository.findById(occurrenceEvent.getId()))
-        .hasValueSatisfying(
-            event -> assertThat(event.getTag().getId()).isEqualTo(fallbackTag.getId()));
+        .hasValueSatisfying(event -> assertThat(event.getTagId()).isEqualTo(fallbackTag.getId()));
     assertThat(recurrenceEventRepository.findById(recurrenceEvent.getId()))
         .hasValueSatisfying(
             rule -> assertThat(rule.getTag().getId()).isEqualTo(fallbackTag.getId()));
@@ -223,8 +215,9 @@ class CustomTagControllerTest {
       throws Exception {
     // given
     Tag customTag =
-        tagRepository.save(Tag.personalCustom(currentAccountReference(), "삭제 보류", "#8B5CF6"));
-    Event ordinaryEvent = eventRepository.save(event("일반", null, customTag));
+        tagRepository.save(
+            Tag.personalCustom(currentAccountReference().getId(), "삭제 보류", "#8B5CF6"));
+    SingleEvent ordinaryEvent = eventRepository.save(event("일반", customTag));
     RecurrenceEvent recurrenceEvent = recurrenceEventRepository.save(recurrenceEvent(customTag));
 
     // when
@@ -238,8 +231,7 @@ class CustomTagControllerTest {
 
     assertThat(tagRepository.existsById(customTag.getId())).isTrue();
     assertThat(eventRepository.findById(ordinaryEvent.getId()))
-        .hasValueSatisfying(
-            event -> assertThat(event.getTag().getId()).isEqualTo(customTag.getId()));
+        .hasValueSatisfying(event -> assertThat(event.getTagId()).isEqualTo(customTag.getId()));
     assertThat(recurrenceEventRepository.findById(recurrenceEvent.getId()))
         .hasValueSatisfying(rule -> assertThat(rule.getTag().getId()).isEqualTo(customTag.getId()));
   }
@@ -254,17 +246,16 @@ class CustomTagControllerTest {
         .formatted(title, colorCode);
   }
 
-  private Event event(String title, Long recurrenceId, Tag tag) {
-    return new Event(
+  private SingleEvent event(String title, Tag tag) {
+    return new SingleEvent(
         title,
         null,
         Instant.parse("2026-07-01T00:00:00Z"),
         Instant.parse("2026-07-01T01:00:00Z"),
         false,
         "UTC",
-        recurrenceId,
-        tag,
-        currentAccountReference());
+        tag.getId(),
+        currentAccountReference().getId());
   }
 
   private RecurrenceEvent recurrenceEvent(Tag tag) {

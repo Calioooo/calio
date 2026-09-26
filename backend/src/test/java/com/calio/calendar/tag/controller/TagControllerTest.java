@@ -1,14 +1,11 @@
 package com.calio.calendar.tag.controller;
 
-import static com.calio.calendar.security.TestAccountSupport.currentAccountReference;
+import static com.calio.calendar.security.TestAccountSupport.currentAccountId;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.calio.calendar.common.testsupport.SharedIntegrationDatabase;
-import com.calio.calendar.event.repository.EventRepository;
-import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.security.AuthenticatedAccountMockMvcTestConfig;
 import com.calio.calendar.security.WithAuthenticatedAccount;
 import com.calio.calendar.tag.domain.Tag;
@@ -24,7 +21,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest(
     properties = {
-      "spring.datasource.url=jdbc:h2:mem:calendar-shared-auth-controller-test;MODE=MySQL;DB_CLOSE_ON_EXIT=FALSE",
+      "spring.datasource.url=jdbc:h2:mem:calendar-tag-test;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE",
       "spring.datasource.driver-class-name=org.h2.Driver",
       "spring.datasource.username=sa",
       "spring.datasource.password=",
@@ -33,21 +30,14 @@ import org.springframework.test.web.servlet.MockMvc;
 @AutoConfigureMockMvc
 @WithAuthenticatedAccount
 @Import(AuthenticatedAccountMockMvcTestConfig.class)
-@SharedIntegrationDatabase
 class TagControllerTest {
 
   @Autowired private MockMvc mockMvc;
 
   @Autowired private TagRepository tagRepository;
 
-  @Autowired private EventRepository eventRepository;
-
-  @Autowired private RecurrenceEventRepository recurrenceEventRepository;
-
   @BeforeEach
   void setUp() {
-    eventRepository.deleteAll();
-    recurrenceEventRepository.deleteAll();
     tagRepository.deleteAll();
   }
 
@@ -56,8 +46,8 @@ class TagControllerTest {
   void givenPersonalDefaultAndCustomTags_whenListTags_thenReturnsAllTags() throws Exception {
     // given
     tagRepository.save(Tag.personalDefault("업무", "#2563eb"));
-    tagRepository.save(Tag.personalDefault("기타", "#64748b"));
-    tagRepository.save(Tag.personalCustom(currentAccountReference(), "사용자", "#111111"));
+    tagRepository.save(Tag.personalFallback("기타", "#64748b"));
+    tagRepository.save(Tag.personalCustom(currentAccountId(), "사용자", "#111111"));
 
     // when
     mockMvc

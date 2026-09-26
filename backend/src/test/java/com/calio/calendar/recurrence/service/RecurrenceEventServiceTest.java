@@ -3,10 +3,11 @@ package com.calio.calendar.recurrence.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.calio.calendar.account.domain.Account;
@@ -14,12 +15,9 @@ import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.common.domain.CanonicalSchedule;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
-import com.calio.calendar.event.controller.dto.EventResponse;
-import com.calio.calendar.event.service.EventCommandService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobEnqueueService;
+import com.calio.calendar.integration.sync.operation.GoogleOperationJobEnqueueService.OutboundOperation;
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarRecurrenceJobKind;
-import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceJobPayload;
-import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceOverrideJobPayload;
 import com.calio.calendar.recurrence.controller.dto.CreateRecurrenceEventRequest;
 import com.calio.calendar.recurrence.controller.dto.RecurrenceEventResponse;
 import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceEventRequest;
@@ -30,8 +28,9 @@ import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
 import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.sharing.recurrence.service.PersonalRecurrenceGroupShareCommandService;
+import com.calio.calendar.singleevent.controller.dto.EventResponse;
 import com.calio.calendar.tag.domain.Tag;
-import com.calio.calendar.tag.service.TagQueryService;
+import com.calio.calendar.tag.repository.TagRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -55,9 +54,7 @@ class RecurrenceEventServiceTest {
 
   @Mock private AccountRepository accountRepository;
 
-  @Mock private TagQueryService tagQueryService;
-
-  @Mock private EventCommandService eventCommandService;
+  @Mock private TagRepository tagRepository;
 
   @Mock private Rfc5545RecurrenceEngine recurrenceEngine;
 
@@ -67,10 +64,13 @@ class RecurrenceEventServiceTest {
 
   @Mock private GoogleOperationJobEnqueueService jobEnqueueService;
 
+  @Mock private OutboundOperation outboundOperation;
+
   private RecurrenceEventService recurrenceEventService;
 
   @BeforeEach
   void setUp() {
+    lenient().when(jobEnqueueService.prepareOutboundOperation(1L)).thenReturn(outboundOperation);
     RecurrenceEventQueryService queryService =
         new RecurrenceEventQueryService(
             recurrenceEventRepository, recurrenceEventOverrideRepository);
@@ -82,8 +82,7 @@ class RecurrenceEventServiceTest {
             queryService,
             commandService,
             accountRepository,
-            tagQueryService,
-            eventCommandService,
+            tagRepository,
             recurrenceEngine,
             clock,
             recurrenceShareCommandService,
@@ -91,14 +90,13 @@ class RecurrenceEventServiceTest {
   }
 
   @Test
-  @DisplayName("반복 일정 생성은 정규화된 RFC line과 canonical schedule만 저장하고 Event row를 만들지 않는다")
+  @DisplayName("반복 일정 생성은 정규화된 RFC line과 canonical schedule만 저장하고 SingleEvent row를 만들지 않는다")
   void givenTimedRequest_whenCreate_thenStoresValidatedMasterWithoutMaterializingEvents() {
     // given
     Tag tag = tag();
-    Account account = account();
     List<String> normalized = List.of("RRULE:FREQ=DAILY;COUNT=3");
-    when(accountRepository.findById(1L)).thenReturn(Optional.of(account));
-    when(tagQueryService.getTagOrDefault(1L, null)).thenReturn(tag);
+    when(tagRepository.findPersonalFallbackTag()).thenReturn(Optional.of(tag));
+    when(accountRepository.findById(1L)).thenReturn(Optional.of(account()));
     when(recurrenceEngine.validate(any(RecurrenceSchedule.class), any())).thenReturn(normalized);
     when(recurrenceEventRepository.save(any(RecurrenceEvent.class)))
         .thenAnswer(
@@ -121,22 +119,13 @@ class RecurrenceEventServiceTest {
         .isEqualTo(Instant.parse("2027-01-01T01:00:00Z"));
     assertThat(captor.getValue().getTimeZone()).isEqualTo("Asia/Seoul");
     assertThat(captor.getValue().getRecurrenceRules()).containsExactlyElementsOf(normalized);
-    assertThat(captor.getValue().getAccount()).isSameAs(account);
+    assertThat(response.recurrenceId()).isEqualTo(10L);
     verify(jobEnqueueService)
         .enqueueRecurrence(
-            1L,
-            10L,
-            GoogleCalendarRecurrenceJobKind.RECURRENCE_CREATE,
-            new GoogleRecurrenceJobPayload(
-                "Rule",
-                "memo",
-                Instant.parse("2027-01-01T00:00:00Z"),
-                Instant.parse("2027-01-01T01:00:00Z"),
-                false,
-                "Asia/Seoul",
-                normalized));
-    verifyNoInteractions(eventCommandService);
-    assertThat(response.canUpdateSeries()).isTrue();
+            eq(outboundOperation),
+            eq(10L),
+            eq(GoogleCalendarRecurrenceJobKind.RECURRENCE_CREATE),
+            any());
   }
 
   @Test
@@ -166,7 +155,7 @@ class RecurrenceEventServiceTest {
     List<String> normalized = List.of("RRULE:FREQ=WEEKLY;COUNT=2");
     when(recurrenceEventRepository.findByIdAndAccountIdForUpdate(10L, 1L))
         .thenReturn(Optional.of(recurrenceEvent));
-    when(tagQueryService.getTagOrDefault(1L, null)).thenReturn(tag);
+    when(tagRepository.findPersonalFallbackTag()).thenReturn(Optional.of(tag));
     when(recurrenceEngine.validate(any(RecurrenceSchedule.class), any())).thenReturn(normalized);
     UpdateRecurrenceEventRequest request =
         new UpdateRecurrenceEventRequest(
@@ -186,25 +175,20 @@ class RecurrenceEventServiceTest {
     assertThat(recurrenceEvent.getTitle()).isEqualTo("Updated");
     assertThat(recurrenceEvent.isAllDay()).isTrue();
     assertThat(recurrenceEvent.getTimeZone()).isNull();
+    InOrder lockOrder = inOrder(jobEnqueueService, recurrenceEventRepository);
+    lockOrder.verify(jobEnqueueService).prepareOutboundOperation(1L);
+    lockOrder.verify(recurrenceEventRepository).findByIdAndAccountIdForUpdate(10L, 1L);
     verify(recurrenceEventOverrideRepository, never()).deleteAllByRecurrenceEventIds(any());
-    verify(eventCommandService, never()).deleteEventsByRecurrenceEventIds(any());
     verify(jobEnqueueService)
         .enqueueRecurrence(
-            1L,
-            10L,
-            GoogleCalendarRecurrenceJobKind.RECURRENCE_UPDATE,
-            new GoogleRecurrenceJobPayload(
-                "Updated",
-                null,
-                Instant.parse("2027-02-01T00:00:00Z"),
-                Instant.parse("2027-02-03T00:00:00Z"),
-                true,
-                null,
-                normalized));
+            eq(outboundOperation),
+            eq(10L),
+            eq(GoogleCalendarRecurrenceJobKind.RECURRENCE_UPDATE),
+            any());
   }
 
   @Test
-  @DisplayName("전체 recurrence 삭제는 override와 account legacy Event를 master보다 먼저 제거한다")
+  @DisplayName("전체 recurrence 삭제는 override를 master보다 먼저 제거한다")
   void givenRecurrenceChildren_whenDeleteMaster_thenDeletesChildrenBeforeMaster() {
     // given
     RecurrenceEvent recurrenceEvent = recurrenceEvent();
@@ -217,18 +201,18 @@ class RecurrenceEventServiceTest {
     // then
     InOrder deletionOrder =
         inOrder(
+            jobEnqueueService,
             recurrenceEventRepository,
             recurrenceEventOverrideRepository,
-            eventCommandService,
             recurrenceShareCommandService);
+    deletionOrder.verify(jobEnqueueService).prepareOutboundOperation(1L);
     deletionOrder.verify(recurrenceEventRepository).findByIdAndAccountIdForUpdate(10L, 1L);
     deletionOrder.verify(recurrenceShareCommandService).deleteAllForSourceRecurrence(10L);
     deletionOrder
         .verify(recurrenceEventOverrideRepository)
         .deleteAllByRecurrenceEventIds(List.of(10L));
-    deletionOrder.verify(eventCommandService).deleteEventsByRecurrenceEventIds(List.of(10L));
     deletionOrder.verify(recurrenceEventRepository).deleteAllByIds(List.of(10L));
-    verify(jobEnqueueService).enqueueRecurrenceDeleted(1L, 10L);
+    verify(jobEnqueueService).enqueueRecurrenceDeleted(outboundOperation, 10L);
   }
 
   @Test
@@ -266,20 +250,13 @@ class RecurrenceEventServiceTest {
     assertThat(captor.getValue().getOverrideDescription()).isNull();
     assertThat(captor.getValue().getOverrideTimeZone()).isEqualTo("Asia/Seoul");
     assertThat(response.title()).isEqualTo("Final title");
-    verify(jobEnqueueService)
-        .enqueueRecurrenceOverride(
-            1L,
-            10L,
-            originStartAt,
-            new GoogleRecurrenceOverrideJobPayload(
-                "Final title",
-                null,
-                Instant.parse("2027-01-03T02:00:00Z"),
-                Instant.parse("2027-01-03T03:00:00Z"),
-                false,
-                "Asia/Seoul"));
     assertThat(response.description()).isNull();
     assertThat(response.originStartAt()).isEqualTo(originStartAt);
+    InOrder lockOrder = inOrder(jobEnqueueService, recurrenceEventRepository);
+    lockOrder.verify(jobEnqueueService).prepareOutboundOperation(1L);
+    lockOrder.verify(recurrenceEventRepository).findByIdAndAccountIdForUpdate(10L, 1L);
+    verify(jobEnqueueService)
+        .enqueueRecurrenceOverride(eq(outboundOperation), eq(10L), eq(originStartAt), any());
   }
 
   @Test
@@ -406,7 +383,11 @@ class RecurrenceEventServiceTest {
     assertThat(existingOverride.getOriginStartAt()).isEqualTo(originStartAt);
     assertThat(existingOverride.isDeleted()).isTrue();
     assertThat(existingOverride.getDeletedAt()).isEqualTo(deletedAt);
-    verify(jobEnqueueService).enqueueRecurrenceOverrideDeleted(1L, 10L, originStartAt);
+    InOrder lockOrder = inOrder(jobEnqueueService, recurrenceEventRepository);
+    lockOrder.verify(jobEnqueueService).prepareOutboundOperation(1L);
+    lockOrder.verify(recurrenceEventRepository).findByIdAndAccountIdForUpdate(10L, 1L);
+    verify(jobEnqueueService)
+        .enqueueRecurrenceOverrideDeleted(outboundOperation, 10L, originStartAt);
   }
 
   @Test

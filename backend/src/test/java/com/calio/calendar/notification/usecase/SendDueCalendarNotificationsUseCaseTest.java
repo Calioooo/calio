@@ -10,7 +10,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.calio.calendar.account.repository.AccountRepository;
-import com.calio.calendar.event.repository.EventRepository;
 import com.calio.calendar.groupcalendar.event.repository.GroupCalendarEventRepository;
 import com.calio.calendar.groupcalendar.recurrence.repository.GroupCalendarRecurrenceEventRepository;
 import com.calio.calendar.groupcalendar.recurrence.repository.GroupCalendarRecurrenceOverrideRepository;
@@ -30,6 +29,7 @@ import com.calio.calendar.notification.repository.NotificationDispatchRepository
 import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.recurrence.service.PersonalRecurrenceOccurrenceResolver;
+import com.calio.calendar.singleevent.repository.SingleEventRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -52,7 +52,7 @@ class SendDueCalendarNotificationsUseCaseTest {
 
   @Mock private AccountRepository accountRepository;
 
-  @Mock private EventRepository eventRepository;
+  @Mock private SingleEventRepository eventRepository;
 
   @Mock private RecurrenceEventRepository recurrenceEventRepository;
 

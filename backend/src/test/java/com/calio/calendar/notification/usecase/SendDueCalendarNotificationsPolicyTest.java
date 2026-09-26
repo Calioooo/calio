@@ -14,8 +14,6 @@ import com.calio.calendar.account.domain.AccountNotificationSettings;
 import com.calio.calendar.account.domain.ImportantReminderOffset;
 import com.calio.calendar.account.domain.TimedReminderOffset;
 import com.calio.calendar.account.repository.AccountRepository;
-import com.calio.calendar.event.domain.Event;
-import com.calio.calendar.event.repository.EventRepository;
 import com.calio.calendar.groupcalendar.event.repository.GroupCalendarEventRepository;
 import com.calio.calendar.groupcalendar.recurrence.repository.GroupCalendarRecurrenceEventRepository;
 import com.calio.calendar.groupcalendar.recurrence.repository.GroupCalendarRecurrenceOverrideRepository;
@@ -30,6 +28,8 @@ import com.calio.calendar.notification.repository.NotificationDispatchRepository
 import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.recurrence.service.PersonalRecurrenceOccurrenceResolver;
+import com.calio.calendar.singleevent.domain.SingleEvent;
+import com.calio.calendar.singleevent.repository.SingleEventRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -50,7 +50,7 @@ class SendDueCalendarNotificationsPolicyTest {
 
   @Mock private AccountRepository accountRepository;
 
-  @Mock private EventRepository eventRepository;
+  @Mock private SingleEventRepository eventRepository;
 
   @Mock private RecurrenceEventRepository recurrenceEventRepository;
 
@@ -103,8 +103,8 @@ class SendDueCalendarNotificationsPolicyTest {
       givenTimedEventInAnotherTimeZone_whenDispatchingDueNotifications_thenUsesScheduleLocalTargetDate() {
     // given
     Instant startAt = Instant.parse("2026-06-01T01:00:00Z");
-    Event event = timedEvent(startAt, "America/Los_Angeles");
-    when(eventRepository.findNormalEvents(eq(1L), any(), any())).thenReturn(List.of(event));
+    SingleEvent event = timedEvent(startAt, "America/Los_Angeles");
+    when(eventRepository.findSingleEvents(eq(1L), any(), any())).thenReturn(List.of(event));
     stubDispatch();
 
     // when
@@ -128,7 +128,7 @@ class SendDueCalendarNotificationsPolicyTest {
   void givenNoRemainingSchedules_whenBriefingIsDue_thenSkipsNotification() {
     // given
     Instant briefingTime = Instant.parse("2026-06-01T23:00:00Z");
-    when(eventRepository.findNormalEvents(eq(1L), any(), any())).thenReturn(List.of());
+    when(eventRepository.findSingleEvents(eq(1L), any(), any())).thenReturn(List.of());
 
     // when
     sendDueCalendarNotificationsUseCase.dispatchAccountNotifications(
@@ -145,9 +145,9 @@ class SendDueCalendarNotificationsPolicyTest {
       givenSchedulesOutsideBriefingDate_whenDispatchingDueNotifications_thenCountsOnlyTargetDateSchedules() {
     // given
     Instant briefingTime = Instant.parse("2026-06-01T23:00:00Z");
-    Event targetDateEvent = timedEvent(Instant.parse("2026-06-02T01:00:00Z"), "Asia/Seoul");
-    Event nextDateEvent = timedEvent(Instant.parse("2026-06-03T01:00:00Z"), "Asia/Seoul");
-    when(eventRepository.findNormalEvents(eq(1L), any(), any()))
+    SingleEvent targetDateEvent = timedEvent(Instant.parse("2026-06-02T01:00:00Z"), "Asia/Seoul");
+    SingleEvent nextDateEvent = timedEvent(Instant.parse("2026-06-03T01:00:00Z"), "Asia/Seoul");
+    when(eventRepository.findSingleEvents(eq(1L), any(), any()))
         .thenReturn(List.of(targetDateEvent, nextDateEvent));
     stubDispatch();
 
@@ -186,10 +186,10 @@ class SendDueCalendarNotificationsPolicyTest {
     doNothing().when(sendDueCalendarNotificationsUseCase).dispatch(anyLong(), any(), any(), any());
   }
 
-  private Event timedEvent(Instant startAt, String timeZone) {
-    Event event =
-        new Event(
-            "해외 회의", "설명", startAt, startAt.plusSeconds(3_600), false, timeZone, null, null, null);
+  private SingleEvent timedEvent(Instant startAt, String timeZone) {
+    SingleEvent event =
+        new SingleEvent(
+            "해외 회의", "설명", startAt, startAt.plusSeconds(3_600), false, timeZone, 1L, 1L);
     ReflectionTestUtils.setField(event, "id", 10L);
     return event;
   }

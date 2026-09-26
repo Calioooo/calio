@@ -24,8 +24,8 @@ import com.calio.calendar.aicalendar.service.CalendarConversationService;
 import com.calio.calendar.aicalendar.service.CalendarMutationService;
 import com.calio.calendar.aicalendar.service.dto.CalendarMutationPreview;
 import com.calio.calendar.aicalendar.service.tool.dto.CalendarMutationToolRequest;
-import com.calio.calendar.event.controller.dto.EventResponse;
-import com.calio.calendar.event.service.EventService;
+import com.calio.calendar.singleevent.controller.dto.EventResponse;
+import com.calio.calendar.singleevent.usecase.ListEventsUseCase;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -80,7 +80,7 @@ class CalendarConversationFlowEvalTest {
 
   @MockitoBean private CalendarAssistantRequestClassifier requestClassifier;
 
-  @MockitoBean private EventService eventService;
+  @MockitoBean private ListEventsUseCase listEventsUseCase;
 
   @MockitoBean private CalendarMutationService mutationService;
 
@@ -165,7 +165,7 @@ class CalendarConversationFlowEvalTest {
     String conversationId = conversationService.createConversation(account.getId());
     EventResponse before = timedEvent("팀 회의", "2026-08-16T05:00:00Z", "2026-08-16T06:00:00Z");
     EventResponse after = timedEvent("팀 회의", "2026-08-16T06:00:00Z", "2026-08-16T07:00:00Z");
-    when(eventService.listEvents(any(), any(), any())).thenReturn(List.of(before));
+    when(listEventsUseCase.list(any(), any(), any())).thenReturn(List.of(before));
     when(mutationService.preview(eq(account.getId()), any()))
         .thenReturn(
             new CalendarMutationPreview(
@@ -205,7 +205,7 @@ class CalendarConversationFlowEvalTest {
     EventResponse after =
         recurrenceOccurrence(
             "팀 회의", "2026-08-16T05:00:00Z", "2026-08-16T06:00:00Z", "2026-08-16T07:00:00Z");
-    when(eventService.listEvents(any(), any(), any())).thenReturn(List.of(before));
+    when(listEventsUseCase.list(any(), any(), any())).thenReturn(List.of(before));
     when(mutationService.preview(eq(account.getId()), any()))
         .thenReturn(
             new CalendarMutationPreview(
@@ -247,7 +247,7 @@ class CalendarConversationFlowEvalTest {
         timedEvent("팀 회의", "2026-08-16T06:00:00Z", "2026-08-16T07:00:00Z");
     EventResponse designReview =
         timedEvent("디자인 리뷰", "2026-08-16T08:00:00Z", "2026-08-16T09:00:00Z");
-    when(eventService.listEvents(any(), any(), any()))
+    when(listEventsUseCase.list(any(), any(), any()))
         .thenReturn(List.of(teamMeeting))
         .thenReturn(List.of(designReview));
     when(mutationService.preview(eq(account.getId()), any()))

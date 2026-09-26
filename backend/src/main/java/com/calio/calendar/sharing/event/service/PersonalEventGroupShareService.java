@@ -2,8 +2,6 @@ package com.calio.calendar.sharing.event.service;
 
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
-import com.calio.calendar.event.domain.Event;
-import com.calio.calendar.event.service.EventQueryService;
 import com.calio.calendar.groupspace.domain.GroupMember;
 import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.service.GroupMembershipQueryService;
@@ -13,6 +11,8 @@ import com.calio.calendar.sharing.event.controller.dto.CreateEventGroupSharesReq
 import com.calio.calendar.sharing.event.controller.dto.CreateEventGroupSharesResponse;
 import com.calio.calendar.sharing.event.controller.dto.EventGroupShareResultResponse;
 import com.calio.calendar.sharing.event.domain.PersonalEventGroupShare;
+import com.calio.calendar.singleevent.domain.SingleEvent;
+import com.calio.calendar.singleevent.repository.SingleEventRepository;
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -26,17 +26,17 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class PersonalEventGroupShareService {
 
-  private final EventQueryService eventQueryService;
+  private final SingleEventRepository eventRepository;
   private final GroupMembershipQueryService membershipQueryService;
   private final PersonalEventGroupShareQueryService shareQueryService;
   private final PersonalEventGroupShareCommandService shareCommandService;
 
   public PersonalEventGroupShareService(
-      EventQueryService eventQueryService,
+      SingleEventRepository eventRepository,
       GroupMembershipQueryService membershipQueryService,
       PersonalEventGroupShareQueryService shareQueryService,
       PersonalEventGroupShareCommandService shareCommandService) {
-    this.eventQueryService = eventQueryService;
+    this.eventRepository = eventRepository;
     this.membershipQueryService = membershipQueryService;
     this.shareQueryService = shareQueryService;
     this.shareCommandService = shareCommandService;
@@ -47,7 +47,7 @@ public class PersonalEventGroupShareService {
       Long accountId, CreateEventGroupSharesRequest request) {
     List<Long> eventIds = distinct(request.eventIds());
     List<Long> groupSpaceIds = distinct(request.groupSpaceIds());
-    Map<Long, Event> eventsById = validateSources(accountId, eventIds);
+    Map<Long, SingleEvent> eventsById = validateSources(accountId, eventIds);
     Map<Long, GroupSpace> activeGroupSpacesById = activeGroupSpaces(accountId, groupSpaceIds);
     Set<ShareKey> existingKeys = existingKeys(eventIds, groupSpaceIds);
 
@@ -66,10 +66,10 @@ public class PersonalEventGroupShareService {
     return new CreateEventGroupSharesResponse(results);
   }
 
-  private Map<Long, Event> validateSources(Long accountId, List<Long> eventIds) {
-    Map<Long, Event> eventsById =
-        eventQueryService.listShareableEvents(accountId, eventIds).stream()
-            .collect(Collectors.toMap(Event::getId, event -> event));
+  private Map<Long, SingleEvent> validateSources(Long accountId, List<Long> eventIds) {
+    Map<Long, SingleEvent> eventsById =
+        eventRepository.findAllByIdInAndAccountId(eventIds, accountId).stream()
+            .collect(Collectors.toMap(SingleEvent::getId, event -> event));
     if (eventsById.size() != eventIds.size()) {
       throw new CalioException(ErrorCode.EVENT_NOT_FOUND);
     }
@@ -89,7 +89,7 @@ public class PersonalEventGroupShareService {
   }
 
   private List<GroupShareTargetResponse> shareTargets(
-      Event event,
+      SingleEvent event,
       List<Long> groupSpaceIds,
       Map<Long, GroupSpace> activeGroupSpacesById,
       Set<ShareKey> existingKeys) {
@@ -102,7 +102,7 @@ public class PersonalEventGroupShareService {
   }
 
   private GroupShareTargetResponse shareTarget(
-      Event event, Long groupSpaceId, GroupSpace groupSpace, Set<ShareKey> existingKeys) {
+      SingleEvent event, Long groupSpaceId, GroupSpace groupSpace, Set<ShareKey> existingKeys) {
     if (groupSpace == null) {
       return new GroupShareTargetResponse(groupSpaceId, GroupShareTargetStatus.NOT_ELIGIBLE);
     }

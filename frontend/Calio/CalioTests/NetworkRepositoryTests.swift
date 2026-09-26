@@ -99,8 +99,7 @@ struct NetworkRepositoryTests {
           "tagType": "DEFAULT"
         },
         "createdAt": "2026-08-01T00:00:00Z",
-        "updatedAt": "2026-08-01T00:00:00Z",
-        "canUpdateSeries": true
+        "updatedAt": "2026-08-01T00:00:00Z"
       }
       """.data(using: .utf8)!
     var capturedRequest: URLRequest?
@@ -298,8 +297,7 @@ struct NetworkRepositoryTests {
           "tagType": "DEFAULT"
         },
         "createdAt": "2026-08-01T09:00:00Z",
-        "updatedAt": "2026-08-01T10:00:00Z",
-        "canUpdateSeries": true
+        "updatedAt": "2026-08-01T10:00:00Z"
       }
       """.data(using: .utf8)!
     let occurrenceResponseJSON = """
