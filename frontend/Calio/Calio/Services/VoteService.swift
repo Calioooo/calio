@@ -21,6 +21,11 @@ struct VoteService {
     return try mapVoteRoom(response)
   }
 
+  func fetchMyParticipatedRooms() async throws -> [ParticipatedVoteRoom] {
+    let responses = try await perform { try await repository.fetchMyParticipatedVoteRooms() }
+    return try responses.map(mapParticipatedVoteRoom(_:))
+  }
+
   func fetchResult(publicId: UUID) async throws -> VoteResult {
     let response = try await perform { try await repository.fetchVoteResult(publicId: publicId) }
     return try mapVoteResult(response)
@@ -115,6 +120,24 @@ struct VoteService {
       room: room,
       dateResults: try dto.dates.map(mapVoteDateResult(_:)),
       submittedNicknames: dto.submittedNicknames
+    )
+  }
+
+  private func mapParticipatedVoteRoom(
+    _ dto: ParticipatedVoteRoomResponseDTO
+  ) throws -> ParticipatedVoteRoom {
+    ParticipatedVoteRoom(
+      room: try mapVoteRoom(
+        VoteRoomResponseDTO(
+          publicId: dto.publicId,
+          name: dto.name,
+          candidateStartDate: dto.candidateStartDate,
+          candidateEndDate: dto.candidateEndDate
+        )
+      ),
+      nickname: dto.nickname,
+      participantStatus: mapVoteParticipantStatus(dto.participantStatus),
+      participantUpdatedAt: dto.participantUpdatedAt
     )
   }
 

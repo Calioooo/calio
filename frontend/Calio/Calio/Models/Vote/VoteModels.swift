@@ -69,6 +69,17 @@ struct VoteRoom: Identifiable, Equatable {
   }
 }
 
+struct ParticipatedVoteRoom: Identifiable, Equatable {
+  let room: VoteRoom
+  let nickname: String
+  let participantStatus: VoteParticipantStatus
+  let participantUpdatedAt: Date
+
+  var id: String {
+    "\(room.publicId.uuidString):\(nickname)"
+  }
+}
+
 struct VoteDateResult: Identifiable, Equatable {
   let day: VoteDay
   let unavailableCount: Int

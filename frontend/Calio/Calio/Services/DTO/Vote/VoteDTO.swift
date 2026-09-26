@@ -13,6 +13,16 @@ struct VoteRoomResponseDTO: Decodable {
   let candidateEndDate: String
 }
 
+struct ParticipatedVoteRoomResponseDTO: Decodable {
+  let publicId: UUID
+  let name: String
+  let candidateStartDate: String
+  let candidateEndDate: String
+  let nickname: String
+  let participantStatus: VoteParticipantStatusDTO
+  let participantUpdatedAt: Date
+}
+
 struct VoteDateResultResponseDTO: Decodable {
   let date: String
   let unavailableCount: Int

@@ -2,6 +2,7 @@ import Foundation
 
 protocol VoteRepository {
   func createVoteRoom(_ request: CreateVoteRoomRequestDTO) async throws -> VoteRoomResponseDTO
+  func fetchMyParticipatedVoteRooms() async throws -> [ParticipatedVoteRoomResponseDTO]
   func fetchVoteResult(publicId: UUID) async throws -> VoteResultResponseDTO
   func createVoteParticipant(
     publicId: UUID,
