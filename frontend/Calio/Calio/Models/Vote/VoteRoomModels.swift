@@ -19,7 +19,12 @@ struct VoteRoomRoute: Identifiable, Equatable {
   static func from(url: URL) -> VoteRoomRoute? {
     guard url.host == CalioAPIConfig.baseURL.host else { return nil }
     let components = url.pathComponents.filter { $0 != "/" }
-    guard components.count == 2, components[0] == "vote-rooms", let publicId = UUID(uuidString: components[1]) else {
+    guard
+      components.count == 3,
+      components[0] == "api",
+      components[1] == "vote-rooms",
+      let publicId = UUID(uuidString: components[2])
+    else {
       return nil
     }
     return VoteRoomRoute(publicId: publicId)
