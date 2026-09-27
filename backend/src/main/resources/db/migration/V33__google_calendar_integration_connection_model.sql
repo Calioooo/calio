@@ -1,7 +1,42 @@
 ALTER TABLE google_calendar_integrations RENAME TO google_calendar_connections;
 
 ALTER TABLE google_calendar_connections
+    DROP CONSTRAINT ck_google_calendar_integrations_lifecycle;
+
+ALTER TABLE google_calendar_connections
     RENAME COLUMN integration_state TO connection_state;
+
+ALTER TABLE google_calendar_connections
+    ADD CONSTRAINT ck_google_calendar_integrations_lifecycle
+        CHECK (
+            (connection_state = 'CONNECTED'
+                AND encrypted_refresh_token IS NOT NULL
+                AND encrypted_access_token IS NOT NULL
+                AND access_token_expires_at IS NOT NULL
+                AND disconnected_at IS NULL
+                AND sync_error_reason IS NULL
+                AND sync_error_at IS NULL)
+            OR
+            (connection_state = 'DISCONNECTED'
+                AND encrypted_refresh_token IS NULL
+                AND encrypted_access_token IS NULL
+                AND access_token_expires_at IS NULL
+                AND next_sync_token IS NULL
+                AND google_operation_lease_owner IS NULL
+                AND google_operation_lease_expires_at IS NULL
+                AND disconnected_at IS NOT NULL
+                AND sync_error_reason IS NULL
+                AND sync_error_at IS NULL)
+            OR
+            (connection_state = 'SYNC_ERROR'
+                AND encrypted_refresh_token IS NULL
+                AND encrypted_access_token IS NULL
+                AND access_token_expires_at IS NULL
+                AND next_sync_token IS NULL
+                AND disconnected_at IS NULL
+                AND sync_error_reason IS NOT NULL
+                AND sync_error_at IS NOT NULL)
+        );
 
 ALTER TABLE google_calendar_connections
     DROP FOREIGN KEY fk_google_calendar_integrations_account;
