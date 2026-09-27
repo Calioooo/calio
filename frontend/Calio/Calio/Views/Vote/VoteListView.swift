@@ -140,8 +140,8 @@ struct VoteListView: View {
       loadingState
     case .loaded(let rooms):
       rooms.isEmpty ? AnyView(emptyState) : AnyView(createdRoomCards(rooms))
-    case .failed:
-      failedState(onRetry: viewModel.reloadCreatedRooms)
+    case .failed(let failure):
+      failedState(message: failure.message, onRetry: viewModel.reloadCreatedRooms)
     }
   }
 
@@ -153,7 +153,10 @@ struct VoteListView: View {
     case .loaded(let rooms):
       rooms.isEmpty ? AnyView(emptyState) : AnyView(participatedRoomCards(rooms))
     case .failed:
-      failedState(onRetry: viewModel.reloadParticipatedRooms)
+      failedState(
+        message: "투표를 불러오지 못했습니다.",
+        onRetry: viewModel.reloadParticipatedRooms
+      )
     }
   }
 
@@ -196,9 +199,12 @@ struct VoteListView: View {
     .padding(.bottom, 34)
   }
 
-  private func failedState(onRetry: @escaping () async -> Void) -> some View {
+  private func failedState(
+    message: String,
+    onRetry: @escaping () async -> Void
+  ) -> some View {
     VStack(spacing: 12) {
-      Text("투표를 불러오지 못했습니다.")
+      Text(message)
         .font(.headline)
         .foregroundStyle(.calioPrimary)
       Button("다시 시도") {

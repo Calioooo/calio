@@ -94,7 +94,7 @@ struct VoteListViewModelTests {
 
     await viewModel.loadIfNeeded()
 
-    #expect(viewModel.createdRoomState == .failed)
+    #expect(viewModel.createdRoomState == .failed(.network))
     #expect(viewModel.participatedRoomState == .loaded([]))
   }
 }
