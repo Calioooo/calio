@@ -589,6 +589,8 @@ class GoogleCalendarSyncMigrationTest {
 
     try (Connection connection = DriverManager.getConnection(url, "sa", "")) {
       assertThat(isNullable(connection, "GOOGLE_OPERATION_JOBS", "EVENT_OPERATION_KIND")).isTrue();
+      assertThat(indexNames(connection, "GOOGLE_OPERATION_JOBS"))
+          .contains("IDX_GOOGLE_OPERATION_JOBS_ACCOUNT");
       assertThat(
               generationExpression(
                   connection, "GOOGLE_OPERATION_JOBS", "ACTIVE_PERIODIC_SYNC_ACCOUNT_ID"))

@@ -24,6 +24,9 @@ SET integration.next_google_operation_sequence = (
         WHERE connection.integration_id = integration.id
     );
 
+CREATE INDEX idx_google_operation_jobs_account
+    ON google_operation_jobs (account_id);
+
 ALTER TABLE google_operation_jobs
     DROP FOREIGN KEY fk_google_operation_jobs_connection;
 
