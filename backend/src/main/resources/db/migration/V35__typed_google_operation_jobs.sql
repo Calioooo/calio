@@ -13,7 +13,7 @@ WHERE job_kind = 'SYNC';
 
 UPDATE google_operation_jobs
 SET job_scope = 'EVENT',
-    event_id = CAST(effective_resource_key AS BIGINT)
+    event_id = CAST(effective_resource_key AS DECIMAL(19, 0))
 WHERE job_kind IN ('CREATE', 'UPDATE', 'DELETE')
   AND effective_resource_scope = 'GENERAL_EVENT';
 
@@ -49,12 +49,12 @@ UPDATE google_operation_jobs
 SET event_operation_kind = NULL
 WHERE job_scope = 'SYNC';
 
+ALTER TABLE google_operation_jobs
+    MODIFY COLUMN job_trigger VARCHAR(32) NULL;
+
 UPDATE google_operation_jobs
 SET job_trigger = NULL
 WHERE job_scope = 'EVENT';
-
-ALTER TABLE google_operation_jobs
-    MODIFY COLUMN job_trigger VARCHAR(32) NULL;
 
 ALTER TABLE google_operation_jobs
     ADD CONSTRAINT ck_google_operation_jobs_scope

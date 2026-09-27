@@ -600,6 +600,58 @@ class GoogleCalendarSyncMigrationTest {
   }
 
   @Test
+  @DisplayName("V35는 기존 Event 작업의 64비트 식별자를 보존하고 trigger를 NULL로 이관한다")
+  void givenExistingEventJob_whenMigrateToV35_thenPreservesEventIdAndClearsTrigger()
+      throws Exception {
+    String url = "jdbc:h2:mem:google-existing-event-job-v35;MODE=MySQL;DB_CLOSE_DELAY=-1";
+    migrateTo(url, MigrationVersion.fromVersion("34"));
+
+    try (Connection connection = DriverManager.getConnection(url, "sa", "");
+        Statement statement = connection.createStatement()) {
+      statement.executeUpdate(
+          "INSERT INTO accounts (id, created_at, updated_at)"
+              + " VALUES (900, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))");
+      statement.executeUpdate(
+          "INSERT INTO google_calendar_integrations (id, account_id, created_at, updated_at)"
+              + " VALUES (900, 900, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))");
+      // Avoid the H2 2.4 legacy generated-column insertion failure; V35 rebuilds this column.
+      statement.executeUpdate(
+          "ALTER TABLE google_operation_jobs DROP CONSTRAINT uk_google_operation_jobs_active_periodic_sync");
+      statement.executeUpdate(
+          "ALTER TABLE google_operation_jobs DROP COLUMN active_periodic_sync_account_id");
+      statement.executeUpdate(
+          "ALTER TABLE google_operation_jobs ADD COLUMN active_periodic_sync_account_id BIGINT");
+      statement.executeUpdate(
+          """
+          INSERT INTO google_operation_jobs (
+              operation_id, integration_id, account_id, integration_sequence,
+              job_kind, job_trigger, effective_resource_scope, effective_resource_key,
+              target_payload, job_state, runnable_at, created_at, updated_at
+          ) VALUES (
+              'existing-event-job', 900, 900, 1,
+              'CREATE', 'CANONICAL_MUTATION', 'GENERAL_EVENT', '4294967296',
+              '{}', 'PENDING', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+          )
+          """);
+    }
+
+    migrateTo(url, MigrationVersion.fromVersion("35"));
+
+    try (Connection connection = DriverManager.getConnection(url, "sa", "");
+        Statement statement = connection.createStatement();
+        ResultSet result =
+            statement.executeQuery(
+                "SELECT job_scope, event_id, job_trigger, event_operation_kind"
+                    + " FROM google_operation_jobs WHERE operation_id = 'existing-event-job'")) {
+      assertThat(result.next()).isTrue();
+      assertThat(result.getString("job_scope")).isEqualTo("EVENT");
+      assertThat(result.getLong("event_id")).isEqualTo(4294967296L);
+      assertThat(result.getString("job_trigger")).isNull();
+      assertThat(result.getString("event_operation_kind")).isEqualTo("CREATE");
+    }
+  }
+
+  @Test
   @DisplayName("V36은 mapping event ID 조회를 위한 non-unique index를 유지한다")
   void givenV35Schema_whenMigrateToV36_thenAddsEventIdLookupIndex() throws Exception {
     // given
