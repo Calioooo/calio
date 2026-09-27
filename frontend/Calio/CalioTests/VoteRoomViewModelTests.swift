@@ -5,7 +5,7 @@ import Testing
 
 @Suite(.serialized)
 struct VoteRoomViewModelTests {
-  @Test @MainActor func restoresExistingSelectionAsSavedAndDraftState() async {
+  @Test @MainActor func restoresExistingSelectionFromSharedParticipantCredentials() async {
     let repository = VoteRoomRepositoryStub(
       lookupResponse: VoteParticipantSelectionResponseDTO(
         nickname: "민지",
@@ -17,7 +17,7 @@ struct VoteRoomViewModelTests {
     viewModel.nickname = "민지"
     viewModel.password = "1234"
 
-    await viewModel.restoreParticipantSelection()
+    await viewModel.submitParticipantCredentials()
 
     #expect(viewModel.participantFlow == .editing)
     #expect(
@@ -40,7 +40,7 @@ struct VoteRoomViewModelTests {
     )
     let viewModel = VoteRoomViewModel(room: room, voteService: VoteService(repository: repository))
     viewModel.nickname = "민지"
-    await viewModel.restoreParticipantSelection()
+    await viewModel.submitParticipantCredentials()
     viewModel.toggleUnavailableDay(VoteDay(year: 2026, month: 10, day: 16))
 
     await viewModel.submitVotes()
@@ -78,7 +78,27 @@ struct VoteRoomViewModelTests {
     #expect(viewModel.resultRefreshFailure == .network)
   }
 
-  @Test @MainActor func credentialFailureDuringSaveReturnsToExistingParticipantFlow() async {
+  @Test @MainActor func registersNewParticipantWhenSharedCredentialsAreNotFound() async {
+    let repository = VoteRoomRepositoryStub(
+      lookupError: VoteServiceError.participantCredentialInvalid,
+      authenticatedParticipantResponse: VoteParticipantResponseDTO(
+        nickname: "민지", status: .registered)
+    )
+    let viewModel = VoteRoomViewModel(room: room, voteService: VoteService(repository: repository))
+    viewModel.nickname = "민지"
+
+    await viewModel.submitParticipantCredentials()
+
+    #expect(viewModel.participantFlow == .editing)
+    #expect(
+      repository.authenticatedParticipantRequests == [
+        CreateVoteParticipantRequestDTO(nickname: "민지", password: nil)
+      ])
+    #expect(viewModel.savedUnavailableDays.isEmpty)
+    #expect(viewModel.draftUnavailableDays.isEmpty)
+  }
+
+  @Test @MainActor func credentialFailureDuringSaveReturnsToParticipantCredentials() async {
     let repository = VoteRoomRepositoryStub(
       lookupResponse: VoteParticipantSelectionResponseDTO(
         nickname: "민지", status: .registered, unavailableDates: []
@@ -88,12 +108,12 @@ struct VoteRoomViewModelTests {
     let viewModel = VoteRoomViewModel(room: room, voteService: VoteService(repository: repository))
     viewModel.nickname = "민지"
     viewModel.password = "1234"
-    await viewModel.restoreParticipantSelection()
+    await viewModel.submitParticipantCredentials()
     viewModel.toggleUnavailableDay(VoteDay(year: 2026, month: 10, day: 16))
 
     await viewModel.submitVotes()
 
-    #expect(viewModel.participantFlow == .existingParticipant)
+    #expect(viewModel.participantFlow == .participantCredentials)
     #expect(viewModel.actionFailure == .credentialInvalid)
     #expect(viewModel.draftUnavailableDays == [VoteDay(year: 2026, month: 10, day: 16)])
   }
@@ -110,7 +130,7 @@ struct VoteRoomViewModelTests {
       personalScheduleService: VotePersonalScheduleStub()
     )
     viewModel.nickname = "민지"
-    await viewModel.restoreParticipantSelection()
+    await viewModel.submitParticipantCredentials()
     viewModel.toggleUnavailableDay(VoteDay(year: 2026, month: 10, day: 16))
 
     await viewModel.requestPersonalSchedule()
@@ -151,8 +171,11 @@ private final class VoteRoomRepositoryStub: VoteRepository {
   private let resultError: Error?
   private let subsequentResultError: Error?
   private let lookupResponse: VoteParticipantSelectionResponseDTO
+  private let lookupError: Error?
+  private let authenticatedParticipantResponse: VoteParticipantResponseDTO
   private let submitResponse: VoteSubmissionResponseDTO
   private let submitError: Error?
+  private(set) var authenticatedParticipantRequests: [CreateVoteParticipantRequestDTO] = []
   private(set) var submitRequests: [SubmitVoteRequestDTO] = []
   private(set) var fetchResultCount = 0
 
@@ -160,8 +183,12 @@ private final class VoteRoomRepositoryStub: VoteRepository {
     resultResponse: VoteResultResponseDTO? = nil,
     resultError: Error? = nil,
     subsequentResultError: Error? = nil,
+    lookupError: Error? = nil,
     lookupResponse: VoteParticipantSelectionResponseDTO = VoteParticipantSelectionResponseDTO(
       nickname: "민지", status: .registered, unavailableDates: []
+    ),
+    authenticatedParticipantResponse: VoteParticipantResponseDTO = VoteParticipantResponseDTO(
+      nickname: "민지", status: .registered
     ),
     submitResponse: VoteSubmissionResponseDTO = VoteSubmissionResponseDTO(
       nickname: "민지", status: .submitted, unavailableDates: []
@@ -177,7 +204,9 @@ private final class VoteRoomRepositoryStub: VoteRepository {
       )
     self.resultError = resultError
     self.subsequentResultError = subsequentResultError
+    self.lookupError = lookupError
     self.lookupResponse = lookupResponse
+    self.authenticatedParticipantResponse = authenticatedParticipantResponse
     self.submitResponse = submitResponse
     self.submitError = submitError
   }
@@ -198,11 +227,24 @@ private final class VoteRoomRepositoryStub: VoteRepository {
     request _: CreateVoteParticipantRequestDTO
   ) async throws -> VoteParticipantResponseDTO { fatalError() }
 
+  func createAuthenticatedVoteParticipant(
+    publicId _: UUID,
+    request: CreateVoteParticipantRequestDTO
+  ) async throws -> VoteParticipantResponseDTO {
+    authenticatedParticipantRequests.append(request)
+    return authenticatedParticipantResponse
+  }
+
+  func fetchMyParticipatedVoteRooms() async throws -> [ParticipatedVoteRoomResponseDTO] {
+    fatalError()
+  }
+
   func lookupVoteParticipantSelection(
     publicId _: UUID,
     request _: LookupVoteParticipantSelectionRequestDTO
   ) async throws -> VoteParticipantSelectionResponseDTO {
-    lookupResponse
+    if let lookupError { throw lookupError }
+    return lookupResponse
   }
 
   func submitVotes(publicId _: UUID, request: SubmitVoteRequestDTO) async throws
