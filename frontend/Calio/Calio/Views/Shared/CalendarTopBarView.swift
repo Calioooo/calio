@@ -16,6 +16,7 @@ struct CalendarTopBarView: View {
   let onGoogleCalendarConnectTapped: () -> Void
   let onCreateTapped: () -> Void
   let onCreateVoteTapped: (() -> Void)?
+  let onMyVotesTapped: (() -> Void)?
 
   init(
     referenceDay: DayKey,
@@ -24,7 +25,8 @@ struct CalendarTopBarView: View {
     onTodayTapped: @escaping () -> Void,
     onGoogleCalendarConnectTapped: @escaping () -> Void,
     onCreateTapped: @escaping () -> Void,
-    onCreateVoteTapped: (() -> Void)? = nil
+    onCreateVoteTapped: (() -> Void)? = nil,
+    onMyVotesTapped: (() -> Void)? = nil
   ) {
     self.referenceDay = referenceDay
     self.showsTodayButton = showsTodayButton
@@ -33,6 +35,7 @@ struct CalendarTopBarView: View {
     self.onGoogleCalendarConnectTapped = onGoogleCalendarConnectTapped
     self.onCreateTapped = onCreateTapped
     self.onCreateVoteTapped = onCreateVoteTapped
+    self.onMyVotesTapped = onMyVotesTapped
   }
 
   var body: some View {
@@ -84,6 +87,10 @@ struct CalendarTopBarView: View {
         voteButton
       }
 
+      if onMyVotesTapped != nil {
+        myVotesButton
+      }
+
       Button(action: onCreateTapped) {
         Label("일정 추가", systemImage: "plus")
           .font(.subheadline.weight(.semibold))
@@ -117,6 +124,9 @@ struct CalendarTopBarView: View {
         googleCalendarButton
         if onCreateVoteTapped != nil {
           voteButton
+        }
+        if onMyVotesTapped != nil {
+          myVotesButton
         }
         createButton
       }
@@ -174,6 +184,20 @@ struct CalendarTopBarView: View {
     .buttonStyle(.plain)
     .accessibilityLabel("투표 만들기")
     .accessibilityIdentifier("calendar_navigation_create_vote")
+  }
+
+  private var myVotesButton: some View {
+    Button(action: { onMyVotesTapped?() }) {
+      Label("내 투표", systemImage: "list.bullet")
+        .font(.subheadline.weight(.semibold))
+        .foregroundStyle(.calioPrimary)
+        .padding(.horizontal, 13)
+        .frame(minHeight: 40)
+        .background(RoundedRectangle(cornerRadius: 10).fill(Color.calioSelection))
+    }
+    .buttonStyle(.plain)
+    .accessibilityLabel("내 투표")
+    .accessibilityIdentifier("calendar_navigation_my_votes")
   }
 }
 

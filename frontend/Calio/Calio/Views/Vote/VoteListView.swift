@@ -8,28 +8,15 @@ struct VoteListView: View {
 
     var title: String {
       switch self {
-      case .created:
-        return "만든 투표"
-      case .participated:
-        return "참여한 투표"
-      }
-    }
-
-    var relationshipTitle: String {
-      switch self {
-      case .created:
-        return "내가 만든 투표"
-      case .participated:
-        return "참여한 투표"
+      case .created: "만든 투표"
+      case .participated: "참여한 투표"
       }
     }
 
     var emptyMessage: String {
       switch self {
-      case .created:
-        return "만든 투표가 없어요."
-      case .participated:
-        return "참여한 투표가 없어요."
+      case .created: "만든 투표가 없어요."
+      case .participated: "참여한 투표가 없어요."
       }
     }
   }
@@ -84,7 +71,7 @@ struct VoteListView: View {
     }
     .background(Color.calioBackground)
     .accessibilityIdentifier("vote_list")
-    .task { await viewModel.loadCreatedRoomsIfNeeded() }
+    .task { await viewModel.loadIfNeeded() }
   }
 
   private var header: some View {
@@ -116,7 +103,7 @@ struct VoteListView: View {
         Button {
           selectedTab = tab
         } label: {
-          Text("\(tab.title) \(rooms(for: tab).count)")
+          Text("\(tab.title) \(roomCount(for: tab))")
             .font(.headline.weight(.semibold))
             .foregroundStyle(selectedTab == tab ? .voteAccent : .calioTextSecondary)
             .frame(maxWidth: .infinity, minHeight: 54)
@@ -142,7 +129,7 @@ struct VoteListView: View {
     case .created:
       createdRoomContent
     case .participated:
-      emptyState
+      participatedRoomContent
     }
   }
 
@@ -150,27 +137,55 @@ struct VoteListView: View {
   private var createdRoomContent: some View {
     switch viewModel.createdRoomState {
     case .idle, .loading:
-      ProgressView("투표를 불러오는 중")
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 56)
-
+      loadingState
     case .loaded(let rooms):
-      if rooms.isEmpty {
-        emptyState
-      } else {
-        roomCards(rooms)
-      }
-
+      rooms.isEmpty ? AnyView(emptyState) : AnyView(createdRoomCards(rooms))
     case .failed:
-      failedState
+      failedState(onRetry: viewModel.reloadCreatedRooms)
     }
   }
 
-  private func roomCards(_ rooms: [VoteRoom]) -> some View {
-    VStack(spacing: 14) {
+  @ViewBuilder
+  private var participatedRoomContent: some View {
+    switch viewModel.participatedRoomState {
+    case .idle, .loading:
+      loadingState
+    case .loaded(let rooms):
+      rooms.isEmpty ? AnyView(emptyState) : AnyView(participatedRoomCards(rooms))
+    case .failed:
+      failedState(onRetry: viewModel.reloadParticipatedRooms)
+    }
+  }
+
+  private var loadingState: some View {
+    ProgressView("투표를 불러오는 중")
+      .frame(maxWidth: .infinity)
+      .padding(.vertical, 56)
+  }
+
+  private func createdRoomCards(_ rooms: [VoteRoom]) -> some View {
+    roomCardList {
       ForEach(rooms) { room in
-        roomButton(room)
+        roomButton(room: room, relationship: "내가 만든 투표")
       }
+    }
+  }
+
+  private func participatedRoomCards(_ rooms: [ParticipatedVoteRoom]) -> some View {
+    roomCardList {
+      ForEach(rooms) { participant in
+        roomButton(
+          room: participant.room,
+          relationship: participantRelationshipText(participant),
+          detail: participantDetailText(participant)
+        )
+      }
+    }
+  }
+
+  private func roomCardList<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+    VStack(spacing: 14) {
+      content()
     }
     .overlay(alignment: .bottomLeading) {
       Text("투표를 선택하면 투표방으로 이동합니다.")
@@ -181,13 +196,13 @@ struct VoteListView: View {
     .padding(.bottom, 34)
   }
 
-  private var failedState: some View {
+  private func failedState(onRetry: @escaping () async -> Void) -> some View {
     VStack(spacing: 12) {
       Text("투표를 불러오지 못했습니다.")
         .font(.headline)
         .foregroundStyle(.calioPrimary)
       Button("다시 시도") {
-        Task { await viewModel.reloadCreatedRooms() }
+        Task { await onRetry() }
       }
       .font(.subheadline.weight(.semibold))
       .foregroundStyle(.voteAccent)
@@ -196,16 +211,14 @@ struct VoteListView: View {
     .padding(.vertical, 56)
   }
 
-  private func rooms(for tab: Tab) -> [VoteRoom] {
+  private func roomCount(for tab: Tab) -> Int {
     switch tab {
     case .created:
-      if case .loaded(let rooms) = viewModel.createdRoomState {
-        return rooms
-      }
-      return []
+      if case .loaded(let rooms) = viewModel.createdRoomState { return rooms.count }
     case .participated:
-      return []
+      if case .loaded(let rooms) = viewModel.participatedRoomState { return rooms.count }
     }
+    return 0
   }
 
   private var emptyState: some View {
@@ -227,7 +240,11 @@ struct VoteListView: View {
     .padding(.vertical, 56)
   }
 
-  private func roomButton(_ room: VoteRoom) -> some View {
+  private func roomButton(
+    room: VoteRoom,
+    relationship: String,
+    detail: String? = nil
+  ) -> some View {
     Button {
       onRoomSelected(room)
     } label: {
@@ -247,12 +264,17 @@ struct VoteListView: View {
             .font(.subheadline)
             .foregroundStyle(.calioTextSecondary)
             .lineLimit(1)
-          Text(selectedTab.relationshipTitle)
+          Text(relationship)
             .font(.caption.weight(.semibold))
             .foregroundStyle(.voteAccent)
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
             .background(Color.voteAccentSoft, in: Capsule())
+          if let detail {
+            Text(detail)
+              .font(.caption)
+              .foregroundStyle(.calioTextSecondary)
+          }
         }
 
         Spacer(minLength: 0)
@@ -284,6 +306,14 @@ struct VoteListView: View {
     .accessibilityIdentifier("vote_list_create")
   }
 
+  private func participantRelationshipText(_ participant: ParticipatedVoteRoom) -> String {
+    "\(participant.nickname)으로 참여"
+  }
+
+  private func participantDetailText(_ participant: ParticipatedVoteRoom) -> String {
+    participant.participantStatus == .submitted ? "일정 선택 완료" : "일정 선택 전"
+  }
+
   private func candidatePeriodText(for room: VoteRoom) -> String {
     "후보 기간 · \(dateText(room.candidateStartDay)) - \(dateText(room.candidateEndDay))"
   }
@@ -293,7 +323,7 @@ struct VoteListView: View {
   }
 }
 
-#Preview("만든 투표") {
+#Preview("내 투표") {
   VoteListView(
     viewModel: VoteListViewModel(
       createdRoomState: .loaded([
@@ -302,14 +332,9 @@ struct VoteListView: View {
           name: "가을 여행 일정",
           candidateStartDay: VoteDay(year: 2026, month: 10, day: 1),
           candidateEndDay: VoteDay(year: 2026, month: 10, day: 31)
-        ),
-        VoteRoom(
-          publicId: UUID(),
-          name: "팀 워크숍 날짜",
-          candidateStartDay: VoteDay(year: 2026, month: 9, day: 21),
-          candidateEndDay: VoteDay(year: 2026, month: 10, day: 12)
-        ),
-      ])
+        )
+      ]),
+      participatedRoomState: .loaded([])
     ),
     onClose: {},
     onRoomSelected: { _ in },
