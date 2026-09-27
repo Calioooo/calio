@@ -241,6 +241,10 @@ private final class VoteRoomRepositoryStub: VoteRepository {
     fatalError()
   }
 
+  func fetchMyCreatedVoteRooms() async throws -> [VoteRoomResponseDTO] {
+    fatalError()
+  }
+
   func lookupVoteParticipantSelection(
     publicId _: UUID,
     request _: LookupVoteParticipantSelectionRequestDTO
