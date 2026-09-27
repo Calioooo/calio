@@ -62,13 +62,8 @@ final class VoteRoomViewModel: ObservableObject {
     await refreshResult(setsLoadingState: true)
   }
 
-  func showExistingParticipant() {
-    participantFlow = .existingParticipant
-    actionFailure = nil
-  }
-
-  func showNewParticipant() {
-    participantFlow = .newParticipant
+  func showParticipantCredentials() {
+    participantFlow = .participantCredentials
     actionFailure = nil
   }
 
@@ -78,34 +73,27 @@ final class VoteRoomViewModel: ObservableObject {
     password = ""
   }
 
-  func registerParticipant() async {
+  func submitParticipantCredentials() async {
     guard canSubmitCredentials else { return }
-    await performParticipantAction { [self] in
-      let participant = try await voteService.createParticipant(
-        publicId: publicId,
-        nickname: trimmedNickname,
-        password: password.nilIfEmpty
-      )
-      savedUnavailableDays = []
-      draftUnavailableDays = []
-      nickname = participant.nickname
-      participantFlow = .editing
-    }
-  }
+    isSubmitting = true
+    actionFailure = nil
+    defer { isSubmitting = false }
 
-  func restoreParticipantSelection() async {
-    guard canSubmitCredentials else { return }
-    await performParticipantAction { [self] in
+    do {
       let selection = try await voteService.lookupParticipantSelection(
         publicId: publicId,
         nickname: trimmedNickname,
         password: password.nilIfEmpty
       )
-      let unavailableDays = Set(selection.unavailableDays)
-      savedUnavailableDays = unavailableDays
-      draftUnavailableDays = unavailableDays
-      nickname = selection.participant.nickname
-      participantFlow = .editing
+      apply(selection: selection)
+    } catch let error as VoteServiceError where error == .participantCredentialInvalid {
+      await registerNewParticipant()
+    } catch is CancellationError {
+      return
+    } catch let error as VoteServiceError {
+      handle(error)
+    } catch {
+      actionFailure = .unexpected
     }
   }
 
@@ -191,21 +179,6 @@ final class VoteRoomViewModel: ObservableObject {
     nickname.trimmingCharacters(in: .whitespacesAndNewlines)
   }
 
-  private func performParticipantAction(_ operation: () async throws -> Void) async {
-    isSubmitting = true
-    actionFailure = nil
-    defer { isSubmitting = false }
-    do {
-      try await operation()
-    } catch is CancellationError {
-      return
-    } catch let error as VoteServiceError {
-      handle(error)
-    } catch {
-      actionFailure = .unexpected
-    }
-  }
-
   private func loadPersonalSchedule(replacingDraft: Bool) async {
     guard let room else { return }
     isLoadingSchedule = true
@@ -259,7 +232,7 @@ final class VoteRoomViewModel: ObservableObject {
     let failure = failure(for: error)
     actionFailure = failure
     if error == .participantCredentialInvalid {
-      participantFlow = .existingParticipant
+      participantFlow = .participantCredentials
     }
     if result == nil {
       loadState = .failed(failure)
@@ -280,10 +253,38 @@ final class VoteRoomViewModel: ObservableObject {
       return .unexpected
     }
   }
+
+  private func apply(selection: VoteParticipantSelection) {
+    let unavailableDays = Set(selection.unavailableDays)
+    savedUnavailableDays = unavailableDays
+    draftUnavailableDays = unavailableDays
+    nickname = selection.participant.nickname
+    participantFlow = .editing
+  }
+
+  private func registerNewParticipant() async {
+    do {
+      let participant = try await voteService.createAuthenticatedParticipant(
+        publicId: publicId,
+        nickname: trimmedNickname,
+        password: password.nilIfEmpty
+      )
+      savedUnavailableDays = []
+      draftUnavailableDays = []
+      nickname = participant.nickname
+      participantFlow = .editing
+    } catch is CancellationError {
+      return
+    } catch let error as VoteServiceError {
+      handle(error)
+    } catch {
+      actionFailure = .unexpected
+    }
+  }
 }
 
-private extension String {
-  var nilIfEmpty: String? {
+extension String {
+  fileprivate var nilIfEmpty: String? {
     isEmpty ? nil : self
   }
 }

@@ -89,7 +89,7 @@ struct VoteRoomView: View {
       switch viewModel.participantFlow {
       case .result:
         resultContent
-      case .existingParticipant, .newParticipant:
+      case .participantCredentials:
         participantCredentials
       case .editing:
         editingContent
@@ -150,7 +150,7 @@ struct VoteRoomView: View {
         )
       }
       Spacer(minLength: 0)
-      Button("투표 참여하기") { viewModel.showExistingParticipant() }
+      Button("투표 참여하기") { viewModel.showParticipantCredentials() }
         .buttonStyle(VoteRoomPrimaryButtonStyle())
         .padding(.horizontal, 36)
         .padding(.bottom, 28)
@@ -165,14 +165,12 @@ struct VoteRoomView: View {
       Image(systemName: "person.crop.circle.badge.checkmark")
         .font(.system(size: 48))
         .foregroundStyle(.voteAccent)
-      Text(viewModel.participantFlow == .newParticipant ? "처음 투표하시나요?" : "투표에 참여하기")
+      Text("투표에 참여하기")
         .font(.title2.bold())
         .foregroundStyle(.calioPrimary)
-      Text(
-        viewModel.participantFlow == .newParticipant ? "닉네임과 비밀번호를 등록해주세요." : "기존 참여 정보를 입력해주세요."
-      )
-      .font(.body)
-      .foregroundStyle(.calioTextSecondary)
+      Text("닉네임과 비밀번호를 입력해주세요.")
+        .font(.body)
+        .foregroundStyle(.calioTextSecondary)
 
       VStack(spacing: 12) {
         TextField("닉네임", text: $viewModel.nickname)
@@ -181,7 +179,7 @@ struct VoteRoomView: View {
           .frame(height: 54)
           .background(Color.calioSurface, in: RoundedRectangle(cornerRadius: 14))
           .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.calioDivider, lineWidth: 1))
-        SecureField("비밀번호", text: $viewModel.password)
+        SecureField("비밀번호 (선택)", text: $viewModel.password)
           .padding(.horizontal, 16)
           .frame(height: 54)
           .background(Color.calioSurface, in: RoundedRectangle(cornerRadius: 14))
@@ -196,13 +194,15 @@ struct VoteRoomView: View {
           .padding(.horizontal, 36)
       }
 
-      Button(viewModel.participantFlow == .newParticipant ? "투표하기" : "투표하기") {
+      Text("처음 참여하는 경우 입력한 정보로 참여자가 등록됩니다.")
+        .font(.footnote)
+        .foregroundStyle(.calioTextSecondary)
+        .multilineTextAlignment(.center)
+        .padding(.horizontal, 36)
+
+      Button("계속") {
         Task {
-          if viewModel.participantFlow == .newParticipant {
-            await viewModel.registerParticipant()
-          } else {
-            await viewModel.restoreParticipantSelection()
-          }
+          await viewModel.submitParticipantCredentials()
         }
       }
       .buttonStyle(VoteRoomPrimaryButtonStyle())
@@ -210,16 +210,6 @@ struct VoteRoomView: View {
       .opacity(viewModel.canSubmitCredentials ? 1 : 0.45)
       .padding(.horizontal, 36)
 
-      Button(viewModel.participantFlow == .newParticipant ? "이미 참여하셨나요?" : "처음 투표하시는 건가요?") {
-        if viewModel.participantFlow == .newParticipant {
-          viewModel.showExistingParticipant()
-        } else {
-          viewModel.showNewParticipant()
-        }
-      }
-      .font(.footnote.weight(.semibold))
-      .foregroundStyle(.voteAccent)
-      .underline()
       Button("취소") { viewModel.cancelParticipantFlow() }
         .font(.footnote)
         .foregroundStyle(.calioTextSecondary)

@@ -40,8 +40,7 @@ enum VoteRoomLoadState: Equatable {
 
 enum VoteParticipantFlow: Equatable {
   case result
-  case existingParticipant
-  case newParticipant
+  case participantCredentials
   case editing
 }
 
@@ -57,7 +56,7 @@ enum VoteRoomFailure: Equatable {
     case .credentialInvalid:
       return "닉네임과 비밀번호를 다시 확인해주세요."
     case .nicknameConflict:
-      return "이미 사용 중인 닉네임입니다. 기존 참여자로 참여해주세요."
+      return "이미 사용 중인 닉네임입니다. 비밀번호를 확인해주세요."
     case .validation:
       return "입력한 내용을 확인해주세요."
     case .network:
