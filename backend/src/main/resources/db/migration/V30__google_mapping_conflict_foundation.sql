@@ -31,5 +31,5 @@ ALTER TABLE google_operation_jobs
 CREATE INDEX idx_google_operation_jobs_pending_scope
     ON google_operation_jobs (
         account_id, integration_id, effective_resource_scope,
-        effective_resource_key, job_state, account_sequence
+        effective_resource_key(191), job_state, account_sequence
     );
