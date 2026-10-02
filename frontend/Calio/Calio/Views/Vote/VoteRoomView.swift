@@ -389,7 +389,6 @@ private struct VoteRoomCalendarGrid: View {
     .frame(maxWidth: .infinity)
     .padding(20)
     .background(Color.calioSurface, in: RoundedRectangle(cornerRadius: 26))
-    .shadow(color: .black.opacity(0.06), radius: 16, y: 8)
     .padding(.horizontal, 8)
     .gesture(
       DragGesture(minimumDistance: 30).onEnded { value in
@@ -521,7 +520,7 @@ private struct VoteRoomPrimaryButtonStyle: ButtonStyle {
       .font(.headline.weight(.semibold))
       .foregroundStyle(.white)
       .frame(maxWidth: .infinity, minHeight: 58)
-      .background(VotePrimaryActionStyle.gradient, in: RoundedRectangle(cornerRadius: 18))
+      .background(Color.calioBrand, in: RoundedRectangle(cornerRadius: 18))
       .opacity(configuration.isPressed ? 0.82 : 1)
   }
 }
