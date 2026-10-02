@@ -111,7 +111,6 @@ struct VoteListView: View {
               if selectedTab == tab {
                 RoundedRectangle(cornerRadius: 16)
                   .fill(Color.calioSurface)
-                  .shadow(color: .black.opacity(0.06), radius: 4, y: 2)
               }
             }
         }
@@ -303,7 +302,7 @@ struct VoteListView: View {
         .font(.headline.weight(.bold))
         .foregroundStyle(.white)
         .frame(maxWidth: .infinity, minHeight: 54)
-        .background(VotePrimaryActionStyle.gradient, in: RoundedRectangle(cornerRadius: 16))
+        .background(Color.calioBrand, in: RoundedRectangle(cornerRadius: 16))
     }
     .buttonStyle(.plain)
     .padding(.horizontal, 20)
