@@ -138,7 +138,7 @@ struct VoteRoomView: View {
             Task { await viewModel.refreshResult() }
           }
           .font(.footnote.weight(.semibold))
-          .foregroundStyle(.voteAccent)
+          .foregroundStyle(.calioAccent)
           .accessibilityHint(failure.message)
           .accessibilityIdentifier("vote_room_retry_result")
         }
