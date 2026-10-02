@@ -105,7 +105,7 @@ struct VoteListView: View {
         } label: {
           Text("\(tab.title) \(roomCount(for: tab))")
             .font(.headline.weight(.semibold))
-            .foregroundStyle(selectedTab == tab ? .voteAccent : .calioTextSecondary)
+            .foregroundStyle(selectedTab == tab ? .calioAccent : .calioTextSecondary)
             .frame(maxWidth: .infinity, minHeight: 54)
             .background {
               if selectedTab == tab {
@@ -120,7 +120,7 @@ struct VoteListView: View {
       }
     }
     .padding(5)
-    .background(Color.voteAccentSoft, in: RoundedRectangle(cornerRadius: 20))
+    .background(Color.calioSelection, in: RoundedRectangle(cornerRadius: 20))
   }
 
   @ViewBuilder
@@ -211,7 +211,7 @@ struct VoteListView: View {
         Task { await onRetry() }
       }
       .font(.subheadline.weight(.semibold))
-      .foregroundStyle(.voteAccent)
+      .foregroundStyle(.calioAccent)
     }
     .frame(maxWidth: .infinity)
     .padding(.vertical, 56)
@@ -231,9 +231,9 @@ struct VoteListView: View {
     VStack(spacing: 10) {
       Image(systemName: "checklist")
         .font(.title2.weight(.semibold))
-        .foregroundStyle(.voteAccent)
+        .foregroundStyle(.calioAccent)
         .frame(width: 54, height: 54)
-        .background(Color.voteAccentSoft, in: RoundedRectangle(cornerRadius: 18))
+        .background(Color.calioSelection, in: RoundedRectangle(cornerRadius: 18))
       Text(selectedTab.emptyMessage)
         .font(.headline)
         .foregroundStyle(.calioPrimary)
@@ -257,9 +257,9 @@ struct VoteListView: View {
       HStack(spacing: 16) {
         Image(systemName: "calendar")
           .font(.title3.weight(.medium))
-          .foregroundStyle(.voteAccent)
+          .foregroundStyle(.calioAccent)
           .frame(width: 64, height: 64)
-          .background(Color.voteAccentSoft, in: RoundedRectangle(cornerRadius: 20))
+          .background(Color.calioSelection, in: RoundedRectangle(cornerRadius: 20))
 
         VStack(alignment: .leading, spacing: 6) {
           Text(room.name)
@@ -272,10 +272,10 @@ struct VoteListView: View {
             .lineLimit(1)
           Text(relationship)
             .font(.caption.weight(.semibold))
-            .foregroundStyle(.voteAccent)
+            .foregroundStyle(.calioAccent)
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
-            .background(Color.voteAccentSoft, in: Capsule())
+            .background(Color.calioSelection, in: Capsule())
           if let detail {
             Text(detail)
               .font(.caption)
