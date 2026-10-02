@@ -25,7 +25,7 @@ struct VoteSharePopoverView: View {
           .font(.system(size: 24, weight: .semibold))
           .foregroundStyle(.white)
           .frame(width: 58, height: 58)
-          .background(VotePrimaryActionStyle.gradient, in: Circle())
+          .background(Color.calioBrand, in: Circle())
 
         VStack(spacing: 8) {
           Text("투표가 만들어졌어요")
@@ -79,7 +79,7 @@ struct VoteSharePopoverView: View {
             .font(.headline.weight(.semibold))
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity, minHeight: 54)
-            .background(VotePrimaryActionStyle.gradient, in: RoundedRectangle(cornerRadius: 14))
+            .background(Color.calioBrand, in: RoundedRectangle(cornerRadius: 14))
         }
         .accessibilityIdentifier("vote_share_system")
 

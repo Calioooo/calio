@@ -146,7 +146,7 @@ struct VoteCreationPopoverView: View {
         }
         .foregroundStyle(.white)
         .frame(maxWidth: .infinity, minHeight: 54)
-        .background(VotePrimaryActionStyle.gradient, in: RoundedRectangle(cornerRadius: 14))
+        .background(Color.calioBrand, in: RoundedRectangle(cornerRadius: 14))
       }
       .buttonStyle(.plain)
       .disabled(!viewModel.canCreate)
