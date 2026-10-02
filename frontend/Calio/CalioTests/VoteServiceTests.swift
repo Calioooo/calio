@@ -225,7 +225,7 @@ struct VoteServiceTests {
     let service = VoteService(repository: repository)
 
     do {
-      try await service.fetchResult(publicId: publicId)
+      _ = try await service.fetchResult(publicId: publicId)
       Issue.record("Expected VoteServiceError.voteRoomNotFound")
     } catch let error as VoteServiceError {
       #expect(error == .voteRoomNotFound)
@@ -276,7 +276,7 @@ struct VoteServiceTests {
     let service = VoteService(repository: repository)
 
     do {
-      try await service.fetchResult(publicId: publicId)
+      _ = try await service.fetchResult(publicId: publicId)
       Issue.record("Expected VoteServiceError.decoding")
     } catch let error as VoteServiceError {
       #expect(error == .decoding)
