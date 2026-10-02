@@ -106,7 +106,6 @@ struct VoteSharePopoverView: View {
         .padding(18)
         .accessibilityLabel("공유 닫기")
       }
-      .shadow(color: .black.opacity(0.2), radius: 24, y: 12)
       .padding(16)
     }
     .accessibilityIdentifier("vote_share_popover")

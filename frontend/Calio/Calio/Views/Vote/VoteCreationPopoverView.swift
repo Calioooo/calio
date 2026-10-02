@@ -42,7 +42,6 @@ struct VoteCreationPopoverView: View {
       .frame(maxWidth: 560)
       .background(Color.calioSurface, in: RoundedRectangle(cornerRadius: 28))
       .overlay(RoundedRectangle(cornerRadius: 28).stroke(Color.calioDivider, lineWidth: 1))
-      .shadow(color: .black.opacity(0.2), radius: 24, y: 12)
       .padding(16)
     }
     .accessibilityIdentifier("vote_creation_popover")
