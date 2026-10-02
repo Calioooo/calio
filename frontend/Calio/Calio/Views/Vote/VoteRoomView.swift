@@ -164,7 +164,7 @@ struct VoteRoomView: View {
       Spacer(minLength: 36)
       Image(systemName: "person.crop.circle.badge.checkmark")
         .font(.system(size: 48))
-        .foregroundStyle(.voteAccent)
+        .foregroundStyle(.calioAccent)
       Text("투표에 참여하기")
         .font(.title2.bold())
         .foregroundStyle(.calioPrimary)
@@ -238,9 +238,9 @@ struct VoteRoomView: View {
         .foregroundStyle(.calioPrimary)
         .padding(.horizontal, 20)
         .frame(height: 68)
-        .background(Color.voteAccentSoft, in: RoundedRectangle(cornerRadius: 18))
+        .background(Color.calioSelection, in: RoundedRectangle(cornerRadius: 18))
         .overlay(
-          RoundedRectangle(cornerRadius: 18).stroke(Color.voteAccent.opacity(0.15), lineWidth: 1))
+          RoundedRectangle(cornerRadius: 18).stroke(Color.calioAccent.opacity(0.15), lineWidth: 1))
       }
       .buttonStyle(.plain)
       .padding(.horizontal, 36)
@@ -438,7 +438,7 @@ private struct VoteRoomCalendarGrid: View {
           RoundedRectangle(cornerRadius: 14)
             .stroke(
               isEditing && selectedDays.contains(day)
-                ? Color.voteAccent : Color.calioDivider.opacity(0.65), lineWidth: 1)
+                ? Color.calioAccent : Color.calioDivider.opacity(0.65), lineWidth: 1)
         )
         .overlay(alignment: .topTrailing) {
           if isEditing && selectedDays.contains(day) {
@@ -446,7 +446,7 @@ private struct VoteRoomCalendarGrid: View {
               .font(.caption2.weight(.bold))
               .foregroundStyle(.white)
               .frame(width: 14, height: 14)
-              .background(Color.voteAccent, in: Circle())
+              .background(Color.calioAccent, in: Circle())
               .padding(5)
           }
         }
@@ -482,7 +482,7 @@ private struct VoteRoomCalendarGrid: View {
   }
 
   private func backgroundColor(for day: VoteDay, result: VoteDateResult?) -> Color {
-    if isEditing, selectedDays.contains(day) { return Color.voteAccentSoft }
+    if isEditing, selectedDays.contains(day) { return Color.calioSelection }
     guard let result, result.unavailableCount > 0 else { return Color.calioSurface }
     let maximum = dateResults.values.map(\.unavailableCount).max() ?? result.unavailableCount
     let intensity = 0.16 + 0.42 * Double(result.unavailableCount) / Double(max(maximum, 1))
