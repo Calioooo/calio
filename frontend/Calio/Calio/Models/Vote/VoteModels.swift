@@ -11,6 +11,14 @@ struct VoteDay: Hashable, Comparable, Identifiable {
     self.day = day
   }
 
+  init(date: Date, calendar: Calendar) {
+    let components = calendar.dateComponents([.year, .month, .day], from: date)
+    guard let year = components.year, let month = components.month, let day = components.day else {
+      preconditionFailure("Failed to create VoteDay from date")
+    }
+    self.init(year: year, month: month, day: day)
+  }
+
   init?(apiDateString: String) {
     let components = apiDateString.split(separator: "-", omittingEmptySubsequences: false)
     guard components.count == 3,

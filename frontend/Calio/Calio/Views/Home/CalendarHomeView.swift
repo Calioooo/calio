@@ -12,7 +12,10 @@ struct CalendarHomeView: View {
   @State private var displayMode: CalendarDisplayMode = .week
   @State private var isShowingEventCreationView = false
   @State private var isShowingAssistant = false
+  @State private var isShowingVoteCreation = false
+  @State private var createdVoteRoom: VoteRoom?
   private let onGoogleCalendarConnectTapped: () -> Void
+  private let onVoteRoomOpen: (VoteRoom) -> Void
 
   private let minimumStripViewHeight: CGFloat = 110
   private let stripViewHeightRatio: CGFloat = 0.2
@@ -21,10 +24,12 @@ struct CalendarHomeView: View {
 
   init(
     viewModel: CalendarHomeViewModel,
-    onGoogleCalendarConnectTapped: @escaping () -> Void = {}
+    onGoogleCalendarConnectTapped: @escaping () -> Void = {},
+    onVoteRoomOpen: @escaping (VoteRoom) -> Void = { _ in }
   ) {
     _viewModel = StateObject(wrappedValue: viewModel)
     self.onGoogleCalendarConnectTapped = onGoogleCalendarConnectTapped
+    self.onVoteRoomOpen = onVoteRoomOpen
   }
 
   var body: some View {
@@ -79,6 +84,7 @@ struct CalendarHomeView: View {
         isPresented: $isShowingAssistant,
         onCalendarRefreshNeeded: viewModel.refreshAfterAssistantResponse
       )
+      .overlay { votePopover }
     }
   }
 
@@ -89,8 +95,30 @@ struct CalendarHomeView: View {
       onSelectedYearMonth: viewModel.selectYearMonth(year:month:),
       onTodayTapped: viewModel.moveToToday,
       onGoogleCalendarConnectTapped: onGoogleCalendarConnectTapped,
-      onCreateTapped: startCreatingEvent
+      onCreateTapped: startCreatingEvent,
+      onCreateVoteTapped: { isShowingVoteCreation = true }
     )
+  }
+
+  @ViewBuilder
+  private var votePopover: some View {
+    if isShowingVoteCreation {
+      VoteCreationPopoverView(
+        onDismiss: { isShowingVoteCreation = false },
+        onCreated: { room in
+          isShowingVoteCreation = false
+          createdVoteRoom = room
+        }
+      )
+      .transition(.opacity)
+    } else if let createdVoteRoom {
+      VoteSharePopoverView(
+        room: createdVoteRoom,
+        onDismiss: dismissVoteSharePopover,
+        onOpenRoom: openVoteRoom
+      )
+      .transition(.opacity)
+    }
   }
 
   @ViewBuilder
@@ -144,6 +172,15 @@ struct CalendarHomeView: View {
   private func startCreatingEvent() {
     viewModel.resetCreateState()
     isShowingEventCreationView = true
+  }
+
+  private func openVoteRoom(_ room: VoteRoom) {
+    createdVoteRoom = nil
+    onVoteRoomOpen(room)
+  }
+
+  private func dismissVoteSharePopover() {
+    createdVoteRoom = nil
   }
 }
 
