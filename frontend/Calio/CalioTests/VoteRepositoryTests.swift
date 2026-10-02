@@ -43,6 +43,19 @@ struct VoteRepositoryTests {
     )
 
     MockURLProtocol.requestHandler = { request in
+      #expect(request.url?.path == "/api/vote-rooms/me")
+      #expect(request.httpMethod == "GET")
+      #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer guest-token")
+      return voteResponse(
+        for: request,
+        statusCode: 200,
+        body:
+          #"[{"publicId":"9F17BFC0-D2ED-48EA-9253-7A98EBCA4C2F","name":"가을 여행 일정","candidateStartDate":"2026-10-10","candidateEndDate":"2026-10-18"}]"#
+      )
+    }
+    _ = try await repository.fetchMyCreatedVoteRooms()
+
+    MockURLProtocol.requestHandler = { request in
       #expect(request.url?.path == "/api/vote-rooms/me/participated")
       #expect(request.httpMethod == "GET")
       #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer guest-token")

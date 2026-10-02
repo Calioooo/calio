@@ -209,6 +209,32 @@ struct VoteServiceTests {
     #expect(rooms.map(\.participantUpdatedAt) == [updatedAt, updatedAt])
   }
 
+  @Test func fetchMyCreatedRoomsPreservesBackendOrder() async throws {
+    let secondPublicId = UUID(uuidString: "E4522B25-7C7C-4EF1-91E0-F6D5E64C0807")!
+    let repository = RecordingVoteRepository(
+      createdRoomResponses: [
+        VoteRoomResponseDTO(
+          publicId: secondPublicId,
+          name: "나중에 만든 투표",
+          candidateStartDate: "2026-10-20",
+          candidateEndDate: "2026-10-25"
+        ),
+        VoteRoomResponseDTO(
+          publicId: publicId,
+          name: "먼저 만든 투표",
+          candidateStartDate: "2026-10-10",
+          candidateEndDate: "2026-10-18"
+        ),
+      ]
+    )
+    let service = VoteService(repository: repository)
+
+    let rooms = try await service.fetchMyCreatedRooms()
+
+    #expect(rooms.map(\.publicId) == [secondPublicId, publicId])
+    #expect(rooms.map(\.name) == ["나중에 만든 투표", "먼저 만든 투표"])
+  }
+
   @Test func knownBackendErrorCodeBecomesVoteServiceError() async {
     let repository = RecordingVoteRepository(
       resultError: APIError.backend(
@@ -296,6 +322,7 @@ private final class RecordingVoteRepository: VoteRepository {
   var submitRequest: SubmitVoteRequestDTO?
 
   private let createRoomResponse: VoteRoomResponseDTO
+  private let createdRoomResponses: [VoteRoomResponseDTO]
   private let resultResponse: VoteResultResponseDTO
   private let participatedRoomResponses: [ParticipatedVoteRoomResponseDTO]
   private let selectionResponse: VoteParticipantSelectionResponseDTO
@@ -310,6 +337,7 @@ private final class RecordingVoteRepository: VoteRepository {
       candidateStartDate: "2026-09-18",
       candidateEndDate: "2026-09-18"
     ),
+    createdRoomResponses: [VoteRoomResponseDTO] = [],
     resultResponse: VoteResultResponseDTO = VoteResultResponseDTO(
       publicId: UUID(),
       name: "투표방",
@@ -336,6 +364,7 @@ private final class RecordingVoteRepository: VoteRepository {
     resultError: Error? = nil
   ) {
     self.createRoomResponse = createRoomResponse
+    self.createdRoomResponses = createdRoomResponses
     self.resultResponse = resultResponse
     self.participatedRoomResponses = participatedRoomResponses
     self.selectionResponse = selectionResponse
@@ -351,6 +380,10 @@ private final class RecordingVoteRepository: VoteRepository {
 
   func fetchMyParticipatedVoteRooms() async throws -> [ParticipatedVoteRoomResponseDTO] {
     participatedRoomResponses
+  }
+
+  func fetchMyCreatedVoteRooms() async throws -> [VoteRoomResponseDTO] {
+    createdRoomResponses
   }
 
   func fetchVoteResult(publicId: UUID) async throws -> VoteResultResponseDTO {

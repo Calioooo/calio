@@ -8,12 +8,19 @@
 import SwiftUI
 
 struct CalendarHomeView: View {
+  private enum VoteListDismissAction {
+    case openRoom(VoteRoom)
+    case createVote
+  }
+
   @StateObject private var viewModel: CalendarHomeViewModel
   @State private var displayMode: CalendarDisplayMode = .week
   @State private var isShowingEventCreationView = false
   @State private var isShowingAssistant = false
   @State private var isShowingVoteCreation = false
+  @State private var isShowingVoteList = false
   @State private var createdVoteRoom: VoteRoom?
+  @State private var pendingVoteListAction: VoteListDismissAction?
   private let onGoogleCalendarConnectTapped: () -> Void
   private let onVoteRoomOpen: (VoteRoom) -> Void
 
@@ -85,6 +92,16 @@ struct CalendarHomeView: View {
         onCalendarRefreshNeeded: viewModel.refreshAfterAssistantResponse
       )
       .overlay { votePopover }
+      .fullScreenCover(
+        isPresented: $isShowingVoteList,
+        onDismiss: performPendingVoteListAction
+      ) {
+        VoteListView(
+          onClose: { isShowingVoteList = false },
+          onRoomSelected: openVoteRoomFromList(_:),
+          onCreateVote: startVoteCreationFromList
+        )
+      }
     }
   }
 
@@ -96,7 +113,8 @@ struct CalendarHomeView: View {
       onTodayTapped: viewModel.moveToToday,
       onGoogleCalendarConnectTapped: onGoogleCalendarConnectTapped,
       onCreateTapped: startCreatingEvent,
-      onCreateVoteTapped: { isShowingVoteCreation = true }
+      onCreateVoteTapped: { isShowingVoteCreation = true },
+      onMyVotesTapped: { isShowingVoteList = true }
     )
   }
 
@@ -181,6 +199,28 @@ struct CalendarHomeView: View {
 
   private func dismissVoteSharePopover() {
     createdVoteRoom = nil
+  }
+
+  private func openVoteRoomFromList(_ room: VoteRoom) {
+    pendingVoteListAction = .openRoom(room)
+    isShowingVoteList = false
+  }
+
+  private func startVoteCreationFromList() {
+    pendingVoteListAction = .createVote
+    isShowingVoteList = false
+  }
+
+  private func performPendingVoteListAction() {
+    guard let action = pendingVoteListAction else { return }
+    pendingVoteListAction = nil
+
+    switch action {
+    case .openRoom(let room):
+      onVoteRoomOpen(room)
+    case .createVote:
+      isShowingVoteCreation = true
+    }
   }
 }
 

@@ -29,6 +29,15 @@ struct URLSessionVoteRepository: VoteRepository {
     )
   }
 
+  func fetchMyCreatedVoteRooms() async throws -> [VoteRoomResponseDTO] {
+    try await apiClient.send(
+      [VoteRoomResponseDTO].self,
+      method: .get,
+      pathComponents: ["api", "vote-rooms", "me"],
+      authorization: .bearer
+    )
+  }
+
   func fetchMyParticipatedVoteRooms() async throws -> [ParticipatedVoteRoomResponseDTO] {
     try await apiClient.send(
       [ParticipatedVoteRoomResponseDTO].self,
