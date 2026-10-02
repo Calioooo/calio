@@ -107,6 +107,7 @@ struct VoteListView: View {
             .font(.headline.weight(.semibold))
             .foregroundStyle(selectedTab == tab ? .calioAccent : .calioTextSecondary)
             .frame(maxWidth: .infinity, minHeight: 54)
+            .contentShape(Rectangle())
             .background {
               if selectedTab == tab {
                 RoundedRectangle(cornerRadius: 16)
