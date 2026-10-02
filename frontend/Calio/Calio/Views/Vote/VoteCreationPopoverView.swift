@@ -59,7 +59,7 @@ struct VoteCreationPopoverView: View {
           .font(.headline.weight(.semibold))
           .foregroundStyle(.calioTextSecondary)
           .frame(width: 44, height: 44)
-          .background(Color.voteAccentSoft, in: Circle())
+          .background(Color.calioSelection, in: Circle())
       }
       .buttonStyle(.plain)
       .accessibilityLabel("투표 만들기 닫기")
@@ -105,7 +105,7 @@ struct VoteCreationPopoverView: View {
   private var periodSummary: some View {
     HStack(spacing: 6) {
       Image(systemName: "calendar")
-        .foregroundStyle(.voteAccent)
+        .foregroundStyle(.calioAccent)
       Text(periodSummaryText)
         .font(.caption.weight(.semibold))
         .foregroundStyle(.calioPrimary)
@@ -122,7 +122,7 @@ struct VoteCreationPopoverView: View {
     }
     .padding(.horizontal, 16)
     .frame(minHeight: 58)
-    .background(Color.voteAccentSoft, in: RoundedRectangle(cornerRadius: 14))
+    .background(Color.calioSelection, in: RoundedRectangle(cornerRadius: 14))
   }
 
   private var creationButton: some View {
@@ -280,7 +280,7 @@ private struct VoteMonthCalendarView: View {
         .font(.subheadline.weight(.bold))
         .foregroundStyle(.calioPrimary)
         .frame(width: 38, height: 38)
-        .background(Color.voteAccentSoft, in: Circle())
+        .background(Color.calioSelection, in: Circle())
     }
     .buttonStyle(.plain)
     .accessibilityLabel(direction < 0 ? "이전 달" : "다음 달")
@@ -301,9 +301,9 @@ private struct VoteMonthCalendarView: View {
         .frame(maxWidth: .infinity, minHeight: 38)
         .background {
           if isRangeBoundary {
-            Circle().fill(Color.voteAccent)
+            Circle().fill(Color.calioAccent)
           } else if isWithinSelectedPeriod {
-            Rectangle().fill(Color.voteAccentSoft)
+            Rectangle().fill(Color.calioSelection)
           }
         }
         .opacity(isSelectable ? 1 : 0.35)
