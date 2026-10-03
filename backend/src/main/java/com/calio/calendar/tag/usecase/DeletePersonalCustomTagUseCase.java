@@ -2,7 +2,7 @@ package com.calio.calendar.tag.usecase;
 
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
-import com.calio.calendar.recurrence.service.RecurrenceEventCommandService;
+import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.singleevent.repository.SingleEventRepository;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.repository.TagRepository;
@@ -13,15 +13,15 @@ import org.springframework.transaction.annotation.Transactional;
 public class DeletePersonalCustomTagUseCase {
 
   private final SingleEventRepository singleEventRepository;
-  private final RecurrenceEventCommandService recurrenceEventCommandService;
+  private final RecurrenceEventRepository recurrenceEventRepository;
   private final TagRepository tagRepository;
 
   public DeletePersonalCustomTagUseCase(
       SingleEventRepository singleEventRepository,
-      RecurrenceEventCommandService recurrenceEventCommandService,
+      RecurrenceEventRepository recurrenceEventRepository,
       TagRepository tagRepository) {
     this.singleEventRepository = singleEventRepository;
-    this.recurrenceEventCommandService = recurrenceEventCommandService;
+    this.recurrenceEventRepository = recurrenceEventRepository;
     this.tagRepository = tagRepository;
   }
 
@@ -36,7 +36,8 @@ public class DeletePersonalCustomTagUseCase {
             .findPersonalFallbackTag()
             .orElseThrow(() -> new CalioException(ErrorCode.DEFAULT_TAG_NOT_FOUND));
     singleEventRepository.reassignAllByTagAndAccountId(tag.getId(), fallbackTag.getId(), accountId);
-    recurrenceEventCommandService.changeTagForRecurrenceEvents(accountId, tag, fallbackTag);
+    recurrenceEventRepository.reassignAllByTagAndAccountId(
+        tag.getId(), fallbackTag.getId(), accountId);
     tagRepository.delete(tag);
   }
 }

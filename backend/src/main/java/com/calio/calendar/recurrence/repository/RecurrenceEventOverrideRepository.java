@@ -20,12 +20,12 @@ public interface RecurrenceEventOverrideRepository
   List<RecurrenceEventOverride> findByRecurrenceEvent_IdAndOriginStartAtIn(
       Long recurrenceId, Collection<Instant> originStartAt);
 
-  @EntityGraph(attributePaths = {"recurrenceEvent", "recurrenceEvent.tag"})
+  @EntityGraph(attributePaths = "recurrenceEvent")
   @Query(
       """
             select recurrenceOverride
             from RecurrenceEventOverride recurrenceOverride
-            where recurrenceOverride.recurrenceEvent.account.id = :accountId
+            where recurrenceOverride.recurrenceEvent.accountId = :accountId
               and recurrenceOverride.deletedAt is null
               and recurrenceOverride.overrideStartAt < :to
               and recurrenceOverride.overrideEndAt > :from
@@ -51,4 +51,15 @@ public interface RecurrenceEventOverrideRepository
             """)
   int deleteAllByRecurrenceEventIds(
       @Param("recurrenceEventIds") Collection<Long> recurrenceEventIds);
+
+  @Modifying(flushAutomatically = true)
+  @Query(
+      """
+            delete from RecurrenceEventOverride recurrenceOverride
+            where recurrenceOverride.recurrenceEvent.id = :recurrenceEventId
+              and recurrenceOverride.originStartAt in :originStartAts
+            """)
+  int deleteByRecurrenceEventIdAndOriginStartAts(
+      @Param("recurrenceEventId") Long recurrenceEventId,
+      @Param("originStartAts") Collection<Instant> originStartAts);
 }

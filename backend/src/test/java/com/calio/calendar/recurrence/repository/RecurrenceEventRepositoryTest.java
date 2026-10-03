@@ -53,12 +53,7 @@ class RecurrenceEventRepositoryTest {
     // then
     assertThat(candidates).extracting(RecurrenceEvent::getId).containsExactly(master.getId());
     assertThat(candidates.getFirst().getRecurrenceRules()).containsExactly("RRULE:FREQ=DAILY");
-    assertThat(
-            entityManager
-                .getEntityManagerFactory()
-                .getPersistenceUnitUtil()
-                .isLoaded(candidates.getFirst(), "tag"))
-        .isTrue();
+    assertThat(candidates.getFirst().getTagId()).isEqualTo(tag.getId());
   }
 
   @Test
@@ -92,7 +87,7 @@ class RecurrenceEventRepositoryTest {
             null,
             RecurrenceSchedule.create(false, startAt, startAt.plusSeconds(3_600), "UTC"),
             List.of("RRULE:FREQ=DAILY"),
-            tag,
-            account));
+            tag.getId(),
+            account.getId()));
   }
 }

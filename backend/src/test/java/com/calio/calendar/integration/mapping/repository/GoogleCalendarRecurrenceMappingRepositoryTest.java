@@ -364,8 +364,8 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
             Instant.parse("2026-07-21T00:00:00Z"),
             null),
         List.of("RRULE:FREQ=DAILY"),
-        tag,
-        account);
+        tag.getId(),
+        account.getId());
   }
 
   private RecurrenceFixture recurrenceFixture() {

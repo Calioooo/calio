@@ -18,6 +18,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest(
     properties = {
@@ -41,7 +42,7 @@ class RecurrenceEventOverrideRepositoryTest {
   @Autowired private EntityManager entityManager;
 
   @Test
-  @DisplayName("활성 기간과 겹치는 override만 조회하고 master와 tag를 함께 로딩한다")
+  @DisplayName("활성 기간과 겹치는 override만 조회하고 master를 함께 로딩한다")
   void givenActiveAndDeletedOverrides_whenFindActiveOverlapping_thenReturnsLoadedActiveOverride() {
     // given
     Account account = accountRepository.save(new Account());
@@ -57,8 +58,8 @@ class RecurrenceEventOverrideRepositoryTest {
                     Instant.parse("2027-01-01T10:00:00Z"),
                     "UTC"),
                 List.of("RRULE:FREQ=DAILY"),
-                tag,
-                account));
+                tag.getId(),
+                account.getId()));
     RecurrenceEventOverride activeOverride =
         recurrenceEventOverrideRepository.save(
             RecurrenceEventOverride.active(
@@ -97,11 +98,62 @@ class RecurrenceEventOverrideRepositoryTest {
                 .getPersistenceUnitUtil()
                 .isLoaded(loadedOverride, "recurrenceEvent"))
         .isTrue();
+    assertThat(loadedOverride.getRecurrenceEvent().getTagId()).isEqualTo(tag.getId());
+  }
+
+  @Test
+  @Transactional
+  @DisplayName("반복 일정과 원래 시작값이 모두 일치하는 개별 변경 기록만 삭제한다")
+  void deleteOverridesByRecurrenceAndOriginKeepsOtherIdentities() {
+    Account account = accountRepository.save(new Account());
+    Tag tag = tagRepository.save(Tag.personalDefault("기타", "#64748B"));
+    Instant firstStart = Instant.parse("2027-02-01T09:00:00Z");
+    RecurrenceSchedule schedule =
+        RecurrenceSchedule.create(false, firstStart, firstStart.plusSeconds(3600), "UTC");
+    RecurrenceEvent first =
+        recurrenceEventRepository.save(
+            new RecurrenceEvent(
+                "First",
+                null,
+                schedule,
+                List.of("RRULE:FREQ=DAILY"),
+                tag.getId(),
+                account.getId()));
+    RecurrenceEvent second =
+        recurrenceEventRepository.save(
+            new RecurrenceEvent(
+                "Second",
+                null,
+                schedule,
+                List.of("RRULE:FREQ=DAILY"),
+                tag.getId(),
+                account.getId()));
+    Instant removedOrigin = firstStart;
+    Instant retainedOrigin = firstStart.plusSeconds(86400);
+    recurrenceEventOverrideRepository.save(
+        RecurrenceEventOverride.deleted(first, removedOrigin, firstStart));
+    recurrenceEventOverrideRepository.save(
+        RecurrenceEventOverride.deleted(first, retainedOrigin, firstStart));
+    recurrenceEventOverrideRepository.save(
+        RecurrenceEventOverride.deleted(second, removedOrigin, firstStart));
+    recurrenceEventOverrideRepository.flush();
+    entityManager.clear();
+
+    recurrenceEventOverrideRepository.deleteByRecurrenceEventIdAndOriginStartAts(
+        first.getId(), List.of(removedOrigin));
+    entityManager.clear();
+
     assertThat(
-            entityManager
-                .getEntityManagerFactory()
-                .getPersistenceUnitUtil()
-                .isLoaded(loadedOverride.getRecurrenceEvent(), "tag"))
-        .isTrue();
+            recurrenceEventOverrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(
+                first.getId(), removedOrigin))
+        .isEmpty();
+    assertThat(
+            recurrenceEventOverrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(
+                first.getId(), retainedOrigin))
+        .isPresent();
+    assertThat(
+            recurrenceEventOverrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(
+                second.getId(), removedOrigin))
+        .isPresent();
   }
 }

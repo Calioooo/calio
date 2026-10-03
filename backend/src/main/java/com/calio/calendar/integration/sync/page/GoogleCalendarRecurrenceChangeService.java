@@ -23,8 +23,8 @@ import com.calio.calendar.integration.sync.page.dto.GoogleCalendarPageRecordCach
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
-import com.calio.calendar.recurrence.service.RecurrenceEventCommandService;
-import com.calio.calendar.recurrence.service.RecurrenceEventQueryService;
+import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
+import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.sharing.recurrence.service.PersonalRecurrenceGroupShareCommandService;
 import com.calio.calendar.tag.domain.Tag;
 import java.util.List;
@@ -36,8 +36,8 @@ public class GoogleCalendarRecurrenceChangeService {
 
   private final GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService;
   private final GoogleCalendarRecurrenceMappingCommandService recurrenceMappingCommandService;
-  private final RecurrenceEventCommandService recurrenceEventCommandService;
-  private final RecurrenceEventQueryService recurrenceEventQueryService;
+  private final RecurrenceEventRepository recurrenceEventRepository;
+  private final RecurrenceEventOverrideRepository overrideRepository;
   private final PersonalRecurrenceGroupShareCommandService recurrenceShareCommandService;
   private final GoogleOperationJobQueryService operationJobQueryService;
   private final GoogleOperationJobService operationJobService;
@@ -45,15 +45,15 @@ public class GoogleCalendarRecurrenceChangeService {
   public GoogleCalendarRecurrenceChangeService(
       GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService,
       GoogleCalendarRecurrenceMappingCommandService recurrenceMappingCommandService,
-      RecurrenceEventCommandService recurrenceEventCommandService,
-      RecurrenceEventQueryService recurrenceEventQueryService,
+      RecurrenceEventRepository recurrenceEventRepository,
+      RecurrenceEventOverrideRepository overrideRepository,
       PersonalRecurrenceGroupShareCommandService recurrenceShareCommandService,
       GoogleOperationJobQueryService operationJobQueryService,
       GoogleOperationJobService operationJobService) {
     this.recurrenceMappingQueryService = recurrenceMappingQueryService;
     this.recurrenceMappingCommandService = recurrenceMappingCommandService;
-    this.recurrenceEventCommandService = recurrenceEventCommandService;
-    this.recurrenceEventQueryService = recurrenceEventQueryService;
+    this.recurrenceEventRepository = recurrenceEventRepository;
+    this.overrideRepository = overrideRepository;
     this.recurrenceShareCommandService = recurrenceShareCommandService;
     this.operationJobQueryService = operationJobQueryService;
     this.operationJobService = operationJobService;
@@ -74,14 +74,14 @@ public class GoogleCalendarRecurrenceChangeService {
       return;
     }
     RecurrenceEvent recurrenceEvent =
-        recurrenceEventCommandService.createRecurrenceEvent(
+        recurrenceEventRepository.save(
             new RecurrenceEvent(
                 item.title(),
                 item.description(),
                 schedule,
                 item.recurrenceRules(),
-                defaultTag,
-                account));
+                defaultTag.getId(),
+                account.getId()));
     GoogleCalendarRecurrenceEventMapping mapping =
         recurrenceMappingCommandService.createRecurrenceEventMapping(
             new GoogleCalendarRecurrenceEventMapping(
@@ -110,8 +110,9 @@ public class GoogleCalendarRecurrenceChangeService {
       recordSyncConflict(mapping, ownership);
       return;
     }
-    recurrenceEventQueryService
-        .getRecurrenceEvent(mapping.getRecurrenceEventId())
+    recurrenceEventRepository
+        .findById(mapping.getRecurrenceEventId())
+        .orElseThrow(() -> new CalioException(ErrorCode.RECURRENCE_EVENT_NOT_FOUND))
         .updateProviderContent(item.title(), item.description(), schedule, item.recurrenceRules());
     mapping.updateProviderEtag(item.providerEtag());
   }
@@ -227,10 +228,11 @@ public class GoogleCalendarRecurrenceChangeService {
     }
     RecurrenceEventOverride recurrenceEventOverride =
         createRecurrenceEventOverride(
-            recurrenceEventQueryService.getRecurrenceEvent(
-                recurrenceEventMapping.getRecurrenceEventId()),
+            recurrenceEventRepository
+                .findById(recurrenceEventMapping.getRecurrenceEventId())
+                .orElseThrow(() -> new CalioException(ErrorCode.RECURRENCE_EVENT_NOT_FOUND)),
             item);
-    recurrenceEventCommandService.createOrUpdateRecurrenceOverride(recurrenceEventOverride);
+    overrideRepository.saveAndFlush(recurrenceEventOverride);
     cache
         .recurrenceEventOverrides()
         .put(existingOverride.recurrenceEventOverrideKey(), recurrenceEventOverride);
@@ -293,9 +295,8 @@ public class GoogleCalendarRecurrenceChangeService {
       return;
     }
     recurrenceShareCommandService.deleteAllForSourceRecurrence(recurrenceEventId);
-    recurrenceEventCommandService.deleteRecurrenceOverridesByRecurrenceEventIds(
-        List.of(recurrenceEventId));
-    recurrenceEventCommandService.deleteRecurrenceEventsByIds(List.of(recurrenceEventId));
+    overrideRepository.deleteAllByRecurrenceEventIds(List.of(recurrenceEventId));
+    recurrenceEventRepository.deleteAllByIds(List.of(recurrenceEventId));
   }
 
   private void validateMappedRecurrenceOverrideKey(
@@ -374,8 +375,8 @@ public class GoogleCalendarRecurrenceChangeService {
 
   private RecurrenceEventOverride recurrenceOverride(
       GoogleCalendarRecurrenceOverrideMapping mapping) {
-    return recurrenceEventQueryService
-        .getOverrideIfExists(
+    return overrideRepository
+        .findByRecurrenceEvent_IdAndOriginStartAt(
             mapping.getRecurrenceEventMapping().getRecurrenceEventId(), mapping.getOriginStartAt())
         .orElseThrow(() -> new CalioException(ErrorCode.GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID));
   }

@@ -1,22 +1,21 @@
 package com.calio.calendar.recurrence.domain;
 
-import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.common.domain.BaseEntity;
-import com.calio.calendar.tag.domain.Tag;
+import com.calio.calendar.common.domain.CanonicalSchedule;
+import com.calio.calendar.common.error.CalioException;
+import com.calio.calendar.common.error.ErrorCode;
 import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 
 @Entity
 @Table(name = "recurrence_events")
@@ -45,13 +44,11 @@ public class RecurrenceEvent extends BaseEntity {
   @Convert(converter = RecurrenceRuleJsonConverter.class)
   private List<String> recurrenceRules = List.of();
 
-  @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "account_id", nullable = false)
-  private Account account;
+  @Column(name = "account_id", nullable = false)
+  private Long accountId;
 
-  @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "tag_id", nullable = false)
-  private Tag tag;
+  @Column(name = "tag_id", nullable = false)
+  private Long tagId;
 
   protected RecurrenceEvent() {}
 
@@ -60,13 +57,13 @@ public class RecurrenceEvent extends BaseEntity {
       String description,
       RecurrenceSchedule schedule,
       List<String> recurrenceRules,
-      Tag tag,
-      Account account) {
+      Long tagId,
+      Long accountId) {
     this.title = new RecurrenceEventTitle(title);
     this.description = description;
     replaceSchedule(schedule, recurrenceRules);
-    this.tag = tag;
-    this.account = account;
+    this.tagId = tagId;
+    this.accountId = accountId;
   }
 
   public void update(
@@ -74,11 +71,11 @@ public class RecurrenceEvent extends BaseEntity {
       String description,
       RecurrenceSchedule schedule,
       List<String> recurrenceRules,
-      Tag tag) {
+      Long tagId) {
     this.title = new RecurrenceEventTitle(title);
     this.description = description;
     replaceSchedule(schedule, recurrenceRules);
-    this.tag = tag;
+    this.tagId = tagId;
   }
 
   public void updateProviderContent(
@@ -125,11 +122,51 @@ public class RecurrenceEvent extends BaseEntity {
     return recurrenceRules;
   }
 
-  public Tag getTag() {
-    return tag;
+  public Long getTagId() {
+    return tagId;
   }
 
-  public Account getAccount() {
-    return account;
+  public Long getAccountId() {
+    return accountId;
+  }
+
+  public RecurrenceEventOverride changeOccurrence(
+      RecurrenceEventOverride existing,
+      Instant originStartAt,
+      boolean generatedOrigin,
+      String title,
+      String description,
+      CanonicalSchedule schedule) {
+    requireEligibleOccurrence(existing, originStartAt, generatedOrigin);
+    if (existing == null) {
+      return RecurrenceEventOverride.active(this, originStartAt, title, description, schedule);
+    }
+    existing.activate(title, description, schedule);
+    return existing;
+  }
+
+  public RecurrenceEventOverride excludeOccurrence(
+      RecurrenceEventOverride existing,
+      Instant originStartAt,
+      boolean generatedOrigin,
+      Instant deletedAt) {
+    requireEligibleOccurrence(existing, originStartAt, generatedOrigin);
+    if (existing == null) {
+      return RecurrenceEventOverride.deleted(this, originStartAt, deletedAt);
+    }
+    existing.markDeleted(deletedAt);
+    return existing;
+  }
+
+  private void requireEligibleOccurrence(
+      RecurrenceEventOverride existing, Instant originStartAt, boolean generatedOrigin) {
+    if (existing == null && !generatedOrigin) {
+      throw new CalioException(ErrorCode.RECURRENCE_OCCURRENCE_NOT_FOUND);
+    }
+    if (existing != null
+        && (!Objects.equals(id, existing.getRecurrenceId())
+            || !Objects.equals(originStartAt, existing.getOriginStartAt()))) {
+      throw new IllegalArgumentException("Override belongs to a different recurrence event.");
+    }
   }
 }

@@ -10,21 +10,22 @@ import com.calio.calendar.groupspace.domain.GroupMember;
 import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.service.GroupMembershipQueryService;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
-import com.calio.calendar.recurrence.service.RecurrenceEventQueryService;
+import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.sharing.controller.dto.GroupShareTargetStatus;
 import com.calio.calendar.sharing.recurrence.controller.dto.CreateRecurrenceGroupSharesRequest;
 import com.calio.calendar.sharing.recurrence.controller.dto.CreateRecurrenceGroupSharesResponse;
 import com.calio.calendar.sharing.recurrence.domain.PersonalRecurrenceGroupShare;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
 class PersonalRecurrenceGroupShareServiceTest {
 
-  private final RecurrenceEventQueryService recurrenceEventQueryService =
-      mock(RecurrenceEventQueryService.class);
+  private final RecurrenceEventRepository recurrenceEventRepository =
+      mock(RecurrenceEventRepository.class);
   private final GroupMembershipQueryService membershipQueryService =
       mock(GroupMembershipQueryService.class);
   private final PersonalRecurrenceGroupShareQueryService shareQueryService =
@@ -33,7 +34,7 @@ class PersonalRecurrenceGroupShareServiceTest {
       mock(PersonalRecurrenceGroupShareCommandService.class);
   private final PersonalRecurrenceGroupShareService service =
       new PersonalRecurrenceGroupShareService(
-          recurrenceEventQueryService,
+          recurrenceEventRepository,
           membershipQueryService,
           shareQueryService,
           shareCommandService);
@@ -44,7 +45,8 @@ class PersonalRecurrenceGroupShareServiceTest {
     RecurrenceEvent recurrenceEvent = mock(RecurrenceEvent.class);
     when(recurrenceEvent.getId()).thenReturn(30L);
     GroupSpace groupSpace = groupSpace(10L);
-    when(recurrenceEventQueryService.getRecurrenceEvent(100L, 30L)).thenReturn(recurrenceEvent);
+    when(recurrenceEventRepository.findByIdAndAccountId(30L, 100L))
+        .thenReturn(Optional.of(recurrenceEvent));
     when(membershipQueryService.listActiveMemberships(100L, List.of(10L, 20L)))
         .thenReturn(List.of(member(groupSpace)));
     when(shareQueryService.listExistingShares(List.of(30L), List.of(10L, 20L)))

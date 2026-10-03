@@ -784,8 +784,8 @@ class RecurrenceEventControllerTest {
                     java.time.Instant.parse("2027-03-01T10:00:00Z"),
                     "UTC"),
                 List.of("RRULE:FREQ=DAILY;COUNT=2"),
-                defaultTag,
-                otherAccount));
+                defaultTag.getId(),
+                otherAccount.getId()));
     Instant originStartAt = Instant.parse("2027-03-01T09:00:00Z");
     overrideRepository.save(
         RecurrenceEventOverride.active(

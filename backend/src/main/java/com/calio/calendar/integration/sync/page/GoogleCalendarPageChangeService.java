@@ -23,7 +23,7 @@ import com.calio.calendar.integration.sync.page.dto.GoogleCalendarPageRecordCach
 import com.calio.calendar.integration.sync.page.dto.GoogleCalendarPageRecordCache.GoogleCalendarRecurrenceOverrideKey;
 import com.calio.calendar.integration.sync.page.dto.GoogleCalendarPageRecordCache.RecurrenceEventOverrideKey;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
-import com.calio.calendar.recurrence.service.RecurrenceEventQueryService;
+import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.repository.TagRepository;
 import java.time.Instant;
@@ -45,7 +45,7 @@ public class GoogleCalendarPageChangeService {
   private final GoogleCalendarEventChangeService eventChangeService;
   private final AccountRepository accountRepository;
   private final TagRepository tagRepository;
-  private final RecurrenceEventQueryService recurrenceEventQueryService;
+  private final RecurrenceEventOverrideRepository overrideRepository;
   private final GoogleCalendarRecurrenceChangeService recurrenceChangeService;
   private final GoogleOperationLeaseService operationLeaseService;
 
@@ -56,7 +56,7 @@ public class GoogleCalendarPageChangeService {
       GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService,
       AccountRepository accountRepository,
       TagRepository tagRepository,
-      RecurrenceEventQueryService recurrenceEventQueryService,
+      RecurrenceEventOverrideRepository overrideRepository,
       GoogleCalendarRecurrenceChangeService recurrenceChangeService,
       GoogleOperationLeaseService operationLeaseService) {
     this.connectionQueryService = connectionQueryService;
@@ -65,7 +65,7 @@ public class GoogleCalendarPageChangeService {
     this.recurrenceMappingQueryService = recurrenceMappingQueryService;
     this.accountRepository = accountRepository;
     this.tagRepository = tagRepository;
-    this.recurrenceEventQueryService = recurrenceEventQueryService;
+    this.overrideRepository = overrideRepository;
     this.recurrenceChangeService = recurrenceChangeService;
     this.operationLeaseService = operationLeaseService;
   }
@@ -258,8 +258,9 @@ public class GoogleCalendarPageChangeService {
               overrideItems.stream()
                   .map(RecurrenceEventOverrideUpsert::originStartAt)
                   .collect(Collectors.toSet());
-          recurrenceEventQueryService
-              .listOverrides(recurrenceEventMapping.getRecurrenceEventId(), originStartTimes)
+          overrideRepository
+              .findByRecurrenceEvent_IdAndOriginStartAtIn(
+                  recurrenceEventMapping.getRecurrenceEventId(), originStartTimes)
               .forEach(
                   recurrenceEventOverride ->
                       recurrenceEventOverrides.put(

@@ -1,4 +1,4 @@
-package com.calio.calendar.recurrence.service;
+package com.calio.calendar.recurrence.usecase;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -10,7 +10,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.common.domain.CanonicalSchedule;
 import com.calio.calendar.common.error.CalioException;
@@ -27,7 +26,8 @@ import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
 import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
-import com.calio.calendar.sharing.recurrence.service.PersonalRecurrenceGroupShareCommandService;
+import com.calio.calendar.recurrence.service.Rfc5545RecurrenceEngine;
+import com.calio.calendar.sharing.recurrence.repository.PersonalRecurrenceGroupShareRepository;
 import com.calio.calendar.singleevent.controller.dto.EventResponse;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.repository.TagRepository;
@@ -46,7 +46,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
-class RecurrenceEventServiceTest {
+class RecurrenceEventUseCaseTest {
 
   @Mock private RecurrenceEventRepository recurrenceEventRepository;
 
@@ -60,33 +60,61 @@ class RecurrenceEventServiceTest {
 
   @Mock private Clock clock;
 
-  @Mock private PersonalRecurrenceGroupShareCommandService recurrenceShareCommandService;
+  @Mock private PersonalRecurrenceGroupShareRepository recurrenceShareRepository;
 
   @Mock private GoogleOperationJobEnqueueService jobEnqueueService;
 
   @Mock private OutboundOperation outboundOperation;
 
-  private RecurrenceEventService recurrenceEventService;
+  private CreateRecurrenceEventUseCase createRecurrenceEvent;
+  private GetRecurrenceEventUseCase getRecurrenceEvent;
+  private GetRecurrenceOccurrenceUseCase getRecurrenceOccurrence;
+  private UpdateRecurrenceEventUseCase updateRecurrenceEvent;
+  private UpdateRecurrenceOccurrenceUseCase updateRecurrenceOccurrence;
+  private DeleteRecurrenceEventUseCase deleteRecurrenceEvent;
+  private DeleteRecurrenceOccurrenceUseCase deleteRecurrenceOccurrence;
 
   @BeforeEach
   void setUp() {
     lenient().when(jobEnqueueService.prepareOutboundOperation(1L)).thenReturn(outboundOperation);
-    RecurrenceEventQueryService queryService =
-        new RecurrenceEventQueryService(
-            recurrenceEventRepository, recurrenceEventOverrideRepository);
-    RecurrenceEventCommandService commandService =
-        new RecurrenceEventCommandService(
-            recurrenceEventRepository, recurrenceEventOverrideRepository);
-    recurrenceEventService =
-        new RecurrenceEventService(
-            queryService,
-            commandService,
+    lenient().when(tagRepository.findById(2L)).thenReturn(Optional.of(tag()));
+    createRecurrenceEvent =
+        new CreateRecurrenceEventUseCase(
             accountRepository,
             tagRepository,
+            recurrenceEventRepository,
             recurrenceEngine,
-            clock,
-            recurrenceShareCommandService,
             jobEnqueueService);
+    getRecurrenceEvent = new GetRecurrenceEventUseCase(recurrenceEventRepository, tagRepository);
+    getRecurrenceOccurrence =
+        new GetRecurrenceOccurrenceUseCase(
+            recurrenceEventRepository,
+            recurrenceEventOverrideRepository,
+            tagRepository,
+            recurrenceEngine);
+    updateRecurrenceEvent =
+        new UpdateRecurrenceEventUseCase(
+            recurrenceEventRepository, tagRepository, recurrenceEngine, jobEnqueueService);
+    updateRecurrenceOccurrence =
+        new UpdateRecurrenceOccurrenceUseCase(
+            recurrenceEventRepository,
+            recurrenceEventOverrideRepository,
+            tagRepository,
+            recurrenceEngine,
+            jobEnqueueService);
+    deleteRecurrenceEvent =
+        new DeleteRecurrenceEventUseCase(
+            recurrenceEventRepository,
+            recurrenceEventOverrideRepository,
+            recurrenceShareRepository,
+            jobEnqueueService);
+    deleteRecurrenceOccurrence =
+        new DeleteRecurrenceOccurrenceUseCase(
+            recurrenceEventRepository,
+            recurrenceEventOverrideRepository,
+            recurrenceEngine,
+            jobEnqueueService,
+            clock);
   }
 
   @Test
@@ -96,7 +124,7 @@ class RecurrenceEventServiceTest {
     Tag tag = tag();
     List<String> normalized = List.of("RRULE:FREQ=DAILY;COUNT=3");
     when(tagRepository.findPersonalFallbackTag()).thenReturn(Optional.of(tag));
-    when(accountRepository.findById(1L)).thenReturn(Optional.of(account()));
+    when(accountRepository.existsById(1L)).thenReturn(true);
     when(recurrenceEngine.validate(any(RecurrenceSchedule.class), any())).thenReturn(normalized);
     when(recurrenceEventRepository.save(any(RecurrenceEvent.class)))
         .thenAnswer(
@@ -108,7 +136,7 @@ class RecurrenceEventServiceTest {
     CreateRecurrenceEventRequest request = timedCreateRequest();
 
     // when
-    var response = recurrenceEventService.createRecurrenceEvent(1L, request);
+    var response = createRecurrenceEvent.create(1L, request);
 
     // then
     ArgumentCaptor<RecurrenceEvent> captor = ArgumentCaptor.forClass(RecurrenceEvent.class);
@@ -129,15 +157,15 @@ class RecurrenceEventServiceTest {
   }
 
   @Test
-  @DisplayName("반복 일정 조회는 QueryService의 domain entity를 응답 DTO로 변환한다")
+  @DisplayName("계정이 소유한 반복 일정은 태그와 함께 응답 DTO로 변환한다")
   void givenOwnedRecurrenceEvent_whenGet_thenCreatesResponse() {
     // given
     RecurrenceEvent recurrenceEvent = recurrenceEvent();
-    when(recurrenceEventRepository.findByIdAndAccount_Id(10L, 1L))
+    when(recurrenceEventRepository.findByIdAndAccountId(10L, 1L))
         .thenReturn(Optional.of(recurrenceEvent));
 
     // when
-    RecurrenceEventResponse response = recurrenceEventService.getRecurrenceEvent(1L, 10L);
+    RecurrenceEventResponse response = getRecurrenceEvent.get(1L, 10L);
 
     // then
     assertThat(response.recurrenceId()).isEqualTo(10L);
@@ -169,7 +197,7 @@ class RecurrenceEventServiceTest {
             null);
 
     // when
-    recurrenceEventService.updateRecurrenceEvent(1L, 10L, request);
+    updateRecurrenceEvent.update(1L, 10L, request);
 
     // then
     assertThat(recurrenceEvent.getTitle()).isEqualTo("Updated");
@@ -196,7 +224,7 @@ class RecurrenceEventServiceTest {
         .thenReturn(Optional.of(recurrenceEvent));
 
     // when
-    recurrenceEventService.deleteRecurrenceEvent(1L, 10L);
+    deleteRecurrenceEvent.delete(1L, 10L);
 
     // then
     InOrder deletionOrder =
@@ -204,10 +232,10 @@ class RecurrenceEventServiceTest {
             jobEnqueueService,
             recurrenceEventRepository,
             recurrenceEventOverrideRepository,
-            recurrenceShareCommandService);
+            recurrenceShareRepository);
     deletionOrder.verify(jobEnqueueService).prepareOutboundOperation(1L);
     deletionOrder.verify(recurrenceEventRepository).findByIdAndAccountIdForUpdate(10L, 1L);
-    deletionOrder.verify(recurrenceShareCommandService).deleteAllForSourceRecurrence(10L);
+    deletionOrder.verify(recurrenceShareRepository).deleteAllByRecurrenceEventId(10L);
     deletionOrder
         .verify(recurrenceEventOverrideRepository)
         .deleteAllByRecurrenceEventIds(List.of(10L));
@@ -240,7 +268,7 @@ class RecurrenceEventServiceTest {
             "Asia/Seoul");
 
     // when
-    EventResponse response = recurrenceEventService.updateRecurrenceOccurrence(1L, 10L, request);
+    EventResponse response = updateRecurrenceOccurrence.update(1L, 10L, request);
 
     // then
     ArgumentCaptor<RecurrenceEventOverride> captor =
@@ -282,7 +310,7 @@ class RecurrenceEventServiceTest {
             "Asia/Seoul");
 
     // when, then
-    assertThatThrownBy(() -> recurrenceEventService.updateRecurrenceOccurrence(1L, 10L, request))
+    assertThatThrownBy(() -> updateRecurrenceOccurrence.update(1L, 10L, request))
         .isInstanceOf(CalioException.class)
         .extracting(exception -> ((CalioException) exception).getErrorCode())
         .isEqualTo(ErrorCode.RECURRENCE_OCCURRENCE_NOT_FOUND);
@@ -316,7 +344,7 @@ class RecurrenceEventServiceTest {
             Instant.parse("2027-02-02T00:00:00Z"),
             null),
         List.of("RRULE:FREQ=WEEKLY;COUNT=2"),
-        tag());
+        2L);
     when(recurrenceEventRepository.findByIdAndAccountIdForUpdate(10L, 1L))
         .thenReturn(Optional.of(recurrenceEvent));
     when(recurrenceEventOverrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(
@@ -335,7 +363,7 @@ class RecurrenceEventServiceTest {
             null);
 
     // when
-    recurrenceEventService.updateRecurrenceOccurrence(1L, 10L, request);
+    updateRecurrenceOccurrence.update(1L, 10L, request);
 
     // then
     verify(recurrenceEngine, never()).containsOrigin(any(), any(), any());
@@ -375,7 +403,7 @@ class RecurrenceEventServiceTest {
     when(clock.instant()).thenReturn(deletedAt);
 
     // when
-    recurrenceEventService.deleteRecurrenceOccurrence(1L, 10L, originStartAt);
+    deleteRecurrenceOccurrence.delete(1L, 10L, originStartAt);
 
     // then
     verify(recurrenceEngine, never()).containsOrigin(any(), any(), any());
@@ -408,15 +436,14 @@ class RecurrenceEventServiceTest {
                 Instant.parse("2027-01-05T03:00:00Z"),
                 false,
                 "Asia/Seoul"));
-    when(recurrenceEventRepository.findByIdAndAccount_Id(10L, 1L))
+    when(recurrenceEventRepository.findByIdAndAccountId(10L, 1L))
         .thenReturn(Optional.of(recurrenceEvent));
     when(recurrenceEventOverrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(
             10L, originStartAt))
         .thenReturn(Optional.of(movedOverride));
 
     // when
-    EventResponse occurrence =
-        recurrenceEventService.getRecurrenceOccurrence(1L, 10L, originStartAt);
+    EventResponse occurrence = getRecurrenceOccurrence.get(1L, 10L, originStartAt);
 
     // then
     assertThat(occurrence.title()).isEqualTo("이동한 회의");
@@ -439,8 +466,7 @@ class RecurrenceEventServiceTest {
     when(recurrenceEngine.containsOrigin(any(), any(), any())).thenReturn(false);
 
     // when, then
-    assertThatThrownBy(
-            () -> recurrenceEventService.deleteRecurrenceOccurrence(1L, 10L, originStartAt))
+    assertThatThrownBy(() -> deleteRecurrenceOccurrence.delete(1L, 10L, originStartAt))
         .isInstanceOf(CalioException.class)
         .extracting(exception -> ((CalioException) exception).getErrorCode())
         .isEqualTo(ErrorCode.RECURRENCE_OCCURRENCE_NOT_FOUND);
@@ -470,19 +496,15 @@ class RecurrenceEventServiceTest {
                 Instant.parse("2027-01-01T01:00:00Z"),
                 "Asia/Seoul"),
             List.of("RRULE:FREQ=DAILY;COUNT=3"),
-            tag(),
-            account());
+            2L,
+            1L);
     ReflectionTestUtils.setField(recurrenceEvent, "id", 10L);
     return recurrenceEvent;
   }
 
   private Tag tag() {
-    return Tag.personalDefault("기타", "#64748B");
-  }
-
-  private Account account() {
-    Account account = new Account();
-    ReflectionTestUtils.setField(account, "id", 1L);
-    return account;
+    Tag tag = Tag.personalDefault("기타", "#64748B");
+    ReflectionTestUtils.setField(tag, "id", 2L);
+    return tag;
   }
 }

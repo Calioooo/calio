@@ -23,7 +23,8 @@ import com.calio.calendar.integration.sync.operation.GoogleOperationJobQueryServ
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobService;
 import com.calio.calendar.integration.sync.operation.GoogleOperationLeaseService;
 import com.calio.calendar.integration.sync.page.GoogleCalendarRecurrenceChangeService;
-import com.calio.calendar.recurrence.service.RecurrenceEventCommandService;
+import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
+import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.sharing.event.service.PersonalEventGroupShareCommandService;
 import com.calio.calendar.sharing.recurrence.service.PersonalRecurrenceGroupShareCommandService;
 import com.calio.calendar.singleevent.repository.SingleEventRepository;
@@ -51,8 +52,10 @@ class GoogleCalendarIntegrationDataServiceTest {
       mock(PersonalEventGroupShareCommandService.class);
   private final PersonalRecurrenceGroupShareCommandService recurrenceShareCommandService =
       mock(PersonalRecurrenceGroupShareCommandService.class);
-  private final RecurrenceEventCommandService recurrenceEventCommandService =
-      mock(RecurrenceEventCommandService.class);
+  private final RecurrenceEventRepository recurrenceEventRepository =
+      mock(RecurrenceEventRepository.class);
+  private final RecurrenceEventOverrideRepository overrideRepository =
+      mock(RecurrenceEventOverrideRepository.class);
   private final GoogleOperationJobService operationJobPersistenceService =
       mock(GoogleOperationJobService.class);
   private final GoogleOperationLeaseService operationLeaseService =
@@ -201,9 +204,8 @@ class GoogleCalendarIntegrationDataServiceTest {
         "next-token");
 
     verify(recurrenceMappingCommandService).deleteRecurrenceEventMappingsWithIds(List.of(10L));
-    verify(recurrenceEventCommandService, never()).deleteRecurrenceEventsByIds(any());
-    verify(recurrenceEventCommandService, never())
-        .deleteRecurrenceOverridesByRecurrenceEventIds(any());
+    verify(recurrenceEventRepository, never()).deleteAllByIds(any());
+    verify(overrideRepository, never()).deleteAllByRecurrenceEventIds(any());
   }
 
   @Test
@@ -253,8 +255,7 @@ class GoogleCalendarIntegrationDataServiceTest {
         "next-token");
 
     verify(recurrenceMappingCommandService).deleteOverrideMappingsWithIds(List.of(10L));
-    verify(recurrenceEventCommandService, never())
-        .deleteRecurrenceOverridesByRecurrenceEventIdAndOriginStartAts(any(), any());
+    verify(overrideRepository, never()).deleteByRecurrenceEventIdAndOriginStartAts(any(), any());
   }
 
   @Test
@@ -292,8 +293,7 @@ class GoogleCalendarIntegrationDataServiceTest {
     deletionOrder
         .verify(recurrenceMappingQueryService)
         .listOverrideMappingsByRecurrenceEventIds(List.of(40L));
-    verify(recurrenceEventCommandService, never())
-        .deleteRecurrenceOverridesByRecurrenceEventIdAndOriginStartAts(any(), any());
+    verify(overrideRepository, never()).deleteByRecurrenceEventIdAndOriginStartAts(any(), any());
   }
 
   private GoogleCalendarIntegrationDataService newService() {
@@ -306,7 +306,8 @@ class GoogleCalendarIntegrationDataServiceTest {
         singleEventRepository,
         eventShareCommandService,
         recurrenceShareCommandService,
-        recurrenceEventCommandService,
+        recurrenceEventRepository,
+        overrideRepository,
         recurrenceChangeService,
         operationLeaseService,
         operationJobPersistenceService,

@@ -13,7 +13,13 @@ import com.calio.calendar.recurrence.controller.dto.RecurrenceEventResponse;
 import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceEventRequest;
 import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceOccurrenceRequest;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
-import com.calio.calendar.recurrence.service.RecurrenceEventService;
+import com.calio.calendar.recurrence.usecase.CreateRecurrenceEventUseCase;
+import com.calio.calendar.recurrence.usecase.DeleteRecurrenceEventUseCase;
+import com.calio.calendar.recurrence.usecase.DeleteRecurrenceOccurrenceUseCase;
+import com.calio.calendar.recurrence.usecase.GetRecurrenceEventUseCase;
+import com.calio.calendar.recurrence.usecase.GetRecurrenceOccurrenceUseCase;
+import com.calio.calendar.recurrence.usecase.UpdateRecurrenceEventUseCase;
+import com.calio.calendar.recurrence.usecase.UpdateRecurrenceOccurrenceUseCase;
 import com.calio.calendar.singleevent.controller.dto.CreateSingleEventRequest;
 import com.calio.calendar.singleevent.controller.dto.EventResponse;
 import com.calio.calendar.singleevent.controller.dto.UpdateSingleEventRequest;
@@ -38,7 +44,13 @@ public class CalendarMutationService {
   private final GetSingleEventUseCase getEventUseCase;
   private final UpdateSingleEventUseCase updateEventUseCase;
   private final DeleteSingleEventUseCase deleteEventUseCase;
-  private final RecurrenceEventService recurrenceEventService;
+  private final CreateRecurrenceEventUseCase createRecurrenceEvent;
+  private final GetRecurrenceEventUseCase getRecurrenceEvent;
+  private final GetRecurrenceOccurrenceUseCase getRecurrenceOccurrence;
+  private final UpdateRecurrenceEventUseCase updateRecurrenceEvent;
+  private final UpdateRecurrenceOccurrenceUseCase updateRecurrenceOccurrence;
+  private final DeleteRecurrenceEventUseCase deleteRecurrenceEvent;
+  private final DeleteRecurrenceOccurrenceUseCase deleteRecurrenceOccurrence;
   private final TagRepository tagRepository;
   private final CalendarAiMutationPolicy aiMutationPolicy;
 
@@ -47,14 +59,26 @@ public class CalendarMutationService {
       GetSingleEventUseCase getEventUseCase,
       UpdateSingleEventUseCase updateEventUseCase,
       DeleteSingleEventUseCase deleteEventUseCase,
-      RecurrenceEventService recurrenceEventService,
+      CreateRecurrenceEventUseCase createRecurrenceEvent,
+      GetRecurrenceEventUseCase getRecurrenceEvent,
+      GetRecurrenceOccurrenceUseCase getRecurrenceOccurrence,
+      UpdateRecurrenceEventUseCase updateRecurrenceEvent,
+      UpdateRecurrenceOccurrenceUseCase updateRecurrenceOccurrence,
+      DeleteRecurrenceEventUseCase deleteRecurrenceEvent,
+      DeleteRecurrenceOccurrenceUseCase deleteRecurrenceOccurrence,
       TagRepository tagRepository,
       CalendarAiMutationPolicy aiMutationPolicy) {
     this.createEventUseCase = createEventUseCase;
     this.getEventUseCase = getEventUseCase;
     this.updateEventUseCase = updateEventUseCase;
     this.deleteEventUseCase = deleteEventUseCase;
-    this.recurrenceEventService = recurrenceEventService;
+    this.createRecurrenceEvent = createRecurrenceEvent;
+    this.getRecurrenceEvent = getRecurrenceEvent;
+    this.getRecurrenceOccurrence = getRecurrenceOccurrence;
+    this.updateRecurrenceEvent = updateRecurrenceEvent;
+    this.updateRecurrenceOccurrence = updateRecurrenceOccurrence;
+    this.deleteRecurrenceEvent = deleteRecurrenceEvent;
+    this.deleteRecurrenceOccurrence = deleteRecurrenceOccurrence;
     this.tagRepository = tagRepository;
     this.aiMutationPolicy = aiMutationPolicy;
   }
@@ -80,8 +104,7 @@ public class CalendarMutationService {
       case CREATE_RECURRENCE_EVENT ->
           List.of(
               eventForSeries(
-                  recurrenceEventService.createRecurrenceEvent(
-                      accountId, createRecurrenceEventRequest(request))));
+                  createRecurrenceEvent.create(accountId, createRecurrenceEventRequest(request))));
       case UPDATE_EVENT -> applyEventUpdate(accountId, request);
       case DELETE_EVENT -> deleteEvent(accountId, request);
       case UPDATE_RECURRENCE_OCCURRENCE -> applyOccurrenceUpdate(accountId, request);
@@ -164,7 +187,7 @@ public class CalendarMutationService {
   private CalendarMutationPreview previewSeriesUpdate(
       Long accountId, CalendarMutationToolRequest request) {
     RecurrenceEventResponse before =
-        recurrenceEventService.getRecurrenceEvent(accountId, requireRecurrenceId(request));
+        getRecurrenceEvent.get(accountId, requireRecurrenceId(request));
     UpdateRecurrenceEventRequest seriesRequest = updateSeriesRequest(request, before);
     return new CalendarMutationPreview(
         CalendarMutationType.UPDATE,
@@ -177,7 +200,7 @@ public class CalendarMutationService {
   private CalendarMutationPreview previewSeriesDeletion(
       Long accountId, CalendarMutationToolRequest request) {
     RecurrenceEventResponse before =
-        recurrenceEventService.getRecurrenceEvent(accountId, requireRecurrenceId(request));
+        getRecurrenceEvent.get(accountId, requireRecurrenceId(request));
     return new CalendarMutationPreview(
         CalendarMutationType.DELETE,
         CalendarMutationScope.ENTIRE_SERIES,
@@ -190,13 +213,13 @@ public class CalendarMutationService {
     EventResponse before = getOccurrence(accountId, request);
     rejectOccurrenceTagChange(request, before);
     return List.of(
-        recurrenceEventService.updateRecurrenceOccurrence(
+        updateRecurrenceOccurrence.update(
             accountId, requireRecurrenceId(request), updateOccurrenceRequest(request, before)));
   }
 
   private List<EventResponse> deleteOccurrence(
       Long accountId, CalendarMutationToolRequest request) {
-    recurrenceEventService.deleteRecurrenceOccurrence(
+    deleteRecurrenceOccurrence.delete(
         accountId, requireRecurrenceId(request), requireOriginStartAt(request));
     return List.of();
   }
@@ -204,20 +227,20 @@ public class CalendarMutationService {
   private List<EventResponse> applySeriesUpdate(
       Long accountId, CalendarMutationToolRequest request) {
     RecurrenceEventResponse before =
-        recurrenceEventService.getRecurrenceEvent(accountId, requireRecurrenceId(request));
+        getRecurrenceEvent.get(accountId, requireRecurrenceId(request));
     RecurrenceEventResponse updated =
-        recurrenceEventService.updateRecurrenceEvent(
+        updateRecurrenceEvent.update(
             accountId, requireRecurrenceId(request), updateSeriesRequest(request, before));
     return List.of(eventForSeries(updated));
   }
 
   private List<EventResponse> deleteSeries(Long accountId, CalendarMutationToolRequest request) {
-    recurrenceEventService.deleteRecurrenceEvent(accountId, requireRecurrenceId(request));
+    deleteRecurrenceEvent.delete(accountId, requireRecurrenceId(request));
     return List.of();
   }
 
   private EventResponse getOccurrence(Long accountId, CalendarMutationToolRequest request) {
-    return recurrenceEventService.getRecurrenceOccurrence(
+    return getRecurrenceOccurrence.get(
         accountId, requireRecurrenceId(request), requireOriginStartAt(request));
   }
 
