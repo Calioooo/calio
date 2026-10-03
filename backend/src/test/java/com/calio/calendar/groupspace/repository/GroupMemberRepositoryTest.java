@@ -7,7 +7,6 @@ import com.calio.calendar.groupspace.domain.GroupMember;
 import com.calio.calendar.groupspace.domain.GroupMemberStatus;
 import com.calio.calendar.groupspace.domain.GroupSpace;
 import jakarta.persistence.EntityManager;
-import jakarta.persistence.EntityManagerFactory;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -32,13 +31,11 @@ class GroupMemberRepositoryTest {
 
   @Autowired private GroupSpaceRepository groupSpaceRepository;
 
-  @Autowired private EntityManagerFactory entityManagerFactory;
-
   @Autowired private EntityManager entityManager;
 
   @Test
-  @DisplayName("그룹 목록 membership 조회는 GroupSpace를 함께 조회하고 동률이면 최신 그룹부터 정렬한다")
-  void listMembershipsLoadsGroupSpaceAndPreservesTieBreakOrder() {
+  @DisplayName("그룹 목록 membership 조회는 groupSpaceId로 동률이면 최신 그룹부터 정렬한다")
+  void listMembershipsPreservesTieBreakOrderWithGroupSpaceIdReference() {
     // given
     Instant now = Instant.parse("2026-08-12T00:00:00Z");
     GroupSpace firstGroup = groupSpaceRepository.saveAndFlush(new GroupSpace(1L, "first", null));
@@ -56,16 +53,13 @@ class GroupMemberRepositoryTest {
 
     // then
     assertThat(memberships)
-        .extracting(member -> member.getGroupSpace().getId())
+        .extracting(GroupMember::getGroupSpaceId)
         .containsExactly(secondGroup.getId(), firstGroup.getId());
-    assertThat(memberships)
-        .allMatch(
-            member -> entityManagerFactory.getPersistenceUnitUtil().isLoaded(member, "groupSpace"));
   }
 
   @Test
-  @DisplayName("활성 membership 단건 조회는 GroupSpace를 함께 조회한다")
-  void getActiveMembershipLoadsGroupSpace() {
+  @DisplayName("활성 membership 단건 조회는 groupSpaceId 참조를 반환한다")
+  void getActiveMembershipReturnsGroupSpaceIdReference() {
     // given
     GroupSpace groupSpace = groupSpaceRepository.saveAndFlush(new GroupSpace(1L, "group", null));
     groupMemberRepository.saveAndFlush(
@@ -80,7 +74,6 @@ class GroupMemberRepositoryTest {
             .orElseThrow();
 
     // then
-    assertThat(entityManagerFactory.getPersistenceUnitUtil().isLoaded(membership, "groupSpace"))
-        .isTrue();
+    assertThat(membership.getGroupSpaceId()).isEqualTo(groupSpace.getId());
   }
 }

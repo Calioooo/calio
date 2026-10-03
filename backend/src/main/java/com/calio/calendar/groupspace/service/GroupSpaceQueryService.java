@@ -36,7 +36,7 @@ public class GroupSpaceQueryService {
   }
 
   public int getActiveMemberCount(Long groupSpaceId) {
-    return groupMemberRepository.countByGroupSpace_IdAndStatus(
+    return groupMemberRepository.countByGroupSpaceIdAndStatus(
         groupSpaceId, GroupMemberStatus.ACTIVE);
   }
 

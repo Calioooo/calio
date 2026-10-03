@@ -3,16 +3,15 @@ package com.calio.calendar.groupspace.domain;
 import com.calio.calendar.common.domain.BaseEntity;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
+import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -26,9 +25,8 @@ public class GroupMember extends BaseEntity {
   @Column(name = "id")
   private Long id;
 
-  @ManyToOne(fetch = FetchType.LAZY, optional = false)
-  @JoinColumn(name = "group_space_id", nullable = false)
-  private GroupSpace groupSpace;
+  @Column(name = "group_space_id", nullable = false)
+  private Long groupSpaceId;
 
   @Column(name = "account_id", nullable = false)
   private Long accountId;
@@ -37,8 +35,11 @@ public class GroupMember extends BaseEntity {
   @Column(nullable = false, length = 16)
   private GroupMemberStatus status;
 
-  @Column(nullable = false, length = 9)
-  private String nickname;
+  @Embedded
+  @AttributeOverride(
+      name = "value",
+      column = @Column(name = "nickname", nullable = false, length = 9))
+  private GroupMemberNickname nickname;
 
   @Column(name = "is_anonymous", nullable = false)
   private boolean isAnonymous;
@@ -48,20 +49,24 @@ public class GroupMember extends BaseEntity {
 
   protected GroupMember() {}
 
-  public GroupMember(GroupSpace groupSpace, Long accountId, String nickname, Instant now) {
-    this.groupSpace = groupSpace;
+  public GroupMember(Long groupSpaceId, Long accountId, GroupMemberNickname nickname, Instant now) {
+    this.groupSpaceId = groupSpaceId;
     this.accountId = accountId;
     this.status = GroupMemberStatus.ACTIVE;
     this.nickname = nickname;
     this.statusChangedAt = normalize(now);
   }
 
+  public GroupMember(GroupSpace groupSpace, Long accountId, String nickname, Instant now) {
+    this(groupSpace.getId(), accountId, new GroupMemberNickname(nickname), now);
+  }
+
   public Long getId() {
     return id;
   }
 
-  public GroupSpace getGroupSpace() {
-    return groupSpace;
+  public Long getGroupSpaceId() {
+    return groupSpaceId;
   }
 
   public Long getAccountId() {
@@ -73,7 +78,7 @@ public class GroupMember extends BaseEntity {
   }
 
   public String getNickname() {
-    return nickname;
+    return nickname.value();
   }
 
   public Instant getStatusChangedAt() {
@@ -84,10 +89,12 @@ public class GroupMember extends BaseEntity {
     return isAnonymous;
   }
 
+  public GroupMemberRole roleFor(Long ownerAccountId) {
+    return ownerAccountId.equals(accountId) ? GroupMemberRole.OWNER : GroupMemberRole.MEMBER;
+  }
+
   public GroupMemberRole roleIn(GroupSpace groupSpace) {
-    return groupSpace.getOwnerAccountId().equals(accountId)
-        ? GroupMemberRole.OWNER
-        : GroupMemberRole.MEMBER;
+    return roleFor(groupSpace.getOwnerAccountId());
   }
 
   public void deactivate(GroupMemberStatus inactiveStatus, Instant now) {
@@ -98,7 +105,7 @@ public class GroupMember extends BaseEntity {
     this.statusChangedAt = normalize(now);
   }
 
-  public void reactivate(String nickname, Instant now) {
+  public void reactivate(GroupMemberNickname nickname, Instant now) {
     this.status = GroupMemberStatus.ACTIVE;
     this.nickname = nickname;
     this.statusChangedAt = normalize(now);

@@ -8,7 +8,8 @@ import static org.mockito.Mockito.when;
 
 import com.calio.calendar.groupspace.domain.GroupMember;
 import com.calio.calendar.groupspace.domain.GroupSpace;
-import com.calio.calendar.groupspace.service.GroupMembershipQueryService;
+import com.calio.calendar.groupspace.repository.GroupMemberRepository;
+import com.calio.calendar.groupspace.repository.GroupSpaceRepository;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.service.RecurrenceEventQueryService;
 import com.calio.calendar.sharing.controller.dto.GroupShareTargetStatus;
@@ -25,8 +26,8 @@ class PersonalRecurrenceGroupShareServiceTest {
 
   private final RecurrenceEventQueryService recurrenceEventQueryService =
       mock(RecurrenceEventQueryService.class);
-  private final GroupMembershipQueryService membershipQueryService =
-      mock(GroupMembershipQueryService.class);
+  private final GroupMemberRepository groupMemberRepository = mock(GroupMemberRepository.class);
+  private final GroupSpaceRepository groupSpaceRepository = mock(GroupSpaceRepository.class);
   private final PersonalRecurrenceGroupShareQueryService shareQueryService =
       mock(PersonalRecurrenceGroupShareQueryService.class);
   private final PersonalRecurrenceGroupShareCommandService shareCommandService =
@@ -34,7 +35,8 @@ class PersonalRecurrenceGroupShareServiceTest {
   private final PersonalRecurrenceGroupShareService service =
       new PersonalRecurrenceGroupShareService(
           recurrenceEventQueryService,
-          membershipQueryService,
+          groupMemberRepository,
+          groupSpaceRepository,
           shareQueryService,
           shareCommandService);
 
@@ -45,8 +47,9 @@ class PersonalRecurrenceGroupShareServiceTest {
     when(recurrenceEvent.getId()).thenReturn(30L);
     GroupSpace groupSpace = groupSpace(10L);
     when(recurrenceEventQueryService.getRecurrenceEvent(100L, 30L)).thenReturn(recurrenceEvent);
-    when(membershipQueryService.listActiveMemberships(100L, List.of(10L, 20L)))
+    when(groupMemberRepository.findAllActiveByAccountIdAndGroupSpaceIds(100L, List.of(10L, 20L)))
         .thenReturn(List.of(member(groupSpace)));
+    when(groupSpaceRepository.findAllById(List.of(10L))).thenReturn(List.of(groupSpace));
     when(shareQueryService.listExistingShares(List.of(30L), List.of(10L, 20L)))
         .thenReturn(List.of());
     when(shareCommandService.createIfAbsent(any())).thenReturn(true);

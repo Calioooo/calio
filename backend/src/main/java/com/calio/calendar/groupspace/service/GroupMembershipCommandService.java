@@ -3,6 +3,7 @@ package com.calio.calendar.groupspace.service;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.groupspace.domain.GroupMember;
+import com.calio.calendar.groupspace.domain.GroupMemberNickname;
 import com.calio.calendar.groupspace.domain.GroupMemberStatus;
 import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.repository.GroupMemberRepository;
@@ -46,7 +47,7 @@ public class GroupMembershipCommandService {
   }
 
   public void changeToActive(GroupMember member, String nickname, Instant now) {
-    member.reactivate(nickname, now);
+    member.reactivate(new GroupMemberNickname(nickname), now);
     groupMemberRepository.flush();
   }
 

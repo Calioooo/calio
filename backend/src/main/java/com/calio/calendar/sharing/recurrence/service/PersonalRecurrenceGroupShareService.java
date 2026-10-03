@@ -2,7 +2,8 @@ package com.calio.calendar.sharing.recurrence.service;
 
 import com.calio.calendar.groupspace.domain.GroupMember;
 import com.calio.calendar.groupspace.domain.GroupSpace;
-import com.calio.calendar.groupspace.service.GroupMembershipQueryService;
+import com.calio.calendar.groupspace.repository.GroupMemberRepository;
+import com.calio.calendar.groupspace.repository.GroupSpaceRepository;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.service.RecurrenceEventQueryService;
 import com.calio.calendar.sharing.controller.dto.GroupShareTargetResponse;
@@ -22,17 +23,20 @@ import org.springframework.transaction.annotation.Transactional;
 public class PersonalRecurrenceGroupShareService {
 
   private final RecurrenceEventQueryService recurrenceEventQueryService;
-  private final GroupMembershipQueryService membershipQueryService;
+  private final GroupMemberRepository groupMemberRepository;
+  private final GroupSpaceRepository groupSpaceRepository;
   private final PersonalRecurrenceGroupShareQueryService shareQueryService;
   private final PersonalRecurrenceGroupShareCommandService shareCommandService;
 
   public PersonalRecurrenceGroupShareService(
       RecurrenceEventQueryService recurrenceEventQueryService,
-      GroupMembershipQueryService membershipQueryService,
+      GroupMemberRepository groupMemberRepository,
+      GroupSpaceRepository groupSpaceRepository,
       PersonalRecurrenceGroupShareQueryService shareQueryService,
       PersonalRecurrenceGroupShareCommandService shareCommandService) {
     this.recurrenceEventQueryService = recurrenceEventQueryService;
-    this.membershipQueryService = membershipQueryService;
+    this.groupMemberRepository = groupMemberRepository;
+    this.groupSpaceRepository = groupSpaceRepository;
     this.shareQueryService = shareQueryService;
     this.shareCommandService = shareCommandService;
   }
@@ -63,10 +67,14 @@ public class PersonalRecurrenceGroupShareService {
   }
 
   private Map<Long, GroupSpace> activeGroupSpaces(Long accountId, List<Long> groupSpaceIds) {
-    return membershipQueryService.listActiveMemberships(accountId, groupSpaceIds).stream()
-        .collect(
-            java.util.stream.Collectors.toMap(
-                member -> member.getGroupSpace().getId(), GroupMember::getGroupSpace));
+    List<Long> activeGroupSpaceIds =
+        groupMemberRepository
+            .findAllActiveByAccountIdAndGroupSpaceIds(accountId, groupSpaceIds)
+            .stream()
+            .map(GroupMember::getGroupSpaceId)
+            .toList();
+    return groupSpaceRepository.findAllById(activeGroupSpaceIds).stream()
+        .collect(java.util.stream.Collectors.toMap(GroupSpace::getId, groupSpace -> groupSpace));
   }
 
   private GroupShareTargetResponse shareTarget(

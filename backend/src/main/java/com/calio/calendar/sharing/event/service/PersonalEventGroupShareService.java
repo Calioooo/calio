@@ -4,7 +4,8 @@ import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.groupspace.domain.GroupMember;
 import com.calio.calendar.groupspace.domain.GroupSpace;
-import com.calio.calendar.groupspace.service.GroupMembershipQueryService;
+import com.calio.calendar.groupspace.repository.GroupMemberRepository;
+import com.calio.calendar.groupspace.repository.GroupSpaceRepository;
 import com.calio.calendar.sharing.controller.dto.GroupShareTargetResponse;
 import com.calio.calendar.sharing.controller.dto.GroupShareTargetStatus;
 import com.calio.calendar.sharing.event.controller.dto.CreateEventGroupSharesRequest;
@@ -27,17 +28,20 @@ import org.springframework.transaction.annotation.Transactional;
 public class PersonalEventGroupShareService {
 
   private final SingleEventRepository eventRepository;
-  private final GroupMembershipQueryService membershipQueryService;
+  private final GroupMemberRepository groupMemberRepository;
+  private final GroupSpaceRepository groupSpaceRepository;
   private final PersonalEventGroupShareQueryService shareQueryService;
   private final PersonalEventGroupShareCommandService shareCommandService;
 
   public PersonalEventGroupShareService(
       SingleEventRepository eventRepository,
-      GroupMembershipQueryService membershipQueryService,
+      GroupMemberRepository groupMemberRepository,
+      GroupSpaceRepository groupSpaceRepository,
       PersonalEventGroupShareQueryService shareQueryService,
       PersonalEventGroupShareCommandService shareCommandService) {
     this.eventRepository = eventRepository;
-    this.membershipQueryService = membershipQueryService;
+    this.groupMemberRepository = groupMemberRepository;
+    this.groupSpaceRepository = groupSpaceRepository;
     this.shareQueryService = shareQueryService;
     this.shareCommandService = shareCommandService;
   }
@@ -77,9 +81,14 @@ public class PersonalEventGroupShareService {
   }
 
   private Map<Long, GroupSpace> activeGroupSpaces(Long accountId, List<Long> groupSpaceIds) {
-    return membershipQueryService.listActiveMemberships(accountId, groupSpaceIds).stream()
-        .collect(
-            Collectors.toMap(member -> member.getGroupSpace().getId(), GroupMember::getGroupSpace));
+    List<Long> activeGroupSpaceIds =
+        groupMemberRepository
+            .findAllActiveByAccountIdAndGroupSpaceIds(accountId, groupSpaceIds)
+            .stream()
+            .map(GroupMember::getGroupSpaceId)
+            .toList();
+    return groupSpaceRepository.findAllById(activeGroupSpaceIds).stream()
+        .collect(Collectors.toMap(GroupSpace::getId, groupSpace -> groupSpace));
   }
 
   private Set<ShareKey> existingKeys(Collection<Long> eventIds, Collection<Long> groupSpaceIds) {
