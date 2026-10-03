@@ -17,9 +17,9 @@ import com.calio.calendar.groupspace.controller.dto.GroupMembershipResponse;
 import com.calio.calendar.groupspace.controller.dto.TransferGroupOwnerResponse;
 import com.calio.calendar.groupspace.domain.GroupJoinResult;
 import com.calio.calendar.groupspace.domain.GroupMember;
+import com.calio.calendar.groupspace.domain.GroupMemberNickname;
 import com.calio.calendar.groupspace.domain.GroupMemberStatus;
 import com.calio.calendar.groupspace.domain.GroupSpace;
-import com.calio.calendar.groupspace.domain.GroupSpaceFields;
 import com.calio.calendar.tag.repository.TagRepository;
 import java.time.Clock;
 import java.time.Instant;
@@ -89,7 +89,7 @@ public class GroupMembershipService {
     validateInvitation(invitation, lockedMembers, now);
 
     GroupMember membership = findMembership(lockedMembers, accountId);
-    String nickname = GroupSpaceFields.normalizeNickname(request.nickname());
+    String nickname = new GroupMemberNickname(request.nickname()).value();
     if (membership == null) {
       requireAvailableNickname(groupSpace.getId(), nickname, null);
       membership = createMembership(groupSpace, accountId, nickname, now);
@@ -123,7 +123,8 @@ public class GroupMembershipService {
       Long accountId, Long groupSpaceId, boolean isAnonymous) {
     GroupMember member = commandService.lockActiveMember(groupSpaceId, accountId);
     commandService.changeAnonymous(member, isAnonymous);
-    return GroupMembershipResponse.from(member, member.getGroupSpace());
+    GroupSpace groupSpace = groupSpaceQueryService.getGroupSpace(groupSpaceId);
+    return GroupMembershipResponse.from(member, groupSpace);
   }
 
   @Transactional

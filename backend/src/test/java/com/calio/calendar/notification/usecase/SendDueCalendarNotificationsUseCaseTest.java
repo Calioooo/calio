@@ -15,6 +15,7 @@ import com.calio.calendar.groupcalendar.recurrence.repository.GroupCalendarRecur
 import com.calio.calendar.groupcalendar.recurrence.repository.GroupCalendarRecurrenceOverrideRepository;
 import com.calio.calendar.groupcalendar.recurrence.service.GroupCalendarRecurrenceOccurrenceResolver;
 import com.calio.calendar.groupspace.repository.GroupMemberRepository;
+import com.calio.calendar.groupspace.repository.GroupSpaceRepository;
 import com.calio.calendar.notification.client.ApnsClient;
 import com.calio.calendar.notification.client.ApnsSendResult;
 import com.calio.calendar.notification.client.ApnsSendResultType;
@@ -62,6 +63,8 @@ class SendDueCalendarNotificationsUseCaseTest {
 
   @Mock private GroupMemberRepository groupMemberRepository;
 
+  @Mock private GroupSpaceRepository groupSpaceRepository;
+
   @Mock private GroupCalendarEventRepository groupCalendarEventRepository;
 
   @Mock private GroupCalendarRecurrenceEventRepository groupCalendarRecurrenceEventRepository;
@@ -88,6 +91,7 @@ class SendDueCalendarNotificationsUseCaseTest {
             recurrenceOverrideRepository,
             personalRecurrenceOccurrenceResolver,
             groupMemberRepository,
+            groupSpaceRepository,
             groupCalendarEventRepository,
             groupCalendarRecurrenceEventRepository,
             groupCalendarRecurrenceOverrideRepository,

@@ -4,6 +4,8 @@ import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.groupspace.domain.GroupMember;
 import com.calio.calendar.groupspace.domain.GroupSpace;
+import com.calio.calendar.groupspace.domain.GroupSpaceEmoji;
+import com.calio.calendar.groupspace.domain.GroupSpaceName;
 import com.calio.calendar.groupspace.repository.GroupMemberRepository;
 import com.calio.calendar.groupspace.repository.GroupSpaceRepository;
 import java.time.Instant;
@@ -40,7 +42,7 @@ public class GroupSpaceCommandService {
   }
 
   public void update(GroupSpace groupSpace, String name, String emoji) {
-    groupSpace.update(name, emoji);
+    groupSpace.update(new GroupSpaceName(name), GroupSpaceEmoji.fromNullable(emoji));
     groupSpaceRepository.flush();
   }
 

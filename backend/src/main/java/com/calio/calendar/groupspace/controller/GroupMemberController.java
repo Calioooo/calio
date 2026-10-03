@@ -5,7 +5,11 @@ import com.calio.calendar.groupspace.controller.dto.GroupMembershipResponse;
 import com.calio.calendar.groupspace.controller.dto.TransferGroupOwnerRequest;
 import com.calio.calendar.groupspace.controller.dto.TransferGroupOwnerResponse;
 import com.calio.calendar.groupspace.controller.dto.UpdateAnonymousSharingRequest;
-import com.calio.calendar.groupspace.service.GroupMembershipService;
+import com.calio.calendar.groupspace.usecase.ChangeMemberAnonymousSharingUseCase;
+import com.calio.calendar.groupspace.usecase.KickGroupMemberUseCase;
+import com.calio.calendar.groupspace.usecase.LeaveGroupSpaceUseCase;
+import com.calio.calendar.groupspace.usecase.ListGroupMembersUseCase;
+import com.calio.calendar.groupspace.usecase.TransferGroupOwnershipUseCase;
 import com.calio.calendar.security.AuthenticatedAccount;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -25,17 +29,30 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/group-spaces/{groupSpaceId}")
 public class GroupMemberController {
 
-  private final GroupMembershipService groupMembershipService;
+  private final ListGroupMembersUseCase listGroupMembersUseCase;
+  private final TransferGroupOwnershipUseCase transferGroupOwnershipUseCase;
+  private final ChangeMemberAnonymousSharingUseCase changeMemberAnonymousSharingUseCase;
+  private final LeaveGroupSpaceUseCase leaveGroupSpaceUseCase;
+  private final KickGroupMemberUseCase kickGroupMemberUseCase;
 
-  public GroupMemberController(GroupMembershipService groupMembershipService) {
-    this.groupMembershipService = groupMembershipService;
+  public GroupMemberController(
+      ListGroupMembersUseCase listGroupMembersUseCase,
+      TransferGroupOwnershipUseCase transferGroupOwnershipUseCase,
+      ChangeMemberAnonymousSharingUseCase changeMemberAnonymousSharingUseCase,
+      LeaveGroupSpaceUseCase leaveGroupSpaceUseCase,
+      KickGroupMemberUseCase kickGroupMemberUseCase) {
+    this.listGroupMembersUseCase = listGroupMembersUseCase;
+    this.transferGroupOwnershipUseCase = transferGroupOwnershipUseCase;
+    this.changeMemberAnonymousSharingUseCase = changeMemberAnonymousSharingUseCase;
+    this.leaveGroupSpaceUseCase = leaveGroupSpaceUseCase;
+    this.kickGroupMemberUseCase = kickGroupMemberUseCase;
   }
 
   @GetMapping("/members")
   public GroupMemberListResponse listMembers(
       @AuthenticationPrincipal AuthenticatedAccount account,
       @PathVariable("groupSpaceId") Long groupSpaceId) {
-    return groupMembershipService.listActiveMembers(account.accountId(), groupSpaceId);
+    return listGroupMembersUseCase.list(account.accountId(), groupSpaceId);
   }
 
   @PostMapping("/owner-transfer")
@@ -43,7 +60,7 @@ public class GroupMemberController {
       @AuthenticationPrincipal AuthenticatedAccount account,
       @PathVariable("groupSpaceId") Long groupSpaceId,
       @Valid @RequestBody TransferGroupOwnerRequest request) {
-    return groupMembershipService.transferOwnership(
+    return transferGroupOwnershipUseCase.transfer(
         account.accountId(), groupSpaceId, request.targetMemberId());
   }
 
@@ -52,7 +69,7 @@ public class GroupMemberController {
       @AuthenticationPrincipal AuthenticatedAccount account,
       @PathVariable("groupSpaceId") Long groupSpaceId,
       @Valid @RequestBody UpdateAnonymousSharingRequest request) {
-    return groupMembershipService.changeAnonymousSharing(
+    return changeMemberAnonymousSharingUseCase.change(
         account.accountId(), groupSpaceId, request.isAnonymous());
   }
 
@@ -60,7 +77,7 @@ public class GroupMemberController {
   public ResponseEntity<Void> leave(
       @AuthenticationPrincipal AuthenticatedAccount account,
       @PathVariable("groupSpaceId") Long groupSpaceId) {
-    groupMembershipService.leave(account.accountId(), groupSpaceId);
+    leaveGroupSpaceUseCase.leave(account.accountId(), groupSpaceId);
     return ResponseEntity.noContent().build();
   }
 
@@ -69,7 +86,7 @@ public class GroupMemberController {
       @AuthenticationPrincipal AuthenticatedAccount account,
       @PathVariable("groupSpaceId") Long groupSpaceId,
       @PathVariable("memberId") Long memberId) {
-    groupMembershipService.kick(account.accountId(), groupSpaceId, memberId);
+    kickGroupMemberUseCase.kick(account.accountId(), groupSpaceId, memberId);
     return ResponseEntity.noContent().build();
   }
 }
