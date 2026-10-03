@@ -556,7 +556,7 @@ class GoogleCalendarPageChangeServiceTest {
         .satisfies(
             recurrence -> {
               assertThat(recurrence.getTitle()).isEqualTo("Changed");
-              assertThat(recurrence.getTag().getId()).isEqualTo(defaultTag.getId());
+              assertThat(recurrence.getTagId()).isEqualTo(defaultTag.getId());
               assertThat(recurrence.getRecurrenceRules()).containsExactly("RRULE:FREQ=WEEKLY");
             });
     assertThat(recurrenceEventOverrideRepository.findAll())

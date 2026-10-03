@@ -205,8 +205,7 @@ class CustomTagControllerTest {
     assertThat(eventRepository.findById(ordinaryEvent.getId()))
         .hasValueSatisfying(event -> assertThat(event.getTagId()).isEqualTo(fallbackTag.getId()));
     assertThat(recurrenceEventRepository.findById(recurrenceEvent.getId()))
-        .hasValueSatisfying(
-            rule -> assertThat(rule.getTag().getId()).isEqualTo(fallbackTag.getId()));
+        .hasValueSatisfying(rule -> assertThat(rule.getTagId()).isEqualTo(fallbackTag.getId()));
   }
 
   @Test
@@ -233,7 +232,7 @@ class CustomTagControllerTest {
     assertThat(eventRepository.findById(ordinaryEvent.getId()))
         .hasValueSatisfying(event -> assertThat(event.getTagId()).isEqualTo(customTag.getId()));
     assertThat(recurrenceEventRepository.findById(recurrenceEvent.getId()))
-        .hasValueSatisfying(rule -> assertThat(rule.getTag().getId()).isEqualTo(customTag.getId()));
+        .hasValueSatisfying(rule -> assertThat(rule.getTagId()).isEqualTo(customTag.getId()));
   }
 
   private String customTagRequest(String title, String colorCode) {
@@ -268,7 +267,7 @@ class CustomTagControllerTest {
             Instant.parse("2026-07-01T10:00:00Z"),
             "UTC"),
         java.util.List.of("RRULE:FREQ=DAILY;COUNT=2"),
-        tag,
-        currentAccountReference());
+        tag.getId(),
+        currentAccountReference().getId());
   }
 }

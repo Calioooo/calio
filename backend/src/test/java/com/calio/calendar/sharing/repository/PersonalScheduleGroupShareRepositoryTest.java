@@ -171,8 +171,8 @@ class PersonalScheduleGroupShareRepositoryTest {
                 null,
                 new RecurrenceSchedule(START_AT, START_AT.plusSeconds(3600), false, "UTC"),
                 List.of("RRULE:FREQ=DAILY"),
-                tag,
-                account));
+                tag.getId(),
+                account.getId()));
     GroupSpace groupSpace =
         groupSpaceRepository.saveAndFlush(new GroupSpace(account.getId(), "group", null));
 

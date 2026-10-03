@@ -3,6 +3,7 @@ package com.calio.calendar.recurrence.controller.dto;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
 import com.calio.calendar.tag.controller.dto.TagResponse;
+import com.calio.calendar.tag.domain.Tag;
 import java.time.Instant;
 import java.util.List;
 
@@ -19,7 +20,7 @@ public record RecurrenceEventResponse(
     Instant createdAt,
     Instant updatedAt) {
 
-  public static RecurrenceEventResponse from(RecurrenceEvent recurrenceEvent) {
+  public static RecurrenceEventResponse from(RecurrenceEvent recurrenceEvent, Tag tag) {
     RecurrenceSchedule schedule = RecurrenceSchedule.from(recurrenceEvent);
     return new RecurrenceEventResponse(
         recurrenceEvent.getId(),
@@ -30,7 +31,7 @@ public record RecurrenceEventResponse(
         schedule.firstOccurrenceEndAt(),
         recurrenceEvent.getTimeZone(),
         recurrenceEvent.getRecurrenceRules(),
-        TagResponse.from(recurrenceEvent.getTag()),
+        TagResponse.from(tag),
         recurrenceEvent.getCreatedAt(),
         recurrenceEvent.getUpdatedAt());
   }
