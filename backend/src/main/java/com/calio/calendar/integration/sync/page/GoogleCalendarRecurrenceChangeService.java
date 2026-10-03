@@ -23,7 +23,6 @@ import com.calio.calendar.integration.sync.page.dto.GoogleCalendarPageRecordCach
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
-import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.sharing.recurrence.service.PersonalRecurrenceGroupShareCommandService;
 import com.calio.calendar.tag.domain.Tag;
@@ -37,7 +36,6 @@ public class GoogleCalendarRecurrenceChangeService {
   private final GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService;
   private final GoogleCalendarRecurrenceMappingCommandService recurrenceMappingCommandService;
   private final RecurrenceEventRepository recurrenceEventRepository;
-  private final RecurrenceEventOverrideRepository overrideRepository;
   private final PersonalRecurrenceGroupShareCommandService recurrenceShareCommandService;
   private final GoogleOperationJobQueryService operationJobQueryService;
   private final GoogleOperationJobService operationJobService;
@@ -46,14 +44,12 @@ public class GoogleCalendarRecurrenceChangeService {
       GoogleCalendarRecurrenceMappingQueryService recurrenceMappingQueryService,
       GoogleCalendarRecurrenceMappingCommandService recurrenceMappingCommandService,
       RecurrenceEventRepository recurrenceEventRepository,
-      RecurrenceEventOverrideRepository overrideRepository,
       PersonalRecurrenceGroupShareCommandService recurrenceShareCommandService,
       GoogleOperationJobQueryService operationJobQueryService,
       GoogleOperationJobService operationJobService) {
     this.recurrenceMappingQueryService = recurrenceMappingQueryService;
     this.recurrenceMappingCommandService = recurrenceMappingCommandService;
     this.recurrenceEventRepository = recurrenceEventRepository;
-    this.overrideRepository = overrideRepository;
     this.recurrenceShareCommandService = recurrenceShareCommandService;
     this.operationJobQueryService = operationJobQueryService;
     this.operationJobService = operationJobService;
@@ -222,17 +218,12 @@ public class GoogleCalendarRecurrenceChangeService {
       RecurrenceEventOverrideUpsert item,
       ExistingRecurrenceOverride existingOverride,
       GoogleCalendarPageRecordCache cache) {
-    if (existingOverride.recurrenceEventOverride() != null) {
-      updateRecurrenceEventOverride(existingOverride.recurrenceEventOverride(), item);
-      return existingOverride.recurrenceEventOverride();
-    }
-    RecurrenceEventOverride recurrenceEventOverride =
-        createRecurrenceEventOverride(
-            recurrenceEventRepository
-                .findById(recurrenceEventMapping.getRecurrenceEventId())
-                .orElseThrow(() -> new CalioException(ErrorCode.RECURRENCE_EVENT_NOT_FOUND)),
-            item);
-    overrideRepository.saveAndFlush(recurrenceEventOverride);
+    RecurrenceEvent recurrenceEvent =
+        recurrenceEventRepository
+            .findById(recurrenceEventMapping.getRecurrenceEventId())
+            .orElseThrow(() -> new CalioException(ErrorCode.RECURRENCE_EVENT_NOT_FOUND));
+    RecurrenceEventOverride recurrenceEventOverride = applyProviderOverride(recurrenceEvent, item);
+    recurrenceEventRepository.flush();
     cache
         .recurrenceEventOverrides()
         .put(existingOverride.recurrenceEventOverrideKey(), recurrenceEventOverride);
@@ -277,7 +268,7 @@ public class GoogleCalendarRecurrenceChangeService {
       recordSyncConflict(mapping, ownership);
       return;
     }
-    updateRecurrenceEventOverride(recurrenceOverride(mapping), item);
+    applyProviderOverride(recurrenceOverride(mapping).getRecurrenceEvent(), item);
     mapping.updateProviderEtag(item.providerEtag());
   }
 
@@ -295,8 +286,7 @@ public class GoogleCalendarRecurrenceChangeService {
       return;
     }
     recurrenceShareCommandService.deleteAllForSourceRecurrence(recurrenceEventId);
-    overrideRepository.deleteAllByRecurrenceEventIds(List.of(recurrenceEventId));
-    recurrenceEventRepository.deleteAllByIds(List.of(recurrenceEventId));
+    recurrenceEventRepository.deleteAllById(List.of(recurrenceEventId));
   }
 
   private void validateMappedRecurrenceOverrideKey(
@@ -340,11 +330,10 @@ public class GoogleCalendarRecurrenceChangeService {
     }
   }
 
-  private RecurrenceEventOverride createRecurrenceEventOverride(
+  private RecurrenceEventOverride applyProviderOverride(
       RecurrenceEvent recurrenceEvent, RecurrenceEventOverrideUpsert item) {
     if (item instanceof ActiveRecurrenceEventOverrideUpsert active) {
-      return RecurrenceEventOverride.active(
-          recurrenceEvent,
+      return recurrenceEvent.updateProviderOccurrence(
           active.originStartAt(),
           active.title(),
           active.description(),
@@ -352,19 +341,8 @@ public class GoogleCalendarRecurrenceChangeService {
     }
     CancelledRecurrenceEventOverrideUpsert cancelled =
         (CancelledRecurrenceEventOverrideUpsert) item;
-    return RecurrenceEventOverride.deleted(
-        recurrenceEvent, cancelled.originStartAt(), cancelled.deletedAt());
-  }
-
-  private void updateRecurrenceEventOverride(
-      RecurrenceEventOverride recurrenceEventOverride, RecurrenceEventOverrideUpsert item) {
-    if (item instanceof ActiveRecurrenceEventOverrideUpsert active) {
-      recurrenceEventOverride.activate(
-          active.title(), active.description(), toOverrideSchedule(active.schedule()));
-      return;
-    }
-    recurrenceEventOverride.markDeleted(
-        ((CancelledRecurrenceEventOverrideUpsert) item).deletedAt());
+    return recurrenceEvent.excludeProviderOccurrence(
+        cancelled.originStartAt(), cancelled.deletedAt());
   }
 
   private void recordSyncConflict(
@@ -375,9 +353,9 @@ public class GoogleCalendarRecurrenceChangeService {
 
   private RecurrenceEventOverride recurrenceOverride(
       GoogleCalendarRecurrenceOverrideMapping mapping) {
-    return overrideRepository
-        .findByRecurrenceEvent_IdAndOriginStartAt(
-            mapping.getRecurrenceEventMapping().getRecurrenceEventId(), mapping.getOriginStartAt())
+    return recurrenceEventRepository
+        .findById(mapping.getRecurrenceEventMapping().getRecurrenceEventId())
+        .flatMap(recurrenceEvent -> recurrenceEvent.findOverride(mapping.getOriginStartAt()))
         .orElseThrow(() -> new CalioException(ErrorCode.GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID));
   }
 

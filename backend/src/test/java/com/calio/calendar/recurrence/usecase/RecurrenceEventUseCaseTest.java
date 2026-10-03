@@ -97,24 +97,13 @@ class RecurrenceEventUseCaseTest {
             recurrenceEventRepository, tagRepository, recurrenceEngine, jobEnqueueService);
     updateRecurrenceOccurrence =
         new UpdateRecurrenceOccurrenceUseCase(
-            recurrenceEventRepository,
-            recurrenceEventOverrideRepository,
-            tagRepository,
-            recurrenceEngine,
-            jobEnqueueService);
+            recurrenceEventRepository, tagRepository, recurrenceEngine, jobEnqueueService);
     deleteRecurrenceEvent =
         new DeleteRecurrenceEventUseCase(
-            recurrenceEventRepository,
-            recurrenceEventOverrideRepository,
-            recurrenceShareRepository,
-            jobEnqueueService);
+            recurrenceEventRepository, recurrenceShareRepository, jobEnqueueService);
     deleteRecurrenceOccurrence =
         new DeleteRecurrenceOccurrenceUseCase(
-            recurrenceEventRepository,
-            recurrenceEventOverrideRepository,
-            recurrenceEngine,
-            jobEnqueueService,
-            clock);
+            recurrenceEventRepository, recurrenceEngine, jobEnqueueService, clock);
   }
 
   @Test
@@ -206,7 +195,7 @@ class RecurrenceEventUseCaseTest {
     InOrder lockOrder = inOrder(jobEnqueueService, recurrenceEventRepository);
     lockOrder.verify(jobEnqueueService).prepareOutboundOperation(1L);
     lockOrder.verify(recurrenceEventRepository).findByIdAndAccountIdForUpdate(10L, 1L);
-    verify(recurrenceEventOverrideRepository, never()).deleteAllByRecurrenceEventIds(any());
+    assertThat(recurrenceEvent.getOverrides()).isEmpty();
     verify(jobEnqueueService)
         .enqueueRecurrence(
             eq(outboundOperation),
@@ -216,8 +205,8 @@ class RecurrenceEventUseCaseTest {
   }
 
   @Test
-  @DisplayName("전체 recurrence 삭제는 override를 master보다 먼저 제거한다")
-  void givenRecurrenceChildren_whenDeleteMaster_thenDeletesChildrenBeforeMaster() {
+  @DisplayName("전체 반복 일정 삭제는 공유를 정리한 뒤 Root의 생명주기로 삭제한다")
+  void givenRecurrenceEvent_whenDelete_thenDeletesAggregateRoot() {
     // given
     RecurrenceEvent recurrenceEvent = recurrenceEvent();
     when(recurrenceEventRepository.findByIdAndAccountIdForUpdate(10L, 1L))
@@ -228,18 +217,11 @@ class RecurrenceEventUseCaseTest {
 
     // then
     InOrder deletionOrder =
-        inOrder(
-            jobEnqueueService,
-            recurrenceEventRepository,
-            recurrenceEventOverrideRepository,
-            recurrenceShareRepository);
+        inOrder(jobEnqueueService, recurrenceEventRepository, recurrenceShareRepository);
     deletionOrder.verify(jobEnqueueService).prepareOutboundOperation(1L);
     deletionOrder.verify(recurrenceEventRepository).findByIdAndAccountIdForUpdate(10L, 1L);
     deletionOrder.verify(recurrenceShareRepository).deleteAllByRecurrenceEventId(10L);
-    deletionOrder
-        .verify(recurrenceEventOverrideRepository)
-        .deleteAllByRecurrenceEventIds(List.of(10L));
-    deletionOrder.verify(recurrenceEventRepository).deleteAllByIds(List.of(10L));
+    deletionOrder.verify(recurrenceEventRepository).delete(recurrenceEvent);
     verify(jobEnqueueService).enqueueRecurrenceDeleted(outboundOperation, 10L);
   }
 
@@ -252,11 +234,6 @@ class RecurrenceEventUseCaseTest {
     when(recurrenceEventRepository.findByIdAndAccountIdForUpdate(10L, 1L))
         .thenReturn(Optional.of(recurrenceEvent));
     when(recurrenceEngine.containsOrigin(any(), any(), any())).thenReturn(true);
-    when(recurrenceEventOverrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(
-            10L, originStartAt))
-        .thenReturn(Optional.empty());
-    when(recurrenceEventOverrideRepository.saveAndFlush(any()))
-        .thenAnswer(invocation -> invocation.getArgument(0));
     UpdateRecurrenceOccurrenceRequest request =
         new UpdateRecurrenceOccurrenceRequest(
             originStartAt,
@@ -271,12 +248,11 @@ class RecurrenceEventUseCaseTest {
     EventResponse response = updateRecurrenceOccurrence.update(1L, 10L, request);
 
     // then
-    ArgumentCaptor<RecurrenceEventOverride> captor =
-        ArgumentCaptor.forClass(RecurrenceEventOverride.class);
-    verify(recurrenceEventOverrideRepository).saveAndFlush(captor.capture());
-    assertThat(captor.getValue().getOverrideTitle()).isEqualTo("Final title");
-    assertThat(captor.getValue().getOverrideDescription()).isNull();
-    assertThat(captor.getValue().getOverrideTimeZone()).isEqualTo("Asia/Seoul");
+    RecurrenceEventOverride override = recurrenceEvent.findOverride(originStartAt).orElseThrow();
+    verify(recurrenceEventRepository).flush();
+    assertThat(override.getOverrideTitle()).isEqualTo("Final title");
+    assertThat(override.getOverrideDescription()).isNull();
+    assertThat(override.getOverrideTimeZone()).isEqualTo("Asia/Seoul");
     assertThat(response.title()).isEqualTo("Final title");
     assertThat(response.description()).isNull();
     assertThat(response.originStartAt()).isEqualTo(originStartAt);
@@ -295,9 +271,6 @@ class RecurrenceEventUseCaseTest {
     Instant originStartAt = Instant.parse("2027-01-01T00:00:01Z");
     when(recurrenceEventRepository.findByIdAndAccountIdForUpdate(10L, 1L))
         .thenReturn(Optional.of(recurrenceEvent));
-    when(recurrenceEventOverrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(
-            10L, originStartAt))
-        .thenReturn(Optional.empty());
     when(recurrenceEngine.containsOrigin(any(), any(), any())).thenReturn(false);
     UpdateRecurrenceOccurrenceRequest request =
         new UpdateRecurrenceOccurrenceRequest(
@@ -314,7 +287,8 @@ class RecurrenceEventUseCaseTest {
         .isInstanceOf(CalioException.class)
         .extracting(exception -> ((CalioException) exception).getErrorCode())
         .isEqualTo(ErrorCode.RECURRENCE_OCCURRENCE_NOT_FOUND);
-    verify(recurrenceEventOverrideRepository, never()).saveAndFlush(any());
+    assertThat(recurrenceEvent.findOverride(originStartAt)).isEmpty();
+    verify(recurrenceEventRepository, never()).flush();
   }
 
   @Test
@@ -324,9 +298,9 @@ class RecurrenceEventUseCaseTest {
     RecurrenceEvent recurrenceEvent = recurrenceEvent();
     Instant originStartAt = Instant.parse("2027-01-01T00:00:00Z");
     RecurrenceEventOverride existingOverride =
-        RecurrenceEventOverride.active(
-            recurrenceEvent,
+        recurrenceEvent.changeOccurrence(
             originStartAt,
+            true,
             "Old title",
             "old memo",
             CanonicalSchedule.recurrenceOverride(
@@ -334,7 +308,7 @@ class RecurrenceEventUseCaseTest {
                 Instant.parse("2027-01-02T03:00:00Z"),
                 false,
                 "Asia/Seoul"));
-    existingOverride.markDeleted(Instant.parse("2027-01-05T00:00:00Z"));
+    recurrenceEvent.excludeOccurrence(originStartAt, false, Instant.parse("2027-01-05T00:00:00Z"));
     recurrenceEvent.update(
         "All day master",
         null,
@@ -347,11 +321,6 @@ class RecurrenceEventUseCaseTest {
         2L);
     when(recurrenceEventRepository.findByIdAndAccountIdForUpdate(10L, 1L))
         .thenReturn(Optional.of(recurrenceEvent));
-    when(recurrenceEventOverrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(
-            10L, originStartAt))
-        .thenReturn(Optional.of(existingOverride));
-    when(recurrenceEventOverrideRepository.saveAndFlush(any()))
-        .thenAnswer(invocation -> invocation.getArgument(0));
     UpdateRecurrenceOccurrenceRequest request =
         new UpdateRecurrenceOccurrenceRequest(
             originStartAt,
@@ -367,7 +336,8 @@ class RecurrenceEventUseCaseTest {
 
     // then
     verify(recurrenceEngine, never()).containsOrigin(any(), any(), any());
-    verify(recurrenceEventOverrideRepository).saveAndFlush(existingOverride);
+    verify(recurrenceEventRepository).flush();
+    assertThat(recurrenceEvent.findOverride(originStartAt)).containsSame(existingOverride);
     assertThat(existingOverride.getOriginStartAt()).isEqualTo(originStartAt);
     assertThat(existingOverride.getOverrideTitle()).isEqualTo("Restored");
     assertThat(existingOverride.getOverrideStartAt()).isEqualTo(request.startAt());
@@ -385,9 +355,9 @@ class RecurrenceEventUseCaseTest {
     Instant originStartAt = Instant.parse("2027-01-01T00:00:00Z");
     Instant deletedAt = Instant.parse("2027-01-06T00:00:00Z");
     RecurrenceEventOverride existingOverride =
-        RecurrenceEventOverride.active(
-            recurrenceEvent,
+        recurrenceEvent.changeOccurrence(
             originStartAt,
+            true,
             "Override",
             null,
             CanonicalSchedule.recurrenceOverride(
@@ -397,9 +367,6 @@ class RecurrenceEventUseCaseTest {
                 "Asia/Seoul"));
     when(recurrenceEventRepository.findByIdAndAccountIdForUpdate(10L, 1L))
         .thenReturn(Optional.of(recurrenceEvent));
-    when(recurrenceEventOverrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(
-            10L, originStartAt))
-        .thenReturn(Optional.of(existingOverride));
     when(clock.instant()).thenReturn(deletedAt);
 
     // when
@@ -407,7 +374,8 @@ class RecurrenceEventUseCaseTest {
 
     // then
     verify(recurrenceEngine, never()).containsOrigin(any(), any(), any());
-    verify(recurrenceEventOverrideRepository).saveAndFlush(existingOverride);
+    verify(recurrenceEventRepository).flush();
+    assertThat(recurrenceEvent.findOverride(originStartAt)).containsSame(existingOverride);
     assertThat(existingOverride.getOriginStartAt()).isEqualTo(originStartAt);
     assertThat(existingOverride.isDeleted()).isTrue();
     assertThat(existingOverride.getDeletedAt()).isEqualTo(deletedAt);
@@ -426,9 +394,9 @@ class RecurrenceEventUseCaseTest {
     RecurrenceEvent recurrenceEvent = recurrenceEvent();
     Instant originStartAt = Instant.parse("2027-01-01T00:00:00Z");
     RecurrenceEventOverride movedOverride =
-        RecurrenceEventOverride.active(
-            recurrenceEvent,
+        recurrenceEvent.changeOccurrence(
             originStartAt,
+            true,
             "이동한 회의",
             "변경된 설명",
             CanonicalSchedule.recurrenceOverride(
@@ -460,9 +428,6 @@ class RecurrenceEventUseCaseTest {
     Instant originStartAt = Instant.parse("2027-01-01T00:00:01Z");
     when(recurrenceEventRepository.findByIdAndAccountIdForUpdate(10L, 1L))
         .thenReturn(Optional.of(recurrenceEvent));
-    when(recurrenceEventOverrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(
-            10L, originStartAt))
-        .thenReturn(Optional.empty());
     when(recurrenceEngine.containsOrigin(any(), any(), any())).thenReturn(false);
 
     // when, then
@@ -470,7 +435,8 @@ class RecurrenceEventUseCaseTest {
         .isInstanceOf(CalioException.class)
         .extracting(exception -> ((CalioException) exception).getErrorCode())
         .isEqualTo(ErrorCode.RECURRENCE_OCCURRENCE_NOT_FOUND);
-    verify(recurrenceEventOverrideRepository, never()).saveAndFlush(any());
+    assertThat(recurrenceEvent.findOverride(originStartAt)).isEmpty();
+    verify(recurrenceEventRepository, never()).flush();
   }
 
   private CreateRecurrenceEventRequest timedCreateRequest() {

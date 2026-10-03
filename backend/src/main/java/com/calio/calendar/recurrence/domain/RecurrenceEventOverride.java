@@ -15,6 +15,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
+import java.util.Objects;
 
 @Entity
 @Table(
@@ -64,10 +65,10 @@ public class RecurrenceEventOverride extends BaseEntity {
 
   private RecurrenceEventOverride(RecurrenceEvent recurrenceEvent, Instant originStartAt) {
     this.recurrenceEvent = recurrenceEvent;
-    this.originStartAt = originStartAt;
+    this.originStartAt = Objects.requireNonNull(originStartAt);
   }
 
-  public static RecurrenceEventOverride active(
+  static RecurrenceEventOverride active(
       RecurrenceEvent recurrenceEvent,
       Instant originStartAt,
       String title,
@@ -78,14 +79,14 @@ public class RecurrenceEventOverride extends BaseEntity {
     return override;
   }
 
-  public static RecurrenceEventOverride deleted(
+  static RecurrenceEventOverride deleted(
       RecurrenceEvent recurrenceEvent, Instant originStartAt, Instant deletedAt) {
     RecurrenceEventOverride override = new RecurrenceEventOverride(recurrenceEvent, originStartAt);
     override.markDeleted(deletedAt);
     return override;
   }
 
-  public void activate(String title, String description, CanonicalSchedule schedule) {
+  void activate(String title, String description, CanonicalSchedule schedule) {
     this.overrideTitle = new RecurrenceEventTitle(title);
     this.overrideDescription = description;
     this.overrideStartAt = schedule.startAt();
@@ -95,7 +96,7 @@ public class RecurrenceEventOverride extends BaseEntity {
     this.deletedAt = null;
   }
 
-  public void markDeleted(Instant deletedAt) {
+  void markDeleted(Instant deletedAt) {
     this.overrideTitle = null;
     this.overrideDescription = null;
     this.overrideStartAt = null;

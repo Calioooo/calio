@@ -16,7 +16,6 @@ import com.calio.calendar.integration.sync.operation.GoogleOperationLeaseService
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEffectiveScope;
 import com.calio.calendar.integration.sync.page.GoogleCalendarRecurrenceChangeService;
 import com.calio.calendar.integration.sync.page.dto.GoogleCalendarRecurrenceOverrideExternalKey;
-import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.sharing.event.service.PersonalEventGroupShareCommandService;
 import com.calio.calendar.sharing.recurrence.service.PersonalRecurrenceGroupShareCommandService;
@@ -45,7 +44,6 @@ public class GoogleCalendarIntegrationDataService {
   private final PersonalEventGroupShareCommandService eventShareCommandService;
   private final PersonalRecurrenceGroupShareCommandService recurrenceShareCommandService;
   private final RecurrenceEventRepository recurrenceEventRepository;
-  private final RecurrenceEventOverrideRepository overrideRepository;
   private final GoogleCalendarRecurrenceChangeService recurrenceChangeService;
   private final GoogleOperationLeaseService operationLeaseService;
   private final GoogleOperationJobService operationJobService;
@@ -61,7 +59,6 @@ public class GoogleCalendarIntegrationDataService {
       PersonalEventGroupShareCommandService eventShareCommandService,
       PersonalRecurrenceGroupShareCommandService recurrenceShareCommandService,
       RecurrenceEventRepository recurrenceEventRepository,
-      RecurrenceEventOverrideRepository overrideRepository,
       GoogleCalendarRecurrenceChangeService recurrenceChangeService,
       GoogleOperationLeaseService operationLeaseService,
       GoogleOperationJobService operationJobService,
@@ -75,7 +72,6 @@ public class GoogleCalendarIntegrationDataService {
     this.eventShareCommandService = eventShareCommandService;
     this.recurrenceShareCommandService = recurrenceShareCommandService;
     this.recurrenceEventRepository = recurrenceEventRepository;
-    this.overrideRepository = overrideRepository;
     this.recurrenceChangeService = recurrenceChangeService;
     this.operationLeaseService = operationLeaseService;
     this.operationJobService = operationJobService;
@@ -341,9 +337,8 @@ public class GoogleCalendarIntegrationDataService {
     if (unmappedRecurrenceEventIds.isEmpty()) {
       return;
     }
-    overrideRepository.deleteAllByRecurrenceEventIds(unmappedRecurrenceEventIds);
     unmappedRecurrenceEventIds.forEach(recurrenceShareCommandService::deleteAllForSourceRecurrence);
-    recurrenceEventRepository.deleteAllByIds(unmappedRecurrenceEventIds);
+    recurrenceEventRepository.deleteAllById(unmappedRecurrenceEventIds);
   }
 
   private void deleteAllMappedEventData(Long integrationId) {
@@ -386,8 +381,10 @@ public class GoogleCalendarIntegrationDataService {
                   .filter(originStartAt -> !remainingOriginStartAts.contains(originStartAt))
                   .toList();
           if (!unmappedOriginStartAts.isEmpty()) {
-            overrideRepository.deleteByRecurrenceEventIdAndOriginStartAts(
-                recurrenceEventId, unmappedOriginStartAts);
+            recurrenceEventRepository
+                .findById(recurrenceEventId)
+                .ifPresent(
+                    recurrenceEvent -> recurrenceEvent.removeOverrides(unmappedOriginStartAts));
           }
         });
   }

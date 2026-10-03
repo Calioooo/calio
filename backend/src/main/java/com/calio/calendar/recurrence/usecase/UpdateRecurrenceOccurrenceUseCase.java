@@ -9,13 +9,11 @@ import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceOccurrenceRe
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
-import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.recurrence.service.Rfc5545RecurrenceEngine;
 import com.calio.calendar.singleevent.controller.dto.EventResponse;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.repository.TagRepository;
-import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,19 +21,16 @@ import org.springframework.transaction.annotation.Transactional;
 public class UpdateRecurrenceOccurrenceUseCase {
 
   private final RecurrenceEventRepository recurrenceEventRepository;
-  private final RecurrenceEventOverrideRepository overrideRepository;
   private final TagRepository tagRepository;
   private final Rfc5545RecurrenceEngine recurrenceEngine;
   private final GoogleOperationJobEnqueueService jobEnqueueService;
 
   public UpdateRecurrenceOccurrenceUseCase(
       RecurrenceEventRepository recurrenceEventRepository,
-      RecurrenceEventOverrideRepository overrideRepository,
       TagRepository tagRepository,
       Rfc5545RecurrenceEngine recurrenceEngine,
       GoogleOperationJobEnqueueService jobEnqueueService) {
     this.recurrenceEventRepository = recurrenceEventRepository;
-    this.overrideRepository = overrideRepository;
     this.tagRepository = tagRepository;
     this.recurrenceEngine = recurrenceEngine;
     this.jobEnqueueService = jobEnqueueService;
@@ -52,24 +47,20 @@ public class UpdateRecurrenceOccurrenceUseCase {
         recurrenceEventRepository
             .findByIdAndAccountIdForUpdate(recurrenceId, accountId)
             .orElseThrow(() -> new CalioException(ErrorCode.RECURRENCE_EVENT_NOT_FOUND));
-    Optional<RecurrenceEventOverride> existing =
-        overrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(
-            recurrenceId, request.originStartAt());
     boolean generatedOrigin =
-        existing.isEmpty()
+        recurrenceEvent.findOverride(request.originStartAt()).isEmpty()
             && recurrenceEngine.containsOrigin(
                 RecurrenceSchedule.from(recurrenceEvent),
                 recurrenceEvent.getRecurrenceRules(),
                 request.originStartAt());
     RecurrenceEventOverride override =
         recurrenceEvent.changeOccurrence(
-            existing.orElse(null),
             request.originStartAt(),
             generatedOrigin,
             request.title(),
             request.description(),
             schedule);
-    overrideRepository.saveAndFlush(override);
+    recurrenceEventRepository.flush();
     jobEnqueueService.enqueueRecurrenceOverride(
         outboundOperation,
         recurrenceId,

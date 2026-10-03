@@ -14,7 +14,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
-import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
 import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
@@ -787,17 +786,17 @@ class RecurrenceEventControllerTest {
                 defaultTag.getId(),
                 otherAccount.getId()));
     Instant originStartAt = Instant.parse("2027-03-01T09:00:00Z");
-    overrideRepository.save(
-        RecurrenceEventOverride.active(
-            otherMaster,
-            originStartAt,
-            "Private override",
-            null,
-            com.calio.calendar.common.domain.CanonicalSchedule.recurrenceOverride(
-                Instant.parse("2027-03-02T12:00:00Z"),
-                Instant.parse("2027-03-02T13:00:00Z"),
-                false,
-                "UTC")));
+    otherMaster.changeOccurrence(
+        originStartAt,
+        true,
+        "Private override",
+        null,
+        com.calio.calendar.common.domain.CanonicalSchedule.recurrenceOverride(
+            Instant.parse("2027-03-02T12:00:00Z"),
+            Instant.parse("2027-03-02T13:00:00Z"),
+            false,
+            "UTC"));
+    recurrenceEventRepository.saveAndFlush(otherMaster);
 
     // when
     mockMvc
