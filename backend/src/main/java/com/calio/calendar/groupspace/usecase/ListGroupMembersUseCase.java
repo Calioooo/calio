@@ -41,13 +41,13 @@ public class ListGroupMembersUseCase {
   private GroupSpace getGroupSpace(Long groupSpaceId) {
     return groupSpaceRepository
         .findById(groupSpaceId)
-        .orElseThrow(ListGroupMembersUseCase::groupSpaceNotFound);
+        .orElseThrow(() -> new CalioException(ErrorCode.GROUP_SPACE_NOT_FOUND));
   }
 
   private void getActiveMembership(Long groupSpaceId, Long accountId) {
     groupMemberRepository
         .findByGroupSpaceIdAndAccountIdAndStatus(groupSpaceId, accountId, GroupMemberStatus.ACTIVE)
-        .orElseThrow(ListGroupMembersUseCase::groupSpaceNotFound);
+        .orElseThrow(() -> new CalioException(ErrorCode.GROUP_SPACE_NOT_FOUND));
   }
 
   private Comparator<GroupMember> memberOrder(GroupSpace groupSpace) {
@@ -55,9 +55,5 @@ public class ListGroupMembersUseCase {
             (GroupMember member) -> !member.roleFor(groupSpace.getOwnerAccountId()).isOwner())
         .thenComparing(GroupMember::getStatusChangedAt)
         .thenComparing(GroupMember::getId);
-  }
-
-  private static CalioException groupSpaceNotFound() {
-    return new CalioException(ErrorCode.GROUP_SPACE_NOT_FOUND);
   }
 }

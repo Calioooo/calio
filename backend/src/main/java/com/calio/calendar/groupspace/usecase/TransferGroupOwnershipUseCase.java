@@ -48,7 +48,7 @@ public class TransferGroupOwnershipUseCase {
   private GroupSpace lockGroupSpace(Long groupSpaceId) {
     return groupSpaceRepository
         .findByIdForUpdate(groupSpaceId)
-        .orElseThrow(TransferGroupOwnershipUseCase::groupSpaceNotFound);
+        .orElseThrow(() -> new CalioException(ErrorCode.GROUP_SPACE_NOT_FOUND));
   }
 
   private GroupMember requireActiveMember(List<GroupMember> members, Long accountId) {
@@ -56,16 +56,12 @@ public class TransferGroupOwnershipUseCase {
         .filter(member -> member.getAccountId().equals(accountId))
         .filter(member -> member.getStatus() == GroupMemberStatus.ACTIVE)
         .findFirst()
-        .orElseThrow(TransferGroupOwnershipUseCase::groupSpaceNotFound);
+        .orElseThrow(() -> new CalioException(ErrorCode.GROUP_SPACE_NOT_FOUND));
   }
 
   private void requireOwner(GroupSpace groupSpace, GroupMember member) {
     if (!member.roleFor(groupSpace.getOwnerAccountId()).isOwner()) {
       throw new CalioException(ErrorCode.GROUP_OWNER_REQUIRED);
     }
-  }
-
-  private static CalioException groupSpaceNotFound() {
-    return new CalioException(ErrorCode.GROUP_SPACE_NOT_FOUND);
   }
 }

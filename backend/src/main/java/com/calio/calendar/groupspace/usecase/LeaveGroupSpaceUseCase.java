@@ -54,7 +54,7 @@ public class LeaveGroupSpaceUseCase {
   private GroupSpace lockGroupSpace(Long groupSpaceId) {
     return groupSpaceRepository
         .findByIdForUpdate(groupSpaceId)
-        .orElseThrow(LeaveGroupSpaceUseCase::groupSpaceNotFound);
+        .orElseThrow(() -> new CalioException(ErrorCode.GROUP_SPACE_NOT_FOUND));
   }
 
   private GroupMember requireActiveMember(List<GroupMember> members, Long accountId) {
@@ -62,15 +62,11 @@ public class LeaveGroupSpaceUseCase {
         .filter(member -> member.getAccountId().equals(accountId))
         .filter(member -> member.getStatus() == GroupMemberStatus.ACTIVE)
         .findFirst()
-        .orElseThrow(LeaveGroupSpaceUseCase::groupSpaceNotFound);
+        .orElseThrow(() -> new CalioException(ErrorCode.GROUP_SPACE_NOT_FOUND));
   }
 
   private int activeMemberCount(List<GroupMember> members) {
     return (int)
         members.stream().filter(member -> member.getStatus() == GroupMemberStatus.ACTIVE).count();
-  }
-
-  private static CalioException groupSpaceNotFound() {
-    return new CalioException(ErrorCode.GROUP_SPACE_NOT_FOUND);
   }
 }

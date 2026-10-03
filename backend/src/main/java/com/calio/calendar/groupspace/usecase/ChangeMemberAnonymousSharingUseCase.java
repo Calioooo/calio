@@ -30,7 +30,7 @@ public class ChangeMemberAnonymousSharingUseCase {
     GroupSpace groupSpace =
         groupSpaceRepository
             .findById(groupSpaceId)
-            .orElseThrow(ChangeMemberAnonymousSharingUseCase::groupSpaceNotFound);
+            .orElseThrow(() -> new CalioException(ErrorCode.GROUP_SPACE_NOT_FOUND));
     return GroupMembershipResponse.from(member, groupSpace);
   }
 
@@ -38,14 +38,10 @@ public class ChangeMemberAnonymousSharingUseCase {
     GroupMember member =
         groupMemberRepository
             .findByGroupSpaceIdAndAccountIdForUpdate(groupSpaceId, accountId)
-            .orElseThrow(ChangeMemberAnonymousSharingUseCase::groupSpaceNotFound);
+            .orElseThrow(() -> new CalioException(ErrorCode.GROUP_SPACE_NOT_FOUND));
     if (member.getStatus() != GroupMemberStatus.ACTIVE) {
-      throw groupSpaceNotFound();
+      throw new CalioException(ErrorCode.GROUP_SPACE_NOT_FOUND);
     }
     return member;
-  }
-
-  private static CalioException groupSpaceNotFound() {
-    return new CalioException(ErrorCode.GROUP_SPACE_NOT_FOUND);
   }
 }

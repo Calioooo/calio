@@ -42,22 +42,18 @@ public class UpdateGroupSpaceUseCase {
   private GroupSpace lockGroupSpace(Long groupSpaceId) {
     return groupSpaceRepository
         .findByIdForUpdate(groupSpaceId)
-        .orElseThrow(UpdateGroupSpaceUseCase::groupSpaceNotFound);
+        .orElseThrow(() -> new CalioException(ErrorCode.GROUP_SPACE_NOT_FOUND));
   }
 
   private GroupMember getActiveMembership(Long groupSpaceId, Long accountId) {
     return groupMemberRepository
         .findByGroupSpaceIdAndAccountIdAndStatus(groupSpaceId, accountId, GroupMemberStatus.ACTIVE)
-        .orElseThrow(UpdateGroupSpaceUseCase::groupSpaceNotFound);
+        .orElseThrow(() -> new CalioException(ErrorCode.GROUP_SPACE_NOT_FOUND));
   }
 
   private void requireOwner(GroupSpace groupSpace, GroupMember member) {
     if (!member.roleFor(groupSpace.getOwnerAccountId()).isOwner()) {
       throw new CalioException(ErrorCode.GROUP_OWNER_REQUIRED);
     }
-  }
-
-  private static CalioException groupSpaceNotFound() {
-    return new CalioException(ErrorCode.GROUP_SPACE_NOT_FOUND);
   }
 }

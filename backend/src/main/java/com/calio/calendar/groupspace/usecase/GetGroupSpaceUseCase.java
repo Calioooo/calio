@@ -35,16 +35,12 @@ public class GetGroupSpaceUseCase {
   private GroupMember getActiveMembership(Long groupSpaceId, Long accountId) {
     return groupMemberRepository
         .findByGroupSpaceIdAndAccountIdAndStatus(groupSpaceId, accountId, GroupMemberStatus.ACTIVE)
-        .orElseThrow(GetGroupSpaceUseCase::groupSpaceNotFound);
+        .orElseThrow(() -> new CalioException(ErrorCode.GROUP_SPACE_NOT_FOUND));
   }
 
   private GroupSpace getGroupSpace(Long groupSpaceId) {
     return groupSpaceRepository
         .findById(groupSpaceId)
-        .orElseThrow(GetGroupSpaceUseCase::groupSpaceNotFound);
-  }
-
-  private static CalioException groupSpaceNotFound() {
-    return new CalioException(ErrorCode.GROUP_SPACE_NOT_FOUND);
+        .orElseThrow(() -> new CalioException(ErrorCode.GROUP_SPACE_NOT_FOUND));
   }
 }
