@@ -1,19 +1,32 @@
 package com.calio.calendar.notification.usecase;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.calio.calendar.account.domain.Account;
+import com.calio.calendar.account.domain.AccountNotificationSettings;
+import com.calio.calendar.account.domain.ImportantReminderOffset;
+import com.calio.calendar.account.domain.TimedReminderOffset;
 import com.calio.calendar.account.repository.AccountRepository;
+import com.calio.calendar.groupcalendar.event.domain.GroupCalendarEvent;
 import com.calio.calendar.groupcalendar.event.repository.GroupCalendarEventRepository;
 import com.calio.calendar.groupcalendar.recurrence.repository.GroupCalendarRecurrenceEventRepository;
 import com.calio.calendar.groupcalendar.recurrence.repository.GroupCalendarRecurrenceOverrideRepository;
 import com.calio.calendar.groupcalendar.recurrence.service.GroupCalendarRecurrenceOccurrenceResolver;
+import com.calio.calendar.groupspace.domain.GroupMember;
+import com.calio.calendar.groupspace.domain.GroupMemberNickname;
+import com.calio.calendar.groupspace.domain.GroupMemberStatus;
+import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.repository.GroupMemberRepository;
 import com.calio.calendar.groupspace.repository.GroupSpaceRepository;
 import com.calio.calendar.notification.client.ApnsClient;
@@ -34,6 +47,7 @@ import com.calio.calendar.singleevent.repository.SingleEventRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
@@ -41,6 +55,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -288,6 +303,52 @@ class SendDueCalendarNotificationsUseCaseTest {
     verify(pushDeviceRepository, never()).findById(10L);
   }
 
+  @Test
+  @DisplayName("활성 그룹 멤버의 일정 알림에는 조회한 그룹명이 포함된다")
+  void givenActiveGroupMemberAndSchedule_whenDispatching_thenIncludesGroupNameInContent() {
+    // given
+    SendDueCalendarNotificationsUseCase useCase = spy(sendDueCalendarNotificationsUseCase);
+    doNothing().when(useCase).dispatch(anyLong(), any(), any(), any());
+    Account account = notificationEnabledAccount();
+    GroupSpace groupSpace = new GroupSpace(1L, "가족", null);
+    ReflectionTestUtils.setField(groupSpace, "id", 10L);
+    GroupMember member = new GroupMember(10L, 1L, new GroupMemberNickname("member"), NOW);
+    GroupCalendarEvent event = mock(GroupCalendarEvent.class);
+    Instant startAt = NOW.plusSeconds(600);
+    when(groupMemberRepository.findByAccountIdAndStatusOrderByStatusChangedAtDescGroupSpaceIdDesc(
+            1L, GroupMemberStatus.ACTIVE))
+        .thenReturn(List.of(member));
+    when(groupSpaceRepository.findAllById(List.of(10L))).thenReturn(List.of(groupSpace));
+    when(groupCalendarEventRepository
+            .findByGroupSpace_IdAndStartAtLessThanAndEndAtGreaterThanOrderByStartAtAsc(
+                eq(10L), any(), any()))
+        .thenReturn(List.of(event));
+    when(groupCalendarRecurrenceEventRepository.findByGroupSpaceIdAndFirstOccurrenceStartAtBefore(
+            eq(10L), any()))
+        .thenReturn(List.of());
+    when(personalRecurrenceOccurrenceResolver.resolveMovedIn(any(), any(), any()))
+        .thenReturn(List.of());
+    when(groupRecurrenceOccurrenceResolver.resolveMovedIn(any(), any(), any()))
+        .thenReturn(List.of());
+    when(event.getId()).thenReturn(20L);
+    when(event.getTitle()).thenReturn("저녁 식사");
+    when(event.getStartAt()).thenReturn(startAt);
+    when(event.getEndAt()).thenReturn(startAt.plusSeconds(3600));
+    when(event.isAllDay()).thenReturn(false);
+    when(event.getTimeZone()).thenReturn("Asia/Seoul");
+
+    // when
+    useCase.dispatchAccountNotifications(account, NOW);
+
+    // then
+    ArgumentCaptor<CalendarNotificationContent> contentCaptor =
+        ArgumentCaptor.forClass(CalendarNotificationContent.class);
+    verify(useCase)
+        .dispatch(
+            eq(1L), eq(NotificationScheduleKey.groupEvent(20L)), eq(NOW), contentCaptor.capture());
+    assertThat(contentCaptor.getValue().body()).isEqualTo("저녁 식사 · 가족");
+  }
+
   private void stubNewDispatchClaim() {
     when(dispatchRepository.saveAndFlush(any(NotificationDispatch.class)))
         .thenAnswer(
@@ -313,5 +374,19 @@ class SendDueCalendarNotificationsUseCaseTest {
     IosPushDevice pushDevice = new IosPushDevice(1L, "installation-" + id, apnsToken);
     ReflectionTestUtils.setField(pushDevice, "id", id);
     return pushDevice;
+  }
+
+  private Account notificationEnabledAccount() {
+    Account account = new Account();
+    ReflectionTestUtils.setField(account, "id", 1L);
+    account.changeNotificationSettings(
+        new AccountNotificationSettings(
+            true,
+            TimedReminderOffset.MINUTES_10,
+            ImportantReminderOffset.MINUTES_120,
+            LocalTime.of(9, 0),
+            false,
+            LocalTime.of(8, 0)));
+    return account;
   }
 }
