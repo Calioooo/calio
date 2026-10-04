@@ -4,7 +4,11 @@ import com.calio.calendar.groupspace.controller.dto.CreateGroupSpaceRequest;
 import com.calio.calendar.groupspace.controller.dto.GroupSpaceDetailResponse;
 import com.calio.calendar.groupspace.controller.dto.GroupSpaceListResponse;
 import com.calio.calendar.groupspace.controller.dto.UpdateGroupSpaceRequest;
-import com.calio.calendar.groupspace.service.GroupSpaceService;
+import com.calio.calendar.groupspace.usecase.CreateGroupSpaceUseCase;
+import com.calio.calendar.groupspace.usecase.DeleteGroupSpaceUseCase;
+import com.calio.calendar.groupspace.usecase.GetGroupSpaceUseCase;
+import com.calio.calendar.groupspace.usecase.ListMyGroupSpacesUseCase;
+import com.calio.calendar.groupspace.usecase.UpdateGroupSpaceUseCase;
 import com.calio.calendar.security.AuthenticatedAccount;
 import jakarta.validation.Valid;
 import java.net.URI;
@@ -25,31 +29,45 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/group-spaces")
 public class GroupSpaceController {
 
-  private final GroupSpaceService groupSpaceService;
+  private final CreateGroupSpaceUseCase createGroupSpaceUseCase;
+  private final ListMyGroupSpacesUseCase listMyGroupSpacesUseCase;
+  private final GetGroupSpaceUseCase getGroupSpaceUseCase;
+  private final UpdateGroupSpaceUseCase updateGroupSpaceUseCase;
+  private final DeleteGroupSpaceUseCase deleteGroupSpaceUseCase;
 
-  public GroupSpaceController(GroupSpaceService groupSpaceService) {
-    this.groupSpaceService = groupSpaceService;
+  public GroupSpaceController(
+      CreateGroupSpaceUseCase createGroupSpaceUseCase,
+      ListMyGroupSpacesUseCase listMyGroupSpacesUseCase,
+      GetGroupSpaceUseCase getGroupSpaceUseCase,
+      UpdateGroupSpaceUseCase updateGroupSpaceUseCase,
+      DeleteGroupSpaceUseCase deleteGroupSpaceUseCase) {
+    this.createGroupSpaceUseCase = createGroupSpaceUseCase;
+    this.listMyGroupSpacesUseCase = listMyGroupSpacesUseCase;
+    this.getGroupSpaceUseCase = getGroupSpaceUseCase;
+    this.updateGroupSpaceUseCase = updateGroupSpaceUseCase;
+    this.deleteGroupSpaceUseCase = deleteGroupSpaceUseCase;
   }
 
   @PostMapping
   public ResponseEntity<GroupSpaceDetailResponse> create(
       @AuthenticationPrincipal AuthenticatedAccount account,
       @Valid @RequestBody CreateGroupSpaceRequest request) {
-    GroupSpaceDetailResponse response = groupSpaceService.create(account.accountId(), request);
+    GroupSpaceDetailResponse response =
+        createGroupSpaceUseCase.create(account.accountId(), request);
     URI location = URI.create("/api/group-spaces/" + response.groupSpaceId());
     return ResponseEntity.created(location).body(response);
   }
 
   @GetMapping
   public GroupSpaceListResponse list(@AuthenticationPrincipal AuthenticatedAccount account) {
-    return groupSpaceService.list(account.accountId());
+    return listMyGroupSpacesUseCase.list(account.accountId());
   }
 
   @GetMapping("/{groupSpaceId}")
   public GroupSpaceDetailResponse get(
       @AuthenticationPrincipal AuthenticatedAccount account,
       @PathVariable("groupSpaceId") Long groupSpaceId) {
-    return groupSpaceService.get(account.accountId(), groupSpaceId);
+    return getGroupSpaceUseCase.get(account.accountId(), groupSpaceId);
   }
 
   @PatchMapping("/{groupSpaceId}")
@@ -57,14 +75,14 @@ public class GroupSpaceController {
       @AuthenticationPrincipal AuthenticatedAccount account,
       @PathVariable("groupSpaceId") Long groupSpaceId,
       @Valid @RequestBody UpdateGroupSpaceRequest request) {
-    return groupSpaceService.update(account.accountId(), groupSpaceId, request);
+    return updateGroupSpaceUseCase.update(account.accountId(), groupSpaceId, request);
   }
 
   @DeleteMapping("/{groupSpaceId}")
   public ResponseEntity<Void> delete(
       @AuthenticationPrincipal AuthenticatedAccount account,
       @PathVariable("groupSpaceId") Long groupSpaceId) {
-    groupSpaceService.delete(account.accountId(), groupSpaceId);
+    deleteGroupSpaceUseCase.delete(account.accountId(), groupSpaceId);
     return ResponseEntity.noContent().build();
   }
 }

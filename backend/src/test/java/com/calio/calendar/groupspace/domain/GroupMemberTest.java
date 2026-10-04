@@ -31,7 +31,7 @@ class GroupMemberTest {
     assertThat(member.getStatusChangedAt()).isNotEqualTo(initialStatusChangedAt);
 
     // when
-    member.reactivate("after", joinedAt.plusSeconds(2));
+    member.reactivate(new GroupMemberNickname("after"), joinedAt.plusSeconds(2));
 
     // then
     assertThat(member.getStatus()).isEqualTo(GroupMemberStatus.ACTIVE);

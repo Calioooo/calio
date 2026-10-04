@@ -26,7 +26,8 @@ import com.calio.calendar.groupspace.domain.GroupMemberStatus;
 import com.calio.calendar.groupspace.repository.GroupMemberRepository;
 import com.calio.calendar.groupspace.repository.GroupSpaceRepository;
 import com.calio.calendar.groupspace.service.GroupMembershipService;
-import com.calio.calendar.groupspace.service.GroupSpaceService;
+import com.calio.calendar.groupspace.usecase.CreateGroupSpaceUseCase;
+import com.calio.calendar.groupspace.usecase.DeleteGroupSpaceUseCase;
 import com.calio.calendar.security.AuthenticatedAccountMockMvcTestConfig;
 import com.calio.calendar.security.WithAuthenticatedAccount;
 import com.calio.calendar.tag.repository.TagRepository;
@@ -73,7 +74,9 @@ class GroupInvitationControllerTest {
 
   @Autowired private ObjectMapper objectMapper;
 
-  @Autowired private GroupSpaceService groupSpaceService;
+  @Autowired private CreateGroupSpaceUseCase createGroupSpaceUseCase;
+
+  @Autowired private DeleteGroupSpaceUseCase deleteGroupSpaceUseCase;
 
   @Autowired private GroupInvitationRepository invitationRepository;
 
@@ -271,7 +274,7 @@ class GroupInvitationControllerTest {
     groupInvitationIssue(groupSpaceId);
 
     // when
-    groupSpaceService.delete(actorAccountId, groupSpaceId);
+    deleteGroupSpaceUseCase.delete(actorAccountId, groupSpaceId);
 
     // then
     assertThat(invitationRepository.count()).isZero();
@@ -412,7 +415,7 @@ class GroupInvitationControllerTest {
   }
 
   private long createGroup() {
-    return groupSpaceService
+    return createGroupSpaceUseCase
         .create(currentAccountId(), new CreateGroupSpaceRequest("Invitation group", null, "issuer"))
         .groupSpaceId();
   }

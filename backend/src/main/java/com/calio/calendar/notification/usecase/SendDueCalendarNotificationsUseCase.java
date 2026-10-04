@@ -14,6 +14,7 @@ import com.calio.calendar.groupcalendar.recurrence.service.GroupCalendarRecurren
 import com.calio.calendar.groupspace.domain.GroupMember;
 import com.calio.calendar.groupspace.domain.GroupMemberStatus;
 import com.calio.calendar.groupspace.repository.GroupMemberRepository;
+import com.calio.calendar.groupspace.repository.GroupSpaceRepository;
 import com.calio.calendar.notification.client.ApnsClient;
 import com.calio.calendar.notification.client.ApnsMessage;
 import com.calio.calendar.notification.client.ApnsSendResult;
@@ -66,6 +67,7 @@ public class SendDueCalendarNotificationsUseCase {
   private final RecurrenceEventOverrideRepository recurrenceOverrideRepository;
   private final PersonalRecurrenceOccurrenceResolver personalRecurrenceOccurrenceResolver;
   private final GroupMemberRepository groupMemberRepository;
+  private final GroupSpaceRepository groupSpaceRepository;
   private final GroupCalendarEventRepository groupCalendarEventRepository;
   private final GroupCalendarRecurrenceEventRepository groupCalendarRecurrenceEventRepository;
   private final GroupCalendarRecurrenceOverrideRepository groupCalendarRecurrenceOverrideRepository;
@@ -82,6 +84,7 @@ public class SendDueCalendarNotificationsUseCase {
       RecurrenceEventOverrideRepository recurrenceOverrideRepository,
       PersonalRecurrenceOccurrenceResolver personalRecurrenceOccurrenceResolver,
       GroupMemberRepository groupMemberRepository,
+      GroupSpaceRepository groupSpaceRepository,
       GroupCalendarEventRepository groupCalendarEventRepository,
       GroupCalendarRecurrenceEventRepository groupCalendarRecurrenceEventRepository,
       GroupCalendarRecurrenceOverrideRepository groupCalendarRecurrenceOverrideRepository,
@@ -96,6 +99,7 @@ public class SendDueCalendarNotificationsUseCase {
     this.recurrenceOverrideRepository = recurrenceOverrideRepository;
     this.personalRecurrenceOccurrenceResolver = personalRecurrenceOccurrenceResolver;
     this.groupMemberRepository = groupMemberRepository;
+    this.groupSpaceRepository = groupSpaceRepository;
     this.groupCalendarEventRepository = groupCalendarEventRepository;
     this.groupCalendarRecurrenceEventRepository = groupCalendarRecurrenceEventRepository;
     this.groupCalendarRecurrenceOverrideRepository = groupCalendarRecurrenceOverrideRepository;
@@ -209,17 +213,30 @@ public class SendDueCalendarNotificationsUseCase {
 
   private List<NotificationSchedule> listGroupSchedules(Long accountId, Instant from, Instant to) {
     List<NotificationSchedule> schedules = new ArrayList<>();
-    groupMemberRepository
-        .findByAccountIdAndStatusOrderByStatusChangedAtDescGroupSpaceIdDesc(
-            accountId, GroupMemberStatus.ACTIVE)
-        .forEach(member -> addGroupSchedules(schedules, member, from, to));
+    List<GroupMember> memberships =
+        groupMemberRepository.findByAccountIdAndStatusOrderByStatusChangedAtDescGroupSpaceIdDesc(
+            accountId, GroupMemberStatus.ACTIVE);
+    Map<Long, String> groupNamesById =
+        groupSpaceRepository
+            .findAllById(memberships.stream().map(GroupMember::getGroupSpaceId).toList())
+            .stream()
+            .collect(
+                java.util.stream.Collectors.toMap(
+                    groupSpace -> groupSpace.getId(), groupSpace -> groupSpace.getName()));
+    memberships.forEach(
+        member ->
+            addGroupSchedules(
+                schedules, member, groupNamesById.get(member.getGroupSpaceId()), from, to));
     return schedules;
   }
 
   private void addGroupSchedules(
-      List<NotificationSchedule> schedules, GroupMember member, Instant from, Instant to) {
-    Long groupSpaceId = member.getGroupSpace().getId();
-    String groupName = member.getGroupSpace().getName();
+      List<NotificationSchedule> schedules,
+      GroupMember member,
+      String groupName,
+      Instant from,
+      Instant to) {
+    Long groupSpaceId = member.getGroupSpaceId();
     groupCalendarEventRepository
         .findByGroupSpace_IdAndStartAtLessThanAndEndAtGreaterThanOrderByStartAtAsc(
             groupSpaceId, to, from)

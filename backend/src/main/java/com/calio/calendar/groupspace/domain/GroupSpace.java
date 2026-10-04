@@ -1,7 +1,9 @@
 package com.calio.calendar.groupspace.domain;
 
 import com.calio.calendar.common.domain.BaseEntity;
+import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -19,18 +21,24 @@ public class GroupSpace extends BaseEntity {
   @Column(name = "owner_account_id", nullable = false)
   private Long ownerAccountId;
 
-  @Column(nullable = false, length = 30)
-  private String name;
+  @Embedded
+  @AttributeOverride(name = "value", column = @Column(name = "name", nullable = false, length = 30))
+  private GroupSpaceName name;
 
-  @Column(length = 64)
-  private String emoji;
+  @Embedded
+  @AttributeOverride(name = "value", column = @Column(name = "emoji", length = 64))
+  private GroupSpaceEmoji emoji;
 
   protected GroupSpace() {}
 
-  public GroupSpace(Long ownerAccountId, String name, String emoji) {
+  public GroupSpace(Long ownerAccountId, GroupSpaceName name, GroupSpaceEmoji emoji) {
     this.ownerAccountId = ownerAccountId;
     this.name = name;
     this.emoji = emoji;
+  }
+
+  public GroupSpace(Long ownerAccountId, String name, String emoji) {
+    this(ownerAccountId, new GroupSpaceName(name), GroupSpaceEmoji.fromNullable(emoji));
   }
 
   public Long getId() {
@@ -42,14 +50,14 @@ public class GroupSpace extends BaseEntity {
   }
 
   public String getName() {
-    return name;
+    return name.value();
   }
 
   public String getEmoji() {
-    return emoji;
+    return emoji == null ? null : emoji.value();
   }
 
-  public void update(String name, String emoji) {
+  public void update(GroupSpaceName name, GroupSpaceEmoji emoji) {
     this.name = name;
     this.emoji = emoji;
   }
