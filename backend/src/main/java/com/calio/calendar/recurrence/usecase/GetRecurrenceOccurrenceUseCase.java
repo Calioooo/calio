@@ -6,7 +6,6 @@ import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceOccurrence;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
-import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.recurrence.service.Rfc5545RecurrenceEngine;
 import com.calio.calendar.singleevent.controller.dto.EventResponse;
@@ -21,17 +20,15 @@ import org.springframework.transaction.annotation.Transactional;
 public class GetRecurrenceOccurrenceUseCase {
 
   private final RecurrenceEventRepository recurrenceEventRepository;
-  private final RecurrenceEventOverrideRepository overrideRepository;
+
   private final TagRepository tagRepository;
   private final Rfc5545RecurrenceEngine recurrenceEngine;
 
   public GetRecurrenceOccurrenceUseCase(
       RecurrenceEventRepository recurrenceEventRepository,
-      RecurrenceEventOverrideRepository overrideRepository,
       TagRepository tagRepository,
       Rfc5545RecurrenceEngine recurrenceEngine) {
     this.recurrenceEventRepository = recurrenceEventRepository;
-    this.overrideRepository = overrideRepository;
     this.tagRepository = tagRepository;
     this.recurrenceEngine = recurrenceEngine;
   }
@@ -47,12 +44,13 @@ public class GetRecurrenceOccurrenceUseCase {
             .findById(recurrenceEvent.getTagId())
             .orElseThrow(() -> new CalioException(ErrorCode.TAG_NOT_FOUND));
     Optional<RecurrenceEventOverride> override =
-        overrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(recurrenceId, originStartAt);
+        recurrenceEventRepository.findOverrideByRecurrenceIdAndOriginStartAt(
+            recurrenceId, originStartAt);
     if (override.isPresent()) {
       if (override.get().isDeleted()) {
         throw new CalioException(ErrorCode.RECURRENCE_OCCURRENCE_NOT_FOUND);
       }
-      return EventResponse.recurrenceOverride(override.get(), tag);
+      return EventResponse.recurrenceOverride(recurrenceEvent, override.get(), tag);
     }
     RecurrenceOccurrence occurrence =
         recurrenceEngine

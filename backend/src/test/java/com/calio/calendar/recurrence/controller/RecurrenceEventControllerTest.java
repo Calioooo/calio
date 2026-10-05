@@ -15,7 +15,6 @@ import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
-import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.security.AuthenticatedAccountMockMvcTestConfig;
 import com.calio.calendar.security.WithAuthenticatedAccount;
@@ -62,8 +61,6 @@ class RecurrenceEventControllerTest {
   @Autowired private SingleEventRepository eventRepository;
 
   @Autowired private RecurrenceEventRepository recurrenceEventRepository;
-
-  @Autowired private RecurrenceEventOverrideRepository overrideRepository;
 
   @Autowired private AccountRepository accountRepository;
 
@@ -344,7 +341,7 @@ class RecurrenceEventControllerTest {
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"));
     assertThat(
-            overrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(
+            recurrenceEventRepository.findOverrideByRecurrenceIdAndOriginStartAt(
                 recurrenceId, Instant.parse("2026-10-01T09:00:00Z")))
         .isEmpty();
   }
@@ -450,8 +447,8 @@ class RecurrenceEventControllerTest {
                 .param("originStartAt", deletedOrigin.toString()))
         .andExpect(status().isNoContent());
     Instant deletedAt =
-        overrideRepository
-            .findByRecurrenceEvent_IdAndOriginStartAt(recurrenceId, deletedOrigin)
+        recurrenceEventRepository
+            .findOverrideByRecurrenceIdAndOriginStartAt(recurrenceId, deletedOrigin)
             .orElseThrow()
             .getDeletedAt();
     Tag replacementTag =
@@ -482,10 +479,10 @@ class RecurrenceEventControllerTest {
 
     // then
     assertThat(
-            overrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(recurrenceId, activeOrigin))
+            recurrenceEventRepository.findOverrideByRecurrenceIdAndOriginStartAt(
+                recurrenceId, activeOrigin))
         .hasValueSatisfying(
             override -> {
-              assertThat(override.getRecurrenceId()).isEqualTo(recurrenceId);
               assertThat(override.getOriginStartAt()).isEqualTo(activeOrigin);
               assertThat(override.getOverrideTitle()).isEqualTo("Preserved active");
               assertThat(override.getOverrideDescription()).isEqualTo("snapshot memo");
@@ -498,11 +495,10 @@ class RecurrenceEventControllerTest {
               assertThat(override.getDeletedAt()).isNull();
             });
     assertThat(
-            overrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(
+            recurrenceEventRepository.findOverrideByRecurrenceIdAndOriginStartAt(
                 recurrenceId, deletedOrigin))
         .hasValueSatisfying(
             override -> {
-              assertThat(override.getRecurrenceId()).isEqualTo(recurrenceId);
               assertThat(override.getOriginStartAt()).isEqualTo(deletedOrigin);
               assertThat(override.getOverrideTitle()).isNull();
               assertThat(override.getOverrideStartAt()).isNull();
@@ -655,7 +651,7 @@ class RecurrenceEventControllerTest {
     assertThat(unchangedMaster.getTimeZone()).isEqualTo("UTC");
     assertThat(unchangedMaster.getRecurrenceRules()).containsExactly("RRULE:FREQ=DAILY;COUNT=3");
     assertThat(
-            overrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(
+            recurrenceEventRepository.findOverrideByRecurrenceIdAndOriginStartAt(
                 recurrenceId, originStartAt))
         .hasValueSatisfying(
             override -> {
@@ -706,7 +702,9 @@ class RecurrenceEventControllerTest {
 
     // then
     java.time.Instant origin = java.time.Instant.parse(originStartAt);
-    assertThat(overrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(recurrenceId, origin))
+    assertThat(
+            recurrenceEventRepository.findOverrideByRecurrenceIdAndOriginStartAt(
+                recurrenceId, origin))
         .hasValueSatisfying(
             override -> {
               assertThat(override.isDeleted()).isFalse();
@@ -719,7 +717,9 @@ class RecurrenceEventControllerTest {
             delete("/api/recurrence-events/{id}/occurrences", recurrenceId)
                 .param("originStartAt", originStartAt))
         .andExpect(status().isNoContent());
-    assertThat(overrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(recurrenceId, origin))
+    assertThat(
+            recurrenceEventRepository.findOverrideByRecurrenceIdAndOriginStartAt(
+                recurrenceId, origin))
         .hasValueSatisfying(
             override -> {
               assertThat(override.isDeleted()).isTrue();
@@ -733,7 +733,7 @@ class RecurrenceEventControllerTest {
       throws Exception {
     // given
     long recurrenceId = createTimedRecurrence("Origin", "2027-02-01", "UTC");
-    long overrideCount = overrideRepository.count();
+    long overrideCount = recurrenceEventRepository.countOverrides();
 
     // when
     mockMvc
@@ -762,7 +762,7 @@ class RecurrenceEventControllerTest {
         .andExpect(jsonPath("$.title").value("RECURRENCE_OCCURRENCE_NOT_FOUND"));
 
     // then
-    assertThat(overrideRepository.count()).isEqualTo(overrideCount);
+    assertThat(recurrenceEventRepository.countOverrides()).isEqualTo(overrideCount);
   }
 
   @Test
@@ -829,7 +829,7 @@ class RecurrenceEventControllerTest {
 
     // then
     assertThat(
-            overrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(
+            recurrenceEventRepository.findOverrideByRecurrenceIdAndOriginStartAt(
                 otherMaster.getId(), originStartAt))
         .hasValueSatisfying(
             override -> {
@@ -874,10 +874,11 @@ class RecurrenceEventControllerTest {
 
     // then
     assertThat(
-            overrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(recurrenceId, activeOrigin))
+            recurrenceEventRepository.findOverrideByRecurrenceIdAndOriginStartAt(
+                recurrenceId, activeOrigin))
         .isEmpty();
     assertThat(
-            overrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(
+            recurrenceEventRepository.findOverrideByRecurrenceIdAndOriginStartAt(
                 recurrenceId, deletedOrigin))
         .isEmpty();
     assertThat(recurrenceEventRepository.findById(recurrenceId)).isEmpty();
@@ -998,7 +999,7 @@ class RecurrenceEventControllerTest {
 
   private void assertCurrentAllDaySnapshot(Long recurrenceId, Instant originStartAt, String title) {
     assertThat(
-            overrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(
+            recurrenceEventRepository.findOverrideByRecurrenceIdAndOriginStartAt(
                 recurrenceId, originStartAt))
         .hasValueSatisfying(
             override -> {

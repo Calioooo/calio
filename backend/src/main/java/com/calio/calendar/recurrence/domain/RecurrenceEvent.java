@@ -5,16 +5,18 @@ import com.calio.calendar.common.domain.CanonicalSchedule;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import jakarta.persistence.AttributeOverride;
-import jakarta.persistence.CascadeType;
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.OneToMany;
+import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -56,7 +58,14 @@ public class RecurrenceEvent extends BaseEntity {
   @Column(name = "tag_id", nullable = false)
   private Long tagId;
 
-  @OneToMany(mappedBy = "recurrenceEvent", cascade = CascadeType.ALL, orphanRemoval = true)
+  @ElementCollection
+  @CollectionTable(
+      name = "recurrence_event_overrides",
+      joinColumns = @JoinColumn(name = "recurrence_id"),
+      uniqueConstraints =
+          @UniqueConstraint(
+              name = "uk_recurrence_event_overrides_recurrence_origin",
+              columnNames = {"recurrence_id", "origin_start_at"}))
   private List<RecurrenceEventOverride> overrides = new ArrayList<>();
 
   protected RecurrenceEvent() {}
@@ -161,28 +170,27 @@ public class RecurrenceEvent extends BaseEntity {
   /** 확인된 회차의 변경 내용을 기록한다. 작업 대상 확인은 requireOccurrence 또는 수신 데이터 검증에서 수행한다. */
   public RecurrenceEventOverride changeOccurrence(
       Instant originStartAt, String title, String description, CanonicalSchedule schedule) {
-    RecurrenceEventOverride existing = findOverride(originStartAt).orElse(null);
-    if (existing == null) {
-      RecurrenceEventOverride created =
-          RecurrenceEventOverride.active(this, originStartAt, title, description, schedule);
-      overrides.add(created);
-      return created;
-    }
-    existing.activate(title, description, schedule);
-    return existing;
+    RecurrenceEventOverride changed =
+        RecurrenceEventOverride.active(originStartAt, title, description, schedule);
+    replaceOverride(changed);
+    return changed;
   }
 
-  /** 확인된 회차의 제외 상태를 기록한다. 기존 개별 변경은 같은 자식의 상태를 전환한다. */
+  /** 확인된 회차의 제외 상태를 불변 값으로 교체한다. */
   public RecurrenceEventOverride excludeOccurrence(Instant originStartAt, Instant deletedAt) {
-    RecurrenceEventOverride existing = findOverride(originStartAt).orElse(null);
-    if (existing == null) {
-      RecurrenceEventOverride created =
-          RecurrenceEventOverride.deleted(this, originStartAt, deletedAt);
-      overrides.add(created);
-      return created;
+    RecurrenceEventOverride excluded = RecurrenceEventOverride.deleted(originStartAt, deletedAt);
+    replaceOverride(excluded);
+    return excluded;
+  }
+
+  private void replaceOverride(RecurrenceEventOverride replacement) {
+    for (int index = 0; index < overrides.size(); index++) {
+      if (overrides.get(index).getOriginStartAt().equals(replacement.getOriginStartAt())) {
+        overrides.set(index, replacement);
+        return;
+      }
     }
-    existing.markDeleted(deletedAt);
-    return existing;
+    overrides.add(replacement);
   }
 
   public void removeOverrides(Collection<Instant> originStartAts) {

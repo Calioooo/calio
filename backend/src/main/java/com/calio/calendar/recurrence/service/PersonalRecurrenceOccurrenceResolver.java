@@ -5,6 +5,7 @@ import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceOccurrence;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
+import com.calio.calendar.recurrence.repository.dto.RecurrenceOverrideView;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -49,10 +50,11 @@ public class PersonalRecurrenceOccurrenceResolver {
   }
 
   public List<PersonalRecurrenceOccurrence> resolveMovedIn(
-      List<RecurrenceEventOverride> overrides, Instant from, Instant to) {
+      List<RecurrenceOverrideView> overrides, Instant from, Instant to) {
     return overrides.stream()
-        .filter(override -> !override.isDeleted())
-        .map(PersonalRecurrenceOccurrence::overridden)
+        .map(
+            view ->
+                PersonalRecurrenceOccurrence.overridden(view.recurrenceEvent(), view.override()))
         .filter(occurrence -> occurrence.overlaps(from, to))
         .toList();
   }
@@ -67,6 +69,6 @@ public class PersonalRecurrenceOccurrenceResolver {
     if (override.isDeleted()) {
       return null;
     }
-    return PersonalRecurrenceOccurrence.overridden(override);
+    return PersonalRecurrenceOccurrence.overridden(recurrenceEvent, override);
   }
 }

@@ -12,7 +12,7 @@ Backend 코드를 변경하기 전에 변경과 관련된 문서를 확인한다
 - 클래스·메서드 작성, 객체 생성, DTO, 입력 검증, 예외, 컬렉션, Spring 구성과 로그: `docs/development/backend/conventions.md`
 - 계층 구성, Repository, JPA 매핑, 트랜잭션과 외부 연동: `docs/development/backend/architecture.md`
 - 비즈니스 판단, 상태 변경, Entity·Value Object·Aggregate와 Domain Service: `docs/development/backend/domain-responsibility.md`
-- 개인 반복 일정의 Root·Child Entity, 회차 작업 대상 확인과 상태 변경: `docs/domain/recurrence-aggregate.md`
+- 개인 반복 일정의 Root·Override VO, 회차 작업 대상 확인과 상태 변경: `docs/domain/recurrence-aggregate.md`
 - 동작·API 계약 변경, 테스트 작성·수정과 테스트 환경 구성: `docs/development/backend/testing.md`
 - Calio의 AI 대화, Prompt 또는 Tool 기능 변경: `docs/development/backend/ai-feature.md`
 

@@ -61,6 +61,6 @@ public class UpdateRecurrenceOccurrenceUseCase {
         tagRepository
             .findById(recurrenceEvent.getTagId())
             .orElseThrow(() -> new CalioException(ErrorCode.TAG_NOT_FOUND));
-    return EventResponse.recurrenceOverride(override, tag);
+    return EventResponse.recurrenceOverride(recurrenceEvent, override, tag);
   }
 }

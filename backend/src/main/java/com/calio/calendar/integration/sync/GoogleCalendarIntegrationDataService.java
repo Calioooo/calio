@@ -382,7 +382,7 @@ public class GoogleCalendarIntegrationDataService {
                   .toList();
           if (!unmappedOriginStartAts.isEmpty()) {
             recurrenceEventRepository
-                .findById(recurrenceEventId)
+                .findByIdForUpdate(recurrenceEventId)
                 .ifPresent(
                     recurrenceEvent -> recurrenceEvent.removeOverrides(unmappedOriginStartAts));
           }

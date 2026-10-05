@@ -255,7 +255,7 @@ class GoogleCalendarIntegrationDataServiceTest {
         "next-token");
 
     verify(recurrenceMappingCommandService).deleteOverrideMappingsWithIds(List.of(10L));
-    verify(recurrenceEventRepository, never()).findById(any());
+    verify(recurrenceEventRepository, never()).findByIdForUpdate(any());
   }
 
   @Test
@@ -293,11 +293,11 @@ class GoogleCalendarIntegrationDataServiceTest {
     deletionOrder
         .verify(recurrenceMappingQueryService)
         .listOverrideMappingsByRecurrenceEventIds(List.of(40L));
-    verify(recurrenceEventRepository, never()).findById(any());
+    verify(recurrenceEventRepository, never()).findByIdForUpdate(any());
   }
 
   @Test
-  @DisplayName("마지막 외부 매핑이 제거된 회차만 Root에서 제거하고 다른 매핑이 남은 자식은 보존한다")
+  @DisplayName("마지막 외부 매핑이 제거된 회차만 Root에서 제거하고 다른 매핑이 남은 변경 값은 보존한다")
   void cleanupUnmappedOverrideThroughRootKeepsMappedChildren() {
     // given
     Instant removedOrigin = Instant.parse("2026-09-01T00:00:00Z");
@@ -324,7 +324,7 @@ class GoogleCalendarIntegrationDataServiceTest {
     when(recurrenceMappingQueryService.listOverrideMappingsByRecurrenceEventIds(List.of(40L)))
         .thenReturn(List.of(retainedMapping));
     when(recurrenceMappingQueryService.listRecurrenceEventMappings(1L)).thenReturn(List.of());
-    when(recurrenceEventRepository.findById(40L)).thenReturn(Optional.of(event));
+    when(recurrenceEventRepository.findByIdForUpdate(40L)).thenReturn(Optional.of(event));
 
     // when
     newService().deleteIntegrationData(1L);

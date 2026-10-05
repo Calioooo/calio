@@ -1,132 +1,53 @@
 package com.calio.calendar.recurrence.domain;
 
-import com.calio.calendar.common.domain.BaseEntity;
 import com.calio.calendar.common.domain.CanonicalSchedule;
 import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.Column;
+import jakarta.persistence.Embeddable;
 import jakarta.persistence.Embedded;
-import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 import java.util.Objects;
 
-/**
- * RecurrenceEvent가 소유하는 Child Entity. 원래 시작값으로 부모 안에서 식별되며, 생성과 상태 전이는 Root를 통해 수행한다. overrideId는
- * 영속 행의 식별자다.
- */
-@Entity
-@Table(
-    name = "recurrence_event_overrides",
-    uniqueConstraints =
-        @UniqueConstraint(
-            name = "uk_recurrence_event_overrides_recurrence_origin",
-            columnNames = {"recurrence_id", "origin_start_at"}))
-public class RecurrenceEventOverride extends BaseEntity {
+/** 특정 회차에 적용할 변경 내용 또는 제외 상태를 표현하는 불변 값. */
+@Embeddable
+public record RecurrenceEventOverride(
+    @Column(name = "origin_start_at", nullable = false) Instant originStartAt,
+    @Embedded
+        @AttributeOverride(
+            name = "value",
+            column = @Column(name = "override_title", length = RecurrenceEventTitle.MAX_LENGTH))
+        RecurrenceEventTitle overrideTitle,
+    @Column(name = "override_description") String overrideDescription,
+    @Embedded RecurrenceOverrideSchedule schedule,
+    @Column(name = "deleted_at") Instant deletedAt) {
 
-  @Id
-  @GeneratedValue(strategy = GenerationType.IDENTITY)
-  private Long overrideId;
-
-  @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "recurrence_id", nullable = false, updatable = false)
-  private RecurrenceEvent recurrenceEvent;
-
-  @Column(name = "origin_start_at", nullable = false, updatable = false)
-  private Instant originStartAt;
-
-  @Embedded
-  @AttributeOverride(
-      name = "value",
-      column = @Column(name = "override_title", length = RecurrenceEventTitle.MAX_LENGTH))
-  private RecurrenceEventTitle overrideTitle;
-
-  @Column(name = "override_description")
-  private String overrideDescription;
-
-  @Column(name = "override_start_at")
-  private Instant overrideStartAt;
-
-  @Column(name = "override_end_at")
-  private Instant overrideEndAt;
-
-  @Column(name = "override_all_day")
-  private Boolean overrideAllDay;
-
-  @Column(name = "override_time_zone")
-  private String overrideTimeZone;
-
-  @Column(name = "deleted_at")
-  private Instant deletedAt;
-
-  protected RecurrenceEventOverride() {}
-
-  private RecurrenceEventOverride(RecurrenceEvent recurrenceEvent, Instant originStartAt) {
-    this.recurrenceEvent = recurrenceEvent;
-    this.originStartAt = Objects.requireNonNull(originStartAt);
+  public RecurrenceEventOverride {
+    Objects.requireNonNull(originStartAt);
+    if (deletedAt == null) {
+      Objects.requireNonNull(overrideTitle);
+      Objects.requireNonNull(schedule);
+    } else if (overrideTitle != null || overrideDescription != null || schedule != null) {
+      throw new IllegalArgumentException("제외된 회차는 변경 내용을 가질 수 없다.");
+    }
   }
 
   static RecurrenceEventOverride active(
-      RecurrenceEvent recurrenceEvent,
-      Instant originStartAt,
-      String title,
-      String description,
-      CanonicalSchedule schedule) {
-    RecurrenceEventOverride override = new RecurrenceEventOverride(recurrenceEvent, originStartAt);
-    override.activate(title, description, schedule);
-    return override;
+      Instant originStartAt, String title, String description, CanonicalSchedule schedule) {
+    return new RecurrenceEventOverride(
+        originStartAt,
+        new RecurrenceEventTitle(title),
+        description,
+        RecurrenceOverrideSchedule.from(Objects.requireNonNull(schedule)),
+        null);
   }
 
-  static RecurrenceEventOverride deleted(
-      RecurrenceEvent recurrenceEvent, Instant originStartAt, Instant deletedAt) {
-    RecurrenceEventOverride override = new RecurrenceEventOverride(recurrenceEvent, originStartAt);
-    override.markDeleted(deletedAt);
-    return override;
-  }
-
-  void activate(String title, String description, CanonicalSchedule schedule) {
-    RecurrenceEventTitle nextTitle = new RecurrenceEventTitle(title);
-    Objects.requireNonNull(schedule);
-    this.overrideTitle = nextTitle;
-    this.overrideDescription = description;
-    this.overrideStartAt = schedule.startAt();
-    this.overrideEndAt = schedule.endAt();
-    this.overrideAllDay = schedule.allDay();
-    this.overrideTimeZone = schedule.timeZone();
-    this.deletedAt = null;
-  }
-
-  void markDeleted(Instant deletedAt) {
-    Objects.requireNonNull(deletedAt);
-    this.overrideTitle = null;
-    this.overrideDescription = null;
-    this.overrideStartAt = null;
-    this.overrideEndAt = null;
-    this.overrideAllDay = null;
-    this.overrideTimeZone = null;
-    this.deletedAt = deletedAt;
+  static RecurrenceEventOverride deleted(Instant originStartAt, Instant deletedAt) {
+    return new RecurrenceEventOverride(
+        originStartAt, null, null, null, Objects.requireNonNull(deletedAt));
   }
 
   public boolean isDeleted() {
     return deletedAt != null;
-  }
-
-  public RecurrenceEvent getRecurrenceEvent() {
-    return recurrenceEvent;
-  }
-
-  public Long getOverrideId() {
-    return overrideId;
-  }
-
-  public Long getRecurrenceId() {
-    return recurrenceEvent.getId();
   }
 
   public Instant getOriginStartAt() {
@@ -142,19 +63,19 @@ public class RecurrenceEventOverride extends BaseEntity {
   }
 
   public Instant getOverrideStartAt() {
-    return overrideStartAt;
+    return schedule == null ? null : schedule.startAt();
   }
 
   public Instant getOverrideEndAt() {
-    return overrideEndAt;
+    return schedule == null ? null : schedule.endAt();
   }
 
   public boolean isOverrideAllDay() {
-    return Boolean.TRUE.equals(overrideAllDay);
+    return schedule != null && schedule.allDay();
   }
 
   public String getOverrideTimeZone() {
-    return overrideTimeZone;
+    return schedule == null ? null : schedule.timeZone();
   }
 
   public Instant getDeletedAt() {

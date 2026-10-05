@@ -107,7 +107,7 @@ public class GoogleCalendarRecurrenceChangeService {
       return;
     }
     recurrenceEventRepository
-        .findById(mapping.getRecurrenceEventId())
+        .findByIdForUpdate(mapping.getRecurrenceEventId())
         .orElseThrow(() -> new CalioException(ErrorCode.RECURRENCE_EVENT_NOT_FOUND))
         .update(item.title(), item.description(), schedule, item.recurrenceRules());
     mapping.updateProviderEtag(item.providerEtag());
@@ -167,7 +167,7 @@ public class GoogleCalendarRecurrenceChangeService {
         loadExistingOverride(recurrenceEventMapping, item, cache);
     if (existingOverride.googleOverrideMapping() != null) {
       applyExistingOverrideMapping(
-          recurrenceEventMapping, existingOverride.googleOverrideMapping(), item, ownership);
+          recurrenceEventMapping, existingOverride.googleOverrideMapping(), item, ownership, cache);
       return;
     }
     RecurrenceEventOverride recurrenceEventOverride =
@@ -205,7 +205,7 @@ public class GoogleCalendarRecurrenceChangeService {
       recurrenceEventOverride = recurrenceOverride(googleOverrideMapping);
     }
     throwIfOverrideMappedToDifferentGoogleEvent(
-        googleOverrideMapping, recurrenceEventOverride, item, cache);
+        googleOverrideMapping, recurrenceEventOverride, recurrenceEventOverrideKey, item, cache);
     return new ExistingRecurrenceOverride(
         googleOverrideKey,
         recurrenceEventOverrideKey,
@@ -220,7 +220,7 @@ public class GoogleCalendarRecurrenceChangeService {
       GoogleCalendarPageRecordCache cache) {
     RecurrenceEvent recurrenceEvent =
         recurrenceEventRepository
-            .findById(recurrenceEventMapping.getRecurrenceEventId())
+            .findByIdForUpdate(recurrenceEventMapping.getRecurrenceEventId())
             .orElseThrow(() -> new CalioException(ErrorCode.RECURRENCE_EVENT_NOT_FOUND));
     RecurrenceEventOverride recurrenceEventOverride = applyOverrideState(recurrenceEvent, item);
     recurrenceEventRepository.flush();
@@ -250,7 +250,8 @@ public class GoogleCalendarRecurrenceChangeService {
       GoogleCalendarRecurrenceEventMapping recurrenceEventMapping,
       GoogleCalendarRecurrenceOverrideMapping mapping,
       RecurrenceEventOverrideUpsert item,
-      GoogleCalendarPageOwnership ownership) {
+      GoogleCalendarPageOwnership ownership,
+      GoogleCalendarPageRecordCache cache) {
     if (mapping.isConflicted()) {
       return;
     }
@@ -268,7 +269,16 @@ public class GoogleCalendarRecurrenceChangeService {
       recordSyncConflict(mapping, ownership);
       return;
     }
-    applyOverrideState(recurrenceOverride(mapping).getRecurrenceEvent(), item);
+    RecurrenceEvent recurrenceEvent =
+        recurrenceEventRepository
+            .findByIdForUpdate(recurrenceEventMapping.getRecurrenceEventId())
+            .orElseThrow(() -> new CalioException(ErrorCode.RECURRENCE_EVENT_NOT_FOUND));
+    RecurrenceEventOverride replacement = applyOverrideState(recurrenceEvent, item);
+    cache
+        .recurrenceEventOverrides()
+        .put(
+            new RecurrenceEventOverrideKey(recurrenceEvent.getId(), item.originStartAt()),
+            replacement);
     mapping.updateProviderEtag(item.providerEtag());
   }
 
@@ -296,7 +306,7 @@ public class GoogleCalendarRecurrenceChangeService {
         recurrenceOverride(googleOverrideMapping);
     RecurrenceEventOverrideKey mappedOverrideKey =
         new RecurrenceEventOverrideKey(
-            mappedRecurrenceEventOverride.getRecurrenceId(),
+            googleOverrideMapping.getRecurrenceEventMapping().getRecurrenceEventId(),
             mappedRecurrenceEventOverride.getOriginStartAt());
     if (!mappedOverrideKey.equals(expectedOverrideKey)) {
       throw new CalioException(ErrorCode.GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID);
@@ -306,11 +316,10 @@ public class GoogleCalendarRecurrenceChangeService {
   private void throwIfOverrideMappedToDifferentGoogleEvent(
       GoogleCalendarRecurrenceOverrideMapping googleOverrideMapping,
       RecurrenceEventOverride recurrenceEventOverride,
+      RecurrenceEventOverrideKey overrideKey,
       RecurrenceEventOverrideUpsert item,
       GoogleCalendarPageRecordCache cache) {
-    if (googleOverrideMapping != null
-        || recurrenceEventOverride == null
-        || recurrenceEventOverride.getOverrideId() == null) {
+    if (googleOverrideMapping != null || recurrenceEventOverride == null) {
       return;
     }
     boolean mappedToDifferentGoogleEvent =
@@ -320,7 +329,7 @@ public class GoogleCalendarRecurrenceChangeService {
                     mapping
                             .getRecurrenceEventMapping()
                             .getRecurrenceEventId()
-                            .equals(recurrenceEventOverride.getRecurrenceId())
+                            .equals(overrideKey.recurrenceEventId())
                         && mapping
                             .getOriginStartAt()
                             .equals(recurrenceEventOverride.getOriginStartAt())
@@ -353,7 +362,7 @@ public class GoogleCalendarRecurrenceChangeService {
   private RecurrenceEventOverride recurrenceOverride(
       GoogleCalendarRecurrenceOverrideMapping mapping) {
     return recurrenceEventRepository
-        .findById(mapping.getRecurrenceEventMapping().getRecurrenceEventId())
+        .findByIdForUpdate(mapping.getRecurrenceEventMapping().getRecurrenceEventId())
         .flatMap(recurrenceEvent -> recurrenceEvent.findOverride(mapping.getOriginStartAt()))
         .orElseThrow(() -> new CalioException(ErrorCode.GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID));
   }

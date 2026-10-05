@@ -19,8 +19,8 @@ class RecurrenceEventTest {
           ORIGIN.plusSeconds(7200), ORIGIN.plusSeconds(10800), false, "UTC");
 
   @Test
-  @DisplayName("같은 원래 시작값을 다시 변경하면 자식을 추가하지 않고 기존 개별 변경을 수정한다")
-  void changeSameOriginUpdatesOwnedOverride() {
+  @DisplayName("같은 회차를 다시 변경하면 항목 수를 유지하면서 값을 교체하고 이전 값은 보존한다")
+  void changeSameOriginReplacesOverrideValue() {
     // given
     RecurrenceEvent event = recurrenceEvent();
     RecurrenceEventOverride original = event.changeOccurrence(ORIGIN, "First", null, MOVED);
@@ -29,18 +29,20 @@ class RecurrenceEventTest {
     RecurrenceEventOverride changed = event.changeOccurrence(ORIGIN, "Updated", "memo", MOVED);
 
     // then
-    assertThat(changed).isSameAs(original);
-    assertThat(event.getOverrides()).containsExactly(original);
-    assertThat(event.findOverride(ORIGIN)).containsSame(original);
-    assertThat(original.getOverrideTitle()).isEqualTo("Updated");
-    assertThat(original.getOverrideDescription()).isEqualTo("memo");
+    assertThat(changed).isNotSameAs(original);
+    assertThat(event.getOverrides()).containsExactly(changed);
+    assertThat(event.findOverride(ORIGIN)).contains(changed);
+    assertThat(changed.getOverrideTitle()).isEqualTo("Updated");
+    assertThat(original.getOverrideTitle()).isEqualTo("First");
+    assertThat(changed.getOverrideDescription()).isEqualTo("memo");
+    assertThat(original.getOverrideDescription()).isNull();
     assertThat(original.getOriginStartAt()).isEqualTo(ORIGIN);
     assertThat(original.getOverrideStartAt()).isEqualTo(MOVED.startAt());
   }
 
   @Test
-  @DisplayName("시리즈 규칙이 바뀌어도 기존 개별 변경의 제외·복원은 같은 자식과 원래 시작값을 유지한다")
-  void restoreExistingOverrideAfterMasterRuleChangeKeepsIdentity() {
+  @DisplayName("시리즈 규칙이 바뀌어도 개별 변경의 제외·복원은 원래 시작값을 유지하고 값을 교체한다")
+  void restoreExistingOverrideAfterMasterRuleChangeReplacesValue() {
     // given
     RecurrenceEvent event = recurrenceEvent();
     RecurrenceEventOverride original = event.changeOccurrence(ORIGIN, "Moved", null, MOVED);
@@ -56,7 +58,8 @@ class RecurrenceEventTest {
     RecurrenceEventOverride excluded = event.excludeOccurrence(ORIGIN, ORIGIN.plusSeconds(86400));
 
     // then
-    assertThat(excluded).isSameAs(original);
+    assertThat(excluded).isNotSameAs(original);
+    assertThat(original.isDeleted()).isFalse();
     assertThat(excluded.isDeleted()).isTrue();
     assertThat(excluded.getOverrideTitle()).isNull();
     assertThat(excluded.getOverrideStartAt()).isNull();
@@ -65,10 +68,11 @@ class RecurrenceEventTest {
     RecurrenceEventOverride restored = event.changeOccurrence(ORIGIN, "Restored", null, MOVED);
 
     // then
-    assertThat(restored).isSameAs(original);
+    assertThat(restored).isNotSameAs(original);
+    assertThat(excluded.isDeleted()).isTrue();
     assertThat(restored.isDeleted()).isFalse();
     assertThat(restored.getDeletedAt()).isNull();
-    assertThat(event.getOverrides()).containsExactly(original);
+    assertThat(event.getOverrides()).containsExactly(restored);
   }
 
   @Test
@@ -118,10 +122,11 @@ class RecurrenceEventTest {
         event.changeOccurrence(outsideOrigin, "Recorded change", null, MOVED);
 
     // then
-    assertThat(active).isSameAs(original);
+    assertThat(active).isNotSameAs(original);
+    assertThat(original.isDeleted()).isTrue();
     assertThat(active.isDeleted()).isFalse();
     assertThat(active.getOriginStartAt()).isEqualTo(outsideOrigin);
-    assertThat(event.getOverrides()).containsExactly(original);
+    assertThat(event.getOverrides()).containsExactly(active);
   }
 
   @Test
@@ -162,7 +167,7 @@ class RecurrenceEventTest {
   }
 
   @Test
-  @DisplayName("Root가 노출한 목록으로 자식을 추가·제거할 수 없다")
+  @DisplayName("Root가 노출한 목록으로 값을 추가·제거할 수 없다")
   void exposedOverridesCannotBypassRoot() {
     // given
     RecurrenceEvent event = recurrenceEvent();
@@ -175,7 +180,7 @@ class RecurrenceEventTest {
   }
 
   @Test
-  @DisplayName("필수 변경 시간이 없으면 기존 자식의 제목과 변경 내용을 보존한다")
+  @DisplayName("필수 변경 시간이 없으면 기존 값의 제목과 변경 내용을 보존한다")
   void invalidChangeKeepsExistingOverrideState() {
     // given
     RecurrenceEvent event = recurrenceEvent();
@@ -192,7 +197,7 @@ class RecurrenceEventTest {
   }
 
   @Test
-  @DisplayName("제외 시각이 없으면 기존 자식의 활성 상태와 변경 내용을 보존한다")
+  @DisplayName("제외 시각이 없으면 기존 값의 활성 상태와 변경 내용을 보존한다")
   void invalidExclusionKeepsExistingOverrideState() {
     // given
     RecurrenceEvent event = recurrenceEvent();
@@ -206,6 +211,21 @@ class RecurrenceEventTest {
     assertThat(original.getOverrideStartAt()).isEqualTo(MOVED.startAt());
     assertThat(original.isDeleted()).isFalse();
     assertThat(event.getOverrides()).containsExactly(original);
+  }
+
+  @Test
+  @DisplayName("같은 내용의 회차 변경 값은 동등하며 변경 내용이나 원래 시작값이 다르면 구분된다")
+  void overrideEqualityUsesAllValues() {
+    RecurrenceEventOverride first =
+        recurrenceEvent().changeOccurrence(ORIGIN, "Moved", "memo", MOVED);
+    RecurrenceEventOverride equal =
+        recurrenceEvent().changeOccurrence(ORIGIN, "Moved", "memo", MOVED);
+    assertThat(first).isEqualTo(equal).hasSameHashCodeAs(equal);
+    assertThat(first)
+        .isNotEqualTo(recurrenceEvent().changeOccurrence(ORIGIN, "Changed", "memo", MOVED));
+    assertThat(first)
+        .isNotEqualTo(
+            recurrenceEvent().changeOccurrence(ORIGIN.plusSeconds(1), "Moved", "memo", MOVED));
   }
 
   private RecurrenceEvent recurrenceEvent() {

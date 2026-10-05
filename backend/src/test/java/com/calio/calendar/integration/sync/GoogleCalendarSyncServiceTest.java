@@ -34,7 +34,7 @@ import com.calio.calendar.integration.sync.page.GoogleCalendarPageOwnership;
 import com.calio.calendar.integration.sync.page.GoogleCalendarRecurrenceChangeService;
 import com.calio.calendar.integration.sync.page.dto.GoogleCalendarNormalizedPage;
 import com.calio.calendar.integration.sync.page.dto.GoogleCalendarRecurrenceOverrideExternalKey;
-import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
+import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.tag.repository.TagRepository;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -562,7 +562,7 @@ class GoogleCalendarSyncServiceTest {
           mock(GoogleCalendarRecurrenceMappingQueryService.class),
           mock(AccountRepository.class),
           mock(TagRepository.class),
-          mock(RecurrenceEventOverrideRepository.class),
+          mock(RecurrenceEventRepository.class),
           mock(GoogleCalendarRecurrenceChangeService.class),
           mock(GoogleOperationLeaseService.class));
     }

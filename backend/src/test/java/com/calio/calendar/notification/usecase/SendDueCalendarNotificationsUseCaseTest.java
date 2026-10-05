@@ -26,7 +26,6 @@ import com.calio.calendar.notification.domain.NotificationDispatchState;
 import com.calio.calendar.notification.domain.NotificationScheduleKey;
 import com.calio.calendar.notification.repository.IosPushDeviceRepository;
 import com.calio.calendar.notification.repository.NotificationDispatchRepository;
-import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.recurrence.service.PersonalRecurrenceOccurrenceResolver;
 import com.calio.calendar.singleevent.repository.SingleEventRepository;
@@ -56,8 +55,6 @@ class SendDueCalendarNotificationsUseCaseTest {
 
   @Mock private RecurrenceEventRepository recurrenceEventRepository;
 
-  @Mock private RecurrenceEventOverrideRepository recurrenceOverrideRepository;
-
   @Mock private PersonalRecurrenceOccurrenceResolver personalRecurrenceOccurrenceResolver;
 
   @Mock private GroupMemberRepository groupMemberRepository;
@@ -85,7 +82,6 @@ class SendDueCalendarNotificationsUseCaseTest {
             accountRepository,
             eventRepository,
             recurrenceEventRepository,
-            recurrenceOverrideRepository,
             personalRecurrenceOccurrenceResolver,
             groupMemberRepository,
             groupCalendarEventRepository,

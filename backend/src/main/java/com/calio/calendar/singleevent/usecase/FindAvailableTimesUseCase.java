@@ -6,8 +6,8 @@ import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceOccurrence;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
-import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
+import com.calio.calendar.recurrence.repository.dto.RecurrenceOverrideView;
 import com.calio.calendar.recurrence.service.Rfc5545RecurrenceEngine;
 import com.calio.calendar.singleevent.controller.dto.EventResponse;
 import com.calio.calendar.singleevent.domain.SingleEvent;
@@ -42,19 +42,17 @@ public class FindAvailableTimesUseCase {
   private final SingleEventRepository eventRepository;
   private final TagRepository tagRepository;
   private final RecurrenceEventRepository recurrenceEventRepository;
-  private final RecurrenceEventOverrideRepository overrideRepository;
+
   private final Rfc5545RecurrenceEngine recurrenceEngine;
 
   public FindAvailableTimesUseCase(
       SingleEventRepository eventRepository,
       TagRepository tagRepository,
       RecurrenceEventRepository recurrenceEventRepository,
-      RecurrenceEventOverrideRepository overrideRepository,
       Rfc5545RecurrenceEngine recurrenceEngine) {
     this.eventRepository = eventRepository;
     this.tagRepository = tagRepository;
     this.recurrenceEventRepository = recurrenceEventRepository;
-    this.overrideRepository = overrideRepository;
     this.recurrenceEngine = recurrenceEngine;
   }
 
@@ -196,11 +194,11 @@ public class FindAvailableTimesUseCase {
     Set<OccurrenceKey> responseKeys = new HashSet<>();
     List<RecurrenceEvent> candidates =
         recurrenceEventRepository.findExpansionCandidatesStartedBefore(accountId, to);
-    List<RecurrenceEventOverride> movedIn =
-        overrideRepository.findActiveOverlappingOverrides(accountId, from, to);
+    List<RecurrenceOverrideView> movedIn =
+        recurrenceEventRepository.findActiveOverlappingOverrides(accountId, from, to);
     Set<Long> tagIds =
         candidates.stream().map(RecurrenceEvent::getTagId).collect(Collectors.toSet());
-    movedIn.stream().map(override -> override.getRecurrenceEvent().getTagId()).forEach(tagIds::add);
+    movedIn.stream().map(override -> override.recurrenceEvent().getTagId()).forEach(tagIds::add);
     Map<Long, Tag> tagsById =
         tagRepository.findAllById(tagIds).stream()
             .collect(Collectors.toMap(Tag::getId, Function.identity()));
@@ -212,7 +210,9 @@ public class FindAvailableTimesUseCase {
         .map(
             override ->
                 EventResponse.recurrenceOverride(
-                    override, requiredTag(tagsById, override.getRecurrenceEvent().getTagId())))
+                    override.recurrenceEvent(),
+                    override.override(),
+                    requiredTag(tagsById, override.recurrenceEvent().getTagId())))
         .forEach(responses::add);
     return responses;
   }
@@ -242,7 +242,7 @@ public class FindAvailableTimesUseCase {
               : override.isDeleted()
                   ? null
                   : EventResponse.recurrenceOverride(
-                      override, requiredTag(tagsById, recurrenceEvent.getTagId()));
+                      recurrenceEvent, override, requiredTag(tagsById, recurrenceEvent.getTagId()));
       if (response != null && overlaps(response, from, to) && responseKeys.add(key)) {
         responses.add(response);
       }
@@ -255,8 +255,8 @@ public class FindAvailableTimesUseCase {
     if (origins.isEmpty()) {
       return Map.of();
     }
-    return overrideRepository
-        .findByRecurrenceEvent_IdAndOriginStartAtIn(recurrenceEvent.getId(), origins)
+    return recurrenceEventRepository
+        .findOverridesByRecurrenceIdAndOriginStartAtIn(recurrenceEvent.getId(), origins)
         .stream()
         .collect(Collectors.toMap(RecurrenceEventOverride::getOriginStartAt, Function.identity()));
   }
@@ -275,8 +275,9 @@ public class FindAvailableTimesUseCase {
   }
 
   private record OccurrenceKey(Long recurrenceId, Instant originStartAt) {
-    private static OccurrenceKey from(RecurrenceEventOverride override) {
-      return new OccurrenceKey(override.getRecurrenceId(), override.getOriginStartAt());
+    private static OccurrenceKey from(RecurrenceOverrideView override) {
+      return new OccurrenceKey(
+          override.recurrenceEvent().getId(), override.override().getOriginStartAt());
     }
   }
 

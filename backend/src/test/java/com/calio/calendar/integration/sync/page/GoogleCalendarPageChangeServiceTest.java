@@ -37,7 +37,6 @@ import com.calio.calendar.integration.sync.page.dto.GoogleCalendarNormalizedPage
 import com.calio.calendar.integration.sync.page.dto.GoogleCalendarNormalizedPage.RecurrenceEventUpsert;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
-import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.singleevent.domain.SingleEvent;
 import com.calio.calendar.singleevent.repository.SingleEventRepository;
@@ -90,8 +89,6 @@ class GoogleCalendarPageChangeServiceTest {
   private GoogleCalendarRecurrenceOverrideMappingRepository recurrenceOverrideMappingRepository;
 
   @Autowired private RecurrenceEventRepository recurrenceEventRepository;
-
-  @Autowired private RecurrenceEventOverrideRepository recurrenceEventOverrideRepository;
 
   @Autowired private SingleEventRepository eventRepository;
 
@@ -561,7 +558,7 @@ class GoogleCalendarPageChangeServiceTest {
               assertThat(recurrence.getTagId()).isEqualTo(defaultTag.getId());
               assertThat(recurrence.getRecurrenceRules()).containsExactly("RRULE:FREQ=WEEKLY");
             });
-    assertThat(recurrenceEventOverrideRepository.findAll())
+    assertThat(recurrenceEventRepository.findAllOverrides())
         .singleElement()
         .satisfies(
             override -> {
@@ -711,7 +708,7 @@ class GoogleCalendarPageChangeServiceTest {
             exception ->
                 assertThat(exception.getErrorCode())
                     .isEqualTo(ErrorCode.GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID));
-    assertThat(recurrenceEventOverrideRepository.count()).isOne();
+    assertThat(recurrenceEventRepository.countOverrides()).isOne();
     assertThat(recurrenceOverrideMappingRepository.findAll())
         .singleElement()
         .satisfies(
@@ -776,7 +773,7 @@ class GoogleCalendarPageChangeServiceTest {
     assertThat(recurrenceEventMappingRepository.count()).isZero();
     assertThat(recurrenceOverrideMappingRepository.count()).isZero();
     assertThat(recurrenceEventRepository.count()).isZero();
-    assertThat(recurrenceEventOverrideRepository.count()).isZero();
+    assertThat(recurrenceEventRepository.countOverrides()).isZero();
   }
 
   @Test
@@ -931,7 +928,7 @@ class GoogleCalendarPageChangeServiceTest {
     assertThat(recurrenceOverrideMappingRepository.count()).isZero();
     assertThat(eventRepository.count()).isZero();
     assertThat(recurrenceEventRepository.count()).isZero();
-    assertThat(recurrenceEventOverrideRepository.count()).isZero();
+    assertThat(recurrenceEventRepository.countOverrides()).isZero();
     assertThat(connectionRepository.findById(integration.getId()))
         .get()
         .satisfies(

@@ -16,7 +16,6 @@ import com.calio.calendar.integration.mapping.domain.GoogleCalendarRecurrenceOve
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
-import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.repository.TagRepository;
@@ -45,8 +44,6 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
   @Autowired private TagRepository tagRepository;
 
   @Autowired private RecurrenceEventRepository recurrenceEventRepository;
-
-  @Autowired private RecurrenceEventOverrideRepository recurrenceEventOverrideRepository;
 
   @Autowired private GoogleCalendarIntegrationRepository integrationRepository;
 
@@ -77,7 +74,10 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
     GoogleCalendarRecurrenceOverrideMapping overrideMapping =
         overrideMappingRepository.saveAndFlush(
             new GoogleCalendarRecurrenceOverrideMapping(
-                eventMapping, recurrenceOverride, externalRecurrenceOverrideId, "a".repeat(64)));
+                eventMapping,
+                recurrenceOverride.getOriginStartAt(),
+                externalRecurrenceOverrideId,
+                "a".repeat(64)));
 
     // when, then
     assertThat(
@@ -103,7 +103,7 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
     eventMappingRepository.flush();
     assertThat(recurrenceEventRepository.findById(recurrenceEvent.getId())).isPresent();
     assertThat(
-            recurrenceEventOverrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(
+            recurrenceEventRepository.findOverrideByRecurrenceIdAndOriginStartAt(
                 recurrenceEvent.getId(), recurrenceOverride.getOriginStartAt()))
         .isPresent();
   }
@@ -394,7 +394,7 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
       RecurrenceEventOverride recurrenceOverride,
       String externalEventId) {
     return new GoogleCalendarRecurrenceOverrideMapping(
-        parentMapping, recurrenceOverride, externalEventId, "a".repeat(64));
+        parentMapping, recurrenceOverride.getOriginStartAt(), externalEventId, "a".repeat(64));
   }
 
   private record RecurrenceFixture(

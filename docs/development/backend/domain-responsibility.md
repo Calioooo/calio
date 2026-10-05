@@ -38,15 +38,15 @@ Application Service는 유스케이스를 수행하기 위해 필요한 객체�
 
 - Aggregate는 하나의 트랜잭션에서 함께 일관성을 보호해야 하는 상태의 경계다.
 - Aggregate에는 하나의 Aggregate Root가 있으며, 외부의 변경 요청은 Root가 제공하는 행위를 통해 진입한다.
-- Aggregate 내부 Entity와 Value Object의 상태를 외부에서 직접 변경해 Root의 불변식을 우회하지 않는다.
-- Child Entity는 자신의 로컬 규칙을 소유할 수 있지만 외부의 변경 진입점이 되지 않는다. Root는 Aggregate 전체의 불변식을 확인하고 필요한 작업을 내부 객체에 위임한다.
-- 변경을 위한 조회와 저장은 Aggregate Root를 기준으로 한다. Child Entity를 직접 변경하기 위한 Repository를 두지 않는다.
-- 내부 Entity를 독립적으로 변경해야 하는 요구가 반복되면 직접 변경을 허용하기보다 별도 Aggregate 경계가 필요한지 검토한다.
-- 조회 전용 데이터 접근은 허용하되, 조회한 Child Entity를 직접 변경하는 진입점으로 사용하지 않는다.
+- 현재 리팩터링에서는 Entity를 Aggregate Root로 두고 내부 상태는 Value Object로 표현한다. Child Entity를 도입하지 않는다.
+- 내부 값의 교체와 컬렉션 변경은 Root의 행위를 통해 수행한다. 외부에서 내부 상태를 직접 변경해 Root의 불변식을 우회하지 않는다.
+- 변경을 위한 조회와 저장은 Aggregate Root를 기준으로 한다. Value Object를 독립적으로 변경하기 위한 Repository를 두지 않는다.
+- 독립적인 식별성·생명주기·변경 경계가 필요한 대상은 별도 Aggregate Root로 분리하고 식별자로 참조한다.
+- 내부 값의 조회 전용 데이터 접근은 허용하되, 조회 결과를 직접 변경하는 진입점으로 사용하지 않는다.
 
 ## Aggregate 사이의 참조
 
-- 같은 Aggregate 내부의 Root와 Child Entity는 객체 연관관계로 구성할 수 있다.
+- 같은 Aggregate 내부의 Root는 Value Object를 값으로 소유한다.
 - 서로 다른 Aggregate는 원칙적으로 Aggregate Root의 식별자로 참조한다.
 - 조회 편의를 위한 데이터 접근과 Aggregate의 변경 경계를 동일하게 취급하지 않는다.
 
@@ -81,7 +81,7 @@ Application Service는 유스케이스를 수행하기 위해 필요한 객체�
 - 이 판단이 보호하는 상태는 무엇이며, 그 상태의 소유자는 누구인가?
 - Application Service가 도메인 객체가 소유해야 할 변경 가능 여부를 대신 판단하고 있지는 않은가?
 - 상태를 변경하는 공개 메서드를 다른 호출자가 사용해도 불변식이 유지되는가?
-- Aggregate 내부 객체를 Root를 거치지 않고 직접 변경하고 있지는 않은가?
+- Aggregate 내부 값을 Root를 거치지 않고 직접 변경하고 있지는 않은가?
 - 하나의 트랜잭션에서 여러 Aggregate를 변경해야 하는 비즈니스 근거가 있는가?
 - 최종적 일관성을 선택했다면 Aggregate 내부가 아니라 경계 사이의 일시적인 불일치만 허용하는가?
 - Domain Service가 필요한 정책인가, 아니면 객체의 행동 또는 유스케이스 조율인가?

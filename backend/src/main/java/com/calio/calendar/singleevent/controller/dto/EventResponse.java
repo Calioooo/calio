@@ -61,8 +61,8 @@ public record EventResponse(
         recurrenceEvent.getUpdatedAt());
   }
 
-  public static EventResponse recurrenceOverride(RecurrenceEventOverride override, Tag tag) {
-    RecurrenceEvent recurrenceEvent = override.getRecurrenceEvent();
+  public static EventResponse recurrenceOverride(
+      RecurrenceEvent recurrenceEvent, RecurrenceEventOverride override, Tag tag) {
     return new EventResponse(
         null,
         override.getOverrideTitle(),

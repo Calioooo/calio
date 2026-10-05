@@ -35,8 +35,8 @@ public record PersonalRecurrenceOccurrence(
         recurrenceEvent.isAllDay() ? null : recurrenceEvent.getTimeZone());
   }
 
-  public static PersonalRecurrenceOccurrence overridden(RecurrenceEventOverride override) {
-    RecurrenceEvent recurrenceEvent = override.getRecurrenceEvent();
+  public static PersonalRecurrenceOccurrence overridden(
+      RecurrenceEvent recurrenceEvent, RecurrenceEventOverride override) {
     return new PersonalRecurrenceOccurrence(
         recurrenceEvent,
         override.getOriginStartAt(),

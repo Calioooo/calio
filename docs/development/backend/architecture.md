@@ -77,7 +77,7 @@ Application Service는 해당 기능의 Repository를 직접 사용한다.
 ## 영속성 매핑과 Aggregate 경계
 
 - JPA 연관관계가 존재한다는 사실만으로 같은 Aggregate라고 판단하지 않는다.
-- 같은 Aggregate 내부에서는 Root와 Child Entity의 객체 연관관계 및 생명주기에 맞는 cascade를 사용할 수 있다.
+- 현재 리팩터링에서는 Root 내부 상태를 Value Object로 표현한다. 여러 값의 소유는 `@ElementCollection`으로 매핑할 수 있으며 별도의 Child Entity를 도입하지 않는다.
 - 서로 다른 Aggregate Root 사이에는 객체 연관관계보다 식별자 참조를 우선한다.
 - Aggregate Root 사이에 영속성 cascade를 적용하지 않는다.
 - 식별자로 참조하더라도 데이터베이스의 외래 키 제약은 유지할 수 있다.

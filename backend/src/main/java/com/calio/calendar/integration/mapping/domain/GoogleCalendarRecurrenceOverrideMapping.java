@@ -1,7 +1,6 @@
 package com.calio.calendar.integration.mapping.domain;
 
 import com.calio.calendar.common.domain.BaseEntity;
-import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
@@ -82,18 +81,6 @@ public class GoogleCalendarRecurrenceOverrideMapping extends BaseEntity {
 
   public void markConflicted() {
     syncState.markConflicted();
-  }
-
-  public GoogleCalendarRecurrenceOverrideMapping(
-      GoogleCalendarRecurrenceEventMapping recurrenceEventMapping,
-      RecurrenceEventOverride recurrenceEventOverride,
-      String externalEventId,
-      String providerEtag) {
-    this(
-        recurrenceEventMapping,
-        recurrenceEventOverride.getOriginStartAt(),
-        externalEventId,
-        providerEtag);
   }
 
   public void markLocalChanged() {

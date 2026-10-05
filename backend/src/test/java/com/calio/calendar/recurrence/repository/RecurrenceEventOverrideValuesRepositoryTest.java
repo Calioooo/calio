@@ -9,16 +9,25 @@ import com.calio.calendar.common.testsupport.SharedIntegrationDatabase;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
+import com.calio.calendar.recurrence.repository.dto.RecurrenceOverrideView;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.repository.TagRepository;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @SpringBootTest(
     properties = {
@@ -30,7 +39,7 @@ import org.springframework.transaction.annotation.Transactional;
     })
 @SharedIntegrationDatabase
 @Transactional
-class RecurrenceEventOverrideRepositoryTest {
+class RecurrenceEventOverrideValuesRepositoryTest {
 
   @Autowired private AccountRepository accountRepository;
 
@@ -38,9 +47,9 @@ class RecurrenceEventOverrideRepositoryTest {
 
   @Autowired private RecurrenceEventRepository recurrenceEventRepository;
 
-  @Autowired private RecurrenceEventOverrideRepository recurrenceEventOverrideRepository;
-
   @Autowired private EntityManager entityManager;
+
+  @Autowired private PlatformTransactionManager transactionManager;
 
   @Test
   @DisplayName("활성 기간과 겹치는 override만 조회하고 master를 함께 로딩한다")
@@ -77,24 +86,19 @@ class RecurrenceEventOverrideRepositoryTest {
     entityManager.clear();
 
     // when
-    List<RecurrenceEventOverride> overrides =
-        recurrenceEventOverrideRepository.findActiveOverlappingOverrides(
+    List<RecurrenceOverrideView> overrides =
+        recurrenceEventRepository.findActiveOverlappingOverrides(
             account.getId(),
             Instant.parse("2027-01-02T09:30:00Z"),
             Instant.parse("2027-01-02T11:30:00Z"));
 
     // then
     assertThat(overrides)
-        .extracting(RecurrenceEventOverride::getOverrideId)
-        .containsExactly(activeOverride.getOverrideId());
-    RecurrenceEventOverride loadedOverride = overrides.getFirst();
-    assertThat(
-            entityManager
-                .getEntityManagerFactory()
-                .getPersistenceUnitUtil()
-                .isLoaded(loadedOverride, "recurrenceEvent"))
-        .isTrue();
-    assertThat(loadedOverride.getRecurrenceEvent().getTagId()).isEqualTo(tag.getId());
+        .extracting(view -> view.override().getOriginStartAt())
+        .containsExactly(activeOverride.getOriginStartAt());
+    RecurrenceOverrideView loadedOverride = overrides.getFirst();
+    assertThat(loadedOverride.override()).isEqualTo(activeOverride);
+    assertThat(loadedOverride.recurrenceEvent().getTagId()).isEqualTo(tag.getId());
   }
 
   @Test
@@ -137,22 +141,22 @@ class RecurrenceEventOverrideRepositoryTest {
     entityManager.clear();
 
     assertThat(
-            recurrenceEventOverrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(
+            recurrenceEventRepository.findOverrideByRecurrenceIdAndOriginStartAt(
                 first.getId(), removedOrigin))
         .isEmpty();
     assertThat(
-            recurrenceEventOverrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(
+            recurrenceEventRepository.findOverrideByRecurrenceIdAndOriginStartAt(
                 first.getId(), retainedOrigin))
         .isPresent();
     assertThat(
-            recurrenceEventOverrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(
+            recurrenceEventRepository.findOverrideByRecurrenceIdAndOriginStartAt(
                 second.getId(), removedOrigin))
         .isPresent();
   }
 
   @Test
-  @DisplayName("Root 저장 후 같은 origin의 수정·제외·복원은 하나의 자식 identity를 유지한다")
-  void saveAndRestoreOverrideThroughRootKeepsPersistedIdentity() {
+  @DisplayName("Root 저장 후 같은 origin의 수정·제외·복원은 같은 회차의 변경 값을 교체해 저장한다")
+  void saveAndRestoreOverrideThroughRootPersistsReplacement() {
     // given
     RecurrenceEvent recurrenceEvent = newRecurrenceEvent();
     Instant origin = recurrenceEvent.getFirstOccurrenceStartAt();
@@ -163,14 +167,21 @@ class RecurrenceEventOverrideRepositoryTest {
         recurrenceEvent.changeOccurrence(origin, "Moved", null, schedule);
     recurrenceEventRepository.saveAndFlush(recurrenceEvent);
     Long recurrenceId = recurrenceEvent.getId();
-    Long overrideId = created.getOverrideId();
-    assertThat(overrideId).isNotNull();
+    assertThat(
+            recurrenceEventRepository.findOverrideByRecurrenceIdAndOriginStartAt(
+                recurrenceId, origin))
+        .contains(created);
     entityManager.clear();
 
     // when
     RecurrenceEvent loaded = recurrenceEventRepository.findById(recurrenceId).orElseThrow();
     loaded.excludeOccurrence(origin, origin.plusSeconds(86400));
-    loaded.changeOccurrence(origin, "Restored", "memo", schedule);
+    recurrenceEventRepository.flush();
+    entityManager.clear();
+    loaded = recurrenceEventRepository.findById(recurrenceId).orElseThrow();
+    assertThat(loaded.findOverride(origin).orElseThrow().isDeleted()).isTrue();
+    RecurrenceEventOverride replacement =
+        loaded.changeOccurrence(origin, "Restored", "memo", schedule);
     recurrenceEventRepository.flush();
     entityManager.clear();
 
@@ -178,14 +189,15 @@ class RecurrenceEventOverrideRepositoryTest {
     RecurrenceEvent reloaded = recurrenceEventRepository.findById(recurrenceId).orElseThrow();
     assertThat(reloaded.getOverrides()).hasSize(1);
     RecurrenceEventOverride restored = reloaded.findOverride(origin).orElseThrow();
-    assertThat(restored.getOverrideId()).isEqualTo(overrideId);
+    assertThat(restored).isEqualTo(replacement);
+    assertThat(created.getOverrideTitle()).isEqualTo("Moved");
     assertThat(restored.getOverrideTitle()).isEqualTo("Restored");
     assertThat(restored.getOverrideDescription()).isEqualTo("memo");
     assertThat(restored.isDeleted()).isFalse();
   }
 
   @Test
-  @DisplayName("Root를 삭제하면 활성·제외 자식도 삭제하고 다른 Root의 같은 origin은 보존한다")
+  @DisplayName("Root를 삭제하면 활성·제외 값도 삭제하고 다른 Root의 같은 origin은 보존한다")
   void deleteRootRemovesOwnedOverridesOnly() {
     // given
     RecurrenceEvent first = newRecurrenceEvent();
@@ -210,18 +222,88 @@ class RecurrenceEventOverrideRepositoryTest {
     // then
     assertThat(recurrenceEventRepository.findById(first.getId())).isEmpty();
     assertThat(
-            recurrenceEventOverrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(
+            recurrenceEventRepository.findOverrideByRecurrenceIdAndOriginStartAt(
                 first.getId(), origin))
         .isEmpty();
     assertThat(
-            recurrenceEventOverrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(
+            recurrenceEventRepository.findOverrideByRecurrenceIdAndOriginStartAt(
                 first.getId(), origin.plusSeconds(86400)))
         .isEmpty();
     assertThat(recurrenceEventRepository.findById(second.getId())).isPresent();
     assertThat(
-            recurrenceEventOverrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(
+            recurrenceEventRepository.findOverrideByRecurrenceIdAndOriginStartAt(
                 second.getId(), origin))
         .isPresent();
+  }
+
+  @Test
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
+  @DisplayName("앱과 동기화가 다른 회차를 동시에 변경해도 Root 잠금으로 두 변경 값을 모두 보존한다")
+  void concurrentOccurrenceChangesPreserveBothValues() throws Exception {
+    TransactionTemplate transaction = new TransactionTemplate(transactionManager);
+    RecurrenceEvent event =
+        transaction.execute(status -> recurrenceEventRepository.saveAndFlush(newRecurrenceEvent()));
+    Instant firstOrigin = event.getFirstOccurrenceStartAt();
+    Instant secondOrigin = firstOrigin.plusSeconds(86400);
+    CountDownLatch firstLocked = new CountDownLatch(1);
+    CountDownLatch secondAttempted = new CountDownLatch(1);
+    CountDownLatch secondLocked = new CountDownLatch(1);
+    CountDownLatch releaseFirst = new CountDownLatch(1);
+    try (ExecutorService executor = Executors.newFixedThreadPool(2)) {
+      Future<?> first =
+          executor.submit(
+              () ->
+                  transaction.executeWithoutResult(
+                      status -> {
+                        RecurrenceEvent root =
+                            recurrenceEventRepository
+                                .findByIdAndAccountIdForUpdate(event.getId(), event.getAccountId())
+                                .orElseThrow();
+                        root.excludeOccurrence(firstOrigin, firstOrigin);
+                        firstLocked.countDown();
+                        await(releaseFirst);
+                      }));
+      try {
+        assertThat(firstLocked.await(5, TimeUnit.SECONDS)).isTrue();
+        Future<?> second =
+            executor.submit(
+                () ->
+                    transaction.executeWithoutResult(
+                        status -> {
+                          secondAttempted.countDown();
+                          RecurrenceEvent root =
+                              recurrenceEventRepository
+                                  .findByIdForUpdate(event.getId())
+                                  .orElseThrow();
+                          secondLocked.countDown();
+                          root.excludeOccurrence(secondOrigin, firstOrigin);
+                        }));
+        assertThat(secondAttempted.await(5, TimeUnit.SECONDS)).isTrue();
+        assertThat(secondLocked.await(250, TimeUnit.MILLISECONDS)).isFalse();
+        releaseFirst.countDown();
+        first.get(5, TimeUnit.SECONDS);
+        second.get(5, TimeUnit.SECONDS);
+      } finally {
+        releaseFirst.countDown();
+      }
+    }
+    List<RecurrenceEventOverride> saved =
+        transaction.execute(
+            status ->
+                recurrenceEventRepository.findById(event.getId()).orElseThrow().getOverrides());
+    assertThat(saved)
+        .extracting(RecurrenceEventOverride::getOriginStartAt)
+        .containsExactlyInAnyOrder(firstOrigin, secondOrigin);
+    assertThat(saved).allMatch(RecurrenceEventOverride::isDeleted);
+  }
+
+  private static void await(CountDownLatch latch) {
+    try {
+      if (!latch.await(5, TimeUnit.SECONDS)) throw new AssertionError("다른 트랜잭션의 작업을 기다리지 못했다.");
+    } catch (InterruptedException exception) {
+      Thread.currentThread().interrupt();
+      throw new AssertionError(exception);
+    }
   }
 
   private RecurrenceEvent newRecurrenceEvent() {
