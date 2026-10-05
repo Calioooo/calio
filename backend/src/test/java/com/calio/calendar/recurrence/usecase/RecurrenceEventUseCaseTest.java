@@ -125,7 +125,7 @@ class RecurrenceEventUseCaseTest {
     CreateRecurrenceEventRequest request = timedCreateRequest();
 
     // when
-    var response = createRecurrenceEvent.create(1L, request);
+    RecurrenceEventResponse response = createRecurrenceEvent.create(1L, request);
 
     // then
     ArgumentCaptor<RecurrenceEvent> captor = ArgumentCaptor.forClass(RecurrenceEvent.class);
@@ -300,7 +300,6 @@ class RecurrenceEventUseCaseTest {
     RecurrenceEventOverride existingOverride =
         recurrenceEvent.changeOccurrence(
             originStartAt,
-            true,
             "Old title",
             "old memo",
             CanonicalSchedule.recurrenceOverride(
@@ -308,7 +307,7 @@ class RecurrenceEventUseCaseTest {
                 Instant.parse("2027-01-02T03:00:00Z"),
                 false,
                 "Asia/Seoul"));
-    recurrenceEvent.excludeOccurrence(originStartAt, false, Instant.parse("2027-01-05T00:00:00Z"));
+    recurrenceEvent.excludeOccurrence(originStartAt, Instant.parse("2027-01-05T00:00:00Z"));
     recurrenceEvent.update(
         "All day master",
         null,
@@ -357,7 +356,6 @@ class RecurrenceEventUseCaseTest {
     RecurrenceEventOverride existingOverride =
         recurrenceEvent.changeOccurrence(
             originStartAt,
-            true,
             "Override",
             null,
             CanonicalSchedule.recurrenceOverride(
@@ -396,7 +394,6 @@ class RecurrenceEventUseCaseTest {
     RecurrenceEventOverride movedOverride =
         recurrenceEvent.changeOccurrence(
             originStartAt,
-            true,
             "이동한 회의",
             "변경된 설명",
             CanonicalSchedule.recurrenceOverride(

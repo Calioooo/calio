@@ -109,7 +109,7 @@ public class GoogleCalendarRecurrenceChangeService {
     recurrenceEventRepository
         .findById(mapping.getRecurrenceEventId())
         .orElseThrow(() -> new CalioException(ErrorCode.RECURRENCE_EVENT_NOT_FOUND))
-        .updateProviderContent(item.title(), item.description(), schedule, item.recurrenceRules());
+        .update(item.title(), item.description(), schedule, item.recurrenceRules());
     mapping.updateProviderEtag(item.providerEtag());
   }
 
@@ -222,7 +222,7 @@ public class GoogleCalendarRecurrenceChangeService {
         recurrenceEventRepository
             .findById(recurrenceEventMapping.getRecurrenceEventId())
             .orElseThrow(() -> new CalioException(ErrorCode.RECURRENCE_EVENT_NOT_FOUND));
-    RecurrenceEventOverride recurrenceEventOverride = applyProviderOverride(recurrenceEvent, item);
+    RecurrenceEventOverride recurrenceEventOverride = applyOverrideState(recurrenceEvent, item);
     recurrenceEventRepository.flush();
     cache
         .recurrenceEventOverrides()
@@ -268,7 +268,7 @@ public class GoogleCalendarRecurrenceChangeService {
       recordSyncConflict(mapping, ownership);
       return;
     }
-    applyProviderOverride(recurrenceOverride(mapping).getRecurrenceEvent(), item);
+    applyOverrideState(recurrenceOverride(mapping).getRecurrenceEvent(), item);
     mapping.updateProviderEtag(item.providerEtag());
   }
 
@@ -330,10 +330,10 @@ public class GoogleCalendarRecurrenceChangeService {
     }
   }
 
-  private RecurrenceEventOverride applyProviderOverride(
+  private RecurrenceEventOverride applyOverrideState(
       RecurrenceEvent recurrenceEvent, RecurrenceEventOverrideUpsert item) {
     if (item instanceof ActiveRecurrenceEventOverrideUpsert active) {
-      return recurrenceEvent.updateProviderOccurrence(
+      return recurrenceEvent.changeOccurrence(
           active.originStartAt(),
           active.title(),
           active.description(),
@@ -341,8 +341,7 @@ public class GoogleCalendarRecurrenceChangeService {
     }
     CancelledRecurrenceEventOverrideUpsert cancelled =
         (CancelledRecurrenceEventOverrideUpsert) item;
-    return recurrenceEvent.excludeProviderOccurrence(
-        cancelled.originStartAt(), cancelled.deletedAt());
+    return recurrenceEvent.excludeOccurrence(cancelled.originStartAt(), cancelled.deletedAt());
   }
 
   private void recordSyncConflict(

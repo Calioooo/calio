@@ -64,7 +64,6 @@ class RecurrenceEventOverrideRepositoryTest {
     RecurrenceEventOverride activeOverride =
         recurrenceEvent.changeOccurrence(
             Instant.parse("2027-01-02T09:00:00Z"),
-            true,
             "Moved",
             null,
             CanonicalSchedule.recurrenceOverride(
@@ -73,7 +72,7 @@ class RecurrenceEventOverrideRepositoryTest {
                 false,
                 "UTC"));
     recurrenceEvent.excludeOccurrence(
-        Instant.parse("2027-01-03T09:00:00Z"), true, Instant.parse("2027-01-01T00:00:00Z"));
+        Instant.parse("2027-01-03T09:00:00Z"), Instant.parse("2027-01-01T00:00:00Z"));
     recurrenceEventRepository.flush();
     entityManager.clear();
 
@@ -126,9 +125,9 @@ class RecurrenceEventOverrideRepositoryTest {
                 account.getId()));
     Instant removedOrigin = firstStart;
     Instant retainedOrigin = firstStart.plusSeconds(86400);
-    first.excludeOccurrence(removedOrigin, true, firstStart);
-    first.excludeOccurrence(retainedOrigin, true, firstStart);
-    second.excludeOccurrence(removedOrigin, true, firstStart);
+    first.excludeOccurrence(removedOrigin, firstStart);
+    first.excludeOccurrence(retainedOrigin, firstStart);
+    second.excludeOccurrence(removedOrigin, firstStart);
     recurrenceEventRepository.flush();
     entityManager.clear();
 
@@ -161,7 +160,7 @@ class RecurrenceEventOverrideRepositoryTest {
         CanonicalSchedule.recurrenceOverride(
             origin.plusSeconds(7200), origin.plusSeconds(10800), false, "UTC");
     RecurrenceEventOverride created =
-        recurrenceEvent.changeOccurrence(origin, true, "Moved", null, schedule);
+        recurrenceEvent.changeOccurrence(origin, "Moved", null, schedule);
     recurrenceEventRepository.saveAndFlush(recurrenceEvent);
     Long recurrenceId = recurrenceEvent.getId();
     Long overrideId = created.getOverrideId();
@@ -170,8 +169,8 @@ class RecurrenceEventOverrideRepositoryTest {
 
     // when
     RecurrenceEvent loaded = recurrenceEventRepository.findById(recurrenceId).orElseThrow();
-    loaded.excludeOccurrence(origin, false, origin.plusSeconds(86400));
-    loaded.changeOccurrence(origin, false, "Restored", "memo", schedule);
+    loaded.excludeOccurrence(origin, origin.plusSeconds(86400));
+    loaded.changeOccurrence(origin, "Restored", "memo", schedule);
     recurrenceEventRepository.flush();
     entityManager.clear();
 
@@ -194,12 +193,11 @@ class RecurrenceEventOverrideRepositoryTest {
     Instant origin = first.getFirstOccurrenceStartAt();
     first.changeOccurrence(
         origin,
-        true,
         "Moved",
         null,
         CanonicalSchedule.recurrenceOverride(origin, origin.plusSeconds(3600), false, "UTC"));
-    first.excludeOccurrence(origin.plusSeconds(86400), true, origin);
-    second.excludeOccurrence(origin, true, origin);
+    first.excludeOccurrence(origin.plusSeconds(86400), origin);
+    second.excludeOccurrence(origin, origin);
     recurrenceEventRepository.saveAndFlush(first);
     recurrenceEventRepository.saveAndFlush(second);
     entityManager.clear();

@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 import com.calio.calendar.aicalendar.domain.CalendarMutationOperation;
 import com.calio.calendar.aicalendar.domain.CalendarMutationScope;
 import com.calio.calendar.aicalendar.domain.CalendarMutationType;
+import com.calio.calendar.aicalendar.service.dto.CalendarMutationPreview;
 import com.calio.calendar.aicalendar.service.tool.dto.CalendarMutationToolRequest;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
@@ -75,7 +76,7 @@ class CalendarMutationServiceTest {
         .thenReturn(Optional.of(Tag.personalDefault("업무", "#64748B")));
 
     // when
-    var preview = service().preview(1L, updateRequest());
+    CalendarMutationPreview preview = service().preview(1L, updateRequest());
 
     // then
     assertThat(preview.type()).isEqualTo(CalendarMutationType.UPDATE);
@@ -115,7 +116,7 @@ class CalendarMutationServiceTest {
         .thenReturn(Optional.of(Tag.personalDefault("업무", "#64748B")));
 
     // when
-    var preview = service().preview(1L, createRequest());
+    CalendarMutationPreview preview = service().preview(1L, createRequest());
 
     // then
     assertThat(preview.type()).isEqualTo(CalendarMutationType.CREATE);
@@ -187,7 +188,7 @@ class CalendarMutationServiceTest {
     when(tagRepository.findPersonalDefaultTagById(1L))
         .thenReturn(Optional.of(Tag.personalDefault("업무", "#64748B")));
 
-    var preview = service().preview(1L, request);
+    CalendarMutationPreview preview = service().preview(1L, request);
 
     assertThat(preview.after().title()).isEqualTo("😀".repeat(80));
   }
@@ -200,7 +201,7 @@ class CalendarMutationServiceTest {
     when(getEventUseCase.get(1L, 10L)).thenReturn(existingEvent);
 
     // when
-    var preview = service().preview(1L, deleteRequest());
+    CalendarMutationPreview preview = service().preview(1L, deleteRequest());
 
     // then
     assertThat(preview.type()).isEqualTo(CalendarMutationType.DELETE);
@@ -463,7 +464,7 @@ class CalendarMutationServiceTest {
             List.of("RRULE:FREQ=DAILY"));
 
     // when
-    var preview = service().preview(1L, request);
+    CalendarMutationPreview preview = service().preview(1L, request);
 
     // then
     assertThat(preview.scope()).isEqualTo(CalendarMutationScope.ENTIRE_SERIES);
@@ -480,7 +481,7 @@ class CalendarMutationServiceTest {
     CalendarMutationToolRequest request = seriesUpdateRequest(null);
 
     // when
-    var preview = service().preview(1L, request);
+    CalendarMutationPreview preview = service().preview(1L, request);
 
     // then
     assertThat(preview.recurrence().after()).containsExactlyElementsOf(existingSeries.recurrence());

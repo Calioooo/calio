@@ -3,6 +3,7 @@ package com.calio.calendar.recurrence.usecase;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobEnqueueService;
+import com.calio.calendar.integration.sync.operation.GoogleOperationJobEnqueueService.OutboundOperation;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.sharing.recurrence.repository.PersonalRecurrenceGroupShareRepository;
@@ -27,7 +28,7 @@ public class DeleteRecurrenceEventUseCase {
 
   @Transactional
   public void delete(Long accountId, Long recurrenceId) {
-    var outboundOperation = jobEnqueueService.prepareOutboundOperation(accountId);
+    OutboundOperation outboundOperation = jobEnqueueService.prepareOutboundOperation(accountId);
     RecurrenceEvent recurrenceEvent =
         recurrenceEventRepository
             .findByIdAndAccountIdForUpdate(recurrenceId, accountId)

@@ -3,8 +3,8 @@ package com.calio.calendar.recurrence.usecase;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobEnqueueService;
+import com.calio.calendar.integration.sync.operation.GoogleOperationJobEnqueueService.OutboundOperation;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
-import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.recurrence.service.Rfc5545RecurrenceEngine;
 import java.time.Clock;
@@ -33,18 +33,13 @@ public class DeleteRecurrenceOccurrenceUseCase {
 
   @Transactional
   public void delete(Long accountId, Long recurrenceId, Instant originStartAt) {
-    var outboundOperation = jobEnqueueService.prepareOutboundOperation(accountId);
+    OutboundOperation outboundOperation = jobEnqueueService.prepareOutboundOperation(accountId);
     RecurrenceEvent recurrenceEvent =
         recurrenceEventRepository
             .findByIdAndAccountIdForUpdate(recurrenceId, accountId)
             .orElseThrow(() -> new CalioException(ErrorCode.RECURRENCE_EVENT_NOT_FOUND));
-    boolean generatedOrigin =
-        recurrenceEvent.findOverride(originStartAt).isEmpty()
-            && recurrenceEngine.containsOrigin(
-                RecurrenceSchedule.from(recurrenceEvent),
-                recurrenceEvent.getRecurrenceRules(),
-                originStartAt);
-    recurrenceEvent.excludeOccurrence(originStartAt, generatedOrigin, clock.instant());
+    recurrenceEvent.requireOccurrence(originStartAt, recurrenceEngine);
+    recurrenceEvent.excludeOccurrence(originStartAt, clock.instant());
     recurrenceEventRepository.flush();
     jobEnqueueService.enqueueRecurrenceOverrideDeleted(
         outboundOperation, recurrenceId, originStartAt);

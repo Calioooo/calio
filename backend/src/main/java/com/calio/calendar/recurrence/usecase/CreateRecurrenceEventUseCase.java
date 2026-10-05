@@ -4,6 +4,7 @@ import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobEnqueueService;
+import com.calio.calendar.integration.sync.operation.GoogleOperationJobEnqueueService.OutboundOperation;
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarRecurrenceJobKind;
 import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceJobPayload;
 import com.calio.calendar.recurrence.controller.dto.CreateRecurrenceEventRequest;
@@ -49,7 +50,7 @@ public class CreateRecurrenceEventUseCase {
             request.firstOccurrenceEndAt(),
             request.timeZone());
     List<String> recurrenceRules = recurrenceEngine.validate(schedule, request.recurrence());
-    var outboundOperation = jobEnqueueService.prepareOutboundOperation(accountId);
+    OutboundOperation outboundOperation = jobEnqueueService.prepareOutboundOperation(accountId);
     if (!accountRepository.existsById(accountId)) {
       throw new CalioException(ErrorCode.ACCOUNT_NOT_FOUND);
     }

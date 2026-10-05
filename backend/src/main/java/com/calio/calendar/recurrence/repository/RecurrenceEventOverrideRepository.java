@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
 import org.springframework.data.repository.query.Param;
 
+/** Child Entity의 조회 전용 접근. 변경과 저장은 RecurrenceEvent Root를 통해 수행한다. */
 public interface RecurrenceEventOverrideRepository
     extends Repository<RecurrenceEventOverride, Long> {
 

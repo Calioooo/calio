@@ -4,11 +4,11 @@ import com.calio.calendar.common.domain.CanonicalSchedule;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.integration.sync.operation.GoogleOperationJobEnqueueService;
+import com.calio.calendar.integration.sync.operation.GoogleOperationJobEnqueueService.OutboundOperation;
 import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceOverrideJobPayload;
 import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceOccurrenceRequest;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
-import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.recurrence.service.Rfc5545RecurrenceEngine;
 import com.calio.calendar.singleevent.controller.dto.EventResponse;
@@ -42,24 +42,15 @@ public class UpdateRecurrenceOccurrenceUseCase {
     CanonicalSchedule schedule =
         CanonicalSchedule.recurrenceOverride(
             request.startAt(), request.endAt(), request.allDay(), request.timeZone());
-    var outboundOperation = jobEnqueueService.prepareOutboundOperation(accountId);
+    OutboundOperation outboundOperation = jobEnqueueService.prepareOutboundOperation(accountId);
     RecurrenceEvent recurrenceEvent =
         recurrenceEventRepository
             .findByIdAndAccountIdForUpdate(recurrenceId, accountId)
             .orElseThrow(() -> new CalioException(ErrorCode.RECURRENCE_EVENT_NOT_FOUND));
-    boolean generatedOrigin =
-        recurrenceEvent.findOverride(request.originStartAt()).isEmpty()
-            && recurrenceEngine.containsOrigin(
-                RecurrenceSchedule.from(recurrenceEvent),
-                recurrenceEvent.getRecurrenceRules(),
-                request.originStartAt());
+    recurrenceEvent.requireOccurrence(request.originStartAt(), recurrenceEngine);
     RecurrenceEventOverride override =
         recurrenceEvent.changeOccurrence(
-            request.originStartAt(),
-            generatedOrigin,
-            request.title(),
-            request.description(),
-            schedule);
+            request.originStartAt(), request.title(), request.description(), schedule);
     recurrenceEventRepository.flush();
     jobEnqueueService.enqueueRecurrenceOverride(
         outboundOperation,

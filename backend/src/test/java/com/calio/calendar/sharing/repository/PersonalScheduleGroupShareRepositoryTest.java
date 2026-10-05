@@ -20,6 +20,7 @@ import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.repository.TagRepository;
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
@@ -92,7 +93,7 @@ class PersonalScheduleGroupShareRepositoryTest {
         eventShareRepository.saveAndFlush(PersonalEventGroupShare.create(event, firstGroup));
     PersonalEventGroupShare second =
         eventShareRepository.saveAndFlush(PersonalEventGroupShare.create(event, secondGroup));
-    var firstPublicShareId = first.getPublicShareId();
+    UUID firstPublicShareId = first.getPublicShareId();
 
     eventShareRepository.flush();
 

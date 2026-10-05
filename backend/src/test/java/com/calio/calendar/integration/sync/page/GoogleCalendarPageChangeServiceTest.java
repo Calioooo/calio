@@ -35,6 +35,8 @@ import com.calio.calendar.integration.sync.page.dto.GoogleCalendarNormalizedPage
 import com.calio.calendar.integration.sync.page.dto.GoogleCalendarNormalizedPage.CancelledRecurrenceEventOverrideUpsert;
 import com.calio.calendar.integration.sync.page.dto.GoogleCalendarNormalizedPage.EventUpsert;
 import com.calio.calendar.integration.sync.page.dto.GoogleCalendarNormalizedPage.RecurrenceEventUpsert;
+import com.calio.calendar.recurrence.domain.RecurrenceEvent;
+import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.singleevent.domain.SingleEvent;
@@ -575,6 +577,86 @@ class GoogleCalendarPageChangeServiceTest {
         .singleElement()
         .extracting(GoogleCalendarRecurrenceOverrideMapping::getProviderEtag)
         .isEqualTo("etag-exception-2");
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  @Transactional
+  @DisplayName("부모 규칙 변경과 새 override가 다른 페이지에 도착해도 순서와 재처리에 관계없이 같은 상태를 유지한다")
+  void parentAndOverridePagesConvergeRegardlessOfOrder(boolean overrideFirst) {
+    // given
+    tagRepository.saveAndFlush(Tag.personalFallback("기타", "#64748B"));
+    NormalizedEventSchedule schedule =
+        new NormalizedEventSchedule(
+            Instant.parse("2026-07-01T09:00:00Z"),
+            Instant.parse("2026-07-01T10:00:00Z"),
+            false,
+            "UTC");
+    RecurrenceEventUpsert initial =
+        new RecurrenceEventUpsert(
+            "series",
+            "etag-master-1",
+            "Initial",
+            null,
+            schedule,
+            List.of("RRULE:FREQ=DAILY;COUNT=1"));
+    applyNormalizedPage(
+        integration.getId(),
+        account.getId(),
+        new GoogleCalendarNormalizedPage(List.of(initial), null, "cursor-1"));
+    Instant origin = Instant.parse("2026-07-02T09:00:00Z");
+    ActiveRecurrenceEventOverrideUpsert override =
+        new ActiveRecurrenceEventOverrideUpsert(
+            "exception",
+            "series",
+            origin,
+            "etag-exception",
+            "Moved",
+            "memo",
+            new NormalizedEventSchedule(
+                Instant.parse("2026-07-04T12:00:00Z"),
+                Instant.parse("2026-07-04T13:00:00Z"),
+                false,
+                "UTC"));
+    RecurrenceEventUpsert updated =
+        new RecurrenceEventUpsert(
+            "series",
+            "etag-master-2",
+            "Updated",
+            null,
+            schedule,
+            List.of("RRULE:FREQ=DAILY;COUNT=3"));
+    GoogleCalendarNormalizedPage parentPage =
+        new GoogleCalendarNormalizedPage(List.of(updated), null, "cursor-2");
+    GoogleCalendarNormalizedPage overridePage =
+        new GoogleCalendarNormalizedPage(List.of(override), null, "cursor-2");
+
+    // when
+    applyNormalizedPage(
+        integration.getId(), account.getId(), overrideFirst ? overridePage : parentPage);
+    if (overrideFirst) {
+      RecurrenceEvent beforeParent = recurrenceEventRepository.findAll().getFirst();
+      assertThat(beforeParent.getRecurrenceRules()).containsExactly("RRULE:FREQ=DAILY;COUNT=1");
+      assertThat(beforeParent.findOverride(origin)).isPresent();
+    }
+    applyNormalizedPage(
+        integration.getId(), account.getId(), overrideFirst ? parentPage : overridePage);
+    applyNormalizedPage(integration.getId(), account.getId(), parentPage);
+    applyNormalizedPage(integration.getId(), account.getId(), overridePage);
+    recurrenceEventRepository.flush();
+
+    // then
+    assertThat(recurrenceEventRepository.findAll()).hasSize(1);
+    RecurrenceEvent event = recurrenceEventRepository.findAll().getFirst();
+    assertThat(event.getTitle()).isEqualTo("Updated");
+    assertThat(event.getRecurrenceRules()).containsExactly("RRULE:FREQ=DAILY;COUNT=3");
+    assertThat(event.getOverrides()).hasSize(1);
+    RecurrenceEventOverride recorded = event.findOverride(origin).orElseThrow();
+    assertThat(recorded.getOverrideTitle()).isEqualTo("Moved");
+    assertThat(recorded.getOverrideDescription()).isEqualTo("memo");
+    assertThat(recorded.getOverrideStartAt()).isEqualTo(override.schedule().startAt());
+    assertThat(recorded.isDeleted()).isFalse();
+    assertThat(recurrenceOverrideMappingRepository.findAll()).hasSize(1);
   }
 
   @Test

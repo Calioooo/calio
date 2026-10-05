@@ -310,8 +310,8 @@ class GoogleCalendarIntegrationDataServiceTest {
             List.of("RRULE:FREQ=DAILY"),
             1L,
             2L);
-    event.excludeProviderOccurrence(removedOrigin, removedOrigin);
-    event.excludeProviderOccurrence(retainedOrigin, removedOrigin);
+    event.excludeOccurrence(removedOrigin, removedOrigin);
+    event.excludeOccurrence(retainedOrigin, removedOrigin);
     when(recurrenceMapping.getRecurrenceEventId()).thenReturn(40L);
     when(recurrenceOverrideMapping.getOriginStartAt()).thenReturn(removedOrigin);
     when(recurrenceOverrideMapping.getRecurrenceEventMapping()).thenReturn(recurrenceMapping);

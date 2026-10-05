@@ -17,6 +17,10 @@ import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 import java.util.Objects;
 
+/**
+ * RecurrenceEvent가 소유하는 Child Entity. 원래 시작값으로 부모 안에서 식별되며, 생성과 상태 전이는 Root를 통해 수행한다. overrideId는
+ * 영속 행의 식별자다.
+ */
 @Entity
 @Table(
     name = "recurrence_event_overrides",
@@ -31,10 +35,10 @@ public class RecurrenceEventOverride extends BaseEntity {
   private Long overrideId;
 
   @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "recurrence_id", nullable = false)
+  @JoinColumn(name = "recurrence_id", nullable = false, updatable = false)
   private RecurrenceEvent recurrenceEvent;
 
-  @Column(name = "origin_start_at", nullable = false)
+  @Column(name = "origin_start_at", nullable = false, updatable = false)
   private Instant originStartAt;
 
   @Embedded
@@ -87,7 +91,9 @@ public class RecurrenceEventOverride extends BaseEntity {
   }
 
   void activate(String title, String description, CanonicalSchedule schedule) {
-    this.overrideTitle = new RecurrenceEventTitle(title);
+    RecurrenceEventTitle nextTitle = new RecurrenceEventTitle(title);
+    Objects.requireNonNull(schedule);
+    this.overrideTitle = nextTitle;
     this.overrideDescription = description;
     this.overrideStartAt = schedule.startAt();
     this.overrideEndAt = schedule.endAt();
@@ -97,6 +103,7 @@ public class RecurrenceEventOverride extends BaseEntity {
   }
 
   void markDeleted(Instant deletedAt) {
+    Objects.requireNonNull(deletedAt);
     this.overrideTitle = null;
     this.overrideDescription = null;
     this.overrideStartAt = null;

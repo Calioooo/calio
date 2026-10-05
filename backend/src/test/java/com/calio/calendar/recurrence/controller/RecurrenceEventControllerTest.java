@@ -788,7 +788,6 @@ class RecurrenceEventControllerTest {
     Instant originStartAt = Instant.parse("2027-03-01T09:00:00Z");
     otherMaster.changeOccurrence(
         originStartAt,
-        true,
         "Private override",
         null,
         com.calio.calendar.common.domain.CanonicalSchedule.recurrenceOverride(

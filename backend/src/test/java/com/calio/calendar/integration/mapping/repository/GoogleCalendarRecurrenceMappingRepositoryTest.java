@@ -379,7 +379,6 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
     Instant origin = Instant.parse(originStartAt);
     recurrenceEvent.changeOccurrence(
         origin,
-        true,
         "Moved",
         null,
         CanonicalSchedule.recurrenceOverride(
