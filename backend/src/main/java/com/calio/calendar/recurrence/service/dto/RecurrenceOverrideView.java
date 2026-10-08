@@ -1,4 +1,4 @@
-package com.calio.calendar.recurrence.repository.dto;
+package com.calio.calendar.recurrence.service.dto;
 
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;

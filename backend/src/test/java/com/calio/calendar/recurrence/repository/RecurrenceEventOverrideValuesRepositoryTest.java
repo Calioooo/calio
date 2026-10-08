@@ -9,7 +9,7 @@ import com.calio.calendar.common.testsupport.SharedIntegrationDatabase;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
-import com.calio.calendar.recurrence.repository.dto.RecurrenceOverrideView;
+import com.calio.calendar.recurrence.service.dto.RecurrenceOverrideView;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.repository.TagRepository;
 import jakarta.persistence.EntityManager;

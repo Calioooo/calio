@@ -2,7 +2,7 @@ package com.calio.calendar.recurrence.repository;
 
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
-import com.calio.calendar.recurrence.repository.dto.RecurrenceOverrideView;
+import com.calio.calendar.recurrence.service.dto.RecurrenceOverrideView;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.Collection;
@@ -67,7 +67,7 @@ public interface RecurrenceEventRepository extends JpaRepository<RecurrenceEvent
 
   @Query(
       """
-      select new com.calio.calendar.recurrence.repository.dto.RecurrenceOverrideView(event, override)
+      select new com.calio.calendar.recurrence.service.dto.RecurrenceOverrideView(event, override)
       from RecurrenceEvent event join event.overrides override
       where event.accountId = :accountId and override.deletedAt is null
         and override.schedule.startAt < :to and override.schedule.endAt > :from
