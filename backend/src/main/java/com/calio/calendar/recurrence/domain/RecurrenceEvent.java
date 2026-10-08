@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
-/** 개인 반복 일정의 Aggregate Root. 회차 개별 변경의 목록과 생명주기를 소유한다. */
 @Entity
 @Table(name = "recurrence_events")
 public class RecurrenceEvent extends BaseEntity {
@@ -157,7 +156,6 @@ public class RecurrenceEvent extends BaseEntity {
         .findFirst();
   }
 
-  /** 현재 시리즈 정의 또는 보존된 개별 변경에서 작업 대상 회차를 확인한다. */
   public void requireOccurrence(Instant originStartAt, RecurrenceOriginMatcher originMatcher) {
     if (findOverride(originStartAt).isPresent()) {
       return;
@@ -176,7 +174,6 @@ public class RecurrenceEvent extends BaseEntity {
     return changed;
   }
 
-  /** 확인된 회차의 제외 상태를 불변 값으로 교체한다. */
   public RecurrenceEventOverride excludeOccurrence(Instant originStartAt, Instant deletedAt) {
     RecurrenceEventOverride excluded = RecurrenceEventOverride.deleted(originStartAt, deletedAt);
     replaceOverride(excluded);

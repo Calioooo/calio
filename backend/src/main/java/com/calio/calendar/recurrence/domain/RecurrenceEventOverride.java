@@ -8,7 +8,6 @@ import jakarta.persistence.Embedded;
 import java.time.Instant;
 import java.util.Objects;
 
-/** 특정 회차에 적용할 변경 내용 또는 제외 상태를 표현하는 불변 값. */
 @Embeddable
 public record RecurrenceEventOverride(
     @Column(name = "origin_start_at", nullable = false) Instant originStartAt,
