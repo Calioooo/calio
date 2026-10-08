@@ -13,7 +13,6 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
-/** Applies personal-calendar recurrence and override rules without accessing persistence. */
 @Component
 public class PersonalRecurrenceOccurrenceResolver {
 

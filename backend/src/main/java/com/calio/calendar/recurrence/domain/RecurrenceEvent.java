@@ -165,7 +165,6 @@ public class RecurrenceEvent extends BaseEntity {
     }
   }
 
-  /** 확인된 회차의 변경 내용을 기록한다. 작업 대상 확인은 requireOccurrence 또는 수신 데이터 검증에서 수행한다. */
   public RecurrenceEventOverride changeOccurrence(
       Instant originStartAt, String title, String description, CanonicalSchedule schedule) {
     RecurrenceEventOverride changed =

@@ -85,12 +85,6 @@ public class GoogleCalendarIntegrationDataService {
   }
 
   @Transactional
-  /**
-   * Completes one sync run atomically.
-   *
-   * <p>FULL sync cleanup, the next sync token, and operation job completion must commit together so
-   * a sync token never represents a partial provider data update.
-   */
   public void completeSyncRun(
       Long jobId,
       Long accountId,

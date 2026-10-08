@@ -97,17 +97,14 @@ class SendDueCalendarNotificationsPolicyTest {
   @DisplayName("시간 일정 알림의 targetDate는 일정의 IANA timezone 기준 날짜를 사용한다")
   void
       givenTimedEventInAnotherTimeZone_whenDispatchingDueNotifications_thenUsesScheduleLocalTargetDate() {
-    // given
     Instant startAt = Instant.parse("2026-06-01T01:00:00Z");
     SingleEvent event = timedEvent(startAt, "America/Los_Angeles");
     when(eventRepository.findSingleEvents(eq(1L), any(), any())).thenReturn(List.of(event));
     stubDispatch();
 
-    // when
     sendDueCalendarNotificationsUseCase.dispatchAccountNotifications(
         account(TimedReminderOffset.AT_START, false), startAt);
 
-    // then
     ArgumentCaptor<CalendarNotificationContent> contentCaptor =
         ArgumentCaptor.forClass(CalendarNotificationContent.class);
     verify(sendDueCalendarNotificationsUseCase)
@@ -122,15 +119,12 @@ class SendDueCalendarNotificationsPolicyTest {
   @Test
   @DisplayName("남은 일정이 없는 브리핑 시각에는 브리핑을 발송하지 않는다")
   void givenNoRemainingSchedules_whenBriefingIsDue_thenSkipsNotification() {
-    // given
     Instant briefingTime = Instant.parse("2026-06-01T23:00:00Z");
     when(eventRepository.findSingleEvents(eq(1L), any(), any())).thenReturn(List.of());
 
-    // when
     sendDueCalendarNotificationsUseCase.dispatchAccountNotifications(
         account(TimedReminderOffset.MINUTES_10, true), briefingTime);
 
-    // then
     verify(sendDueCalendarNotificationsUseCase, org.mockito.Mockito.never())
         .dispatch(any(), any(), any(), any());
   }
@@ -139,7 +133,6 @@ class SendDueCalendarNotificationsPolicyTest {
   @DisplayName("브리핑은 Seoul 기준 당일의 남은 일정만 집계한다")
   void
       givenSchedulesOutsideBriefingDate_whenDispatchingDueNotifications_thenCountsOnlyTargetDateSchedules() {
-    // given
     Instant briefingTime = Instant.parse("2026-06-01T23:00:00Z");
     SingleEvent targetDateEvent = timedEvent(Instant.parse("2026-06-02T01:00:00Z"), "Asia/Seoul");
     SingleEvent nextDateEvent = timedEvent(Instant.parse("2026-06-03T01:00:00Z"), "Asia/Seoul");
@@ -147,11 +140,9 @@ class SendDueCalendarNotificationsPolicyTest {
         .thenReturn(List.of(targetDateEvent, nextDateEvent));
     stubDispatch();
 
-    // when
     sendDueCalendarNotificationsUseCase.dispatchAccountNotifications(
         account(TimedReminderOffset.MINUTES_10, true), briefingTime);
 
-    // then
     ArgumentCaptor<CalendarNotificationContent> contentCaptor =
         ArgumentCaptor.forClass(CalendarNotificationContent.class);
     verify(sendDueCalendarNotificationsUseCase)

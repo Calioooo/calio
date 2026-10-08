@@ -3,7 +3,6 @@ package com.calio.calendar.recurrence.domain;
 import java.time.Instant;
 import java.util.Objects;
 
-/** A recurrence occurrence after applying its override, if one exists. */
 public record PersonalRecurrenceOccurrence(
     RecurrenceEvent recurrenceEvent,
     Instant originStartAt,

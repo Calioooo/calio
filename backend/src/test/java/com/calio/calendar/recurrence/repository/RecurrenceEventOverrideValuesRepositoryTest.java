@@ -54,7 +54,6 @@ class RecurrenceEventOverrideValuesRepositoryTest {
   @Test
   @DisplayName("활성 기간과 겹치는 override만 조회하고 master를 함께 로딩한다")
   void givenActiveAndDeletedOverrides_whenFindActiveOverlapping_thenReturnsLoadedActiveOverride() {
-    // given
     Account account = accountRepository.save(new Account());
     Tag tag = tagRepository.save(Tag.personalDefault("기타", "#64748B"));
     RecurrenceEvent recurrenceEvent =
@@ -85,14 +84,12 @@ class RecurrenceEventOverrideValuesRepositoryTest {
     recurrenceEventRepository.flush();
     entityManager.clear();
 
-    // when
     List<RecurrenceOverrideView> overrides =
         recurrenceEventRepository.findActiveOverlappingOverrides(
             account.getId(),
             Instant.parse("2027-01-02T09:30:00Z"),
             Instant.parse("2027-01-02T11:30:00Z"));
 
-    // then
     assertThat(overrides)
         .extracting(view -> view.override().getOriginStartAt())
         .containsExactly(activeOverride.getOriginStartAt());
@@ -157,7 +154,6 @@ class RecurrenceEventOverrideValuesRepositoryTest {
   @Test
   @DisplayName("Root 저장 후 같은 origin의 수정·제외·복원은 같은 회차의 변경 값을 교체해 저장한다")
   void saveAndRestoreOverrideThroughRootPersistsReplacement() {
-    // given
     RecurrenceEvent recurrenceEvent = newRecurrenceEvent();
     Instant origin = recurrenceEvent.getFirstOccurrenceStartAt();
     CanonicalSchedule schedule =
@@ -173,7 +169,6 @@ class RecurrenceEventOverrideValuesRepositoryTest {
         .contains(created);
     entityManager.clear();
 
-    // when
     RecurrenceEvent loaded = recurrenceEventRepository.findById(recurrenceId).orElseThrow();
     loaded.excludeOccurrence(origin, origin.plusSeconds(86400));
     recurrenceEventRepository.flush();
@@ -185,7 +180,6 @@ class RecurrenceEventOverrideValuesRepositoryTest {
     recurrenceEventRepository.flush();
     entityManager.clear();
 
-    // then
     RecurrenceEvent reloaded = recurrenceEventRepository.findById(recurrenceId).orElseThrow();
     assertThat(reloaded.getOverrides()).hasSize(1);
     RecurrenceEventOverride restored = reloaded.findOverride(origin).orElseThrow();
@@ -199,7 +193,6 @@ class RecurrenceEventOverrideValuesRepositoryTest {
   @Test
   @DisplayName("Root를 삭제하면 활성·제외 값도 삭제하고 다른 Root의 같은 origin은 보존한다")
   void deleteRootRemovesOwnedOverridesOnly() {
-    // given
     RecurrenceEvent first = newRecurrenceEvent();
     RecurrenceEvent second = newRecurrenceEvent();
     Instant origin = first.getFirstOccurrenceStartAt();
@@ -214,12 +207,10 @@ class RecurrenceEventOverrideValuesRepositoryTest {
     recurrenceEventRepository.saveAndFlush(second);
     entityManager.clear();
 
-    // when
     recurrenceEventRepository.deleteById(first.getId());
     recurrenceEventRepository.flush();
     entityManager.clear();
 
-    // then
     assertThat(recurrenceEventRepository.findById(first.getId())).isEmpty();
     assertThat(
             recurrenceEventRepository.findOverrideByRecurrenceIdAndOriginStartAt(

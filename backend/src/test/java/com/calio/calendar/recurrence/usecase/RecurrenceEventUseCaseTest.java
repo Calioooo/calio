@@ -103,7 +103,6 @@ class RecurrenceEventUseCaseTest {
   @Test
   @DisplayName("반복 일정 생성은 정규화된 RFC line과 canonical schedule만 저장하고 SingleEvent row를 만들지 않는다")
   void givenTimedRequest_whenCreate_thenStoresValidatedMasterWithoutMaterializingEvents() {
-    // given
     Tag tag = tag();
     List<String> normalized = List.of("RRULE:FREQ=DAILY;COUNT=3");
     when(tagRepository.findPersonalFallbackTag()).thenReturn(Optional.of(tag));
@@ -118,10 +117,8 @@ class RecurrenceEventUseCaseTest {
             });
     CreateRecurrenceEventRequest request = timedCreateRequest();
 
-    // when
     RecurrenceEventResponse response = createRecurrenceEvent.create(1L, request);
 
-    // then
     ArgumentCaptor<RecurrenceEvent> captor = ArgumentCaptor.forClass(RecurrenceEvent.class);
     verify(recurrenceEventRepository).save(captor.capture());
     assertThat(captor.getValue().getFirstOccurrenceStartAt())
@@ -142,15 +139,12 @@ class RecurrenceEventUseCaseTest {
   @Test
   @DisplayName("계정이 소유한 반복 일정은 태그와 함께 응답 DTO로 변환한다")
   void givenOwnedRecurrenceEvent_whenGet_thenCreatesResponse() {
-    // given
     RecurrenceEvent recurrenceEvent = recurrenceEvent();
     when(recurrenceEventRepository.findByIdAndAccountId(10L, 1L))
         .thenReturn(Optional.of(recurrenceEvent));
 
-    // when
     RecurrenceEventResponse response = getRecurrenceEvent.get(1L, 10L);
 
-    // then
     assertThat(response.recurrenceId()).isEqualTo(10L);
     assertThat(response.title()).isEqualTo("Rule");
     assertThat(response.description()).isEqualTo("memo");
@@ -160,7 +154,6 @@ class RecurrenceEventUseCaseTest {
   @Test
   @DisplayName("전체 수정은 새 정의 검증 후 master snapshot만 교체하고 기존 child 상태를 보존한다")
   void givenValidUpdate_whenUpdate_thenReplacesOnlyMaster() {
-    // given
     RecurrenceEvent recurrenceEvent = recurrenceEvent();
     Tag tag = tag();
     List<String> normalized = List.of("RRULE:FREQ=WEEKLY;COUNT=2");
@@ -179,10 +172,8 @@ class RecurrenceEventUseCaseTest {
             normalized,
             null);
 
-    // when
     updateRecurrenceEvent.update(1L, 10L, request);
 
-    // then
     assertThat(recurrenceEvent.getTitle()).isEqualTo("Updated");
     assertThat(recurrenceEvent.isAllDay()).isTrue();
     assertThat(recurrenceEvent.getTimeZone()).isNull();
@@ -201,15 +192,12 @@ class RecurrenceEventUseCaseTest {
   @Test
   @DisplayName("전체 반복 일정 삭제는 공유를 정리한 뒤 Root의 생명주기로 삭제한다")
   void givenRecurrenceEvent_whenDelete_thenDeletesAggregateRoot() {
-    // given
     RecurrenceEvent recurrenceEvent = recurrenceEvent();
     when(recurrenceEventRepository.findByIdAndAccountIdForUpdate(10L, 1L))
         .thenReturn(Optional.of(recurrenceEvent));
 
-    // when
     deleteRecurrenceEvent.delete(1L, 10L);
 
-    // then
     InOrder deletionOrder =
         inOrder(jobEnqueueService, recurrenceEventRepository, recurrenceShareRepository);
     deletionOrder.verify(jobEnqueueService).prepareOutboundOperation(1L);
@@ -222,7 +210,6 @@ class RecurrenceEventUseCaseTest {
   @Test
   @DisplayName("occurrence PATCH는 title과 null description을 포함한 완전한 snapshot을 저장한다")
   void givenOccurrencePatch_whenUpdate_thenStoresCompleteSnapshot() {
-    // given
     RecurrenceEvent recurrenceEvent = recurrenceEvent();
     Instant originStartAt = Instant.parse("2027-01-01T00:00:00Z");
     when(recurrenceEventRepository.findByIdAndAccountIdForUpdate(10L, 1L))
@@ -238,10 +225,8 @@ class RecurrenceEventUseCaseTest {
             false,
             "Asia/Seoul");
 
-    // when
     EventResponse response = updateRecurrenceOccurrence.update(1L, 10L, request);
 
-    // then
     RecurrenceEventOverride override = recurrenceEvent.findOverride(originStartAt).orElseThrow();
     verify(recurrenceEventRepository).flush();
     assertThat(override.getOverrideTitle()).isEqualTo("Final title");
@@ -260,7 +245,6 @@ class RecurrenceEventUseCaseTest {
   @Test
   @DisplayName("기존 override와 현재 recurrence 회차가 모두 없으면 PATCH 상태를 생성하지 않는다")
   void givenUnknownOriginWithoutOverride_whenUpdate_thenRejectsWithoutStateChange() {
-    // given
     RecurrenceEvent recurrenceEvent = recurrenceEvent();
     Instant originStartAt = Instant.parse("2027-01-01T00:00:01Z");
     when(recurrenceEventRepository.findByIdAndAccountIdForUpdate(10L, 1L))
@@ -276,7 +260,6 @@ class RecurrenceEventUseCaseTest {
             false,
             "Asia/Seoul");
 
-    // when, then
     assertThatThrownBy(() -> updateRecurrenceOccurrence.update(1L, 10L, request))
         .isInstanceOf(CalioException.class)
         .extracting(exception -> ((CalioException) exception).getErrorCode())
@@ -288,7 +271,6 @@ class RecurrenceEventUseCaseTest {
   @Test
   @DisplayName("현재 규칙에서 사라진 제외 회차도 요청한 시간 형식의 변경 값으로 복원한다")
   void givenExcludedOrphanOccurrence_whenPatch_thenReplacesValueWithRequestedScheduleType() {
-    // given
     RecurrenceEvent recurrenceEvent = recurrenceEvent();
     Instant originStartAt = Instant.parse("2027-01-01T00:00:00Z");
     RecurrenceEventOverride existingOverride =
@@ -324,10 +306,8 @@ class RecurrenceEventUseCaseTest {
             true,
             null);
 
-    // when
     updateRecurrenceOccurrence.update(1L, 10L, request);
 
-    // then
     verify(recurrenceEngine, never()).containsOrigin(any(), any(), any());
     verify(recurrenceEventRepository).flush();
     RecurrenceEventOverride restored = recurrenceEvent.findOverride(originStartAt).orElseThrow();
@@ -345,7 +325,6 @@ class RecurrenceEventUseCaseTest {
   @Test
   @DisplayName("현재 rule에서 사라진 active override DELETE는 같은 회차의 값을 제외 상태로 교체한다")
   void givenActiveOrphanOccurrence_whenDelete_thenReplacesValueWithExclusion() {
-    // given
     RecurrenceEvent recurrenceEvent = recurrenceEvent();
     Instant originStartAt = Instant.parse("2027-01-01T00:00:00Z");
     Instant deletedAt = Instant.parse("2027-01-06T00:00:00Z");
@@ -363,10 +342,8 @@ class RecurrenceEventUseCaseTest {
         .thenReturn(Optional.of(recurrenceEvent));
     when(clock.instant()).thenReturn(deletedAt);
 
-    // when
     deleteRecurrenceOccurrence.delete(1L, 10L, originStartAt);
 
-    // then
     verify(recurrenceEngine, never()).containsOrigin(any(), any(), any());
     verify(recurrenceEventRepository).flush();
     RecurrenceEventOverride excluded = recurrenceEvent.findOverride(originStartAt).orElseThrow();
@@ -386,7 +363,6 @@ class RecurrenceEventUseCaseTest {
   @DisplayName("다른 날짜로 이동된 recurrence-occurrence는 origin identity로 현재 override를 조회한다")
   void
       givenMovedOccurrenceOverride_whenGetOccurrence_thenReturnsOverrideRegardlessOfOriginalRange() {
-    // given
     RecurrenceEvent recurrenceEvent = recurrenceEvent();
     Instant originStartAt = Instant.parse("2027-01-01T00:00:00Z");
     RecurrenceEventOverride movedOverride =
@@ -404,10 +380,8 @@ class RecurrenceEventUseCaseTest {
     when(recurrenceEventRepository.findOverrideByRecurrenceIdAndOriginStartAt(10L, originStartAt))
         .thenReturn(Optional.of(movedOverride));
 
-    // when
     EventResponse occurrence = getRecurrenceOccurrence.get(1L, 10L, originStartAt);
 
-    // then
     assertThat(occurrence.title()).isEqualTo("이동한 회의");
     assertThat(occurrence.startAt()).isEqualTo(Instant.parse("2027-01-05T02:00:00Z"));
     assertThat(occurrence.originStartAt()).isEqualTo(originStartAt);
@@ -417,14 +391,12 @@ class RecurrenceEventUseCaseTest {
   @Test
   @DisplayName("현재 rule과 exact override에 없는 origin은 상태를 만들지 않고 거절한다")
   void givenUnknownOriginWithoutOverride_whenDelete_thenRejectsWithoutStateChange() {
-    // given
     RecurrenceEvent recurrenceEvent = recurrenceEvent();
     Instant originStartAt = Instant.parse("2027-01-01T00:00:01Z");
     when(recurrenceEventRepository.findByIdAndAccountIdForUpdate(10L, 1L))
         .thenReturn(Optional.of(recurrenceEvent));
     when(recurrenceEngine.containsOrigin(any(), any(), any())).thenReturn(false);
 
-    // when, then
     assertThatThrownBy(() -> deleteRecurrenceOccurrence.delete(1L, 10L, originStartAt))
         .isInstanceOf(CalioException.class)
         .extracting(exception -> ((CalioException) exception).getErrorCode())
