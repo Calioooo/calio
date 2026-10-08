@@ -25,7 +25,9 @@ public record RecurrenceEventOverride(
     if (deletedAt == null) {
       Objects.requireNonNull(overrideTitle);
       Objects.requireNonNull(schedule);
-    } else if (overrideTitle != null || overrideDescription != null || schedule != null) {
+    }
+    if (deletedAt != null
+        && (overrideTitle != null || overrideDescription != null || schedule != null)) {
       throw new IllegalArgumentException("제외된 회차는 변경 내용을 가질 수 없다.");
     }
   }
