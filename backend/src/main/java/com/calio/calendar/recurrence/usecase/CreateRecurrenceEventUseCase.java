@@ -11,8 +11,8 @@ import com.calio.calendar.recurrence.controller.dto.CreateRecurrenceEventRequest
 import com.calio.calendar.recurrence.controller.dto.RecurrenceEventResponse;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
+import com.calio.calendar.recurrence.domain.Rfc5545RecurrenceEngine;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
-import com.calio.calendar.recurrence.service.Rfc5545RecurrenceEngine;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.repository.TagRepository;
 import java.util.List;

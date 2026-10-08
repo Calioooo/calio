@@ -9,8 +9,8 @@ import com.calio.calendar.integration.sync.operation.dto.GoogleRecurrenceOverrid
 import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceOccurrenceRequest;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
+import com.calio.calendar.recurrence.domain.Rfc5545RecurrenceEngine;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
-import com.calio.calendar.recurrence.service.Rfc5545RecurrenceEngine;
 import com.calio.calendar.singleevent.controller.dto.EventResponse;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.repository.TagRepository;

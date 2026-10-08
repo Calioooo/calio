@@ -156,11 +156,11 @@ public class RecurrenceEvent extends BaseEntity {
         .findFirst();
   }
 
-  public void requireOccurrence(Instant originStartAt, RecurrenceOriginMatcher originMatcher) {
+  public void requireOccurrence(Instant originStartAt, Rfc5545RecurrenceEngine recurrenceEngine) {
     if (findOverride(originStartAt).isPresent()) {
       return;
     }
-    if (!originMatcher.containsOrigin(schedule, recurrenceRules, originStartAt)) {
+    if (!recurrenceEngine.containsOrigin(schedule, recurrenceRules, originStartAt)) {
       throw new CalioException(ErrorCode.RECURRENCE_OCCURRENCE_NOT_FOUND);
     }
   }

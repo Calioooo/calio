@@ -2,6 +2,9 @@ package com.calio.calendar.recurrence.domain;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 import com.calio.calendar.common.domain.CanonicalSchedule;
 import com.calio.calendar.common.error.CalioException;
@@ -72,8 +75,11 @@ class RecurrenceEventTest {
   void unknownOriginCannotBeResolved() {
     RecurrenceEvent event = recurrenceEvent();
 
-    RecurrenceOriginMatcher originMatcher = (schedule, rules, origin) -> false;
-    assertThatThrownBy(() -> event.requireOccurrence(ORIGIN, originMatcher))
+    Rfc5545RecurrenceEngine recurrenceEngine = mock(Rfc5545RecurrenceEngine.class);
+    when(recurrenceEngine.containsOrigin(
+            RecurrenceSchedule.from(event), event.getRecurrenceRules(), ORIGIN))
+        .thenReturn(false);
+    assertThatThrownBy(() -> event.requireOccurrence(ORIGIN, recurrenceEngine))
         .isInstanceOf(CalioException.class)
         .extracting(exception -> ((CalioException) exception).getErrorCode())
         .isEqualTo(ErrorCode.RECURRENCE_OCCURRENCE_NOT_FOUND);
@@ -118,13 +124,11 @@ class RecurrenceEventTest {
   void excludedOverrideCanBeResolvedWithoutCurrentRule() {
     RecurrenceEvent event = recurrenceEvent();
     RecurrenceEventOverride excluded = event.excludeOccurrence(ORIGIN, ORIGIN);
-    RecurrenceOriginMatcher originMatcher =
-        (schedule, rules, origin) -> {
-          throw new AssertionError("기존 개별 변경은 현재 규칙 조회가 필요하지 않다.");
-        };
+    Rfc5545RecurrenceEngine recurrenceEngine = mock(Rfc5545RecurrenceEngine.class);
 
-    event.requireOccurrence(ORIGIN, originMatcher);
+    event.requireOccurrence(ORIGIN, recurrenceEngine);
 
+    verifyNoInteractions(recurrenceEngine);
     assertThat(event.findOverride(ORIGIN)).containsSame(excluded);
     assertThat(excluded.isDeleted()).isTrue();
   }
@@ -133,13 +137,12 @@ class RecurrenceEventTest {
   @DisplayName("반복 규칙에서 확인한 회차는 작업 대상으로 사용할 수 있고 조회만으로 override를 만들지 않는다")
   void generatedOccurrenceCanBeResolvedWithoutRecordingOverride() {
     RecurrenceEvent event = recurrenceEvent();
-    RecurrenceOriginMatcher originMatcher =
-        (schedule, rules, origin) ->
-            schedule.equals(RecurrenceSchedule.from(event))
-                && rules.equals(event.getRecurrenceRules())
-                && origin.equals(ORIGIN);
+    Rfc5545RecurrenceEngine recurrenceEngine = mock(Rfc5545RecurrenceEngine.class);
+    when(recurrenceEngine.containsOrigin(
+            RecurrenceSchedule.from(event), event.getRecurrenceRules(), ORIGIN))
+        .thenReturn(true);
 
-    event.requireOccurrence(ORIGIN, originMatcher);
+    event.requireOccurrence(ORIGIN, recurrenceEngine);
 
     assertThat(event.getOverrides()).isEmpty();
   }

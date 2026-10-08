@@ -5,6 +5,7 @@ import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceOccurrence;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
+import com.calio.calendar.recurrence.domain.Rfc5545RecurrenceEngine;
 import com.calio.calendar.recurrence.service.dto.RecurrenceOverrideView;
 import java.time.Instant;
 import java.util.List;

@@ -14,8 +14,8 @@ import com.calio.calendar.integration.sync.page.dto.GoogleCalendarNormalizedPage
 import com.calio.calendar.integration.sync.page.dto.GoogleCalendarNormalizedPage.RecurrenceEventUpsert;
 import com.calio.calendar.recurrence.domain.RecurrenceOccurrence;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
+import com.calio.calendar.recurrence.domain.Rfc5545RecurrenceEngine;
 import com.calio.calendar.recurrence.service.Ical4jRecurrenceEngine;
-import com.calio.calendar.recurrence.service.Rfc5545RecurrenceEngine;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
