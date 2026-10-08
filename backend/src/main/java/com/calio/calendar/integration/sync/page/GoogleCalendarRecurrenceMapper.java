@@ -11,7 +11,7 @@ import com.calio.calendar.integration.sync.page.dto.GoogleCalendarNormalizedPage
 import com.calio.calendar.integration.sync.page.dto.GoogleCalendarNormalizedPage.RecurrenceEventOverrideUpsert;
 import com.calio.calendar.integration.sync.page.dto.GoogleCalendarNormalizedPage.RecurrenceEventUpsert;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
-import com.calio.calendar.recurrence.service.Rfc5545RecurrenceEngine;
+import com.calio.calendar.recurrence.domain.Rfc5545RecurrenceEngine;
 import java.time.Instant;
 import java.util.List;
 import org.springframework.stereotype.Component;

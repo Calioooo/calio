@@ -16,7 +16,7 @@ import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.service.GroupMembershipQueryService;
 import com.calio.calendar.groupspace.service.GroupSpaceCommandService;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
-import com.calio.calendar.recurrence.service.Rfc5545RecurrenceEngine;
+import com.calio.calendar.recurrence.domain.Rfc5545RecurrenceEngine;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.repository.TagRepository;
 import java.time.Clock;

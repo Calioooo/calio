@@ -64,13 +64,11 @@ class CustomTagControllerTest {
   @DisplayName("사용자는 custom tag를 생성하면 colorCode가 대문자로 정규화된 CUSTOM 응답을 받는다")
   void givenValidCustomTagRequest_whenCreateCustomTag_thenReturnsCreatedCustomTag()
       throws Exception {
-    // when
     mockMvc
         .perform(
             post("/api/custom-tags")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(customTagRequest("운동", "#22c55e")))
-        // then
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.id").isNumber())
         .andExpect(jsonPath("$.title").value("운동"))
@@ -84,7 +82,6 @@ class CustomTagControllerTest {
   @Test
   @DisplayName("custom tag 제목은 중복될 수 있다")
   void givenDuplicateTitle_whenCreateCustomTags_thenStoresBothTags() throws Exception {
-    // when
     mockMvc
         .perform(
             post("/api/custom-tags")
@@ -98,7 +95,6 @@ class CustomTagControllerTest {
                 .content(customTagRequest("중복", "#222222")))
         .andExpect(status().isCreated());
 
-    // then
     long duplicateTitleCount =
         tagRepository.findAll().stream()
             .filter(tag -> tag.getTagType() == TagType.CUSTOM)
@@ -110,13 +106,11 @@ class CustomTagControllerTest {
   @Test
   @DisplayName("custom tag 생성 시 제목이 공백이면 VALIDATION_FAILED 예외를 반환한다")
   void givenBlankTitle_whenCreateCustomTag_thenReturnsValidationFailed() throws Exception {
-    // when
     mockMvc
         .perform(
             post("/api/custom-tags")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(customTagRequest(" ", "#22C55E")))
-        // then
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"));
   }
@@ -124,13 +118,11 @@ class CustomTagControllerTest {
   @Test
   @DisplayName("custom tag 생성 시 colorCode가 공백이면 VALIDATION_FAILED 예외를 반환한다")
   void givenBlankColorCode_whenCreateCustomTag_thenReturnsValidationFailed() throws Exception {
-    // when
     mockMvc
         .perform(
             post("/api/custom-tags")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(customTagRequest("색상 공백", " ")))
-        // then
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"));
   }
@@ -138,13 +130,11 @@ class CustomTagControllerTest {
   @Test
   @DisplayName("custom tag 생성 시 잘못된 colorCode는 INVALID_TAG_COLOR_CODE 예외를 반환한다")
   void givenInvalidColorCode_whenCreateCustomTag_thenReturnsInvalidTagColorCode() throws Exception {
-    // when
     mockMvc
         .perform(
             post("/api/custom-tags")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(customTagRequest("색상 오류", "22C55E")))
-        // then
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.title").value("INVALID_TAG_COLOR_CODE"));
   }
@@ -153,18 +143,15 @@ class CustomTagControllerTest {
   @DisplayName("사용자가 CUSTOM 태그를 수정하면 성공하고, PERSONAL_DEFAULT 태그를 수정하면 TAG_NOT_FOUND 예외를 반환한다")
   void givenCustomAndPersonalDefaultTagIds_whenUpdateCustomTag_thenOnlyCustomTagIsUpdated()
       throws Exception {
-    // given
     Tag customTag =
         tagRepository.save(Tag.personalCustom(currentAccountReference().getId(), "기존", "#111111"));
     Tag defaultTag = tagRepository.save(Tag.personalDefault("기타", "#64748B"));
 
-    // when
     mockMvc
         .perform(
             put("/api/custom-tags/{tagId}", customTag.getId())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(customTagRequest("변경", "#abcdef")))
-        // then
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.id").value(customTag.getId()))
         .andExpect(jsonPath("$.title").value("변경"))
@@ -184,7 +171,6 @@ class CustomTagControllerTest {
   @DisplayName("custom tag를 삭제하면 단건 일정과 반복 일정 모두 fallback 기타 태그로 재할당한다")
   void givenCustomTagInUse_whenDeleteCustomTag_thenReassignsAllUsagesToFallbackTag()
       throws Exception {
-    // given
     Tag fallbackTag = tagRepository.save(Tag.personalFallback("기타", "#64748B"));
     Tag customTag =
         tagRepository.save(
@@ -192,11 +178,9 @@ class CustomTagControllerTest {
     SingleEvent ordinaryEvent = eventRepository.save(event("일반", customTag));
     RecurrenceEvent recurrenceEvent = recurrenceEventRepository.save(recurrenceEvent(customTag));
 
-    // when
     MvcResult deleteResult =
         mockMvc
             .perform(delete("/api/custom-tags/{tagId}", customTag.getId()))
-            // then
             .andExpect(status().isNoContent())
             .andReturn();
 
@@ -205,25 +189,21 @@ class CustomTagControllerTest {
     assertThat(eventRepository.findById(ordinaryEvent.getId()))
         .hasValueSatisfying(event -> assertThat(event.getTagId()).isEqualTo(fallbackTag.getId()));
     assertThat(recurrenceEventRepository.findById(recurrenceEvent.getId()))
-        .hasValueSatisfying(
-            rule -> assertThat(rule.getTag().getId()).isEqualTo(fallbackTag.getId()));
+        .hasValueSatisfying(rule -> assertThat(rule.getTagId()).isEqualTo(fallbackTag.getId()));
   }
 
   @Test
   @DisplayName("fallback 기타 태그가 없으면 custom tag 삭제는 내부 오류를 노출하지 않고 기존 참조를 보존한다")
   void givenMissingFallbackTag_whenDeleteCustomTag_thenHidesInternalErrorAndKeepsReferences()
       throws Exception {
-    // given
     Tag customTag =
         tagRepository.save(
             Tag.personalCustom(currentAccountReference().getId(), "삭제 보류", "#8B5CF6"));
     SingleEvent ordinaryEvent = eventRepository.save(event("일반", customTag));
     RecurrenceEvent recurrenceEvent = recurrenceEventRepository.save(recurrenceEvent(customTag));
 
-    // when
     mockMvc
         .perform(delete("/api/custom-tags/{tagId}", customTag.getId()))
-        // then
         .andExpect(status().isInternalServerError())
         .andExpect(jsonPath("$.title").value("Internal Server Error"))
         .andExpect(jsonPath("$.detail").doesNotExist())
@@ -233,7 +213,7 @@ class CustomTagControllerTest {
     assertThat(eventRepository.findById(ordinaryEvent.getId()))
         .hasValueSatisfying(event -> assertThat(event.getTagId()).isEqualTo(customTag.getId()));
     assertThat(recurrenceEventRepository.findById(recurrenceEvent.getId()))
-        .hasValueSatisfying(rule -> assertThat(rule.getTag().getId()).isEqualTo(customTag.getId()));
+        .hasValueSatisfying(rule -> assertThat(rule.getTagId()).isEqualTo(customTag.getId()));
   }
 
   private String customTagRequest(String title, String colorCode) {
@@ -268,7 +248,7 @@ class CustomTagControllerTest {
             Instant.parse("2026-07-01T10:00:00Z"),
             "UTC"),
         java.util.List.of("RRULE:FREQ=DAILY;COUNT=2"),
-        tag,
-        currentAccountReference());
+        tag.getId(),
+        currentAccountReference().getId());
   }
 }

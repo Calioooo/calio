@@ -39,32 +39,23 @@ class RecurrenceEventRepositoryTest {
   @Test
   @DisplayName("종료 없는 RFC master도 first occurrence가 조회 종료보다 앞서면 후보에 포함한다")
   void givenUnboundedRule_whenFindExpansionCandidates_thenIncludesMaster() {
-    // given
     Account account = accountRepository.save(new Account());
     Tag tag = tagRepository.save(Tag.personalDefault("기타", "#64748B"));
     RecurrenceEvent master = saveRecurrenceEvent(account, tag, "Unbounded", "2020-01-01T09:00:00Z");
     entityManager.clear();
 
-    // when
     List<RecurrenceEvent> candidates =
         recurrenceEventRepository.findExpansionCandidatesStartedBefore(
             account.getId(), Instant.parse("2026-01-01T00:00:00Z"));
 
-    // then
     assertThat(candidates).extracting(RecurrenceEvent::getId).containsExactly(master.getId());
     assertThat(candidates.getFirst().getRecurrenceRules()).containsExactly("RRULE:FREQ=DAILY");
-    assertThat(
-            entityManager
-                .getEntityManagerFactory()
-                .getPersistenceUnitUtil()
-                .isLoaded(candidates.getFirst(), "tag"))
-        .isTrue();
+    assertThat(candidates.getFirst().getTagId()).isEqualTo(tag.getId());
   }
 
   @Test
   @DisplayName("account가 같고 first occurrence가 조회 종료보다 앞선 master만 후보로 조회한다")
   void givenMastersAcrossAccountsAndTime_whenFindExpansionCandidates_thenScopesByAccountAndStart() {
-    // given
     Account account = accountRepository.save(new Account());
     Account otherAccount = accountRepository.save(new Account());
     Tag tag = tagRepository.save(Tag.personalDefault("기타", "#64748B"));
@@ -74,12 +65,10 @@ class RecurrenceEventRepositoryTest {
     saveRecurrenceEvent(otherAccount, tag, "Other account", "2026-02-01T09:00:00Z");
     entityManager.clear();
 
-    // when
     List<RecurrenceEvent> candidates =
         recurrenceEventRepository.findExpansionCandidatesStartedBefore(
             account.getId(), Instant.parse("2026-02-20T00:00:00Z"));
 
-    // then
     assertThat(candidates).extracting(RecurrenceEvent::getId).containsExactly(included.getId());
   }
 
@@ -92,7 +81,7 @@ class RecurrenceEventRepositoryTest {
             null,
             RecurrenceSchedule.create(false, startAt, startAt.plusSeconds(3_600), "UTC"),
             List.of("RRULE:FREQ=DAILY"),
-            tag,
-            account));
+            tag.getId(),
+            account.getId()));
   }
 }

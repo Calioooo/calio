@@ -26,7 +26,6 @@ import com.calio.calendar.notification.domain.NotificationDispatchState;
 import com.calio.calendar.notification.domain.NotificationScheduleKey;
 import com.calio.calendar.notification.repository.IosPushDeviceRepository;
 import com.calio.calendar.notification.repository.NotificationDispatchRepository;
-import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.recurrence.service.PersonalRecurrenceOccurrenceResolver;
 import com.calio.calendar.singleevent.repository.SingleEventRepository;
@@ -56,8 +55,6 @@ class SendDueCalendarNotificationsUseCaseTest {
 
   @Mock private RecurrenceEventRepository recurrenceEventRepository;
 
-  @Mock private RecurrenceEventOverrideRepository recurrenceOverrideRepository;
-
   @Mock private PersonalRecurrenceOccurrenceResolver personalRecurrenceOccurrenceResolver;
 
   @Mock private GroupMemberRepository groupMemberRepository;
@@ -85,7 +82,6 @@ class SendDueCalendarNotificationsUseCaseTest {
             accountRepository,
             eventRepository,
             recurrenceEventRepository,
-            recurrenceOverrideRepository,
             personalRecurrenceOccurrenceResolver,
             groupMemberRepository,
             groupCalendarEventRepository,
@@ -101,7 +97,6 @@ class SendDueCalendarNotificationsUseCaseTest {
   @Test
   @DisplayName("하나의 리마인더 claim은 권한이 있는 모든 iOS 기기에 각각 발송한다")
   void givenTwoEligibleDevices_whenDispatch_thenSendsToEachDevice() {
-    // given
     Instant scheduledAt = Instant.parse("2026-09-08T00:00:00Z");
     stubNewDispatchClaim();
     when(dispatchRepository.markCompleted(
@@ -115,7 +110,6 @@ class SendDueCalendarNotificationsUseCaseTest {
     when(apnsClient.send(any()))
         .thenReturn(new ApnsSendResult(ApnsSendResultType.ACCEPTED, "apns-id", null));
 
-    // when
     sendDueCalendarNotificationsUseCase.dispatch(
         1L,
         NotificationScheduleKey.personalEvent(1L),
@@ -123,7 +117,6 @@ class SendDueCalendarNotificationsUseCaseTest {
         CalendarNotificationContent.schedule(
             CalendarNotificationType.REMINDER, LocalDate.of(2026, 9, 8), "회의", null));
 
-    // then
     verify(apnsClient, times(2)).send(any());
     verify(dispatchRepository)
         .markCompleted(
@@ -136,7 +129,6 @@ class SendDueCalendarNotificationsUseCaseTest {
   @Test
   @DisplayName("이미 claim된 리마인더는 APNs에 다시 발송하지 않는다")
   void givenExistingDispatchClaim_whenDispatch_thenSkipsApnsSend() {
-    // given
     Instant scheduledAt = Instant.parse("2026-09-08T00:00:00Z");
     when(dispatchRepository.saveAndFlush(any(NotificationDispatch.class)))
         .thenThrow(new DataIntegrityViolationException("duplicate claim"));
@@ -148,7 +140,6 @@ class SendDueCalendarNotificationsUseCaseTest {
             scheduledAt))
         .thenReturn(Optional.of(completedDispatch));
 
-    // when
     sendDueCalendarNotificationsUseCase.dispatch(
         1L,
         NotificationScheduleKey.personalEvent(1L),
@@ -156,7 +147,6 @@ class SendDueCalendarNotificationsUseCaseTest {
         CalendarNotificationContent.schedule(
             CalendarNotificationType.REMINDER, LocalDate.of(2026, 9, 8), "회의", null));
 
-    // then
     verify(dispatchRepository).saveAndFlush(any());
     verify(apnsClient, never()).send(any());
   }
@@ -164,7 +154,6 @@ class SendDueCalendarNotificationsUseCaseTest {
   @Test
   @DisplayName("일시적인 APNs 실패는 dispatch를 재시도 가능 상태로 전환한다")
   void givenTransientApnsFailure_whenDispatch_thenMarksDispatchRetryable() {
-    // given
     Instant scheduledAt = Instant.parse("2026-09-08T00:00:00Z");
     stubNewDispatchClaim();
     when(pushDeviceRepository.findByAccountIdAndActiveTrueAndApnsTokenIsNotNull(1L))
@@ -180,7 +169,6 @@ class SendDueCalendarNotificationsUseCaseTest {
             eq(NotificationDispatchState.RETRYABLE)))
         .thenReturn(1);
 
-    // when
     sendDueCalendarNotificationsUseCase.dispatch(
         1L,
         NotificationScheduleKey.personalEvent(1L),
@@ -188,7 +176,6 @@ class SendDueCalendarNotificationsUseCaseTest {
         CalendarNotificationContent.schedule(
             CalendarNotificationType.REMINDER, LocalDate.of(2026, 9, 8), "회의", null));
 
-    // then
     verify(dispatchRepository)
         .markRetryable(
             anyLong(),
@@ -202,7 +189,6 @@ class SendDueCalendarNotificationsUseCaseTest {
   @Test
   @DisplayName("재시도 가능한 기존 dispatch의 소유권을 획득하면 APNs 발송을 다시 수행한다")
   void givenRetryableDispatch_whenOwnershipIsAcquired_thenRetriesApnsSend() {
-    // given
     Instant scheduledAt = Instant.parse("2026-09-08T00:00:00Z");
     NotificationDispatch retryableDispatch = completedDispatch(scheduledAt);
     ReflectionTestUtils.setField(retryableDispatch, "state", NotificationDispatchState.RETRYABLE);
@@ -234,7 +220,6 @@ class SendDueCalendarNotificationsUseCaseTest {
             eq(NotificationDispatchState.COMPLETED)))
         .thenReturn(1);
 
-    // when
     sendDueCalendarNotificationsUseCase.dispatch(
         1L,
         NotificationScheduleKey.personalEvent(1L),
@@ -242,7 +227,6 @@ class SendDueCalendarNotificationsUseCaseTest {
         CalendarNotificationContent.schedule(
             CalendarNotificationType.REMINDER, LocalDate.of(2026, 9, 8), "회의", null));
 
-    // then
     verify(apnsClient).send(any());
     verify(dispatchRepository)
         .markCompleted(
@@ -255,7 +239,6 @@ class SendDueCalendarNotificationsUseCaseTest {
   @Test
   @DisplayName("APNs가 현재 토큰을 무효로 판정하면 해당 푸시 기기를 비활성화한다")
   void givenInvalidCurrentToken_whenDispatch_thenDeactivatesPushDevice() {
-    // given
     Instant scheduledAt = Instant.parse("2026-09-08T00:00:00Z");
     IosPushDevice pushDevice = pushDevice(10L, "invalid-token");
     stubNewDispatchClaim();
@@ -271,7 +254,6 @@ class SendDueCalendarNotificationsUseCaseTest {
         .thenReturn(
             new ApnsSendResult(ApnsSendResultType.INVALID_ENDPOINT, "apns-id", "BadDeviceToken"));
 
-    // when
     sendDueCalendarNotificationsUseCase.dispatch(
         1L,
         NotificationScheduleKey.personalEvent(1L),
@@ -279,7 +261,6 @@ class SendDueCalendarNotificationsUseCaseTest {
         CalendarNotificationContent.schedule(
             CalendarNotificationType.REMINDER, LocalDate.of(2026, 9, 8), "회의", null));
 
-    // then
     verify(pushDeviceRepository).deactivateIfTokenMatches(10L, "invalid-token", NOW);
     verify(pushDeviceRepository, never()).findById(10L);
   }

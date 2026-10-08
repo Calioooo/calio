@@ -6,8 +6,9 @@ import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceOccurrence;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
-import com.calio.calendar.recurrence.service.RecurrenceEventQueryService;
-import com.calio.calendar.recurrence.service.Rfc5545RecurrenceEngine;
+import com.calio.calendar.recurrence.domain.Rfc5545RecurrenceEngine;
+import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
+import com.calio.calendar.recurrence.service.dto.RecurrenceOverrideView;
 import com.calio.calendar.singleevent.controller.dto.EventResponse;
 import com.calio.calendar.singleevent.domain.SingleEvent;
 import com.calio.calendar.singleevent.repository.SingleEventRepository;
@@ -33,17 +34,18 @@ public class ListEventsUseCase {
 
   private final SingleEventRepository eventRepository;
   private final TagRepository tagRepository;
-  private final RecurrenceEventQueryService recurrenceEventQueryService;
+  private final RecurrenceEventRepository recurrenceEventRepository;
+
   private final Rfc5545RecurrenceEngine recurrenceEngine;
 
   public ListEventsUseCase(
       SingleEventRepository eventRepository,
       TagRepository tagRepository,
-      RecurrenceEventQueryService recurrenceEventQueryService,
+      RecurrenceEventRepository recurrenceEventRepository,
       Rfc5545RecurrenceEngine recurrenceEngine) {
     this.eventRepository = eventRepository;
     this.tagRepository = tagRepository;
-    this.recurrenceEventQueryService = recurrenceEventQueryService;
+    this.recurrenceEventRepository = recurrenceEventRepository;
     this.recurrenceEngine = recurrenceEngine;
   }
 
@@ -76,13 +78,27 @@ public class ListEventsUseCase {
   private List<EventResponse> listRecurrenceOccurrences(Long accountId, Instant from, Instant to) {
     List<EventResponse> responses = new ArrayList<>();
     Set<OccurrenceKey> responseKeys = new HashSet<>();
-    for (RecurrenceEvent recurrenceEvent :
-        recurrenceEventQueryService.listExpansionCandidatesStartedBefore(accountId, to)) {
-      addExpandedOccurrences(recurrenceEvent, from, to, responseKeys, responses);
+    List<RecurrenceEvent> candidates =
+        recurrenceEventRepository.findExpansionCandidatesStartedBefore(accountId, to);
+    List<RecurrenceOverrideView> movedIn =
+        recurrenceEventRepository.findActiveOverlappingOverrides(accountId, from, to);
+    Set<Long> tagIds =
+        candidates.stream().map(RecurrenceEvent::getTagId).collect(Collectors.toSet());
+    movedIn.stream().map(override -> override.recurrenceEvent().getTagId()).forEach(tagIds::add);
+    Map<Long, Tag> tagsById =
+        tagRepository.findAllById(tagIds).stream()
+            .collect(Collectors.toMap(Tag::getId, Function.identity()));
+    for (RecurrenceEvent recurrenceEvent : candidates) {
+      addExpandedOccurrences(recurrenceEvent, from, to, responseKeys, responses, tagsById);
     }
-    recurrenceEventQueryService.listActiveOverlappingOverrides(accountId, from, to).stream()
+    movedIn.stream()
         .filter(override -> responseKeys.add(OccurrenceKey.from(override)))
-        .map(EventResponse::recurrenceOverride)
+        .map(
+            override ->
+                EventResponse.recurrenceOverride(
+                    override.recurrenceEvent(),
+                    override.override(),
+                    requiredTag(tagsById, override.recurrenceEvent().getTagId())))
         .forEach(responses::add);
     return responses;
   }
@@ -92,7 +108,8 @@ public class ListEventsUseCase {
       Instant from,
       Instant to,
       Set<OccurrenceKey> responseKeys,
-      List<EventResponse> responses) {
+      List<EventResponse> responses,
+      Map<Long, Tag> tagsById) {
     List<RecurrenceOccurrence> occurrences =
         recurrenceEngine.expand(
             RecurrenceSchedule.from(recurrenceEvent),
@@ -106,8 +123,12 @@ public class ListEventsUseCase {
       RecurrenceEventOverride override = overridesByOrigin.get(occurrence.originStartAt());
       EventResponse response =
           override == null
-              ? EventResponse.recurrenceOccurrence(recurrenceEvent, occurrence)
-              : override.isDeleted() ? null : EventResponse.recurrenceOverride(override);
+              ? EventResponse.recurrenceOccurrence(
+                  recurrenceEvent, occurrence, requiredTag(tagsById, recurrenceEvent.getTagId()))
+              : override.isDeleted()
+                  ? null
+                  : EventResponse.recurrenceOverride(
+                      recurrenceEvent, override, requiredTag(tagsById, recurrenceEvent.getTagId()));
       if (response != null && overlaps(response, from, to) && responseKeys.add(key)) {
         responses.add(response);
       }
@@ -121,8 +142,8 @@ public class ListEventsUseCase {
     if (originStartAts.isEmpty()) {
       return Map.of();
     }
-    return recurrenceEventQueryService
-        .listOverrides(recurrenceEvent.getId(), originStartAts)
+    return recurrenceEventRepository
+        .findOverridesByRecurrenceIdAndOriginStartAtIn(recurrenceEvent.getId(), originStartAts)
         .stream()
         .collect(Collectors.toMap(RecurrenceEventOverride::getOriginStartAt, Function.identity()));
   }
@@ -141,8 +162,9 @@ public class ListEventsUseCase {
   }
 
   private record OccurrenceKey(Long recurrenceId, Instant originStartAt) {
-    private static OccurrenceKey from(RecurrenceEventOverride override) {
-      return new OccurrenceKey(override.getRecurrenceId(), override.getOriginStartAt());
+    private static OccurrenceKey from(RecurrenceOverrideView override) {
+      return new OccurrenceKey(
+          override.recurrenceEvent().getId(), override.override().getOriginStartAt());
     }
   }
 }

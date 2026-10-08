@@ -14,9 +14,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.account.repository.AccountRepository;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
-import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
-import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.security.AuthenticatedAccountMockMvcTestConfig;
 import com.calio.calendar.security.WithAuthenticatedAccount;
@@ -38,6 +36,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import tools.jackson.databind.JsonNode;
@@ -56,6 +55,8 @@ import tools.jackson.databind.ObjectMapper;
 @Import(AuthenticatedAccountMockMvcTestConfig.class)
 class RecurrenceEventControllerTest {
 
+  @Autowired private JdbcTemplate jdbcTemplate;
+
   @Autowired private MockMvc mockMvc;
 
   @Autowired private ObjectMapper objectMapper;
@@ -63,8 +64,6 @@ class RecurrenceEventControllerTest {
   @Autowired private SingleEventRepository eventRepository;
 
   @Autowired private RecurrenceEventRepository recurrenceEventRepository;
-
-  @Autowired private RecurrenceEventOverrideRepository overrideRepository;
 
   @Autowired private AccountRepository accountRepository;
 
@@ -83,10 +82,8 @@ class RecurrenceEventControllerTest {
   @Test
   @DisplayName("timed master는 timezone과 RFC line을 왕복하고 occurrence를 SingleEvent row 없이 전개한다")
   void givenTimedMaster_whenCreateDetailAndList_thenReturnsCanonicalContract() throws Exception {
-    // given, when
     long recurrenceId = createTimedRecurrence("Daily", "2026-08-01", "Asia/Seoul");
 
-    // then
     assertThat(eventRepository.count()).isZero();
     mockMvc
         .perform(get("/api/recurrence-events/{id}", recurrenceId))
@@ -117,7 +114,6 @@ class RecurrenceEventControllerTest {
   @Test
   @DisplayName("all-day master는 exclusive 날짜 범위를 UTC midnight occurrence로 반환한다")
   void givenAllDayMaster_whenList_thenReturnsExclusiveUtcMidnightRange() throws Exception {
-    // given
     MvcResult result =
         mockMvc
             .perform(
@@ -141,7 +137,6 @@ class RecurrenceEventControllerTest {
             .andReturn();
     long recurrenceId = readResponse(result).get("recurrenceId").asLong();
 
-    // when, then
     mockMvc
         .perform(
             get("/api/events")
@@ -159,7 +154,6 @@ class RecurrenceEventControllerTest {
   @DisplayName("all-day 반복은 첫 occurrence 종료 이후에도 RRULE에 따라 조회된다")
   void givenAllDayCountRule_whenListAfterFirstOccurrenceEnd_thenReturnsOccurrence()
       throws Exception {
-    // given
     MvcResult result =
         mockMvc
             .perform(
@@ -180,7 +174,6 @@ class RecurrenceEventControllerTest {
             .andReturn();
     long recurrenceId = readResponse(result).get("recurrenceId").asLong();
 
-    // when, then
     mockMvc
         .perform(
             get("/api/events")
@@ -196,7 +189,6 @@ class RecurrenceEventControllerTest {
   @Test
   @DisplayName("반복 조회가 occurrence 상한을 초과하면 안정적인 errorCode로 응답한다")
   void givenDenseRule_whenListEvents_thenReturnsOccurrenceLimitExceeded() throws Exception {
-    // given
     mockMvc
         .perform(
             post("/api/recurrence-events")
@@ -214,7 +206,6 @@ class RecurrenceEventControllerTest {
                                 """))
         .andExpect(status().isCreated());
 
-    // when, then
     mockMvc
         .perform(
             get("/api/events")
@@ -228,7 +219,6 @@ class RecurrenceEventControllerTest {
   @Test
   @DisplayName("active override는 null description을 포함한 snapshot 전체로 원본을 대체하고 이동 후 범위로 조회된다")
   void givenMovedOverride_whenList_thenUsesFinalSnapshotOverlap() throws Exception {
-    // given
     long recurrenceId = createTimedRecurrence("Master", "2026-10-01", "UTC");
     mockMvc
         .perform(
@@ -253,7 +243,6 @@ class RecurrenceEventControllerTest {
         .andExpect(jsonPath("$.timeZone").value("UTC"))
         .andExpect(jsonPath("$.originStartAt").value("2026-10-01T09:00:00Z"));
 
-    // when, then
     mockMvc
         .perform(
             get("/api/events")
@@ -277,7 +266,6 @@ class RecurrenceEventControllerTest {
   @DisplayName("all-day master의 occurrence를 독립된 timed snapshot으로 변경할 수 있다")
   void givenAllDayMaster_whenPatchTimedOccurrence_thenUsesRequestScheduleTypeAndTimeZone()
       throws Exception {
-    // given
     MvcResult createResult =
         mockMvc
             .perform(
@@ -298,7 +286,6 @@ class RecurrenceEventControllerTest {
             .andReturn();
     long recurrenceId = readResponse(createResult).get("recurrenceId").asLong();
 
-    // when, then
     mockMvc
         .perform(
             patch("/api/recurrence-events/{id}/occurrences", recurrenceId)
@@ -324,10 +311,8 @@ class RecurrenceEventControllerTest {
   @DisplayName("occurrence PATCH에서 allDay를 누락하면 snapshot을 저장하지 않는다")
   void givenMissingAllDay_whenPatchOccurrence_thenReturnsValidationFailedWithoutOverride()
       throws Exception {
-    // given
     long recurrenceId = createTimedRecurrence("Required allDay", "2026-10-01", "UTC");
 
-    // when, then
     mockMvc
         .perform(
             patch("/api/recurrence-events/{id}/occurrences", recurrenceId)
@@ -345,7 +330,7 @@ class RecurrenceEventControllerTest {
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.title").value("VALIDATION_FAILED"));
     assertThat(
-            overrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(
+            recurrenceEventRepository.findOverrideByRecurrenceIdAndOriginStartAt(
                 recurrenceId, Instant.parse("2026-10-01T09:00:00Z")))
         .isEmpty();
   }
@@ -354,7 +339,6 @@ class RecurrenceEventControllerTest {
   @DisplayName("새 virtual occurrence와 orphan active override는 final start 순서로 exact once 조회된다")
   void givenVirtualOccurrencesAndOrphanOverride_whenList_thenReturnsExactOnceInStartOrder()
       throws Exception {
-    // given
     long recurrenceId = createTimedRecurrence("Original rule", "2029-08-01", "UTC");
     Instant orphanOrigin = Instant.parse("2029-08-01T09:00:00Z");
     mockMvc
@@ -381,7 +365,6 @@ class RecurrenceEventControllerTest {
                 .content(timedRequest("Current rule", "2029-08-10", "UTC")))
         .andExpect(status().isOk());
 
-    // when
     MvcResult result =
         mockMvc
             .perform(
@@ -400,7 +383,6 @@ class RecurrenceEventControllerTest {
             .andExpect(jsonPath("$[2].timeZone").value("UTC"))
             .andReturn();
 
-    // then
     JsonNode events = readResponse(result);
     int orphanMatches = 0;
     for (JsonNode event : events) {
@@ -424,7 +406,6 @@ class RecurrenceEventControllerTest {
   @DisplayName("전체 master 수정은 active와 deleted override를 보존하고 orphan 조회를 유지한다")
   void givenActiveAndDeletedOverrides_whenReplaceMaster_thenPreservesChildStateAndOrphanQuery()
       throws Exception {
-    // given
     long recurrenceId = createTimedRecurrence("Master", "2026-12-01", "UTC");
     Instant activeOrigin = Instant.parse("2026-12-01T09:00:00Z");
     Instant deletedOrigin = Instant.parse("2026-12-02T09:00:00Z");
@@ -451,14 +432,13 @@ class RecurrenceEventControllerTest {
                 .param("originStartAt", deletedOrigin.toString()))
         .andExpect(status().isNoContent());
     Instant deletedAt =
-        overrideRepository
-            .findByRecurrenceEvent_IdAndOriginStartAt(recurrenceId, deletedOrigin)
+        recurrenceEventRepository
+            .findOverrideByRecurrenceIdAndOriginStartAt(recurrenceId, deletedOrigin)
             .orElseThrow()
             .getDeletedAt();
     Tag replacementTag =
         tagRepository.save(Tag.personalCustom(accountId, "Changed tag", "#123456"));
 
-    // when
     mockMvc
         .perform(
             put("/api/recurrence-events/{id}", recurrenceId)
@@ -481,12 +461,11 @@ class RecurrenceEventControllerTest {
         .andExpect(jsonPath("$.allDay").value(true))
         .andExpect(jsonPath("$.timeZone").doesNotExist());
 
-    // then
     assertThat(
-            overrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(recurrenceId, activeOrigin))
+            recurrenceEventRepository.findOverrideByRecurrenceIdAndOriginStartAt(
+                recurrenceId, activeOrigin))
         .hasValueSatisfying(
             override -> {
-              assertThat(override.getRecurrenceId()).isEqualTo(recurrenceId);
               assertThat(override.getOriginStartAt()).isEqualTo(activeOrigin);
               assertThat(override.getOverrideTitle()).isEqualTo("Preserved active");
               assertThat(override.getOverrideDescription()).isEqualTo("snapshot memo");
@@ -499,11 +478,10 @@ class RecurrenceEventControllerTest {
               assertThat(override.getDeletedAt()).isNull();
             });
     assertThat(
-            overrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(
+            recurrenceEventRepository.findOverrideByRecurrenceIdAndOriginStartAt(
                 recurrenceId, deletedOrigin))
         .hasValueSatisfying(
             override -> {
-              assertThat(override.getRecurrenceId()).isEqualTo(recurrenceId);
               assertThat(override.getOriginStartAt()).isEqualTo(deletedOrigin);
               assertThat(override.getOverrideTitle()).isNull();
               assertThat(override.getOverrideStartAt()).isNull();
@@ -590,7 +568,6 @@ class RecurrenceEventControllerTest {
   @DisplayName("잘못된 master schedule, timezone, recurrence rule은 master와 override를 변경하지 않는다")
   void givenInvalidMasterUpdates_whenReplaceMaster_thenPreservesMasterAndOverrideState()
       throws Exception {
-    // given
     long recurrenceId = createTimedRecurrence("Validation master", "2028-01-01", "UTC");
     Instant originStartAt = Instant.parse("2028-01-01T09:00:00Z");
     mockMvc
@@ -611,7 +588,6 @@ class RecurrenceEventControllerTest {
                                 """))
         .andExpect(status().isOk());
 
-    // when
     mockMvc
         .perform(
             put("/api/recurrence-events/{id}", recurrenceId)
@@ -646,7 +622,6 @@ class RecurrenceEventControllerTest {
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.title").value("INVALID_RECURRENCE_RULE"));
 
-    // then
     RecurrenceEvent unchangedMaster =
         recurrenceEventRepository.findById(recurrenceId).orElseThrow();
     assertThat(unchangedMaster.getTitle()).isEqualTo("Validation master");
@@ -656,7 +631,7 @@ class RecurrenceEventControllerTest {
     assertThat(unchangedMaster.getTimeZone()).isEqualTo("UTC");
     assertThat(unchangedMaster.getRecurrenceRules()).containsExactly("RRULE:FREQ=DAILY;COUNT=3");
     assertThat(
-            overrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(
+            recurrenceEventRepository.findOverrideByRecurrenceIdAndOriginStartAt(
                 recurrenceId, originStartAt))
         .hasValueSatisfying(
             override -> {
@@ -676,7 +651,6 @@ class RecurrenceEventControllerTest {
   @DisplayName("같은 originStartAt의 PATCH와 DELETE는 한 override row에서 active와 deleted 상태를 전환한다")
   void givenSameOccurrence_whenPatchAndDeleteRepeatedly_thenTransitionsSingleOverrideState()
       throws Exception {
-    // given
     long recurrenceId = createTimedRecurrence("State", "2027-01-01", "UTC");
     String originStartAt = "2027-01-01T09:00:00Z";
     mockMvc
@@ -685,7 +659,6 @@ class RecurrenceEventControllerTest {
                 .param("originStartAt", originStartAt))
         .andExpect(status().isNoContent());
 
-    // when
     mockMvc
         .perform(
             patch("/api/recurrence-events/{id}/occurrences", recurrenceId)
@@ -705,9 +678,10 @@ class RecurrenceEventControllerTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.title").value("Restored"));
 
-    // then
     java.time.Instant origin = java.time.Instant.parse(originStartAt);
-    assertThat(overrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(recurrenceId, origin))
+    assertThat(
+            recurrenceEventRepository.findOverrideByRecurrenceIdAndOriginStartAt(
+                recurrenceId, origin))
         .hasValueSatisfying(
             override -> {
               assertThat(override.isDeleted()).isFalse();
@@ -720,7 +694,9 @@ class RecurrenceEventControllerTest {
             delete("/api/recurrence-events/{id}/occurrences", recurrenceId)
                 .param("originStartAt", originStartAt))
         .andExpect(status().isNoContent());
-    assertThat(overrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(recurrenceId, origin))
+    assertThat(
+            recurrenceEventRepository.findOverrideByRecurrenceIdAndOriginStartAt(
+                recurrenceId, origin))
         .hasValueSatisfying(
             override -> {
               assertThat(override.isDeleted()).isTrue();
@@ -732,11 +708,10 @@ class RecurrenceEventControllerTest {
   @DisplayName("engine이 생성하지 않는 originStartAt의 PATCH는 RECURRENCE_OCCURRENCE_NOT_FOUND를 반환한다")
   void givenUnknownOriginStartAt_whenPatchOccurrence_thenReturnsOccurrenceNotFound()
       throws Exception {
-    // given
     long recurrenceId = createTimedRecurrence("Origin", "2027-02-01", "UTC");
-    long overrideCount = overrideRepository.count();
+    long overrideCount =
+        jdbcTemplate.queryForObject("select count(*) from recurrence_event_overrides", Long.class);
 
-    // when
     mockMvc
         .perform(
             patch("/api/recurrence-events/{id}/occurrences", recurrenceId)
@@ -762,15 +737,16 @@ class RecurrenceEventControllerTest {
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.title").value("RECURRENCE_OCCURRENCE_NOT_FOUND"));
 
-    // then
-    assertThat(overrideRepository.count()).isEqualTo(overrideCount);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from recurrence_event_overrides", Long.class))
+        .isEqualTo(overrideCount);
   }
 
   @Test
   @DisplayName("다른 account의 실제 override identity도 master 소유권 경로에서 격리한다")
   void givenOtherAccountOverride_whenMutate_thenReturnsRecurrenceNotFoundWithoutStateChange()
       throws Exception {
-    // given
     Account otherAccount = accountRepository.save(new Account());
     Tag defaultTag = tagRepository.findPersonalFallbackTag().orElseThrow();
     RecurrenceEvent otherMaster =
@@ -784,22 +760,20 @@ class RecurrenceEventControllerTest {
                     java.time.Instant.parse("2027-03-01T10:00:00Z"),
                     "UTC"),
                 List.of("RRULE:FREQ=DAILY;COUNT=2"),
-                defaultTag,
-                otherAccount));
+                defaultTag.getId(),
+                otherAccount.getId()));
     Instant originStartAt = Instant.parse("2027-03-01T09:00:00Z");
-    overrideRepository.save(
-        RecurrenceEventOverride.active(
-            otherMaster,
-            originStartAt,
-            "Private override",
-            null,
-            com.calio.calendar.common.domain.CanonicalSchedule.recurrenceOverride(
-                Instant.parse("2027-03-02T12:00:00Z"),
-                Instant.parse("2027-03-02T13:00:00Z"),
-                false,
-                "UTC")));
+    otherMaster.changeOccurrence(
+        originStartAt,
+        "Private override",
+        null,
+        com.calio.calendar.common.domain.CanonicalSchedule.recurrenceOverride(
+            Instant.parse("2027-03-02T12:00:00Z"),
+            Instant.parse("2027-03-02T13:00:00Z"),
+            false,
+            "UTC"));
+    recurrenceEventRepository.saveAndFlush(otherMaster);
 
-    // when
     mockMvc
         .perform(get("/api/recurrence-events/{id}", otherMaster.getId()))
         .andExpect(status().isNotFound())
@@ -829,9 +803,8 @@ class RecurrenceEventControllerTest {
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.title").value("RECURRENCE_EVENT_NOT_FOUND"));
 
-    // then
     assertThat(
-            overrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(
+            recurrenceEventRepository.findOverrideByRecurrenceIdAndOriginStartAt(
                 otherMaster.getId(), originStartAt))
         .hasValueSatisfying(
             override -> {
@@ -843,7 +816,6 @@ class RecurrenceEventControllerTest {
   @Test
   @DisplayName("전체 recurrence 삭제는 active와 deleted override, master를 모두 제거한다")
   void givenRecurrenceChildren_whenDeleteMaster_thenRemovesAllChildrenAndMaster() throws Exception {
-    // given
     long recurrenceId = createTimedRecurrence("Delete all", "2027-05-01", "UTC");
     Instant activeOrigin = Instant.parse("2027-05-01T09:00:00Z");
     Instant deletedOrigin = Instant.parse("2027-05-02T09:00:00Z");
@@ -869,17 +841,16 @@ class RecurrenceEventControllerTest {
             delete("/api/recurrence-events/{id}/occurrences", recurrenceId)
                 .param("originStartAt", deletedOrigin.toString()))
         .andExpect(status().isNoContent());
-    // when
     mockMvc
         .perform(delete("/api/recurrence-events/{id}", recurrenceId))
         .andExpect(status().isNoContent());
 
-    // then
     assertThat(
-            overrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(recurrenceId, activeOrigin))
+            recurrenceEventRepository.findOverrideByRecurrenceIdAndOriginStartAt(
+                recurrenceId, activeOrigin))
         .isEmpty();
     assertThat(
-            overrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(
+            recurrenceEventRepository.findOverrideByRecurrenceIdAndOriginStartAt(
                 recurrenceId, deletedOrigin))
         .isEmpty();
     assertThat(recurrenceEventRepository.findById(recurrenceId)).isEmpty();
@@ -888,11 +859,9 @@ class RecurrenceEventControllerTest {
   @Test
   @DisplayName("다른 account의 custom tag로 recurrence master를 생성하면 TAG_NOT_FOUND를 반환한다")
   void givenOtherAccountTag_whenCreate_thenReturnsTagNotFound() throws Exception {
-    // given
     Account otherAccount = accountRepository.save(new Account());
     Tag otherTag = tagRepository.save(Tag.personalCustom(otherAccount.getId(), "Other", "#123456"));
 
-    // when, then
     mockMvc
         .perform(
             post("/api/recurrence-events")
@@ -963,7 +932,6 @@ class RecurrenceEventControllerTest {
   @Test
   @DisplayName("RDATE, EXDATE, EXRULE, 복수 RRULE 입력을 하나의 recurrence set으로 저장한다")
   void givenMultipleRecurrenceRules_whenCreate_thenAcceptsContract() throws Exception {
-    // given
     String request = timedRequest("Multiple rules", "2026-08-01", "UTC");
     String recurrence = "\"recurrence\": [\"RRULE:FREQ=DAILY;COUNT=3\"]";
     String multipleLines =
@@ -976,7 +944,6 @@ class RecurrenceEventControllerTest {
                     "EXRULE:FREQ=WEEKLY;COUNT=2;BYDAY=TU"
                   ]""";
 
-    // when, then
     mockMvc
         .perform(
             post("/api/recurrence-events")
@@ -1000,7 +967,7 @@ class RecurrenceEventControllerTest {
 
   private void assertCurrentAllDaySnapshot(Long recurrenceId, Instant originStartAt, String title) {
     assertThat(
-            overrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(
+            recurrenceEventRepository.findOverrideByRecurrenceIdAndOriginStartAt(
                 recurrenceId, originStartAt))
         .hasValueSatisfying(
             override -> {

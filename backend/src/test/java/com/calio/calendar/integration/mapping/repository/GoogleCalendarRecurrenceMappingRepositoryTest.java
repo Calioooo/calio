@@ -16,7 +16,6 @@ import com.calio.calendar.integration.mapping.domain.GoogleCalendarRecurrenceOve
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
-import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.tag.domain.Tag;
 import com.calio.calendar.tag.repository.TagRepository;
@@ -46,8 +45,6 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
 
   @Autowired private RecurrenceEventRepository recurrenceEventRepository;
 
-  @Autowired private RecurrenceEventOverrideRepository recurrenceEventOverrideRepository;
-
   @Autowired private GoogleCalendarIntegrationRepository integrationRepository;
 
   @Autowired private GoogleCalendarConnectionRepository connectionRepository;
@@ -60,24 +57,13 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
   @Transactional
   @DisplayName("recurrence provider mapping은 canonical/provider identity와 parent join으로 조회한다")
   void givenRecurrenceMappings_whenLookup_thenKeepsCanonicalAndProviderIdentitySeparate() {
-    // given
     Account account = accountRepository.saveAndFlush(new Account());
     Tag tag = tagRepository.saveAndFlush(Tag.personalDefault("기타", "#64748B"));
     GoogleCalendarConnection connection = connection(account.getId());
     RecurrenceEvent recurrenceEvent =
         recurrenceEventRepository.saveAndFlush(recurrenceEvent(account, tag));
     RecurrenceEventOverride recurrenceOverride =
-        recurrenceEventOverrideRepository.saveAndFlush(
-            RecurrenceEventOverride.active(
-                recurrenceEvent,
-                Instant.parse("2026-07-21T00:00:00Z"),
-                "Moved",
-                null,
-                CanonicalSchedule.recurrenceOverride(
-                    Instant.parse("2026-07-21T01:00:00Z"),
-                    Instant.parse("2026-07-21T02:00:00Z"),
-                    false,
-                    "UTC")));
+        recurrenceOverride(recurrenceEvent, "2026-07-21T00:00:00Z");
     String externalRecurrenceEventId = "m".repeat(1024);
     String externalRecurrenceOverrideId = "e".repeat(1024);
     GoogleCalendarRecurrenceEventMapping eventMapping =
@@ -87,9 +73,11 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
     GoogleCalendarRecurrenceOverrideMapping overrideMapping =
         overrideMappingRepository.saveAndFlush(
             new GoogleCalendarRecurrenceOverrideMapping(
-                eventMapping, recurrenceOverride, externalRecurrenceOverrideId, "a".repeat(64)));
+                eventMapping,
+                recurrenceOverride.getOriginStartAt(),
+                externalRecurrenceOverrideId,
+                "a".repeat(64)));
 
-    // when, then
     assertThat(
             eventMappingRepository.findByConnectionIdAndRecurrenceEventId(
                 connection.getId(), recurrenceEvent.getId()))
@@ -113,7 +101,7 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
     eventMappingRepository.flush();
     assertThat(recurrenceEventRepository.findById(recurrenceEvent.getId())).isPresent();
     assertThat(
-            recurrenceEventOverrideRepository.findByRecurrenceEvent_IdAndOriginStartAt(
+            recurrenceEventRepository.findOverrideByRecurrenceIdAndOriginStartAt(
                 recurrenceEvent.getId(), recurrenceOverride.getOriginStartAt()))
         .isPresent();
   }
@@ -121,14 +109,12 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
   @Test
   @DisplayName("동일 provider recurrence event identity의 mapping 중복을 거부한다")
   void givenDuplicateRecurrenceEventProviderIdentity_whenSave_thenRejectsDuplicate() {
-    // given
     RecurrenceFixture fixture = recurrenceFixture();
     eventMappingRepository.saveAndFlush(
         eventMapping(fixture, fixture.recurrenceEvent(), "same-external-id"));
     RecurrenceEvent otherRecurrenceEvent =
         recurrenceEventRepository.saveAndFlush(recurrenceEvent(fixture.account(), fixture.tag()));
 
-    // when, then
     assertThatThrownBy(
             () ->
                 eventMappingRepository.saveAndFlush(
@@ -139,12 +125,10 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
   @Test
   @DisplayName("같은 Connection에서 하나의 recurrence ID에 두 mapping 연결을 거부한다")
   void givenDuplicateCanonicalRecurrenceEvent_whenSave_thenRejectsSecondMapping() {
-    // given
     RecurrenceFixture fixture = recurrenceFixture();
     eventMappingRepository.saveAndFlush(
         eventMapping(fixture, fixture.recurrenceEvent(), "first-external-id"));
 
-    // when, then
     assertThatThrownBy(
             () ->
                 eventMappingRepository.saveAndFlush(
@@ -253,9 +237,9 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
   }
 
   @Test
+  @Transactional
   @DisplayName("동일 parent와 external ID의 recurrence override mapping 중복을 거부한다")
   void givenDuplicateRecurrenceOverrideProviderIdentity_whenSave_thenRejectsDuplicate() {
-    // given
     RecurrenceFixture fixture = recurrenceFixture();
     GoogleCalendarRecurrenceEventMapping parentMapping =
         eventMappingRepository.saveAndFlush(
@@ -267,7 +251,6 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
     overrideMappingRepository.saveAndFlush(
         overrideMapping(parentMapping, firstOverride, "same-override-id"));
 
-    // when, then
     assertThatThrownBy(
             () ->
                 overrideMappingRepository.saveAndFlush(
@@ -278,7 +261,6 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
   @Test
   @DisplayName("같은 parent mapping에서 하나의 exact origin에 두 mapping 연결을 거부한다")
   void givenDuplicateCanonicalRecurrenceOverride_whenSave_thenRejectsSecondMapping() {
-    // given
     RecurrenceFixture fixture = recurrenceFixture();
     GoogleCalendarRecurrenceEventMapping parentMapping =
         eventMappingRepository.saveAndFlush(
@@ -288,7 +270,6 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
     overrideMappingRepository.saveAndFlush(
         overrideMapping(parentMapping, recurrenceOverride, "first-override-id"));
 
-    // when, then
     assertThatThrownBy(
             () ->
                 overrideMappingRepository.saveAndFlush(
@@ -299,16 +280,13 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
   @Test
   @DisplayName("canonical recurrence event를 hard-delete해도 mapping은 immutable recurrence ID로 남는다")
   void givenMappedRecurrenceEvent_whenDeleteCanonical_thenMappingIdentityRemains() {
-    // given
     RecurrenceFixture fixture = recurrenceFixture();
     eventMappingRepository.saveAndFlush(
         eventMapping(fixture, fixture.recurrenceEvent(), "recurrence-event-id"));
 
-    // when
     recurrenceEventRepository.deleteById(fixture.recurrenceEvent().getId());
     recurrenceEventRepository.flush();
 
-    // then
     assertThat(
             eventMappingRepository.findByConnectionIdAndRecurrenceEventId(
                 fixture.connection().getId(), fixture.recurrenceEvent().getId()))
@@ -318,7 +296,6 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
   @Test
   @DisplayName("canonical override를 삭제해도 mapping은 immutable origin identity로 남는다")
   void givenMappedOverride_whenDeleteCanonical_thenOriginIdentityRemains() {
-    // given
     RecurrenceFixture fixture = recurrenceFixture();
     GoogleCalendarRecurrenceEventMapping parentMapping =
         eventMappingRepository.saveAndFlush(
@@ -329,11 +306,9 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
         overrideMappingRepository.saveAndFlush(
             overrideMapping(parentMapping, recurrenceOverride, "recurrence-override-id"));
 
-    // when
-    recurrenceEventOverrideRepository.delete(recurrenceOverride);
-    recurrenceEventOverrideRepository.flush();
+    fixture.recurrenceEvent().removeOverrides(List.of(recurrenceOverride.getOriginStartAt()));
+    recurrenceEventRepository.saveAndFlush(fixture.recurrenceEvent());
 
-    // then
     assertThat(overrideMappingRepository.findById(mapping.getId()))
         .get()
         .extracting(GoogleCalendarRecurrenceOverrideMapping::getOriginStartAt)
@@ -364,8 +339,8 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
             Instant.parse("2026-07-21T00:00:00Z"),
             null),
         List.of("RRULE:FREQ=DAILY"),
-        tag,
-        account);
+        tag.getId(),
+        account.getId());
   }
 
   private RecurrenceFixture recurrenceFixture() {
@@ -385,17 +360,17 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
 
   private RecurrenceEventOverride recurrenceOverride(
       RecurrenceEvent recurrenceEvent, String originStartAt) {
-    return recurrenceEventOverrideRepository.saveAndFlush(
-        RecurrenceEventOverride.active(
-            recurrenceEvent,
-            Instant.parse(originStartAt),
-            "Moved",
-            null,
-            CanonicalSchedule.recurrenceOverride(
-                Instant.parse(originStartAt).plusSeconds(3600),
-                Instant.parse(originStartAt).plusSeconds(7200),
-                false,
-                "UTC")));
+    Instant origin = Instant.parse(originStartAt);
+    recurrenceEvent.changeOccurrence(
+        origin,
+        "Moved",
+        null,
+        CanonicalSchedule.recurrenceOverride(
+            origin.plusSeconds(3600), origin.plusSeconds(7200), false, "UTC"));
+    return recurrenceEventRepository
+        .saveAndFlush(recurrenceEvent)
+        .findOverride(origin)
+        .orElseThrow();
   }
 
   private GoogleCalendarRecurrenceOverrideMapping overrideMapping(
@@ -403,7 +378,7 @@ class GoogleCalendarRecurrenceMappingRepositoryTest {
       RecurrenceEventOverride recurrenceOverride,
       String externalEventId) {
     return new GoogleCalendarRecurrenceOverrideMapping(
-        parentMapping, recurrenceOverride, externalEventId, "a".repeat(64));
+        parentMapping, recurrenceOverride.getOriginStartAt(), externalEventId, "a".repeat(64));
   }
 
   private record RecurrenceFixture(

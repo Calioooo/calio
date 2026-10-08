@@ -231,7 +231,7 @@ public class GoogleCalendarRecurrenceJobHandler {
       completeOverrideConflict(job, workerToken, recurrenceEventMapping.mappingId(), null, null);
       return;
     }
-    String expected = scope.overrideId() == null ? occurrence.etag() : scope.etag();
+    String expected = scope.overrideMappingId() == null ? occurrence.etag() : scope.etag();
     try {
       GoogleCalendarEventResponse updated =
           eventsClient.patch(
@@ -276,7 +276,7 @@ public class GoogleCalendarRecurrenceJobHandler {
       completeOverrideConflict(job, workerToken, recurrenceEventMapping.mappingId(), null, null);
       return;
     }
-    String expected = scope.overrideId() == null ? occurrence.etag() : scope.etag();
+    String expected = scope.overrideMappingId() == null ? occurrence.etag() : scope.etag();
     try {
       eventsClient.delete(token, occurrence.id(), expected);
       transactionTemplate.executeWithoutResult(
@@ -289,7 +289,7 @@ public class GoogleCalendarRecurrenceJobHandler {
 
   private GoogleCalendarEventResponse getOverrideOccurrence(
       GoogleCalendarRecurrenceJob job, OverrideMappingScope scope, String token) {
-    if (scope.overrideId() == null) {
+    if (scope.overrideMappingId() == null) {
       return eventsClient
           .getRecurrenceOccurrence(
               token, scope.recurrenceEventMapping().externalId(), job.getOriginStartAt())
@@ -300,12 +300,12 @@ public class GoogleCalendarRecurrenceJobHandler {
 
   private boolean isMissingUnmappedOccurrence(
       OverrideMappingScope scope, GoogleCalendarEventResponse occurrence) {
-    return scope.overrideId() == null && (occurrence == null || occurrence.isCancelled());
+    return scope.overrideMappingId() == null && (occurrence == null || occurrence.isCancelled());
   }
 
   private boolean isChangedMappedOccurrence(
       OverrideMappingScope scope, GoogleCalendarEventResponse occurrence) {
-    return scope.overrideId() != null
+    return scope.overrideMappingId() != null
         && (occurrence == null || !scope.etag().equals(occurrence.etag()));
   }
 
@@ -630,7 +630,7 @@ public class GoogleCalendarRecurrenceJobHandler {
 
   private record OverrideMappingScope(
       RecurrenceMappingSnapshot recurrenceEventMapping,
-      Long overrideId,
+      Long overrideMappingId,
       String externalId,
       String etag,
       boolean overrideConflicted) {

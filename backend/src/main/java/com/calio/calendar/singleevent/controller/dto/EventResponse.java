@@ -43,7 +43,7 @@ public record EventResponse(
   }
 
   public static EventResponse recurrenceOccurrence(
-      RecurrenceEvent recurrenceEvent, RecurrenceOccurrence occurrence) {
+      RecurrenceEvent recurrenceEvent, RecurrenceOccurrence occurrence, Tag tag) {
     return new EventResponse(
         null,
         recurrenceEvent.getTitle(),
@@ -55,14 +55,14 @@ public record EventResponse(
         false,
         recurrenceEvent.getId(),
         true,
-        TagResponse.from(recurrenceEvent.getTag()),
+        TagResponse.from(tag),
         occurrence.originStartAt(),
         recurrenceEvent.getCreatedAt(),
         recurrenceEvent.getUpdatedAt());
   }
 
-  public static EventResponse recurrenceOverride(RecurrenceEventOverride override) {
-    RecurrenceEvent recurrenceEvent = override.getRecurrenceEvent();
+  public static EventResponse recurrenceOverride(
+      RecurrenceEvent recurrenceEvent, RecurrenceEventOverride override, Tag tag) {
     return new EventResponse(
         null,
         override.getOverrideTitle(),
@@ -74,7 +74,7 @@ public record EventResponse(
         false,
         recurrenceEvent.getId(),
         true,
-        TagResponse.from(recurrenceEvent.getTag()),
+        TagResponse.from(tag),
         override.getOriginStartAt(),
         recurrenceEvent.getCreatedAt(),
         recurrenceEvent.getUpdatedAt());

@@ -16,7 +16,7 @@ public interface PersonalRecurrenceGroupShareRepository
   Optional<PersonalRecurrenceGroupShare> findByRecurrenceEvent_IdAndGroupSpace_Id(
       Long recurrenceEventId, Long groupSpaceId);
 
-  @EntityGraph(attributePaths = {"recurrenceEvent", "recurrenceEvent.account", "groupSpace"})
+  @EntityGraph(attributePaths = {"recurrenceEvent", "groupSpace"})
   @Query(
       """
             select share
@@ -28,7 +28,7 @@ public interface PersonalRecurrenceGroupShareRepository
       @Param("recurrenceEventIds") Collection<Long> recurrenceEventIds,
       @Param("groupSpaceIds") Collection<Long> groupSpaceIds);
 
-  @EntityGraph(attributePaths = {"recurrenceEvent", "recurrenceEvent.account", "groupSpace"})
+  @EntityGraph(attributePaths = {"recurrenceEvent", "groupSpace"})
   @Query(
       """
             select share
@@ -59,7 +59,7 @@ public interface PersonalRecurrenceGroupShareRepository
       """
             delete from PersonalRecurrenceGroupShare share
             where share.groupSpace.id = :groupSpaceId
-              and share.recurrenceEvent.account.id = (
+              and share.recurrenceEvent.accountId = (
                     select member.accountId
                     from GroupMember member
                     where member.id = :memberId

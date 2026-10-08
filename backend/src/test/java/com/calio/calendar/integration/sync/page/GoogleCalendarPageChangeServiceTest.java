@@ -35,7 +35,8 @@ import com.calio.calendar.integration.sync.page.dto.GoogleCalendarNormalizedPage
 import com.calio.calendar.integration.sync.page.dto.GoogleCalendarNormalizedPage.CancelledRecurrenceEventOverrideUpsert;
 import com.calio.calendar.integration.sync.page.dto.GoogleCalendarNormalizedPage.EventUpsert;
 import com.calio.calendar.integration.sync.page.dto.GoogleCalendarNormalizedPage.RecurrenceEventUpsert;
-import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
+import com.calio.calendar.recurrence.domain.RecurrenceEvent;
+import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.singleevent.domain.SingleEvent;
 import com.calio.calendar.singleevent.repository.SingleEventRepository;
@@ -53,6 +54,7 @@ import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -68,6 +70,8 @@ class GoogleCalendarPageChangeServiceTest {
 
   private static final GoogleCalendarPageOwnership PAGE_OWNERSHIP =
       new GoogleCalendarPageOwnership(1L, "test-worker-token");
+
+  @Autowired private JdbcTemplate jdbcTemplate;
 
   @Autowired private GoogleCalendarPageChangeService pagePersistenceService;
 
@@ -88,8 +92,6 @@ class GoogleCalendarPageChangeServiceTest {
   private GoogleCalendarRecurrenceOverrideMappingRepository recurrenceOverrideMappingRepository;
 
   @Autowired private RecurrenceEventRepository recurrenceEventRepository;
-
-  @Autowired private RecurrenceEventOverrideRepository recurrenceEventOverrideRepository;
 
   @Autowired private SingleEventRepository eventRepository;
 
@@ -118,7 +120,6 @@ class GoogleCalendarPageChangeServiceTest {
   @Transactional
   @DisplayName("동일한 ExternalId 로 sync 응답이 오면 해당 Event의 데이터를 수정한다")
   void givenRepeatedExternalIdentity_whenPersistPages_thenUpsertsAndPreservesLocalFields() {
-    // given
     Tag fallbackTag = tagRepository.saveAndFlush(Tag.personalFallback("기타", "#64748B"));
 
     persistProviderPage(
@@ -137,14 +138,12 @@ class GoogleCalendarPageChangeServiceTest {
     firstImport.changeImportantEvent(true);
     eventRepository.flush();
 
-    // when
     persistProviderPage(
         integration.getId(),
         account.getId(),
         "second-run",
         page(allDayItem("external-1", "Changed"), "cursor-2"));
 
-    // then
     SingleEvent updatedImport = eventRepository.findById(internalEventId).orElseThrow();
     assertThat(updatedImport.getTitle()).isEqualTo("Changed");
     assertThat(updatedImport.isAllDay()).isTrue();
@@ -162,7 +161,6 @@ class GoogleCalendarPageChangeServiceTest {
   @Transactional
   @DisplayName("Event의 timezone이 null이면 page에 설정한 timezone으로 정규화한 schedule과 timezone을 저장한다")
   void givenOffsetlessTimedItemAndPageZone_whenPersistPage_thenStoresCanonicalSchedule() {
-    // given
     tagRepository.saveAndFlush(Tag.personalFallback("기타", "#64748B"));
     GoogleCalendarEventResponse item =
         new GoogleCalendarEventResponse(
@@ -177,14 +175,12 @@ class GoogleCalendarPageChangeServiceTest {
             new GoogleCalendarEventTimeResponse(null, "2026-07-01T09:00:00", null),
             new GoogleCalendarEventTimeResponse(null, "2026-07-01T10:00:00", null));
 
-    // when
     persistProviderPage(
         integration.getId(),
         account.getId(),
         "page-zone-run",
         new GoogleCalendarEventPage(List.of(item), null, "cursor-1", "Asia/Seoul"));
 
-    // then
     SingleEvent imported =
         eventRepository
             .findSingleEvents(
@@ -204,7 +200,6 @@ class GoogleCalendarPageChangeServiceTest {
       "pending outbound Job이 있는 recurrence-event를 Event로 변환하려 하면 기존 conflict를 보존하고 Event를 만들지 않는다")
   void
       givenConflictedRecurrenceEventConversion_whenPersistEventUpsert_thenDoesNotCreateEventMapping() {
-    // given
     tagRepository.saveAndFlush(Tag.personalFallback("기타", "#64748B"));
     String externalEventId = "converted-event";
     applyNormalizedPage(
@@ -231,7 +226,6 @@ class GoogleCalendarPageChangeServiceTest {
     Long existingRecurrenceEventId = existingMapping.getRecurrenceEventId();
     when(operationJobQueryService.hasPendingOutboundJob(any(), any(), any())).thenReturn(true);
 
-    // when
     applyNormalizedPage(
         integration.getId(),
         account.getId(),
@@ -250,7 +244,6 @@ class GoogleCalendarPageChangeServiceTest {
             null,
             null));
 
-    // then
     assertThat(mappingRepository.findAll()).isEmpty();
     assertThat(recurrenceEventMappingRepository.findAll())
         .singleElement()
@@ -276,7 +269,6 @@ class GoogleCalendarPageChangeServiceTest {
       "pending outbound Job이 있는 Event를 recurrence-event로 변환하려 하면 기존 conflict를 보존하고 recurrence-event를 만들지 않는다")
   void
       givenConflictedEventConversion_whenPersistRecurrenceUpsert_thenDoesNotCreateRecurrenceEventMapping() {
-    // given
     tagRepository.saveAndFlush(Tag.personalFallback("기타", "#64748B"));
     String externalEventId = "converted-recurrence";
     applyNormalizedPage(
@@ -301,7 +293,6 @@ class GoogleCalendarPageChangeServiceTest {
     Long existingEventId = existingMapping.getEventId();
     when(operationJobQueryService.hasPendingOutboundJob(any(), any(), any())).thenReturn(true);
 
-    // when
     applyNormalizedPage(
         integration.getId(),
         account.getId(),
@@ -321,7 +312,6 @@ class GoogleCalendarPageChangeServiceTest {
             null,
             null));
 
-    // then
     assertThat(mappingRepository.findAll())
         .singleElement()
         .satisfies(
@@ -345,19 +335,16 @@ class GoogleCalendarPageChangeServiceTest {
   @Transactional
   @DisplayName("Google이 허용하는 최대 1024자 event id를 저장한다")
   void givenMaximumLengthExternalEventId_whenPersistPage_thenStoresCompleteId() {
-    // given
     tagRepository.saveAndFlush(Tag.personalFallback("기타", "#64748B"));
     String externalEventId = "a".repeat(1024);
     String googleEtag = "e".repeat(1024);
 
-    // when
     persistProviderPage(
         integration.getId(),
         account.getId(),
         "maximum-id-run",
         page(timedItem(externalEventId, "Maximum ID", googleEtag), "cursor-1"));
 
-    // then
     assertThat(
             mappingRepository.findAllByExternalIdentity(
                 integration.getId(),
@@ -377,10 +364,8 @@ class GoogleCalendarPageChangeServiceTest {
   @Transactional
   @DisplayName("마지막 page에 유효한 nextSyncToken이 없으면 sync token missing 예외를 반환한다")
   void givenMissingNextSyncToken_whenPersistLastPage_thenReturnsTokenMissing(String nextSyncToken) {
-    // given
     tagRepository.saveAndFlush(Tag.personalFallback("기타", "#64748B"));
 
-    // when, then
     assertThatThrownBy(
             () ->
                 persistProviderPage(
@@ -399,7 +384,6 @@ class GoogleCalendarPageChangeServiceTest {
   @Transactional
   @DisplayName("Google 일정의 시작 시각이 종료 시각보다 늦으면 invalid response 예외를 반환한다.")
   void givenInvalidGoogleEventRange_whenPersistPage_thenRejectsResponse() {
-    // given
     tagRepository.saveAndFlush(Tag.personalFallback("기타", "#64748B"));
     GoogleCalendarEventResponse item =
         new GoogleCalendarEventResponse(
@@ -414,7 +398,6 @@ class GoogleCalendarPageChangeServiceTest {
             new GoogleCalendarEventTimeResponse(null, "2026-07-01T10:00:00Z", "UTC"),
             new GoogleCalendarEventTimeResponse(null, "2026-07-01T10:00:00Z", "UTC"));
 
-    // when, then
     assertThatThrownBy(
             () ->
                 persistProviderPage(
@@ -434,13 +417,11 @@ class GoogleCalendarPageChangeServiceTest {
   @Transactional
   @DisplayName("동일 page에 external event id가 중복되면 partial 저장 없이 invalid response 예외를 반환한다")
   void givenDuplicateExternalEventIds_whenPersistPage_thenRejectsResponse() {
-    // given
     tagRepository.saveAndFlush(Tag.personalFallback("기타", "#64748B"));
     GoogleCalendarEventResponse item = timedItem("external-1", "Event");
     GoogleCalendarEventPage page =
         new GoogleCalendarEventPage(List.of(item, item), null, "cursor-1", "UTC");
 
-    // when, then
     assertThatThrownBy(
             () -> persistProviderPage(integration.getId(), account.getId(), "duplicate-run", page))
         .isInstanceOfSatisfying(
@@ -455,7 +436,6 @@ class GoogleCalendarPageChangeServiceTest {
   @Transactional
   @DisplayName("Event를 RecurrenceEvent으로 바뀐 기존 Event 데이터는 mapping 데이터를 먼저 삭제한 후, Event를 제거한다")
   void givenMappedItemBecomesRecurring_whenPersistPage_thenDeletesStaleProviderData() {
-    // given
     tagRepository.saveAndFlush(Tag.personalFallback("기타", "#64748B"));
     persistProviderPage(
         integration.getId(),
@@ -463,7 +443,6 @@ class GoogleCalendarPageChangeServiceTest {
         "first-run",
         page(timedItem("external-1", "Initial"), "cursor-1"));
 
-    // when
     GoogleCalendarEventResponse recurringItem =
         new GoogleCalendarEventResponse(
             "external-1",
@@ -479,7 +458,6 @@ class GoogleCalendarPageChangeServiceTest {
     persistProviderPage(
         integration.getId(), account.getId(), "second-run", page(recurringItem, "cursor-2"));
 
-    // then
     assertThat(mappingRepository.findEventIdsByConnectionId(integration.getId())).isEmpty();
     assertThat(
             eventRepository.findSingleEvents(
@@ -494,7 +472,6 @@ class GoogleCalendarPageChangeServiceTest {
   @Transactional
   @DisplayName("recurrence-event와 override를 수정에 성공한다.")
   void givenNormalizedRecurrenceReplay_whenPersistPages_thenUpsertsCanonicalAggregate() {
-    // given
     Tag defaultTag = tagRepository.saveAndFlush(Tag.personalFallback("기타", "#64748B"));
     NormalizedEventSchedule recurrenceSchedule =
         new NormalizedEventSchedule(
@@ -528,7 +505,6 @@ class GoogleCalendarPageChangeServiceTest {
         account.getId(),
         new GoogleCalendarNormalizedPage(List.of(recurrenceEvent, activeOverride), null, "cursor"));
 
-    // when
     RecurrenceEventUpsert updatedRecurrenceEvent =
         new RecurrenceEventUpsert(
             "recurrence-event-1",
@@ -550,16 +526,16 @@ class GoogleCalendarPageChangeServiceTest {
         new GoogleCalendarNormalizedPage(
             List.of(updatedRecurrenceEvent, cancelledOverride), null, "cursor"));
 
-    // then
     assertThat(recurrenceEventRepository.findAll())
         .singleElement()
         .satisfies(
             recurrence -> {
               assertThat(recurrence.getTitle()).isEqualTo("Changed");
-              assertThat(recurrence.getTag().getId()).isEqualTo(defaultTag.getId());
+              assertThat(recurrence.getTagId()).isEqualTo(defaultTag.getId());
               assertThat(recurrence.getRecurrenceRules()).containsExactly("RRULE:FREQ=WEEKLY");
             });
-    assertThat(recurrenceEventOverrideRepository.findAll())
+    assertThat(recurrenceEventRepository.findAll())
+        .flatExtracting(RecurrenceEvent::getOverrides)
         .singleElement()
         .satisfies(
             override -> {
@@ -577,13 +553,89 @@ class GoogleCalendarPageChangeServiceTest {
         .isEqualTo("etag-exception-2");
   }
 
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  @Transactional
+  @DisplayName("부모 규칙 변경과 새 override가 다른 페이지에 도착해도 순서와 재처리에 관계없이 같은 상태를 유지한다")
+  void parentAndOverridePagesConvergeRegardlessOfOrder(boolean overrideFirst) {
+    tagRepository.saveAndFlush(Tag.personalFallback("기타", "#64748B"));
+    NormalizedEventSchedule schedule =
+        new NormalizedEventSchedule(
+            Instant.parse("2026-07-01T09:00:00Z"),
+            Instant.parse("2026-07-01T10:00:00Z"),
+            false,
+            "UTC");
+    RecurrenceEventUpsert initial =
+        new RecurrenceEventUpsert(
+            "series",
+            "etag-master-1",
+            "Initial",
+            null,
+            schedule,
+            List.of("RRULE:FREQ=DAILY;COUNT=1"));
+    applyNormalizedPage(
+        integration.getId(),
+        account.getId(),
+        new GoogleCalendarNormalizedPage(List.of(initial), null, "cursor-1"));
+    Instant origin = Instant.parse("2026-07-02T09:00:00Z");
+    ActiveRecurrenceEventOverrideUpsert override =
+        new ActiveRecurrenceEventOverrideUpsert(
+            "exception",
+            "series",
+            origin,
+            "etag-exception",
+            "Moved",
+            "memo",
+            new NormalizedEventSchedule(
+                Instant.parse("2026-07-04T12:00:00Z"),
+                Instant.parse("2026-07-04T13:00:00Z"),
+                false,
+                "UTC"));
+    RecurrenceEventUpsert updated =
+        new RecurrenceEventUpsert(
+            "series",
+            "etag-master-2",
+            "Updated",
+            null,
+            schedule,
+            List.of("RRULE:FREQ=DAILY;COUNT=3"));
+    GoogleCalendarNormalizedPage parentPage =
+        new GoogleCalendarNormalizedPage(List.of(updated), null, "cursor-2");
+    GoogleCalendarNormalizedPage overridePage =
+        new GoogleCalendarNormalizedPage(List.of(override), null, "cursor-2");
+
+    applyNormalizedPage(
+        integration.getId(), account.getId(), overrideFirst ? overridePage : parentPage);
+    if (overrideFirst) {
+      RecurrenceEvent beforeParent = recurrenceEventRepository.findAll().getFirst();
+      assertThat(beforeParent.getRecurrenceRules()).containsExactly("RRULE:FREQ=DAILY;COUNT=1");
+      assertThat(beforeParent.findOverride(origin)).isPresent();
+    }
+    applyNormalizedPage(
+        integration.getId(), account.getId(), overrideFirst ? parentPage : overridePage);
+    applyNormalizedPage(integration.getId(), account.getId(), parentPage);
+    applyNormalizedPage(integration.getId(), account.getId(), overridePage);
+    recurrenceEventRepository.flush();
+
+    assertThat(recurrenceEventRepository.findAll()).hasSize(1);
+    RecurrenceEvent event = recurrenceEventRepository.findAll().getFirst();
+    assertThat(event.getTitle()).isEqualTo("Updated");
+    assertThat(event.getRecurrenceRules()).containsExactly("RRULE:FREQ=DAILY;COUNT=3");
+    assertThat(event.getOverrides()).hasSize(1);
+    RecurrenceEventOverride recorded = event.findOverride(origin).orElseThrow();
+    assertThat(recorded.getOverrideTitle()).isEqualTo("Moved");
+    assertThat(recorded.getOverrideDescription()).isEqualTo("memo");
+    assertThat(recorded.getOverrideStartAt()).isEqualTo(override.schedule().startAt());
+    assertThat(recorded.isDeleted()).isFalse();
+    assertThat(recurrenceOverrideMappingRepository.findAll()).hasSize(1);
+  }
+
   @Test
   @Transactional
   @DisplayName(
       "동일 override external ID가 서로 다른 recurrence-event를 참조하는 요청이 오면 invalid response 예외를 반환한다")
   void
       givenOverrideExternalIdMappedToDifferentRecurrenceEvent_whenPersistPage_thenRejectsResponse() {
-    // given
     tagRepository.saveAndFlush(Tag.personalFallback("기타", "#64748B"));
     NormalizedEventSchedule recurrenceSchedule =
         new NormalizedEventSchedule(
@@ -617,7 +669,6 @@ class GoogleCalendarPageChangeServiceTest {
     ActiveRecurrenceEventOverrideUpsert conflictingOverride =
         recurrenceOverride("shared-override", "recurrence-event-b");
 
-    // when, then
     assertThatThrownBy(
             () ->
                 applyNormalizedPage(
@@ -629,7 +680,10 @@ class GoogleCalendarPageChangeServiceTest {
             exception ->
                 assertThat(exception.getErrorCode())
                     .isEqualTo(ErrorCode.GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID));
-    assertThat(recurrenceEventOverrideRepository.count()).isOne();
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from recurrence_event_overrides", Long.class))
+        .isOne();
     assertThat(recurrenceOverrideMappingRepository.findAll())
         .singleElement()
         .satisfies(
@@ -644,7 +698,6 @@ class GoogleCalendarPageChangeServiceTest {
   @Transactional
   @DisplayName("같은 page에서 recurrence-event 삭제 요청이 연관된 override 요청보다 먼저 와도 정상적으로 관련된 override가 삭제된다")
   void givenCancellationBeforeOverride_whenPersistPage_thenDeletesRecurrenceAggregate() {
-    // given
     tagRepository.saveAndFlush(Tag.personalFallback("기타", "#64748B"));
     RecurrenceEventUpsert recurrenceEvent =
         new RecurrenceEventUpsert(
@@ -676,7 +729,6 @@ class GoogleCalendarPageChangeServiceTest {
         account.getId(),
         new GoogleCalendarNormalizedPage(List.of(recurrenceEvent, override), null, "cursor-1"));
 
-    // when
     GoogleCalendarNormalizedPage normalizedPage =
         pageNormalizer.normalize(
             integration.getId(),
@@ -690,11 +742,13 @@ class GoogleCalendarPageChangeServiceTest {
             new GoogleCalendarSyncRunContext("access-token"));
     applyNormalizedPage(integration.getId(), account.getId(), normalizedPage);
 
-    // then
     assertThat(recurrenceEventMappingRepository.count()).isZero();
     assertThat(recurrenceOverrideMappingRepository.count()).isZero();
     assertThat(recurrenceEventRepository.count()).isZero();
-    assertThat(recurrenceEventOverrideRepository.count()).isZero();
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from recurrence_event_overrides", Long.class))
+        .isZero();
   }
 
   @Test
@@ -775,7 +829,6 @@ class GoogleCalendarPageChangeServiceTest {
   @Transactional
   @DisplayName("FULL Sync시 sync 목록에 없는 기존 데이터를 batch로 삭제하고 sync를 완료한다")
   void givenUnseenProviderData_whenFinalizeFullSync_thenDeletesInBatches() {
-    // given
     Tag defaultTag = tagRepository.saveAndFlush(Tag.personalFallback("기타", "#64748B"));
     NormalizedEventSchedule eventSchedule =
         new NormalizedEventSchedule(
@@ -831,25 +884,26 @@ class GoogleCalendarPageChangeServiceTest {
         new GoogleCalendarNormalizedPage(
             List.of(recurrenceEvent, override), null, "next-sync-token"));
 
-    // when
     integrationDataService.completeSyncRun(
         1L,
         account.getId(),
         integration.getId(),
         "full-reconciliation-run",
         GoogleCalendarSyncMode.FULL,
-        Set.of(), // empty seen events
+        Set.of(),
         Set.of(),
         Set.of(),
         "next-sync-token");
 
-    // then
     assertThat(mappingRepository.count()).isZero();
     assertThat(recurrenceEventMappingRepository.count()).isZero();
     assertThat(recurrenceOverrideMappingRepository.count()).isZero();
     assertThat(eventRepository.count()).isZero();
     assertThat(recurrenceEventRepository.count()).isZero();
-    assertThat(recurrenceEventOverrideRepository.count()).isZero();
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from recurrence_event_overrides", Long.class))
+        .isZero();
     assertThat(connectionRepository.findById(integration.getId()))
         .get()
         .satisfies(
@@ -863,7 +917,6 @@ class GoogleCalendarPageChangeServiceTest {
   @DisplayName("blank title의 all-day import는 기본값 title을 사용하고 cancelled delta로 hard delete된다")
   void
       givenBlankAllDayItemThenCancellation_whenPersistPages_thenImportsAndHardDeletesIdempotently() {
-    // given
     tagRepository.saveAndFlush(Tag.personalFallback("기타", "#64748B"));
     persistProviderPage(
         integration.getId(),
@@ -881,7 +934,6 @@ class GoogleCalendarPageChangeServiceTest {
     assertThat(imported.getDescription()).isEqualTo("Changed description");
     assertThat(imported.isAllDay()).isTrue();
 
-    // when
     persistProviderPage(
         integration.getId(),
         account.getId(),
@@ -893,7 +945,6 @@ class GoogleCalendarPageChangeServiceTest {
         "third-run",
         page(cancelledItem("external-blank"), "cursor-3"));
 
-    // then
     assertThat(mappingRepository.findEventIdsByConnectionId(integration.getId())).isEmpty();
     assertThat(eventRepository.findById(imported.getId())).isEmpty();
   }

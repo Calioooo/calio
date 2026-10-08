@@ -1,0 +1,215 @@
+package com.calio.calendar.recurrence.domain;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+
+import com.calio.calendar.common.domain.CanonicalSchedule;
+import com.calio.calendar.common.error.CalioException;
+import com.calio.calendar.common.error.ErrorCode;
+import java.time.Instant;
+import java.util.List;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
+class RecurrenceEventTest {
+
+  private static final Instant ORIGIN = Instant.parse("2027-01-01T09:00:00Z");
+  private static final CanonicalSchedule MOVED =
+      CanonicalSchedule.recurrenceOverride(
+          ORIGIN.plusSeconds(7200), ORIGIN.plusSeconds(10800), false, "UTC");
+
+  @Test
+  @DisplayName("같은 회차를 다시 변경하면 항목 수를 유지하면서 값을 교체하고 이전 값은 보존한다")
+  void changeSameOriginReplacesOverrideValue() {
+    RecurrenceEvent event = recurrenceEvent();
+    RecurrenceEventOverride original = event.changeOccurrence(ORIGIN, "First", null, MOVED);
+
+    RecurrenceEventOverride changed = event.changeOccurrence(ORIGIN, "Updated", "memo", MOVED);
+
+    assertThat(changed).isNotSameAs(original);
+    assertThat(event.getOverrides()).containsExactly(changed);
+    assertThat(event.findOverride(ORIGIN)).contains(changed);
+    assertThat(changed.getOverrideTitle()).isEqualTo("Updated");
+    assertThat(original.getOverrideTitle()).isEqualTo("First");
+    assertThat(changed.getOverrideDescription()).isEqualTo("memo");
+    assertThat(original.getOverrideDescription()).isNull();
+    assertThat(original.getOriginStartAt()).isEqualTo(ORIGIN);
+    assertThat(original.getOverrideStartAt()).isEqualTo(MOVED.startAt());
+  }
+
+  @Test
+  @DisplayName("시리즈 규칙이 바뀌어도 개별 변경의 제외·복원은 원래 시작값을 유지하고 값을 교체한다")
+  void restoreExistingOverrideAfterMasterRuleChangeReplacesValue() {
+    RecurrenceEvent event = recurrenceEvent();
+    RecurrenceEventOverride original = event.changeOccurrence(ORIGIN, "Moved", null, MOVED);
+    event.update(
+        "Updated series",
+        null,
+        RecurrenceSchedule.create(
+            false, ORIGIN.plusSeconds(86400), ORIGIN.plusSeconds(90000), "UTC"),
+        List.of("RRULE:FREQ=WEEKLY"),
+        2L);
+
+    RecurrenceEventOverride excluded = event.excludeOccurrence(ORIGIN, ORIGIN.plusSeconds(86400));
+
+    assertThat(excluded).isNotSameAs(original);
+    assertThat(original.isDeleted()).isFalse();
+    assertThat(excluded.isDeleted()).isTrue();
+    assertThat(excluded.getOverrideTitle()).isNull();
+    assertThat(excluded.getOverrideStartAt()).isNull();
+
+    RecurrenceEventOverride restored = event.changeOccurrence(ORIGIN, "Restored", null, MOVED);
+
+    assertThat(restored).isNotSameAs(original);
+    assertThat(excluded.isDeleted()).isTrue();
+    assertThat(restored.isDeleted()).isFalse();
+    assertThat(restored.getDeletedAt()).isNull();
+    assertThat(event.getOverrides()).containsExactly(restored);
+  }
+
+  @Test
+  @DisplayName("기존 개별 변경과 반복 규칙에 모두 없는 원래 시작값은 작업 대상 회차로 확인할 수 없다")
+  void unknownOriginCannotBeResolved() {
+    RecurrenceEvent event = recurrenceEvent();
+
+    Rfc5545RecurrenceEngine recurrenceEngine = mock(Rfc5545RecurrenceEngine.class);
+    when(recurrenceEngine.containsOrigin(
+            RecurrenceSchedule.from(event), event.getRecurrenceRules(), ORIGIN))
+        .thenReturn(false);
+    assertThatThrownBy(() -> event.requireOccurrence(ORIGIN, recurrenceEngine))
+        .isInstanceOf(CalioException.class)
+        .extracting(exception -> ((CalioException) exception).getErrorCode())
+        .isEqualTo(ErrorCode.RECURRENCE_OCCURRENCE_NOT_FOUND);
+    assertThat(event.getOverrides()).isEmpty();
+  }
+
+  @Test
+  @DisplayName("동일한 원래 시작값이라도 시리즈가 다르면 각 Root가 자신의 개별 변경을 소유한다")
+  void sameOriginInDifferentRootsHasIndependentState() {
+    RecurrenceEvent first = recurrenceEvent();
+    RecurrenceEvent second = recurrenceEvent();
+    RecurrenceEventOverride active = first.changeOccurrence(ORIGIN, "Moved", null, MOVED);
+
+    RecurrenceEventOverride excluded = second.excludeOccurrence(ORIGIN, ORIGIN);
+
+    assertThat(active).isNotSameAs(excluded);
+    assertThat(first.findOverride(ORIGIN)).containsSame(active);
+    assertThat(second.findOverride(ORIGIN)).containsSame(excluded);
+    assertThat(active.isDeleted()).isFalse();
+    assertThat(excluded.isDeleted()).isTrue();
+  }
+
+  @Test
+  @DisplayName("현재 규칙에 없는 회차 기록도 같은 변경 메서드로 제외·복원하고 원래 시작값을 유지한다")
+  void recordedOccurrenceOutsideCurrentRuleKeepsLocalIdentity() {
+    RecurrenceEvent event = recurrenceEvent();
+    Instant outsideOrigin = ORIGIN.plusSeconds(1);
+    RecurrenceEventOverride original = event.excludeOccurrence(outsideOrigin, ORIGIN);
+
+    RecurrenceEventOverride active =
+        event.changeOccurrence(outsideOrigin, "Recorded change", null, MOVED);
+
+    assertThat(active).isNotSameAs(original);
+    assertThat(original.isDeleted()).isTrue();
+    assertThat(active.isDeleted()).isFalse();
+    assertThat(active.getOriginStartAt()).isEqualTo(outsideOrigin);
+    assertThat(event.getOverrides()).containsExactly(active);
+  }
+
+  @Test
+  @DisplayName("보존된 제외 기록은 현재 규칙 조회 없이 작업 대상 회차로 확인한다")
+  void excludedOverrideCanBeResolvedWithoutCurrentRule() {
+    RecurrenceEvent event = recurrenceEvent();
+    RecurrenceEventOverride excluded = event.excludeOccurrence(ORIGIN, ORIGIN);
+    Rfc5545RecurrenceEngine recurrenceEngine = mock(Rfc5545RecurrenceEngine.class);
+
+    event.requireOccurrence(ORIGIN, recurrenceEngine);
+
+    verifyNoInteractions(recurrenceEngine);
+    assertThat(event.findOverride(ORIGIN)).containsSame(excluded);
+    assertThat(excluded.isDeleted()).isTrue();
+  }
+
+  @Test
+  @DisplayName("반복 규칙에서 확인한 회차는 작업 대상으로 사용할 수 있고 조회만으로 override를 만들지 않는다")
+  void generatedOccurrenceCanBeResolvedWithoutRecordingOverride() {
+    RecurrenceEvent event = recurrenceEvent();
+    Rfc5545RecurrenceEngine recurrenceEngine = mock(Rfc5545RecurrenceEngine.class);
+    when(recurrenceEngine.containsOrigin(
+            RecurrenceSchedule.from(event), event.getRecurrenceRules(), ORIGIN))
+        .thenReturn(true);
+
+    event.requireOccurrence(ORIGIN, recurrenceEngine);
+
+    assertThat(event.getOverrides()).isEmpty();
+  }
+
+  @Test
+  @DisplayName("Root가 노출한 목록으로 값을 추가·제거할 수 없다")
+  void exposedOverridesCannotBypassRoot() {
+    RecurrenceEvent event = recurrenceEvent();
+    RecurrenceEventOverride override = event.changeOccurrence(ORIGIN, "Moved", null, MOVED);
+
+    assertThatThrownBy(() -> event.getOverrides().clear())
+        .isInstanceOf(UnsupportedOperationException.class);
+    assertThat(event.getOverrides()).containsExactly(override);
+  }
+
+  @Test
+  @DisplayName("필수 변경 시간이 없으면 기존 값의 제목과 변경 내용을 보존한다")
+  void invalidChangeKeepsExistingOverrideState() {
+    RecurrenceEvent event = recurrenceEvent();
+    RecurrenceEventOverride original = event.changeOccurrence(ORIGIN, "Original", "memo", MOVED);
+
+    assertThatThrownBy(() -> event.changeOccurrence(ORIGIN, "Changed", null, null))
+        .isInstanceOf(NullPointerException.class);
+    assertThat(original.getOverrideTitle()).isEqualTo("Original");
+    assertThat(original.getOverrideDescription()).isEqualTo("memo");
+    assertThat(original.getOverrideStartAt()).isEqualTo(MOVED.startAt());
+    assertThat(original.isDeleted()).isFalse();
+    assertThat(event.getOverrides()).containsExactly(original);
+  }
+
+  @Test
+  @DisplayName("제외 시각이 없으면 기존 값의 활성 상태와 변경 내용을 보존한다")
+  void invalidExclusionKeepsExistingOverrideState() {
+    RecurrenceEvent event = recurrenceEvent();
+    RecurrenceEventOverride original = event.changeOccurrence(ORIGIN, "Original", "memo", MOVED);
+
+    assertThatThrownBy(() -> event.excludeOccurrence(ORIGIN, null))
+        .isInstanceOf(NullPointerException.class);
+    assertThat(original.getOverrideTitle()).isEqualTo("Original");
+    assertThat(original.getOverrideDescription()).isEqualTo("memo");
+    assertThat(original.getOverrideStartAt()).isEqualTo(MOVED.startAt());
+    assertThat(original.isDeleted()).isFalse();
+    assertThat(event.getOverrides()).containsExactly(original);
+  }
+
+  @Test
+  @DisplayName("같은 내용의 회차 변경 값은 동등하며 변경 내용이나 원래 시작값이 다르면 구분된다")
+  void overrideEqualityUsesAllValues() {
+    RecurrenceEventOverride first =
+        recurrenceEvent().changeOccurrence(ORIGIN, "Moved", "memo", MOVED);
+    RecurrenceEventOverride equal =
+        recurrenceEvent().changeOccurrence(ORIGIN, "Moved", "memo", MOVED);
+    assertThat(first).isEqualTo(equal).hasSameHashCodeAs(equal);
+    assertThat(first)
+        .isNotEqualTo(recurrenceEvent().changeOccurrence(ORIGIN, "Changed", "memo", MOVED));
+    assertThat(first)
+        .isNotEqualTo(
+            recurrenceEvent().changeOccurrence(ORIGIN.plusSeconds(1), "Moved", "memo", MOVED));
+  }
+
+  private RecurrenceEvent recurrenceEvent() {
+    return new RecurrenceEvent(
+        "Series",
+        null,
+        RecurrenceSchedule.create(false, ORIGIN, ORIGIN.plusSeconds(3600), "UTC"),
+        List.of("RRULE:FREQ=DAILY;COUNT=3"),
+        2L,
+        1L);
+  }
+}

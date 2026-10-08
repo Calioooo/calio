@@ -1,10 +1,12 @@
 package com.calio.calendar.sharing.recurrence.service;
 
+import com.calio.calendar.common.error.CalioException;
+import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.groupspace.domain.GroupMember;
 import com.calio.calendar.groupspace.domain.GroupSpace;
 import com.calio.calendar.groupspace.service.GroupMembershipQueryService;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
-import com.calio.calendar.recurrence.service.RecurrenceEventQueryService;
+import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.sharing.controller.dto.GroupShareTargetResponse;
 import com.calio.calendar.sharing.controller.dto.GroupShareTargetStatus;
 import com.calio.calendar.sharing.recurrence.controller.dto.CreateRecurrenceGroupSharesRequest;
@@ -21,17 +23,17 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class PersonalRecurrenceGroupShareService {
 
-  private final RecurrenceEventQueryService recurrenceEventQueryService;
+  private final RecurrenceEventRepository recurrenceEventRepository;
   private final GroupMembershipQueryService membershipQueryService;
   private final PersonalRecurrenceGroupShareQueryService shareQueryService;
   private final PersonalRecurrenceGroupShareCommandService shareCommandService;
 
   public PersonalRecurrenceGroupShareService(
-      RecurrenceEventQueryService recurrenceEventQueryService,
+      RecurrenceEventRepository recurrenceEventRepository,
       GroupMembershipQueryService membershipQueryService,
       PersonalRecurrenceGroupShareQueryService shareQueryService,
       PersonalRecurrenceGroupShareCommandService shareCommandService) {
-    this.recurrenceEventQueryService = recurrenceEventQueryService;
+    this.recurrenceEventRepository = recurrenceEventRepository;
     this.membershipQueryService = membershipQueryService;
     this.shareQueryService = shareQueryService;
     this.shareCommandService = shareCommandService;
@@ -41,7 +43,9 @@ public class PersonalRecurrenceGroupShareService {
   public CreateRecurrenceGroupSharesResponse create(
       Long accountId, Long recurrenceId, CreateRecurrenceGroupSharesRequest request) {
     RecurrenceEvent recurrenceEvent =
-        recurrenceEventQueryService.getRecurrenceEvent(accountId, recurrenceId);
+        recurrenceEventRepository
+            .findByIdAndAccountId(recurrenceId, accountId)
+            .orElseThrow(() -> new CalioException(ErrorCode.RECURRENCE_EVENT_NOT_FOUND));
     List<Long> groupSpaceIds = distinct(request.groupSpaceIds());
     Map<Long, GroupSpace> activeGroupSpacesById = activeGroupSpaces(accountId, groupSpaceIds);
     Set<Long> existingGroupSpaceIds =

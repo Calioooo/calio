@@ -16,7 +16,7 @@ import com.calio.calendar.integration.sync.operation.GoogleOperationLeaseService
 import com.calio.calendar.integration.sync.operation.domain.GoogleCalendarEffectiveScope;
 import com.calio.calendar.integration.sync.page.GoogleCalendarRecurrenceChangeService;
 import com.calio.calendar.integration.sync.page.dto.GoogleCalendarRecurrenceOverrideExternalKey;
-import com.calio.calendar.recurrence.service.RecurrenceEventCommandService;
+import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.sharing.event.service.PersonalEventGroupShareCommandService;
 import com.calio.calendar.sharing.recurrence.service.PersonalRecurrenceGroupShareCommandService;
 import com.calio.calendar.singleevent.repository.SingleEventRepository;
@@ -43,7 +43,7 @@ public class GoogleCalendarIntegrationDataService {
   private final SingleEventRepository singleEventRepository;
   private final PersonalEventGroupShareCommandService eventShareCommandService;
   private final PersonalRecurrenceGroupShareCommandService recurrenceShareCommandService;
-  private final RecurrenceEventCommandService recurrenceEventCommandService;
+  private final RecurrenceEventRepository recurrenceEventRepository;
   private final GoogleCalendarRecurrenceChangeService recurrenceChangeService;
   private final GoogleOperationLeaseService operationLeaseService;
   private final GoogleOperationJobService operationJobService;
@@ -58,7 +58,7 @@ public class GoogleCalendarIntegrationDataService {
       SingleEventRepository singleEventRepository,
       PersonalEventGroupShareCommandService eventShareCommandService,
       PersonalRecurrenceGroupShareCommandService recurrenceShareCommandService,
-      RecurrenceEventCommandService recurrenceEventCommandService,
+      RecurrenceEventRepository recurrenceEventRepository,
       GoogleCalendarRecurrenceChangeService recurrenceChangeService,
       GoogleOperationLeaseService operationLeaseService,
       GoogleOperationJobService operationJobService,
@@ -71,7 +71,7 @@ public class GoogleCalendarIntegrationDataService {
     this.singleEventRepository = singleEventRepository;
     this.eventShareCommandService = eventShareCommandService;
     this.recurrenceShareCommandService = recurrenceShareCommandService;
-    this.recurrenceEventCommandService = recurrenceEventCommandService;
+    this.recurrenceEventRepository = recurrenceEventRepository;
     this.recurrenceChangeService = recurrenceChangeService;
     this.operationLeaseService = operationLeaseService;
     this.operationJobService = operationJobService;
@@ -85,12 +85,6 @@ public class GoogleCalendarIntegrationDataService {
   }
 
   @Transactional
-  /**
-   * Completes one sync run atomically.
-   *
-   * <p>FULL sync cleanup, the next sync token, and operation job completion must commit together so
-   * a sync token never represents a partial provider data update.
-   */
   public void completeSyncRun(
       Long jobId,
       Long accountId,
@@ -337,10 +331,8 @@ public class GoogleCalendarIntegrationDataService {
     if (unmappedRecurrenceEventIds.isEmpty()) {
       return;
     }
-    recurrenceEventCommandService.deleteRecurrenceOverridesByRecurrenceEventIds(
-        unmappedRecurrenceEventIds);
     unmappedRecurrenceEventIds.forEach(recurrenceShareCommandService::deleteAllForSourceRecurrence);
-    recurrenceEventCommandService.deleteRecurrenceEventsByIds(unmappedRecurrenceEventIds);
+    recurrenceEventRepository.deleteAllById(unmappedRecurrenceEventIds);
   }
 
   private void deleteAllMappedEventData(Long integrationId) {
@@ -383,9 +375,10 @@ public class GoogleCalendarIntegrationDataService {
                   .filter(originStartAt -> !remainingOriginStartAts.contains(originStartAt))
                   .toList();
           if (!unmappedOriginStartAts.isEmpty()) {
-            recurrenceEventCommandService
-                .deleteRecurrenceOverridesByRecurrenceEventIdAndOriginStartAts(
-                    recurrenceEventId, unmappedOriginStartAts);
+            recurrenceEventRepository
+                .findByIdForUpdate(recurrenceEventId)
+                .ifPresent(
+                    recurrenceEvent -> recurrenceEvent.removeOverrides(unmappedOriginStartAts));
           }
         });
   }

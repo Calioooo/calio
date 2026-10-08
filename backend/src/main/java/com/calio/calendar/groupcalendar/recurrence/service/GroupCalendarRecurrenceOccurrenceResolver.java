@@ -4,7 +4,7 @@ import com.calio.calendar.groupcalendar.recurrence.domain.GroupCalendarRecurrenc
 import com.calio.calendar.groupcalendar.recurrence.domain.GroupCalendarRecurrenceOccurrence;
 import com.calio.calendar.groupcalendar.recurrence.domain.GroupCalendarRecurrenceOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceOccurrence;
-import com.calio.calendar.recurrence.service.Rfc5545RecurrenceEngine;
+import com.calio.calendar.recurrence.domain.Rfc5545RecurrenceEngine;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;

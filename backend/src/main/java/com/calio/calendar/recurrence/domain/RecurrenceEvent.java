@@ -1,22 +1,28 @@
 package com.calio.calendar.recurrence.domain;
 
-import com.calio.calendar.account.domain.Account;
 import com.calio.calendar.common.domain.BaseEntity;
-import com.calio.calendar.tag.domain.Tag;
+import com.calio.calendar.common.domain.CanonicalSchedule;
+import com.calio.calendar.common.error.CalioException;
+import com.calio.calendar.common.error.ErrorCode;
 import jakarta.persistence.AttributeOverride;
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 
 @Entity
 @Table(name = "recurrence_events")
@@ -45,13 +51,21 @@ public class RecurrenceEvent extends BaseEntity {
   @Convert(converter = RecurrenceRuleJsonConverter.class)
   private List<String> recurrenceRules = List.of();
 
-  @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "account_id", nullable = false)
-  private Account account;
+  @Column(name = "account_id", nullable = false)
+  private Long accountId;
 
-  @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "tag_id", nullable = false)
-  private Tag tag;
+  @Column(name = "tag_id", nullable = false)
+  private Long tagId;
+
+  @ElementCollection
+  @CollectionTable(
+      name = "recurrence_event_overrides",
+      joinColumns = @JoinColumn(name = "recurrence_id"),
+      uniqueConstraints =
+          @UniqueConstraint(
+              name = "uk_recurrence_event_overrides_recurrence_origin",
+              columnNames = {"recurrence_id", "origin_start_at"}))
+  private List<RecurrenceEventOverride> overrides = new ArrayList<>();
 
   protected RecurrenceEvent() {}
 
@@ -60,13 +74,13 @@ public class RecurrenceEvent extends BaseEntity {
       String description,
       RecurrenceSchedule schedule,
       List<String> recurrenceRules,
-      Tag tag,
-      Account account) {
+      Long tagId,
+      Long accountId) {
     this.title = new RecurrenceEventTitle(title);
     this.description = description;
     replaceSchedule(schedule, recurrenceRules);
-    this.tag = tag;
-    this.account = account;
+    this.tagId = tagId;
+    this.accountId = accountId;
   }
 
   public void update(
@@ -74,14 +88,12 @@ public class RecurrenceEvent extends BaseEntity {
       String description,
       RecurrenceSchedule schedule,
       List<String> recurrenceRules,
-      Tag tag) {
-    this.title = new RecurrenceEventTitle(title);
-    this.description = description;
-    replaceSchedule(schedule, recurrenceRules);
-    this.tag = tag;
+      Long tagId) {
+    update(title, description, schedule, recurrenceRules);
+    this.tagId = tagId;
   }
 
-  public void updateProviderContent(
+  public void update(
       String title, String description, RecurrenceSchedule schedule, List<String> recurrenceRules) {
     this.title = new RecurrenceEventTitle(title);
     this.description = description;
@@ -125,11 +137,59 @@ public class RecurrenceEvent extends BaseEntity {
     return recurrenceRules;
   }
 
-  public Tag getTag() {
-    return tag;
+  public Long getTagId() {
+    return tagId;
   }
 
-  public Account getAccount() {
-    return account;
+  public Long getAccountId() {
+    return accountId;
+  }
+
+  public List<RecurrenceEventOverride> getOverrides() {
+    return List.copyOf(overrides);
+  }
+
+  public Optional<RecurrenceEventOverride> findOverride(Instant originStartAt) {
+    Objects.requireNonNull(originStartAt);
+    return overrides.stream()
+        .filter(override -> override.getOriginStartAt().equals(originStartAt))
+        .findFirst();
+  }
+
+  public void requireOccurrence(Instant originStartAt, Rfc5545RecurrenceEngine recurrenceEngine) {
+    if (findOverride(originStartAt).isPresent()) {
+      return;
+    }
+    if (!recurrenceEngine.containsOrigin(schedule, recurrenceRules, originStartAt)) {
+      throw new CalioException(ErrorCode.RECURRENCE_OCCURRENCE_NOT_FOUND);
+    }
+  }
+
+  public RecurrenceEventOverride changeOccurrence(
+      Instant originStartAt, String title, String description, CanonicalSchedule schedule) {
+    RecurrenceEventOverride changed =
+        RecurrenceEventOverride.active(originStartAt, title, description, schedule);
+    replaceOverride(changed);
+    return changed;
+  }
+
+  public RecurrenceEventOverride excludeOccurrence(Instant originStartAt, Instant deletedAt) {
+    RecurrenceEventOverride excluded = RecurrenceEventOverride.deleted(originStartAt, deletedAt);
+    replaceOverride(excluded);
+    return excluded;
+  }
+
+  private void replaceOverride(RecurrenceEventOverride replacement) {
+    for (int index = 0; index < overrides.size(); index++) {
+      if (overrides.get(index).getOriginStartAt().equals(replacement.getOriginStartAt())) {
+        overrides.set(index, replacement);
+        return;
+      }
+    }
+    overrides.add(replacement);
+  }
+
+  public void removeOverrides(Collection<Instant> originStartAts) {
+    overrides.removeIf(override -> originStartAts.contains(override.getOriginStartAt()));
   }
 }

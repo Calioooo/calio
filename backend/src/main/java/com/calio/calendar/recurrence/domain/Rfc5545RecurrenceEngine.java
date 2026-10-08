@@ -1,7 +1,5 @@
-package com.calio.calendar.recurrence.service;
+package com.calio.calendar.recurrence.domain;
 
-import com.calio.calendar.recurrence.domain.RecurrenceOccurrence;
-import com.calio.calendar.recurrence.domain.RecurrenceSchedule;
 import java.time.Instant;
 import java.util.List;
 

@@ -30,7 +30,6 @@ import com.calio.calendar.recurrence.domain.PersonalRecurrenceOccurrence;
 import com.calio.calendar.recurrence.domain.RecurrenceEvent;
 import com.calio.calendar.recurrence.domain.RecurrenceEventOverride;
 import com.calio.calendar.recurrence.domain.RecurrenceOccurrence;
-import com.calio.calendar.recurrence.repository.RecurrenceEventOverrideRepository;
 import com.calio.calendar.recurrence.repository.RecurrenceEventRepository;
 import com.calio.calendar.recurrence.service.PersonalRecurrenceOccurrenceResolver;
 import com.calio.calendar.singleevent.domain.SingleEvent;
@@ -63,7 +62,7 @@ public class SendDueCalendarNotificationsUseCase {
   private final AccountRepository accountRepository;
   private final SingleEventRepository eventRepository;
   private final RecurrenceEventRepository recurrenceEventRepository;
-  private final RecurrenceEventOverrideRepository recurrenceOverrideRepository;
+
   private final PersonalRecurrenceOccurrenceResolver personalRecurrenceOccurrenceResolver;
   private final GroupMemberRepository groupMemberRepository;
   private final GroupCalendarEventRepository groupCalendarEventRepository;
@@ -79,7 +78,6 @@ public class SendDueCalendarNotificationsUseCase {
       AccountRepository accountRepository,
       SingleEventRepository eventRepository,
       RecurrenceEventRepository recurrenceEventRepository,
-      RecurrenceEventOverrideRepository recurrenceOverrideRepository,
       PersonalRecurrenceOccurrenceResolver personalRecurrenceOccurrenceResolver,
       GroupMemberRepository groupMemberRepository,
       GroupCalendarEventRepository groupCalendarEventRepository,
@@ -93,7 +91,6 @@ public class SendDueCalendarNotificationsUseCase {
     this.accountRepository = accountRepository;
     this.eventRepository = eventRepository;
     this.recurrenceEventRepository = recurrenceEventRepository;
-    this.recurrenceOverrideRepository = recurrenceOverrideRepository;
     this.personalRecurrenceOccurrenceResolver = personalRecurrenceOccurrenceResolver;
     this.groupMemberRepository = groupMemberRepository;
     this.groupCalendarEventRepository = groupCalendarEventRepository;
@@ -184,7 +181,7 @@ public class SendDueCalendarNotificationsUseCase {
       return;
     }
     List<RecurrenceEventOverride> overrides =
-        recurrenceOverrideRepository.findByRecurrenceEvent_IdAndOriginStartAtIn(
+        recurrenceEventRepository.findOverridesByRecurrenceIdAndOriginStartAtIn(
             recurrenceEvent.getId(),
             occurrences.stream().map(RecurrenceOccurrence::originStartAt).toList());
     personalRecurrenceOccurrenceResolver
@@ -196,9 +193,7 @@ public class SendDueCalendarNotificationsUseCase {
       List<NotificationSchedule> schedules, Long accountId, Instant from, Instant to) {
     personalRecurrenceOccurrenceResolver
         .resolveMovedIn(
-            recurrenceOverrideRepository.findActiveOverlappingOverrides(accountId, from, to),
-            from,
-            to)
+            recurrenceEventRepository.findActiveOverlappingOverrides(accountId, from, to), from, to)
         .forEach(
             occurrence -> {
               if (schedules.stream().noneMatch(schedule -> schedule.matches(occurrence))) {

@@ -11,12 +11,19 @@ import static org.mockito.Mockito.when;
 import com.calio.calendar.aicalendar.domain.CalendarMutationOperation;
 import com.calio.calendar.aicalendar.domain.CalendarMutationScope;
 import com.calio.calendar.aicalendar.domain.CalendarMutationType;
+import com.calio.calendar.aicalendar.service.dto.CalendarMutationPreview;
 import com.calio.calendar.aicalendar.service.tool.dto.CalendarMutationToolRequest;
 import com.calio.calendar.common.error.CalioException;
 import com.calio.calendar.common.error.ErrorCode;
 import com.calio.calendar.recurrence.controller.dto.RecurrenceEventResponse;
 import com.calio.calendar.recurrence.controller.dto.UpdateRecurrenceOccurrenceRequest;
-import com.calio.calendar.recurrence.service.RecurrenceEventService;
+import com.calio.calendar.recurrence.usecase.CreateRecurrenceEventUseCase;
+import com.calio.calendar.recurrence.usecase.DeleteRecurrenceEventUseCase;
+import com.calio.calendar.recurrence.usecase.DeleteRecurrenceOccurrenceUseCase;
+import com.calio.calendar.recurrence.usecase.GetRecurrenceEventUseCase;
+import com.calio.calendar.recurrence.usecase.GetRecurrenceOccurrenceUseCase;
+import com.calio.calendar.recurrence.usecase.UpdateRecurrenceEventUseCase;
+import com.calio.calendar.recurrence.usecase.UpdateRecurrenceOccurrenceUseCase;
 import com.calio.calendar.singleevent.controller.dto.CreateSingleEventRequest;
 import com.calio.calendar.singleevent.controller.dto.EventResponse;
 import com.calio.calendar.singleevent.controller.dto.UpdateSingleEventRequest;
@@ -47,7 +54,13 @@ class CalendarMutationServiceTest {
 
   @Mock private DeleteSingleEventUseCase deleteEventUseCase;
 
-  @Mock private RecurrenceEventService recurrenceEventService;
+  @Mock private CreateRecurrenceEventUseCase createRecurrenceEvent;
+  @Mock private GetRecurrenceEventUseCase getRecurrenceEvent;
+  @Mock private GetRecurrenceOccurrenceUseCase getRecurrenceOccurrence;
+  @Mock private UpdateRecurrenceEventUseCase updateRecurrenceEvent;
+  @Mock private UpdateRecurrenceOccurrenceUseCase updateRecurrenceOccurrence;
+  @Mock private DeleteRecurrenceEventUseCase deleteRecurrenceEvent;
+  @Mock private DeleteRecurrenceOccurrenceUseCase deleteRecurrenceOccurrence;
 
   @Mock private TagRepository tagRepository;
 
@@ -56,16 +69,13 @@ class CalendarMutationServiceTest {
   @Test
   @DisplayName("일정 수정 Preview는 기존 일정을 조회하지만 실제 수정은 실행하지 않는다")
   void givenEventUpdate_whenPreview_thenReturnsBeforeAndAfterWithoutChangingEvent() {
-    // given
     EventResponse existingEvent = event("기존 회의", Instant.parse("2026-08-21T05:00:00Z"));
     when(getEventUseCase.get(1L, 10L)).thenReturn(existingEvent);
     when(tagRepository.findPersonalDefaultTagById(1L))
         .thenReturn(Optional.of(Tag.personalDefault("업무", "#64748B")));
 
-    // when
-    var preview = service().preview(1L, updateRequest());
+    CalendarMutationPreview preview = service().preview(1L, updateRequest());
 
-    // then
     assertThat(preview.type()).isEqualTo(CalendarMutationType.UPDATE);
     assertThat(preview.scope()).isEqualTo(CalendarMutationScope.EVENT);
     assertThat(preview.before()).isEqualTo(existingEvent);
@@ -77,16 +87,13 @@ class CalendarMutationServiceTest {
   @Test
   @DisplayName("확정된 일정 수정은 변경된 일정 응답을 반환한다")
   void givenConfirmedEventUpdate_whenApply_thenReturnsUpdatedEvent() {
-    // given
     when(getEventUseCase.get(1L, 10L))
         .thenReturn(event("기존 회의", Instant.parse("2026-08-21T05:00:00Z")));
     EventResponse updatedEvent = event("변경 회의", Instant.parse("2026-08-21T06:00:00Z"));
     when(updateEventUseCase.update(eq(1L), eq(10L), any())).thenReturn(updatedEvent);
 
-    // when
     List<EventResponse> result = service().apply(1L, updateRequest());
 
-    // then
     assertThat(result).containsExactly(updatedEvent);
     ArgumentCaptor<UpdateSingleEventRequest> requestCaptor =
         ArgumentCaptor.forClass(UpdateSingleEventRequest.class);
@@ -98,14 +105,11 @@ class CalendarMutationServiceTest {
   @Test
   @DisplayName("일정 생성 Preview는 생성하지 않고 생성될 일정을 반환한다")
   void givenEventCreation_whenPreview_thenReturnsAfterWithoutCreatingEvent() {
-    // given
     when(tagRepository.findPersonalDefaultTagById(1L))
         .thenReturn(Optional.of(Tag.personalDefault("업무", "#64748B")));
 
-    // when
-    var preview = service().preview(1L, createRequest());
+    CalendarMutationPreview preview = service().preview(1L, createRequest());
 
-    // then
     assertThat(preview.type()).isEqualTo(CalendarMutationType.CREATE);
     assertThat(preview.scope()).isEqualTo(CalendarMutationScope.EVENT);
     assertThat(preview.before()).isNull();
@@ -116,14 +120,11 @@ class CalendarMutationServiceTest {
   @Test
   @DisplayName("확정된 일정 생성은 생성된 일정 응답을 반환한다")
   void givenConfirmedEventCreation_whenApply_thenReturnsCreatedEvent() {
-    // given
     EventResponse createdEvent = event("새 회의", Instant.parse("2026-08-22T05:00:00Z"));
     when(createEventUseCase.create(eq(1L), any())).thenReturn(createdEvent);
 
-    // when
     List<EventResponse> result = service().apply(1L, createRequest());
 
-    // then
     assertThat(result).containsExactly(createdEvent);
     ArgumentCaptor<CreateSingleEventRequest> requestCaptor =
         ArgumentCaptor.forClass(CreateSingleEventRequest.class);
@@ -175,7 +176,7 @@ class CalendarMutationServiceTest {
     when(tagRepository.findPersonalDefaultTagById(1L))
         .thenReturn(Optional.of(Tag.personalDefault("업무", "#64748B")));
 
-    var preview = service().preview(1L, request);
+    CalendarMutationPreview preview = service().preview(1L, request);
 
     assertThat(preview.after().title()).isEqualTo("😀".repeat(80));
   }
@@ -183,14 +184,11 @@ class CalendarMutationServiceTest {
   @Test
   @DisplayName("일정 삭제 Preview는 삭제하지 않고 삭제될 일정을 반환한다")
   void givenEventDeletion_whenPreview_thenReturnsBeforeWithoutDeletingEvent() {
-    // given
     EventResponse existingEvent = event("기존 회의", Instant.parse("2026-08-21T05:00:00Z"));
     when(getEventUseCase.get(1L, 10L)).thenReturn(existingEvent);
 
-    // when
-    var preview = service().preview(1L, deleteRequest());
+    CalendarMutationPreview preview = service().preview(1L, deleteRequest());
 
-    // then
     assertThat(preview.type()).isEqualTo(CalendarMutationType.DELETE);
     assertThat(preview.scope()).isEqualTo(CalendarMutationScope.EVENT);
     assertThat(preview.before()).isEqualTo(existingEvent);
@@ -201,10 +199,8 @@ class CalendarMutationServiceTest {
   @Test
   @DisplayName("확정된 일정 삭제는 빈 결과를 반환한다")
   void givenConfirmedEventDeletion_whenApply_thenReturnsEmptyResult() {
-    // when
     List<EventResponse> result = service().apply(1L, deleteRequest());
 
-    // then
     assertThat(result).isEmpty();
     verify(deleteEventUseCase).delete(1L, 10L);
   }
@@ -275,10 +271,8 @@ class CalendarMutationServiceTest {
   @Test
   @DisplayName("존재하지 않는 일정의 변경 Preview는 event not found를 전파한다")
   void givenMissingEvent_whenPreviewUpdate_thenPropagatesEventNotFound() {
-    // given
     when(getEventUseCase.get(1L, 10L)).thenThrow(new CalioException(ErrorCode.EVENT_NOT_FOUND));
 
-    // when, then
     assertThatThrownBy(() -> service().preview(1L, updateRequest()))
         .isInstanceOf(CalioException.class)
         .extracting(exception -> ((CalioException) exception).getErrorCode())
@@ -286,32 +280,28 @@ class CalendarMutationServiceTest {
   }
 
   @Test
-  @DisplayName("확정된 반복 회차 수정은 기존 RecurrenceEventService 수정 유스케이스를 호출한다")
+  @DisplayName("확정된 반복 회차 수정은 해당 수정 유스케이스를 호출한다")
   void
       givenConfirmedRecurrenceOccurrenceUpdate_whenApply_thenDelegatesToExistingRecurrenceService() {
-    // given
     EventResponse existingOccurrence =
         recurrenceOccurrence("기존 회의", Instant.parse("2026-08-21T05:00:00Z"));
     EventResponse updatedOccurrence =
         recurrenceOccurrence("변경 회의", Instant.parse("2026-08-21T06:00:00Z"));
-    when(recurrenceEventService.getRecurrenceOccurrence(
-            1L, 20L, Instant.parse("2026-08-21T05:00:00Z")))
+    when(getRecurrenceOccurrence.get(1L, 20L, Instant.parse("2026-08-21T05:00:00Z")))
         .thenReturn(existingOccurrence);
-    when(recurrenceEventService.updateRecurrenceOccurrence(
+    when(updateRecurrenceOccurrence.update(
             org.mockito.ArgumentMatchers.eq(1L),
             org.mockito.ArgumentMatchers.eq(20L),
             org.mockito.ArgumentMatchers.any()))
         .thenReturn(updatedOccurrence);
 
-    // when
     List<EventResponse> result = service().apply(1L, occurrenceUpdateRequest());
 
-    // then
     assertThat(result).containsExactly(updatedOccurrence);
     ArgumentCaptor<UpdateRecurrenceOccurrenceRequest> requestCaptor =
         ArgumentCaptor.forClass(UpdateRecurrenceOccurrenceRequest.class);
-    verify(recurrenceEventService)
-        .updateRecurrenceOccurrence(
+    verify(updateRecurrenceOccurrence)
+        .update(
             org.mockito.ArgumentMatchers.eq(1L),
             org.mockito.ArgumentMatchers.eq(20L),
             requestCaptor.capture());
@@ -323,11 +313,9 @@ class CalendarMutationServiceTest {
   @Test
   @DisplayName("반복 회차 태그 변경 Preview는 지원하지 않는 변경 오류를 반환한다")
   void givenOccurrenceTagChange_whenPreview_thenRejectsUnsupportedChange() {
-    // given
     EventResponse existingOccurrence =
         recurrenceOccurrence("기존 회의", Instant.parse("2026-08-21T05:00:00Z"));
-    when(recurrenceEventService.getRecurrenceOccurrence(
-            1L, 20L, Instant.parse("2026-08-21T05:00:00Z")))
+    when(getRecurrenceOccurrence.get(1L, 20L, Instant.parse("2026-08-21T05:00:00Z")))
         .thenReturn(existingOccurrence);
     CalendarMutationToolRequest request =
         new CalendarMutationToolRequest(
@@ -344,7 +332,6 @@ class CalendarMutationServiceTest {
             99L,
             null);
 
-    // when, then
     assertThatThrownBy(() -> service().preview(1L, request))
         .isInstanceOf(CalioException.class)
         .extracting(exception -> ((CalioException) exception).getErrorCode())
@@ -354,32 +341,26 @@ class CalendarMutationServiceTest {
   @Test
   @DisplayName("확정된 반복 회차 삭제는 원래 회차 시작 시각으로 삭제 유스케이스를 호출한다")
   void givenConfirmedRecurrenceOccurrenceDeletion_whenApply_thenDelegatesToRecurrenceService() {
-    // given
     Instant originStartAt = Instant.parse("2026-08-21T05:00:00Z");
 
-    // when
     List<EventResponse> result = service().apply(1L, occurrenceDeletionRequest(20L, originStartAt));
 
-    // then
     assertThat(result).isEmpty();
-    verify(recurrenceEventService).deleteRecurrenceOccurrence(1L, 20L, originStartAt);
+    verify(deleteRecurrenceOccurrence).delete(1L, 20L, originStartAt);
   }
 
   @Test
   @DisplayName("확정된 전체 반복 일정 삭제는 시리즈 삭제 유스케이스를 호출한다")
   void givenConfirmedRecurrenceSeriesDeletion_whenApply_thenDelegatesToRecurrenceService() {
-    // when
     List<EventResponse> result = service().apply(1L, seriesDeletionRequest(20L));
 
-    // then
     assertThat(result).isEmpty();
-    verify(recurrenceEventService).deleteRecurrenceEvent(1L, 20L);
+    verify(deleteRecurrenceEvent).delete(1L, 20L);
   }
 
   @Test
   @DisplayName("반복 회차 작업에 recurrenceId 또는 originStartAt이 없으면 거절한다")
   void givenMissingOccurrenceIdentifier_whenPreview_thenRejectsValidationFailure() {
-    // when, then
     assertThatThrownBy(
             () ->
                 service()
@@ -397,7 +378,6 @@ class CalendarMutationServiceTest {
   @Test
   @DisplayName("전체 반복 일정 작업에 recurrenceId가 없으면 거절한다")
   void givenMissingSeriesIdentifier_whenPreview_thenRejectsValidationFailure() {
-    // when, then
     assertThatThrownBy(() -> service().preview(1L, seriesDeletionRequest(null)))
         .isInstanceOf(CalioException.class)
         .extracting(exception -> ((CalioException) exception).getErrorCode())
@@ -407,12 +387,10 @@ class CalendarMutationServiceTest {
   @Test
   @DisplayName("존재하지 않는 반복 회차는 Preview에서 not-found 오류를 유지한다")
   void givenUnknownOccurrence_whenPreview_thenPropagatesNotFoundError() {
-    // given
     Instant originStartAt = Instant.parse("2026-08-21T05:00:00Z");
-    when(recurrenceEventService.getRecurrenceOccurrence(1L, 20L, originStartAt))
+    when(getRecurrenceOccurrence.get(1L, 20L, originStartAt))
         .thenThrow(new CalioException(ErrorCode.RECURRENCE_OCCURRENCE_NOT_FOUND));
 
-    // when, then
     assertThatThrownBy(() -> service().preview(1L, occurrenceDeletionRequest(20L, originStartAt)))
         .isInstanceOf(CalioException.class)
         .extracting(exception -> ((CalioException) exception).getErrorCode())
@@ -422,7 +400,6 @@ class CalendarMutationServiceTest {
   @Test
   @DisplayName("전체 반복 일정 수정 Preview는 변경 전후 recurrence rule을 함께 반환한다")
   void givenSeriesRuleChange_whenPreview_thenIncludesBeforeAndAfterRules() {
-    // given
     RecurrenceEventResponse existingSeries =
         new RecurrenceEventResponse(
             20L,
@@ -436,7 +413,7 @@ class CalendarMutationServiceTest {
             null,
             Instant.parse("2026-08-01T00:00:00Z"),
             Instant.parse("2026-08-01T00:00:00Z"));
-    when(recurrenceEventService.getRecurrenceEvent(1L, 20L)).thenReturn(existingSeries);
+    when(getRecurrenceEvent.get(1L, 20L)).thenReturn(existingSeries);
     CalendarMutationToolRequest request =
         new CalendarMutationToolRequest(
             CalendarMutationOperation.UPDATE_RECURRENCE_SERIES,
@@ -452,10 +429,8 @@ class CalendarMutationServiceTest {
             null,
             List.of("RRULE:FREQ=DAILY"));
 
-    // when
-    var preview = service().preview(1L, request);
+    CalendarMutationPreview preview = service().preview(1L, request);
 
-    // then
     assertThat(preview.scope()).isEqualTo(CalendarMutationScope.ENTIRE_SERIES);
     assertThat(preview.recurrence().before()).containsExactly("RRULE:FREQ=WEEKLY;BYDAY=FR");
     assertThat(preview.recurrence().after()).containsExactly("RRULE:FREQ=DAILY");
@@ -464,26 +439,21 @@ class CalendarMutationServiceTest {
   @Test
   @DisplayName("전체 반복 일정 수정에서 recurrence rule을 생략하면 기존 규칙을 유지한다")
   void givenOmittedSeriesRules_whenPreview_thenPreservesExistingRules() {
-    // given
     RecurrenceEventResponse existingSeries = recurrenceSeries();
-    when(recurrenceEventService.getRecurrenceEvent(1L, 20L)).thenReturn(existingSeries);
+    when(getRecurrenceEvent.get(1L, 20L)).thenReturn(existingSeries);
     CalendarMutationToolRequest request = seriesUpdateRequest(null);
 
-    // when
-    var preview = service().preview(1L, request);
+    CalendarMutationPreview preview = service().preview(1L, request);
 
-    // then
     assertThat(preview.recurrence().after()).containsExactlyElementsOf(existingSeries.recurrence());
   }
 
   @Test
   @DisplayName("전체 반복 일정 수정에서 빈 recurrence rule은 Preview와 적용 모두 거절한다")
   void givenEmptySeriesRules_whenPreviewOrApply_thenRejectsValidationFailure() {
-    // given
-    when(recurrenceEventService.getRecurrenceEvent(1L, 20L)).thenReturn(recurrenceSeries());
+    when(getRecurrenceEvent.get(1L, 20L)).thenReturn(recurrenceSeries());
     CalendarMutationToolRequest request = seriesUpdateRequest(List.of());
 
-    // when, then
     assertThatThrownBy(() -> service().preview(1L, request))
         .isInstanceOf(CalioException.class)
         .extracting(exception -> ((CalioException) exception).getErrorCode())
@@ -500,7 +470,13 @@ class CalendarMutationServiceTest {
         getEventUseCase,
         updateEventUseCase,
         deleteEventUseCase,
-        recurrenceEventService,
+        createRecurrenceEvent,
+        getRecurrenceEvent,
+        getRecurrenceOccurrence,
+        updateRecurrenceEvent,
+        updateRecurrenceOccurrence,
+        deleteRecurrenceEvent,
+        deleteRecurrenceOccurrence,
         tagRepository,
         aiMutationPolicy);
   }
