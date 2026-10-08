@@ -74,11 +74,4 @@ public interface RecurrenceEventRepository extends JpaRepository<RecurrenceEvent
       """)
   List<RecurrenceOverrideView> findActiveOverlappingOverrides(
       @Param("accountId") Long accountId, @Param("from") Instant from, @Param("to") Instant to);
-
-  @Query("select override from RecurrenceEvent event join event.overrides override")
-  List<RecurrenceEventOverride> findAllOverrides();
-
-  @Query(
-      "select count(override.originStartAt) from RecurrenceEvent event join event.overrides override")
-  long countOverrides();
 }

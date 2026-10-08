@@ -36,6 +36,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import tools.jackson.databind.JsonNode;
@@ -53,6 +54,8 @@ import tools.jackson.databind.ObjectMapper;
 @WithAuthenticatedAccount
 @Import(AuthenticatedAccountMockMvcTestConfig.class)
 class RecurrenceEventControllerTest {
+
+  @Autowired private JdbcTemplate jdbcTemplate;
 
   @Autowired private MockMvc mockMvc;
 
@@ -706,7 +709,8 @@ class RecurrenceEventControllerTest {
   void givenUnknownOriginStartAt_whenPatchOccurrence_thenReturnsOccurrenceNotFound()
       throws Exception {
     long recurrenceId = createTimedRecurrence("Origin", "2027-02-01", "UTC");
-    long overrideCount = recurrenceEventRepository.countOverrides();
+    long overrideCount =
+        jdbcTemplate.queryForObject("select count(*) from recurrence_event_overrides", Long.class);
 
     mockMvc
         .perform(
@@ -733,7 +737,10 @@ class RecurrenceEventControllerTest {
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.title").value("RECURRENCE_OCCURRENCE_NOT_FOUND"));
 
-    assertThat(recurrenceEventRepository.countOverrides()).isEqualTo(overrideCount);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from recurrence_event_overrides", Long.class))
+        .isEqualTo(overrideCount);
   }
 
   @Test

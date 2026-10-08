@@ -54,6 +54,7 @@ import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -69,6 +70,8 @@ class GoogleCalendarPageChangeServiceTest {
 
   private static final GoogleCalendarPageOwnership PAGE_OWNERSHIP =
       new GoogleCalendarPageOwnership(1L, "test-worker-token");
+
+  @Autowired private JdbcTemplate jdbcTemplate;
 
   @Autowired private GoogleCalendarPageChangeService pagePersistenceService;
 
@@ -531,7 +534,8 @@ class GoogleCalendarPageChangeServiceTest {
               assertThat(recurrence.getTagId()).isEqualTo(defaultTag.getId());
               assertThat(recurrence.getRecurrenceRules()).containsExactly("RRULE:FREQ=WEEKLY");
             });
-    assertThat(recurrenceEventRepository.findAllOverrides())
+    assertThat(recurrenceEventRepository.findAll())
+        .flatExtracting(RecurrenceEvent::getOverrides)
         .singleElement()
         .satisfies(
             override -> {
@@ -676,7 +680,10 @@ class GoogleCalendarPageChangeServiceTest {
             exception ->
                 assertThat(exception.getErrorCode())
                     .isEqualTo(ErrorCode.GOOGLE_CALENDAR_EVENT_RESPONSE_INVALID));
-    assertThat(recurrenceEventRepository.countOverrides()).isOne();
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from recurrence_event_overrides", Long.class))
+        .isOne();
     assertThat(recurrenceOverrideMappingRepository.findAll())
         .singleElement()
         .satisfies(
@@ -738,7 +745,10 @@ class GoogleCalendarPageChangeServiceTest {
     assertThat(recurrenceEventMappingRepository.count()).isZero();
     assertThat(recurrenceOverrideMappingRepository.count()).isZero();
     assertThat(recurrenceEventRepository.count()).isZero();
-    assertThat(recurrenceEventRepository.countOverrides()).isZero();
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from recurrence_event_overrides", Long.class))
+        .isZero();
   }
 
   @Test
@@ -890,7 +900,10 @@ class GoogleCalendarPageChangeServiceTest {
     assertThat(recurrenceOverrideMappingRepository.count()).isZero();
     assertThat(eventRepository.count()).isZero();
     assertThat(recurrenceEventRepository.count()).isZero();
-    assertThat(recurrenceEventRepository.countOverrides()).isZero();
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from recurrence_event_overrides", Long.class))
+        .isZero();
     assertThat(connectionRepository.findById(integration.getId()))
         .get()
         .satisfies(
